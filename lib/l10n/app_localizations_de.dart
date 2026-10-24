@@ -938,4 +938,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get typeInstead => 'Lieber tippen';
+
+  @override
+  String get widgetNothingToday => 'Heute steht nichts an.';
+
+  @override
+  String widgetMore(String count) {
+    return 'und $count weitere';
+  }
 }

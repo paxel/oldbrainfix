@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:oldbrainfix/src/agenda_widget.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -121,6 +122,28 @@ class FakeAlarms implements AlarmPlatform {
   Future<bool> nudgeOpened() async {
     final tapped = _nudgeTapped;
     _nudgeTapped = false;
+    return tapped;
+  }
+
+  /// The Agenda widget's snapshots, in the order they were handed over.
+  final agendas = <AgendaSnapshot>[];
+
+  @override
+  Future<void> showAgenda(AgendaSnapshot snapshot) async =>
+      agendas.add(snapshot);
+
+  var _unsortedTapped = false;
+
+  /// The Agenda widget's Unsorted count is tapped while the app runs.
+  void tapUnsorted() {
+    _unsortedTapped = true;
+    _actions.add(null);
+  }
+
+  @override
+  Future<bool> unsortedOpened() async {
+    final tapped = _unsortedTapped;
+    _unsortedTapped = false;
     return tapped;
   }
 

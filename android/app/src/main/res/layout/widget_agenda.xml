@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Agenda widget: the heading, the Unsorted count, today's
+     Occurrences (added as widget_agenda_row by AgendaWidget) and how many
+     more there are. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/agenda"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_agenda_background"
+    android:orientation="vertical"
+    android:padding="8dp">
+    <TextView
+        android:id="@+id/agenda_heading"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:text="@string/agenda_widget"
+        android:textColor="@color/agenda_widget_text"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+    <TextView
+        android:id="@+id/agenda_unsorted"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/widget_agenda_row_background"
+        android:drawableEnd="@drawable/ic_widget_unsorted"
+        android:gravity="center_vertical"
+        android:minHeight="32dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp"
+        android:textColor="@color/agenda_widget_accent"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+    <LinearLayout
+        android:id="@+id/agenda_rows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+    <TextView
+        android:id="@+id/agenda_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="@string/agenda_widget_open_app"
+        android:textColor="@color/agenda_widget_text_dim"
+        android:textSize="14sp" />
+    <TextView
+        android:id="@+id/agenda_more"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:textColor="@color/agenda_widget_text_dim"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>

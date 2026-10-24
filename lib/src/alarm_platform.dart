@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'agenda_widget.dart';
+
 /// The access alarms need (ADR 0004), each granted by the user.
 enum AlarmPermission {
   /// Showing notifications at all.
@@ -191,6 +193,13 @@ abstract interface class AlarmPlatform {
   /// asked; asking clears it.
   Future<bool> nudgeOpened();
 
+  /// Hands the home-screen Agenda widget what it shows from now on.
+  Future<void> showAgenda(AgendaSnapshot snapshot);
+
+  /// Whether the Agenda widget's Unsorted count was tapped since this
+  /// was last asked; asking clears it.
+  Future<bool> unsortedOpened();
+
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
 
@@ -232,6 +241,12 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<bool> nudgeOpened() async => false;
+
+  @override
+  Future<void> showAgenda(AgendaSnapshot snapshot) async {}
+
+  @override
+  Future<bool> unsortedOpened() async => false;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -341,6 +356,14 @@ class AndroidAlarms implements AlarmPlatform {
   @override
   Future<bool> nudgeOpened() async =>
       await _channel.invokeMethod<bool>('nudgeOpened') ?? false;
+
+  @override
+  Future<void> showAgenda(AgendaSnapshot snapshot) =>
+      _channel.invokeMethod('agenda', snapshot.toMap());
+
+  @override
+  Future<bool> unsortedOpened() async =>
+      await _channel.invokeMethod<bool>('unsortedOpened') ?? false;
 
   @override
   Future<List<AlarmAction>> pendingActions() async {

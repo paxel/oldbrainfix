@@ -42,6 +42,7 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
+        if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
         }
@@ -49,14 +50,18 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm or the Nudge opened the running app: the app
-     * shows it.
+     * The full-screen alarm, the Nudge or the Agenda widget's Unsorted
+     * count opened the running app: the app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_NUDGE, false)) {
             nudgeOpened = true
+            actionsArrived()
+        }
+        if (opensUnsorted(intent)) {
+            unsortedOpened = true
             actionsArrived()
         }
         // Something was shared in while the app runs: it takes it now.
@@ -212,6 +217,14 @@ class MainActivity : FlutterActivity() {
                         result.success(nudgeOpened)
                         nudgeOpened = false
                     }
+                    "agenda" -> {
+                        AgendaWidget.replace(this@MainActivity, json(call.arguments) as JSONObject)
+                        result.success(null)
+                    }
+                    "unsortedOpened" -> {
+                        result.success(unsortedOpened)
+                        unsortedOpened = false
+                    }
                     "permissions" -> result.success(Permissions.granted(this@MainActivity))
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
@@ -345,6 +358,14 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Whether [intent] is the Agenda widget's Unsorted count, not a
+     * reopening from the recent apps with it.
+     */
+    private fun opensUnsorted(intent: Intent?): Boolean =
+        intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
+            intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
+
     /** Channel arguments (maps, lists, numbers) as org.json values. */
     private fun json(value: Any?): Any? = when (value) {
         is Map<*, *> -> JSONObject().apply {
@@ -375,11 +396,17 @@ class MainActivity : FlutterActivity() {
         /** Marks the launch from the Nudge's notification. */
         const val EXTRA_NUDGE = "oldbrainfix.nudge"
 
+        /** Marks the launch from the Agenda widget's Unsorted count. */
+        const val EXTRA_UNSORTED = "oldbrainfix.unsorted"
+
         /** Marks the launch by a share from another app ([ShareActivity]). */
         const val EXTRA_SHARED = "oldbrainfix.shared"
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false
+
+        /** The Agenda widget's Unsorted count was tapped and the app has not shown the list yet. */
+        private var unsortedOpened = false
 
         /** The capture screen an entry point asked for and the app has not opened yet. */
         private var captureRequested: String? = null

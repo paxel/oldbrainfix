@@ -1,20 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_widget.dart';
 import 'alarm_platform.dart';
 import 'schedule_text.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
-/// start, on every change to the log, and whenever the app comes back.
+/// start, on every change to the log, and whenever the app comes back;
+/// the home-screen Agenda widget's snapshot goes along with them.
 /// Before each full sync it applies what was tapped on notifications
 /// meanwhile, so a Done reaches the log even when it was tapped while
 /// the app was not running. Tells its listeners when taps were applied,
 /// the granted permissions changed, Escalation was turned on or off
 /// anywhere, a full-screen alarm started or stopped, or the Nudge's
-/// notification was tapped.
+/// notification or the Agenda widget's Unsorted count was tapped.
 class AlarmSync extends ChangeNotifier {
   /// The permissions whose absence the red banner always shows; the
   /// full-screen one counts as well while any Routine escalates.
@@ -38,10 +41,14 @@ class AlarmSync extends ChangeNotifier {
   /// What was handed to the platform last, to skip handing it again.
   String? _lastArmed;
 
+  /// The Agenda widget's snapshot handed over last, likewise.
+  String? _lastShown;
+
   /// Whether any Routine escalates, as of the last arming.
   var _escalating = false;
   Ringing? _ringing;
   var _nudgeOpened = false;
+  var _unsortedOpened = false;
 
   AlarmSync({
     required this.store,
@@ -90,6 +97,14 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// Whether the Agenda widget's Unsorted count was tapped and the
+  /// Unsorted list is still to show; taking it clears it.
+  bool takeUnsortedOpened() {
+    final opened = _unsortedOpened;
+    _unsortedOpened = false;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -116,8 +131,10 @@ class AlarmSync extends ChangeNotifier {
     final granted = await platform.permissions();
     final ringing = await platform.ringing();
     final nudgeOpened = await platform.nudgeOpened();
+    final unsortedOpened = await platform.unsortedOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
+    if (unsortedOpened) _unsortedOpened = true;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -134,7 +151,8 @@ class AlarmSync extends ChangeNotifier {
         (actions.isNotEmpty ||
             permissionsChanged ||
             ringingChanged ||
-            nudgeOpened)) {
+            nudgeOpened ||
+            unsortedOpened)) {
       notifyListeners();
     }
   });
@@ -189,6 +207,7 @@ class AlarmSync extends ChangeNotifier {
       for (final (routine, occurrence) in done) 'done $routine@$occurrence',
       if (nudge != null) '${nudge.nudge}|${nudge.title}|${nudge.body}',
     ].join('\n');
+    await _show(t, force: force);
     if (!force && signature == _lastArmed) return;
     _lastArmed = signature;
     await platform.arm(
@@ -212,6 +231,17 @@ class AlarmSync extends ChangeNotifier {
       done: done,
       nudge: nudge,
     );
+  }
+
+  /// Hands the Agenda widget its snapshot when it changed: the
+  /// Unsorted count, a Note's text or a Done change it without changing
+  /// the alarms.
+  Future<void> _show(AppLocalizations t, {required bool force}) async {
+    final snapshot = AgendaSnapshot.of(store, wallClock, t, _locale);
+    final signature = jsonEncode(snapshot.toMap());
+    if (!force && signature == _lastShown) return;
+    _lastShown = signature;
+    await platform.showAgenda(snapshot);
   }
 
   /// The first line of a Note's text, or null when there is none.

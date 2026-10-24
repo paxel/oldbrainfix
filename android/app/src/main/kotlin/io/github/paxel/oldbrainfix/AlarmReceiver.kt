@@ -5,7 +5,8 @@ import android.content.Context
 import android.content.Intent
 
 /**
- * The armed alarm firing, and Done and Snooze tapped on a notification.
+ * The armed alarm firing, and Done and Snooze tapped on a notification
+ * (Done also from the Agenda widget).
  * A tap is queued for the app (it applies it to the log on its next
  * start or at once while it runs) and takes effect on the alarms right
  * away: what is Done no longer rings, a snooze rings again. Either stops
@@ -68,6 +69,8 @@ class AlarmReceiver : BroadcastReceiver() {
             RingService.stop(alarm.routine, alarm.occurrence)
             Notifications.cancel(context, alarm)
             Scheduler.arm(context)
+            // A Done shows in the Agenda widget before the app applies it.
+            AgendaWidget.update(context)
             MainActivity.actionsArrived()
         }
 

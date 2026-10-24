@@ -2,4 +2,11 @@
 <resources>
     <!-- The app's teal accent (lib/src/look.dart). -->
     <color name="capture_teal">#FF00796B</color>
+    <!-- The Agenda widget in the app's light look; values-night has the
+         dark one. -->
+    <color name="agenda_widget_background">#FFCDE8E4</color>
+    <color name="agenda_widget_card">#FFF8FCFB</color>
+    <color name="agenda_widget_text">#FF1B1F1E</color>
+    <color name="agenda_widget_text_dim">#FF5F6B69</color>
+    <color name="agenda_widget_accent">#FF00796B</color>
 </resources>

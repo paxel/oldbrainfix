@@ -161,8 +161,9 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
 /// The Starter Set on this Device's first start, then the alarm setup
 /// where there are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
-/// one rings, and the Nudge screen when the Nudge's notification was
-/// tapped.
+/// one rings, the Nudge screen when the Nudge's notification was
+/// tapped, and the Unsorted list when the Agenda widget's Unsorted
+/// count was.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -199,6 +200,7 @@ class _HomeState extends State<_Home> {
     super.initState();
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
+    widget.alarms.addListener(_unsortedOpened);
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
     // way out as well, so a changed Device setting (the Re-nag interval)
@@ -222,6 +224,7 @@ class _HomeState extends State<_Home> {
   void dispose() {
     widget.alarms.removeListener(_ringChanged);
     widget.alarms.removeListener(_nudgeOpened);
+    widget.alarms.removeListener(_unsortedOpened);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -259,6 +262,15 @@ class _HomeState extends State<_Home> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Opens the Unsorted list when the Agenda widget's Unsorted count
+  /// was tapped.
+  void _unsortedOpened() {
+    if (!mounted || !widget.alarms.takeUnsortedOpened()) return;
+    unawaited(
+      openUnsorted(context, widget.notes, widget.places, widget.alarms),
     );
   }
 

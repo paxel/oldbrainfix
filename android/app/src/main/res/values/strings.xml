@@ -11,4 +11,7 @@
     <string name="capture_photo">Photo note</string>
     <string name="capture_all">Voice, text, photo</string>
     <string name="capture_widget_description">Opens Capture with one tap.</string>
+    <string name="agenda_widget">Agenda</string>
+    <string name="agenda_widget_description">Today\'s Routines and Reminders to check off, and what is Unsorted.</string>
+    <string name="agenda_widget_open_app">Open Old Brain Fix to see what\'s due today.</string>
 </resources>

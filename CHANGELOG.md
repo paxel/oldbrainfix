@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Record a voice Note that starts at once and ends with one big stop button; the recording is kept to play back.
 - Share images, text and links from other apps into a new Unsorted Note.
 - App shortcuts, Quick Settings tiles and home-screen widgets that open voice, text or photo capture directly, also for hardware buttons.
+- An Agenda home-screen widget that lists today's Routines and Reminders to check off, with the Unsorted count.
 - English and German.
 - Light teal and anthracite dark themes that follow the system.
 - Notes as embossed cards over a background of hand-drawn question marks that drift slowly while scrolling.

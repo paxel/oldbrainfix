@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One Occurrence's card in the Agenda widget, above the background. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/agenda_widget_card" />
+    <corners android:radius="12dp" />
+</shape>

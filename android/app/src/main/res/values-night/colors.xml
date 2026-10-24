@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The Agenda widget in the app's anthracite dark look. -->
+    <color name="agenda_widget_background">#FF26292C</color>
+    <color name="agenda_widget_card">#FF3E454A</color>
+    <color name="agenda_widget_text">#FFECEFEE</color>
+    <color name="agenda_widget_text_dim">#FFA9B3B1</color>
+    <color name="agenda_widget_accent">#FF4DB6AC</color>
+</resources>

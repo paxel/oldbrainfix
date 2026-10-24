@@ -933,4 +933,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get typeInstead => 'Type instead';
+
+  @override
+  String get widgetNothingToday => 'Nothing due today.';
+
+  @override
+  String widgetMore(String count) {
+    return 'and $count more';
+  }
 }

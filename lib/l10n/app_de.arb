@@ -240,5 +240,7 @@
   "microphoneExplainTitle": "Mikrofon verwenden?",
   "microphoneExplainBody": "Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.",
   "microphoneMissing": "Sprachnotizen brauchen das Mikrofon.",
-  "typeInstead": "Lieber tippen"
+  "typeInstead": "Lieber tippen",
+  "widgetNothingToday": "Heute steht nichts an.",
+  "widgetMore": "und {count} weitere"
 }

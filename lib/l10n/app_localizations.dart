@@ -1543,6 +1543,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Type instead'**
   String get typeInstead;
+
+  /// No description provided for @widgetNothingToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing due today.'**
+  String get widgetNothingToday;
+
+  /// No description provided for @widgetMore.
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String widgetMore(String count);
 }
 
 class _AppLocalizationsDelegate

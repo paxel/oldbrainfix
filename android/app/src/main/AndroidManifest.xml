@@ -188,6 +188,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_capture_bar" />
         </receiver>
+        <!-- The Agenda widget: today's Occurrences to check off and the
+             Unsorted count. It shows what the app hands over and queues a
+             Done like a notification's. -->
+        <receiver
+            android:name=".AgendaWidget"
+            android:label="@string/agenda_widget"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_agenda" />
+        </receiver>
         <!-- Lets the camera app write the photo being taken, and nothing
              else. -->
         <provider
