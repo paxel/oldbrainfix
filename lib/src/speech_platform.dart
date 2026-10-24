@@ -477,6 +477,8 @@ class _TranscriptTextState extends State<TranscriptText> {
     _transcriber?.removeListener(_changed);
     _transcriber = transcriber?..addListener(_changed);
     _transcribing = transcriber?.current == widget.hash;
+    // Written since the Note was read: a lazy list builds this late.
+    _text ??= transcriber?.transcriptOf(widget.noteId, widget.hash);
   }
 
   @override

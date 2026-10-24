@@ -263,16 +263,19 @@ class Store {
     ];
   }
 
-  /// Latest-wins order: date, then recording time, then device, then dseq.
-  static bool _newer(Entry a, Entry b) {
+  /// Latest-wins order: date, then recording time, then device, then
+  /// dseq. Sorting a field's entries by it puts the current value last.
+  static int latestWins(Entry a, Entry b) {
     final byDate = a.date.compareTo(b.date);
-    if (byDate != 0) return byDate > 0;
+    if (byDate != 0) return byDate;
     final byRecorded = a.recorded.compareTo(b.recorded);
-    if (byRecorded != 0) return byRecorded > 0;
+    if (byRecorded != 0) return byRecorded;
     final byDevice = a.device.compareTo(b.device);
-    if (byDevice != 0) return byDevice > 0;
-    return a.dseq > b.dseq;
+    if (byDevice != 0) return byDevice;
+    return a.dseq.compareTo(b.dseq);
   }
+
+  static bool _newer(Entry a, Entry b) => latestWins(a, b) > 0;
 
   List<Entry> _entries(String sql, [List<Object?> args = const []]) => [
     for (final r in _db.select(sql, args))

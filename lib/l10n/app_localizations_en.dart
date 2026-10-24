@@ -998,4 +998,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noWordsHeard => 'No words heard.';
+
+  @override
+  String get historyTitle => 'History';
+
+  @override
+  String get streakHeading => 'Streak';
+
+  @override
+  String get streakNow => 'Now';
+
+  @override
+  String get streakLongest => 'Longest';
+
+  @override
+  String get lastSevenDays => 'Last 7 days';
+
+  @override
+  String dayAllDone(String day) {
+    return '$day: all Done';
+  }
+
+  @override
+  String dayPartlyDone(String day) {
+    return '$day: partly Done, partly Missed';
+  }
+
+  @override
+  String dayMissed(String day) {
+    return '$day: Missed';
+  }
+
+  @override
+  String dayOpen(String day) {
+    return '$day: still due';
+  }
+
+  @override
+  String dayNothing(String day) {
+    return '$day: nothing due';
+  }
+
+  @override
+  String get adherenceHeading => 'Adherence';
+
+  @override
+  String get adherenceThisWeek => 'This week';
+
+  @override
+  String get adherenceThisMonth => 'This month';
+
+  @override
+  String get adherenceLast30Days => 'Last 30 days';
+
+  @override
+  String adherenceOf(int done, int total) {
+    return '$done of $total Done';
+  }
+
+  @override
+  String get adherenceNone => 'Nothing yet';
+
+  @override
+  String get showStreaks => 'Show Streaks on this phone';
+
+  @override
+  String get showStreaksDetail => 'Adherence shows either way.';
+
+  @override
+  String get historyLog => 'Log';
+
+  @override
+  String get historyEmpty => 'Nothing was due yet.';
+
+  @override
+  String get snoozesHere =>
+      'Snoozes show only as this phone recorded them, for about the last month.';
+
+  @override
+  String logDone(String time) {
+    return 'Done: $time';
+  }
+
+  @override
+  String logDoneEarly(String time) {
+    return 'Done early: $time';
+  }
+
+  @override
+  String logDoneLate(String time) {
+    return 'Done late: $time';
+  }
+
+  @override
+  String get logMissed => 'Missed';
+
+  @override
+  String get logOpen => 'Due, not Done yet';
+
+  @override
+  String get logComing => 'Still to come';
+
+  @override
+  String logSnoozed(String time) {
+    return 'Snoozed until $time';
+  }
 }

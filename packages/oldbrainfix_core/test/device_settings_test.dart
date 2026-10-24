@@ -89,4 +89,15 @@ void main() {
     expect(store.missedSeen, seen);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
+
+  test('Streaks show until this Device switches them off', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.streaksOn, isTrue);
+    store.streaksOn = false;
+    expect(store.streaksOn, isFalse);
+    store.streaksOn = true;
+    expect(store.streaksOn, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
 }

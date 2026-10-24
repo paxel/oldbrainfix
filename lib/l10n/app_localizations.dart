@@ -1645,6 +1645,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No words heard.'**
   String get noWordsHeard;
+
+  /// No description provided for @historyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get historyTitle;
+
+  /// No description provided for @streakHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak'**
+  String get streakHeading;
+
+  /// No description provided for @streakNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Now'**
+  String get streakNow;
+
+  /// No description provided for @streakLongest.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest'**
+  String get streakLongest;
+
+  /// No description provided for @lastSevenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get lastSevenDays;
+
+  /// No description provided for @dayAllDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: all Done'**
+  String dayAllDone(String day);
+
+  /// No description provided for @dayPartlyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: partly Done, partly Missed'**
+  String dayPartlyDone(String day);
+
+  /// No description provided for @dayMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: Missed'**
+  String dayMissed(String day);
+
+  /// No description provided for @dayOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: still due'**
+  String dayOpen(String day);
+
+  /// No description provided for @dayNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'{day}: nothing due'**
+  String dayNothing(String day);
+
+  /// No description provided for @adherenceHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Adherence'**
+  String get adherenceHeading;
+
+  /// No description provided for @adherenceThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get adherenceThisWeek;
+
+  /// No description provided for @adherenceThisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This month'**
+  String get adherenceThisMonth;
+
+  /// No description provided for @adherenceLast30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get adherenceLast30Days;
+
+  /// No description provided for @adherenceOf.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} Done'**
+  String adherenceOf(int done, int total);
+
+  /// No description provided for @adherenceNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing yet'**
+  String get adherenceNone;
+
+  /// No description provided for @showStreaks.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Streaks on this phone'**
+  String get showStreaks;
+
+  /// No description provided for @showStreaksDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Adherence shows either way.'**
+  String get showStreaksDetail;
+
+  /// No description provided for @historyLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Log'**
+  String get historyLog;
+
+  /// No description provided for @historyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was due yet.'**
+  String get historyEmpty;
+
+  /// No description provided for @snoozesHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Snoozes show only as this phone recorded them, for about the last month.'**
+  String get snoozesHere;
+
+  /// No description provided for @logDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done: {time}'**
+  String logDone(String time);
+
+  /// No description provided for @logDoneEarly.
+  ///
+  /// In en, this message translates to:
+  /// **'Done early: {time}'**
+  String logDoneEarly(String time);
+
+  /// No description provided for @logDoneLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Done late: {time}'**
+  String logDoneLate(String time);
+
+  /// No description provided for @logMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get logMissed;
+
+  /// No description provided for @logOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Due, not Done yet'**
+  String get logOpen;
+
+  /// No description provided for @logComing.
+  ///
+  /// In en, this message translates to:
+  /// **'Still to come'**
+  String get logComing;
+
+  /// No description provided for @logSnoozed.
+  ///
+  /// In en, this message translates to:
+  /// **'Snoozed until {time}'**
+  String logSnoozed(String time);
 }
 
 class _AppLocalizationsDelegate

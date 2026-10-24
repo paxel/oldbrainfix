@@ -19,6 +19,7 @@ extension DeviceSettings on Store {
   static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
   static const _calendarContext = 'calendarContext';
   static const _bluetoothContext = 'bluetoothContext';
+  static const _streaksOff = 'streaksOff';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -129,4 +130,10 @@ extension DeviceSettings on Store {
   bool get bluetoothContextOn => localSetting(_bluetoothContext) == 'true';
 
   set bluetoothContextOn(bool on) => setLocalSetting(_bluetoothContext, '$on');
+
+  /// Whether this Device shows Streaks; on unless switched off. Adherence
+  /// shows either way.
+  bool get streaksOn => localSetting(_streaksOff) != 'true';
+
+  set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
 }

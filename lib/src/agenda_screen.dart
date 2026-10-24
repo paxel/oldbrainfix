@@ -19,6 +19,7 @@ import 'note_editor_screen.dart';
 import 'nudge_screen.dart';
 import 'photo_platform.dart';
 import 'routine_editor_screen.dart';
+import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
 
@@ -312,6 +313,27 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _routineEdited();
   }
 
+  /// A long press on a Routine's row opens a menu where the finger is,
+  /// leading to its history.
+  Future<void> _rowMenu(AgendaRow row, Offset at) async {
+    final t = context.t;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final choice = await showMenu<bool>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [PopupMenuItem(value: true, child: Text(t.historyTitle))],
+    );
+    if (!mounted || choice != true) return;
+    await openHistory(context, widget.notes, row.routine);
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _file(Note note) async {
     await fileNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -355,6 +377,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
           time: occurrenceTime(t, locale, row.occurrence),
           onToggle: () => _toggle(row),
           onTap: () => _openRow(row),
+          onMenu: row.routine.isReminder ? null : (at) => _rowMenu(row, at),
         ),
     ];
     return Scaffold(
@@ -535,13 +558,15 @@ class _Heading extends StatelessWidget {
 
 /// One Occurrence as an embossed row: the box to check it off, its time,
 /// its Note's text, and its Area's colour and icon. Tapping the row
-/// opens its Routine.
+/// opens its Routine; a long press opens [onMenu] where the finger is,
+/// when there is one.
 class _OccurrenceRow extends StatelessWidget {
   final AgendaRow row;
   final Area? area;
   final String time;
   final VoidCallback onToggle;
   final VoidCallback onTap;
+  final void Function(Offset at)? onMenu;
 
   const _OccurrenceRow({
     required this.row,
@@ -549,6 +574,7 @@ class _OccurrenceRow extends StatelessWidget {
     required this.time,
     required this.onToggle,
     required this.onTap,
+    this.onMenu,
   });
 
   @override
@@ -568,59 +594,65 @@ class _OccurrenceRow extends StatelessWidget {
           // The row's ink shows on the card, not under it.
           child: Material(
             type: MaterialType.transparency,
-            child: InkWell(
-              onTap: onTap,
-              child: Container(
-                decoration: colour == null
-                    ? null
-                    : BoxDecoration(
-                        border: Border(
-                          left: BorderSide(color: colour, width: 6),
-                        ),
-                      ),
-                padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: done,
-                      semanticLabel: t.markDone,
-                      onChanged: (_) => onToggle(),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(time, style: text.labelLarge),
-                          Text(
-                            title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: text.bodyLarge?.copyWith(
-                              decoration: done
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
+            child: GestureDetector(
+              onLongPressStart: switch (onMenu) {
+                null => null,
+                final onMenu => (details) => onMenu(details.globalPosition),
+              },
+              child: InkWell(
+                onTap: onTap,
+                child: Container(
+                  decoration: colour == null
+                      ? null
+                      : BoxDecoration(
+                          border: Border(
+                            left: BorderSide(color: colour, width: 6),
                           ),
-                        ],
+                        ),
+                  padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: done,
+                        semanticLabel: t.markDone,
+                        onChanged: (_) => onToggle(),
                       ),
-                    ),
-                    if (row.routine.isReminder)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(
-                          Icons.notifications_outlined,
-                          size: 18,
-                          color: scheme.onSurfaceVariant,
-                          semanticLabel: t.reminder,
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(time, style: text.labelLarge),
+                            Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: text.bodyLarge?.copyWith(
+                                decoration: done
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    if (areaIconData(area?.icon) case final icon?)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Icon(icon, size: 20, color: colour),
-                      ),
-                  ],
+                      if (row.routine.isReminder)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Icon(
+                            Icons.notifications_outlined,
+                            size: 18,
+                            color: scheme.onSurfaceVariant,
+                            semanticLabel: t.reminder,
+                          ),
+                        ),
+                      if (areaIconData(area?.icon) case final icon?)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Icon(icon, size: 20, color: colour),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

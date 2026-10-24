@@ -577,5 +577,106 @@
   "speechModelFailed": "The download did not finish, and nothing was kept. Try again later.",
   "speechModelMismatch": "That is not the expected speech model, so it was not kept.",
   "transcribing": "Transcribing…",
-  "noWordsHeard": "No words heard."
+  "noWordsHeard": "No words heard.",
+  "historyTitle": "History",
+  "streakHeading": "Streak",
+  "streakNow": "Now",
+  "streakLongest": "Longest",
+  "lastSevenDays": "Last 7 days",
+  "dayAllDone": "{day}: all Done",
+  "@dayAllDone": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "dayPartlyDone": "{day}: partly Done, partly Missed",
+  "@dayPartlyDone": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "dayMissed": "{day}: Missed",
+  "@dayMissed": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "dayOpen": "{day}: still due",
+  "@dayOpen": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "dayNothing": "{day}: nothing due",
+  "@dayNothing": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      }
+    }
+  },
+  "adherenceHeading": "Adherence",
+  "adherenceThisWeek": "This week",
+  "adherenceThisMonth": "This month",
+  "adherenceLast30Days": "Last 30 days",
+  "adherenceOf": "{done} of {total} Done",
+  "@adherenceOf": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "adherenceNone": "Nothing yet",
+  "showStreaks": "Show Streaks on this phone",
+  "showStreaksDetail": "Adherence shows either way.",
+  "historyLog": "Log",
+  "historyEmpty": "Nothing was due yet.",
+  "snoozesHere": "Snoozes show only as this phone recorded them, for about the last month.",
+  "logDone": "Done: {time}",
+  "@logDone": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "logDoneEarly": "Done early: {time}",
+  "@logDoneEarly": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "logDoneLate": "Done late: {time}",
+  "@logDoneLate": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "logMissed": "Missed",
+  "logOpen": "Due, not Done yet",
+  "logComing": "Still to come",
+  "logSnoozed": "Snoozed until {time}",
+  "@logSnoozed": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  }
 }

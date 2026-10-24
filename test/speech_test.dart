@@ -371,6 +371,40 @@ void main() {
       expect(find.text('and fresh basil'), findsOneWidget);
     });
 
+    testWidgets('the editor shows a Transcript written while it is open, '
+        'further down than it had built', (tester) async {
+      speech
+        ..installed = WhisperModel.sha256
+        ..transcripts[1] = 'the garage closes at six'
+        ..transcribeGate = Completer<void>();
+      // A long text pushes the recording far below the screen.
+      final note = notes.capture(
+        List.filled(80, 'car').join('\n'),
+        recordings: [first],
+      );
+      await start(tester);
+      final agenda = tester.element(find.byType(AgendaScreen));
+      unawaited(openNote(agenda, notes, Places(store), notes.byId(note.id)!));
+      await tester.pumpAndSettle();
+      final editor = find.byType(NoteEditorScreen);
+      expect(editor, findsOneWidget);
+      expect(find.byType(TranscriptText, skipOffstage: false), findsNothing);
+
+      speech.transcribeGate?.complete();
+      await tester.pumpAndSettle();
+      expect(notes.byId(note.id)?.transcripts.values, [
+        'the garage closes at six',
+      ]);
+      await tester.scrollUntilVisible(
+        find.text('the garage closes at six'),
+        200,
+        scrollable: find
+            .descendant(of: editor, matching: find.byType(Scrollable))
+            .first,
+      );
+      expect(find.text('the garage closes at six'), findsOneWidget);
+    });
+
     testWidgets('the notes browser finds a Note by its Transcript', (
       tester,
     ) async {

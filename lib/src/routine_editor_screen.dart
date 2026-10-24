@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
+import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 
 /// The Device's wall clock: what its own clock shows for an instant.
@@ -60,7 +61,8 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// Escalation section below it turns on the full-screen alarm after a
 /// number of ignored Re-nags (3 when first turned on). Save writes the
 /// Routine; leaving without saving drops the edit, but not a changed
-/// Device default, which applies at once.
+/// Device default, which applies at once. A saved Routine's history
+/// opens from the top bar.
 class RoutineEditorScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -363,6 +365,12 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (routine != null && !routine.isReminder)
+            IconButton(
+              tooltip: t.historyTitle,
+              onPressed: () => openHistory(context, widget.notes, routine),
+              icon: const Icon(Icons.history),
+            ),
           if (routine != null)
             IconButton(
               tooltip: t.delete,

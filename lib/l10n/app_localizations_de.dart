@@ -1003,4 +1003,109 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noWordsHeard => 'Keine Worte erkannt.';
+
+  @override
+  String get historyTitle => 'Verlauf';
+
+  @override
+  String get streakHeading => 'Serie';
+
+  @override
+  String get streakNow => 'Aktuell';
+
+  @override
+  String get streakLongest => 'Längste';
+
+  @override
+  String get lastSevenDays => 'Letzte 7 Tage';
+
+  @override
+  String dayAllDone(String day) {
+    return '$day: alles erledigt';
+  }
+
+  @override
+  String dayPartlyDone(String day) {
+    return '$day: teils erledigt, teils verpasst';
+  }
+
+  @override
+  String dayMissed(String day) {
+    return '$day: verpasst';
+  }
+
+  @override
+  String dayOpen(String day) {
+    return '$day: steht noch an';
+  }
+
+  @override
+  String dayNothing(String day) {
+    return '$day: nichts fällig';
+  }
+
+  @override
+  String get adherenceHeading => 'Einhaltung';
+
+  @override
+  String get adherenceThisWeek => 'Diese Woche';
+
+  @override
+  String get adherenceThisMonth => 'Diesen Monat';
+
+  @override
+  String get adherenceLast30Days => 'Letzte 30 Tage';
+
+  @override
+  String adherenceOf(int done, int total) {
+    return '$done von $total erledigt';
+  }
+
+  @override
+  String get adherenceNone => 'Noch nichts';
+
+  @override
+  String get showStreaks => 'Serien auf diesem Telefon zeigen';
+
+  @override
+  String get showStreaksDetail => 'Die Einhaltung wird immer gezeigt.';
+
+  @override
+  String get historyLog => 'Protokoll';
+
+  @override
+  String get historyEmpty => 'Bisher war nichts fällig.';
+
+  @override
+  String get snoozesHere =>
+      'Verschobenes ist nur auf diesem Telefon festgehalten, und nur für etwa den letzten Monat.';
+
+  @override
+  String logDone(String time) {
+    return 'Erledigt: $time';
+  }
+
+  @override
+  String logDoneEarly(String time) {
+    return 'Früh erledigt: $time';
+  }
+
+  @override
+  String logDoneLate(String time) {
+    return 'Spät erledigt: $time';
+  }
+
+  @override
+  String get logMissed => 'Verpasst';
+
+  @override
+  String get logOpen => 'Fällig, noch nicht erledigt';
+
+  @override
+  String get logComing => 'Kommt noch';
+
+  @override
+  String logSnoozed(String time) {
+    return 'Verschoben bis $time';
+  }
 }

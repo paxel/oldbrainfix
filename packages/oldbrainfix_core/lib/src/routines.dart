@@ -312,21 +312,8 @@ class Routines {
     final fields = store.currentFields(id);
     if (fields[RoutineKeys.type] != RoutineKeys.typeRoutine) return null;
     final noteId = fields[RoutineKeys.note];
-    final start = Day.tryParse(fields[RoutineKeys.start] ?? '');
-    if (noteId == null || start == null) return null;
-    final ruleText = fields[RoutineKeys.rule];
-    final rule = ruleText == null ? null : Recurrence.tryParse(ruleText);
-    if (ruleText != null && rule == null) return null;
-    final times = [
-      for (final text in (fields[RoutineKeys.times] ?? '').split(','))
-        ?ClockTime.tryParse(text),
-    ];
-    final Schedule schedule;
-    try {
-      schedule = Schedule(start: start, times: times, rule: rule);
-    } on ArgumentError {
-      return null;
-    }
+    final schedule = scheduleOf(fields);
+    if (noteId == null || schedule == null) return null;
     final renag = int.tryParse(fields[RoutineKeys.renag] ?? '');
     final escalation = int.tryParse(fields[RoutineKeys.escalation] ?? '');
     final trashed = fields[RoutineKeys.trashed];
@@ -356,6 +343,24 @@ class Routines {
             key.substring(RoutineKeys.donePrefix.length): DateTime.parse(value),
       },
     );
+  }
+
+  /// The schedule the Routine [fields] hold, or null when they hold none.
+  static Schedule? scheduleOf(Map<String, String?> fields) {
+    final start = Day.tryParse(fields[RoutineKeys.start] ?? '');
+    if (start == null) return null;
+    final ruleText = fields[RoutineKeys.rule];
+    final rule = ruleText == null ? null : Recurrence.tryParse(ruleText);
+    if (ruleText != null && rule == null) return null;
+    final times = [
+      for (final text in (fields[RoutineKeys.times] ?? '').split(','))
+        ?ClockTime.tryParse(text),
+    ];
+    try {
+      return Schedule(start: start, times: times, rule: rule);
+    } on ArgumentError {
+      return null;
+    }
   }
 
   /// Every Routine and Reminder not in the trash.

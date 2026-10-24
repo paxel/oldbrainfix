@@ -38,6 +38,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A Missed card on the Agenda that lists what was Missed until you tap "Seen".
 - One catch-up notification instead of a burst of old alarms after the phone was off.
 - Escalation: an ignored Routine can turn into a full-screen alarm with sound.
+- A history per Routine with each Done, Missed and snoozed time, its Streak and its Adherence, with Streaks that can be hidden.
 - Nudges that keep reminding you of Unsorted Notes, with a nudge time picked at capture.
 - An "x Unsorted" banner on the Agenda.
 - Quiet Hours that hold Nudges back at night while Routines still ring.
