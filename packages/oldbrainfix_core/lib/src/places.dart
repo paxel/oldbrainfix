@@ -131,6 +131,9 @@ enum NotesGo {
 
   /// Into the deleted Topic's Area.
   area,
+
+  /// Into the trash.
+  trash,
 }
 
 /// Areas and Topics: exactly two levels.
@@ -236,23 +239,21 @@ class Places {
     if (topic == null) {
       throw ArgumentError.value(topicId, 'topicId', 'not a Topic');
     }
-    final to = notesGo == NotesGo.area ? topic.areaId : null;
     store.batch(() {
-      for (final note in _notesInside(topicId)) {
-        store.append(note.id, NoteKeys.place, to);
-      }
+      _moveNotes(topicId, notesGo, topic.areaId);
       store.append(topicId, PlaceKeys.type, null);
     });
   }
 
-  /// Deletes the Area [areaId] with its Topics; their Notes go back to
-  /// Unsorted.
-  void deleteArea(String areaId) {
+  /// Deletes the Area [areaId] with its Topics; their Notes go where
+  /// [notesGo] says: back to Unsorted or into the trash.
+  void deleteArea(String areaId, NotesGo notesGo) {
     _requireArea(areaId);
+    if (notesGo == NotesGo.area) {
+      throw ArgumentError.value(notesGo, 'notesGo', 'an Area has no Area');
+    }
     store.batch(() {
-      for (final note in _notesInside(areaId)) {
-        store.append(note.id, NoteKeys.place, null);
-      }
+      _moveNotes(areaId, notesGo, null);
       for (final topic in topics(areaId)) {
         store.append(topic.id, PlaceKeys.type, null);
       }
@@ -279,6 +280,22 @@ class Places {
   bool isPlace(String id) => areaById(id) != null || topicById(id) != null;
 
   List<Note> _notesInside(String id) => Notes(store).inside(id);
+
+  /// Sends the Notes inside [id] where [notesGo] says; [areaId] is where
+  /// [NotesGo.area] leads.
+  void _moveNotes(String id, NotesGo notesGo, String? areaId) {
+    final notes = Notes(store);
+    for (final note in _notesInside(id)) {
+      switch (notesGo) {
+        case NotesGo.unsorted:
+          store.append(note.id, NoteKeys.place, null);
+        case NotesGo.area:
+          store.append(note.id, NoteKeys.place, areaId);
+        case NotesGo.trash:
+          notes.trash(note.id);
+      }
+    }
+  }
 
   // The writes behind addArea and addTopic, for use inside one batch.
   String _appendArea(String name, String? starter) {

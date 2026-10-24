@@ -160,6 +160,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Topic'));
+      await tester.pumpAndSettle();
       await typeName(tester, 'Model trains', 'Create');
       expect(find.text('Model trains'), findsOneWidget);
       final area = Places(store).areas().single;
@@ -249,12 +251,14 @@ void main() {
       expect(find.text('Delete the Area “Household”?'), findsOneWidget);
       expect(find.textContaining('2 Notes inside.'), findsOneWidget);
       expect(find.textContaining('Its Topics are deleted'), findsOneWidget);
-      // Only Unsorted for now: the trash comes with the Note editor.
+      expect(find.textContaining('Where should they go?'), findsOneWidget);
+      // Cancel, Unsorted, trash: an Area has no Area to move them into.
       final actions = find.descendant(
         of: find.byType(AlertDialog),
         matching: find.byType(TextButton),
       );
-      expect(actions, findsNWidgets(2));
+      expect(actions, findsNWidgets(3));
+      expect(buttonColour(tester, 'Move to trash'), errorColour(tester));
       await tester.tap(find.text('Move to Unsorted'));
       await tester.pumpAndSettle();
 
@@ -263,6 +267,50 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Unsorted'), findsNWidgets(2));
+    });
+
+    testWidgets('an Area with Notes can trash them with its Topics', (
+      tester,
+    ) async {
+      final store = openStore();
+      final places = Places(store);
+      final notes = Notes(store);
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      notes.capture('a', place: home.id);
+      notes.capture('b', place: kitchen.id);
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await openAreas(tester);
+
+      await rowMenu(tester, 'Household', 'Delete');
+      await tester.tap(find.text('Move to trash'));
+      await tester.pumpAndSettle();
+
+      expect(places.areas(), isEmpty);
+      expect(notes.all(), isEmpty);
+      expect(notes.trashed(), hasLength(2));
+    });
+
+    testWidgets('a Topic with Notes can trash them', (tester) async {
+      final store = openStore();
+      final places = Places(store);
+      final notes = Notes(store);
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final note = notes.capture('nees mor sauce', place: kitchen.id);
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await openAreas(tester);
+      await tester.tap(find.text('Household'));
+      await tester.pumpAndSettle();
+
+      await rowMenu(tester, 'Kitchen', 'Delete');
+      expect(buttonColour(tester, 'Move to trash'), errorColour(tester));
+      await tester.tap(find.text('Move to trash'));
+      await tester.pumpAndSettle();
+
+      expect(places.topics(home.id), isEmpty);
+      expect(notes.byId(note.id)?.isTrashed, isTrue);
+      expect(find.text('nees mor sauce'), findsNothing);
     });
 
     testWidgets('an Area gets a colour and an icon', (tester) async {

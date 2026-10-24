@@ -186,4 +186,79 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get noNotesHere =>
       'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
+
+  @override
+  String get noteTitle => 'Notiz';
+
+  @override
+  String get importance => 'Wichtigkeit';
+
+  @override
+  String get importanceUnimportant => 'Unwichtig';
+
+  @override
+  String get importanceNormal => 'Normal';
+
+  @override
+  String get importanceImportant => 'Wichtig';
+
+  @override
+  String get capturedHeading => 'Erfasst';
+
+  @override
+  String get amend => 'Zur Notiz hinzufügen';
+
+  @override
+  String get amendHint => 'Was gibt es Neues?';
+
+  @override
+  String get add => 'Hinzufügen';
+
+  @override
+  String get moveToTrash => 'In den Papierkorb';
+
+  @override
+  String get trashTitle => 'Papierkorb';
+
+  @override
+  String get trashEmpty => 'Der Papierkorb ist leer.';
+
+  @override
+  String get restore => 'Wiederherstellen';
+
+  @override
+  String goneIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wird in $count Tagen endgültig gelöscht',
+      one: 'Wird in 1 Tag endgültig gelöscht',
+      zero: 'Wird innerhalb eines Tages endgültig gelöscht',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trashThem => 'In den Papierkorb';
+
+  @override
+  String get orderByImportance => 'Nach Wichtigkeit ordnen';
+
+  @override
+  String get orderByTime => 'Nach Zeit ordnen';
+
+  @override
+  String get hideUnimportant => 'Unwichtige Notizen ausblenden';
+
+  @override
+  String get showUnimportant => 'Unwichtige Notizen einblenden';
+
+  @override
+  String get addHere => 'Hier hinzufügen';
+
+  @override
+  String get noteHere => 'Notiz hier';
+
+  @override
+  String get topicChoice => 'Thema';
 }

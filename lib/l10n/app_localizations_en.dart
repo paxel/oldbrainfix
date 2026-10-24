@@ -183,4 +183,79 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noNotesHere => 'No Notes here yet. Tap + to add one.';
+
+  @override
+  String get noteTitle => 'Note';
+
+  @override
+  String get importance => 'Importance';
+
+  @override
+  String get importanceUnimportant => 'Unimportant';
+
+  @override
+  String get importanceNormal => 'Normal';
+
+  @override
+  String get importanceImportant => 'Important';
+
+  @override
+  String get capturedHeading => 'Captured';
+
+  @override
+  String get amend => 'Add to Note';
+
+  @override
+  String get amendHint => 'What\'s new?';
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get moveToTrash => 'Move to trash';
+
+  @override
+  String get trashTitle => 'Trash';
+
+  @override
+  String get trashEmpty => 'The trash is empty.';
+
+  @override
+  String get restore => 'Restore';
+
+  @override
+  String goneIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted for good in $count days',
+      one: 'Deleted for good in 1 day',
+      zero: 'Deleted for good within a day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trashThem => 'Move to trash';
+
+  @override
+  String get orderByImportance => 'Order by Importance';
+
+  @override
+  String get orderByTime => 'Order by time';
+
+  @override
+  String get hideUnimportant => 'Hide unimportant Notes';
+
+  @override
+  String get showUnimportant => 'Show unimportant Notes';
+
+  @override
+  String get addHere => 'Add here';
+
+  @override
+  String get noteHere => 'Note here';
+
+  @override
+  String get topicChoice => 'Topic';
 }

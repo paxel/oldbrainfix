@@ -1,0 +1,339 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+import 'area_look.dart';
+import 'areas_screen.dart';
+import 'l10n.dart';
+import 'look.dart';
+import 'note_card.dart';
+import 'place_names.dart';
+
+/// Opens the editor of [note]; returns once the user left it.
+Future<void> openNote(
+  BuildContext context,
+  Notes notes,
+  Places places,
+  Note note,
+) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    builder: (_) =>
+        NoteEditorScreen(notes: notes, places: places, noteId: note.id),
+  ),
+);
+
+/// Everything about one Note: its text, fixed in place and saved on
+/// leaving, its Importance, its Capture Context and where it is filed,
+/// and its Sections, each with its own Capture Context. "Add to Note"
+/// amends it; the trash button deletes it.
+class NoteEditorScreen extends StatefulWidget {
+  final Notes notes;
+  final Places places;
+  final String noteId;
+
+  const NoteEditorScreen({
+    super.key,
+    required this.notes,
+    required this.places,
+    required this.noteId,
+  });
+
+  @override
+  State<NoteEditorScreen> createState() => _NoteEditorScreenState();
+}
+
+class _NoteEditorScreenState extends State<NoteEditorScreen> {
+  final _text = TextEditingController();
+  PlacedNote? _placed;
+  List<Section> _sections = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _text.text = _placed?.note.text ?? '';
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _load() {
+    final note = widget.notes.byId(widget.noteId);
+    _placed = note == null ? null : placeNote(widget.places, note);
+    _sections = widget.notes.sections(widget.noteId);
+  }
+
+  void _reload() => setState(_load);
+
+  /// Writes the text when it changed; a blank text keeps the old one.
+  void _saveText() {
+    final note = _placed?.note;
+    final text = _text.text.trim();
+    if (note == null || text.isEmpty || text == note.text) return;
+    widget.notes.edit(note.id, text);
+    _load();
+  }
+
+  void _setImportance(Set<Importance> picked) {
+    _saveText();
+    widget.notes.setImportance(widget.noteId, picked.single);
+    _reload();
+  }
+
+  Future<void> _file() async {
+    final note = _placed?.note;
+    if (note == null) return;
+    _saveText();
+    if (await fileNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      _reload();
+    }
+  }
+
+  Future<void> _amend() async {
+    _saveText();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (_) => const _AmendDialog(),
+    );
+    final trimmed = text?.trim();
+    if (!mounted || trimmed == null || trimmed.isEmpty) return;
+    widget.notes.amend(widget.noteId, trimmed);
+    _reload();
+  }
+
+  void _trash() {
+    widget.notes.trash(widget.noteId);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final placed = _placed;
+    if (placed == null) return Scaffold(appBar: AppBar());
+    final (:note, :area, :topic) = placed;
+    final when = DateFormat.yMd(Localizations.localeOf(context).toString())
+        .add_Hm();
+    final colour = areaColour(area?.colour);
+    final place = area == null
+        ? t.unsorted
+        : [
+            areaName(t, area),
+            if (topic != null) topicName(t, topic),
+          ].join(' / ');
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _saveText();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(t.noteTitle),
+          actions: [
+            IconButton(
+              tooltip: t.moveToTrash,
+              onPressed: _trash,
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Embossed(
+              strong: note.importance == Importance.important,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _text,
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  decoration: const InputDecoration(
+                    filled: false,
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            _Panel(
+              heading: t.importance,
+              child: SegmentedButton<Importance>(
+                segments: [
+                  ButtonSegment(
+                    value: Importance.unimportant,
+                    label: Text(t.importanceUnimportant),
+                  ),
+                  ButtonSegment(
+                    value: Importance.normal,
+                    label: Text(t.importanceNormal),
+                  ),
+                  ButtonSegment(
+                    value: Importance.important,
+                    label: Text(t.importanceImportant),
+                  ),
+                ],
+                selected: {note.importance},
+                showSelectedIcon: false,
+                onSelectionChanged: _setImportance,
+              ),
+            ),
+            _Panel(
+              heading: t.capturedHeading,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CaptureContextLines(capture: note.context, when: when),
+                  Row(
+                    children: [
+                      Icon(
+                        areaIconData(area?.icon) ?? Icons.folder_outlined,
+                        size: 20,
+                        color:
+                            colour ??
+                            Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(place)),
+                      IconButton(
+                        tooltip: t.fileInto,
+                        onPressed: _file,
+                        icon: const Icon(Icons.drive_file_move_outline),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            for (final section in _sections)
+              _Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      section.text,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    CaptureContextLines(capture: section.context, when: when),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: _amend,
+                icon: const Icon(Icons.add),
+                label: Text(t.amend),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The Capture Context of a Note or Section, one line per thing known.
+/// For now that is the time.
+class CaptureContextLines extends StatelessWidget {
+  final CaptureContext capture;
+  final DateFormat when;
+
+  const CaptureContextLines({
+    super.key,
+    required this.capture,
+    required this.when,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      children: [
+        Icon(Icons.schedule, size: 20, color: muted),
+        const SizedBox(width: 8),
+        Text(
+          when.format(capture.captured.toLocal()),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}
+
+/// One embossed block of the editor, with an optional heading.
+class _Panel extends StatelessWidget {
+  final String? heading;
+  final Widget child;
+
+  const _Panel({required this.child, this.heading});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Embossed(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (heading case final heading?) ...[
+              Text(heading, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+            ],
+            child,
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Asks for the text of a new Section.
+class _AmendDialog extends StatefulWidget {
+  const _AmendDialog();
+
+  @override
+  State<_AmendDialog> createState() => _AmendDialogState();
+}
+
+class _AmendDialogState extends State<_AmendDialog> {
+  final _text = TextEditingController();
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return AlertDialog(
+      title: Text(t.amend),
+      content: TextField(
+        controller: _text,
+        autofocus: true,
+        maxLines: null,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(hintText: t.amendHint),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_text.text),
+          child: Text(t.add),
+        ),
+      ],
+    );
+  }
+}

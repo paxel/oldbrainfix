@@ -32,6 +32,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _trail = BrowserTrail();
 
   @override
+  void initState() {
+    super.initState();
+    // What has been in the trash for 30 days goes for good.
+    _notes.purgeTrash();
+  }
+
+  @override
   void dispose() {
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();

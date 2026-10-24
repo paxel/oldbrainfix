@@ -21,7 +21,9 @@ PlacedNote placeNote(Places places, Note note) {
 
 /// A Note drawn as a softly embossed card: its text, capture time and
 /// where it is filed. Its Area's colour runs down the left edge and its
-/// icon leads the place line.
+/// icon leads the place line. An important Note gets an accent marker
+/// and a stronger emboss, an unimportant one is dimmed (UI laws,
+/// "Cards").
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -36,6 +38,15 @@ class NoteCard extends StatelessWidget {
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
 
+  /// Opens the Note's editor.
+  final VoidCallback? onTap;
+
+  /// Shown under the place line, e.g. the trash's restore.
+  final Widget? footer;
+
+  /// How much faded an unimportant card is drawn.
+  static const unimportantOpacity = 0.55;
+
   const NoteCard({
     super.key,
     required this.note,
@@ -43,6 +54,8 @@ class NoteCard extends StatelessWidget {
     this.area,
     this.topic,
     this.onFile,
+    this.onTap,
+    this.footer,
   });
 
   @override
@@ -59,59 +72,87 @@ class NoteCard extends StatelessWidget {
             areaName(t, area),
             if (topic != null) topicName(t, topic),
           ].join(' / ');
-    return Padding(
+    final important = note.importance == Importance.important;
+    final footer = this.footer;
+    final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Embossed(
+        strong: important,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            decoration: colour == null
-                ? null
-                : BoxDecoration(
-                    border: Border(left: BorderSide(color: colour, width: 6)),
-                  ),
-            padding: const EdgeInsets.fromLTRB(16, 16, 4, 16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(note.text, style: text.bodyLarge),
-                      const SizedBox(height: 6),
-                      Text(
-                        when.format(note.captured.toLocal()),
-                        style: text.bodySmall,
+          // The card's ink shows on the card, not under it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onTap,
+              child: Container(
+                decoration: colour == null
+                    ? null
+                    : BoxDecoration(
+                        border: Border(
+                          left: BorderSide(color: colour, width: 6),
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                padding: const EdgeInsets.fromLTRB(16, 16, 4, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (areaIconData(area?.icon) case final icon?) ...[
-                            Icon(
-                              icon,
-                              size: 16,
-                              color: colour ?? scheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Flexible(child: Text(place, style: text.labelMedium)),
+                          Text(note.text, style: text.bodyLarge),
+                          const SizedBox(height: 6),
+                          Text(
+                            when.format(note.captured.toLocal()),
+                            style: text.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (areaIconData(area?.icon)
+                                  case final icon?) ...[
+                                Icon(
+                                  icon,
+                                  size: 16,
+                                  color: colour ?? scheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Flexible(
+                                child: Text(place, style: text.labelMedium),
+                              ),
+                            ],
+                          ),
+                          ?footer,
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    if (important)
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.label_important,
+                          color: scheme.primary,
+                          semanticLabel: t.importanceImportant,
+                        ),
+                      ),
+                    if (onFile != null)
+                      IconButton(
+                        tooltip: t.fileInto,
+                        onPressed: onFile,
+                        icon: const Icon(Icons.drive_file_move_outline),
+                      ),
+                  ],
                 ),
-                if (onFile != null)
-                  IconButton(
-                    tooltip: t.fileInto,
-                    onPressed: onFile,
-                    icon: const Icon(Icons.drive_file_move_outline),
-                  ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+    return note.importance == Importance.unimportant
+        ? Opacity(opacity: unimportantOpacity, child: card)
+        : card;
   }
 }

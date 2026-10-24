@@ -415,6 +415,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No Notes here yet. Tap + to add one.'**
   String get noNotesHere;
+
+  /// No description provided for @noteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get noteTitle;
+
+  /// No description provided for @importance.
+  ///
+  /// In en, this message translates to:
+  /// **'Importance'**
+  String get importance;
+
+  /// No description provided for @importanceUnimportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Unimportant'**
+  String get importanceUnimportant;
+
+  /// No description provided for @importanceNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get importanceNormal;
+
+  /// No description provided for @importanceImportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Important'**
+  String get importanceImportant;
+
+  /// No description provided for @capturedHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured'**
+  String get capturedHeading;
+
+  /// No description provided for @amend.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to Note'**
+  String get amend;
+
+  /// No description provided for @amendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s new?'**
+  String get amendHint;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @moveToTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to trash'**
+  String get moveToTrash;
+
+  /// No description provided for @trashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash'**
+  String get trashTitle;
+
+  /// No description provided for @trashEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The trash is empty.'**
+  String get trashEmpty;
+
+  /// No description provided for @restore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restore;
+
+  /// No description provided for @goneIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Deleted for good within a day} =1{Deleted for good in 1 day} other{Deleted for good in {count} days}}'**
+  String goneIn(int count);
+
+  /// No description provided for @trashThem.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to trash'**
+  String get trashThem;
+
+  /// No description provided for @orderByImportance.
+  ///
+  /// In en, this message translates to:
+  /// **'Order by Importance'**
+  String get orderByImportance;
+
+  /// No description provided for @orderByTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Order by time'**
+  String get orderByTime;
+
+  /// No description provided for @hideUnimportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide unimportant Notes'**
+  String get hideUnimportant;
+
+  /// No description provided for @showUnimportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Show unimportant Notes'**
+  String get showUnimportant;
+
+  /// No description provided for @addHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Add here'**
+  String get addHere;
+
+  /// No description provided for @noteHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Note here'**
+  String get noteHere;
+
+  /// No description provided for @topicChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic'**
+  String get topicChoice;
 }
 
 class _AppLocalizationsDelegate

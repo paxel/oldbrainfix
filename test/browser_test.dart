@@ -170,13 +170,49 @@ void main() {
       expect(notes.all().single.place, kitchen.id);
     });
 
-    testWidgets('+ adds an Area on the Areas level, a Topic in an Area', (
+    testWidgets('+ adds an Area on the Areas level', (tester) async {
+      await openBrowser(tester);
+      expect(find.byTooltip('New Area'), findsOneWidget);
+    });
+
+    testWidgets('+ in an Area offers a Note filed into it or a Topic', (
       tester,
     ) async {
       await openBrowser(tester);
-      expect(find.byTooltip('New Area'), findsOneWidget);
       await open(tester, 'Household');
-      expect(find.byTooltip('New Topic'), findsOneWidget);
+      final plus = tester.getCenter(find.byTooltip('Add here'));
+      await tester.tap(find.byTooltip('Add here'));
+      await tester.pumpAndSettle();
+      // The menu opens where the finger is, not from the bottom edge.
+      final menu = tester.getRect(
+        find.ancestor(
+          of: find.text('Note here'),
+          matching: find.byWidgetPredicate((w) => w is PopupMenuItem),
+        ),
+      );
+      expect((menu.center - plus).distance, lessThan(200));
+      expect(find.text('Topic'), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
+
+      await open(tester, 'Note here');
+      await tester.enterText(find.byType(TextField), 'nees mor sauce');
+      await open(tester, 'Save');
+      expect(cardTexts(tester), ['nees mor sauce']);
+      expect(notes.all().single.place, home.id);
+
+      await tester.tap(find.byTooltip('Add here'));
+      await tester.pumpAndSettle();
+      await open(tester, 'Topic');
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.byType(TextField),
+        ),
+        'Cellar',
+      );
+      await open(tester, 'Create');
+      expect(find.text('Cellar'), findsOneWidget);
+      expect(places.topics(home.id).map((t) => t.name), contains('Cellar'));
     });
 
     testWidgets('no level has a bottom bar', (tester) async {

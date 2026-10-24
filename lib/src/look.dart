@@ -89,11 +89,15 @@ ThemeMode themeModeOf(ThemeChoice choice) => switch (choice) {
 class Embossed extends StatelessWidget {
   final Widget child;
 
-  const Embossed({super.key, required this.child});
+  /// Raised further above the background, for important cards.
+  final bool strong;
+
+  const Embossed({super.key, required this.child, this.strong = false});
 
   @override
   Widget build(BuildContext context) {
     final tones = LookTones.of(Theme.of(context).brightness);
+    final lift = strong ? 2.0 : 1.0;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: tones.card,
@@ -101,13 +105,13 @@ class Embossed extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: tones.shade,
-            offset: const Offset(4, 4),
-            blurRadius: 10,
+            offset: Offset(4 * lift, 4 * lift),
+            blurRadius: 10 * lift,
           ),
           BoxShadow(
             color: tones.highlight,
-            offset: const Offset(-3, -3),
-            blurRadius: 8,
+            offset: Offset(-3 * lift, -3 * lift),
+            blurRadius: 8 * lift,
           ),
         ],
       ),

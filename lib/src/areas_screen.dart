@@ -9,7 +9,9 @@ import 'file_into_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'note_editor_screen.dart';
 import 'place_names.dart';
+import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
@@ -94,11 +96,27 @@ class _AreasScreenState extends State<AreasScreen> {
     if (widget.trail.area(widget.places) case final area?) _open(area);
   }
 
+  Future<void> _openTrash() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TrashScreen(notes: widget.notes, places: widget.places),
+      ),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _file(Note note) async {
     if (await fileNote(context, widget.notes, widget.places, note)) {
       if (!mounted) return;
       _reload();
     }
+  }
+
+  Future<void> _openNote(Note note) async {
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
   }
 
   Future<void> _act(Area area, _AreaAction action) async {
@@ -119,8 +137,8 @@ class _AreasScreenState extends State<AreasScreen> {
         if (!mounted) return;
       case _AreaAction.delete:
         final go = await confirmDeleteArea(context, widget.places, area);
-        if (!mounted || !go) return;
-        widget.places.deleteArea(area.id);
+        if (!mounted || go == null) return;
+        widget.places.deleteArea(area.id, go);
     }
     _reload();
   }
@@ -152,7 +170,16 @@ class _AreasScreenState extends State<AreasScreen> {
     final t = context.t;
     final searching = _query.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: Text(t.areasTitle)),
+      appBar: AppBar(
+        title: Text(t.areasTitle),
+        actions: [
+          IconButton(
+            tooltip: t.trashTitle,
+            onPressed: _openTrash,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: BrowserSwipes(
         onForward: _forward,
         child: Column(
@@ -166,7 +193,7 @@ class _AreasScreenState extends State<AreasScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _hits, _file)
+                    ? _hitCards(context, _hits, _file, _openNote)
                     : _areaRows(t),
               ),
             ),
@@ -185,6 +212,8 @@ class _AreasScreenState extends State<AreasScreen> {
 enum _AreaAction { rename, look, delete }
 
 enum _TopicAction { rename, delete }
+
+enum _AreaAdd { note, topic }
 
 /// The browser's second level, one Area: its Topics and its diary of
 /// cards, with a search field over the Area's Notes and "+" to add a
@@ -212,6 +241,8 @@ class _AreaScreenState extends State<AreaScreen> {
   Area? _area;
   List<Topic> _topics = const [];
   List<PlacedNote> _diary = const [];
+  DiaryOrder _order = DiaryOrder.time;
+  bool _hideUnimportant = false;
   bool _loaded = false;
 
   @override
@@ -240,15 +271,51 @@ class _AreaScreenState extends State<AreaScreen> {
           a,
         ).toLowerCase().compareTo(topicName(t, b).toLowerCase()),
       );
-    _diary = _search(widget.places, _query.text, within: widget.areaId);
+    _diary = _search(
+      widget.places,
+      _query.text,
+      within: widget.areaId,
+      order: _order,
+      hideUnimportant: _hideUnimportant,
+    );
   }
 
   void _reload() => setState(_load);
 
-  Future<void> _add() async {
-    final name = await askName(context, title: context.t.newTopic);
-    if (!mounted || name == null) return;
-    widget.places.addTopic(widget.areaId, name);
+  /// "+" opens a menu at the button: a Note filed straight into this
+  /// Area, or a new Topic.
+  Future<void> _add(BuildContext button) async {
+    final t = context.t;
+    final box = button.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+    final choice = await showMenu<_AreaAdd>(
+      context: context,
+      position: RelativeRect.fromRect(
+        box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(value: _AreaAdd.note, child: Text(t.noteHere)),
+        PopupMenuItem(value: _AreaAdd.topic, child: Text(t.topicChoice)),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case _AreaAdd.note:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                CaptureScreen(notes: widget.notes, place: widget.areaId),
+          ),
+        );
+        if (!mounted) return;
+      case _AreaAdd.topic:
+        final name = await askName(context, title: t.newTopic);
+        if (!mounted || name == null) return;
+        widget.places.addTopic(widget.areaId, name);
+    }
     _reload();
   }
 
@@ -278,6 +345,12 @@ class _AreaScreenState extends State<AreaScreen> {
       if (!mounted) return;
       _reload();
     }
+  }
+
+  Future<void> _openNote(Note note) async {
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
   }
 
   Future<void> _act(Area area, Topic topic, _TopicAction action) async {
@@ -321,7 +394,7 @@ class _AreaScreenState extends State<AreaScreen> {
             ],
           ),
         ),
-      ...diaryCards(context, _diary, _file),
+      ...diaryCards(context, _diary, _file, _openNote),
     ];
   }
 
@@ -332,7 +405,22 @@ class _AreaScreenState extends State<AreaScreen> {
     if (area == null) return Scaffold(appBar: AppBar());
     final searching = _query.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: Text(areaName(t, area))),
+      appBar: AppBar(
+        title: Text(areaName(t, area)),
+        actions: diaryActions(
+          context,
+          order: _order,
+          hideUnimportant: _hideUnimportant,
+          onOrder: (order) => setState(() {
+            _order = order;
+            _load();
+          }),
+          onHideUnimportant: (hide) => setState(() {
+            _hideUnimportant = hide;
+            _load();
+          }),
+        ),
+      ),
       body: BrowserSwipes(
         onForward: _forward,
         child: Column(
@@ -346,17 +434,19 @@ class _AreaScreenState extends State<AreaScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file)
+                    ? _hitCards(context, _diary, _file, _openNote)
                     : _browsing(t, area),
               ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: t.newTopic,
-        onPressed: _add,
-        child: const Icon(Icons.add),
+      floatingActionButton: Builder(
+        builder: (button) => FloatingActionButton(
+          tooltip: t.addHere,
+          onPressed: () => _add(button),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -384,6 +474,8 @@ class _TopicScreenState extends State<TopicScreen> {
   final _query = TextEditingController();
   late Topic? _topic;
   late List<PlacedNote> _diary;
+  DiaryOrder _order = DiaryOrder.time;
+  bool _hideUnimportant = false;
 
   @override
   void initState() {
@@ -399,7 +491,13 @@ class _TopicScreenState extends State<TopicScreen> {
 
   void _load() {
     _topic = widget.places.topicById(widget.topicId);
-    _diary = _search(widget.places, _query.text, within: widget.topicId);
+    _diary = _search(
+      widget.places,
+      _query.text,
+      within: widget.topicId,
+      order: _order,
+      hideUnimportant: _hideUnimportant,
+    );
   }
 
   void _reload() => setState(_load);
@@ -422,6 +520,12 @@ class _TopicScreenState extends State<TopicScreen> {
     }
   }
 
+  Future<void> _openNote(Note note) async {
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -429,7 +533,22 @@ class _TopicScreenState extends State<TopicScreen> {
     if (topic == null) return Scaffold(appBar: AppBar());
     final searching = _query.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: Text(topicName(t, topic))),
+      appBar: AppBar(
+        title: Text(topicName(t, topic)),
+        actions: diaryActions(
+          context,
+          order: _order,
+          hideUnimportant: _hideUnimportant,
+          onOrder: (order) => setState(() {
+            _order = order;
+            _load();
+          }),
+          onHideUnimportant: (hide) => setState(() {
+            _hideUnimportant = hide;
+            _load();
+          }),
+        ),
+      ),
       body: BrowserSwipes(
         child: Column(
           children: [
@@ -442,10 +561,10 @@ class _TopicScreenState extends State<TopicScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file)
+                    ? _hitCards(context, _diary, _file, _openNote)
                     : _diary.isEmpty
                     ? [BrowserEmpty(text: t.noNotesHere)]
-                    : diaryCards(context, _diary, _file),
+                    : diaryCards(context, _diary, _file, _openNote),
               ),
             ),
           ],
@@ -460,9 +579,20 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 }
 
-/// The Notes matching [query], newest first, with where they are filed.
-List<PlacedNote> _search(Places places, String query, {String? within}) => [
-  for (final note in Search(places.store).notes(query, within: within))
+/// The Notes matching [query] as a diary in [order], with where they
+/// are filed.
+List<PlacedNote> _search(
+  Places places,
+  String query, {
+  String? within,
+  DiaryOrder order = DiaryOrder.time,
+  bool hideUnimportant = false,
+}) => [
+  for (final note in diary(
+    Search(places.store).notes(query, within: within),
+    order: order,
+    hideUnimportant: hideUnimportant,
+  ))
     placeNote(places, note),
 ];
 
@@ -471,9 +601,10 @@ List<Widget> _hitCards(
   BuildContext context,
   List<PlacedNote> hits,
   void Function(Note note) onFile,
+  void Function(Note note) onOpen,
 ) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
-    : diaryCards(context, hits, onFile);
+    : diaryCards(context, hits, onFile, onOpen);
 
 /// Opens "file into…" for [note] and files it; true when it moved.
 Future<bool> fileNote(
@@ -631,41 +762,53 @@ class _NameDialogState extends State<_NameDialog> {
   }
 }
 
-/// Asks once whether to delete [area]. With Notes inside, the question
-/// is where they go; for now that is only Unsorted (the trash comes with
-/// the Note editor). True when the user confirmed.
-Future<bool> confirmDeleteArea(
+/// Asks once whether to delete [area]. With Notes inside, in it or in
+/// its Topics, the question is where they go: Unsorted or the trash.
+/// Null when the user cancelled.
+Future<NotesGo?> confirmDeleteArea(
   BuildContext context,
   Places places,
   Area area,
-) async {
+) {
   final t = context.t;
   final count = places.notesInside(area.id);
   final hasTopics = places.topics(area.id).isNotEmpty;
-  final go = await showDialog<bool>(
+  return showDialog<NotesGo>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(t.deleteAreaQuestion(areaName(t, area))),
       content: _lines([
-        if (count > 0) t.notesInside(count),
         if (hasTopics) t.topicsGoToo,
+        if (count > 0) ...[t.notesInside(count), t.whereNotesGo],
       ]),
       actions: [
         _cancel(context, t),
-        _destructive(
-          context,
-          count > 0 ? t.moveToUnsorted : t.delete,
-          () => Navigator.of(context).pop(true),
-        ),
+        if (count == 0)
+          _destructive(
+            context,
+            t.delete,
+            () => Navigator.of(context).pop(NotesGo.unsorted),
+          )
+        else ...[
+          _destructive(
+            context,
+            t.moveToUnsorted,
+            () => Navigator.of(context).pop(NotesGo.unsorted),
+          ),
+          _destructive(
+            context,
+            t.trashThem,
+            () => Navigator.of(context).pop(NotesGo.trash),
+          ),
+        ],
       ],
     ),
   );
-  return go ?? false;
 }
 
 /// Asks once whether to delete [topic]. With Notes inside, the question
-/// is where they go: Unsorted or [area] (the trash comes with the Note
-/// editor). Null when the user cancelled.
+/// is where they go: Unsorted, [area] or the trash. Null when the user
+/// cancelled.
 Future<NotesGo?> confirmDeleteTopic(
   BuildContext context,
   Places places,
@@ -699,6 +842,11 @@ Future<NotesGo?> confirmDeleteTopic(
             context,
             t.moveToArea(areaName(t, area)),
             () => Navigator.of(context).pop(NotesGo.area),
+          ),
+          _destructive(
+            context,
+            t.trashThem,
+            () => Navigator.of(context).pop(NotesGo.trash),
           ),
         ],
       ],

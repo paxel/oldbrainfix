@@ -80,5 +80,34 @@
   "searchTopicHint": "Search this Topic",
   "clearSearch": "Clear search",
   "nothingFound": "No Note matches.",
-  "noNotesHere": "No Notes here yet. Tap + to add one."
+  "noNotesHere": "No Notes here yet. Tap + to add one.",
+  "noteTitle": "Note",
+  "importance": "Importance",
+  "importanceUnimportant": "Unimportant",
+  "importanceNormal": "Normal",
+  "importanceImportant": "Important",
+  "capturedHeading": "Captured",
+  "amend": "Add to Note",
+  "amendHint": "What's new?",
+  "add": "Add",
+  "moveToTrash": "Move to trash",
+  "trashTitle": "Trash",
+  "trashEmpty": "The trash is empty.",
+  "restore": "Restore",
+  "goneIn": "{count, plural, =0{Deleted for good within a day} =1{Deleted for good in 1 day} other{Deleted for good in {count} days}}",
+  "@goneIn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "trashThem": "Move to trash",
+  "orderByImportance": "Order by Importance",
+  "orderByTime": "Order by time",
+  "hideUnimportant": "Hide unimportant Notes",
+  "showUnimportant": "Show unimportant Notes",
+  "addHere": "Add here",
+  "noteHere": "Note here",
+  "topicChoice": "Topic"
 }

@@ -104,11 +104,13 @@ class BrowserSearchField extends StatelessWidget {
   );
 }
 
-/// Notes as a diary of cards, each with "file into…".
+/// Notes as a diary of cards, each with "file into…"; tapping a card
+/// opens it.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
   void Function(Note note) onFile,
+  void Function(Note note) onOpen,
 ) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
@@ -120,7 +122,38 @@ List<Widget> diaryCards(
         area: area,
         topic: topic,
         onFile: () => onFile(note),
+        onTap: () => onOpen(note),
       ),
+  ];
+}
+
+/// The app bar buttons of a diary: order by time or by Importance, and
+/// hide or show the unimportant Notes. Each says what tapping it does.
+List<Widget> diaryActions(
+  BuildContext context, {
+  required DiaryOrder order,
+  required bool hideUnimportant,
+  required ValueChanged<DiaryOrder> onOrder,
+  required ValueChanged<bool> onHideUnimportant,
+}) {
+  final t = context.t;
+  final byImportance = order == DiaryOrder.importance;
+  return [
+    IconButton(
+      tooltip: byImportance ? t.orderByTime : t.orderByImportance,
+      isSelected: byImportance,
+      onPressed: () =>
+          onOrder(byImportance ? DiaryOrder.time : DiaryOrder.importance),
+      icon: const Icon(Icons.sort),
+      selectedIcon: const Icon(Icons.label_important_outline),
+    ),
+    IconButton(
+      tooltip: hideUnimportant ? t.showUnimportant : t.hideUnimportant,
+      isSelected: hideUnimportant,
+      onPressed: () => onHideUnimportant(!hideUnimportant),
+      icon: const Icon(Icons.visibility_outlined),
+      selectedIcon: const Icon(Icons.visibility_off_outlined),
+    ),
   ];
 }
 

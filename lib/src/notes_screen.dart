@@ -8,6 +8,7 @@ import 'capture_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'note_editor_screen.dart';
 
 /// The list of captured Notes, newest first, with "+" to capture and the
 /// magnifier to open the notes browser. Stands in for the Agenda.
@@ -69,6 +70,12 @@ class _NotesScreenState extends State<NotesScreen> {
     }
   }
 
+  Future<void> _open(Note note) async {
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -98,6 +105,7 @@ class _NotesScreenState extends State<NotesScreen> {
                     area: area,
                     topic: topic,
                     onFile: () => _file(note),
+                    onTap: () => _open(note),
                   ),
               ],
             ),

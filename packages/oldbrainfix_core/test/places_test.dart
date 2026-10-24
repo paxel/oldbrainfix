@@ -184,7 +184,7 @@ void main() {
       notes.file(inTopic.id, kitchen.id);
       notes.file(elsewhere.id, work.id);
       tick();
-      places.deleteArea(home.id);
+      places.deleteArea(home.id, NotesGo.unsorted);
       expect(places.areas().map((a) => a.id), [work.id]);
       expect(places.topicById(kitchen.id), isNull);
       expect(notes.byId(inArea.id)?.isUnsorted, isTrue);
@@ -199,10 +199,59 @@ void main() {
       tick();
       notes.file(note.id, home.id);
       tick();
-      places.deleteArea(home.id);
+      places.deleteArea(home.id, NotesGo.unsorted);
       tick();
       notes.file(note.id, work.id);
       expect(notes.byId(note.id)?.place, work.id);
+    });
+
+    test('deleting a Topic can trash its Notes', () {
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final note = notes.capture('sauce', place: kitchen.id);
+      tick();
+      places.deleteTopic(kitchen.id, NotesGo.trash);
+      expect(notes.byId(note.id)?.isTrashed, isTrue);
+      expect(notes.byId(note.id)?.isUnsorted, isFalse);
+      expect(notes.all(), isEmpty);
+      expect(notes.trashed().map((n) => n.id), [note.id]);
+    });
+
+    test('deleting an Area can trash its and its Topics\' Notes', () {
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final work = places.addArea('Work');
+      final inArea = notes.capture('a', place: home.id);
+      final inTopic = notes.capture('b', place: kitchen.id);
+      final elsewhere = notes.capture('c', place: work.id);
+      tick();
+      places.deleteArea(home.id, NotesGo.trash);
+      expect(places.topicById(kitchen.id), isNull);
+      expect(notes.all().map((n) => n.id), [elsewhere.id]);
+      expect(notes.trashed().map((n) => n.id).toSet(), {inArea.id, inTopic.id});
+    });
+
+    test('an Area\'s Notes cannot move into the Area being deleted', () {
+      final home = places.addArea('Household');
+      notes.capture('a', place: home.id);
+      expect(
+        () => places.deleteArea(home.id, NotesGo.area),
+        throwsArgumentError,
+      );
+      expect(places.areaById(home.id), isNotNull);
+    });
+
+    test('a trashed Note whose place is gone comes back Unsorted', () {
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final note = notes.capture('sauce', place: kitchen.id);
+      tick();
+      notes.trash(note.id);
+      tick();
+      places.deleteTopic(kitchen.id, NotesGo.area);
+      tick();
+      notes.restore(note.id);
+      expect(notes.byId(note.id)?.isUnsorted, isTrue);
     });
   });
 
