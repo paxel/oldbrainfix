@@ -1,5 +1,5 @@
-//! The strings, generated at build time from `lib/l10n/*.arb` by
-//! `oldbrainfix-l10n`. One accessor per key; the ones with placeholders
+//! The strings, generated at build time from `lib/l10n/*.arb` and the
+//! desktop's own `desktop/l10n/*.arb` by `oldbrainfix-l10n`. One accessor per key; the ones with placeholders
 //! take typed arguments and format through the ICU subset.
 
 include!(concat!(env!("OUT_DIR"), "/l10n.rs"));
@@ -35,5 +35,19 @@ mod tests {
         assert_eq!(locale_for_system(Some("en-US")), "en");
         assert_eq!(locale_for_system(Some("fr")), "en");
         assert_eq!(locale_for_system(None), "en");
+    }
+
+    #[test]
+    fn the_desktop_strings_are_translated() {
+        let en = L10n::new("en");
+        let de = L10n::new("de");
+        for (en, de) in [
+            (en.close(), de.close()),
+            (en.capture_keys_hint(), de.capture_keys_hint()),
+            (en.drag_to_file(), de.drag_to_file()),
+        ] {
+            assert_ne!(en, de);
+        }
+        assert_eq!(de.close(), "Schließen");
     }
 }

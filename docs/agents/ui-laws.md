@@ -95,4 +95,6 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - The desktop window is multi-pane: Areas and Topics on the left, Notes
   in the middle, the selected Note's editor on the right, the Agenda as
   a panel or view.
-- Keys replace swipes: one for back, one for forward.
+- Keys replace swipes: one for back, one for forward. They are Alt+Left
+  and Alt+Right, and the mouse's back and forward buttons; the keys
+  rest while text is being typed.

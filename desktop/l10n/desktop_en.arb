@@ -1,0 +1,9 @@
+{
+  "@@locale": "en",
+  "close": "Close",
+  "@close": {"description": "Closes a dialog that saves as you pick, like an Area's colour and icon."},
+  "captureKeysHint": "Ctrl+Enter saves it with a Nudge in 1 h.",
+  "@captureKeysHint": {"description": "Under the desktop's capture field while something is typed."},
+  "dragToFile": "Or drag its card onto an Area or Topic.",
+  "@dragToFile": {"description": "Under the File into… button in the desktop's Note editor."}
+}

@@ -1,21 +1,26 @@
 //! The Dart core writes the fixture corpus under `desktop/fixtures`
 //! (`packages/oldbrainfix_core/tool/gen_fixtures.dart`); this core must
-//! read every log the same and sign every entry the same.
+//! read every log the same, sign every entry the same, and write every
+//! scenario again to the same log, byte for byte.
 
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
+use chrono::{DateTime, Duration, TimeZone, Utc};
+use oldbrainfix_core::notes::keys as note_keys;
+use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
-    Note, Notes, Places, Section, SigningKey, Store, WireEntry, dart_iso, parse_time,
+    Importance, Note, Notes, NotesGo, Places, STARTER_SET, Section, SigningKey, Store, WireEntry,
+    dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 4] = ["notes", "places", "sections", "trash"];
+const SCENARIOS: [&str; 5] = ["edits", "notes", "places", "sections", "trash"];
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
@@ -323,5 +328,242 @@ fn the_workspace_version_is_the_pubspec_version() -> TestResult {
         .and_then(|v| v.split('+').next())
         .ok_or("pubspec.yaml names a version")?;
     assert_eq!(version.trim(), env!("CARGO_PKG_VERSION"));
+    Ok(())
+}
+
+// ------------------------------------------------- writing the scenarios
+
+/// The generator's store: the writer key, author Ada, a clock that starts
+/// at 2026-01-01 10:00 UTC and moves one second per read, and ids
+/// counted from 1, as `_store()` in the generator makes it.
+fn writer_store() -> Result<Store, Box<dyn std::error::Error>> {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI64, Ordering};
+    let start = Utc
+        .with_ymd_and_hms(2026, 1, 1, 10, 0, 0)
+        .single()
+        .ok_or("a valid start")?;
+    let ticks = Arc::new(AtomicI64::new(0));
+    let clock = move || start + Duration::seconds(ticks.fetch_add(1, Ordering::SeqCst) + 1);
+    let mut store = Store::in_memory(Box::new(clock), || Ok(writer_key()))?;
+    let ids = Arc::new(AtomicI64::new(0));
+    store.set_id_maker(Box::new(move || {
+        Ok(format!("{:032x}", ids.fetch_add(1, Ordering::SeqCst) + 1))
+    }));
+    store.set_local_setting("author", "Ada")?;
+    Ok(store)
+}
+
+fn utc(y: i32, m: u32, d: u32, h: u32) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+    Ok(Utc
+        .with_ymd_and_hms(y, m, d, h, 0, 0)
+        .single()
+        .ok_or("a valid date")?)
+}
+
+type Built = Result<(), Box<dyn std::error::Error>>;
+
+/// Writes one scenario into a store.
+type Writer = fn(&Store) -> Built;
+
+/// The generator's `notes` scenario.
+fn write_notes(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let a = notes.capture("Buy more sauce", None, None)?;
+    notes.set_importance(&a.id, Importance::Important)?;
+    let b = notes.capture("nees mor sauce", None, None)?;
+    notes.edit(&b.id, "Needs more sauce")?;
+    let c = notes.capture("Maybe paint the shed", None, None)?;
+    notes.set_importance(&c.id, Importance::Unimportant)?;
+    notes.set_importance(&c.id, Importance::Normal)?;
+    notes.set_importance(&c.id, Importance::Unimportant)?;
+    let d = notes.capture("First text", None, None)?;
+    store.append(
+        &d.id,
+        note_keys::TEXT,
+        Some("Dated back"),
+        Some(utc(2025, 12, 31, 0)?),
+    )?;
+    let e = notes.capture("Sub-millisecond", None, None)?;
+    store.append(
+        &e.id,
+        note_keys::TEXT,
+        Some("Half a millisecond later"),
+        Some(utc(2026, 1, 2, 9)? + Duration::microseconds(500)),
+    )?;
+    store.append(
+        &e.id,
+        note_keys::TEXT,
+        Some("Earlier, written later"),
+        Some(utc(2026, 1, 2, 9)?),
+    )?;
+    notes.capture(
+        "Quote \" backslash \\ slash / newline \n tab \t bell \u{1} umlaut ü emoji 🧠",
+        None,
+        None,
+    )?;
+    Ok(())
+}
+
+/// The generator's `sections` scenario.
+fn write_sections(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let a = notes.capture("Dentist on Tuesday", None, None)?;
+    notes.amend(&a.id, "Moved to Wednesday")?;
+    let b = notes.capture("Ask about the crown", None, None)?;
+    notes.amend(&b.id, "Bring the old X-ray")?;
+    let c = notes.capture("Dentist number", None, None)?;
+    notes.merge(&b.id, &a.id)?;
+    notes.merge(&a.id, &c.id)?;
+    notes.amend(&c.id, "Called, all set")?;
+    let x = notes.capture("Loop one", None, None)?;
+    let y = notes.capture("Loop two", None, None)?;
+    store.append(&y.id, note_keys::MERGED, Some(&x.id), None)?;
+    store.append(&x.id, note_keys::MERGED, Some(&y.id), None)?;
+    let z = notes.capture("Merged into a stranger", None, None)?;
+    store.append(&z.id, note_keys::MERGED, Some("note:elsewhere"), None)?;
+    Ok(())
+}
+
+/// The generator's `places` scenario.
+fn write_places(store: &Store) -> Built {
+    let places = Places::new(store);
+    let notes = Notes::new(store);
+    let every: Vec<&str> = STARTER_SET
+        .iter()
+        .flat_map(|(area, topics)| std::iter::once(area.slug).chain(topics.iter().map(|t| t.slug)))
+        .collect();
+    places.plant_starter_set(&every)?;
+    let starter = |slug: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let area = places
+            .areas()?
+            .into_iter()
+            .find(|a| a.starter.as_deref() == Some(slug));
+        Ok(area.ok_or("a starter Area")?.id)
+    };
+    let car = starter("car")?;
+    places.rename(&car, "Bike")?;
+    let kids = places.add_area("Kids")?;
+    places.set_colour(&kids.id, Some("6A1B9A"))?;
+    places.set_icon(&kids.id, Some("kids"))?;
+    let school = places.add_topic(&kids.id, "School")?;
+    let household = starter("household")?;
+    let kitchen = places
+        .topics(&household)?
+        .into_iter()
+        .find(|t| t.starter.as_deref() == Some("kitchen"))
+        .ok_or("the kitchen")?;
+    notes.capture("Descale the kettle", Some(&kitchen.id), None)?;
+    notes.capture("Sort the cellar", Some(&household), None)?;
+    notes.capture("Parents evening", Some(&school.id), None)?;
+    notes.capture("New tyres", Some(&car), None)?;
+    let lost = notes.capture("Where did this go?", Some(&school.id), None)?;
+    store.append(&school.id, place_keys::TYPE, None, None)?;
+    notes.capture("Still Unsorted", None, None)?;
+    let gone = places.add_area("Gone")?;
+    places.add_topic(&gone.id, "Gone too")?;
+    places.delete_area(&gone.id, NotesGo::Unsorted)?;
+    notes.set_importance(&lost.id, Importance::Important)?;
+    Ok(())
+}
+
+/// The generator's `trash` scenario.
+fn write_trash(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let a = notes.capture("Old shopping list", None, None)?;
+    notes.trash(&a.id)?;
+    let b = notes.capture("Not so old after all", None, None)?;
+    notes.trash(&b.id)?;
+    notes.restore(&b.id)?;
+    let c = notes.capture("Long gone", None, None)?;
+    store.append(
+        &c.id,
+        note_keys::TRASHED,
+        Some(&dart_iso(utc(2025, 11, 1, 0)?)),
+        None,
+    )?;
+    let d = notes.capture("Into the bin with the other", None, None)?;
+    let e = notes.capture("The other", None, None)?;
+    notes.merge(&d.id, &e.id)?;
+    notes.trash(&e.id)?;
+    Ok(())
+}
+
+/// The generator's `edits` scenario: what the desktop writes beyond the
+/// others.
+fn write_edits(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let places = Places::new(store);
+    let home = places.add_area("Hom")?;
+    places.rename(&home.id, "Home")?;
+    places.set_colour(&home.id, Some("00838F"))?;
+    places.set_icon(&home.id, Some("home"))?;
+    let post = places.add_topic(&home.id, "Post")?;
+    let bills = places.add_topic(&home.id, "Bils")?;
+    places.rename(&bills.id, "Bills")?;
+    let junk = places.add_topic(&home.id, "Junk")?;
+    let empty = places.add_topic(&home.id, "Empty")?;
+    let errands = places.add_area("Errands")?;
+    places.set_colour(&errands.id, Some("C62828"))?;
+    places.set_icon(&errands.id, Some("shopping"))?;
+    places.set_colour(&errands.id, None)?;
+    places.set_icon(&errands.id, None)?;
+    let shop = places.add_topic(&errands.id, "Shop")?;
+    let garage = places.add_area("Garage")?;
+    let tools = places.add_topic(&garage.id, "Tools")?;
+    let plumber = notes.capture("Call the plumber", None, Some(Duration::minutes(10)))?;
+    let plants = notes.capture("Water the plants", None, Some(Duration::minutes(30)))?;
+    let hour = Some(Notes::default_nudge());
+    let passport = notes.capture("Renew the passport", None, hour)?;
+    notes.capture("Pay the rent", Some(&bills.id), hour)?;
+    notes.capture("Old flyer", Some(&junk.id), hour)?;
+    notes.capture("Buy stamps", Some(&shop.id), hour)?;
+    notes.capture("Return the drill", Some(&errands.id), hour)?;
+    notes.capture("Oil the saw", Some(&tools.id), hour)?;
+    notes.capture("Sweep the floor", Some(&garage.id), hour)?;
+    notes.file(&plumber.id, &post.id)?;
+    notes.file(&plumber.id, &bills.id)?;
+    notes.file(&plants.id, &post.id)?;
+    notes.file(&passport.id, &post.id)?;
+    store.append(
+        &passport.id,
+        note_keys::SPAWNED,
+        Some(&dart_iso(utc(2026, 1, 1, 12)?)),
+        None,
+    )?;
+    places.delete_topic(&post.id, NotesGo::Unsorted)?;
+    places.delete_topic(&bills.id, NotesGo::Area)?;
+    places.delete_topic(&junk.id, NotesGo::Trash)?;
+    places.delete_topic(&empty.id, NotesGo::Unsorted)?;
+    places.delete_area(&errands.id, NotesGo::Trash)?;
+    places.delete_area(&garage.id, NotesGo::Unsorted)?;
+    Ok(())
+}
+
+#[test]
+fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
+    let writers: [(&str, Writer); 5] = [
+        ("edits", write_edits),
+        ("notes", write_notes),
+        ("places", write_places),
+        ("sections", write_sections),
+        ("trash", write_trash),
+    ];
+    assert_eq!(writers.map(|(s, _)| s), SCENARIOS);
+    for (scenario, write) in writers {
+        let store = writer_store()?;
+        write(&store)?;
+        let ours: Vec<String> = store
+            .all_entries()?
+            .iter()
+            .map(|e| serde_json::to_string(&e.wire()))
+            .collect::<Result<_, _>>()?;
+        let text = std::fs::read_to_string(fixtures().join(scenario).join("log.jsonl"))?;
+        let theirs: Vec<&str> = text.lines().filter(|l| !l.is_empty()).collect();
+        assert_eq!(ours.len(), theirs.len(), "{scenario}: entry count");
+        for (i, (ours, theirs)) in ours.iter().zip(&theirs).enumerate() {
+            assert_eq!(ours, theirs, "{scenario}: line {}", i + 1);
+        }
+    }
     Ok(())
 }

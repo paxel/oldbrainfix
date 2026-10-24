@@ -1,8 +1,9 @@
-//! Areas and Topics as the Dart core's `Places` reads them: exactly two
-//! levels.
+//! Areas and Topics as the Dart core's `Places` reads and writes them:
+//! exactly two levels.
 
-use crate::Result;
+use crate::notes::{Notes, keys as note_keys};
 use crate::store::{Store, utf16_cmp};
+use crate::{Error, Result};
 
 /// Field keys of Areas and Topics.
 pub mod keys {
@@ -18,6 +19,24 @@ pub mod keys {
     pub const ICON: &str = "icon";
     /// The Area a Topic lives in.
     pub const AREA: &str = "area";
+}
+
+/// The icons an Area can carry, as keys every front end draws its own
+/// way: the Dart core's `areaIcons`.
+pub const AREA_ICONS: [&str; 14] = [
+    "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping", "money",
+    "pets", "sport", "travel", "star",
+];
+
+/// Where a deleted place's Notes go.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotesGo {
+    /// Back to Unsorted.
+    Unsorted,
+    /// Into the deleted Topic's Area.
+    Area,
+    /// Into the trash.
+    Trash,
 }
 
 /// The top level Notes are filed under (CONTEXT.md).
@@ -144,6 +163,176 @@ impl<'a> Places<'a> {
         Places { store }
     }
 
+    /// Creates an Area named `name`.
+    pub fn add_area(&self, name: &str) -> Result<Area> {
+        let name = Self::name(name)?;
+        let id = self.store.batch(|| self.append_area(name, None))?;
+        self.area_by_id(&id)?
+            .ok_or_else(|| Error::Invalid("the new Area is gone".into()))
+    }
+
+    /// Creates a Topic named `name` inside the Area `area_id`. Only an
+    /// Area holds Topics: there is no third level.
+    pub fn add_topic(&self, area_id: &str, name: &str) -> Result<Topic> {
+        self.require_area(area_id)?;
+        let name = Self::name(name)?;
+        let id = self
+            .store
+            .batch(|| self.append_topic(area_id, name, None))?;
+        self.topic_by_id(&id)?
+            .ok_or_else(|| Error::Invalid("the new Topic is gone".into()))
+    }
+
+    /// Renames the Area or Topic `id`.
+    pub fn rename(&self, id: &str, name: &str) -> Result<()> {
+        let name = Self::name(name)?;
+        if !self.is_place(id)? {
+            return Err(Error::Invalid(format!("not an Area or Topic: {id}")));
+        }
+        self.store
+            .append(id, keys::NAME, Some(name), None)
+            .map(drop)
+    }
+
+    /// Sets or clears the colour (`RRGGBB`) of the Area `area_id`.
+    pub fn set_colour(&self, area_id: &str, colour: Option<&str>) -> Result<()> {
+        self.require_area(area_id)?;
+        self.store
+            .append(area_id, keys::COLOUR, colour, None)
+            .map(drop)
+    }
+
+    /// Sets or clears the icon of the Area `area_id`, one of
+    /// [`AREA_ICONS`].
+    pub fn set_icon(&self, area_id: &str, icon: Option<&str>) -> Result<()> {
+        self.require_area(area_id)?;
+        if let Some(icon) = icon
+            && !AREA_ICONS.contains(&icon)
+        {
+            return Err(Error::Invalid(format!("not an Area icon: {icon}")));
+        }
+        self.store.append(area_id, keys::ICON, icon, None).map(drop)
+    }
+
+    /// How many Notes sit in `id`; for an Area, its Topics' Notes count
+    /// too.
+    pub fn notes_inside(&self, id: &str) -> Result<usize> {
+        Ok(Notes::new(self.store).inside(id)?.len())
+    }
+
+    /// Deletes the Topic `topic_id`; its Notes go where `notes_go` says.
+    pub fn delete_topic(&self, topic_id: &str, notes_go: NotesGo) -> Result<()> {
+        let topic = self
+            .topic_by_id(topic_id)?
+            .ok_or_else(|| Error::Invalid(format!("not a Topic: {topic_id}")))?;
+        self.store.batch(|| {
+            self.move_notes(topic_id, notes_go, Some(&topic.area_id))?;
+            self.store.append(topic_id, keys::TYPE, None, None)?;
+            Ok(())
+        })
+    }
+
+    /// Deletes the Area `area_id` with its Topics; their Notes go where
+    /// `notes_go` says: back to Unsorted or into the trash.
+    pub fn delete_area(&self, area_id: &str, notes_go: NotesGo) -> Result<()> {
+        self.require_area(area_id)?;
+        if notes_go == NotesGo::Area {
+            return Err(Error::Invalid("an Area has no Area".into()));
+        }
+        self.store.batch(|| {
+            self.move_notes(area_id, notes_go, None)?;
+            for topic in self.topics(area_id)? {
+                self.store.append(&topic.id, keys::TYPE, None, None)?;
+            }
+            self.store.append(area_id, keys::TYPE, None, None)?;
+            Ok(())
+        })
+    }
+
+    /// Plants the Starter Set entries whose slugs are in `picked`. A
+    /// Topic is planted only together with its Area.
+    pub fn plant_starter_set(&self, picked: &[&str]) -> Result<()> {
+        self.store.batch(|| {
+            for (area, topics) in STARTER_SET {
+                if !picked.contains(&area.slug) {
+                    continue;
+                }
+                let area_id = self.append_area(area.name, Some(area.slug))?;
+                for topic in topics {
+                    if picked.contains(&topic.slug) {
+                        self.append_topic(&area_id, topic.name, Some(topic.slug))?;
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+
+    /// Sends the Notes inside `id` where `notes_go` says; `area_id` is
+    /// where [`NotesGo::Area`] leads.
+    fn move_notes(&self, id: &str, notes_go: NotesGo, area_id: Option<&str>) -> Result<()> {
+        let notes = Notes::new(self.store);
+        for note in notes.inside(id)? {
+            match notes_go {
+                NotesGo::Unsorted => {
+                    // Back to Unsorted, even when it spawned a Routine
+                    // (CONTEXT.md).
+                    self.store.append(&note.id, note_keys::PLACE, None, None)?;
+                    if note.spawned {
+                        self.store
+                            .append(&note.id, note_keys::SPAWNED, None, None)?;
+                    }
+                }
+                NotesGo::Area => {
+                    self.store
+                        .append(&note.id, note_keys::PLACE, area_id, None)?;
+                }
+                NotesGo::Trash => notes.trash(&note.id)?,
+            }
+        }
+        Ok(())
+    }
+
+    // The writes behind add_area and add_topic, for use inside one batch.
+    fn append_area(&self, name: &str, starter: Option<&str>) -> Result<String> {
+        let id = format!("area:{}", self.store.new_id()?);
+        self.store
+            .append(&id, keys::TYPE, Some(keys::TYPE_AREA), None)?;
+        self.store.append(&id, keys::NAME, Some(name), None)?;
+        if let Some(starter) = starter {
+            self.store.append(&id, keys::STARTER, Some(starter), None)?;
+        }
+        Ok(id)
+    }
+
+    fn append_topic(&self, area_id: &str, name: &str, starter: Option<&str>) -> Result<String> {
+        let id = format!("topic:{}", self.store.new_id()?);
+        self.store
+            .append(&id, keys::TYPE, Some(keys::TYPE_TOPIC), None)?;
+        self.store.append(&id, keys::AREA, Some(area_id), None)?;
+        self.store.append(&id, keys::NAME, Some(name), None)?;
+        if let Some(starter) = starter {
+            self.store.append(&id, keys::STARTER, Some(starter), None)?;
+        }
+        Ok(id)
+    }
+
+    fn require_area(&self, id: &str) -> Result<()> {
+        match self.area_by_id(id)? {
+            Some(_) => Ok(()),
+            None => Err(Error::Invalid(format!("not an Area: {id}"))),
+        }
+    }
+
+    /// `name` trimmed; an error when nothing is left.
+    fn name(name: &str) -> Result<&str> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err(Error::Invalid("the name must not be empty".into()));
+        }
+        Ok(trimmed)
+    }
+
     /// The Area `id`, or `None` when there is none.
     pub fn area_by_id(&self, id: &str) -> Result<Option<Area>> {
         let fields = self.store.current_fields(id)?;
@@ -211,6 +400,34 @@ impl<'a> Places<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn place_writes_check_what_they_write_to() -> Result<()> {
+        let store = crate::store::tests::store();
+        let places = Places::new(&store);
+        assert!(places.add_area("  ").is_err());
+        let area = places.add_area(" Home ")?;
+        assert_eq!(area.name, "Home");
+        assert!(places.add_topic("area:none", "x").is_err());
+        let topic = places.add_topic(&area.id, "Post")?;
+        assert!(places.add_topic(&topic.id, "Third level").is_err());
+        assert!(places.rename("area:none", "x").is_err());
+        assert!(places.set_icon(&area.id, Some("rocket")).is_err());
+        assert!(places.set_colour(&topic.id, Some("C62828")).is_err());
+        assert!(places.delete_area(&area.id, NotesGo::Area).is_err());
+        assert!(places.delete_topic(&area.id, NotesGo::Unsorted).is_err());
+        places.set_icon(&area.id, Some("home"))?;
+        assert_eq!(
+            places.area_by_id(&area.id)?.and_then(|a| a.icon),
+            Some("home".into())
+        );
+        places.plant_starter_set(&["work", "meetings", "doctor"])?;
+        let names: Vec<_> = places.areas()?.into_iter().map(|a| a.name).collect();
+        assert_eq!(names, ["Home", "Work"]);
+        places.delete_area(&area.id, NotesGo::Unsorted)?;
+        assert!(places.topic_by_id(&topic.id)?.is_none());
+        Ok(())
+    }
 
     #[test]
     fn starter_names_are_found_by_slug() {

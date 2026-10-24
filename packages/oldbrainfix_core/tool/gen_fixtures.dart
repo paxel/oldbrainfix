@@ -159,6 +159,74 @@ final _scenarios = <Scenario>[
       notes.trash(e.id);
     },
   ),
+  (
+    name: 'edits',
+    about:
+        'What the desktop writes beyond the other scenarios: Areas and '
+        'Topics made and renamed, an Area coloured and given an icon, '
+        'another one with both cleared again; Notes captured with each '
+        'Nudge time, some into a place; Notes filed and filed again; Topics '
+        'deleted with their Notes sent back to Unsorted (one that spawned a '
+        'Routine included), into the Area and into the trash, and an empty '
+        'one; Areas deleted with their Topics, their Notes sent into the '
+        'trash and back to Unsorted.',
+    build: (store) {
+      final notes = Notes(store);
+      final places = Places(store);
+      final home = places.addArea('Hom');
+      places.rename(home.id, 'Home');
+      places.setColour(home.id, '00838F');
+      places.setIcon(home.id, 'home');
+      final post = places.addTopic(home.id, 'Post');
+      final bills = places.addTopic(home.id, 'Bils');
+      places.rename(bills.id, 'Bills');
+      final junk = places.addTopic(home.id, 'Junk');
+      final empty = places.addTopic(home.id, 'Empty');
+      final errands = places.addArea('Errands');
+      places.setColour(errands.id, 'C62828');
+      places.setIcon(errands.id, 'shopping');
+      places.setColour(errands.id, null);
+      places.setIcon(errands.id, null);
+      final shop = places.addTopic(errands.id, 'Shop');
+      final garage = places.addArea('Garage');
+      final tools = places.addTopic(garage.id, 'Tools');
+      final plumber = notes.capture(
+        'Call the plumber',
+        nudgeIn: const Duration(minutes: 10),
+      );
+      final plants = notes.capture(
+        'Water the plants',
+        nudgeIn: const Duration(minutes: 30),
+      );
+      final passport = notes.capture(
+        'Renew the passport',
+        nudgeIn: Notes.defaultNudge,
+      );
+      final hour = Notes.defaultNudge;
+      notes.capture('Pay the rent', place: bills.id, nudgeIn: hour);
+      notes.capture('Old flyer', place: junk.id, nudgeIn: hour);
+      notes.capture('Buy stamps', place: shop.id, nudgeIn: hour);
+      notes.capture('Return the drill', place: errands.id, nudgeIn: hour);
+      notes.capture('Oil the saw', place: tools.id, nudgeIn: hour);
+      notes.capture('Sweep the floor', place: garage.id, nudgeIn: hour);
+      notes.file(plumber.id, post.id);
+      notes.file(plumber.id, bills.id);
+      notes.file(plants.id, post.id);
+      notes.file(passport.id, post.id);
+      // A Routine was spawned from it on another Device.
+      store.append(
+        passport.id,
+        NoteKeys.spawned,
+        DateTime.utc(2026, 1, 1, 12).toIso8601String(),
+      );
+      places.deleteTopic(post.id, NotesGo.unsorted);
+      places.deleteTopic(bills.id, NotesGo.area);
+      places.deleteTopic(junk.id, NotesGo.trash);
+      places.deleteTopic(empty.id, NotesGo.unsorted);
+      places.deleteArea(errands.id, NotesGo.trash);
+      places.deleteArea(garage.id, NotesGo.unsorted);
+    },
+  ),
 ];
 
 /// A value that tests how the signed bytes escape text.

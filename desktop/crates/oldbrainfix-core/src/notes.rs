@@ -1,15 +1,17 @@
-//! Notes and their Sections as the Dart core's `Notes` reads them: the
-//! text, the capture time, the Importance, where a Note is filed, whether
-//! it is in the trash, and what was merged into it.
+//! Notes and their Sections as the Dart core's `Notes` reads and writes
+//! them: the text, the capture time, the Importance, where a Note is
+//! filed, whether it is in the trash, and what was merged into it. Every
+//! write appends the same entries, in the same order and read from the
+//! clock as often, as the Dart core's, so both logs come out alike.
 
 use std::collections::HashSet;
 
 use chrono::{DateTime, Duration, Utc};
 
-use crate::Result;
-use crate::entry::parse_time;
+use crate::entry::{dart_iso, parse_time};
 use crate::places::Places;
 use crate::store::{Fields, Store};
+use crate::{Error, Result};
 
 /// Field keys of a Note.
 pub mod keys {
@@ -27,6 +29,8 @@ pub mod keys {
     pub const MERGED: &str = "merged";
     /// When the Note first spawned a Routine or Reminder.
     pub const SPAWNED: &str = "spawned";
+    /// When the Note's Nudge is due, chosen at Capture.
+    pub const NUDGE: &str = "nudge";
 
     /// Field keys of a Section.
     pub const TYPE_SECTION: &str = "section";
@@ -120,8 +124,157 @@ impl<'a> Notes<'a> {
         Duration::days(30)
     }
 
+    /// How long after Capture the Nudge comes when none was picked (UI
+    /// laws, "Capture").
+    pub fn default_nudge() -> Duration {
+        Duration::hours(1)
+    }
+
     pub fn new(store: &'a Store) -> Notes<'a> {
         Notes { store }
+    }
+
+    /// Captures a new Note at the store's now with `text`, filed into the
+    /// Area or Topic `place` when one is given, nudged `nudge_in` from now
+    /// while it is Unsorted. The text is kept as given.
+    pub fn capture(
+        &self,
+        text: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+    ) -> Result<Note> {
+        if let Some(place) = place
+            && !Places::new(self.store).is_place(place)?
+        {
+            return Err(Error::Invalid(format!("not an Area or Topic: {place}")));
+        }
+        let id = format!("note:{}", self.store.new_id()?);
+        let now = self.store.now();
+        let at = Some(now);
+        self.store.batch(|| {
+            let s = self.store;
+            s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
+            s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
+            s.append(&id, keys::TEXT, Some(text), at)?;
+            if let Some(place) = place {
+                s.append(&id, keys::PLACE, Some(place), at)?;
+            }
+            if let Some(nudge_in) = nudge_in {
+                s.append(&id, keys::NUDGE, Some(&dart_iso(now + nudge_in)), at)?;
+            }
+            Ok(())
+        })?;
+        self.by_id(&id)?
+            .ok_or_else(|| Error::Invalid("the captured Note is gone".into()))
+    }
+
+    /// Files the Note `note_id` into the Area or Topic `place_id`, out of
+    /// wherever it was before.
+    pub fn file(&self, note_id: &str, place_id: &str) -> Result<()> {
+        self.require_note(note_id)?;
+        if !Places::new(self.store).is_place(place_id)? {
+            return Err(Error::Invalid(format!("not an Area or Topic: {place_id}")));
+        }
+        self.store
+            .append(note_id, keys::PLACE, Some(place_id), None)
+            .map(drop)
+    }
+
+    /// Fixes the text of the Note `note_id` in place. The old text stays
+    /// in the log only.
+    pub fn edit(&self, note_id: &str, text: &str) -> Result<()> {
+        self.require_note(note_id)?;
+        let text = Self::text(text)?;
+        self.store
+            .append(note_id, keys::TEXT, Some(text), None)
+            .map(drop)
+    }
+
+    /// Amends the Note `note_id` with a new Section holding `text`,
+    /// captured at the store's now.
+    pub fn amend(&self, note_id: &str, text: &str) -> Result<Section> {
+        self.require_note(note_id)?;
+        let text = Self::text(text)?;
+        let id = format!("section:{}", self.store.new_id()?);
+        let now = self.store.now();
+        let at = Some(now);
+        self.store.batch(|| {
+            let s = self.store;
+            s.append(&id, keys::TYPE, Some(keys::TYPE_SECTION), at)?;
+            s.append(&id, keys::NOTE, Some(note_id), at)?;
+            s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
+            s.append(&id, keys::TEXT, Some(text), at)?;
+            Ok(())
+        })?;
+        let fields = self.store.current_fields(&id)?;
+        Self::section(&id, note_id, &fields)?
+            .ok_or_else(|| Error::Invalid("the new Section is gone".into()))
+    }
+
+    /// Merges the Note `note_id` into the Note `into_id`: it becomes a
+    /// dated Section of it and leaves every list and Unsorted. Nothing is
+    /// copied; the merged Note only points at its target.
+    pub fn merge(&self, note_id: &str, into_id: &str) -> Result<()> {
+        for id in [note_id, into_id] {
+            let listed = self
+                .by_id(id)?
+                .is_some_and(|n| !n.is_trashed() && !n.is_merged());
+            if !listed {
+                return Err(Error::Invalid(format!("not a Note in the lists: {id}")));
+            }
+        }
+        if note_id == into_id {
+            return Err(Error::Invalid("a Note cannot merge into itself".into()));
+        }
+        self.store
+            .append(note_id, keys::MERGED, Some(into_id), None)
+            .map(drop)
+    }
+
+    /// Sets the Importance of the Note `note_id`.
+    pub fn set_importance(&self, note_id: &str, importance: Importance) -> Result<()> {
+        self.require_note(note_id)?;
+        self.store
+            .append(note_id, keys::IMPORTANCE, Some(importance.name()), None)
+            .map(drop)
+    }
+
+    /// Moves the Note `note_id` to the trash: it leaves every list and
+    /// Unsorted, and can be restored until [`Notes::trash_keep`] has
+    /// passed.
+    pub fn trash(&self, note_id: &str) -> Result<()> {
+        self.require_note(note_id)?;
+        // The time is read on its own before the entry reads it again, as
+        // in the Dart core.
+        let at = dart_iso(self.store.now());
+        self.store
+            .append(note_id, keys::TRASHED, Some(&at), None)
+            .map(drop)
+    }
+
+    /// Brings the Note `note_id` back from the trash, to where it was
+    /// filed.
+    pub fn restore(&self, note_id: &str) -> Result<()> {
+        self.require_note(note_id)?;
+        self.store
+            .append(note_id, keys::TRASHED, None, None)
+            .map(drop)
+    }
+
+    fn require_note(&self, id: &str) -> Result<()> {
+        match self.by_id(id)? {
+            Some(_) => Ok(()),
+            None => Err(Error::Invalid(format!("not a Note: {id}"))),
+        }
+    }
+
+    /// `text` trimmed; an error when nothing is left.
+    fn text(text: &str) -> Result<&str> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Err(Error::Invalid("the text must not be empty".into()));
+        }
+        Ok(trimmed)
     }
 
     /// The Note `id`, trashed or not, or `None` when there is none.
@@ -308,6 +461,34 @@ mod tests {
         }
         assert_eq!(Importance::from_name(None), Importance::Normal);
         assert_eq!(Importance::from_name(Some("huge")), Importance::Normal);
+    }
+
+    #[test]
+    fn writes_check_what_they_write_to() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        assert!(notes.capture("x", Some("area:none"), None).is_err());
+        let a = notes.capture("  kept as typed ", None, None)?;
+        assert_eq!(a.text, "  kept as typed ");
+        assert!(notes.edit(&a.id, "   ").is_err());
+        assert!(notes.edit("note:none", "x").is_err());
+        assert!(notes.amend(&a.id, "").is_err());
+        assert!(notes.file(&a.id, "topic:none").is_err());
+        assert!(notes.merge(&a.id, &a.id).is_err());
+        assert!(notes.merge(&a.id, "note:none").is_err());
+        notes.edit(&a.id, " fixed ")?;
+        assert_eq!(notes.by_id(&a.id)?.map(|n| n.text), Some("fixed".into()));
+        let b = notes.capture("other", None, Some(Duration::minutes(10)))?;
+        notes.trash(&b.id)?;
+        assert!(notes.merge(&a.id, &b.id).is_err());
+        notes.restore(&b.id)?;
+        notes.merge(&a.id, &b.id)?;
+        assert_eq!(notes.sections(&b.id)?.len(), 1);
+        assert_eq!(
+            store.current(&b.id, keys::NUDGE)?.as_deref(),
+            Some("2026-01-01T10:10:06.000Z")
+        );
+        Ok(())
     }
 
     #[test]

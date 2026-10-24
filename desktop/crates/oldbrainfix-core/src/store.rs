@@ -18,6 +18,10 @@ use crate::{Error, Result};
 /// Where the store reads "now".
 pub type Clock = Box<dyn Fn() -> DateTime<Utc> + Send>;
 
+/// Where the store gets the ids of new entities: random, unless a test
+/// counts them as the Dart core's fixture generator does.
+pub type IdMaker = Box<dyn Fn() -> Result<String> + Send>;
+
 /// The tables, word for word as the Dart core creates them.
 const SCHEMA: &str = "
       CREATE TABLE IF NOT EXISTS entries (
@@ -65,6 +69,7 @@ impl Fields {
 pub struct Store {
     db: Connection,
     clock: Clock,
+    ids: IdMaker,
 }
 
 impl Store {
@@ -91,7 +96,11 @@ impl Store {
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
         db.execute_batch(SCHEMA)?;
-        let store = Store { db, clock };
+        let store = Store {
+            db,
+            clock,
+            ids: Box::new(random_id),
+        };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;
             store.set_local_setting("device", &device_id_from_key(&key.public_key()))?;
@@ -103,6 +112,25 @@ impl Store {
     /// Now, by the store's clock.
     pub fn now(&self) -> DateTime<Utc> {
         (self.clock)()
+    }
+
+    /// Makes the ids of new entities with `ids` from now on.
+    pub fn set_id_maker(&mut self, ids: IdMaker) {
+        self.ids = ids;
+    }
+
+    /// A fresh id for a new entity.
+    pub fn new_id(&self) -> Result<String> {
+        (self.ids)()
+    }
+
+    /// Runs `body` in one transaction: all of its entries or none. Not
+    /// to be nested.
+    pub fn batch<T>(&self, body: impl FnOnce() -> Result<T>) -> Result<T> {
+        let tx = self.db.unchecked_transaction()?;
+        let out = body()?;
+        tx.commit()?;
+        Ok(out)
     }
 
     /// This installation's stable device id.
@@ -332,6 +360,14 @@ fn raw_row(r: &Row) -> rusqlite::Result<(i64, WireEntry)> {
     ))
 }
 
+/// 16 random bytes as hex, as the Dart core's ids.
+fn random_id() -> Result<String> {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes)
+        .map_err(|e| Error::Invalid(format!("no randomness for an id: {e}")))?;
+    Ok(hex::encode(bytes))
+}
+
 /// Text order as Dart's `String.compareTo` has it: by UTF-16 code units.
 pub fn utf16_cmp(a: &str, b: &str) -> Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
@@ -431,6 +467,25 @@ pub(crate) mod tests {
         })?;
         assert_eq!(again.device_id()?, device);
         assert_eq!(again.current("note:a", "text")?.as_deref(), Some("kept"));
+        Ok(())
+    }
+
+    #[test]
+    fn ids_are_random_unless_counted_and_a_failed_batch_leaves_nothing() -> Result<()> {
+        let mut store = store();
+        let a = store.new_id()?;
+        assert_eq!(a.len(), 32);
+        assert_ne!(a, store.new_id()?);
+        store.set_id_maker(Box::new(|| Ok("1".into())));
+        assert_eq!(store.new_id()?, "1");
+        let failed: Result<()> = store.batch(|| {
+            store.append("note:a", "text", Some("lost"), None)?;
+            Err(Error::Invalid("on purpose".into()))
+        });
+        assert!(failed.is_err());
+        assert!(store.all_entries()?.is_empty());
+        store.batch(|| store.append("note:a", "text", Some("kept"), None))?;
+        assert_eq!(store.all_entries()?.len(), 1);
         Ok(())
     }
 

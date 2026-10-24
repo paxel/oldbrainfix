@@ -14,6 +14,7 @@ pub const UNSORTED: char = '\u{e33a}';
 pub const TRASH: char = '\u{e1bb}';
 pub const IMPORTANT: char = '\u{e361}';
 pub const NO_AREA_ICON: char = '\u{f091}';
+pub const ADD: char = '\u{e047}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
@@ -79,10 +80,7 @@ mod tests {
 
     #[test]
     fn every_area_icon_of_the_core_has_a_glyph() {
-        for key in [
-            "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping",
-            "money", "pets", "sport", "travel", "star",
-        ] {
+        for key in oldbrainfix_core::AREA_ICONS {
             assert!(area_icon(Some(key)).is_some(), "{key}");
         }
         assert_eq!(area_icon(Some("rocket")), None);

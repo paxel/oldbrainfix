@@ -16,6 +16,10 @@ impl eframe::App for Native {
         App::install(ui.ctx());
         self.app.show(ui);
     }
+
+    fn on_exit(&mut self) {
+        self.app.flush();
+    }
 }
 
 fn run() -> Result<(), String> {

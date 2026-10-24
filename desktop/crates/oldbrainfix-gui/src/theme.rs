@@ -48,6 +48,12 @@ pub fn tones(visuals: &Visuals) -> Tones {
     if visuals.dark_mode { DARK } else { LIGHT }
 }
 
+/// The colours offered for an Area, as stored (`RRGGBB`): the phone's
+/// `areaPalette`.
+pub const AREA_PALETTE: [&str; 9] = [
+    "C62828", "EF6C00", "F9A825", "2E7D32", "00838F", "1565C0", "6A1B9A", "8D6E63", "546E7A",
+];
+
 /// How round a card is.
 pub const CARD_RADIUS: u8 = 16;
 
