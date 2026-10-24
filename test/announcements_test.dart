@@ -15,7 +15,7 @@ void main() {
       top: statusBar * tester.view.devicePixelRatio,
     );
     addTearDown(tester.view.reset);
-    final store = Store.inMemory();
+    final store = Store.inMemory()..starterSetOffered = true;
     addTearDown(store.close);
     announcements = Announcements();
     addTearDown(announcements.dispose);

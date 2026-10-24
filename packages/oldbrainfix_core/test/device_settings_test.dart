@@ -25,4 +25,13 @@ void main() {
     store.setLocalSetting('theme', 'purple');
     expect(store.themeChoice, ThemeChoice.system);
   });
+
+  test('the Starter Set is offered until this Device has offered it', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.starterSetOffered, isFalse);
+    store.starterSetOffered = true;
+    expect(store.starterSetOffered, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
 }

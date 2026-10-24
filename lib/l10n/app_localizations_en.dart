@@ -26,4 +26,143 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dismissAnnouncement => 'Dismiss';
+
+  @override
+  String get browseTooltip => 'Areas and Topics';
+
+  @override
+  String get areasTitle => 'Areas';
+
+  @override
+  String get noAreasYet => 'No Areas yet. Tap + to make one.';
+
+  @override
+  String get noTopicsYet =>
+      'No Topics yet. Notes can sit in the Area itself, or tap + to make a Topic.';
+
+  @override
+  String get newArea => 'New Area';
+
+  @override
+  String get newTopic => 'New Topic';
+
+  @override
+  String get nameHint => 'Name';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get areaLook => 'Colour and icon';
+
+  @override
+  String get colourHeading => 'Colour';
+
+  @override
+  String get iconHeading => 'Icon';
+
+  @override
+  String get noColour => 'No colour';
+
+  @override
+  String get noIcon => 'No icon';
+
+  @override
+  String deleteAreaQuestion(String name) {
+    return 'Delete the Area “$name”?';
+  }
+
+  @override
+  String deleteTopicQuestion(String name) {
+    return 'Delete the Topic “$name”?';
+  }
+
+  @override
+  String get topicsGoToo => 'Its Topics are deleted with it.';
+
+  @override
+  String notesInside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes inside.',
+      one: '1 Note inside.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get whereNotesGo => 'Where should they go?';
+
+  @override
+  String get moveToUnsorted => 'Move to Unsorted';
+
+  @override
+  String moveToArea(String area) {
+    return 'Move to “$area”';
+  }
+
+  @override
+  String get unsorted => 'Unsorted';
+
+  @override
+  String get fileInto => 'File into…';
+
+  @override
+  String get starterSetTitle => 'Pick your Areas';
+
+  @override
+  String get starterSetIntro =>
+      'Here is a start. Untick what you don\'t need — you can change everything later.';
+
+  @override
+  String get starterSetDone => 'Start';
+
+  @override
+  String get starterHousehold => 'Household';
+
+  @override
+  String get starterKitchen => 'Kitchen';
+
+  @override
+  String get starterGarden => 'Garden';
+
+  @override
+  String get starterCleaning => 'Cleaning';
+
+  @override
+  String get starterWork => 'Work';
+
+  @override
+  String get starterMeetings => 'Meetings';
+
+  @override
+  String get starterToSortOut => 'To sort out';
+
+  @override
+  String get starterCar => 'Car';
+
+  @override
+  String get starterService => 'Service';
+
+  @override
+  String get starterRepairs => 'Repairs';
+
+  @override
+  String get starterHealth => 'Health';
+
+  @override
+  String get starterDoctor => 'Doctor';
+
+  @override
+  String get starterMedication => 'Medication';
 }

@@ -5,6 +5,7 @@ library;
 export 'src/device_settings.dart';
 export 'src/entry.dart';
 export 'src/notes.dart';
+export 'src/places.dart';
 export 'src/question_marks.dart';
 export 'src/signing.dart';
 export 'src/store.dart';

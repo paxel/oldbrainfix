@@ -9,7 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 void main() {
   Store openStore() {
-    final store = Store.inMemory();
+    final store = Store.inMemory()..starterSetOffered = true;
     addTearDown(store.close);
     return store;
   }

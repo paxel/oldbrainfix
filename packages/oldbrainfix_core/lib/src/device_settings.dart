@@ -7,6 +7,7 @@ enum ThemeChoice { system, light, dark }
 /// (ADR 0008).
 extension DeviceSettings on Store {
   static const _theme = 'theme';
+  static const _starterSetOffered = 'starterSetOffered';
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -14,4 +15,11 @@ extension DeviceSettings on Store {
       ThemeChoice.system;
 
   set themeChoice(ThemeChoice choice) => setLocalSetting(_theme, choice.name);
+
+  /// Whether this Device has already offered the Starter Set on first
+  /// start.
+  bool get starterSetOffered => localSetting(_starterSetOffered) == 'true';
+
+  set starterSetOffered(bool offered) =>
+      setLocalSetting(_starterSetOffered, '$offered');
 }

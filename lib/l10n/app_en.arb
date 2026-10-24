@@ -5,5 +5,74 @@
   "captureTooltip": "Capture a Note",
   "captureHint": "What's on your mind?",
   "save": "Save",
-  "dismissAnnouncement": "Dismiss"
+  "dismissAnnouncement": "Dismiss",
+  "browseTooltip": "Areas and Topics",
+  "areasTitle": "Areas",
+  "noAreasYet": "No Areas yet. Tap + to make one.",
+  "noTopicsYet": "No Topics yet. Notes can sit in the Area itself, or tap + to make a Topic.",
+  "newArea": "New Area",
+  "newTopic": "New Topic",
+  "nameHint": "Name",
+  "cancel": "Cancel",
+  "create": "Create",
+  "rename": "Rename",
+  "delete": "Delete",
+  "areaLook": "Colour and icon",
+  "colourHeading": "Colour",
+  "iconHeading": "Icon",
+  "noColour": "No colour",
+  "noIcon": "No icon",
+  "deleteAreaQuestion": "Delete the Area “{name}”?",
+  "@deleteAreaQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteTopicQuestion": "Delete the Topic “{name}”?",
+  "@deleteTopicQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "topicsGoToo": "Its Topics are deleted with it.",
+  "notesInside": "{count, plural, =1{1 Note inside.} other{{count} Notes inside.}}",
+  "@notesInside": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "whereNotesGo": "Where should they go?",
+  "moveToUnsorted": "Move to Unsorted",
+  "moveToArea": "Move to “{area}”",
+  "@moveToArea": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "unsorted": "Unsorted",
+  "fileInto": "File into…",
+  "starterSetTitle": "Pick your Areas",
+  "starterSetIntro": "Here is a start. Untick what you don't need — you can change everything later.",
+  "starterSetDone": "Start",
+  "starterHousehold": "Household",
+  "starterKitchen": "Kitchen",
+  "starterGarden": "Garden",
+  "starterCleaning": "Cleaning",
+  "starterWork": "Work",
+  "starterMeetings": "Meetings",
+  "starterToSortOut": "To sort out",
+  "starterCar": "Car",
+  "starterService": "Service",
+  "starterRepairs": "Repairs",
+  "starterHealth": "Health",
+  "starterDoctor": "Doctor",
+  "starterMedication": "Medication"
 }

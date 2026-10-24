@@ -52,7 +52,7 @@ The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. 
 _Avoid_: category, subcategory, tag
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine or Reminder, is merged, or is deleted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine or Reminder, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:

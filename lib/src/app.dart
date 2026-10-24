@@ -6,6 +6,7 @@ import 'announcements.dart';
 import 'look.dart';
 import 'notes_screen.dart';
 import 'question_mark_background.dart';
+import 'starter_set_screen.dart';
 
 class OldBrainFixApp extends StatefulWidget {
   final Store store;
@@ -26,6 +27,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _announcements = widget.announcements ?? Announcements();
   late final _themeMode = themeModeOf(widget.store.themeChoice);
   late final _notes = Notes(widget.store);
+  late final _places = Places(widget.store);
 
   @override
   void dispose() {
@@ -50,6 +52,35 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
         child: child ?? const SizedBox.shrink(),
       ),
     ),
-    home: NotesScreen(notes: _notes),
+    home: _Home(store: widget.store, notes: _notes, places: _places),
   );
+}
+
+/// The Starter Set on this Device's first start, the Notes after it.
+class _Home extends StatefulWidget {
+  final Store store;
+  final Notes notes;
+  final Places places;
+
+  const _Home({required this.store, required this.notes, required this.places});
+
+  @override
+  State<_Home> createState() => _HomeState();
+}
+
+class _HomeState extends State<_Home> {
+  late bool _starterSetOffered = widget.store.starterSetOffered;
+
+  /// Plants what the user kept of the Starter Set; it is not offered
+  /// again on this Device.
+  void _plant(Set<String> picked) {
+    widget.places.plantStarterSet(picked);
+    widget.store.starterSetOffered = true;
+    setState(() => _starterSetOffered = true);
+  }
+
+  @override
+  Widget build(BuildContext context) => _starterSetOffered
+      ? NotesScreen(notes: widget.notes, places: widget.places)
+      : StarterSetScreen(onDone: _plant);
 }

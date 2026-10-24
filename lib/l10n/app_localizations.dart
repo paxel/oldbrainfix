@@ -133,6 +133,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get dismissAnnouncement;
+
+  /// No description provided for @browseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas and Topics'**
+  String get browseTooltip;
+
+  /// No description provided for @areasTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas'**
+  String get areasTitle;
+
+  /// No description provided for @noAreasYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Areas yet. Tap + to make one.'**
+  String get noAreasYet;
+
+  /// No description provided for @noTopicsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Topics yet. Notes can sit in the Area itself, or tap + to make a Topic.'**
+  String get noTopicsYet;
+
+  /// No description provided for @newArea.
+  ///
+  /// In en, this message translates to:
+  /// **'New Area'**
+  String get newArea;
+
+  /// No description provided for @newTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'New Topic'**
+  String get newTopic;
+
+  /// No description provided for @nameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameHint;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @rename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get rename;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @areaLook.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour and icon'**
+  String get areaLook;
+
+  /// No description provided for @colourHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour'**
+  String get colourHeading;
+
+  /// No description provided for @iconHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Icon'**
+  String get iconHeading;
+
+  /// No description provided for @noColour.
+  ///
+  /// In en, this message translates to:
+  /// **'No colour'**
+  String get noColour;
+
+  /// No description provided for @noIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'No icon'**
+  String get noIcon;
+
+  /// No description provided for @deleteAreaQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the Area “{name}”?'**
+  String deleteAreaQuestion(String name);
+
+  /// No description provided for @deleteTopicQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the Topic “{name}”?'**
+  String deleteTopicQuestion(String name);
+
+  /// No description provided for @topicsGoToo.
+  ///
+  /// In en, this message translates to:
+  /// **'Its Topics are deleted with it.'**
+  String get topicsGoToo;
+
+  /// No description provided for @notesInside.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note inside.} other{{count} Notes inside.}}'**
+  String notesInside(int count);
+
+  /// No description provided for @whereNotesGo.
+  ///
+  /// In en, this message translates to:
+  /// **'Where should they go?'**
+  String get whereNotesGo;
+
+  /// No description provided for @moveToUnsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Unsorted'**
+  String get moveToUnsorted;
+
+  /// No description provided for @moveToArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to “{area}”'**
+  String moveToArea(String area);
+
+  /// No description provided for @unsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsorted'**
+  String get unsorted;
+
+  /// No description provided for @fileInto.
+  ///
+  /// In en, this message translates to:
+  /// **'File into…'**
+  String get fileInto;
+
+  /// No description provided for @starterSetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick your Areas'**
+  String get starterSetTitle;
+
+  /// No description provided for @starterSetIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Here is a start. Untick what you don\'t need — you can change everything later.'**
+  String get starterSetIntro;
+
+  /// No description provided for @starterSetDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get starterSetDone;
+
+  /// No description provided for @starterHousehold.
+  ///
+  /// In en, this message translates to:
+  /// **'Household'**
+  String get starterHousehold;
+
+  /// No description provided for @starterKitchen.
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen'**
+  String get starterKitchen;
+
+  /// No description provided for @starterGarden.
+  ///
+  /// In en, this message translates to:
+  /// **'Garden'**
+  String get starterGarden;
+
+  /// No description provided for @starterCleaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning'**
+  String get starterCleaning;
+
+  /// No description provided for @starterWork.
+  ///
+  /// In en, this message translates to:
+  /// **'Work'**
+  String get starterWork;
+
+  /// No description provided for @starterMeetings.
+  ///
+  /// In en, this message translates to:
+  /// **'Meetings'**
+  String get starterMeetings;
+
+  /// No description provided for @starterToSortOut.
+  ///
+  /// In en, this message translates to:
+  /// **'To sort out'**
+  String get starterToSortOut;
+
+  /// No description provided for @starterCar.
+  ///
+  /// In en, this message translates to:
+  /// **'Car'**
+  String get starterCar;
+
+  /// No description provided for @starterService.
+  ///
+  /// In en, this message translates to:
+  /// **'Service'**
+  String get starterService;
+
+  /// No description provided for @starterRepairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairs'**
+  String get starterRepairs;
+
+  /// No description provided for @starterHealth.
+  ///
+  /// In en, this message translates to:
+  /// **'Health'**
+  String get starterHealth;
+
+  /// No description provided for @starterDoctor.
+  ///
+  /// In en, this message translates to:
+  /// **'Doctor'**
+  String get starterDoctor;
+
+  /// No description provided for @starterMedication.
+  ///
+  /// In en, this message translates to:
+  /// **'Medication'**
+  String get starterMedication;
 }
 
 class _AppLocalizationsDelegate
