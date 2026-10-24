@@ -1555,6 +1555,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'and {count} more'**
   String widgetMore(String count);
+
+  /// No description provided for @speechModelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech model'**
+  String get speechModelTitle;
+
+  /// No description provided for @speechModelIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Notes get a Transcript you can read and search. Whisper writes it on this phone, in English or German, with a speech model it needs once. The recording is always kept.'**
+  String get speechModelIntro;
+
+  /// No description provided for @speechModelSource.
+  ///
+  /// In en, this message translates to:
+  /// **'The download is about {megabytes} MB, comes only from Old Brain Fix\'s own release on GitHub, and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.'**
+  String speechModelSource(int megabytes);
+
+  /// No description provided for @speechModelChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the speech model…'**
+  String get speechModelChecking;
+
+  /// No description provided for @speechModelUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcripts are not available on this device. Voice recordings are kept as they are.'**
+  String get speechModelUnsupported;
+
+  /// No description provided for @speechModelReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model is ready. Voice Notes are transcribed on this phone.'**
+  String get speechModelReady;
+
+  /// No description provided for @speechModelMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech model yet'**
+  String get speechModelMissing;
+
+  /// No description provided for @speechModelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download ({megabytes} MB)'**
+  String speechModelDownload(int megabytes);
+
+  /// No description provided for @speechModelPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a file of my own'**
+  String get speechModelPick;
+
+  /// No description provided for @speechModelPickDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It must be whisper.cpp\'s multilingual ggml-base.bin; any other file is rejected.'**
+  String get speechModelPickDetail;
+
+  /// No description provided for @speechModelDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading: {received} of {total} MB'**
+  String speechModelDownloading(String received, String total);
+
+  /// No description provided for @speechModelFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The download did not finish, and nothing was kept. Try again later.'**
+  String get speechModelFailed;
+
+  /// No description provided for @speechModelMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not the expected speech model, so it was not kept.'**
+  String get speechModelMismatch;
+
+  /// No description provided for @transcribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing…'**
+  String get transcribing;
+
+  /// No description provided for @noWordsHeard.
+  ///
+  /// In en, this message translates to:
+  /// **'No words heard.'**
+  String get noWordsHeard;
 }
 
 class _AppLocalizationsDelegate

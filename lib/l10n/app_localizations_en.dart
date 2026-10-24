@@ -941,4 +941,61 @@ class AppLocalizationsEn extends AppLocalizations {
   String widgetMore(String count) {
     return 'and $count more';
   }
+
+  @override
+  String get speechModelTitle => 'Speech model';
+
+  @override
+  String get speechModelIntro =>
+      'Voice Notes get a Transcript you can read and search. Whisper writes it on this phone, in English or German, with a speech model it needs once. The recording is always kept.';
+
+  @override
+  String speechModelSource(int megabytes) {
+    return 'The download is about $megabytes MB, comes only from Old Brain Fix\'s own release on GitHub, and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.';
+  }
+
+  @override
+  String get speechModelChecking => 'Checking the speech model…';
+
+  @override
+  String get speechModelUnsupported =>
+      'Transcripts are not available on this device. Voice recordings are kept as they are.';
+
+  @override
+  String get speechModelReady =>
+      'The speech model is ready. Voice Notes are transcribed on this phone.';
+
+  @override
+  String get speechModelMissing => 'No speech model yet';
+
+  @override
+  String speechModelDownload(int megabytes) {
+    return 'Download ($megabytes MB)';
+  }
+
+  @override
+  String get speechModelPick => 'Use a file of my own';
+
+  @override
+  String get speechModelPickDetail =>
+      'It must be whisper.cpp\'s multilingual ggml-base.bin; any other file is rejected.';
+
+  @override
+  String speechModelDownloading(String received, String total) {
+    return 'Downloading: $received of $total MB';
+  }
+
+  @override
+  String get speechModelFailed =>
+      'The download did not finish, and nothing was kept. Try again later.';
+
+  @override
+  String get speechModelMismatch =>
+      'That is not the expected speech model, so it was not kept.';
+
+  @override
+  String get transcribing => 'Transcribing…';
+
+  @override
+  String get noWordsHeard => 'No words heard.';
 }

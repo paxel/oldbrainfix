@@ -17,6 +17,8 @@ import 'note_editor_screen.dart';
 import 'notes_screen.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
+import 'speech_model_screen.dart';
+import 'speech_platform.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
@@ -135,6 +137,13 @@ class _AreasScreenState extends State<AreasScreen> {
     );
   }
 
+  /// The speech model page lives here until Settings exist.
+  Future<void> _openSpeechModel(SpeechModel model) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => SpeechModelScreen(model: model)),
+    );
+  }
+
   Future<void> _openTrash() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -246,6 +255,13 @@ class _AreasScreenState extends State<AreasScreen> {
               tooltip: t.captureContextTitle,
               onPressed: _openCaptureContext,
               icon: const Icon(Icons.manage_history),
+            ),
+          if (SpeechScope.of(context) case final speech?
+              when speech.model.platform.available)
+            IconButton(
+              tooltip: t.speechModelTitle,
+              onPressed: () => _openSpeechModel(speech.model),
+              icon: const Icon(Icons.record_voice_over_outlined),
             ),
           IconButton(
             tooltip: t.trashTitle,

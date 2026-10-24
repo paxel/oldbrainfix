@@ -17,6 +17,7 @@ import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'speech_platform.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
@@ -38,7 +39,8 @@ Future<void> openNote(
 
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its photos at full width, each opening full screen when
-/// tapped, a play button per voice recording, its Importance, its Capture Context and where it is filed,
+/// tapped, a play button per voice recording with its Transcript under
+/// it, its Importance, its Capture Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
 /// spawn one from it; "merge into…" merges it into another Note; the
@@ -330,6 +332,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   compact: false,
                 ),
               ),
+              TranscriptText(
+                key: ValueKey('transcript:$hash'),
+                noteId: note.id,
+                hash: hash,
+                transcript: note.transcripts[hash],
+                compact: false,
+              ),
             ],
             const SizedBox(height: 16),
             EditorPanel(
@@ -448,6 +457,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       RecordingButton(
                         key: ValueKey(hash),
                         hash: hash,
+                        compact: false,
+                      ),
+                      TranscriptText(
+                        key: ValueKey('transcript:$hash'),
+                        noteId: section.id,
+                        hash: hash,
+                        transcript: section.transcripts[hash],
                         compact: false,
                       ),
                     ],

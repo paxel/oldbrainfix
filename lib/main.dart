@@ -11,6 +11,7 @@ import 'src/context_platform.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
 import 'src/photo_platform.dart';
+import 'src/speech_platform.dart';
 import 'src/voice_platform.dart';
 
 Future<void> main() async {
@@ -27,6 +28,7 @@ Future<void> main() async {
       voice: AndroidVoice(),
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),
+      speech: AndroidSpeech(),
     ),
   );
 }

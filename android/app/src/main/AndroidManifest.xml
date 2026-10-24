@@ -7,6 +7,11 @@
          one, and the recording stays in the Note on the user's own
          devices. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- The one download of the speech model for Transcripts (ADR 0007),
+         only when the user asks for it on the speech model page, and
+         only from Old Brain Fix's own GitHub release. Nothing else goes
+         online: no analytics, no telemetry, no other host. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Capture Context, each only once the user switched it on: the
          calendar event running and the connected Bluetooth device. Read
          at Capture and kept in the Note on the user's own devices. -->

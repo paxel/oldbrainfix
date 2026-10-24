@@ -54,6 +54,14 @@ abstract final class NoteKeys {
 
   static String audio(String hash) => '$audioPrefix$hash';
 
+  /// The Transcript of a voice recording, `transcript:<hash>` = its text,
+  /// on the Note holding `audio:<hash>`, next to the recording and never
+  /// in its place (CONTEXT.md). An empty text means Whisper heard no
+  /// words; absent means not transcribed (yet).
+  static const transcriptPrefix = 'transcript:';
+
+  static String transcript(String hash) => '$transcriptPrefix$hash';
+
   /// The app something was shared in from, as [SourceApp.package] and
   /// [SourceApp.label]; absent for anything not shared in, or when the
   /// platform did not say.
@@ -206,6 +214,10 @@ class Note {
   /// The hashes of its voice recordings, in the order they were added.
   final List<String> recordings;
 
+  /// The Transcripts of its voice recordings, by recording hash; a
+  /// recording not transcribed yet has none.
+  final Map<String, String> transcripts;
+
   const Note({
     required this.id,
     required this.text,
@@ -218,6 +230,7 @@ class Note {
     this.nudge,
     this.photos = const [],
     this.recordings = const [],
+    this.transcripts = const {},
   });
 
   /// When the Note was captured.
@@ -252,6 +265,10 @@ class Section {
   /// travel with it.
   final List<String> recordings;
 
+  /// The Transcripts of [recordings], by recording hash, as for
+  /// [Note.transcripts].
+  final Map<String, String> transcripts;
+
   const Section({
     required this.id,
     required this.noteId,
@@ -259,6 +276,7 @@ class Section {
     required this.context,
     this.photos = const [],
     this.recordings = const [],
+    this.transcripts = const {},
   });
 }
 
@@ -379,6 +397,35 @@ class Notes {
   /// on this Device (yet).
   Uint8List? recordingBytes(String hash) => store.audio(hash);
 
+  /// Keeps [text] as the Transcript of the voice recording [hash] of the
+  /// Note [noteId], a merged one included, next to the recording; the
+  /// recording stays as it is. An empty [text] records that no words
+  /// were heard, so the recording is not transcribed again.
+  void setTranscript(String noteId, String hash, String text) {
+    if (byId(noteId)?.recordings.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a recording of $noteId');
+    }
+    store.append(noteId, NoteKeys.transcript(hash), text.trim());
+  }
+
+  /// The voice recordings without a Transcript, newest capture first:
+  /// those of every Note not in the trash, merged ones included.
+  List<({String noteId, String hash})> untranscribed() {
+    final notes = [
+      for (final id in store.entitiesOfType(NoteKeys.typeNote))
+        if (byId(id) case final note? when !note.isTrashed)
+          if (note.recordings.any((h) => !note.transcripts.containsKey(h)))
+            note,
+    ];
+    notes.sort((a, b) => b.captured.compareTo(a.captured));
+    return [
+      for (final note in notes)
+        for (final hash in note.recordings)
+          if (!note.transcripts.containsKey(hash))
+            (noteId: note.id, hash: hash),
+    ];
+  }
+
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
   /// wherever it was before.
   void file(String noteId, String placeId) {
@@ -470,6 +517,7 @@ class Notes {
             context: note.context,
             photos: note.photos,
             recordings: note.recordings,
+            transcripts: note.transcripts,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -611,6 +659,11 @@ class Notes {
               value == NoteKeys.audioAdded)
             key.substring(NoteKeys.audioPrefix.length),
       ],
+      transcripts: {
+        for (final MapEntry(:key, :value) in fields.entries)
+          if (key.startsWith(NoteKeys.transcriptPrefix) && value != null)
+            key.substring(NoteKeys.transcriptPrefix.length): value,
+      },
     );
   }
 

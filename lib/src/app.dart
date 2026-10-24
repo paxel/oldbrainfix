@@ -21,6 +21,7 @@ import 'question_mark_background.dart';
 import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
 import 'setup_screen.dart';
+import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'voice_platform.dart';
 
@@ -56,6 +57,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// given.
   final CaptureRequests requests;
 
+  /// Whisper and its model for Transcripts; none when not given.
+  final SpeechPlatform speech;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -67,6 +71,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.voice = const NoVoice(),
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
+    this.speech = const NoSpeech(),
   });
 
   @override
@@ -88,6 +93,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     voice: widget.voice,
     bytes: _notes.recordingBytes,
   );
+  late final _speechModel = SpeechModel(widget.speech);
+  late final Transcriber _transcriber;
 
   @override
   void initState() {
@@ -100,12 +107,21 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       platform: widget.alarms,
       wallClock: deviceWallClock,
     );
+    // Transcripts come in the background once the model is checked.
+    _transcriber = Transcriber(
+      notes: _notes,
+      model: _speechModel,
+      platform: widget.speech,
+    );
+    unawaited(_speechModel.check());
   }
 
   @override
   void dispose() {
     _alarms.dispose();
     _playback.dispose();
+    _transcriber.dispose();
+    _speechModel.dispose();
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
@@ -136,9 +152,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                 child: VoiceScope(
                   voice: widget.voice,
                   playback: _playback,
-                  child: DraftsScope(
-                    drafts: _drafts,
-                    child: child ?? const SizedBox.shrink(),
+                  child: SpeechScope(
+                    model: _speechModel,
+                    transcriber: _transcriber,
+                    child: DraftsScope(
+                      drafts: _drafts,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               ),

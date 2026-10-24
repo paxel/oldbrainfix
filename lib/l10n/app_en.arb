@@ -538,5 +538,44 @@
         "type": "String"
       }
     }
-  }
+  },
+  "speechModelTitle": "Speech model",
+  "speechModelIntro": "Voice Notes get a Transcript you can read and search. Whisper writes it on this phone, in English or German, with a speech model it needs once. The recording is always kept.",
+  "speechModelSource": "The download is about {megabytes} MB, comes only from Old Brain Fix's own release on GitHub, and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.",
+  "@speechModelSource": {
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "speechModelChecking": "Checking the speech model…",
+  "speechModelUnsupported": "Transcripts are not available on this device. Voice recordings are kept as they are.",
+  "speechModelReady": "The speech model is ready. Voice Notes are transcribed on this phone.",
+  "speechModelMissing": "No speech model yet",
+  "speechModelDownload": "Download ({megabytes} MB)",
+  "@speechModelDownload": {
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "speechModelPick": "Use a file of my own",
+  "speechModelPickDetail": "It must be whisper.cpp's multilingual ggml-base.bin; any other file is rejected.",
+  "speechModelDownloading": "Downloading: {received} of {total} MB",
+  "@speechModelDownloading": {
+    "placeholders": {
+      "received": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "speechModelFailed": "The download did not finish, and nothing was kept. Try again later.",
+  "speechModelMismatch": "That is not the expected speech model, so it was not kept.",
+  "transcribing": "Transcribing…",
+  "noWordsHeard": "No words heard."
 }

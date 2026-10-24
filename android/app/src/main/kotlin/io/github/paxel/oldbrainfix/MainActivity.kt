@@ -39,6 +39,14 @@ class MainActivity : FlutterActivity() {
     /** The answer to the microphone's "request", until the dialog comes back. */
     private var microphoneAnswer: MethodChannel.Result? = null
 
+    private var speechChannel: MethodChannel? = null
+
+    /** Whisper and its model for the Transcripts of voice Notes. */
+    private val speech by lazy { Speech(this) }
+
+    /** The answer to the speech model's "pick", until the file picker comes back. */
+    private var modelAnswer: MethodChannel.Result? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
@@ -142,6 +150,49 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        speechChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SPEECH_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "supported" -> result.success(WhisperNative.loaded)
+                    "modelHash" -> inBackground(result) { speech.modelHash() }
+                    "download" -> {
+                        val url = call.arguments as String
+                        inBackground(result) {
+                            speech.download(url) { received, total ->
+                                runOnUiThread {
+                                    speechChannel?.invokeMethod(
+                                        "progress",
+                                        mapOf("received" to received, "total" to total),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    "pick" -> pickModel(result)
+                    "cancel" -> {
+                        speech.cancel()
+                        result.success(null)
+                    }
+                    "install" -> inBackground(result) { speech.install() }
+                    "discard" -> inBackground(result) {
+                        speech.discard()
+                        true
+                    }
+                    "remove" -> inBackground(result) {
+                        speech.remove()
+                        true
+                    }
+                    "transcribe" -> speech.transcribe(call.arguments as ByteArray) {
+                        runOnUiThread { result.success(it) }
+                    }
+                    "idle" -> {
+                        speech.idle()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         captureChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAPTURE_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -239,6 +290,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         if (active === this) active = null
         voice.release()
+        speech.release()
         super.onDestroy()
     }
 
@@ -263,9 +315,34 @@ class MainActivity : FlutterActivity() {
         photoAnswer = result
     }
 
+    /**
+     * Lets the user pick a speech model file of their own with the
+     * system's file picker, which needs no storage permission, and copies
+     * it to the side; answers its SHA-256, or null when none was picked.
+     */
+    private fun pickModel(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        try {
+            startActivityForResult(intent, REQUEST_MODEL)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(null)
+        }
+        modelAnswer?.success(null)
+        modelAnswer = result
+    }
+
     @Deprecated("The Flutter activity has no Activity Result API.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_MODEL) {
+            val answer = modelAnswer ?: return
+            modelAnswer = null
+            val uri = data?.data
+            if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
+            return inBackground(answer) { speech.takeIn { contentResolver.openInputStream(uri) } }
+        }
         if (requestCode != REQUEST_PHOTO) return
         val file = Photos.cameraFile(this)
         val answer = photoAnswer
@@ -382,9 +459,11 @@ class MainActivity : FlutterActivity() {
         private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
         private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
         private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
+        private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3
+        private const val REQUEST_MODEL = 4
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12

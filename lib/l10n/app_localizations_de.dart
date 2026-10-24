@@ -946,4 +946,61 @@ class AppLocalizationsDe extends AppLocalizations {
   String widgetMore(String count) {
     return 'und $count weitere';
   }
+
+  @override
+  String get speechModelTitle => 'Sprachmodell';
+
+  @override
+  String get speechModelIntro =>
+      'Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Telefon, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.';
+
+  @override
+  String speechModelSource(int megabytes) {
+    return 'Der Download ist etwa $megabytes MB groß, kommt nur aus dem eigenen Release von Old Brain Fix auf GitHub und wird vor der Verwendung mit einer festen Prüfsumme geprüft. Am besten im WLAN. Sonst wird nie etwas gesendet oder geladen.';
+  }
+
+  @override
+  String get speechModelChecking => 'Sprachmodell wird geprüft …';
+
+  @override
+  String get speechModelUnsupported =>
+      'Auf diesem Gerät gibt es keine Transkripte. Sprachaufnahmen bleiben, wie sie sind.';
+
+  @override
+  String get speechModelReady =>
+      'Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Telefon transkribiert.';
+
+  @override
+  String get speechModelMissing => 'Noch kein Sprachmodell';
+
+  @override
+  String speechModelDownload(int megabytes) {
+    return 'Herunterladen ($megabytes MB)';
+  }
+
+  @override
+  String get speechModelPick => 'Eigene Datei verwenden';
+
+  @override
+  String get speechModelPickDetail =>
+      'Es muss die mehrsprachige ggml-base.bin von whisper.cpp sein; jede andere Datei wird abgelehnt.';
+
+  @override
+  String speechModelDownloading(String received, String total) {
+    return 'Wird geladen: $received von $total MB';
+  }
+
+  @override
+  String get speechModelFailed =>
+      'Der Download wurde nicht fertig, und nichts wurde behalten. Versuch es später noch einmal.';
+
+  @override
+  String get speechModelMismatch =>
+      'Das ist nicht das erwartete Sprachmodell, deshalb wurde es nicht behalten.';
+
+  @override
+  String get transcribing => 'Wird transkribiert …';
+
+  @override
+  String get noWordsHeard => 'Keine Worte erkannt.';
 }

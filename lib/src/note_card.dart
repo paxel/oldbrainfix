@@ -7,6 +7,7 @@ import 'l10n.dart';
 import 'look.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
+import 'speech_platform.dart';
 import 'voice_platform.dart';
 
 /// A Note with the Area and Topic it is filed in, read once per change.
@@ -36,7 +37,8 @@ String? whereCaptured(CaptureContext capture) =>
     };
 
 /// A Note drawn as a softly embossed card: its text, thumbnails of its
-/// first [shownPhotos] photos, a play button per voice recording, capture
+/// first [shownPhotos] photos, a play button per voice recording with
+/// the start of its Transcript under it, capture
 /// time, the Named Place or
 /// coordinates it was captured at with an icon when there is more
 /// Capture Context, and where it is filed. Its Area's colour runs down
@@ -176,6 +178,13 @@ class NoteCard extends StatelessWidget {
                                   ),
                               ],
                             ),
+                            for (final hash in note.recordings)
+                              TranscriptText(
+                                key: ValueKey('transcript:$hash'),
+                                noteId: note.id,
+                                hash: hash,
+                                transcript: note.transcripts[hash],
+                              ),
                           ],
                           const SizedBox(height: 6),
                           Wrap(

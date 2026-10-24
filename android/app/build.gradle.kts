@@ -27,6 +27,21 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Whisper for Transcripts is built for phones only; on any other
+        // ABI there is no transcription and nothing else changes.
+        externalNativeBuild {
+            cmake {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
@@ -35,6 +50,14 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// A debug build is for a 64-bit phone or the emulator: Whisper is built
+// for arm64-v8a only there, which halves the native build.
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.externalNativeBuild?.abiFilters?.set(setOf("arm64-v8a"))
     }
 }
 

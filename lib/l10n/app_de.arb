@@ -242,5 +242,20 @@
   "microphoneMissing": "Sprachnotizen brauchen das Mikrofon.",
   "typeInstead": "Lieber tippen",
   "widgetNothingToday": "Heute steht nichts an.",
-  "widgetMore": "und {count} weitere"
+  "widgetMore": "und {count} weitere",
+  "speechModelTitle": "Sprachmodell",
+  "speechModelIntro": "Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Telefon, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.",
+  "speechModelSource": "Der Download ist etwa {megabytes} MB groß, kommt nur aus dem eigenen Release von Old Brain Fix auf GitHub und wird vor der Verwendung mit einer festen Prüfsumme geprüft. Am besten im WLAN. Sonst wird nie etwas gesendet oder geladen.",
+  "speechModelChecking": "Sprachmodell wird geprüft …",
+  "speechModelUnsupported": "Auf diesem Gerät gibt es keine Transkripte. Sprachaufnahmen bleiben, wie sie sind.",
+  "speechModelReady": "Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Telefon transkribiert.",
+  "speechModelMissing": "Noch kein Sprachmodell",
+  "speechModelDownload": "Herunterladen ({megabytes} MB)",
+  "speechModelPick": "Eigene Datei verwenden",
+  "speechModelPickDetail": "Es muss die mehrsprachige ggml-base.bin von whisper.cpp sein; jede andere Datei wird abgelehnt.",
+  "speechModelDownloading": "Wird geladen: {received} von {total} MB",
+  "speechModelFailed": "Der Download wurde nicht fertig, und nichts wurde behalten. Versuch es später noch einmal.",
+  "speechModelMismatch": "Das ist nicht das erwartete Sprachmodell, deshalb wurde es nicht behalten.",
+  "transcribing": "Wird transkribiert …",
+  "noWordsHeard": "Keine Worte erkannt."
 }
