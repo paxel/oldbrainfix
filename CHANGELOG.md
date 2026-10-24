@@ -15,7 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - App shortcuts, Quick Settings tiles and home-screen widgets that open voice, text or photo capture directly, also for hardware buttons.
 - An Agenda home-screen widget that lists today's Routines and Reminders to check off, with the Unsorted count.
 - English and German.
-- Light teal and anthracite dark themes that follow the system.
+- Light teal and anthracite dark themes that follow the system or a choice of your own.
 - Notes as embossed cards over a background of hand-drawn question marks that drift slowly while scrolling.
 - Areas and Topics of your own, two levels deep, with an optional colour and icon per Area.
 - A Starter Set of Areas and Topics (Household, Work, Car, Health) to pick from on first start.
@@ -34,7 +34,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Schedules from once to iCalendar repeat rules, with several times per day, fixed across early or late ticks and daylight-saving changes.
 - Alarms on the minute with Done and Snooze (10 min, 30 min, 1 h), even from the lock screen and after a restart.
 - A step-by-step permission setup and a red Agenda banner while a needed permission is missing.
-- Re-nag: an ignored alarm rings again at an interval until Done, snoozed or Missed.
+- Re-nag: an ignored alarm rings again at an interval, per phone or per Routine, until Done, snoozed or Missed.
 - A Missed card on the Agenda that lists what was Missed until you tap "Seen".
 - One catch-up notification instead of a burst of old alarms after the phone was off.
 - Escalation: an ignored Routine can turn into a full-screen alarm with sound.
@@ -46,6 +46,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Add any Note, Routine or Reminder to your calendar app, filled in, without a calendar permission.
 - Export all or picked Routines and Reminders as a shareable calendar file with their repeat rules and alarms.
 - Optionally keep all Routines and Reminders in a device calendar of your choice, updated as they change and removed when turned off.
+- Settings that belong to each phone and are never synced.
+- An About page with the version, documentation, source, licences, a way to report problems or write to the developer, and a donation link.
 
 ---
 

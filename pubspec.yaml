@@ -18,6 +18,8 @@ dependencies:
     path: packages/oldbrainfix_core
   intl: any
   path_provider: ^2.1.6
+  package_info_plus: ^10.2.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

@@ -12,8 +12,8 @@ import 'note_card.dart';
 const namedPlaceRadii = [50.0, 100.0, 250.0, 500.0, 1000.0];
 
 /// The user's Named Places, by name. "+" names the spot the Device is at;
-/// each one can be renamed, given another radius or deleted. Lives in the
-/// notes browser until Settings exist.
+/// each one can be renamed, given another radius or deleted. Opens from
+/// Settings.
 class NamedPlacesScreen extends StatefulWidget {
   final NamedPlaces namedPlaces;
 

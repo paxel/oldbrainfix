@@ -760,14 +760,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nudgeBody => 'Tap to sort them.';
 
   @override
-  String get nudgeSettingsHeading => 'Nudges on this phone';
-
-  @override
-  String nudgeSettingsSummary(int minutes, String quiet) {
-    return 'Again after $minutes min, $quiet';
-  }
-
-  @override
   String get nudgeSettingsExplain =>
       'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.';
 
@@ -776,14 +768,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quietHours => 'Quiet Hours';
-
-  @override
-  String quietHoursRange(String from, String until) {
-    return 'Quiet Hours $from to $until';
-  }
-
-  @override
-  String get quietHoursOff => 'no Quiet Hours';
 
   @override
   String get quietFrom => 'From';
@@ -1166,4 +1150,93 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get calendarMirrorNotRemoved =>
       'The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsIntro =>
+      'These settings belong to this phone and are never synced.';
+
+  @override
+  String get settingsLook => 'Look';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get settingsAlarms => 'Alarms';
+
+  @override
+  String get settingsAlarmSetupDetail =>
+      'The permissions alarms need to ring on time.';
+
+  @override
+  String get settingsRenagDetail =>
+      'How often an ignored alarm rings again, unless its Routine has its own interval.';
+
+  @override
+  String get settingsNudges => 'Nudges';
+
+  @override
+  String get settingsCapture => 'Capture';
+
+  @override
+  String get settingsNamedPlacesDetail =>
+      '“Home” or “Work” instead of coordinates. Kept with your Notes, not just on this phone.';
+
+  @override
+  String get settingsCaptureContextDetail =>
+      'Calendar event and Bluetooth device with each Note.';
+
+  @override
+  String get settingsSpeechModelDetail => 'For Transcripts of voice Notes.';
+
+  @override
+  String get settingsCalendar => 'Calendar';
+
+  @override
+  String get settingsHistory => 'History';
+
+  @override
+  String get aboutTitle => 'About Old Brain Fix';
+
+  @override
+  String get aboutTagline =>
+      'Capture a thought in one tap. Get nagged until it is sorted or done.';
+
+  @override
+  String versionLabel(String version, String build) {
+    return 'Version $version ($build)';
+  }
+
+  @override
+  String get documentation => 'Documentation';
+
+  @override
+  String get sourceCode => 'Source code';
+
+  @override
+  String get reportProblem => 'Report a problem or an idea';
+
+  @override
+  String get githubIssues => 'GitHub issues';
+
+  @override
+  String get writeTheDeveloper => 'Write to the developer';
+
+  @override
+  String get buyCoffee => 'Buy me a coffee';
+
+  @override
+  String get coffeeSubtitle => 'On Ko-fi, if Old Brain Fix helps you';
+
+  @override
+  String get openSourceLicenses => 'Open-source licenses';
 }

@@ -7,8 +7,8 @@ import 'speech_platform.dart';
 
 /// The speech model for Transcripts: what it is for, how big it is and
 /// where it comes from, then a download on request or a file of the
-/// user's own. A model that is not the pinned one is never kept. Lives in
-/// the notes browser until Settings exist.
+/// user's own. A model that is not the pinned one is never kept. Opens
+/// from Settings.
 class SpeechModelScreen extends StatelessWidget {
   final SpeechModel model;
 

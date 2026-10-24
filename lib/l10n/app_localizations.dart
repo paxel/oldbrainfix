@@ -1280,18 +1280,6 @@ abstract class AppLocalizations {
   /// **'Tap to sort them.'**
   String get nudgeBody;
 
-  /// No description provided for @nudgeSettingsHeading.
-  ///
-  /// In en, this message translates to:
-  /// **'Nudges on this phone'**
-  String get nudgeSettingsHeading;
-
-  /// No description provided for @nudgeSettingsSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Again after {minutes} min, {quiet}'**
-  String nudgeSettingsSummary(int minutes, String quiet);
-
   /// No description provided for @nudgeSettingsExplain.
   ///
   /// In en, this message translates to:
@@ -1309,18 +1297,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quiet Hours'**
   String get quietHours;
-
-  /// No description provided for @quietHoursRange.
-  ///
-  /// In en, this message translates to:
-  /// **'Quiet Hours {from} to {until}'**
-  String quietHoursRange(String from, String until);
-
-  /// No description provided for @quietHoursOff.
-  ///
-  /// In en, this message translates to:
-  /// **'no Quiet Hours'**
-  String get quietHoursOff;
 
   /// No description provided for @quietFrom.
   ///
@@ -1921,6 +1897,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.'**
   String get calendarMirrorNotRemoved;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'These settings belong to this phone and are never synced.'**
+  String get settingsIntro;
+
+  /// No description provided for @settingsLook.
+  ///
+  /// In en, this message translates to:
+  /// **'Look'**
+  String get settingsLook;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @settingsAlarms.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms'**
+  String get settingsAlarms;
+
+  /// No description provided for @settingsAlarmSetupDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The permissions alarms need to ring on time.'**
+  String get settingsAlarmSetupDetail;
+
+  /// No description provided for @settingsRenagDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'How often an ignored alarm rings again, unless its Routine has its own interval.'**
+  String get settingsRenagDetail;
+
+  /// No description provided for @settingsNudges.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudges'**
+  String get settingsNudges;
+
+  /// No description provided for @settingsCapture.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture'**
+  String get settingsCapture;
+
+  /// No description provided for @settingsNamedPlacesDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'“Home” or “Work” instead of coordinates. Kept with your Notes, not just on this phone.'**
+  String get settingsNamedPlacesDetail;
+
+  /// No description provided for @settingsCaptureContextDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar event and Bluetooth device with each Note.'**
+  String get settingsCaptureContextDetail;
+
+  /// No description provided for @settingsSpeechModelDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'For Transcripts of voice Notes.'**
+  String get settingsSpeechModelDetail;
+
+  /// No description provided for @settingsCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get settingsCalendar;
+
+  /// No description provided for @settingsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get settingsHistory;
+
+  /// No description provided for @aboutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'About Old Brain Fix'**
+  String get aboutTitle;
+
+  /// No description provided for @aboutTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture a thought in one tap. Get nagged until it is sorted or done.'**
+  String get aboutTagline;
+
+  /// No description provided for @versionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} ({build})'**
+  String versionLabel(String version, String build);
+
+  /// No description provided for @documentation.
+  ///
+  /// In en, this message translates to:
+  /// **'Documentation'**
+  String get documentation;
+
+  /// No description provided for @sourceCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Source code'**
+  String get sourceCode;
+
+  /// No description provided for @reportProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Report a problem or an idea'**
+  String get reportProblem;
+
+  /// No description provided for @githubIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub issues'**
+  String get githubIssues;
+
+  /// No description provided for @writeTheDeveloper.
+  ///
+  /// In en, this message translates to:
+  /// **'Write to the developer'**
+  String get writeTheDeveloper;
+
+  /// No description provided for @buyCoffee.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy me a coffee'**
+  String get buyCoffee;
+
+  /// No description provided for @coffeeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'On Ko-fi, if Old Brain Fix helps you'**
+  String get coffeeSubtitle;
+
+  /// No description provided for @openSourceLicenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licenses'**
+  String get openSourceLicenses;
 }
 
 class _AppLocalizationsDelegate

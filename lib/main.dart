@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'src/about_screen.dart';
 import 'src/alarm_platform.dart';
 import 'src/app.dart';
 import 'src/calendar_mirror.dart';
@@ -19,6 +20,7 @@ import 'src/voice_platform.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerLicenses();
   final dir = await getApplicationSupportDirectory();
   final store = Store.open('${dir.path}/oldbrainfix.db');
   runApp(

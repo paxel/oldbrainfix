@@ -305,16 +305,17 @@ void main() {
       captureMany(1);
       await start(tester);
       await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
-      expect(
-        find.text('Again after 60 min, Quiet Hours 22:00 to 08:00'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('nudgeRepeat')), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       expect(
         alarms.nudge?.nudge.quiet,
         QuietHours(ClockTime(22, 0), ClockTime(8, 0)),
       );
 
-      await tap(tester, find.byKey(const ValueKey('nudgeSettings')));
+      await tap(tester, find.byTooltip('Settings'));
+      expect(find.text('22:00'), findsOneWidget);
+      expect(find.text('08:00'), findsOneWidget);
       await tap(tester, find.byKey(const ValueKey('nudgeRepeat')));
       await tap(tester, find.text('10 min').last);
       expect(store.nudgeRepeat, const Duration(minutes: 10));
@@ -323,7 +324,6 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('quietHours')));
       expect(store.quietHoursOn, isFalse);
       expect(alarms.nudge?.nudge.quiet, isNull);
-      expect(find.text('Again after 10 min, no Quiet Hours'), findsOneWidget);
       expect(find.byKey(const ValueKey('quietFrom')), findsNothing);
     });
   });

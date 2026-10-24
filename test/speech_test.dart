@@ -58,12 +58,12 @@ void main() {
     await tester.pump();
   }
 
-  final modelButton = find.byIcon(Icons.record_voice_over_outlined);
+  final modelButton = find.text('Speech model');
 
-  /// Opens the speech model page from the notes browser.
+  /// Opens the speech model page from Settings.
   Future<void> openModel(WidgetTester tester) async {
-    await tap(tester, find.byIcon(Icons.search));
-    expect(find.byType(AreasScreen), findsOneWidget);
+    await tap(tester, find.byTooltip('Settings'));
+    await tester.ensureVisible(modelButton);
     await tap(tester, modelButton);
     expect(find.byType(SpeechModelScreen), findsOneWidget);
   }
@@ -75,11 +75,9 @@ void main() {
   );
 
   group('the speech model page', () {
-    testWidgets('is in the notes browser where there is a speech layer', (
-      tester,
-    ) async {
+    testWidgets('is in Settings where there is a speech layer', (tester) async {
       await start(tester, platform: const NoSpeech());
-      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byTooltip('Settings'));
       expect(modelButton, findsNothing);
     });
 

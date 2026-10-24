@@ -765,14 +765,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get nudgeBody => 'Tippe, um sie einzusortieren.';
 
   @override
-  String get nudgeSettingsHeading => 'Stupser auf diesem Handy';
-
-  @override
-  String nudgeSettingsSummary(int minutes, String quiet) {
-    return 'Erneut nach $minutes Min., $quiet';
-  }
-
-  @override
   String get nudgeSettingsExplain =>
       'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich.';
 
@@ -781,14 +773,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quietHours => 'Ruhezeit';
-
-  @override
-  String quietHoursRange(String from, String until) {
-    return 'Ruhezeit $from bis $until';
-  }
-
-  @override
-  String get quietHoursOff => 'keine Ruhezeit';
 
   @override
   String get quietFrom => 'Von';
@@ -1173,4 +1157,93 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get calendarMirrorNotRemoved =>
       'Die Termine konnten nicht aus dem Kalender entfernt werden. Erlaube Old Brain Fix den Kalender und schalte es noch einmal aus.';
+
+  @override
+  String get settingsTitle => 'Einstellungen';
+
+  @override
+  String get settingsIntro =>
+      'Diese Einstellungen gelten nur für dieses Handy und werden nie synchronisiert.';
+
+  @override
+  String get settingsLook => 'Aussehen';
+
+  @override
+  String get themeSystem => 'Wie das System';
+
+  @override
+  String get themeLight => 'Hell';
+
+  @override
+  String get themeDark => 'Dunkel';
+
+  @override
+  String get settingsAlarms => 'Alarme';
+
+  @override
+  String get settingsAlarmSetupDetail =>
+      'Die Berechtigungen, die Alarme brauchen, um pünktlich zu klingeln.';
+
+  @override
+  String get settingsRenagDetail =>
+      'Wie oft ein unbeachteter Alarm erneut klingelt, wenn seine Routine keinen eigenen Abstand hat.';
+
+  @override
+  String get settingsNudges => 'Stupser';
+
+  @override
+  String get settingsCapture => 'Erfassen';
+
+  @override
+  String get settingsNamedPlacesDetail =>
+      '„Zuhause“ oder „Arbeit“ statt Koordinaten. Sie gehören zu deinen Notizen, nicht nur zu diesem Handy.';
+
+  @override
+  String get settingsCaptureContextDetail =>
+      'Kalendertermin und Bluetooth-Gerät zu jeder Notiz.';
+
+  @override
+  String get settingsSpeechModelDetail => 'Für Transkripte von Sprachnotizen.';
+
+  @override
+  String get settingsCalendar => 'Kalender';
+
+  @override
+  String get settingsHistory => 'Verlauf';
+
+  @override
+  String get aboutTitle => 'Über Old Brain Fix';
+
+  @override
+  String get aboutTagline =>
+      'Einen Gedanken mit einem Tipp festhalten. Erinnert werden, bis er einsortiert oder erledigt ist.';
+
+  @override
+  String versionLabel(String version, String build) {
+    return 'Version $version ($build)';
+  }
+
+  @override
+  String get documentation => 'Dokumentation';
+
+  @override
+  String get sourceCode => 'Quellcode';
+
+  @override
+  String get reportProblem => 'Ein Problem oder eine Idee melden';
+
+  @override
+  String get githubIssues => 'GitHub-Issues';
+
+  @override
+  String get writeTheDeveloper => 'Dem Entwickler schreiben';
+
+  @override
+  String get buyCoffee => 'Spendier mir einen Kaffee';
+
+  @override
+  String get coffeeSubtitle => 'Auf Ko-fi, wenn Old Brain Fix dir hilft';
+
+  @override
+  String get openSourceLicenses => 'Open-Source-Lizenzen';
 }

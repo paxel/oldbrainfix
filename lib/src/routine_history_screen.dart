@@ -22,8 +22,8 @@ Future<void> openHistory(BuildContext context, Notes notes, Routine routine) =>
 /// with the last seven days as dots; its Adherence this week, this month
 /// and over the last 30 days; and a log of every Occurrence, the latest
 /// first, Done (when, early or late), Missed or still due, with the
-/// snoozes this Device recorded. Streaks can be switched off on this
-/// Device here, for now (it moves to Settings later); Adherence stays.
+/// snoozes this Device recorded. Streaks show unless this Device's
+/// Settings switched them off; Adherence always shows.
 class RoutineHistoryScreen extends StatefulWidget {
   final Notes notes;
   final String routineId;
@@ -40,7 +40,7 @@ class RoutineHistoryScreen extends StatefulWidget {
 
 class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
   late final _routines = Routines(widget.notes.store);
-  late bool _streaksOn = widget.notes.store.streaksOn;
+  late final _streaksOn = widget.notes.store.streaksOn;
   Routine? _routine;
   Note? _note;
   RoutineHistory? _history;
@@ -66,11 +66,6 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
     _log = history.entries.reversed.toList();
   }
 
-  void _setStreaks(bool on) {
-    widget.notes.store.streaksOn = on;
-    setState(() => _streaksOn = on);
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -93,13 +88,6 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
         if (_streaksOn) _StreakPanel(history: history),
         _AdherencePanel(history: history),
       ],
-      SwitchListTile(
-        value: _streaksOn,
-        onChanged: _setStreaks,
-        title: Text(t.showStreaks),
-        subtitle: Text(t.showStreaksDetail),
-        contentPadding: EdgeInsets.zero,
-      ),
       const SizedBox(height: 8),
       Text(t.historyLog, style: Theme.of(context).textTheme.titleSmall),
       Text(

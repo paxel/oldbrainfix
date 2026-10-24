@@ -10,7 +10,7 @@ import 'look.dart';
 /// permission: the calendar event running and the connected Bluetooth
 /// device. Each is off until switched on here; switching one on explains
 /// it and asks for its permission, which Capture itself never does.
-/// Lives in the notes browser until Settings exist.
+/// Opens from Settings.
 class CaptureContextScreen extends StatefulWidget {
   final Store store;
 

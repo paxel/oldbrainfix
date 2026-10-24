@@ -23,6 +23,7 @@ import 'photo_platform.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
+import 'settings_screen.dart';
 import 'setup_screen.dart';
 
 /// An Agenda row with where its Note is filed, read once per change.
@@ -33,8 +34,9 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// is checked off as Done on its own, tomorrow's already today. "+"
 /// captures a Note, whose card then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar makes a Routine without a Note and
-/// opens the calendar export. A red
+/// the notes browser; the app bar makes a Routine without a Note, opens
+/// the calendar export, and has the gear in its corner, the only way to
+/// Settings. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them. At local
@@ -59,6 +61,9 @@ class AgendaScreen extends StatefulWidget {
   /// The quick entry points asking for a capture screen.
   final CaptureRequests requests;
 
+  /// Called after the theme was changed in Settings.
+  final VoidCallback? onThemeChanged;
+
   const AgendaScreen({
     super.key,
     required this.notes,
@@ -66,6 +71,7 @@ class AgendaScreen extends StatefulWidget {
     required this.trail,
     required this.alarms,
     this.requests = const NoCaptureRequests(),
+    this.onThemeChanged,
   });
 
   @override
@@ -258,7 +264,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Future<void> _openUnsorted() async {
-    await openUnsorted(context, widget.notes, widget.places, widget.alarms);
+    await openUnsorted(context, widget.notes, widget.places);
     if (!mounted) return;
     _reload();
   }
@@ -276,15 +282,24 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  Future<void> _settings() async {
+    await openSettings(
+      context,
+      widget.notes.store,
+      widget.alarms,
+      onThemeChanged: widget.onThemeChanged,
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _newRoutine() async {
     await newRoutine(context, widget.notes, widget.places);
     if (!mounted) return;
     _routineEdited();
   }
 
-  /// Back from a Routine's editor, which may have changed the Device's
-  /// Re-nag interval: a setting, not the log, so the alarms are armed
-  /// again here.
+  /// Back from a Routine's editor: the alarms are armed again.
   void _routineEdited() {
     unawaited(widget.alarms.refresh());
     _reload();
@@ -397,6 +412,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
             tooltip: t.newRoutineTooltip,
             onPressed: _newRoutine,
             icon: const Icon(Icons.add_alarm),
+          ),
+          IconButton(
+            tooltip: t.settingsTitle,
+            onPressed: _settings,
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),

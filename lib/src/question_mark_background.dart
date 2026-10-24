@@ -190,3 +190,45 @@ class QuestionMarkPainter extends CustomPainter {
   bool shouldRepaint(QuestionMarkPainter old) =>
       old.tones != tones || old.still != still || old.scroll != scroll;
 }
+
+/// One of the background's hand-drawn question marks, upright in
+/// [colour]: the app's mark until it has an icon of its own.
+class QuestionMarkIcon extends StatelessWidget {
+  final double size;
+  final Color colour;
+
+  const QuestionMarkIcon({super.key, required this.size, required this.colour});
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: size,
+    child: CustomPaint(painter: _MarkPainter(colour)),
+  );
+}
+
+class _MarkPainter extends CustomPainter {
+  final Color colour;
+
+  _MarkPainter(this.colour);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const shape = 0;
+    final paths = QuestionMarkPainter._paths[shape];
+    canvas
+      ..scale(size.width / questionMarkBox)
+      ..drawPath(
+        paths.strokes,
+        Paint()
+          ..color = colour
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = questionMarkShapes[shape].weight
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      )
+      ..drawPath(paths.dot, Paint()..color = colour);
+  }
+
+  @override
+  bool shouldRepaint(_MarkPainter old) => old.colour != colour;
+}

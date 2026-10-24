@@ -171,8 +171,8 @@ void main() {
       );
     });
 
-    testWidgets('a Routine sets its own interval and the Device\'s default '
-        'in its Re-nag section', (tester) async {
+    testWidgets('a Routine sets its own interval in its Re-nag section, '
+        'the Device\'s default only in Settings', (tester) async {
       final pills = routines.create('pills', daily([at(8)]));
       await start(tester);
       await tap(tester, find.text('pills').first);
@@ -192,9 +192,7 @@ void main() {
       await tap(tester, section);
       expect(find.text('Rings again every 10 min until Done'), findsOneWidget);
 
-      await tap(tester, find.byKey(const ValueKey('renagDevice')));
-      await tap(tester, find.text('30 min').last);
-      expect(store.renagInterval, const Duration(minutes: 30));
+      expect(find.byKey(const ValueKey('renagDevice')), findsNothing);
 
       await tap(tester, find.byKey(const ValueKey('renagThis')));
       await tap(tester, find.text('5 min').last);
@@ -211,28 +209,16 @@ void main() {
       expect(armed.alarm.renag, const Duration(minutes: 5));
     });
 
-    testWidgets('a changed Device default is armed without a Save', (
+    testWidgets('a Device default changed in Settings is armed at once', (
       tester,
     ) async {
       routines.create('pills', daily([at(20)]));
       await start(tester);
       expect(alarms.armed.first.alarm.renag, const Duration(minutes: 10));
-      await tap(tester, find.text('pills').first);
-      final section = find.text('Re-nag');
-      await tester.scrollUntilVisible(
-        section,
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(RoutineEditorScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tap(tester, section);
+      await tap(tester, find.byTooltip('Settings'));
       await tap(tester, find.byKey(const ValueKey('renagDevice')));
       await tap(tester, find.text('15 min').last);
-      await tap(tester, find.byType(BackButton));
+      expect(store.renagInterval, const Duration(minutes: 15));
       expect(alarms.armed.first.alarm.renag, const Duration(minutes: 15));
     });
 

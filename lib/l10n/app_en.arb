@@ -424,33 +424,9 @@
     }
   },
   "nudgeBody": "Tap to sort them.",
-  "nudgeSettingsHeading": "Nudges on this phone",
-  "nudgeSettingsSummary": "Again after {minutes} min, {quiet}",
-  "@nudgeSettingsSummary": {
-    "placeholders": {
-      "minutes": {
-        "type": "int"
-      },
-      "quiet": {
-        "type": "String"
-      }
-    }
-  },
   "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.",
   "nudgeRepeat": "Nudge again after",
   "quietHours": "Quiet Hours",
-  "quietHoursRange": "Quiet Hours {from} to {until}",
-  "@quietHoursRange": {
-    "placeholders": {
-      "from": {
-        "type": "String"
-      },
-      "until": {
-        "type": "String"
-      }
-    }
-  },
-  "quietHoursOff": "no Quiet Hours",
   "quietFrom": "From",
   "quietUntil": "Until",
   "yes": "Yes",
@@ -710,5 +686,42 @@
   "calendarMirrorExplainBody": "Old Brain Fix can write your Routines and Reminders into a calendar you choose and keep them up to date. It only ever changes or removes the events it wrote itself, and turning this off removes them. Wherever that calendar syncs to, they show up too.",
   "calendarMirrorNotAllowed": "Old Brain Fix may not write to your calendar. You can allow it in the system settings.",
   "calendarMirrorNoCalendar": "There is no calendar on this device to write into.",
-  "calendarMirrorNotRemoved": "The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again."
+  "calendarMirrorNotRemoved": "The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.",
+  "settingsTitle": "Settings",
+  "settingsIntro": "These settings belong to this phone and are never synced.",
+  "settingsLook": "Look",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "settingsAlarms": "Alarms",
+  "settingsAlarmSetupDetail": "The permissions alarms need to ring on time.",
+  "settingsRenagDetail": "How often an ignored alarm rings again, unless its Routine has its own interval.",
+  "settingsNudges": "Nudges",
+  "settingsCapture": "Capture",
+  "settingsNamedPlacesDetail": "“Home” or “Work” instead of coordinates. Kept with your Notes, not just on this phone.",
+  "settingsCaptureContextDetail": "Calendar event and Bluetooth device with each Note.",
+  "settingsSpeechModelDetail": "For Transcripts of voice Notes.",
+  "settingsCalendar": "Calendar",
+  "settingsHistory": "History",
+  "aboutTitle": "About Old Brain Fix",
+  "aboutTagline": "Capture a thought in one tap. Get nagged until it is sorted or done.",
+  "versionLabel": "Version {version} ({build})",
+  "@versionLabel": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "documentation": "Documentation",
+  "sourceCode": "Source code",
+  "reportProblem": "Report a problem or an idea",
+  "githubIssues": "GitHub issues",
+  "writeTheDeveloper": "Write to the developer",
+  "buyCoffee": "Buy me a coffee",
+  "coffeeSubtitle": "On Ko-fi, if Old Brain Fix helps you",
+  "openSourceLicenses": "Open-source licenses"
 }

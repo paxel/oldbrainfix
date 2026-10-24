@@ -179,8 +179,18 @@ void main() {
       await tap(tester, historyButton);
       expect(streak, findsOneWidget);
 
+      expect(find.text('Show Streaks on this phone'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tap(tester, find.byTooltip('Settings'));
       await tap(tester, find.text('Show Streaks on this phone'));
       expect(store.streaksOn, isFalse);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('pills').first);
+      await tap(tester, historyButton);
       expect(streak, findsNothing);
       expect(find.text('Now'), findsNothing);
       expect(find.text('Last 7 days'), findsNothing);
@@ -194,8 +204,10 @@ void main() {
       expect(streak, findsNothing);
       expect(find.text('Adherence'), findsOneWidget);
 
-      await tap(tester, find.text('Show Streaks on this phone'));
-      expect(store.streaksOn, isTrue);
+      store.streaksOn = true;
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tap(tester, historyButton);
       expect(streak, findsOneWidget);
     });
 

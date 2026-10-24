@@ -229,8 +229,9 @@ void main() {
 
     Future<void> openPage(WidgetTester tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
-      await tap(tester, find.byTooltip('Capture Context'));
+      await tap(tester, find.byTooltip('Settings'));
+      await tester.ensureVisible(find.text('Capture Context'));
+      await tap(tester, find.text('Capture Context'));
     }
 
     bool isOn(WidgetTester tester, Finder finder) =>
@@ -303,8 +304,8 @@ void main() {
     testWidgets('are not offered without a source', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tap(tester, find.byIcon(Icons.search));
-      expect(find.byTooltip('Capture Context'), findsNothing);
+      await tap(tester, find.byTooltip('Settings'));
+      expect(find.text('Capture Context'), findsNothing);
     });
   });
 

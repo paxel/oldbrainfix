@@ -201,8 +201,9 @@ void main() {
   group('Named Places', () {
     Future<void> openPage(WidgetTester tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.search));
-      await tap(tester, find.byTooltip('Named Places'));
+      await tap(tester, find.byTooltip('Settings'));
+      await tester.ensureVisible(find.text('Named Places'));
+      await tap(tester, find.text('Named Places'));
     }
 
     Finder inDialog(Finder finder) =>
@@ -252,7 +253,10 @@ void main() {
       expect(named.all(), isEmpty);
       expect(notes.byId(note.id)?.context.location, home);
 
+      // Back on the Agenda, through Settings, and into the browser.
       await tap(tester, find.byType(BackButton));
+      await tap(tester, find.byType(BackButton));
+      await tap(tester, find.byIcon(Icons.search));
       await tap(tester, find.byTooltip('All Notes'));
       expect(find.text('48.1372, 11.5761'), findsOneWidget);
     });

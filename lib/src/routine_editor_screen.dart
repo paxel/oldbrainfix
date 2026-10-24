@@ -57,15 +57,17 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// N days, weeks, months or years, chosen weekdays) or as an RRULE in the
 /// advanced mode, with its times of day. The next Occurrences show while
 /// it is edited. A folded Re-nag section sets how often it rings again
-/// when ignored: its own interval or this Device's default, which is
-/// set there too, for now (it moves to Settings later). A folded
-/// Escalation section below it turns on the full-screen alarm after a
-/// number of ignored Re-nags (3 when first turned on). Save writes the
-/// Routine; leaving without saving drops the edit, but not a changed
-/// Device default, which applies at once. A saved Routine's history
+/// when ignored: its own interval or this Device's default from
+/// Settings. A folded Escalation section below it turns on the
+/// full-screen alarm after a number of ignored Re-nags (3 when first
+/// turned on). Save writes the Routine; leaving without saving drops the
+/// edit. A saved Routine's history
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
 class RoutineEditorScreen extends StatefulWidget {
+  /// The Re-nag intervals offered, in minutes.
+  static const renagChoices = [5, 10, 15, 30, 60];
+
   final Notes notes;
   final Places places;
 
@@ -96,9 +98,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// How many coming Occurrences the editor shows.
   static const _preview = 3;
 
-  /// The Re-nag intervals offered, in minutes.
-  static const _renagChoices = [5, 10, 15, 30, 60];
-
   /// The numbers of ignored Re-nags offered before Escalation.
   static const _escalationChoices = [1, 2, 3, 5, 10];
 
@@ -119,7 +118,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
 
   /// The Routine's own Re-nag interval; null for the Device's default.
   Duration? _renag;
-  late Duration _deviceRenag = widget.notes.store.renagInterval;
+  late final _deviceRenag = widget.notes.store.renagInterval;
 
   /// After how many ignored Re-nags it escalates; null when it does not.
   int? _escalation;
@@ -296,11 +295,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _routines.setRenag(id, _renag);
     _routines.setEscalation(id, _escalation);
     Navigator.of(context).pop(true);
-  }
-
-  void _setDeviceRenag(Duration interval) {
-    widget.notes.store.renagInterval = interval;
-    setState(() => _deviceRenag = interval);
   }
 
   Future<void> _delete() async {
@@ -541,12 +535,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     );
   }
 
-  /// The folded Re-nag section: this one's interval and the Device's.
+  /// The folded Re-nag section: this one's interval, or the Device's.
   Widget _renagPanel(AppLocalizations t) {
     final own = _renag?.inMinutes;
     final device = _deviceRenag.inMinutes;
     // A value set elsewhere stays pickable.
-    List<int> choices(int? kept) => {..._renagChoices, ?kept}.toList()..sort();
+    final choices = {...RoutineEditorScreen.renagChoices, ?own}.toList()
+      ..sort();
     return Embossed(
       child: ExpansionTile(
         key: const ValueKey('renag'),
@@ -575,25 +570,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                     value: null,
                     child: Text(t.renagDeviceDefault(device)),
                   ),
-                  for (final m in choices(own))
-                    DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
-                ],
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(child: Text(t.renagDevice)),
-              DropdownButton<int>(
-                key: const ValueKey('renagDevice'),
-                value: device,
-                onChanged: (minutes) {
-                  if (minutes != null) {
-                    _setDeviceRenag(Duration(minutes: minutes));
-                  }
-                },
-                items: [
-                  for (final m in choices(device))
+                  for (final m in choices)
                     DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
                 ],
               ),

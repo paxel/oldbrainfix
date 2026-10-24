@@ -19,9 +19,9 @@ import 'l10n.dart';
 };
 
 /// Walks through the access alarms need, one step at a time (ADR 0004,
-/// adapted from Chaos Alert): once on this Device's first start, and
-/// from the Agenda's red banner whenever one goes missing. Every step
-/// can be passed by; alarms then fall back to what is allowed.
+/// adapted from Chaos Alert): once on this Device's first start, from
+/// the Agenda's red banner whenever one goes missing, and from Settings.
+/// Every step can be passed by; alarms then fall back to what is allowed.
 class SetupScreen extends StatefulWidget {
   final AlarmSync alarms;
 

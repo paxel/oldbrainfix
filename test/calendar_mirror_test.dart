@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
-import 'package:oldbrainfix/src/calendar_export_screen.dart';
+import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_calendar.dart';
@@ -57,9 +57,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> openExport(WidgetTester tester) async {
-    await tap(tester, find.byTooltip('Export to calendar'));
-    expect(find.byType(CalendarExportScreen), findsOneWidget);
+  Future<void> openSettings(WidgetTester tester) async {
+    await tap(tester, find.byTooltip('Settings'));
+    expect(find.byType(SettingsScreen), findsOneWidget);
   }
 
   final mirrorSwitch = find.descendant(
@@ -77,7 +77,7 @@ void main() {
       final pills = routines.create('pills', daily(8));
       final foreign = mirror.addForeign('1', 'Dentist');
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       expect(find.text('Keep in a calendar'), findsOneWidget);
       expect(switchedOn(tester), isFalse);
 
@@ -108,7 +108,7 @@ void main() {
       routines.create('pills', daily(8));
       mirror.allowOnRequest = false;
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
 
       await tap(tester, mirrorSwitch);
       await tap(tester, find.text('Allow'));
@@ -127,7 +127,7 @@ void main() {
 
     testWidgets('"Not now" asks nothing', (tester) async {
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       await tap(tester, mirrorSwitch);
       await tap(tester, find.text('Not now'));
       expect(mirror.requests, 0);
@@ -139,7 +139,7 @@ void main() {
     ) async {
       mirror = FakeMirror(allowed: true, calendars: const []);
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       await tap(tester, mirrorSwitch);
       expect(switchedOn(tester), isFalse);
       expect(
@@ -157,7 +157,7 @@ void main() {
       );
       final pills = routines.create('pills', daily(8));
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       await tap(tester, mirrorSwitch);
       expect(store.mirrorCalendar, (id: '5', name: 'Phone'));
       expect(mirror.mirroredIn('5').keys, [uid(pills, 8)]);
@@ -169,7 +169,7 @@ void main() {
       mirror.allowed = true;
       final pills = routines.create('pills', daily(8));
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       await tap(tester, mirrorSwitch);
       await tap(tester, find.text('Personal'));
       expect(mirror.mirroredIn('1').keys, [uid(pills, 8)]);
@@ -270,7 +270,7 @@ void main() {
       final foreign = mirror.addForeign('1', 'Dentist');
       await start(tester);
       expect(mirror.mirroredIn('1'), hasLength(2));
-      await openExport(tester);
+      await openSettings(tester);
       expect(switchedOn(tester), isTrue);
 
       await tap(tester, mirrorSwitch);
@@ -291,7 +291,7 @@ void main() {
     ) async {
       routines.create('pills', daily(8));
       await start(tester);
-      await openExport(tester);
+      await openSettings(tester);
       mirror
         ..allowed = false
         ..allowOnRequest = false;

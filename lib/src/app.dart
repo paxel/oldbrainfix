@@ -105,7 +105,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _dark = lookTheme(Brightness.dark);
   late final _announcements = widget.announcements ?? Announcements();
   late final _drafts = widget.drafts ?? MemoryDrafts();
-  late final _themeMode = themeModeOf(widget.store.themeChoice);
+  late var _themeMode = themeModeOf(widget.store.themeChoice);
   late final _notes = Notes(widget.store);
   late final _places = Places(widget.store);
   final _trail = BrowserTrail();
@@ -215,8 +215,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       alarms: _alarms,
       mirror: _mirror,
       requests: widget.requests,
+      onThemeChanged: _themeChanged,
     ),
   );
+
+  /// Shows the theme this Device chose in Settings at once.
+  void _themeChanged() =>
+      setState(() => _themeMode = themeModeOf(widget.store.themeChoice));
 }
 
 /// The Starter Set on this Device's first start, then the alarm setup
@@ -233,6 +238,7 @@ class _Home extends StatefulWidget {
   final AlarmSync alarms;
   final CalendarMirror mirror;
   final CaptureRequests requests;
+  final VoidCallback onThemeChanged;
 
   const _Home({
     required this.store,
@@ -242,6 +248,7 @@ class _Home extends StatefulWidget {
     required this.alarms,
     required this.mirror,
     required this.requests,
+    required this.onThemeChanged,
   });
 
   @override
@@ -266,8 +273,8 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_unsortedOpened);
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
-    // way out as well, so a changed Device setting (the Re-nag interval)
-    // is armed even when the log did not change.
+    // way out as well, so a changed Device setting is armed even when the
+    // log did not change.
     _lifecycle = AppLifecycleListener(
       onResume: _resumed,
       onHide: widget.alarms.refresh,
@@ -326,11 +333,8 @@ class _HomeState extends State<_Home> {
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) => NudgeScreen(
-            notes: widget.notes,
-            places: widget.places,
-            alarms: widget.alarms,
-          ),
+          builder: (_) =>
+              NudgeScreen(notes: widget.notes, places: widget.places),
         ),
       ),
     );
@@ -340,9 +344,7 @@ class _HomeState extends State<_Home> {
   /// was tapped.
   void _unsortedOpened() {
     if (!mounted || !widget.alarms.takeUnsortedOpened()) return;
-    unawaited(
-      openUnsorted(context, widget.notes, widget.places, widget.alarms),
-    );
+    unawaited(openUnsorted(context, widget.notes, widget.places));
   }
 
   /// Plants what the user kept of the Starter Set; it is not offered
@@ -371,6 +373,7 @@ class _HomeState extends State<_Home> {
       trail: widget.trail,
       alarms: widget.alarms,
       requests: widget.requests,
+      onThemeChanged: widget.onThemeChanged,
     );
   }
 }
