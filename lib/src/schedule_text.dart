@@ -25,9 +25,20 @@ String occurrenceTime(AppLocalizations t, String locale, Occurrence o) =>
 
 /// [schedule] in words: how it repeats, and at which times.
 String scheduleText(AppLocalizations t, String locale, Schedule schedule) {
+  final times = schedule.dayTimes;
+  return [
+    repeatText(t, locale, schedule),
+    times.isEmpty
+        ? t.allDay
+        : [for (final time in times) clockText(locale, time)].join(', '),
+  ].join(' · ');
+}
+
+/// How [schedule] repeats, in words, without its times.
+String repeatText(AppLocalizations t, String locale, Schedule schedule) {
   final rule = schedule.rule;
   final simple = SimpleRepeat.of(rule, schedule.start);
-  final repeat = switch (simple?.kind) {
+  return switch (simple?.kind) {
     RepeatKind.once => t.onceOn(dayText(locale, schedule.start)),
     RepeatKind.every => switch (simple?.unit) {
       RepeatUnit.weeks => t.everyNWeeks(simple?.every ?? 1),
@@ -43,11 +54,4 @@ String scheduleText(AppLocalizations t, String locale, Schedule schedule) {
     ),
     null => t.ruleSummary(rule?.format() ?? ''),
   };
-  final times = schedule.dayTimes;
-  return [
-    repeat,
-    times.isEmpty
-        ? t.allDay
-        : [for (final time in times) clockText(locale, time)].join(', '),
-  ].join(' · ');
 }

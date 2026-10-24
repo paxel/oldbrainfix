@@ -43,6 +43,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An "x Unsorted" banner on the Agenda.
 - Quiet Hours that hold Nudges back at night while Routines still ring.
 - Deleting a Note with Routines or Reminders asks whether they go to the trash too.
+- Add any Note, Routine or Reminder to your calendar app, filled in, without a calendar permission.
+- Export all or picked Routines and Reminders as a shareable calendar file with their repeat rules and alarms.
 
 ---
 

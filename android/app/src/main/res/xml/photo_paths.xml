@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The one place the camera app may write to: the photo being taken. -->
+<!-- What the app hands to other apps, each file by its own grant: the
+     photo the camera app writes, and the files the user shares, such as
+     a calendar export. -->
 <paths>
     <cache-path name="camera" path="camera/" />
+    <cache-path name="exports" path="exports/" />
 </paths>

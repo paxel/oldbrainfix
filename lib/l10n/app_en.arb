@@ -678,5 +678,22 @@
         "type": "String"
       }
     }
-  }
+  },
+  "calendarTooltip": "Calendar",
+  "addNoteToCalendar": "Add to calendar at a time you pick",
+  "addToCalendarAt": "Add to calendar: {when}",
+  "@addToCalendarAt": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "shareCalendarFile": "Share as calendar file",
+  "noCalendarApp": "There is no calendar app to add it to.",
+  "nothingTakesCalendarFile": "No app can take the calendar file.",
+  "calendarExportTooltip": "Export to calendar",
+  "calendarExportTitle": "Calendar export",
+  "calendarExportAll": "All Routines and Reminders",
+  "calendarExportEmpty": "No Routines or Reminders yet."
 }

@@ -14,6 +14,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.TimeZone
 
 class MainActivity : FlutterActivity() {
     /** The answer to "request", until the permission dialog comes back. */
@@ -207,6 +208,34 @@ class MainActivity : FlutterActivity() {
                         ocr.idle()
                         result.success(null)
                     }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CALENDAR_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                val args = call.arguments as Map<*, *>
+                when (call.method) {
+                    "insert" -> result.success(
+                        CalendarInsert.open(
+                            this,
+                            CalendarInsert.of(
+                                title = args["title"] as String,
+                                description = args["description"] as String? ?: "",
+                                start = args["start"] as String?,
+                                rule = args["rule"] as String?,
+                                minutes = (args["minutes"] as Number).toInt(),
+                                zone = TimeZone.getDefault(),
+                            ),
+                        ),
+                    )
+                    "share" -> result.success(
+                        FileShare.share(
+                            this,
+                            args["name"] as String,
+                            args["bytes"] as ByteArray,
+                            args["type"] as String,
+                        ),
+                    )
                     else -> result.notImplemented()
                 }
             }
@@ -479,6 +508,7 @@ class MainActivity : FlutterActivity() {
         private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
+        private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3

@@ -1813,6 +1813,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Snoozed until {time}'**
   String logSnoozed(String time);
+
+  /// No description provided for @calendarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get calendarTooltip;
+
+  /// No description provided for @addNoteToCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to calendar at a time you pick'**
+  String get addNoteToCalendar;
+
+  /// No description provided for @addToCalendarAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to calendar: {when}'**
+  String addToCalendarAt(String when);
+
+  /// No description provided for @shareCalendarFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Share as calendar file'**
+  String get shareCalendarFile;
+
+  /// No description provided for @noCalendarApp.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no calendar app to add it to.'**
+  String get noCalendarApp;
+
+  /// No description provided for @nothingTakesCalendarFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No app can take the calendar file.'**
+  String get nothingTakesCalendarFile;
+
+  /// No description provided for @calendarExportTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Export to calendar'**
+  String get calendarExportTooltip;
+
+  /// No description provided for @calendarExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar export'**
+  String get calendarExportTitle;
+
+  /// No description provided for @calendarExportAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All Routines and Reminders'**
+  String get calendarExportAll;
+
+  /// No description provided for @calendarExportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No Routines or Reminders yet.'**
+  String get calendarExportEmpty;
 }
 
 class _AppLocalizationsDelegate

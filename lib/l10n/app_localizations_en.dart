@@ -1103,4 +1103,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String logSnoozed(String time) {
     return 'Snoozed until $time';
   }
+
+  @override
+  String get calendarTooltip => 'Calendar';
+
+  @override
+  String get addNoteToCalendar => 'Add to calendar at a time you pick';
+
+  @override
+  String addToCalendarAt(String when) {
+    return 'Add to calendar: $when';
+  }
+
+  @override
+  String get shareCalendarFile => 'Share as calendar file';
+
+  @override
+  String get noCalendarApp => 'There is no calendar app to add it to.';
+
+  @override
+  String get nothingTakesCalendarFile => 'No app can take the calendar file.';
+
+  @override
+  String get calendarExportTooltip => 'Export to calendar';
+
+  @override
+  String get calendarExportTitle => 'Calendar export';
+
+  @override
+  String get calendarExportAll => 'All Routines and Reminders';
+
+  @override
+  String get calendarExportEmpty => 'No Routines or Reminders yet.';
 }

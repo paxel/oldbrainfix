@@ -285,5 +285,15 @@
   "logMissed": "Verpasst",
   "logOpen": "Fällig, noch nicht erledigt",
   "logComing": "Kommt noch",
-  "logSnoozed": "Verschoben bis {time}"
+  "logSnoozed": "Verschoben bis {time}",
+  "calendarTooltip": "Kalender",
+  "addNoteToCalendar": "In den Kalender, Zeit selbst wählen",
+  "addToCalendarAt": "In den Kalender: {when}",
+  "shareCalendarFile": "Als Kalenderdatei teilen",
+  "noCalendarApp": "Es gibt keine Kalender-App, die es aufnehmen kann.",
+  "nothingTakesCalendarFile": "Keine App kann die Kalenderdatei annehmen.",
+  "calendarExportTooltip": "In den Kalender exportieren",
+  "calendarExportTitle": "Kalenderexport",
+  "calendarExportAll": "Alle Routinen und Erinnerungen",
+  "calendarExportEmpty": "Noch keine Routinen oder Erinnerungen."
 }

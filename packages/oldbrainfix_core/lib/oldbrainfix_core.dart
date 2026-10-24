@@ -7,6 +7,7 @@ export 'src/blobs.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
 export 'src/history.dart';
+export 'src/ics.dart';
 export 'src/named_places.dart';
 export 'src/notes.dart';
 export 'src/nudges.dart';

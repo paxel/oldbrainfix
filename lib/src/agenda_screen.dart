@@ -8,6 +8,8 @@ import 'alarm_sync.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
+import 'calendar_export_screen.dart';
+import 'calendar_platform.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'l10n.dart';
@@ -31,7 +33,8 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// is checked off as Done on its own, tomorrow's already today. "+"
 /// captures a Note, whose card then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar makes a Routine without a Note. A red
+/// the notes browser; the app bar makes a Routine without a Note and
+/// opens the calendar export. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them. At local
@@ -384,6 +387,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
       appBar: AppBar(
         title: Text(t.appTitle),
         actions: [
+          if (CalendarScope.of(context).available)
+            IconButton(
+              tooltip: t.calendarExportTooltip,
+              onPressed: () => openCalendarExport(context, widget.notes),
+              icon: const Icon(Icons.event_outlined),
+            ),
           IconButton(
             tooltip: t.newRoutineTooltip,
             onPressed: _newRoutine,

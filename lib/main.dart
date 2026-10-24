@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/alarm_platform.dart';
 import 'src/app.dart';
+import 'src/calendar_platform.dart';
 import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/drafts.dart';
@@ -31,6 +32,7 @@ Future<void> main() async {
       requests: AndroidCaptureRequests(),
       speech: AndroidSpeech(),
       ocr: const AndroidOcr(),
+      calendar: const AndroidCalendar(),
     ),
   );
 }

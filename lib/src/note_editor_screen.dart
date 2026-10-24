@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'calendar_platform.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'l10n.dart';
@@ -45,8 +46,9 @@ Future<void> openNote(
 /// Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
-/// spawn one from it; "merge into…" merges it into another Note; the
-/// trash button deletes it.
+/// spawn one from it; the calendar button adds it, or its Routines and
+/// Reminders, to the calendar; "merge into…" merges it into another
+/// Note; the trash button deletes it.
 ///
 /// Typed text survives the app being killed: it goes to the log when the
 /// app goes to the background, and a [Draft] of it is kept after every
@@ -232,6 +234,39 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
+  /// What the calendar button offers: the Note on its own at a time the
+  /// calendar app lets the user pick, each event of its Routines and
+  /// Reminders, and all of those as one calendar file.
+  List<CalendarChoice> _calendarChoices() {
+    final note = _placed?.note;
+    if (note == null) return const [];
+    final t = context.t;
+    final typed = _text.text.trim();
+    final events = [
+      for (final routine in _routines)
+        ...eventsOf(context, _routineBook, routine),
+    ];
+    return [
+      (
+        label: t.addNoteToCalendar,
+        run: () => addToCalendar(
+          context,
+          CalendarEvent.ofText(
+            note.id,
+            typed.isEmpty ? noteText(t, note) : typed,
+          ),
+        ),
+      ),
+      for (final routine in _routines)
+        ...addChoices(context, _routineBook, routine),
+      if (events.isNotEmpty)
+        (
+          label: t.shareCalendarFile,
+          run: () => shareCalendarFile(context, widget.notes.store, events),
+        ),
+    ];
+  }
+
   /// Merges the Note, with its text as typed, into the one picked; it
   /// then is a Section there and the editor closes.
   Future<void> _merge() async {
@@ -285,6 +320,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         appBar: AppBar(
           title: Text(t.noteTitle),
           actions: [
+            CalendarButton(choices: _calendarChoices),
             IconButton(
               tooltip: t.mergeInto,
               onPressed: _merge,

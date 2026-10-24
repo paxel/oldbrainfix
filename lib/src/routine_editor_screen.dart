@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
@@ -62,7 +63,8 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// number of ignored Re-nags (3 when first turned on). Save writes the
 /// Routine; leaving without saving drops the edit, but not a changed
 /// Device default, which applies at once. A saved Routine's history
-/// opens from the top bar.
+/// opens from the top bar, and its calendar button adds it, as saved,
+/// to the calendar or shares it as a calendar file.
 class RoutineEditorScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -330,6 +332,24 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     Navigator.of(context).pop(true);
   }
 
+  /// What the calendar button offers for [routine] as saved: each of its
+  /// events, and all of them as one calendar file.
+  List<CalendarChoice> _calendarChoices(Routine routine) {
+    final add = addChoices(context, _routines, routine);
+    if (add.isEmpty) return const [];
+    return [
+      ...add,
+      (
+        label: context.t.shareCalendarFile,
+        run: () => shareCalendarFile(
+          context,
+          widget.notes.store,
+          eventsOf(context, _routines, routine),
+        ),
+      ),
+    ];
+  }
+
   Future<void> _openNote() async {
     final note = _note;
     if (note == null || note.isTrashed) return;
@@ -365,6 +385,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          if (routine != null)
+            CalendarButton(choices: () => _calendarChoices(routine)),
           if (routine != null && !routine.isReminder)
             IconButton(
               tooltip: t.historyTitle,

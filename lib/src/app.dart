@@ -9,6 +9,7 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'browser.dart';
+import 'calendar_platform.dart';
 import 'capture_requests.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
@@ -64,6 +65,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// ocrs for Photo Texts; none when not given.
   final OcrPlatform ocr;
 
+  /// The calendar app to add to and the apps to share calendar files
+  /// with; none when not given.
+  final CalendarPlatform calendar;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -77,6 +82,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.requests = const NoCaptureRequests(),
     this.speech = const NoSpeech(),
     this.ocr = const NoOcr(),
+    this.calendar = const NoCalendar(),
   });
 
   @override
@@ -166,9 +172,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                     transcriber: _transcriber,
                     child: PhotoReaderScope(
                       reader: _photoReader,
-                      child: DraftsScope(
-                        drafts: _drafts,
-                        child: child ?? const SizedBox.shrink(),
+                      child: CalendarScope(
+                        calendar: widget.calendar,
+                        child: DraftsScope(
+                          drafts: _drafts,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   ),
