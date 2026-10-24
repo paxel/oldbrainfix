@@ -16,6 +16,10 @@
          calendar event running and the connected Bluetooth device. Read
          at Capture and kept in the Note on the user's own devices. -->
     <uses-permission android:name="android.permission.READ_CALENDAR"/>
+    <!-- The calendar mirror, only once the user switched it on: Routines
+         and Reminders written into the one calendar the user chose.
+         Only events the app wrote there are ever changed or removed. -->
+    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-permission
         android:name="android.permission.BLUETOOTH"

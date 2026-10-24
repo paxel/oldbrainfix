@@ -1142,4 +1142,35 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calendarExportEmpty => 'Noch keine Routinen oder Erinnerungen.';
+
+  @override
+  String get calendarMirrorSwitch => 'Im Kalender führen';
+
+  @override
+  String get calendarMirrorDetail =>
+      'Deine Routinen und Erinnerungen erscheinen in einem Kalender deiner Wahl auf diesem Gerät und folgen jeder Änderung.';
+
+  @override
+  String calendarMirrorIn(String calendar) {
+    return 'In „$calendar“. Tippen, um einen anderen Kalender zu wählen.';
+  }
+
+  @override
+  String get calendarMirrorExplainTitle => 'Im Kalender führen?';
+
+  @override
+  String get calendarMirrorExplainBody =>
+      'Old Brain Fix kann deine Routinen und Erinnerungen in einen Kalender deiner Wahl schreiben und aktuell halten. Es ändert oder entfernt nur Termine, die es selbst geschrieben hat, und wenn du das ausschaltest, entfernt es sie wieder. Wohin dieser Kalender synchronisiert, dort erscheinen sie auch.';
+
+  @override
+  String get calendarMirrorNotAllowed =>
+      'Old Brain Fix darf nicht in deinen Kalender schreiben. Du kannst es in den Systemeinstellungen erlauben.';
+
+  @override
+  String get calendarMirrorNoCalendar =>
+      'Auf diesem Gerät gibt es keinen Kalender, in den geschrieben werden kann.';
+
+  @override
+  String get calendarMirrorNotRemoved =>
+      'Die Termine konnten nicht aus dem Kalender entfernt werden. Erlaube Old Brain Fix den Kalender und schalte es noch einmal aus.';
 }

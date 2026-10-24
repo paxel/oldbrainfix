@@ -1873,6 +1873,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No Routines or Reminders yet.'**
   String get calendarExportEmpty;
+
+  /// No description provided for @calendarMirrorSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep in a calendar'**
+  String get calendarMirrorSwitch;
+
+  /// No description provided for @calendarMirrorDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Routines and Reminders appear in a calendar of your choice on this device and follow every change.'**
+  String get calendarMirrorDetail;
+
+  /// No description provided for @calendarMirrorIn.
+  ///
+  /// In en, this message translates to:
+  /// **'In “{calendar}”. Tap to choose another calendar.'**
+  String calendarMirrorIn(String calendar);
+
+  /// No description provided for @calendarMirrorExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep them in your calendar?'**
+  String get calendarMirrorExplainTitle;
+
+  /// No description provided for @calendarMirrorExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can write your Routines and Reminders into a calendar you choose and keep them up to date. It only ever changes or removes the events it wrote itself, and turning this off removes them. Wherever that calendar syncs to, they show up too.'**
+  String get calendarMirrorExplainBody;
+
+  /// No description provided for @calendarMirrorNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix may not write to your calendar. You can allow it in the system settings.'**
+  String get calendarMirrorNotAllowed;
+
+  /// No description provided for @calendarMirrorNoCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no calendar on this device to write into.'**
+  String get calendarMirrorNoCalendar;
+
+  /// No description provided for @calendarMirrorNotRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.'**
+  String get calendarMirrorNotRemoved;
 }
 
 class _AppLocalizationsDelegate

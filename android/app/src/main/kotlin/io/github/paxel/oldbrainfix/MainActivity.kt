@@ -24,7 +24,7 @@ class MainActivity : FlutterActivity() {
 
     private var photoChannel: MethodChannel? = null
 
-    /** The answers to the calendar's and Bluetooth's "request", by request code. */
+    /** The answers to the calendar's, the calendar mirror's and Bluetooth's "request", by request code. */
     private val contextAnswers = mutableMapOf<Int, MethodChannel.Result>()
 
     /** The answer to "take", until the camera app comes back. */
@@ -213,8 +213,25 @@ class MainActivity : FlutterActivity() {
             }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CALENDAR_CHANNEL)
             .setMethodCallHandler { call, result ->
-                val args = call.arguments as Map<*, *>
+                val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
                 when (call.method) {
+                    "mirrorGranted" -> result.success(CalendarMirror.granted(this))
+                    "mirrorRequest" -> requestMirror(result)
+                    "zone" -> result.success(TimeZone.getDefault().id)
+                    "calendars" -> inBackground(result) { CalendarMirror.calendars(this) }
+                    "marked" -> inBackground(result) {
+                        CalendarMirror.marked(this, (args["calendar"] as String).toLong())
+                    }
+                    "apply" -> inBackground(result) {
+                        CalendarMirror.apply(
+                            this,
+                            calendarId = (args["calendar"] as String).toLong(),
+                            creates = (args["create"] as List<*>).map { it as Map<*, *> },
+                            updates = (args["update"] as List<*>).map { it as Map<*, *> },
+                            deletes = (args["delete"] as List<*>).map { it as String },
+                            minutes = (args["minutes"] as Number).toInt(),
+                        )
+                    }
                     "insert" -> result.success(
                         CalendarInsert.open(
                             this,
@@ -446,6 +463,14 @@ class MainActivity : FlutterActivity() {
         requestPermissions(arrayOf(permission), code)
     }
 
+    /** Asks to read and write calendars for the mirror; answers whether both are allowed now. */
+    private fun requestMirror(result: MethodChannel.Result) {
+        if (CalendarMirror.granted(this)) return result.success(true)
+        contextAnswers.remove(REQUEST_CALENDAR_MIRROR)?.success(false)
+        contextAnswers[REQUEST_CALENDAR_MIRROR] = result
+        requestPermissions(CalendarMirror.permissions, REQUEST_CALENDAR_MIRROR)
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -455,6 +480,7 @@ class MainActivity : FlutterActivity() {
         when (requestCode) {
             REQUEST_CALENDAR -> contextAnswers.remove(requestCode)?.success(Calendar.granted(this))
             REQUEST_BLUETOOTH -> contextAnswers.remove(requestCode)?.success(Bluetooth.granted(this))
+            REQUEST_CALENDAR_MIRROR -> contextAnswers.remove(requestCode)?.success(CalendarMirror.granted(this))
             REQUEST_MICROPHONE -> {
                 microphoneAnswer?.success(Voice.granted(this))
                 microphoneAnswer = null
@@ -516,6 +542,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
+        private const val REQUEST_CALENDAR_MIRROR = 13
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */

@@ -9,6 +9,7 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'browser.dart';
+import 'calendar_mirror.dart';
 import 'calendar_platform.dart';
 import 'capture_requests.dart';
 import 'context_platform.dart';
@@ -69,6 +70,13 @@ class OldBrainFixApp extends StatefulWidget {
   /// with; none when not given.
   final CalendarPlatform calendar;
 
+  /// The Device's calendars to mirror Routines and Reminders into; none
+  /// when not given.
+  final MirrorPlatform mirror;
+
+  /// How long the calendar mirror waits after a change for more to come.
+  final Duration mirrorDelay;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -83,6 +91,8 @@ class OldBrainFixApp extends StatefulWidget {
     this.speech = const NoSpeech(),
     this.ocr = const NoOcr(),
     this.calendar = const NoCalendar(),
+    this.mirror = const NoMirror(),
+    this.mirrorDelay = CalendarMirror.defaultDelay,
   });
 
   @override
@@ -100,6 +110,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _places = Places(widget.store);
   final _trail = BrowserTrail();
   late final AlarmSync _alarms;
+  late final _mirror = CalendarMirror(
+    store: widget.store,
+    platform: widget.mirror,
+    delay: widget.mirrorDelay,
+  );
   late final _playback = Playback(
     voice: widget.voice,
     bytes: _notes.recordingBytes,
@@ -133,6 +148,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   @override
   void dispose() {
     _alarms.dispose();
+    _mirror.dispose();
     _playback.dispose();
     _transcriber.dispose();
     _speechModel.dispose();
@@ -174,9 +190,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                       reader: _photoReader,
                       child: CalendarScope(
                         calendar: widget.calendar,
-                        child: DraftsScope(
-                          drafts: _drafts,
-                          child: child ?? const SizedBox.shrink(),
+                        child: CalendarMirrorScope(
+                          mirror: _mirror,
+                          child: DraftsScope(
+                            drafts: _drafts,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),
@@ -194,6 +213,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       places: _places,
       trail: _trail,
       alarms: _alarms,
+      mirror: _mirror,
       requests: widget.requests,
     ),
   );
@@ -211,6 +231,7 @@ class _Home extends StatefulWidget {
   final Places places;
   final BrowserTrail trail;
   final AlarmSync alarms;
+  final CalendarMirror mirror;
   final CaptureRequests requests;
 
   const _Home({
@@ -219,6 +240,7 @@ class _Home extends StatefulWidget {
     required this.places,
     required this.trail,
     required this.alarms,
+    required this.mirror,
     required this.requests,
   });
 
@@ -247,7 +269,7 @@ class _HomeState extends State<_Home> {
     // way out as well, so a changed Device setting (the Re-nag interval)
     // is armed even when the log did not change.
     _lifecycle = AppLifecycleListener(
-      onResume: widget.alarms.refresh,
+      onResume: _resumed,
       onHide: widget.alarms.refresh,
     );
   }
@@ -259,6 +281,14 @@ class _HomeState extends State<_Home> {
       context.t,
       Localizations.localeOf(context).toString(),
     );
+    widget.mirror.setTexts(context.t);
+  }
+
+  /// Back from the background: the alarms as above, and the calendar
+  /// mirror in step with what other Devices synced meanwhile.
+  void _resumed() {
+    unawaited(widget.alarms.refresh());
+    unawaited(widget.mirror.sync());
   }
 
   @override

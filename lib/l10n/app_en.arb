@@ -695,5 +695,20 @@
   "calendarExportTooltip": "Export to calendar",
   "calendarExportTitle": "Calendar export",
   "calendarExportAll": "All Routines and Reminders",
-  "calendarExportEmpty": "No Routines or Reminders yet."
+  "calendarExportEmpty": "No Routines or Reminders yet.",
+  "calendarMirrorSwitch": "Keep in a calendar",
+  "calendarMirrorDetail": "Your Routines and Reminders appear in a calendar of your choice on this device and follow every change.",
+  "calendarMirrorIn": "In “{calendar}”. Tap to choose another calendar.",
+  "@calendarMirrorIn": {
+    "placeholders": {
+      "calendar": {
+        "type": "String"
+      }
+    }
+  },
+  "calendarMirrorExplainTitle": "Keep them in your calendar?",
+  "calendarMirrorExplainBody": "Old Brain Fix can write your Routines and Reminders into a calendar you choose and keep them up to date. It only ever changes or removes the events it wrote itself, and turning this off removes them. Wherever that calendar syncs to, they show up too.",
+  "calendarMirrorNotAllowed": "Old Brain Fix may not write to your calendar. You can allow it in the system settings.",
+  "calendarMirrorNoCalendar": "There is no calendar on this device to write into.",
+  "calendarMirrorNotRemoved": "The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again."
 }

@@ -295,5 +295,13 @@
   "calendarExportTooltip": "In den Kalender exportieren",
   "calendarExportTitle": "Kalenderexport",
   "calendarExportAll": "Alle Routinen und Erinnerungen",
-  "calendarExportEmpty": "Noch keine Routinen oder Erinnerungen."
+  "calendarExportEmpty": "Noch keine Routinen oder Erinnerungen.",
+  "calendarMirrorSwitch": "Im Kalender führen",
+  "calendarMirrorDetail": "Deine Routinen und Erinnerungen erscheinen in einem Kalender deiner Wahl auf diesem Gerät und folgen jeder Änderung.",
+  "calendarMirrorIn": "In „{calendar}“. Tippen, um einen anderen Kalender zu wählen.",
+  "calendarMirrorExplainTitle": "Im Kalender führen?",
+  "calendarMirrorExplainBody": "Old Brain Fix kann deine Routinen und Erinnerungen in einen Kalender deiner Wahl schreiben und aktuell halten. Es ändert oder entfernt nur Termine, die es selbst geschrieben hat, und wenn du das ausschaltest, entfernt es sie wieder. Wohin dieser Kalender synchronisiert, dort erscheinen sie auch.",
+  "calendarMirrorNotAllowed": "Old Brain Fix darf nicht in deinen Kalender schreiben. Du kannst es in den Systemeinstellungen erlauben.",
+  "calendarMirrorNoCalendar": "Auf diesem Gerät gibt es keinen Kalender, in den geschrieben werden kann.",
+  "calendarMirrorNotRemoved": "Die Termine konnten nicht aus dem Kalender entfernt werden. Erlaube Old Brain Fix den Kalender und schalte es noch einmal aus."
 }
