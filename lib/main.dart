@@ -10,6 +10,7 @@ import 'src/context_platform.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
 import 'src/photo_platform.dart';
+import 'src/voice_platform.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +23,7 @@ Future<void> main() async {
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),
       photos: AndroidPhotos(),
+      voice: AndroidVoice(),
       context: const AndroidContext(),
     ),
   );

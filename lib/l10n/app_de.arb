@@ -230,5 +230,15 @@
   "contextSourceApp": "Geteilt aus {app}",
   "contextDuring": "Während: {events}",
   "contextBluetooth": "Verbunden: {devices}",
-  "moreCaptureContext": "Mehr zur Erfassung"
+  "moreCaptureContext": "Mehr zur Erfassung",
+  "recordVoice": "Sprache aufnehmen",
+  "recording": "Aufnahme läuft …",
+  "stopAndSave": "Beenden und speichern",
+  "voiceRecording": "Sprachaufnahme",
+  "playRecording": "Sprachaufnahme abspielen",
+  "stopPlaying": "Anhalten",
+  "microphoneExplainTitle": "Mikrofon verwenden?",
+  "microphoneExplainBody": "Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.",
+  "microphoneMissing": "Sprachnotizen brauchen das Mikrofon.",
+  "typeInstead": "Lieber tippen"
 }

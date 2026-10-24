@@ -17,6 +17,7 @@ import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
 Future<void> openNote(
@@ -37,7 +38,7 @@ Future<void> openNote(
 
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its photos at full width, each opening full screen when
-/// tapped, its Importance, its Capture Context and where it is filed,
+/// tapped, a play button per voice recording, its Importance, its Capture Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
 /// spawn one from it; "merge into…" merges it into another Note; the
@@ -319,6 +320,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onTap: () => viewPhoto(context, hash),
               ),
             ],
+            for (final hash in note.recordings) ...[
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: RecordingButton(
+                  key: ValueKey(hash),
+                  hash: hash,
+                  compact: false,
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             EditorPanel(
               heading: t.importance,
@@ -429,6 +441,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         key: ValueKey(hash),
                         hash: hash,
                         onTap: () => viewPhoto(context, hash),
+                      ),
+                    ],
+                    for (final hash in section.recordings) ...[
+                      const SizedBox(height: 8),
+                      RecordingButton(
+                        key: ValueKey(hash),
+                        hash: hash,
+                        compact: false,
                       ),
                     ],
                     const SizedBox(height: 8),

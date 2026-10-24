@@ -21,6 +21,7 @@ import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
 import 'setup_screen.dart';
 import 'starter_set_screen.dart';
+import 'voice_platform.dart';
 
 class OldBrainFixApp extends StatefulWidget {
   final Store store;
@@ -42,6 +43,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// given.
   final PhotoPlatform photos;
 
+  /// The Device's microphone and playback of voice recordings; none when
+  /// not given.
+  final VoicePlatform voice;
+
   /// The calendar and Bluetooth devices for the Capture Context; none
   /// when not given.
   final ContextSource context;
@@ -54,6 +59,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
     this.photos = const NoPhotos(),
+    this.voice = const NoVoice(),
     this.context = const NoContext(),
   });
 
@@ -72,6 +78,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _places = Places(widget.store);
   final _trail = BrowserTrail();
   late final AlarmSync _alarms;
+  late final _playback = Playback(
+    voice: widget.voice,
+    bytes: _notes.recordingBytes,
+  );
 
   @override
   void initState() {
@@ -89,6 +99,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   @override
   void dispose() {
     _alarms.dispose();
+    _playback.dispose();
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
@@ -116,9 +127,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
               child: PhotoScope(
                 photos: widget.photos,
                 bytes: _notes.photoBytes,
-                child: DraftsScope(
-                  drafts: _drafts,
-                  child: child ?? const SizedBox.shrink(),
+                child: VoiceScope(
+                  voice: widget.voice,
+                  playback: _playback,
+                  child: DraftsScope(
+                    drafts: _drafts,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),

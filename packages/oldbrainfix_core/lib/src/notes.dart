@@ -46,6 +46,14 @@ abstract final class NoteKeys {
 
   static String photo(String hash) => '$photoPrefix$hash';
 
+  /// One field per voice recording, `audio:<hash>` = [audioAdded], as for
+  /// photos. The bytes are in the store's audio, under the hash
+  /// ([Store.audio]).
+  static const audioPrefix = 'audio:';
+  static const audioAdded = 'added';
+
+  static String audio(String hash) => '$audioPrefix$hash';
+
   /// The app something was shared in from, as [SourceApp.package] and
   /// [SourceApp.label]; absent for anything not shared in, or when the
   /// platform did not say.
@@ -195,6 +203,9 @@ class Note {
   /// The hashes of its photos, in the order they were added.
   final List<String> photos;
 
+  /// The hashes of its voice recordings, in the order they were added.
+  final List<String> recordings;
+
   const Note({
     required this.id,
     required this.text,
@@ -206,6 +217,7 @@ class Note {
     this.spawned = false,
     this.nudge,
     this.photos = const [],
+    this.recordings = const [],
   });
 
   /// When the Note was captured.
@@ -236,12 +248,17 @@ class Section {
   /// The hashes of its photos: a merged Note's photos travel with it.
   final List<String> photos;
 
+  /// The hashes of its voice recordings: a merged Note's recordings
+  /// travel with it.
+  final List<String> recordings;
+
   const Section({
     required this.id,
     required this.noteId,
     required this.text,
     required this.context,
     this.photos = const [],
+    this.recordings = const [],
   });
 }
 
@@ -288,16 +305,18 @@ class Notes {
 
   Notes(this.store);
 
-  /// Captures a new Note at the store's now with [text] and [photos],
-  /// filed into the Area or Topic [place] when one is given, nudged
-  /// [nudgeIn] from now while it is Unsorted. The text may be empty for
-  /// a photo Note. The photos are kept without their metadata. A Note
-  /// shared in from another app records it as [sourceApp].
+  /// Captures a new Note at the store's now with [text], [photos] and
+  /// voice [recordings], filed into the Area or Topic [place] when one is
+  /// given, nudged [nudgeIn] from now while it is Unsorted. The text may
+  /// be empty for a photo or voice Note. The photos are kept without
+  /// their metadata. A Note shared in from another app records it as
+  /// [sourceApp].
   Note capture(
     String text, {
     String? place,
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
+    List<Uint8List> recordings = const [],
     SourceApp? sourceApp,
   }) {
     if (place != null && !Places(store).isPlace(place)) {
@@ -307,6 +326,7 @@ class Notes {
     final now = store.clock().toUtc();
     // The bytes are kept before the log names them.
     final hashes = [for (final bytes in photos) store.putPhoto(bytes)];
+    final audio = [for (final bytes in recordings) store.putAudio(bytes)];
     store.batch(() {
       store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
@@ -318,6 +338,9 @@ class Notes {
       }
       for (final hash in hashes) {
         store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: now);
+      }
+      for (final hash in audio) {
+        store.append(id, NoteKeys.audio(hash), NoteKeys.audioAdded, date: now);
       }
       if (sourceApp != null) {
         final app = sourceApp;
@@ -342,6 +365,19 @@ class Notes {
   /// The bytes of the photo [hash], or null when they are not on this
   /// Device (yet).
   Uint8List? photoBytes(String hash) => store.photo(hash);
+
+  /// Adds the voice recording [bytes] to the Note [noteId]; returns the
+  /// hash it is kept under.
+  String addRecording(String noteId, Uint8List bytes) {
+    _requireNote(noteId);
+    final hash = store.putAudio(bytes);
+    store.append(noteId, NoteKeys.audio(hash), NoteKeys.audioAdded);
+    return hash;
+  }
+
+  /// The bytes of the voice recording [hash], or null when they are not
+  /// on this Device (yet).
+  Uint8List? recordingBytes(String hash) => store.audio(hash);
 
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
   /// wherever it was before.
@@ -433,6 +469,7 @@ class Notes {
             text: note.text,
             context: note.context,
             photos: note.photos,
+            recordings: note.recordings,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -567,6 +604,12 @@ class Notes {
           if (key.startsWith(NoteKeys.photoPrefix) &&
               value == NoteKeys.photoAdded)
             key.substring(NoteKeys.photoPrefix.length),
+      ],
+      recordings: [
+        for (final MapEntry(:key, :value) in fields.entries)
+          if (key.startsWith(NoteKeys.audioPrefix) &&
+              value == NoteKeys.audioAdded)
+            key.substring(NoteKeys.audioPrefix.length),
       ],
     );
   }

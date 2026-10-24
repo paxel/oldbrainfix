@@ -902,4 +902,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moreCaptureContext => 'More about the capture';
+
+  @override
+  String get recordVoice => 'Record voice';
+
+  @override
+  String get recording => 'Recording…';
+
+  @override
+  String get stopAndSave => 'Stop and save';
+
+  @override
+  String get voiceRecording => 'Voice recording';
+
+  @override
+  String get playRecording => 'Play the voice recording';
+
+  @override
+  String get stopPlaying => 'Stop';
+
+  @override
+  String get microphoneExplainTitle => 'Use the microphone?';
+
+  @override
+  String get microphoneExplainBody =>
+      'Voice Notes record what you say, so a thought is kept before it is gone. Old Brain Fix uses the microphone only while you record. The recording stays in the Note on your own devices and is never sent anywhere else.';
+
+  @override
+  String get microphoneMissing => 'Voice Notes need the microphone.';
+
+  @override
+  String get typeInstead => 'Type instead';
 }

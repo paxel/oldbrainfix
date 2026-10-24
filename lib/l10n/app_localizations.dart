@@ -1483,6 +1483,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More about the capture'**
   String get moreCaptureContext;
+
+  /// No description provided for @recordVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Record voice'**
+  String get recordVoice;
+
+  /// No description provided for @recording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording…'**
+  String get recording;
+
+  /// No description provided for @stopAndSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and save'**
+  String get stopAndSave;
+
+  /// No description provided for @voiceRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice recording'**
+  String get voiceRecording;
+
+  /// No description provided for @playRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Play the voice recording'**
+  String get playRecording;
+
+  /// No description provided for @stopPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopPlaying;
+
+  /// No description provided for @microphoneExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the microphone?'**
+  String get microphoneExplainTitle;
+
+  /// No description provided for @microphoneExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Notes record what you say, so a thought is kept before it is gone. Old Brain Fix uses the microphone only while you record. The recording stays in the Note on your own devices and is never sent anywhere else.'**
+  String get microphoneExplainBody;
+
+  /// No description provided for @microphoneMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice Notes need the microphone.'**
+  String get microphoneMissing;
+
+  /// No description provided for @typeInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Type instead'**
+  String get typeInstead;
 }
 
 class _AppLocalizationsDelegate

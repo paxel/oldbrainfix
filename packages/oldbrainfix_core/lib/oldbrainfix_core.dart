@@ -3,6 +3,7 @@
 library;
 
 export 'src/alarms.dart';
+export 'src/blobs.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
 export 'src/named_places.dart';

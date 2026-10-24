@@ -72,7 +72,7 @@ void main() {
     test('a hash that is no hash never reaches outside the directory', () {
       final dir = Directory.systemTemp.createTempSync('obf');
       addTearDown(() => dir.deleteSync(recursive: true));
-      final blobs = FilePhotoBlobs('${dir.path}/photos');
+      final blobs = FileBlobs('${dir.path}/photos');
       blobs.put('../escape', Uint8List.fromList([1]));
       expect(File('${dir.path}/escape').existsSync(), isFalse);
       expect(blobs.get('../escape'), isNull);

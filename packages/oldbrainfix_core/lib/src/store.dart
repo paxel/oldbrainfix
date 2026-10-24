@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
 
+import 'blobs.dart';
 import 'entry.dart';
 import 'photos.dart';
 import 'signing.dart';
@@ -15,17 +16,18 @@ import 'signing.dart';
 /// The store never reads the wall clock on its own: [clock] is handed in,
 /// so tests and the fixture generator get a reproducible log.
 ///
-/// Photo bytes live outside the log, content-addressed by SHA-256: a
-/// `photos` directory next to the database file, or memory for
-/// [Store.inMemory].
+/// Photo and voice recording bytes live outside the log, content-addressed
+/// by SHA-256: `photos` and `audio` directories next to the database file,
+/// or memory for [Store.inMemory].
 class Store {
   final Database _db;
-  final PhotoBlobs _photos;
+  final Blobs _photos;
+  final Blobs _audio;
 
   /// Where the store reads "now" for [Entry.recorded] and default dates.
   final DateTime Function() clock;
 
-  Store._(this._db, this.clock, this._photos);
+  Store._(this._db, this.clock, this._photos, this._audio);
 
   final _listeners = <void Function()>[];
   var _inBatch = false;
@@ -53,20 +55,28 @@ class Store {
     sqlite3.open(path),
     clock,
     newKey,
-    FilePhotoBlobs('${File(path).parent.path}/photos'),
+    FileBlobs('${File(path).parent.path}/photos'),
+    FileBlobs('${File(path).parent.path}/audio'),
   );
 
   /// Opens a throwaway in-memory store (tests).
   factory Store.inMemory({
     DateTime Function() clock = DateTime.now,
     SigningKey Function() newKey = SigningKey.generate,
-  }) => _init(sqlite3.openInMemory(), clock, newKey, MemoryPhotoBlobs());
+  }) => _init(
+    sqlite3.openInMemory(),
+    clock,
+    newKey,
+    MemoryBlobs(),
+    MemoryBlobs(),
+  );
 
   static Store _init(
     Database db,
     DateTime Function() clock,
     SigningKey Function() newKey,
-    PhotoBlobs photos,
+    Blobs photos,
+    Blobs audio,
   ) {
     db.execute('''
       PRAGMA journal_mode = WAL;
@@ -91,7 +101,7 @@ class Store {
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
     ''');
-    final store = Store._(db, clock, photos);
+    final store = Store._(db, clock, photos, audio);
     if (store.localSetting('device') == null) {
       final key = newKey();
       store.setLocalSetting('device', deviceIdFromKey(key.publicKey));
@@ -143,6 +153,20 @@ class Store {
 
   /// The bytes of the photo [hash], or null when they are not here.
   Uint8List? photo(String hash) => _photos.get(hash);
+
+  // --------------------------------------------------------------- audio
+
+  /// Keeps the voice recording [bytes] as they are and returns the hash
+  /// it is kept under. The same recording twice is kept once.
+  String putAudio(Uint8List bytes) {
+    final hash = sha256.convert(bytes).toString();
+    _audio.put(hash, bytes);
+    return hash;
+  }
+
+  /// The bytes of the voice recording [hash], or null when they are not
+  /// here.
+  Uint8List? audio(String hash) => _audio.get(hash);
 
   // ----------------------------------------------------------------- log
 

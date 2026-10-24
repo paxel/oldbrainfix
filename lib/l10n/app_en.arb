@@ -519,5 +519,15 @@
       }
     }
   },
-  "moreCaptureContext": "More about the capture"
+  "moreCaptureContext": "More about the capture",
+  "recordVoice": "Record voice",
+  "recording": "Recording…",
+  "stopAndSave": "Stop and save",
+  "voiceRecording": "Voice recording",
+  "playRecording": "Play the voice recording",
+  "stopPlaying": "Stop",
+  "microphoneExplainTitle": "Use the microphone?",
+  "microphoneExplainBody": "Voice Notes record what you say, so a thought is kept before it is gone. Old Brain Fix uses the microphone only while you record. The recording stays in the Note on your own devices and is never sent anywhere else.",
+  "microphoneMissing": "Voice Notes need the microphone.",
+  "typeInstead": "Type instead"
 }

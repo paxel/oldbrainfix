@@ -907,4 +907,35 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get moreCaptureContext => 'Mehr zur Erfassung';
+
+  @override
+  String get recordVoice => 'Sprache aufnehmen';
+
+  @override
+  String get recording => 'Aufnahme läuft …';
+
+  @override
+  String get stopAndSave => 'Beenden und speichern';
+
+  @override
+  String get voiceRecording => 'Sprachaufnahme';
+
+  @override
+  String get playRecording => 'Sprachaufnahme abspielen';
+
+  @override
+  String get stopPlaying => 'Anhalten';
+
+  @override
+  String get microphoneExplainTitle => 'Mikrofon verwenden?';
+
+  @override
+  String get microphoneExplainBody =>
+      'Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+
+  @override
+  String get microphoneMissing => 'Sprachnotizen brauchen das Mikrofon.';
+
+  @override
+  String get typeInstead => 'Lieber tippen';
 }

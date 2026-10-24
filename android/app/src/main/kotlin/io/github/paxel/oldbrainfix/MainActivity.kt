@@ -29,6 +29,14 @@ class MainActivity : FlutterActivity() {
     /** The answer to "take", until the camera app comes back. */
     private var photoAnswer: MethodChannel.Result? = null
 
+    private var voiceChannel: MethodChannel? = null
+
+    /** The microphone and the player for voice Notes. */
+    private val voice by lazy { Voice(this) }
+
+    /** The answer to the microphone's "request", until the dialog comes back. */
+    private var microphoneAnswer: MethodChannel.Result? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
@@ -88,6 +96,33 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "take" -> takePhoto(result)
                     "shared" -> inBackground(result) { Shares.take() }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOICE_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "granted" -> result.success(Voice.granted(this@MainActivity))
+                    "request" -> requestMicrophone(result)
+                    "start" -> result.success(voice.start())
+                    "stop" -> {
+                        val stopped = voice.stop() ?: return@setMethodCallHandler result.success(null)
+                        inBackground(result) {
+                            stopped.file.readBytes()
+                                .takeIf { stopped.clean || Voice.complete(it) }
+                                .also { stopped.file.delete() }
+                        }
+                    }
+                    "play" -> result.success(
+                        voice.play(call.arguments as ByteArray) {
+                            voiceChannel?.invokeMethod("played", null)
+                        },
+                    )
+                    "stopPlaying" -> {
+                        voice.stopPlaying()
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -169,6 +204,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         if (active === this) active = null
+        voice.release()
         super.onDestroy()
     }
 
@@ -231,6 +267,14 @@ class MainActivity : FlutterActivity() {
         requestPermissions(Location.permissions, REQUEST_LOCATION)
     }
 
+    /** Asks for the microphone; answers whether it is allowed now. */
+    private fun requestMicrophone(result: MethodChannel.Result) {
+        if (Voice.granted(this)) return result.success(true)
+        microphoneAnswer?.success(false)
+        microphoneAnswer = result
+        requestPermissions(arrayOf(Voice.permission), REQUEST_MICROPHONE)
+    }
+
     /** Asks for the calendar or Bluetooth [kind]; answers whether it is allowed now. */
     private fun requestContext(kind: String?, result: MethodChannel.Result) {
         val (code, permission, granted) = when (kind) {
@@ -253,6 +297,10 @@ class MainActivity : FlutterActivity() {
         when (requestCode) {
             REQUEST_CALENDAR -> contextAnswers.remove(requestCode)?.success(Calendar.granted(this))
             REQUEST_BLUETOOTH -> contextAnswers.remove(requestCode)?.success(Bluetooth.granted(this))
+            REQUEST_MICROPHONE -> {
+                microphoneAnswer?.success(Voice.granted(this))
+                microphoneAnswer = null
+            }
         }
         if (requestCode != REQUEST_LOCATION) return
         val answer = permissionAnswer ?: return
@@ -290,10 +338,12 @@ class MainActivity : FlutterActivity() {
         private const val ALARM_CHANNEL = "io.github.paxel.oldbrainfix/alarms"
         private const val PHOTO_CHANNEL = "io.github.paxel.oldbrainfix/photos"
         private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
+        private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
         private const val REQUEST_LOCATION = 1
         private const val REQUEST_PHOTO = 2
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
+        private const val REQUEST_MICROPHONE = 12
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */

@@ -3,6 +3,10 @@
          app is open; matched against Named Places on the phone. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Voice Notes: the microphone records only while the user records
+         one, and the recording stays in the Note on the user's own
+         devices. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Capture Context, each only once the user switched it on: the
          calendar event running and the connected Bluetooth device. Read
          at Capture and kept in the Note on the user's own devices. -->

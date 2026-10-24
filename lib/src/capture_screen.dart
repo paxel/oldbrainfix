@@ -9,14 +9,15 @@ import 'l10n.dart';
 import 'location.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
+import 'voice_platform.dart';
 
 /// A Note just captured, and for its location and for the rest of its
 /// Capture Context whether it got attached, each once that is known.
 typedef Captured = ({String noteId, List<Future<bool>> attached});
 
-/// Opens text Capture, filing the new Note into the Area or Topic [place]
-/// when one is given, or with the [shared] item from another app filled
-/// in. [onChanged] runs once the user left Capture, for the caller to
+/// Opens text Capture, or voice Capture recording at once when [voice] is
+/// set, filing the new Note into the Area or Topic [place] when one is
+/// given, or with the [shared] item from another app filled in. [onChanged] runs once the user left Capture, for the caller to
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
 /// [onCaptured] gets the new Note's id first, when there is one.
@@ -29,11 +30,13 @@ Future<void> captureNote(
   Notes notes, {
   String? place,
   SharedItem? shared,
+  bool voice = false,
   required VoidCallback onChanged,
   ValueChanged<String>? onCaptured,
 }) async {
   final location = LocationScope.of(context);
   final photos = PhotoScope.of(context);
+  final microphone = VoiceScope.of(context);
   final contextSource = ContextScope.of(context);
   final captured = await Navigator.of(context).push<Captured>(
     MaterialPageRoute(
@@ -41,9 +44,11 @@ Future<void> captureNote(
         notes: notes,
         location: location,
         photos: photos,
+        voice: microphone,
         contextSource: contextSource,
         place: place,
         shared: shared,
+        startVoice: voice,
       ),
     ),
   );
@@ -84,10 +89,19 @@ Future<void> captureNote(
 /// optional. Something shared in from another app opens here with its
 /// text and photos filled in, and the app it came from recorded. Photos
 /// are written at once, so none is lost.
+///
+/// The mic button switches to voice: recording starts at once, the
+/// elapsed time runs, and one big stop button ends it and saves, as do
+/// the Nudge buttons and Back; there is no hold-to-talk and no stop on
+/// silence (UI laws, "Capture"). The first time, while the microphone is
+/// not allowed yet, it explains why and asks. The app going to the
+/// background ends the recording and keeps it. Text typed before goes
+/// into the same Note.
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
   final LocationSource location;
   final PhotoPlatform photos;
+  final VoicePlatform voice;
   final ContextSource contextSource;
 
   /// The Area or Topic the new Note is filed into; Unsorted when null.
@@ -96,14 +110,19 @@ class CaptureScreen extends StatefulWidget {
   /// What another app shared, filled in; null for a plain Capture.
   final SharedItem? shared;
 
+  /// Opens in voice, recording at once.
+  final bool startVoice;
+
   const CaptureScreen({
     super.key,
     required this.notes,
     this.location = const NoLocation(),
     this.photos = const NoPhotos(),
+    this.voice = const NoVoice(),
     this.contextSource = const NoContext(),
     this.place,
     this.shared,
+    this.startVoice = false,
   });
 
   @override
@@ -124,6 +143,29 @@ class _CaptureScreenState extends State<CaptureScreen> {
   /// The hashes of the Note's photos, as written.
   List<String> _photos = const [];
 
+  /// The hashes of the Note's voice recordings, as written.
+  List<String> _recordings = const [];
+
+  /// Whether the screen shows voice instead of the text field.
+  var _voiceMode = false;
+
+  /// Whether voice found the microphone not allowed or not working.
+  var _micMissing = false;
+
+  /// The recording being started and then running, whether it did start;
+  /// null while none runs.
+  Future<bool>? _recording;
+
+  /// Ending the recording and keeping it, once asked for.
+  Future<void>? _stopping;
+
+  /// Counts the recording's seconds while it runs.
+  Timer? _ticker;
+  var _elapsed = Duration.zero;
+
+  /// Set once leaving began, so a second tap does not leave twice.
+  var _leaving = false;
+
   @override
   void initState() {
     super.initState();
@@ -143,13 +185,19 @@ class _CaptureScreenState extends State<CaptureScreen> {
         if (state == AppLifecycleState.paused ||
             state == AppLifecycleState.hidden) {
           _write(null);
+          // Recording stops in the background: what is there is kept.
+          unawaited(_stopRecording());
         }
       },
     );
+    if (widget.startVoice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openVoice());
+    }
   }
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _lifecycle.dispose();
     _text.dispose();
     super.dispose();
@@ -172,11 +220,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
     if (nudgeIn != null) widget.notes.setNudge(captured.noteId, nudgeIn);
   }
 
-  /// Captures the new Note with [text] and [photos].
+  /// Captures the new Note with [text], [photos] and [recordings].
   void _create(
     String text, {
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
+    List<Uint8List> recordings = const [],
   }) {
     final note = widget.notes.capture(
       text,
@@ -184,6 +233,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       // Kept for a filed Note too: sent back to Unsorted, it is due.
       nudgeIn: nudgeIn ?? Notes.defaultNudge,
       photos: photos,
+      recordings: recordings,
       sourceApp: widget.shared?.sourceApp,
     );
     _captured = (
@@ -194,6 +244,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
       ],
     );
     _photos = note.photos;
+    _recordings = note.recordings;
   }
 
   /// Writes [photos] into the Note, capturing it with the text so far
@@ -218,8 +269,84 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _addPhotos([bytes]));
   }
 
-  /// Saves and leaves: by Save or Back (1 h), or a picked Nudge time.
-  void _save([Duration? nudgeIn]) {
+  /// Writes the recording [bytes] into the Note, capturing it with the
+  /// text so far when there is none yet.
+  void _addRecording(Uint8List bytes) {
+    final captured = _captured;
+    if (captured == null) {
+      _create(_text.text.trim(), recordings: [bytes]);
+      return;
+    }
+    widget.notes.addRecording(captured.noteId, bytes);
+    _recordings = widget.notes.byId(captured.noteId)?.recordings ?? _recordings;
+  }
+
+  /// Switches to voice and starts recording, asking for the microphone
+  /// first, with an explanation, while it is not allowed.
+  Future<void> _openVoice() async {
+    if (_recording != null || _leaving) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _voiceMode = true;
+      _micMissing = false;
+      _elapsed = Duration.zero;
+    });
+    final voice = widget.voice;
+    var allowed = await voice.granted();
+    if (!mounted || _leaving) return;
+    if (!allowed) allowed = await explainAndAskMicrophone(context, voice);
+    if (!mounted || _leaving) return;
+    if (!allowed) {
+      setState(() => _micMissing = true);
+      return;
+    }
+    // Recording ends any playing, and the play buttons show it.
+    await VoiceScope.playbackOf(context)?.stop();
+    if (!mounted || _leaving) return;
+    final recording = _recording = voice.start();
+    final started = await recording;
+    // Stopped meanwhile, by Back or the background: nothing to count.
+    if (!mounted || _recording != recording) return;
+    if (!started) {
+      _recording = null;
+      setState(() => _micMissing = true);
+      return;
+    }
+    _ticker = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() => _elapsed = Duration(seconds: timer.tick));
+    });
+  }
+
+  /// Ends the recording and writes it into the Note; the same ending
+  /// when asked again, nothing when none runs.
+  Future<void> _stopRecording() {
+    final recording = _recording;
+    if (recording != null) {
+      _recording = null;
+      _ticker?.cancel();
+      _stopping = _keep(recording);
+    }
+    return _stopping ?? Future.value();
+  }
+
+  /// Waits for [recording] to have started, ends it and keeps what was
+  /// recorded; back to the text field afterwards.
+  Future<void> _keep(Future<bool> recording) async {
+    if (!await recording) return;
+    final bytes = await widget.voice.stop();
+    if (bytes != null) _addRecording(bytes);
+    _stopping = null;
+    // Leaving, the text field never comes back to pop the keyboard up.
+    if (mounted && !_leaving) setState(() => _voiceMode = false);
+  }
+
+  /// Saves and leaves: by Save, Back or the stop button (1 h), or a
+  /// picked Nudge time. A running recording is ended and kept first.
+  Future<void> _save([Duration? nudgeIn]) async {
+    if (_leaving) return;
+    _leaving = true;
+    await _stopRecording();
+    if (!mounted) return;
     _write(nudgeIn);
     Navigator.of(context).pop(_captured);
   }
@@ -227,23 +354,33 @@ class _CaptureScreenState extends State<CaptureScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
+    final recording = _voiceMode && !_micMissing;
     // Leaving by Back saves as well (UI laws, "Capture").
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _save();
+        if (!didPop) unawaited(_save());
       },
       child: Scaffold(
         appBar: AppBar(
-          actions: [
-            if (widget.photos.available)
-              IconButton(
-                tooltip: t.takePhoto,
-                onPressed: _takePhoto,
-                icon: const Icon(Icons.photo_camera_outlined),
-              ),
-            TextButton(onPressed: _save, child: Text(t.save)),
-          ],
+          // While recording, the big stop button is the one way out.
+          actions: recording
+              ? null
+              : [
+                  if (widget.voice.available && !_voiceMode)
+                    IconButton(
+                      tooltip: t.recordVoice,
+                      onPressed: _openVoice,
+                      icon: const Icon(Icons.mic_none),
+                    ),
+                  if (widget.photos.available)
+                    IconButton(
+                      tooltip: t.takePhoto,
+                      onPressed: _takePhoto,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                    ),
+                  TextButton(onPressed: _save, child: Text(t.save)),
+                ],
         ),
         body: SafeArea(
           child: Padding(
@@ -258,17 +395,32 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-                Expanded(
-                  child: TextField(
-                    controller: _text,
-                    autofocus: true,
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: _photos.isEmpty
-                          ? t.captureHint
-                          : t.capturePhotoHint,
+                if (_recordings.isNotEmpty && !_voiceMode) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        for (final hash in _recordings)
+                          RecordingButton(key: ValueKey(hash), hash: hash),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                ],
+                Expanded(
+                  child: _voiceMode
+                      ? _voice(context)
+                      : TextField(
+                          controller: _text,
+                          autofocus: !widget.startVoice,
+                          maxLines: null,
+                          decoration: InputDecoration(
+                            hintText: _photos.isEmpty && _recordings.isEmpty
+                                ? t.captureHint
+                                : t.capturePhotoHint,
+                          ),
+                        ),
                 ),
                 NudgeButtons(onPicked: _save),
               ],
@@ -276,6 +428,81 @@ class _CaptureScreenState extends State<CaptureScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Voice: the text typed so far, then the running time and the big
+  /// stop button; or, without the microphone, why there is none.
+  Widget _voice(BuildContext context) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final typed = _text.text.trim();
+    return Column(
+      children: [
+        if (typed.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              typed,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyLarge,
+            ),
+          ),
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              child: _micMissing
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(t.microphoneMissing, textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _openVoice,
+                          child: Text(t.allowAccess),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _voiceMode = false),
+                          child: Text(t.typeInstead),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(t.recording, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        Text(
+                          elapsedText(_elapsed),
+                          key: const ValueKey('elapsed'),
+                          style: theme.textTheme.displayMedium,
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox.square(
+                          dimension: 160,
+                          child: FilledButton(
+                            key: const ValueKey('stopRecording'),
+                            onPressed: _save,
+                            style: FilledButton.styleFrom(
+                              shape: const CircleBorder(),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: Icon(
+                              Icons.stop,
+                              size: 96,
+                              semanticLabel: t.stopAndSave,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(t.stopAndSave),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
