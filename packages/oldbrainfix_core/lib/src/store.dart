@@ -295,6 +295,13 @@ class Store {
 
   static final _random = Random.secure();
 
-  /// A fresh random id for a new entity.
-  static String newId() => hex(List.generate(16, (_) => _random.nextInt(256)));
+  static String _randomId() =>
+      hex(List.generate(16, (_) => _random.nextInt(256)));
+
+  /// Makes the ids of new entities: random, unless the fixture generator
+  /// hands in a counter so its logs come out the same on every run.
+  static String Function() idMaker = _randomId;
+
+  /// A fresh id for a new entity.
+  static String newId() => idMaker();
 }

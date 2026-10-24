@@ -1,0 +1,32 @@
+{
+  "seed": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "publicKey": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "code": "65b6-0673",
+  "entries": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 7,
+      "entity": "note:0001",
+      "field": "text",
+      "value": "Quote \" backslash \\ slash / newline \n tab \t bell \u0001 umlaut ü emoji 🧠",
+      "date": "2026-01-01T10:00:00.000Z",
+      "author": "Ada \"the writer\"",
+      "recorded": "2026-01-01T10:00:00.123456Z",
+      "bytes": "WyI2NWI2MDY3M2Q2ZWQ4ODRiZjAxYzJjMjIyZDgyYWRhMCIsNywibm90ZTowMDAxIiwidGV4dCIsIlF1b3RlIFwiIGJhY2tzbGFzaCBcXCBzbGFzaCAvIG5ld2xpbmUgXG4gdGFiIFx0IGJlbGwgXHUwMDAxIHVtbGF1dCDDvCBlbW9qaSDwn6egIiwiMjAyNi0wMS0wMVQxMDowMDowMC4wMDBaIiwiQWRhIFwidGhlIHdyaXRlclwiIiwiMjAyNi0wMS0wMVQxMDowMDowMC4xMjM0NTZaIl0=",
+      "sig": "d9LK21NWWirZeQ1ypeKcluJIMnrMldKAYlIljqlzfxUNYqdCCVBFABxd59OGNnDUitsnLToinap0fRvy5EpYAQ=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 8,
+      "entity": "note:0001",
+      "field": "trashed",
+      "value": null,
+      "date": "2026-01-01T10:00:00.000Z",
+      "author": "",
+      "recorded": "2026-01-01T10:00:00.123456Z",
+      "bytes": "WyI2NWI2MDY3M2Q2ZWQ4ODRiZjAxYzJjMjIyZDgyYWRhMCIsOCwibm90ZTowMDAxIiwidHJhc2hlZCIsbnVsbCwiMjAyNi0wMS0wMVQxMDowMDowMC4wMDBaIiwiIiwiMjAyNi0wMS0wMVQxMDowMDowMC4xMjM0NTZaIl0=",
+      "sig": "Nbj6FjQTxAK/vsAfV4Fo8fshq40wwiukMt1U5uVyDnF+NoIpxhMTUkHUwMeW/wttI72m7r3ACi+VrfJFTL13AA=="
+    }
+  ]
+}

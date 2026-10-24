@@ -50,6 +50,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An optional App Lock with a PIN, fingerprint or screen lock that guards your Notes while capturing and alarms stay open.
 - Optional Area Locks that keep single Areas and their Notes hidden until unlocked, with their alarms, Agenda rows, widget and calendar entries shown as "Private Routine" or in full, still checkable.
 - An About page with the version, documentation, source, licences, a way to report problems or write to the developer, and a donation link.
+- A desktop app that shows Areas and Topics, their Notes as cards and the selected Note with its dated parts side by side, in the phone's look.
 
 ---
 

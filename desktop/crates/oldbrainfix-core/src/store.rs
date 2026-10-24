@@ -1,0 +1,443 @@
+//! The log: an append-only entry log over SQLite with a latest-wins
+//! projection (ADR 0002), the same tables as the Dart core's `Store`.
+//!
+//! The store never reads the wall clock on its own: the clock is handed
+//! in, so tests get a reproducible log.
+
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::path::Path;
+
+use chrono::{DateTime, Utc};
+use rusqlite::{Connection, OptionalExtension, Row, params};
+
+use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
+use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
+use crate::{Error, Result};
+
+/// Where the store reads "now".
+pub type Clock = Box<dyn Fn() -> DateTime<Utc> + Send>;
+
+/// The tables, word for word as the Dart core creates them.
+const SCHEMA: &str = "
+      CREATE TABLE IF NOT EXISTS entries (
+        seq      INTEGER PRIMARY KEY AUTOINCREMENT,
+        device   TEXT NOT NULL,
+        dseq     INTEGER NOT NULL,
+        entity   TEXT NOT NULL,
+        field    TEXT NOT NULL,
+        value    TEXT,
+        date     TEXT NOT NULL,
+        author   TEXT NOT NULL,
+        recorded TEXT NOT NULL,
+        sig      TEXT
+      );
+      CREATE TABLE IF NOT EXISTS local_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_device_dseq
+        ON entries (device, dseq);
+      CREATE INDEX IF NOT EXISTS idx_entries_entity_field
+        ON entries (entity, field);
+    ";
+
+/// The current fields of one entity, in the order they were first
+/// written, as the Dart core's `currentFields` map keeps them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Fields(Vec<(String, Option<String>)>);
+
+impl Fields {
+    /// The current value of `field`; `None` when absent or cleared.
+    pub fn get(&self, field: &str) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|(k, _)| k == field)
+            .and_then(|(_, v)| v.as_deref())
+    }
+
+    /// Every field with its current value, in first-written order.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
+        self.0.iter().map(|(k, v)| (k.as_str(), v.as_deref()))
+    }
+}
+
+pub struct Store {
+    db: Connection,
+    clock: Clock,
+}
+
+impl Store {
+    /// Opens an on-disk store, creating it if needed. `new_key` makes the
+    /// Device's signing key on first open.
+    pub fn open(
+        path: &Path,
+        clock: Clock,
+        new_key: impl FnOnce() -> Result<SigningKey>,
+    ) -> Result<Store> {
+        Self::init(Connection::open(path)?, clock, new_key)
+    }
+
+    /// Opens a throwaway in-memory store (tests).
+    pub fn in_memory(clock: Clock, new_key: impl FnOnce() -> Result<SigningKey>) -> Result<Store> {
+        Self::init(Connection::open_in_memory()?, clock, new_key)
+    }
+
+    fn init(
+        db: Connection,
+        clock: Clock,
+        new_key: impl FnOnce() -> Result<SigningKey>,
+    ) -> Result<Store> {
+        // The pragma answers with the mode it took; memory stays memory.
+        db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
+        db.execute_batch(SCHEMA)?;
+        let store = Store { db, clock };
+        if store.local_setting("device")?.is_none() {
+            let key = new_key()?;
+            store.set_local_setting("device", &device_id_from_key(&key.public_key()))?;
+            store.set_local_setting("signseed", &key.seed_hex())?;
+        }
+        Ok(store)
+    }
+
+    /// Now, by the store's clock.
+    pub fn now(&self) -> DateTime<Utc> {
+        (self.clock)()
+    }
+
+    /// This installation's stable device id.
+    pub fn device_id(&self) -> Result<String> {
+        self.local_setting("device")?
+            .ok_or_else(|| Error::Invalid("the store has no device id".into()))
+    }
+
+    /// This Device's signing key.
+    pub fn signing_key(&self) -> Result<SigningKey> {
+        let seed = self
+            .local_setting("signseed")?
+            .ok_or_else(|| Error::Invalid("the store has no signing key".into()))?;
+        SigningKey::from_seed_hex(&seed)
+    }
+
+    /// Author name stamped on own entries.
+    pub fn author(&self) -> Result<String> {
+        Ok(self.local_setting("author")?.unwrap_or_default())
+    }
+
+    // ---------------------------------------------------- local settings
+
+    /// A setting of this Device. Never synced (ADR 0008).
+    pub fn local_setting(&self, key: &str) -> Result<Option<String>> {
+        Ok(self
+            .db
+            .query_row(
+                "SELECT value FROM local_settings WHERE key = ?",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    pub fn set_local_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)",
+            [key, value],
+        )?;
+        Ok(())
+    }
+
+    // --------------------------------------------------------------- log
+
+    /// Appends one fact under this Device, signed as the Dart core signs.
+    /// `date` defaults to now.
+    pub fn append(
+        &self,
+        entity: &str,
+        field: &str,
+        value: Option<&str>,
+        date: Option<DateTime<Utc>>,
+    ) -> Result<Entry> {
+        let now = self.now();
+        let device = self.device_id()?;
+        let dseq = self.version_vector()?.get(&device).copied().unwrap_or(0) + 1;
+        let date_iso = dart_iso(date.unwrap_or(now));
+        let recorded_iso = dart_iso(now);
+        let author = self.author()?;
+        let sig = self.signing_key()?.sign(&entry_bytes(
+            &device,
+            dseq,
+            entity,
+            field,
+            value,
+            &date_iso,
+            &author,
+            &recorded_iso,
+        ));
+        self.db.execute(
+            "INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                device,
+                dseq,
+                entity,
+                field,
+                value,
+                date_iso,
+                author,
+                recorded_iso,
+                sig
+            ],
+        )?;
+        self.entries(
+            "SELECT * FROM entries WHERE device = ? AND dseq = ?",
+            params![device, dseq],
+        )?
+        .pop()
+        .ok_or_else(|| Error::Invalid("the appended entry is gone".into()))
+    }
+
+    /// Takes in an entry another Device wrote, as it is; one already held
+    /// is skipped. Returns whether it was new.
+    pub fn insert(&self, entry: &WireEntry) -> Result<bool> {
+        let changed = self.db.execute(
+            "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                entry.device,
+                entry.dseq,
+                entry.entity,
+                entry.field,
+                entry.value,
+                entry.date,
+                entry.author,
+                entry.recorded,
+                entry.sig
+            ],
+        )?;
+        Ok(changed > 0)
+    }
+
+    /// The newest dseq held from each Device.
+    pub fn version_vector(&self) -> Result<HashMap<String, i64>> {
+        let mut stmt = self
+            .db
+            .prepare("SELECT device, MAX(dseq) AS m FROM entries GROUP BY device")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Every entry of `entity`, in log order.
+    pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
+        self.entries(
+            "SELECT * FROM entries WHERE entity = ? ORDER BY seq",
+            params![entity],
+        )
+    }
+
+    /// Every entry, in log order.
+    pub fn all_entries(&self) -> Result<Vec<Entry>> {
+        self.entries("SELECT * FROM entries ORDER BY seq", params![])
+    }
+
+    /// The current value of `field` on `entity`: latest wins.
+    pub fn current(&self, entity: &str, field: &str) -> Result<Option<String>> {
+        Ok(self.current_fields(entity)?.get(field).map(str::to_string))
+    }
+
+    /// The current value of every field on `entity`: latest wins.
+    pub fn current_fields(&self, entity: &str) -> Result<Fields> {
+        let mut latest: Vec<Entry> = Vec::new();
+        for e in self.history(entity)? {
+            match latest.iter_mut().find(|held| held.field == e.field) {
+                Some(held) => {
+                    if Self::latest_wins(&e, held) == Ordering::Greater {
+                        *held = e;
+                    }
+                }
+                None => latest.push(e),
+            }
+        }
+        Ok(Fields(
+            latest.into_iter().map(|e| (e.field, e.value)).collect(),
+        ))
+    }
+
+    /// Entities whose current `$type` is `ty`.
+    pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
+        let ids: Vec<String> = {
+            let mut stmt = self.db.prepare(
+                "SELECT DISTINCT entity FROM entries WHERE field = '$type' AND value = ?",
+            )?;
+            let rows = stmt.query_map([ty], |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut out = Vec::new();
+        for id in ids {
+            if self.current(&id, "$type")?.as_deref() == Some(ty) {
+                out.push(id);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Latest-wins order: date, then recording time, then device, then
+    /// dseq. Sorting a field's entries by it puts the current value last.
+    pub fn latest_wins(a: &Entry, b: &Entry) -> Ordering {
+        a.date_at
+            .cmp(&b.date_at)
+            .then(a.recorded_at.cmp(&b.recorded_at))
+            .then_with(|| utf16_cmp(&a.device, &b.device))
+            .then(a.dseq.cmp(&b.dseq))
+    }
+
+    fn entries(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Entry>> {
+        let mut stmt = self.db.prepare(sql)?;
+        let rows = stmt.query_map(args, raw_row)?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (seq, wire) = row?;
+            out.push(Entry {
+                seq,
+                date_at: parse_time(&wire.date)?,
+                recorded_at: parse_time(&wire.recorded)?,
+                device: wire.device,
+                dseq: wire.dseq,
+                entity: wire.entity,
+                field: wire.field,
+                value: wire.value,
+                date: wire.date,
+                author: wire.author,
+                recorded: wire.recorded,
+                sig: wire.sig,
+            });
+        }
+        Ok(out)
+    }
+}
+
+fn raw_row(r: &Row) -> rusqlite::Result<(i64, WireEntry)> {
+    Ok((
+        r.get("seq")?,
+        WireEntry {
+            device: r.get("device")?,
+            dseq: r.get("dseq")?,
+            entity: r.get("entity")?,
+            field: r.get("field")?,
+            value: r.get("value")?,
+            date: r.get("date")?,
+            author: r.get("author")?,
+            recorded: r.get("recorded")?,
+            sig: r.get("sig")?,
+        },
+    ))
+}
+
+/// Text order as Dart's `String.compareTo` has it: by UTF-16 code units.
+pub fn utf16_cmp(a: &str, b: &str) -> Ordering {
+    a.encode_utf16().cmp(b.encode_utf16())
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::signing::verify_signature;
+    use chrono::TimeZone;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI64, Ordering as AtomicOrdering};
+
+    /// A clock that starts at 2026-01-01 10:00 UTC and moves one second
+    /// per read.
+    pub fn ticking() -> Clock {
+        let ticks = Arc::new(AtomicI64::new(0));
+        Box::new(move || {
+            let n = ticks.fetch_add(1, AtomicOrdering::SeqCst) + 1;
+            let start = Utc.with_ymd_and_hms(2026, 1, 1, 10, 0, 0).single();
+            start.unwrap_or_default() + chrono::Duration::seconds(n)
+        })
+    }
+
+    pub fn store() -> Store {
+        match Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32]))) {
+            Ok(s) => s,
+            Err(e) => panic!("store: {e}"),
+        }
+    }
+
+    #[test]
+    fn own_entries_are_signed_and_verify_under_the_device_key() -> Result<()> {
+        let store = store();
+        store.set_local_setting("author", "Ada")?;
+        let e = store.append("note:a", "text", Some("hello"), None)?;
+        let bytes = entry_bytes(
+            &e.device,
+            e.dseq,
+            &e.entity,
+            &e.field,
+            e.value.as_deref(),
+            &e.date,
+            &e.author,
+            &e.recorded,
+        );
+        let key = store.signing_key()?;
+        assert!(verify_signature(
+            &key.public_key(),
+            &bytes,
+            e.sig.as_deref()
+        ));
+        assert_eq!(store.device_id()?, device_id_from_key(&key.public_key()));
+        assert_eq!(e.author, "Ada");
+        assert_eq!(e.date, "2026-01-01T10:00:01.000Z");
+        Ok(())
+    }
+
+    #[test]
+    fn the_latest_date_wins_not_the_latest_append() -> Result<()> {
+        let store = store();
+        let day = |d| Utc.with_ymd_and_hms(2026, 5, d, 0, 0, 0).single();
+        store.append("note:a", "text", Some("new"), day(2))?;
+        store.append("note:a", "text", Some("old"), day(1))?;
+        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("new"));
+        store.append("note:a", "text", None, day(3))?;
+        assert_eq!(store.current("note:a", "text")?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn dseq_counts_up_and_a_held_entry_is_not_taken_twice() -> Result<()> {
+        let store = store();
+        store.append("note:a", "text", Some("1"), None)?;
+        let e = store.append("note:a", "text", Some("2"), None)?;
+        assert_eq!(e.dseq, 2);
+        assert_eq!(store.version_vector()?.get(&e.device), Some(&2));
+        assert!(!store.insert(&e.wire())?);
+        let mut other = e.wire();
+        other.device = "other".into();
+        assert!(store.insert(&other)?);
+        assert_eq!(store.all_entries()?.len(), 3);
+        assert_eq!(e.id(), format!("{}:2", e.device));
+        Ok(())
+    }
+
+    #[test]
+    fn the_device_identity_survives_a_reopen() -> Result<()> {
+        let dir = tempfile::tempdir().map_err(|e| Error::Invalid(e.to_string()))?;
+        let path = dir.path().join("oldbrainfix.db");
+        let first = Store::open(&path, ticking(), SigningKey::generate)?;
+        let device = first.device_id()?;
+        first.append("note:a", "text", Some("kept"), None)?;
+        drop(first);
+        let again = Store::open(&path, ticking(), || {
+            Err(Error::Invalid("no new key on reopen".into()))
+        })?;
+        assert_eq!(again.device_id()?, device);
+        assert_eq!(again.current("note:a", "text")?.as_deref(), Some("kept"));
+        Ok(())
+    }
+
+    #[test]
+    fn text_orders_by_utf16_code_units_like_dart() {
+        // U+FF5E sorts after U+1F600 in UTF-16, before it by code point.
+        assert_eq!(utf16_cmp("\u{FF5E}", "\u{1F600}"), Ordering::Greater);
+        assert_eq!(utf16_cmp("a", "b"), Ordering::Less);
+    }
+}

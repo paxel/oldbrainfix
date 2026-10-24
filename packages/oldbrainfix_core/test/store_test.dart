@@ -93,4 +93,17 @@ void main() {
     store.append('note:a', 'text', 'five');
     expect(heard, 2);
   });
+
+  test('new ids come from the id maker, random by default', () {
+    final ids = {Store.newId(), Store.newId()};
+    expect(ids, hasLength(2));
+    expect(ids.first, matches(RegExp(r'^[0-9a-f]{32}$')));
+    final random = Store.idMaker;
+    addTearDown(() => Store.idMaker = random);
+    var n = 0;
+    Store.idMaker = () => 'id${++n}';
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(Notes(store).capture('x').id, 'note:id1');
+  });
 }

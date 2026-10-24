@@ -1,0 +1,27 @@
+[package]
+name = "oldbrainfix-core"
+description = "Core of the Old Brain Fix desktop app: the signed entry log and the Notes, Areas and Topics read from it"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "oldbrainfix_core"
+
+[dependencies]
+rusqlite = { version = "0.38", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+sha2 = "0.10"
+hex = "0.4"
+getrandom = "0.3"
+ed25519-dalek = "2"
+base64 = "0.22"
+
+[dev-dependencies]
+# Reads the fixtures' doubles back bit for bit.
+serde_json = { version = "1.0", features = ["float_roundtrip"] }
+tempfile = "3.10"

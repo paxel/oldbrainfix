@@ -29,6 +29,35 @@ jobs:
       - name: No untranslated strings
         run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
 
+  desktop:
+    name: Desktop (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: The fixture corpus the desktop core is tested against is current
+        working-directory: packages/oldbrainfix_core
+        run: |
+          dart pub get
+          dart run tool/gen_fixtures.dart ../../desktop/fixtures
+          git diff --exit-code -- ../../desktop/fixtures
+          test -z "$(git status --porcelain -- ../../desktop/fixtures)"
+      - name: Format, lint and test
+        working-directory: desktop
+        run: |
+          cargo fmt --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+
   apk:
     name: Debug APK
     runs-on: ubuntu-latest

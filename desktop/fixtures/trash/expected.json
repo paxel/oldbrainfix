@@ -1,0 +1,80 @@
+{
+  "now": "2026-01-02T10:00:29.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Old shopping list",
+      "captured": "2026-01-01T10:00:01.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:05.000Z",
+      "mergedInto": null,
+      "spawned": false
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "Not so old after all",
+      "captured": "2026-01-01T10:00:07.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Long gone",
+      "captured": "2026-01-01T10:00:14.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2025-11-01T00:00:00.000Z",
+      "mergedInto": null,
+      "spawned": false
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Into the bin with the other",
+      "captured": "2026-01-01T10:00:19.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000005",
+      "spawned": false
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "The other",
+      "captured": "2026-01-01T10:00:23.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:28.000Z",
+      "mergedInto": null,
+      "spawned": false
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000002"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000002"
+  ],
+  "trashed": [
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000001"
+  ],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000002": [],
+    "note:00000000000000000000000000000005": [
+      {
+        "id": "note:00000000000000000000000000000004",
+        "noteId": "note:00000000000000000000000000000005",
+        "text": "Into the bin with the other",
+        "captured": "2026-01-01T10:00:19.000Z"
+      }
+    ],
+    "note:00000000000000000000000000000001": []
+  }
+}
