@@ -169,7 +169,9 @@ class AlarmSync extends ChangeNotifier {
       for (final alarm in Alarms(store).plan(wallClock))
         ArmedAlarm(
           alarm: alarm,
-          title: _title(alarm.text) ?? t.noteGone,
+          // A photo Note without words is still there.
+          title:
+              _title(alarm.text) ?? (alarm.text == null ? t.noteGone : t.photo),
           body: occurrenceTime(t, _locale, alarm.occurrence),
         ),
     ];

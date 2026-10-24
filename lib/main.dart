@@ -8,6 +8,7 @@ import 'src/alarm_platform.dart';
 import 'src/app.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
+import 'src/photo_platform.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,7 @@ Future<void> main() async {
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),
+      photos: AndroidPhotos(),
     ),
   );
 }

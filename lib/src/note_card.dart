@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'photo_views.dart';
 import 'place_names.dart';
 
 /// A Note with the Area and Topic it is filed in, read once per change.
@@ -33,7 +34,8 @@ String? whereCaptured(CaptureContext capture) =>
       null => null,
     };
 
-/// A Note drawn as a softly embossed card: its text, capture time, the
+/// A Note drawn as a softly embossed card: its text, thumbnails of its
+/// first [shownPhotos] photos, capture time, the
 /// Named Place or coordinates it was captured at, and where it is filed. Its Area's colour runs down the left edge and its
 /// icon leads the place line. Its enrich options file it, spawn a
 /// Routine or Reminder from it, and merge it. An important Note gets an accent marker
@@ -68,6 +70,9 @@ class NoteCard extends StatelessWidget {
 
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
+
+  /// How many photo thumbnails a card shows; the rest are counted.
+  static const shownPhotos = 3;
 
   const NoteCard({
     super.key,
@@ -126,7 +131,35 @@ class NoteCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(note.text, style: text.bodyLarge),
+                          // A photo Note may have no words.
+                          if (note.text.isNotEmpty)
+                            Text(note.text, style: text.bodyLarge),
+                          if (note.photos.isNotEmpty) ...[
+                            if (note.text.isNotEmpty) const SizedBox(height: 8),
+                            // Not a sideways list: swipes on a card
+                            // belong to the browser.
+                            Row(
+                              children: [
+                                for (final hash in note.photos.take(
+                                  shownPhotos,
+                                )) ...[
+                                  NotePhoto(
+                                    key: ValueKey(hash),
+                                    hash: hash,
+                                    size: 64,
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                if (note.photos.length > shownPhotos)
+                                  Text(
+                                    t.morePhotos(
+                                      note.photos.length - shownPhotos,
+                                    ),
+                                    style: text.labelLarge,
+                                  ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 6),
                           Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,

@@ -4,6 +4,18 @@
   "noNotesYet": "Nothing captured yet.",
   "captureTooltip": "Capture a Note",
   "captureHint": "What's on your mind?",
+  "capturePhotoHint": "A few words about it (optional)",
+  "takePhoto": "Take a photo",
+  "photo": "Photo",
+  "photoMissing": "Photo not on this device",
+  "morePhotos": "+{count}",
+  "@morePhotos": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "save": "Save",
   "dismissAnnouncement": "Dismiss",
   "browseTooltip": "Search and browse",

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'named_places.dart';
 import 'places.dart';
 import 'store.dart';
@@ -34,6 +36,14 @@ abstract final class NoteKeys {
   /// When the Note's Nudge is due, chosen at Capture; absent means
   /// [Notes.defaultNudge] after its capture.
   static const nudge = 'nudge';
+
+  /// One field per photo, `photo:<hash>` = [photoAdded], so photos added
+  /// on two Devices at once are both kept. The bytes are in the store's
+  /// photos, under the hash ([Store.photo]).
+  static const photoPrefix = 'photo:';
+  static const photoAdded = 'added';
+
+  static String photo(String hash) => '$photoPrefix$hash';
 }
 
 /// Field keys of a Section.
@@ -98,6 +108,9 @@ class Note {
   /// When its Nudge was asked for at Capture, or null when it was not.
   final DateTime? nudge;
 
+  /// The hashes of its photos, in the order they were added.
+  final List<String> photos;
+
   const Note({
     required this.id,
     required this.text,
@@ -108,6 +121,7 @@ class Note {
     this.mergedInto,
     this.spawned = false,
     this.nudge,
+    this.photos = const [],
   });
 
   /// When the Note was captured.
@@ -135,11 +149,15 @@ class Section {
   final String text;
   final CaptureContext context;
 
+  /// The hashes of its photos: a merged Note's photos travel with it.
+  final List<String> photos;
+
   const Section({
     required this.id,
     required this.noteId,
     required this.text,
     required this.context,
+    this.photos = const [],
   });
 }
 
@@ -186,15 +204,23 @@ class Notes {
 
   Notes(this.store);
 
-  /// Captures a new text Note at the store's now, filed into the Area or
-  /// Topic [place] when one is given, nudged [nudgeIn] from now while it
-  /// is Unsorted.
-  Note capture(String text, {String? place, Duration? nudgeIn}) {
+  /// Captures a new Note at the store's now with [text] and [photos],
+  /// filed into the Area or Topic [place] when one is given, nudged
+  /// [nudgeIn] from now while it is Unsorted. The text may be empty for
+  /// a photo Note. The photos are kept without their metadata.
+  Note capture(
+    String text, {
+    String? place,
+    Duration? nudgeIn,
+    List<Uint8List> photos = const [],
+  }) {
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
     }
     final id = 'note:${Store.newId()}';
     final now = store.clock().toUtc();
+    // The bytes are kept before the log names them.
+    final hashes = [for (final bytes in photos) store.putPhoto(bytes)];
     store.batch(() {
       store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
@@ -204,9 +230,25 @@ class Notes {
         final due = now.add(nudgeIn).toIso8601String();
         store.append(id, NoteKeys.nudge, due, date: now);
       }
+      for (final hash in hashes) {
+        store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: now);
+      }
     });
     return byId(id)!;
   }
+
+  /// Adds the photo [bytes] to the Note [noteId], without their metadata;
+  /// returns the hash it is kept under.
+  String addPhoto(String noteId, Uint8List bytes) {
+    _requireNote(noteId);
+    final hash = store.putPhoto(bytes);
+    store.append(noteId, NoteKeys.photo(hash), NoteKeys.photoAdded);
+    return hash;
+  }
+
+  /// The bytes of the photo [hash], or null when they are not on this
+  /// Device (yet).
+  Uint8List? photoBytes(String hash) => store.photo(hash);
 
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
   /// wherever it was before.
@@ -297,6 +339,7 @@ class Notes {
             noteId: noteId,
             text: note.text,
             context: note.context,
+            photos: note.photos,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -402,6 +445,13 @@ class Notes {
       mergedInto: _mergedInto(id),
       spawned: fields[NoteKeys.spawned] != null,
       nudge: DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
+      // The fields come in the order they were first written.
+      photos: [
+        for (final MapEntry(:key, :value) in fields.entries)
+          if (key.startsWith(NoteKeys.photoPrefix) &&
+              value == NoteKeys.photoAdded)
+            key.substring(NoteKeys.photoPrefix.length),
+      ],
     );
   }
 

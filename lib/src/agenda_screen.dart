@@ -16,6 +16,7 @@ import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'nudge_screen.dart';
+import 'photo_platform.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
@@ -33,7 +34,9 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them. At local
 /// midnight the Agenda moves on to the new day, and whenever an
-/// Occurrence becomes Missed the summary takes it in.
+/// Occurrence becomes Missed the summary takes it in. Whatever another
+/// app shares in opens in Capture over the Agenda, filled in and
+/// Unsorted.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow is faded.
   static const tomorrowOpacity = 0.55;
@@ -73,6 +76,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   String? _capturedId;
   PlacedNote? _captured;
 
+  /// Where shares come from; set with the first dependencies.
+  PhotoPlatform? _photos;
+  StreamSubscription<void>? _shares;
+  var _sharing = false;
+
   @override
   void initState() {
     super.initState();
@@ -81,8 +89,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
       // Back from the background, the last capture is old news. A
       // dialog or the notification shade only makes the app inactive.
       onShow: () => _capturedId = null,
-      // Maybe a new day.
-      onResume: _reload,
+      // Maybe a new day, maybe something shared meanwhile.
+      onResume: () {
+        _reload();
+        unawaited(_openShared());
+      },
     );
     widget.alarms.addListener(_reload);
     // Notes sorted on a page opened from elsewhere, like the Nudge
@@ -91,7 +102,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_photos != null) return;
+    final photos = _photos = PhotoScope.of(context);
+    _shares = photos.sharedArrived.listen((_) => _openShared());
+    // Shared before the Agenda was up, as on a start by a share.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openShared());
+  }
+
+  @override
   void dispose() {
+    unawaited(_shares?.cancel());
     _timer?.cancel();
     widget.alarms.removeListener(_reload);
     widget.notes.store.removeListener(_logChanged);
@@ -163,6 +185,29 @@ class _AgendaScreenState extends State<AgendaScreen> {
       onCaptured: (id) => _capturedId = id,
       onChanged: _reloadIfMounted,
     );
+  }
+
+  /// Opens Capture for each share waiting, one after the other. A shared
+  /// Note starts Unsorted.
+  Future<void> _openShared() async {
+    final photos = _photos;
+    if (photos == null || _sharing) return;
+    _sharing = true;
+    try {
+      while (mounted) {
+        final shared = await photos.takeShared();
+        if (shared == null || !mounted) return;
+        await captureNote(
+          context,
+          widget.notes,
+          shared: shared,
+          onCaptured: (id) => _capturedId = id,
+          onChanged: _reloadIfMounted,
+        );
+      }
+    } finally {
+      _sharing = false;
+    }
   }
 
   Future<void> _browse() async {
@@ -485,7 +530,8 @@ class _OccurrenceRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final colour = areaColour(area?.colour);
     final done = row.done != null;
-    final title = row.note?.text ?? t.noteGone;
+    final note = row.note;
+    final title = note == null ? t.noteGone : noteText(t, note);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Embossed(

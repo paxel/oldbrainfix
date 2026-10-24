@@ -12,6 +12,7 @@ import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
+import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
@@ -34,7 +35,8 @@ Future<void> openNote(
 );
 
 /// Everything about one Note: its text, fixed in place and saved on
-/// leaving, its Importance, its Capture Context and where it is filed,
+/// leaving, its photos at full width, each opening full screen when
+/// tapped, its Importance, its Capture Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
 /// spawn one from it; "merge into…" merges it into another Note; the
@@ -301,6 +303,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             ),
+            for (final hash in note.photos) ...[
+              const SizedBox(height: 16),
+              NotePhoto(
+                key: ValueKey(hash),
+                hash: hash,
+                onTap: () => viewPhoto(context, hash),
+              ),
+            ],
             const SizedBox(height: 16),
             EditorPanel(
               heading: t.importance,
@@ -400,10 +410,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      section.text,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+                    if (section.text.isNotEmpty)
+                      Text(
+                        section.text,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    for (final hash in section.photos) ...[
+                      const SizedBox(height: 8),
+                      NotePhoto(
+                        key: ValueKey(hash),
+                        hash: hash,
+                        onTap: () => viewPhoto(context, hash),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     CaptureContextLines(capture: section.context, when: when),
                   ],

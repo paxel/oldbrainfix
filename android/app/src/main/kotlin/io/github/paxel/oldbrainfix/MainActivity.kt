@@ -1,9 +1,14 @@
 package io.github.paxel.oldbrainfix
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.WindowManager
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -15,6 +20,11 @@ class MainActivity : FlutterActivity() {
     private var permissionAnswer: MethodChannel.Result? = null
 
     private var alarmChannel: MethodChannel? = null
+
+    private var photoChannel: MethodChannel? = null
+
+    /** The answer to "take", until the camera app comes back. */
+    private var photoAnswer: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
@@ -33,6 +43,10 @@ class MainActivity : FlutterActivity() {
             nudgeOpened = true
             actionsArrived()
         }
+        // Something was shared in while the app runs: it takes it now.
+        if (intent.getBooleanExtra(EXTRA_SHARED, false)) {
+            photoChannel?.invokeMethod("shared", null)
+        }
         if (!intent.getBooleanExtra(EXTRA_RING, false)) return
         showOverLockScreen(true)
         actionsArrived()
@@ -50,6 +64,15 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        photoChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PHOTO_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "take" -> takePhoto(result)
+                    "shared" -> inBackground(result) { Shares.take() }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         alarmChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ALARM_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -130,6 +153,58 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
     }
 
+    /**
+     * Opens the Device's camera app to take a photo into [cameraFile]
+     * through our FileProvider. Not the CAMERA permission: the camera app
+     * takes the photo, and declaring it would make this intent need it.
+     */
+    private fun takePhoto(result: MethodChannel.Result) {
+        val file = Photos.cameraFile(this).apply { delete() }
+        val uri = FileProvider.getUriForFile(this, "$packageName.photos", file)
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            .putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.clipData = ClipData.newRawUri("", uri)
+        try {
+            startActivityForResult(intent, REQUEST_PHOTO)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(null)
+        }
+        photoAnswer?.success(null)
+        photoAnswer = result
+    }
+
+    @Deprecated("The Flutter activity has no Activity Result API.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_PHOTO) return
+        val file = Photos.cameraFile(this)
+        val answer = photoAnswer
+        photoAnswer = null
+        if (answer == null) {
+            // The app was gone while the camera was open: the photo
+            // still reaches a Note, through Capture like a share.
+            if (resultCode == Activity.RESULT_OK && file.length() > 0L) {
+                Shares.keepPhoto(this, file)
+                photoChannel?.invokeMethod("shared", null)
+            }
+            return
+        }
+        if (resultCode != Activity.RESULT_OK || file.length() == 0L) {
+            file.delete()
+            return answer.success(null)
+        }
+        inBackground(answer) { Photos.normalize { file.inputStream() }.also { file.delete() } }
+    }
+
+    /** Answers [result] with what [work] makes, off the main thread. */
+    private fun inBackground(result: MethodChannel.Result, work: () -> Any?) {
+        Thread {
+            val value = runCatching(work).getOrNull()
+            runOnUiThread { result.success(value) }
+        }.start()
+    }
+
     private fun request(result: MethodChannel.Result) {
         if (Location.granted(this)) return result.success(true)
         permissionAnswer?.success(false)
@@ -177,7 +252,9 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val LOCATION_CHANNEL = "io.github.paxel.oldbrainfix/location"
         private const val ALARM_CHANNEL = "io.github.paxel.oldbrainfix/alarms"
+        private const val PHOTO_CHANNEL = "io.github.paxel.oldbrainfix/photos"
         private const val REQUEST_LOCATION = 1
+        private const val REQUEST_PHOTO = 2
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */
@@ -185,6 +262,9 @@ class MainActivity : FlutterActivity() {
 
         /** Marks the launch from the Nudge's notification. */
         const val EXTRA_NUDGE = "oldbrainfix.nudge"
+
+        /** Marks the launch by a share from another app ([ShareActivity]). */
+        const val EXTRA_SHARED = "oldbrainfix.shared"
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false

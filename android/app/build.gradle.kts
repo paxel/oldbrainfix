@@ -49,5 +49,8 @@ flutter {
 }
 
 dependencies {
+    // FileProvider for the camera app; already part of Flutter's own
+    // dependencies, named here because the app uses it directly.
+    implementation("androidx.core:core:1.13.1")
     testImplementation("junit:junit:4.13.2")
 }

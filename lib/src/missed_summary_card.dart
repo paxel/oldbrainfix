@@ -53,7 +53,10 @@ class MissedSummaryCard extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '${missed.note?.text.trim().split('\n').first ?? t.noteGone}'
+                    '${switch (missed.note) {
+                      final note? => noteText(t, note).trim().split('\n').first,
+                      null => t.noteGone,
+                    }}'
                     ' · ${t.missedTimes(missed.count)}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

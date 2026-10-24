@@ -14,6 +14,7 @@ import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
 import 'nudge_screen.dart';
+import 'photo_platform.dart';
 import 'question_mark_background.dart';
 import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
@@ -36,6 +37,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// The Device's alarm layer; none when not given.
   final AlarmPlatform alarms;
 
+  /// The Device's camera and what other apps share in; none when not
+  /// given.
+  final PhotoPlatform photos;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -43,6 +48,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.drafts,
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
+    this.photos = const NoPhotos(),
   });
 
   @override
@@ -99,9 +105,13 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
           announcements: _announcements,
           child: LocationScope(
             location: widget.location,
-            child: DraftsScope(
-              drafts: _drafts,
-              child: child ?? const SizedBox.shrink(),
+            child: PhotoScope(
+              photos: widget.photos,
+              bytes: _notes.photoBytes,
+              child: DraftsScope(
+                drafts: _drafts,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         ),

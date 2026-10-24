@@ -7,6 +7,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Added
 - Capture a thought as a text Note with one tap on +; leaving by Back or switching apps keeps it.
+- Take a photo as a Note, optionally with a few words; kept photos carry no location data.
+- Share images, text and links from other apps into a new Unsorted Note.
 - English and German.
 - Light teal and anthracite dark themes that follow the system.
 - Notes as embossed cards over a background of hand-drawn question marks that drift slowly while scrolling.

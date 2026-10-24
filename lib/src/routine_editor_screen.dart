@@ -402,7 +402,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          note.text,
+                          noteText(t, note),
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         Text(t.noteInTrash),
@@ -419,7 +419,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                note.text,
+                                noteText(t, note),
                                 style: Theme.of(context).textTheme.bodyLarge,
                               ),
                             ),

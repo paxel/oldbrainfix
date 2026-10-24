@@ -22,6 +22,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get captureHint => 'What\'s on your mind?';
 
   @override
+  String get capturePhotoHint => 'A few words about it (optional)';
+
+  @override
+  String get takePhoto => 'Take a photo';
+
+  @override
+  String get photo => 'Photo';
+
+  @override
+  String get photoMissing => 'Photo not on this device';
+
+  @override
+  String morePhotos(int count) {
+    return '+$count';
+  }
+
+  @override
   String get save => 'Save';
 
   @override

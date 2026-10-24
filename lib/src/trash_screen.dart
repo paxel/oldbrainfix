@@ -96,7 +96,7 @@ class _TrashScreenState extends State<TrashScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      note?.text ?? t.noteDeleted,
+                      note == null ? t.noteDeleted : noteText(t, note),
                       style: theme.textTheme.bodyLarge,
                     ),
                   ),

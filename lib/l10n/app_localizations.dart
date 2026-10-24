@@ -122,6 +122,36 @@ abstract class AppLocalizations {
   /// **'What\'s on your mind?'**
   String get captureHint;
 
+  /// No description provided for @capturePhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A few words about it (optional)'**
+  String get capturePhotoHint;
+
+  /// No description provided for @takePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get takePhoto;
+
+  /// No description provided for @photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get photo;
+
+  /// No description provided for @photoMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo not on this device'**
+  String get photoMissing;
+
+  /// No description provided for @morePhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count}'**
+  String morePhotos(int count);
+
   /// No description provided for @save.
   ///
   /// In en, this message translates to:
