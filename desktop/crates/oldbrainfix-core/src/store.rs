@@ -3,12 +3,17 @@
 //!
 //! The store never reads the wall clock on its own: the clock is handed
 //! in, so tests get a reproducible log.
+//!
+//! One store can be shared between threads: each call, and each batch as
+//! a whole, holds the connection on its own, so two threads never write
+//! into each other's transaction or take the same dseq.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
+use parking_lot::ReentrantMutex;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
@@ -16,11 +21,11 @@ use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
 use crate::{Error, Result};
 
 /// Where the store reads "now".
-pub type Clock = Box<dyn Fn() -> DateTime<Utc> + Send>;
+pub type Clock = Box<dyn Fn() -> DateTime<Utc> + Send + Sync>;
 
 /// Where the store gets the ids of new entities: random, unless a test
 /// counts them as the Dart core's fixture generator does.
-pub type IdMaker = Box<dyn Fn() -> Result<String> + Send>;
+pub type IdMaker = Box<dyn Fn() -> Result<String> + Send + Sync>;
 
 /// The tables, word for word as the Dart core creates them.
 const SCHEMA: &str = "
@@ -67,7 +72,8 @@ impl Fields {
 }
 
 pub struct Store {
-    db: Connection,
+    /// Reentrant, so a batch holds it while the calls inside take it too.
+    db: ReentrantMutex<Connection>,
     clock: Clock,
     ids: IdMaker,
 }
@@ -97,7 +103,7 @@ impl Store {
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
         db.execute_batch(SCHEMA)?;
         let store = Store {
-            db,
+            db: ReentrantMutex::new(db),
             clock,
             ids: Box::new(random_id),
         };
@@ -127,7 +133,8 @@ impl Store {
     /// Runs `body` in one transaction: all of its entries or none. Not
     /// to be nested.
     pub fn batch<T>(&self, body: impl FnOnce() -> Result<T>) -> Result<T> {
-        let tx = self.db.unchecked_transaction()?;
+        let db = self.db.lock();
+        let tx = db.unchecked_transaction()?;
         let out = body()?;
         tx.commit()?;
         Ok(out)
@@ -158,6 +165,7 @@ impl Store {
     pub fn local_setting(&self, key: &str) -> Result<Option<String>> {
         Ok(self
             .db
+            .lock()
             .query_row(
                 "SELECT value FROM local_settings WHERE key = ?",
                 [key],
@@ -167,7 +175,7 @@ impl Store {
     }
 
     pub fn set_local_setting(&self, key: &str, value: &str) -> Result<()> {
-        self.db.execute(
+        self.db.lock().execute(
             "INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)",
             [key, value],
         )?;
@@ -185,6 +193,7 @@ impl Store {
         value: Option<&str>,
         date: Option<DateTime<Utc>>,
     ) -> Result<Entry> {
+        let db = self.db.lock();
         let now = self.now();
         let device = self.device_id()?;
         let dseq = self.version_vector()?.get(&device).copied().unwrap_or(0) + 1;
@@ -201,7 +210,7 @@ impl Store {
             &author,
             &recorded_iso,
         ));
-        self.db.execute(
+        db.execute(
             "INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
@@ -227,7 +236,7 @@ impl Store {
     /// Takes in an entry another Device wrote, as it is; one already held
     /// is skipped. Returns whether it was new.
     pub fn insert(&self, entry: &WireEntry) -> Result<bool> {
-        let changed = self.db.execute(
+        let changed = self.db.lock().execute(
             "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
@@ -247,9 +256,8 @@ impl Store {
 
     /// The newest dseq held from each Device.
     pub fn version_vector(&self) -> Result<HashMap<String, i64>> {
-        let mut stmt = self
-            .db
-            .prepare("SELECT device, MAX(dseq) AS m FROM entries GROUP BY device")?;
+        let db = self.db.lock();
+        let mut stmt = db.prepare("SELECT device, MAX(dseq) AS m FROM entries GROUP BY device")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -293,7 +301,8 @@ impl Store {
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let ids: Vec<String> = {
-            let mut stmt = self.db.prepare(
+            let db = self.db.lock();
+            let mut stmt = db.prepare(
                 "SELECT DISTINCT entity FROM entries WHERE field = '$type' AND value = ?",
             )?;
             let rows = stmt.query_map([ty], |r| r.get(0))?;
@@ -319,7 +328,8 @@ impl Store {
     }
 
     fn entries(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<Entry>> {
-        let mut stmt = self.db.prepare(sql)?;
+        let db = self.db.lock();
+        let mut stmt = db.prepare(sql)?;
         let rows = stmt.query_map(args, raw_row)?;
         let mut out = Vec::new();
         for row in rows {

@@ -1,6 +1,14 @@
-//! The window (UI laws, "Desktop"): Areas and Topics on the left, the
-//! capture field and the Notes of the selection in the middle as embossed
-//! cards, the selected Note's editor on the right.
+//! The window (UI laws, "Desktop"): the Agenda, Areas and Topics on the
+//! left, the capture field and the Agenda or the Notes of the selection
+//! in the middle as embossed cards, the selected Note's editor or a
+//! Routine's editor on the right.
+//!
+//! The window opens on the Agenda (UI laws, "Agenda"): the Missed
+//! Summary until "Seen", the "x Unsorted" banner, today's all-day and
+//! then timed Occurrences, a gap, and tomorrow's dimmed, all of them
+//! checkable. Its gear leads to this Device's Settings, its alarm button
+//! to a new Routine. A Note spawns Routines and Reminders from its
+//! editor; deleting a Note that spawned some asks whether they go too.
 //!
 //! Every change goes through `oldbrainfix_core`, which writes the entries
 //! the phone's core writes. A card dragged onto an Area or Topic on the
@@ -11,24 +19,38 @@
 //! and from an Area into its last selected Topic. The keys rest while
 //! text is being typed, where Alt+arrows move the cursor.
 
-use chrono::{DateTime, Duration, Local, Utc};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::Sender;
+
+use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
 use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, Sense, TextEdit,
     Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::{
-    AREA_ICONS, Area, Importance, Note, Notes, NotesGo, Places, Section, Store, Topic,
+    AREA_ICONS, AgendaRow, Alarms, Area, ClockTime, Day, DeviceSettings, Importance, MissedSummary,
+    Note, Notes, NotesGo, Occurrence, Places, QuietHours, Routine, Routines, Section, Store, Topic,
 };
 
+use crate::alerts::Event;
+use crate::autostart::Autostart;
 use crate::background;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
+use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
+use crate::schedule_text::{day_text, occurrence_time, schedule_text};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
+    /// Today's and tomorrow's Occurrences, the Missed Summary and the
+    /// Unsorted count.
+    Agenda,
+    /// This Device's settings, reached from the Agenda's gear.
+    Settings,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -49,6 +71,22 @@ struct Placed {
     topic: Option<Topic>,
 }
 
+/// One Agenda row with the Area its Note is filed in.
+#[derive(Debug, Clone)]
+struct Row {
+    row: AgendaRow,
+    area: Option<Area>,
+}
+
+/// What the Agenda shows.
+#[derive(Debug, Clone, Default)]
+struct AgendaView {
+    today: Vec<Row>,
+    tomorrow: Vec<Row>,
+    missed: MissedSummary,
+    unsorted: usize,
+}
+
 /// What the panes show, read once per change.
 #[derive(Debug, Clone, Default)]
 struct View {
@@ -56,6 +94,13 @@ struct View {
     notes: Vec<Placed>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
+    /// The Routines and Reminders the selected Note spawned.
+    routines: Vec<Routine>,
+    /// While the Agenda shows.
+    agenda: Option<AgendaView>,
+    /// The Routines and Reminders in the trash on their own, with their
+    /// Notes, while the trash shows.
+    trashed_routines: Vec<(Routine, Option<Note>)>,
 }
 
 impl View {
@@ -102,6 +147,15 @@ enum Dialog {
     Merge {
         query: String,
         others: Vec<(String, String)>,
+    },
+    /// Whether the Routines and Reminders of the Note being deleted go
+    /// to the trash too.
+    TrashNote {
+        question: String,
+    },
+    /// Whether the edited Routine or Reminder goes to the trash.
+    DeleteRoutine {
+        question: String,
     },
 }
 
@@ -150,10 +204,50 @@ enum Action {
     DeletePlace(NotesGo),
     Back,
     Forward,
+    /// Checks the Occurrence of the Routine off, or unchecks it.
+    Toggle(String, Occurrence),
+    /// Checks off a Missed Occurrence: Done, late.
+    CheckMissed(String, Occurrence),
+    /// "Seen" on the Missed Summary.
+    Seen,
+    OpenRoutine(String),
+    /// A new Routine, or Reminder, from the Note, or with its Note made
+    /// behind the scenes.
+    NewRoutine {
+        note: Option<String>,
+        reminder: bool,
+    },
+    Editor(Intent),
+    /// Deletes the edited Routine, asked.
+    DeleteRoutine,
+    /// Deletes the selected Note, with or without its Routines, asked.
+    TrashNote(bool),
+    RestoreRoutine(String),
+    Setting(Setting),
+}
+
+/// A change in the Settings.
+#[derive(Debug, Clone, PartialEq)]
+enum Setting {
+    Alerts(bool),
+    Autostart(bool),
+    Renag(i64),
+    NudgeRepeat(i64),
+    QuietOn(bool),
+    Quiet(QuietHours),
+}
+
+/// The wall clock the window shows days on.
+pub type Wall = Arc<dyn Fn(DateTime<Utc>) -> NaiveDateTime + Send + Sync>;
+
+/// The system's local time.
+pub fn local_wall(utc: DateTime<Utc>) -> NaiveDateTime {
+    utc.with_timezone(&Local).naive_local()
 }
 
 pub struct App {
-    store: Store,
+    store: Arc<Store>,
+    wall: Wall,
     t: L10n,
     selection: Selection,
     selected_note: Option<String>,
@@ -174,15 +268,34 @@ pub struct App {
     /// Whether the dialog's text field is to take the keyboard, once, as
     /// it opens.
     focus: bool,
+    /// The Routine or Reminder being made or changed on the right.
+    editor: Option<RoutineEditor>,
+    /// Bumped by the alerts when a notification changed the log.
+    changes: Option<Arc<AtomicU64>>,
+    seen_changes: u64,
+    /// Tells the alerts to look again after a change here.
+    wake: Option<Sender<Event>>,
+    /// The login start the Settings switch.
+    autostart: Option<Autostart>,
+    /// When the panes were last read, to follow the clock.
+    read_at: DateTime<Utc>,
+    /// The Quiet Hours as typed in the Settings.
+    quiet_text: (String, String),
+    /// Whether the capture field is to take the keyboard, once.
+    focus_capture: bool,
 }
 
 impl App {
-    /// The window over `store`, speaking `locale`, showing all Notes.
-    pub fn new(store: Store, locale: &str) -> App {
+    /// The window over `store`, speaking `locale`, showing the Agenda on
+    /// the system's local time.
+    pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
+        let store = store.into();
+        let read_at = store.now();
         let mut app = App {
             store,
+            wall: Arc::new(local_wall),
             t: L10n::new(locale),
-            selection: Selection::All,
+            selection: Selection::Agenda,
             selected_note: None,
             view: View::default(),
             error: None,
@@ -194,9 +307,57 @@ impl App {
             amend: String::new(),
             dialog: None,
             focus: false,
+            editor: None,
+            changes: None,
+            seen_changes: 0,
+            wake: None,
+            autostart: None,
+            read_at,
+            quiet_text: (String::new(), String::new()),
+            focus_capture: false,
         };
         app.refresh();
         app
+    }
+
+    /// Shows days on `wall` instead of the system's local time.
+    pub fn set_wall_clock(&mut self, wall: Wall) {
+        self.wall = wall;
+        self.refresh();
+    }
+
+    /// Reads the log again whenever `changes` moves on.
+    pub fn watch_changes(&mut self, changes: Arc<AtomicU64>) {
+        self.seen_changes = changes.load(Ordering::SeqCst);
+        self.changes = Some(changes);
+    }
+
+    /// Tells `wake` after every change made here.
+    pub fn set_wake(&mut self, wake: Sender<Event>) {
+        self.wake = Some(wake);
+    }
+
+    /// The login start the Settings switch on and off.
+    pub fn set_autostart(&mut self, autostart: Option<Autostart>) {
+        self.autostart = autostart;
+    }
+
+    /// Shows the capture field with the keyboard in it.
+    pub fn focus_capture(&mut self) {
+        if matches!(self.selection, Selection::Settings | Selection::Trash) {
+            self.select(Selection::Agenda);
+        }
+        self.focus_capture = true;
+    }
+
+    /// The Routine or Reminder being made or changed, if any.
+    pub fn routine_editor(&self) -> Option<&RoutineEditor> {
+        self.editor.as_ref()
+    }
+
+    /// The editor of the Routine `id`, on the right.
+    pub fn open_routine(&mut self, id: &str) {
+        self.apply(Action::OpenRoutine(id.to_string()));
     }
 
     pub fn t(&self) -> &L10n {
@@ -271,6 +432,10 @@ impl App {
             }
             Err(e) => self.error = Some(e.to_string()),
         }
+        self.read_at = self.store.now();
+        if let Ok(quiet) = DeviceSettings::new(&self.store).quiet_hours() {
+            self.quiet_text = (quiet.start.to_string(), quiet.end.to_string());
+        }
         let shown = self.view.detail.as_ref().map(|(p, _)| &p.note);
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
             self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
@@ -287,7 +452,9 @@ impl App {
             let topics = places.topics(&area.id)?;
             areas.push((area, topics));
         }
+        let routines = Routines::new(&self.store);
         let shown = match &self.selection {
+            Selection::Agenda | Selection::Settings => Vec::new(),
             Selection::All => notes.all()?,
             Selection::Unsorted => notes.unsorted()?,
             Selection::Place(id) => notes.inside(id)?,
@@ -320,10 +487,52 @@ impl App {
         for note in shown {
             placed.push(place(note)?);
         }
+        let note_routines = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => routines.of_note(&p.note.id)?,
+            _ => Vec::new(),
+        };
+        let agenda = match self.selection {
+            Selection::Agenda => {
+                let wall = &*self.wall;
+                let agenda = routines.agenda(wall)?;
+                let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
+                    let area = match &row.note {
+                        Some(note) => place(note.clone())?.area,
+                        None => None,
+                    };
+                    Ok(Row { row, area })
+                };
+                Some(AgendaView {
+                    today: agenda
+                        .today_rows
+                        .into_iter()
+                        .map(row)
+                        .collect::<oldbrainfix_core::Result<_>>()?,
+                    tomorrow: agenda
+                        .tomorrow_rows
+                        .into_iter()
+                        .map(row)
+                        .collect::<oldbrainfix_core::Result<_>>()?,
+                    missed: Alarms::new(&self.store).missed(wall)?,
+                    unsorted: notes.unsorted()?.len(),
+                })
+            }
+            _ => None,
+        };
+        let mut trashed_routines = Vec::new();
+        if self.selection == Selection::Trash {
+            for routine in routines.trashed()? {
+                let note = routines.note(&routine)?;
+                trashed_routines.push((routine, note));
+            }
+        }
         Ok(View {
             areas,
             notes: placed,
             detail,
+            routines: note_routines,
+            agenda,
+            trashed_routines,
         })
     }
 
@@ -333,6 +542,9 @@ impl App {
         self.refresh();
         if let Err(e) = done {
             self.error = Some(e.to_string());
+        }
+        if let Some(wake) = &self.wake {
+            drop(wake.send(Event::Wake));
         }
     }
 
@@ -362,6 +574,7 @@ impl App {
             Action::SelectNote(id) => {
                 self.save_text()?;
                 self.selected_note = Some(id);
+                self.editor = None;
             }
             Action::Capture(nudge_in) => {
                 let text = self.capture.trim();
@@ -378,6 +591,7 @@ impl App {
                 self.capture.clear();
                 self.save_text()?;
                 self.selected_note = Some(note.id);
+                self.editor = None;
             }
             Action::SaveText => self.save_text()?,
             Action::Amend => {
@@ -388,9 +602,27 @@ impl App {
             Action::File { note, place } => notes.file(&note, &place)?,
             Action::Trash => {
                 self.save_text()?;
-                Notes::new(&self.store).trash(&selected)?;
+                let linked = Routines::new(&self.store).of_note(&selected)?;
+                if linked.is_empty() {
+                    Routines::new(&self.store).trash_note(&selected, false)?;
+                } else {
+                    let count = linked.len() as i64;
+                    let reminders = linked.iter().filter(|r| r.is_reminder()).count() as i64;
+                    let question = if reminders == count {
+                        self.t.delete_note_reminders(count)
+                    } else if reminders == 0 {
+                        self.t.delete_note_routines(count)
+                    } else {
+                        self.t.delete_note_routines_and_reminders(count)
+                    };
+                    self.dialog = Some(Dialog::TrashNote { question });
+                }
             }
-            Action::Restore => notes.restore(&selected)?,
+            Action::TrashNote(with_routines) => {
+                Routines::new(&self.store).trash_note(&selected, with_routines)?;
+                self.dialog = None;
+            }
+            Action::Restore => Routines::new(&self.store).restore_note(&selected)?,
             Action::Merge(into) => {
                 self.save_text()?;
                 Notes::new(&self.store).merge(&selected, &into)?;
@@ -472,6 +704,103 @@ impl App {
                     return self.act(Action::Select(forward));
                 }
             }
+            Action::Toggle(routine, occurrence) => {
+                let routines = Routines::new(&self.store);
+                let done = routines
+                    .by_id(&routine)?
+                    .is_some_and(|r| r.done_at(&occurrence).is_some());
+                if done {
+                    routines.unmark_done(&routine, &occurrence)?;
+                } else {
+                    routines.mark_done(&routine, &occurrence, None)?;
+                }
+            }
+            Action::CheckMissed(routine, occurrence) => {
+                Routines::new(&self.store).mark_done(&routine, &occurrence, None)?;
+            }
+            Action::Seen => Alarms::new(&self.store).mark_seen()?,
+            Action::OpenRoutine(id) => {
+                self.save_text()?;
+                let routines = Routines::new(&self.store);
+                if let Some(routine) = routines.by_id(&id)? {
+                    let note = routines.note(&routine)?;
+                    let today = Day::today(self.store.now(), &*self.wall);
+                    let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
+                }
+            }
+            Action::NewRoutine { note, reminder } => {
+                self.save_text()?;
+                let note = match note {
+                    Some(id) => Notes::new(&self.store).by_id(&id)?,
+                    None => None,
+                };
+                let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                self.editor = Some(RoutineEditor::new(
+                    note,
+                    reminder,
+                    self.store.now(),
+                    &*self.wall,
+                    renag,
+                ));
+            }
+            Action::Editor(intent) => match intent {
+                Intent::Save => {
+                    if let Some(editor) = &self.editor {
+                        editor.save(&self.store)?;
+                        self.editor = None;
+                    }
+                }
+                Intent::Delete => {
+                    let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);
+                    let question = if reminder {
+                        self.t.delete_reminder_question()
+                    } else {
+                        self.t.delete_routine_question()
+                    };
+                    self.dialog = Some(Dialog::DeleteRoutine {
+                        question: question.to_string(),
+                    });
+                }
+                Intent::Close => self.editor = None,
+                Intent::OpenNote(id) => {
+                    self.editor = None;
+                    self.selected_note = Some(id);
+                }
+            },
+            Action::DeleteRoutine => {
+                self.dialog = None;
+                if let Some(id) = self.editor.take().and_then(|e| e.routine) {
+                    Routines::new(&self.store).trash(&id)?;
+                }
+            }
+            Action::RestoreRoutine(id) => Routines::new(&self.store).restore(&id)?,
+            Action::Setting(setting) => self.set(setting)?,
+        }
+        Ok(())
+    }
+
+    /// Keeps a change made in the Settings.
+    fn set(&mut self, setting: Setting) -> oldbrainfix_core::Result<()> {
+        let settings = DeviceSettings::new(&self.store);
+        match setting {
+            Setting::Alerts(on) => settings.set_alerts_on(on)?,
+            Setting::Autostart(on) => {
+                settings.set_autostart_on(on)?;
+                if let Some(autostart) = &self.autostart
+                    && let Err(e) = autostart.set(on)
+                {
+                    return Err(oldbrainfix_core::Error::Invalid(
+                        self.t.autostart_failed(&e),
+                    ));
+                }
+            }
+            Setting::Renag(minutes) => settings.set_renag_interval(Duration::minutes(minutes))?,
+            Setting::NudgeRepeat(minutes) => {
+                settings.set_nudge_repeat(Duration::minutes(minutes))?;
+            }
+            Setting::QuietOn(on) => settings.set_quiet_hours_on(on)?,
+            Setting::Quiet(quiet) => settings.set_quiet_hours(quiet)?,
         }
         Ok(())
     }
@@ -500,7 +829,8 @@ impl App {
     /// to All Notes.
     fn back(&self) -> Option<Selection> {
         match &self.selection {
-            Selection::All => None,
+            Selection::All | Selection::Agenda => None,
+            Selection::Settings => Some(Selection::Agenda),
             Selection::Place(id) => Some(match self.view.topic(id) {
                 Some(topic) => Selection::Place(topic.area_id.clone()),
                 None => Selection::All,
@@ -576,6 +906,20 @@ impl App {
     pub fn show(&mut self, ui: &mut Ui) {
         let tones = theme::tones(ui.visuals());
         let mut actions = Vec::new();
+        // A notification's Done or a new minute changes what shows.
+        let changed = self
+            .changes
+            .as_ref()
+            .map(|c| c.load(Ordering::SeqCst))
+            .is_some_and(|c| c != self.seen_changes);
+        if changed || self.store.now() - self.read_at >= Duration::seconds(30) {
+            if let Some(c) = &self.changes {
+                self.seen_changes = c.load(Ordering::SeqCst);
+            }
+            self.refresh();
+        }
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(30));
         if self.dialog.is_none() {
             let typing = ui.ctx().text_edit_focused();
             ui.input_mut(|i| {
@@ -634,6 +978,7 @@ impl App {
             .show(ui, |ui| {
                 let text = ui.visuals().text_color();
                 let rows = [
+                    (Selection::Agenda, icons::AGENDA, t.agenda_title()),
                     (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Unsorted, icons::UNSORTED, t.unsorted()),
                 ];
@@ -701,6 +1046,8 @@ impl App {
     /// The title of the middle pane.
     fn title(&self) -> String {
         match &self.selection {
+            Selection::Agenda => self.t.agenda_title().to_string(),
+            Selection::Settings => self.t.settings_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -736,7 +1083,7 @@ impl App {
             {
                 actions.push(Action::Capture(Notes::default_nudge()));
             }
-            ui.add(
+            let field = ui.add(
                 TextEdit::multiline(&mut self.capture)
                     .id(id)
                     .hint_text(t.capture_hint())
@@ -746,6 +1093,9 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            if std::mem::take(&mut self.focus_capture) {
+                field.request_focus();
+            }
             if self.capture.trim().is_empty() {
                 return;
             }
@@ -768,6 +1118,11 @@ impl App {
     }
 
     fn notes_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        match self.selection {
+            Selection::Agenda => return self.agenda_pane(ui, tones, actions),
+            Selection::Settings => return self.settings_pane(ui, tones, actions),
+            _ => {}
+        }
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
             ui.heading(RichText::new(self.title()).color(text));
@@ -785,13 +1140,18 @@ impl App {
             ui.spacing_mut().item_spacing.y = 16.0;
             self.capture_card(ui, tones, actions);
         }
+        if trash && !self.view.trashed_routines.is_empty() {
+            self.trashed_routines(ui, tones, actions);
+        }
         if self.view.notes.is_empty() {
             let empty = if trash {
                 self.t.trash_empty()
             } else {
                 self.t.no_notes_yet()
             };
-            ui.label(RichText::new(empty).color(ui.visuals().weak_text_color()));
+            if !(trash && !self.view.trashed_routines.is_empty()) {
+                ui.label(RichText::new(empty).color(ui.visuals().weak_text_color()));
+            }
             return;
         }
         let output = egui::ScrollArea::vertical()
@@ -821,9 +1181,16 @@ impl App {
 
     /// The selected Note's editor (UI laws, "Desktop").
     fn note_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        if let Some(editor) = &mut self.editor {
+            if let Some(intent) = editor.show(ui, &self.t, tones) {
+                actions.push(Action::Editor(intent));
+            }
+            return;
+        }
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
+        let linked = &self.view.routines;
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
@@ -954,6 +1321,30 @@ impl App {
                     return;
                 }
                 embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.routines_heading()).strong().color(text));
+                    for routine in linked {
+                        let icon = if routine.is_reminder() {
+                            icons::REMINDER
+                        } else {
+                            icons::REPEAT
+                        };
+                        let label = schedule_text(&t, &routine.schedule);
+                        if row(ui, tones, false, 0.0, Some((icon, text)), &label, false).clicked() {
+                            actions.push(Action::OpenRoutine(routine.id.clone()));
+                        }
+                    }
+                    ui.horizontal(|ui| {
+                        for (reminder, label) in [(false, t.routine()), (true, t.reminder())] {
+                            if ui.button(RichText::new(label).color(text)).clicked() {
+                                actions.push(Action::NewRoutine {
+                                    note: Some(note.id.clone()),
+                                    reminder,
+                                });
+                            }
+                        }
+                    });
+                });
+                embossed(ui, tones, false, None, |ui| {
                     ui.add(
                         TextEdit::multiline(amend)
                             .id(Id::new("amend"))
@@ -1025,11 +1416,313 @@ impl App {
                     Dialog::Merge { query, others } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
+                    Dialog::TrashNote { question } => {
+                        title(ui, question);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.delete_note_linked_detail()).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if ui.button(RichText::new(t.no()).color(text)).clicked() {
+                                actions.push(Action::TrashNote(false));
+                            }
+                            if destructive(ui, t.yes()) {
+                                actions.push(Action::TrashNote(true));
+                            }
+                        });
+                    }
+                    Dialog::DeleteRoutine { question } => {
+                        title(ui, question);
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::DeleteRoutine);
+                            }
+                        });
+                    }
                 }
             });
         if modal.should_close() {
             actions.push(Action::CloseDialog);
         }
+    }
+
+    /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
+    /// Summary until "Seen", the "x Unsorted" banner, today's
+    /// Occurrences, a gap, and tomorrow's dimmed; each checkable on its
+    /// own, a click on one opens its Routine. The gear in the corner
+    /// leads to the Settings.
+    fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        ui.horizontal(|ui| {
+            ui.heading(RichText::new(t.agenda_title()).color(text));
+            ui.add_space((ui.available_width() - 60.0).max(0.0));
+            if icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text).clicked() {
+                actions.push(Action::NewRoutine {
+                    note: None,
+                    reminder: false,
+                });
+            }
+            if icon_button(ui, icons::SETTINGS, t.settings_title(), text).clicked() {
+                actions.push(Action::Select(Selection::Settings));
+            }
+        });
+        ui.add_space(8.0);
+        ui.spacing_mut().item_spacing.y = 16.0;
+        self.capture_card(ui, tones, actions);
+        let Some(agenda) = self.view.agenda.clone() else {
+            return;
+        };
+        let output = egui::ScrollArea::vertical()
+            .id_salt("agenda")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 12.0;
+                ui.add_space(4.0);
+                if !agenda.missed.is_empty() {
+                    missed_card(ui, &t, tones, &agenda.missed, actions);
+                }
+                if agenda.unsorted > 0 {
+                    let banner = embossed(ui, tones, false, None, |ui| {
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::INBOX, 20.0, tones.accent);
+                            ui.label(
+                                RichText::new(t.unsorted_banner(agenda.unsorted as i64))
+                                    .color(text),
+                            );
+                        });
+                    });
+                    let banner =
+                        ui.interact(banner.rect, Id::new("unsorted banner"), Sense::click());
+                    banner.widget_info(|| {
+                        WidgetInfo::labeled(
+                            WidgetType::Button,
+                            true,
+                            t.unsorted_banner(agenda.unsorted as i64),
+                        )
+                    });
+                    if banner
+                        .on_hover_cursor(egui::CursorIcon::PointingHand)
+                        .clicked()
+                    {
+                        actions.push(Action::Select(Selection::Unsorted));
+                    }
+                }
+                ui.label(
+                    RichText::new(t.agenda_today())
+                        .strong()
+                        .size(16.0)
+                        .color(text),
+                );
+                if agenda.today.is_empty() {
+                    ui.label(
+                        RichText::new(t.nothing_today()).color(ui.visuals().weak_text_color()),
+                    );
+                }
+                for row in &agenda.today {
+                    agenda_row(ui, &t, tones, row, actions);
+                }
+                // The visible gap between today and tomorrow.
+                ui.add_space(24.0);
+                ui.scope(|ui| {
+                    ui.multiply_opacity(TOMORROW_OPACITY);
+                    ui.label(
+                        RichText::new(t.agenda_tomorrow())
+                            .strong()
+                            .size(16.0)
+                            .color(text),
+                    );
+                    if agenda.tomorrow.is_empty() {
+                        ui.label(
+                            RichText::new(t.nothing_tomorrow())
+                                .color(ui.visuals().weak_text_color()),
+                        );
+                    }
+                    for row in &agenda.tomorrow {
+                        agenda_row(ui, &t, tones, row, actions);
+                    }
+                });
+                ui.add_space(8.0);
+            });
+        if output.state.offset.y != self.scrolled {
+            self.scrolled = output.state.offset.y;
+            ui.ctx().request_repaint();
+        }
+    }
+
+    /// This Device's settings (ADR 0008): its notifications and login
+    /// start, its Re-nag interval, and the Nudges' repeat and Quiet
+    /// Hours.
+    fn settings_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let settings = DeviceSettings::new(&self.store);
+        let alerts = settings.alerts_on().unwrap_or(true);
+        let autostart = settings.autostart_on().unwrap_or(true);
+        let renag = settings
+            .renag_interval()
+            .map(|d| d.num_minutes())
+            .unwrap_or(10);
+        let repeat = settings
+            .nudge_repeat()
+            .map(|d| d.num_minutes())
+            .unwrap_or(60);
+        let quiet_on = settings.quiet_hours_on().unwrap_or(true);
+        let quiet = settings
+            .quiet_hours()
+            .unwrap_or(oldbrainfix_core::settings::DEFAULT_QUIET_HOURS);
+        ui.heading(RichText::new(t.settings_title()).color(text));
+        ui.label(RichText::new(t.settings_intro()).color(weak));
+        ui.add_space(8.0);
+        let quiet_text = &mut self.quiet_text;
+        egui::ScrollArea::vertical()
+            .id_salt("settings")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 16.0;
+                ui.add_space(4.0);
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_computer()).strong().color(text));
+                    let mut on = alerts;
+                    if ui
+                        .checkbox(&mut on, RichText::new(t.alerts_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::Alerts(on)));
+                    }
+                    ui.label(RichText::new(t.alerts_detail()).small().color(weak));
+                    let mut on = autostart;
+                    if ui
+                        .checkbox(&mut on, RichText::new(t.autostart_switch()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::Autostart(on)));
+                    }
+                    ui.label(RichText::new(t.autostart_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_alarms()).strong().color(text));
+                    let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
+                    if !choices.contains(&renag) {
+                        choices.push(renag);
+                        choices.sort();
+                    }
+                    minutes_choice(
+                        ui,
+                        "renag device",
+                        t.renag_device(),
+                        &t,
+                        renag,
+                        &choices,
+                        |m| {
+                            actions.push(Action::Setting(Setting::Renag(m)));
+                        },
+                    );
+                    ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_nudges()).strong().color(text));
+                    ui.label(
+                        RichText::new(t.nudge_settings_explain())
+                            .small()
+                            .color(weak),
+                    );
+                    let mut choices: Vec<i64> = NUDGE_REPEAT_CHOICES.to_vec();
+                    if !choices.contains(&repeat) {
+                        choices.push(repeat);
+                        choices.sort();
+                    }
+                    minutes_choice(
+                        ui,
+                        "nudge repeat",
+                        t.nudge_repeat(),
+                        &t,
+                        repeat,
+                        &choices,
+                        |m| {
+                            actions.push(Action::Setting(Setting::NudgeRepeat(m)));
+                        },
+                    );
+                    let mut on = quiet_on;
+                    if ui
+                        .checkbox(&mut on, RichText::new(t.quiet_hours()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::QuietOn(on)));
+                    }
+                    if !quiet_on {
+                        return;
+                    }
+                    let mut typed = None;
+                    ui.horizontal(|ui| {
+                        for (label, value, id, start) in [
+                            (t.quiet_from(), &mut quiet_text.0, "quiet from", true),
+                            (t.quiet_until(), &mut quiet_text.1, "quiet until", false),
+                        ] {
+                            ui.label(RichText::new(label).color(text));
+                            let field = ui.add(
+                                TextEdit::singleline(value)
+                                    .id(Id::new(id))
+                                    .hint_text(t.time_hint())
+                                    .text_color(text)
+                                    .desired_width(60.0),
+                            );
+                            if field.changed()
+                                && let Some(time) = ClockTime::parse(value.trim())
+                            {
+                                typed = Some((start, time));
+                            }
+                        }
+                    });
+                    if let Some((start, time)) = typed {
+                        let changed = if start {
+                            QuietHours {
+                                start: time,
+                                ..quiet
+                            }
+                        } else {
+                            QuietHours { end: time, ..quiet }
+                        };
+                        if changed != quiet {
+                            actions.push(Action::Setting(Setting::Quiet(changed)));
+                        }
+                    }
+                    let unreadable = [&quiet_text.0, &quiet_text.1]
+                        .iter()
+                        .any(|v| ClockTime::parse(v.trim()).is_none());
+                    if unreadable {
+                        ui.label(
+                            RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
+                        );
+                    }
+                });
+            });
+    }
+
+    /// The Routines and Reminders in the trash on their own, each with
+    /// its Restore.
+    fn trashed_routines(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        embossed(ui, tones, false, None, |ui| {
+            ui.label(RichText::new(t.routines_heading()).strong().color(text));
+            for (routine, note) in &self.view.trashed_routines {
+                ui.horizontal_wrapped(|ui| {
+                    let what = note.as_ref().map_or(t.note_gone(), |n| n.text.as_str());
+                    ui.label(RichText::new(what).color(text));
+                    ui.label(
+                        RichText::new(schedule_text(&t, &routine.schedule))
+                            .small()
+                            .color(weak),
+                    );
+                    if ui.button(RichText::new(t.restore()).color(text)).clicked() {
+                        actions.push(Action::RestoreRoutine(routine.id.clone()));
+                    }
+                });
+            }
+        });
     }
 
     /// The card's text next to the pointer while a card is dragged.
@@ -1077,7 +1770,7 @@ fn place_row(resp: &egui::Response, place: &str, actions: &mut Vec<Action>) {
 }
 
 /// A square button that shows `icon`, called `label`.
-fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
+pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
     resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
     if resp.hovered() {
@@ -1298,6 +1991,233 @@ fn merge_form(
         });
     cancel(ui, t, actions);
 }
+/// How much tomorrow is faded on the Agenda (the phone's
+/// `tomorrowOpacity`).
+pub const TOMORROW_OPACITY: f32 = 0.55;
+
+/// The Nudge repeats offered, in minutes (the phone's choices).
+pub const NUDGE_REPEAT_CHOICES: [i64; 3] = [10, 30, 60];
+
+/// A row of `label` and a choice of `minutes`; `picked` gets a new one.
+fn minutes_choice(
+    ui: &mut Ui,
+    id: &str,
+    label: &str,
+    t: &L10n,
+    minutes: i64,
+    choices: &[i64],
+    mut picked: impl FnMut(i64),
+) {
+    let text = ui.visuals().text_color();
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(label).color(text));
+        let mut chosen = minutes;
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(RichText::new(t.renag_minutes(minutes)).color(text))
+            .show_ui(ui, |ui| {
+                for m in choices {
+                    ui.selectable_value(
+                        &mut chosen,
+                        *m,
+                        RichText::new(t.renag_minutes(*m)).color(text),
+                    );
+                }
+            });
+        if chosen != minutes {
+            picked(chosen);
+        }
+    });
+}
+
+/// A pill to pick one of a few choices: self-painted so its text reads in
+/// every state, with the accent while `on`.
+pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Response {
+    let font = FontId::proportional(14.0);
+    let fg = ui.visuals().text_color();
+    let galley = ui.painter().layout_no_wrap(label.to_string(), font, fg);
+    let pad = egui::vec2(10.0, 5.0);
+    let (rect, resp) = ui.allocate_exact_size(galley.size() + pad * 2.0, Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, on, label));
+    if ui.is_rect_visible(rect) {
+        let fill = if on {
+            tones.accent.gamma_multiply(0.3)
+        } else if resp.hovered() {
+            tones.card.gamma_multiply(0.7)
+        } else {
+            Color32::TRANSPARENT
+        };
+        if fill.a() > 0 {
+            ui.painter().rect_filled(rect, 12.0, fill);
+        }
+        ui.painter().rect_stroke(
+            rect,
+            12.0,
+            egui::Stroke::new(
+                1.0,
+                if on {
+                    tones.accent
+                } else {
+                    ui.visuals().weak_text_color()
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+        ui.painter().galley(rect.min + pad, galley, fg);
+    }
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// The box that checks an Occurrence off, called `label`.
+fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, true, done, label));
+    if resp.hovered() {
+        ui.painter()
+            .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);
+    }
+    let (icon, colour) = if done {
+        (icons::CHECKED, tones.accent)
+    } else {
+        (icons::UNCHECKED, ui.visuals().text_color())
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// What an Occurrence of a Routine shows as: its Note's text, or that the
+/// Note is gone.
+fn row_title(t: &L10n, note: Option<&Note>) -> String {
+    match note {
+        Some(note) if !note.text.trim().is_empty() => note.text.trim().to_string(),
+        Some(_) => t.photo().to_string(),
+        None => t.note_gone().to_string(),
+    }
+}
+
+/// One Occurrence on the Agenda as an embossed row: the box to check it
+/// off, its time, its Note's text, and its Area's colour and icon. A
+/// click on the text opens its Routine.
+fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let routine = &row.row.routine;
+    let occurrence = row.row.occurrence;
+    let done = row.row.done().is_some();
+    let colour = row
+        .area
+        .as_ref()
+        .and_then(|a| area_colour(a.colour.as_deref()));
+    let title = row_title(t, row.row.note.as_ref());
+    let time = occurrence_time(t, &occurrence);
+    embossed(ui, tones, false, colour, |ui| {
+        ui.horizontal(|ui| {
+            let label = format!("{}: {time} {title}", t.mark_done());
+            if check(ui, tones, done, &label).clicked() {
+                actions.push(Action::Toggle(routine.id.clone(), occurrence));
+            }
+            ui.add_space(4.0);
+            let width = (ui.available_width() - 56.0).max(40.0);
+            let body = ui.vertical(|ui| {
+                ui.set_max_width(width);
+                ui.label(RichText::new(&time).strong().color(text));
+                let mut line = RichText::new(&title).size(15.0).color(text);
+                if done {
+                    line = line.strikethrough();
+                }
+                ui.add(egui::Label::new(line).truncate());
+            });
+            let open = body
+                .response
+                .interact(Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &title));
+            if open.clicked() {
+                actions.push(Action::OpenRoutine(routine.id.clone()));
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(icon) = row
+                    .area
+                    .as_ref()
+                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
+                {
+                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
+                }
+                if routine.is_reminder() {
+                    icons::show(ui, icons::REMINDER, 18.0, weak);
+                }
+            });
+        });
+    });
+}
+
+/// How many Missed Occurrences of one Routine show to check off.
+const MISSED_SHOWN: usize = 3;
+
+/// The Missed Summary: each Routine that Missed something since "Seen",
+/// how often, and its latest Missed Occurrences to check off late. It
+/// stays until "Seen".
+fn missed_card(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    missed: &MissedSummary,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let error = ui.visuals().error_fg_color;
+    embossed(ui, tones, true, None, |ui| {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::HISTORY, 20.0, error);
+            ui.label(
+                RichText::new(t.missed_title())
+                    .strong()
+                    .size(16.0)
+                    .color(text),
+            );
+            ui.add_space((ui.available_width() - 64.0).max(0.0));
+            if ui
+                .button(RichText::new(t.missed_seen()).color(text))
+                .clicked()
+            {
+                actions.push(Action::Seen);
+            }
+        });
+        for routine in &missed.routines {
+            let what = row_title(t, routine.note.as_ref());
+            let first = what.lines().next().unwrap_or_default();
+            ui.label(
+                RichText::new(format!(
+                    "{first} · {}",
+                    t.missed_times(routine.count() as i64)
+                ))
+                .color(text),
+            );
+            for m in routine.missed.iter().take(MISSED_SHOWN) {
+                ui.horizontal(|ui| {
+                    let when = format!(
+                        "{}  {}",
+                        day_text(t, m.occurrence.day),
+                        occurrence_time(t, &m.occurrence)
+                    );
+                    let label = format!("{}: {when} {first}", t.mark_done());
+                    if check(ui, tones, false, &label).clicked() {
+                        actions.push(Action::CheckMissed(
+                            routine.routine.id.clone(),
+                            m.occurrence,
+                        ));
+                    }
+                    ui.label(RichText::new(when).color(text));
+                });
+            }
+            if routine.count() > MISSED_SHOWN {
+                let more = t.missed_more((routine.count() - MISSED_SHOWN) as i64);
+                ui.label(RichText::new(more).small().color(weak));
+            }
+        }
+    });
+}
+
 /// An Area's stored colour (`RRGGBB`), or `None` when it has none or it
 /// cannot be read.
 pub fn area_colour(hex: Option<&str>) -> Option<Color32> {
@@ -1386,7 +2306,7 @@ fn row(
 
 /// Lays out `content` on a softly embossed card the width of `ui`;
 /// `band` runs an Area's colour down its left edge.
-fn embossed(
+pub(crate) fn embossed(
     ui: &mut Ui,
     tones: Tones,
     strong: bool,

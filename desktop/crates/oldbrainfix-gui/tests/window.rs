@@ -37,7 +37,9 @@ fn harness(
     scenario: &str,
     locale: &str,
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
-    let app = App::new(store(scenario)?, locale);
+    let mut app = App::new(store(scenario)?, locale);
+    // These tests browse the Notes; the window opens on the Agenda.
+    app.select(Selection::All);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
@@ -194,7 +196,11 @@ fn every_importance_draws_and_an_empty_store_says_so() -> TestResult {
                 App::install(ui.ctx());
                 app.show(ui);
             },
-            App::new(empty, "en"),
+            {
+                let mut app = App::new(empty, "en");
+                app.select(Selection::All);
+                app
+            },
         );
     harness.run();
     assert!(shows(&harness, "Nothing captured yet."));

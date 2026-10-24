@@ -15,6 +15,20 @@ pub const TRASH: char = '\u{e1bb}';
 pub const IMPORTANT: char = '\u{e361}';
 pub const NO_AREA_ICON: char = '\u{f091}';
 pub const ADD: char = '\u{e047}';
+pub const REMOVE: char = '\u{e516}';
+pub const AGENDA: char = '\u{e66a}';
+pub const SETTINGS: char = '\u{e57f}';
+pub const ADD_ALARM: char = '\u{e049}';
+pub const REPEAT: char = '\u{e51f}';
+pub const REMINDER: char = '\u{e44f}';
+pub const CHECKED: char = '\u{e157}';
+pub const UNCHECKED: char = '\u{e158}';
+pub const INBOX: char = '\u{e40c}';
+pub const HISTORY: char = '\u{e314}';
+pub const CLOSE: char = '\u{e16a}';
+pub const NOTE: char = '\u{e605}';
+pub const PREVIOUS: char = '\u{e15e}';
+pub const NEXT: char = '\u{e15f}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

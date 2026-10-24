@@ -2,16 +2,24 @@
 //!
 //! The native window and the eframe glue live in the `oldbrainfix`
 //! binary; everything that can be tested headless lives here so the
-//! kittest harness can drive it.
+//! kittest harness can drive it: the window, the alarm layer behind the
+//! notifications, the tray, the login start and the one-instance rule.
 
+pub mod alerts;
 pub mod app;
+pub mod autostart;
 pub mod background;
 pub mod icons;
+pub mod instance;
 pub mod l10n;
 pub mod names;
+pub mod notify;
+pub mod routine_editor;
+pub mod schedule_text;
 pub mod theme;
+pub mod tray;
 
-pub use app::{App, Selection};
+pub use app::{App, Selection, Wall, local_wall};
 
 use std::path::PathBuf;
 

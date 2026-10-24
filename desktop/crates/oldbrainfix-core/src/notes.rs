@@ -84,6 +84,8 @@ pub struct Note {
     pub merged_into: Option<String>,
     /// Whether the Note ever spawned a Routine or Reminder.
     pub spawned: bool,
+    /// When its Nudge is due, as chosen at Capture; `None` when none was.
+    pub nudge: Option<DateTime<Utc>>,
 }
 
 impl Note {
@@ -99,6 +101,12 @@ impl Note {
     /// Reminder spawned from it (CONTEXT.md).
     pub fn is_unsorted(&self) -> bool {
         self.place.is_none() && !self.is_trashed() && !self.is_merged() && !self.spawned
+    }
+
+    /// When the Nudge for this Note is due: as chosen at Capture, else
+    /// [`Notes::default_nudge`] after it.
+    pub fn nudge_at(&self) -> DateTime<Utc> {
+        self.nudge.unwrap_or(self.captured + Notes::default_nudge())
     }
 }
 
@@ -300,6 +308,7 @@ impl<'a> Notes<'a> {
             trashed: fields.get(keys::TRASHED).map(parse_time).transpose()?,
             merged_into: self.merged_into(id)?,
             spawned: fields.get(keys::SPAWNED).is_some(),
+            nudge: fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok()),
         }))
     }
 

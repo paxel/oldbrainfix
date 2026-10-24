@@ -1,26 +1,32 @@
 //! The Dart core writes the fixture corpus under `desktop/fixtures`
 //! (`packages/oldbrainfix_core/tool/gen_fixtures.dart`); this core must
 //! read every log the same, sign every entry the same, and write every
-//! scenario again to the same log, byte for byte.
+//! scenario again to the same log, byte for byte. Schedules, the alarm
+//! plan, the Missed Summary and the Nudge must come to the same on the
+//! same European wall clock, Europe/Berlin here.
 
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
+use oldbrainfix_core::alarms::{WallMoment, instant_of};
 use oldbrainfix_core::notes::keys as note_keys;
+use oldbrainfix_core::nudges::QuietHours;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
+use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
-    Importance, Note, Notes, NotesGo, Places, STARTER_SET, Section, SigningKey, Store, WireEntry,
-    dart_iso, parse_time,
+    AgendaRow, Alarms, ClockTime, Day, Importance, Note, Notes, NotesGo, Occurrence, Places,
+    Recurrence, Routine, Routines, STARTER_SET, Schedule, Section, SigningKey, SimpleRepeat, Store,
+    WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 5] = ["edits", "notes", "places", "sections", "trash"];
+const SCENARIOS: [&str; 6] = ["edits", "notes", "places", "routines", "sections", "trash"];
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
@@ -542,10 +548,11 @@ fn write_edits(store: &Store) -> Built {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 5] = [
+    let writers: [(&str, Writer); 6] = [
         ("edits", write_edits),
         ("notes", write_notes),
         ("places", write_places),
+        ("routines", write_routines),
         ("sections", write_sections),
         ("trash", write_trash),
     ];
@@ -564,6 +571,356 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         for (i, (ours, theirs)) in ours.iter().zip(&theirs).enumerate() {
             assert_eq!(ours, theirs, "{scenario}: line {}", i + 1);
         }
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------- Routines
+
+/// The European wall clock the generator's `_europe` keeps.
+fn berlin(utc: DateTime<Utc>) -> NaiveDateTime {
+    utc.with_timezone(&chrono_tz::Europe::Berlin).naive_local()
+}
+
+fn at(hour: u32, minute: u32) -> Result<ClockTime, Box<dyn std::error::Error>> {
+    Ok(ClockTime::new(hour, minute).ok_or("a time of day")?)
+}
+
+fn schedule(
+    start: Day,
+    times: &[ClockTime],
+    rule: Option<&str>,
+) -> Result<Schedule, Box<dyn std::error::Error>> {
+    let rule = rule.map(Recurrence::parse).transpose()?;
+    Ok(Schedule::new(start, times, rule).ok_or("a schedule")?)
+}
+
+fn daily() -> Option<Recurrence> {
+    Some(Recurrence::every(Frequency::Daily, 1))
+}
+
+/// The generator's `routines` scenario.
+fn write_routines(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let routines = Routines::new(store);
+    let day = Day::new;
+    let pills = notes.capture("Take the pills", None, None)?;
+    let three = [at(20, 0)?, at(8, 0)?, at(14, 0)?];
+    let medication_schedule = Schedule::new(day(2026, 1, 1), &three, daily()).ok_or("daily")?;
+    let medication = routines.spawn(&pills.id, &medication_schedule)?;
+    routines.set_renag(&medication.id, Some(Duration::minutes(5)))?;
+    routines.set_escalation(&medication.id, Some(3))?;
+    routines.spawn(
+        &pills.id,
+        &schedule(day(2026, 3, 1), &[], Some("FREQ=MONTHLY;BYDAY=1SU"))?,
+    )?;
+    let plants = notes.capture("Water the plants", None, Some(Duration::minutes(30)))?;
+    let weekends = schedule(day(2026, 1, 3), &[], Some("FREQ=WEEKLY;BYDAY=SA,SU"))?;
+    let weekend = routines.spawn(&plants.id, &weekends)?;
+    routines.reschedule(&weekend.id, &weekends)?;
+    let dentist = notes.capture("Dentist", None, None)?;
+    routines.spawn(
+        &dentist.id,
+        &schedule(day(2026, 3, 29), &[at(2, 30)?], None)?,
+    )?;
+    routines.spawn(
+        &dentist.id,
+        &schedule(day(2026, 10, 25), &[at(2, 30)?], None)?,
+    )?;
+    let night = routines.create(
+        "  Night meds  ",
+        &schedule(
+            day(2026, 1, 1),
+            &[at(23, 0)?],
+            Some("FREQ=DAILY;INTERVAL=2"),
+        )?,
+    )?;
+    routines.set_renag(&night.id, Some(Duration::minutes(15)))?;
+    routines.set_renag(&night.id, None)?;
+    let month_end = Some("FREQ=MONTHLY;BYMONTHDAY=-1");
+    let rent = routines.create(
+        "Pay the rent",
+        &schedule(day(2026, 1, 31), &[at(9, 0)?], month_end)?,
+    )?;
+    routines.reschedule(
+        &rent.id,
+        &schedule(day(2026, 1, 31), &[at(9, 0)?, at(18, 0)?], month_end)?,
+    )?;
+    let o = |d: Day, t: Option<ClockTime>| Occurrence::new(d, t);
+    routines.mark_done(&medication.id, &o(day(2026, 3, 28), Some(at(8, 0)?)), None)?;
+    routines.mark_done(
+        &medication.id,
+        &o(day(2026, 3, 28), Some(at(14, 0)?)),
+        Some(utc(2026, 3, 28, 15)?),
+    )?;
+    routines.mark_done(&medication.id, &o(day(2026, 3, 29), Some(at(8, 0)?)), None)?;
+    routines.unmark_done(&medication.id, &o(day(2026, 3, 29), Some(at(8, 0)?)))?;
+    routines.mark_done(&weekend.id, &o(day(2026, 10, 24), None), None)?;
+    let habit = routines.create(
+        "Old habit",
+        &Schedule::new(day(2026, 1, 1), &[], daily()).ok_or("daily")?,
+    )?;
+    routines.trash(&habit.id)?;
+    let stretch = routines.create(
+        "Stretch",
+        &schedule(
+            day(2026, 1, 2),
+            &[at(7, 30)?],
+            Some("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH;WKST=SU"),
+        )?,
+    )?;
+    routines.trash(&stretch.id)?;
+    routines.restore(&stretch.id)?;
+    let walk = notes.capture("Walk the dog", None, None)?;
+    routines.spawn(
+        &walk.id,
+        &Schedule::new(day(2026, 1, 1), &[at(7, 0)?], daily()).ok_or("daily")?,
+    )?;
+    routines.trash_note(&walk.id, true)?;
+    routines.restore_note(&walk.id)?;
+    let flyer = notes.capture("Flyer for the fair", None, None)?;
+    routines.spawn(&flyer.id, &schedule(day(2026, 4, 1), &[at(10, 0)?], None)?)?;
+    routines.trash_note(&flyer.id, false)?;
+    let car = notes.capture("Car inspection", None, None)?;
+    routines.spawn(&car.id, &schedule(day(2026, 5, 1), &[], None)?)?;
+    routines.trash_note(&car.id, true)?;
+    notes.capture("Unsorted thought", None, Some(Duration::minutes(10)))?;
+    notes.capture("Another thought", None, None)?;
+    Ok(())
+}
+
+fn iso(at: Option<DateTime<Utc>>) -> Value {
+    json!(at.map(dart_iso))
+}
+
+fn wall(moment: &WallMoment) -> String {
+    format!("{}T{}", moment.day, moment.time)
+}
+
+fn routine_json(r: &Routine) -> Value {
+    let done: serde_json::Map<String, Value> = r
+        .done
+        .iter()
+        .map(|(k, v)| (k.clone(), json!(dart_iso(*v))))
+        .collect();
+    json!({
+        "id": r.id,
+        "noteId": r.note_id,
+        "start": r.schedule.start.to_string(),
+        "times": r.schedule.times.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        "rule": r.schedule.rule.as_ref().map(Recurrence::format),
+        "done": done,
+        "renag": r.renag.map(|d| d.num_minutes()),
+        "escalation": r.escalation,
+        "scheduledAt": iso(r.scheduled_at),
+        "trashed": iso(r.trashed),
+        "trashedWith": r.trashed_with,
+        "reminder": r.is_reminder(),
+    })
+}
+
+fn rows_json(rows: &[AgendaRow]) -> Value {
+    json!(
+        rows.iter()
+            .map(|r| json!([
+                r.routine.id,
+                r.occurrence.key(),
+                r.note.as_ref().map(|n| n.id.clone()),
+                iso(r.done()),
+            ]))
+            .collect::<Vec<_>>()
+    )
+}
+
+/// What this core makes of the `routines` log at one held moment, in the
+/// shape of a check in the generator's `alarms.json`.
+fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error::Error>> {
+    for (key, value) in local.as_object().ok_or("local settings")? {
+        store.set_local_setting(key, value.as_str().ok_or("a setting")?)?;
+    }
+    let now = store.now();
+    let alarms = Alarms::new(store);
+    let agenda = Routines::new(store).agenda(&berlin)?;
+    let plan = alarms.plan(&berlin)?;
+    let missed = alarms.missed(&berlin)?;
+    let nudge = alarms.nudge(&berlin)?;
+    let later = now + Duration::hours(3);
+    Ok(json!({
+        "now": dart_iso(now),
+        "local": local,
+        "today": agenda.today.to_string(),
+        "agenda": {
+            "today": rows_json(&agenda.today_rows),
+            "tomorrow": rows_json(&agenda.tomorrow_rows),
+        },
+        "alarmCount": plan.len(),
+        "alarms": plan.iter().take(40).map(|a| json!({
+            "id": a.id(),
+            "kind": a.kind.name(),
+            "routine": a.routine_id,
+            "occurrence": a.occurrence.key(),
+            "at": dart_iso(a.at),
+            "wall": a.wall.as_ref().map(wall),
+            "renag": a.renag.num_minutes(),
+            "escalation": a.escalation,
+            "escalatesAt": iso(a.escalates_at()),
+            "ends": wall(&a.ends),
+            "endsAt": dart_iso(a.ends_at),
+            "text": a.text,
+            "firesAfterNow": iso(a.fires_after(now)),
+        })).collect::<Vec<_>>(),
+        "missed": {
+            "count": missed.count(),
+            "nextChange": iso(missed.next_change),
+            "routines": missed.routines.iter().map(|m| json!({
+                "routine": m.routine.id,
+                "note": m.note.as_ref().map(|n| n.id.clone()),
+                "missed": m.missed.iter()
+                    .map(|o| json!([o.occurrence.key(), dart_iso(o.missed_at)]))
+                    .collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+        },
+        "nudge": nudge.map(|n| json!({
+            "notes": n.notes.iter().map(|n| n.id.clone()).collect::<Vec<_>>(),
+            "at": dart_iso(n.at),
+            "since": iso(n.since),
+            "firesAfterLater": dart_iso(n.fires_after(later, &berlin)),
+        })),
+        "recentlyDone": alarms.recently_done(&berlin)?.iter()
+            .map(|(id, o)| json!([id, o.key()]))
+            .collect::<Vec<_>>(),
+    }))
+}
+
+#[test]
+fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("routines").join("alarms.json"))?;
+    let read_at = read_json(&fixtures().join("routines").join("expected.json"))?;
+    let store = load("routines", read_at["now"].as_str().ok_or("now")?)?;
+    let routines = Routines::new(&store);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut every = Vec::new();
+    for id in &ids {
+        if let Some(routine) = routines.by_id(id)? {
+            every.push(routine_json(&routine));
+        }
+    }
+    assert_eq!(json!(every), expected["routines"]);
+    let all: Vec<String> = routines.all()?.into_iter().map(|r| r.id).collect();
+    assert_eq!(json!(all), expected["all"]);
+    let trashed: Vec<String> = routines.trashed()?.into_iter().map(|r| r.id).collect();
+    assert_eq!(json!(trashed), expected["trashed"]);
+    let mut of_note = serde_json::Map::new();
+    for note in Notes::new(&store).all()? {
+        let ids: Vec<String> = routines
+            .of_note(&note.id)?
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        of_note.insert(note.id, json!(ids));
+    }
+    assert_eq!(Value::Object(of_note), expected["ofNote"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 5);
+    for check in checks {
+        let store = load("routines", check["now"].as_str().ok_or("now")?)?;
+        let ours = check_json(&store, &check["local"])?;
+        for key in [
+            "today",
+            "agenda",
+            "alarmCount",
+            "alarms",
+            "missed",
+            "nudge",
+            "recentlyDone",
+        ] {
+            assert_eq!(ours[key], check[key], "{} {key}", check["now"]);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn rules_schedules_and_instants_come_out_as_the_dart_core_has_them() -> TestResult {
+    let fixture = read_json(&fixtures().join("schedules.json"))?;
+    let simple_json = |s: Option<SimpleRepeat>| {
+        json!(s.map(|s| json!({
+            "kind": format!("{:?}", s.kind).to_lowercase(),
+            "every": s.every,
+            "unit": format!("{:?}", s.unit).to_lowercase(),
+            "weekdays": s.weekdays.iter().collect::<Vec<_>>(),
+            "rule": s.to_rule().map(|r| r.format()),
+        })))
+    };
+    for case in fixture["rules"].as_array().ok_or("rules")? {
+        let text = case["text"].as_str().ok_or("text")?;
+        let ours = match Recurrence::parse(text) {
+            Ok(rule) => json!({
+                "text": text,
+                "format": rule.format(),
+                "times": rule.times().map(|t| t.iter().map(ToString::to_string).collect::<Vec<_>>()),
+                "simple": simple_json(SimpleRepeat::of(Some(&rule))),
+            }),
+            Err(e) => json!({"text": text, "error": e.message, "source": e.source}),
+        };
+        assert_eq!(&ours, case, "{text:?}");
+    }
+    assert_eq!(simple_json(SimpleRepeat::of(None)), fixture["simpleOnce"]);
+    for case in fixture["schedules"].as_array().ok_or("schedules")? {
+        let s = |k: &str| case[k].as_str().ok_or(format!("{k} is text"));
+        let times: Vec<ClockTime> = case["times"]
+            .as_array()
+            .ok_or("times")?
+            .iter()
+            .filter_map(|t| t.as_str().and_then(ClockTime::parse))
+            .collect();
+        let start = Day::parse(s("start")?).ok_or("start")?;
+        let from = Day::parse(s("from")?).ok_or("from")?;
+        let to = Day::parse(s("to")?).ok_or("to")?;
+        let schedule = schedule(start, &times, case["rule"].as_str())?;
+        let keys =
+            |list: Vec<Occurrence>| json!(list.iter().map(Occurrence::key).collect::<Vec<_>>());
+        let day_times: Vec<String> = schedule
+            .day_times()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(json!(day_times), case["dayTimes"], "{case}");
+        assert_eq!(keys(schedule.between(from, to)), case["between"], "{case}");
+        assert_eq!(keys(schedule.next(from, 8)), case["next"], "{case}");
+    }
+    for case in fixture["days"].as_array().ok_or("days")? {
+        let n: Vec<i64> = serde_json::from_value(case["in"].clone())?;
+        let [y, m, d] = n[..] else {
+            return Err("three numbers".into());
+        };
+        let day = Day::new(y, m, d);
+        assert_eq!(json!(day.to_string()), case["day"]);
+        assert_eq!(json!(day.weekday()), case["weekday"]);
+    }
+    for case in fixture["instants"].as_array().ok_or("instants")? {
+        let day = Day::parse(case[0].as_str().ok_or("day")?).ok_or("a day")?;
+        let time = ClockTime::parse(case[1].as_str().ok_or("time")?).ok_or("a time")?;
+        assert_eq!(
+            json!(dart_iso(instant_of(day, time, &berlin))),
+            case[2],
+            "{case}"
+        );
+    }
+    for case in fixture["quiet"].as_array().ok_or("quiet")? {
+        let hours = case[0].as_str().ok_or("hours")?;
+        let (start, end) = hours.split_once('-').ok_or("from-to")?;
+        let quiet = QuietHours {
+            start: ClockTime::parse(start).ok_or("start")?,
+            end: ClockTime::parse(end).ok_or("end")?,
+        };
+        let instant = parse_time(case[1].as_str().ok_or("instant")?)?;
+        assert_eq!(
+            json!(dart_iso(quiet.defer(instant, &berlin))),
+            case[2],
+            "{case}"
+        );
     }
     Ok(())
 }

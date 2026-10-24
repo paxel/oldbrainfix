@@ -1,0 +1,162 @@
+{
+  "now": "2026-01-02T10:02:41.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Take the pills",
+      "captured": "2026-01-01T10:00:01.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Water the plants",
+      "captured": "2026-01-01T10:00:19.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "Dentist",
+      "captured": "2026-01-01T10:00:31.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "Night meds",
+      "captured": "2026-01-01T10:00:47.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:0000000000000000000000000000000b",
+      "text": "Pay the rent",
+      "captured": "2026-01-01T10:01:00.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "Old habit",
+      "captured": "2026-01-01T10:01:20.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:0000000000000000000000000000000f",
+      "text": "Stretch",
+      "captured": "2026-01-01T10:01:33.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000011",
+      "text": "Walk the dog",
+      "captured": "2026-01-01T10:01:47.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "text": "Flyer for the fair",
+      "captured": "2026-01-01T10:02:05.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:02:16.000Z",
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "text": "Car inspection",
+      "captured": "2026-01-01T10:02:18.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:02:29.000Z",
+      "mergedInto": null,
+      "spawned": true
+    },
+    {
+      "id": "note:00000000000000000000000000000017",
+      "text": "Unsorted thought",
+      "captured": "2026-01-01T10:02:33.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false
+    },
+    {
+      "id": "note:00000000000000000000000000000018",
+      "text": "Another thought",
+      "captured": "2026-01-01T10:02:38.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000018",
+    "note:00000000000000000000000000000017",
+    "note:00000000000000000000000000000011",
+    "note:0000000000000000000000000000000f",
+    "note:0000000000000000000000000000000d",
+    "note:0000000000000000000000000000000b",
+    "note:00000000000000000000000000000009",
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000017",
+    "note:00000000000000000000000000000018"
+  ],
+  "trashed": [
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000013"
+  ],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000018": [],
+    "note:00000000000000000000000000000017": [],
+    "note:00000000000000000000000000000011": [],
+    "note:0000000000000000000000000000000f": [],
+    "note:0000000000000000000000000000000d": [],
+    "note:0000000000000000000000000000000b": [],
+    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000004": [],
+    "note:00000000000000000000000000000001": [],
+    "note:00000000000000000000000000000015": [],
+    "note:00000000000000000000000000000013": []
+  }
+}
