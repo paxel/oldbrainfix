@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon: each capture screen directly. They go
+     through the small capture activities, which hand over to the running
+     app; hardware-button mappers can launch these shortcuts too. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="capture_voice"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_voice"
+        android:shortcutShortLabel="@string/capture_voice_short"
+        android:shortcutLongLabel="@string/capture_voice">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="io.github.paxel.oldbrainfix"
+            android:targetClass="io.github.paxel.oldbrainfix.VoiceCaptureActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="capture_text"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_text"
+        android:shortcutShortLabel="@string/capture_text_short"
+        android:shortcutLongLabel="@string/capture_text">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="io.github.paxel.oldbrainfix"
+            android:targetClass="io.github.paxel.oldbrainfix.TextCaptureActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="capture_photo"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_photo"
+        android:shortcutShortLabel="@string/capture_photo_short"
+        android:shortcutLongLabel="@string/capture_photo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="io.github.paxel.oldbrainfix"
+            android:targetClass="io.github.paxel.oldbrainfix.PhotoCaptureActivity" />
+    </shortcut>
+</shortcuts>

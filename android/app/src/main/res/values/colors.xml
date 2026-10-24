@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's teal accent (lib/src/look.dart). -->
+    <color name="capture_teal">#FF00796B</color>
+</resources>

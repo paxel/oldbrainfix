@@ -31,6 +31,8 @@ class MainActivity : FlutterActivity() {
 
     private var voiceChannel: MethodChannel? = null
 
+    private var captureChannel: MethodChannel? = null
+
     /** The microphone and the player for voice Notes. */
     private val voice by lazy { Voice(this) }
 
@@ -40,6 +42,9 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
+        if (savedInstanceState == null) {
+            CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
+        }
         super.onCreate(savedInstanceState)
     }
 
@@ -57,6 +62,11 @@ class MainActivity : FlutterActivity() {
         // Something was shared in while the app runs: it takes it now.
         if (intent.getBooleanExtra(EXTRA_SHARED, false)) {
             photoChannel?.invokeMethod("shared", null)
+        }
+        // A shortcut, tile or widget asked for Capture while the app runs.
+        CaptureModes.of(intent.action, intent.flags)?.let {
+            captureRequested = it
+            captureChannel?.invokeMethod("requested", null)
         }
         if (!intent.getBooleanExtra(EXTRA_RING, false)) return
         showOverLockScreen(true)
@@ -122,6 +132,17 @@ class MainActivity : FlutterActivity() {
                     "stopPlaying" -> {
                         voice.stopPlaying()
                         result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
+        captureChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAPTURE_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "take" -> {
+                        result.success(captureRequested)
+                        captureRequested = null
                     }
                     else -> result.notImplemented()
                 }
@@ -339,8 +360,10 @@ class MainActivity : FlutterActivity() {
         private const val PHOTO_CHANNEL = "io.github.paxel.oldbrainfix/photos"
         private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
         private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
+        private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
         private const val REQUEST_LOCATION = 1
-        private const val REQUEST_PHOTO = 2
+        // Not 2: Permissions.REQUEST_NOTIFICATIONS.
+        private const val REQUEST_PHOTO = 3
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
@@ -357,6 +380,9 @@ class MainActivity : FlutterActivity() {
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false
+
+        /** The capture screen an entry point asked for and the app has not opened yet. */
+        private var captureRequested: String? = null
 
         /**
          * The full-screen alarm stopped: the app no longer shows over the

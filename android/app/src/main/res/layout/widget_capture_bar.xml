@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="4dp">
+    <ImageView
+        android:id="@+id/capture_voice"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="2dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_capture_background"
+        android:contentDescription="@string/capture_voice"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_capture_voice" />
+    <ImageView
+        android:id="@+id/capture_text"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="2dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_capture_background"
+        android:contentDescription="@string/capture_text"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_capture_text" />
+    <ImageView
+        android:id="@+id/capture_photo"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="2dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_capture_background"
+        android:contentDescription="@string/capture_photo"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_capture_photo" />
+</LinearLayout>

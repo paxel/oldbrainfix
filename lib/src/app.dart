@@ -9,6 +9,7 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'browser.dart';
+import 'capture_requests.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'l10n.dart';
@@ -51,6 +52,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// when not given.
   final ContextSource context;
 
+  /// The quick entry points asking for a capture screen; none when not
+  /// given.
+  final CaptureRequests requests;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -61,6 +66,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.photos = const NoPhotos(),
     this.voice = const NoVoice(),
     this.context = const NoContext(),
+    this.requests = const NoCaptureRequests(),
   });
 
   @override
@@ -147,6 +153,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       places: _places,
       trail: _trail,
       alarms: _alarms,
+      requests: widget.requests,
     ),
   );
 }
@@ -162,6 +169,7 @@ class _Home extends StatefulWidget {
   final Places places;
   final BrowserTrail trail;
   final AlarmSync alarms;
+  final CaptureRequests requests;
 
   const _Home({
     required this.store,
@@ -169,6 +177,7 @@ class _Home extends StatefulWidget {
     required this.places,
     required this.trail,
     required this.alarms,
+    required this.requests,
   });
 
   @override
@@ -278,6 +287,7 @@ class _HomeState extends State<_Home> {
       places: widget.places,
       trail: widget.trail,
       alarms: widget.alarms,
+      requests: widget.requests,
     );
   }
 }

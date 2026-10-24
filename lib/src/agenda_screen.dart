@@ -8,6 +8,7 @@ import 'alarm_sync.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
+import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -36,7 +37,8 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// midnight the Agenda moves on to the new day, and whenever an
 /// Occurrence becomes Missed the summary takes it in. Whatever another
 /// app shares in opens in Capture over the Agenda, filled in and
-/// Unsorted.
+/// Unsorted, and so does the capture screen a shortcut, tile, widget or
+/// hardware button asked for, just as from "+".
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow is faded.
   static const tomorrowOpacity = 0.55;
@@ -50,12 +52,16 @@ class AgendaScreen extends StatefulWidget {
   /// The Device's alarms: taps applied and permissions changed.
   final AlarmSync alarms;
 
+  /// The quick entry points asking for a capture screen.
+  final CaptureRequests requests;
+
   const AgendaScreen({
     super.key,
     required this.notes,
     required this.places,
     required this.trail,
     required this.alarms,
+    this.requests = const NoCaptureRequests(),
   });
 
   @override
@@ -79,7 +85,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// Where shares come from; set with the first dependencies.
   PhotoPlatform? _photos;
   StreamSubscription<void>? _shares;
-  var _sharing = false;
+  late final StreamSubscription<void> _requests;
+
+  /// Set while a share or a requested capture is open, so two never
+  /// stack.
+  var _opening = false;
 
   @override
   void initState() {
@@ -89,16 +99,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
       // Back from the background, the last capture is old news. A
       // dialog or the notification shade only makes the app inactive.
       onShow: () => _capturedId = null,
-      // Maybe a new day, maybe something shared meanwhile.
+      // Maybe a new day, maybe something shared or a capture asked
+      // for meanwhile.
       onResume: () {
         _reload();
-        unawaited(_openShared());
+        unawaited(_openWaiting());
       },
     );
     widget.alarms.addListener(_reload);
     // Notes sorted on a page opened from elsewhere, like the Nudge
     // screen, change the Unsorted count.
     widget.notes.store.addListener(_logChanged);
+    _requests = widget.requests.arrived.listen((_) => _openWaiting());
   }
 
   @override
@@ -106,14 +118,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
     super.didChangeDependencies();
     if (_photos != null) return;
     final photos = _photos = PhotoScope.of(context);
-    _shares = photos.sharedArrived.listen((_) => _openShared());
-    // Shared before the Agenda was up, as on a start by a share.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openShared());
+    _shares = photos.sharedArrived.listen((_) => _openWaiting());
+    // Shared or asked for before the Agenda was up, as on a start by a
+    // share or a shortcut.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _openWaiting());
   }
 
   @override
   void dispose() {
     unawaited(_shares?.cancel());
+    unawaited(_requests.cancel());
     _timer?.cancel();
     widget.alarms.removeListener(_reload);
     widget.notes.store.removeListener(_logChanged);
@@ -187,26 +201,40 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  /// Opens Capture for each share waiting, one after the other. A shared
-  /// Note starts Unsorted.
-  Future<void> _openShared() async {
+  /// Opens Capture for each share waiting, one after the other, then
+  /// the capture screen an entry point asked for, the same as "+" with
+  /// voice or the camera started. A shared Note starts Unsorted.
+  Future<void> _openWaiting() async {
     final photos = _photos;
-    if (photos == null || _sharing) return;
-    _sharing = true;
+    if (photos == null || _opening) return;
+    _opening = true;
     try {
       while (mounted) {
         final shared = await photos.takeShared();
-        if (shared == null || !mounted) return;
+        if (!mounted) return;
+        if (shared != null) {
+          await captureNote(
+            context,
+            widget.notes,
+            shared: shared,
+            onCaptured: (id) => _capturedId = id,
+            onChanged: _reloadIfMounted,
+          );
+          continue;
+        }
+        final mode = await widget.requests.take();
+        if (mode == null || !mounted) return;
         await captureNote(
           context,
           widget.notes,
-          shared: shared,
+          voice: mode == CaptureMode.voice,
+          photo: mode == CaptureMode.photo,
           onCaptured: (id) => _capturedId = id,
           onChanged: _reloadIfMounted,
         );
       }
     } finally {
-      _sharing = false;
+      _opening = false;
     }
   }
 

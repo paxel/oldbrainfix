@@ -16,7 +16,7 @@ import 'voice_platform.dart';
 typedef Captured = ({String noteId, List<Future<bool>> attached});
 
 /// Opens text Capture, or voice Capture recording at once when [voice] is
-/// set, filing the new Note into the Area or Topic [place] when one is
+/// set, or the camera at once when [photo] is set, filing the new Note into the Area or Topic [place] when one is
 /// given, or with the [shared] item from another app filled in. [onChanged] runs once the user left Capture, for the caller to
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
@@ -31,6 +31,7 @@ Future<void> captureNote(
   String? place,
   SharedItem? shared,
   bool voice = false,
+  bool photo = false,
   required VoidCallback onChanged,
   ValueChanged<String>? onCaptured,
 }) async {
@@ -49,6 +50,7 @@ Future<void> captureNote(
         place: place,
         shared: shared,
         startVoice: voice,
+        startPhoto: photo,
       ),
     ),
   );
@@ -113,6 +115,10 @@ class CaptureScreen extends StatefulWidget {
   /// Opens in voice, recording at once.
   final bool startVoice;
 
+  /// Opens the camera at once; back from it, the screen is text Capture
+  /// with the photo.
+  final bool startPhoto;
+
   const CaptureScreen({
     super.key,
     required this.notes,
@@ -123,6 +129,7 @@ class CaptureScreen extends StatefulWidget {
     this.place,
     this.shared,
     this.startVoice = false,
+    this.startPhoto = false,
   });
 
   @override
@@ -192,6 +199,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
     if (widget.startVoice) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openVoice());
+    } else if (widget.startPhoto && widget.photos.available) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _takePhoto());
     }
   }
 
@@ -413,7 +422,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
                       ? _voice(context)
                       : TextField(
                           controller: _text,
-                          autofocus: !widget.startVoice,
+                          autofocus: !widget.startVoice && !widget.startPhoto,
                           maxLines: null,
                           decoration: InputDecoration(
                             hintText: _photos.isEmpty && _recordings.isEmpty

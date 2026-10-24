@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_text_short">Text</string>
+    <string name="capture_voice_short">Sprache</string>
+    <string name="capture_photo_short">Foto</string>
+    <string name="capture_text">Textnotiz</string>
+    <string name="capture_voice">Sprachnotiz</string>
+    <string name="capture_photo">Fotonotiz</string>
+    <string name="capture_all">Sprache, Text, Foto</string>
+    <string name="capture_widget_description">Öffnet die Erfassung mit einem Tipp.</string>
+</resources>

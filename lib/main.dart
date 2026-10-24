@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/alarm_platform.dart';
 import 'src/app.dart';
+import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
       photos: AndroidPhotos(),
       voice: AndroidVoice(),
       context: const AndroidContext(),
+      requests: AndroidCaptureRequests(),
     ),
   );
 }

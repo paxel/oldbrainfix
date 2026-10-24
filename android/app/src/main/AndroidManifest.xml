@@ -54,6 +54,10 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Long-press the icon: voice, text and photo Capture. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
         <!-- The share target: images, text and links from other apps. It
              only hands the share over to MainActivity. -->
@@ -79,6 +83,111 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+        <!-- Voice, text and photo Capture for app shortcuts and
+             hardware-button mappers. Each only hands over to MainActivity,
+             which opens the capture screen. -->
+        <activity
+            android:name=".VoiceCaptureActivity"
+            android:label="@string/capture_voice"
+            android:icon="@drawable/ic_shortcut_voice"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+        <activity
+            android:name=".TextCaptureActivity"
+            android:label="@string/capture_text"
+            android:icon="@drawable/ic_shortcut_text"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+        <activity
+            android:name=".PhotoCaptureActivity"
+            android:label="@string/capture_photo"
+            android:icon="@drawable/ic_shortcut_photo"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+        <!-- Quick Settings tiles for voice, text and photo Capture. On the
+             lock screen Android asks to unlock first. -->
+        <service
+            android:name=".VoiceCaptureTile"
+            android:label="@string/capture_voice"
+            android:icon="@drawable/ic_capture_voice"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".TextCaptureTile"
+            android:label="@string/capture_text"
+            android:icon="@drawable/ic_capture_text"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".PhotoCaptureTile"
+            android:label="@string/capture_photo"
+            android:icon="@drawable/ic_capture_photo"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <!-- Home-screen widgets: one capture button each, and all three
+             side by side. -->
+        <receiver
+            android:name=".VoiceCaptureWidget"
+            android:label="@string/capture_voice"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_voice" />
+        </receiver>
+        <receiver
+            android:name=".TextCaptureWidget"
+            android:label="@string/capture_text"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_text" />
+        </receiver>
+        <receiver
+            android:name=".PhotoCaptureWidget"
+            android:label="@string/capture_photo"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_photo" />
+        </receiver>
+        <receiver
+            android:name=".CaptureBarWidget"
+            android:label="@string/capture_all"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_capture_bar" />
+        </receiver>
         <!-- Lets the camera app write the photo being taken, and nothing
              else. -->
         <provider

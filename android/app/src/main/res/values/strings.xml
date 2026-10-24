@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the launcher and the system show for the quick entry points into
+     Capture: app shortcuts, Quick Settings tiles and widgets. The app's own
+     texts are in lib/l10n. -->
+<resources>
+    <string name="capture_text_short">Text</string>
+    <string name="capture_voice_short">Voice</string>
+    <string name="capture_photo_short">Photo</string>
+    <string name="capture_text">Text note</string>
+    <string name="capture_voice">Voice note</string>
+    <string name="capture_photo">Photo note</string>
+    <string name="capture_all">Voice, text, photo</string>
+    <string name="capture_widget_description">Opens Capture with one tap.</string>
+</resources>
