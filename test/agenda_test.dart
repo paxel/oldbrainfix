@@ -133,6 +133,20 @@ void main() {
       expect(agendaRows(tester).first, '08:00 pills');
     });
 
+    testWidgets('moves on to the new day at midnight while open', (
+      tester,
+    ) async {
+      now = DateTime(2026, 10, 24, 23, 59);
+      routines.create('dentist', Schedule(start: tomorrow, times: [at(10)]));
+      await start(tester);
+      expect(dimmed(tester, 'dentist'), isTrue);
+
+      now = DateTime(2026, 10, 25, 0, 0, 30);
+      await tester.pump(const Duration(minutes: 1, seconds: 1));
+      expect(dimmed(tester, 'dentist'), isFalse);
+      expect(find.text('Nothing due tomorrow.'), findsOneWidget);
+    });
+
     testWidgets('tomorrow is checked off today, and stays where it is', (
       tester,
     ) async {

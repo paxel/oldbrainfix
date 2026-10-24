@@ -135,9 +135,10 @@ class Routines {
     store.append(id, RoutineKeys.type, null);
   }
 
-  /// Checks off [occurrence] of the Routine [id] as Done, at the store's
-  /// now. Early or late, the schedule stays as it is (ADR 0006).
-  void markDone(String id, Occurrence occurrence) {
+  /// Checks off [occurrence] of the Routine [id] as Done, at [at] or the
+  /// store's now: [at] is when it was tapped on a notification, applied
+  /// later. Early or late, the schedule stays as it is (ADR 0006).
+  void markDone(String id, Occurrence occurrence, {DateTime? at}) {
     final routine = _require(id);
     if (!routine.schedule.has(occurrence)) {
       throw ArgumentError.value(occurrence, 'occurrence', 'not due then');
@@ -145,7 +146,7 @@ class Routines {
     store.append(
       id,
       RoutineKeys.done(occurrence),
-      store.clock().toUtc().toIso8601String(),
+      (at ?? store.clock()).toUtc().toIso8601String(),
     );
   }
 

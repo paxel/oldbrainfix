@@ -18,6 +18,22 @@ class Store {
 
   Store._(this._db, this.clock);
 
+  final _listeners = <void Function()>[];
+  var _inBatch = false;
+
+  /// Calls [listener] after every change to the log: after each append,
+  /// or once a [batch] is committed. Local settings do not count.
+  void addListener(void Function() listener) => _listeners.add(listener);
+
+  void removeListener(void Function() listener) => _listeners.remove(listener);
+
+  void _changed() {
+    if (_inBatch) return;
+    for (final listener in List.of(_listeners)) {
+      listener();
+    }
+  }
+
   /// Opens an on-disk store, creating it if needed. [newKey] makes the
   /// Device's signing key on first open; fixtures pass a fixed one.
   factory Store.open(
@@ -124,6 +140,7 @@ class Store {
       'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [device, dseq, entity, field, value, dateIso, author, recordedIso, sig],
     );
+    _changed();
     return _entries('SELECT * FROM entries WHERE device = ? AND dseq = ?', [
       device,
       dseq,
@@ -133,14 +150,19 @@ class Store {
   /// Runs [body] in one transaction.
   T batch<T>(T Function() body) {
     _db.execute('BEGIN');
+    _inBatch = true;
+    final T result;
     try {
-      final result = body();
+      result = body();
       _db.execute('COMMIT');
-      return result;
     } catch (_) {
       _db.execute('ROLLBACK');
       rethrow;
+    } finally {
+      _inBatch = false;
     }
+    _changed();
+    return result;
   }
 
   /// The newest dseq held from each Device.

@@ -2,6 +2,7 @@
 /// domain on top of it. No Flutter here (docs/adr/0001, 0002).
 library;
 
+export 'src/alarms.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
 export 'src/named_places.dart';

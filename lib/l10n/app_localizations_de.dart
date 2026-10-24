@@ -548,4 +548,67 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get notFiled => 'Nicht abgelegt';
+
+  @override
+  String get alarmChannel => 'Routinen und Erinnerungen';
+
+  @override
+  String get snooze => 'Später';
+
+  @override
+  String get snoozeQuestion => 'Erinnere mich wieder in …';
+
+  @override
+  String get snooze10 => '10 Min.';
+
+  @override
+  String get snooze30 => '30 Min.';
+
+  @override
+  String get snooze60 => '1 Std.';
+
+  @override
+  String get alarmsBanner =>
+      'Alarme kommen vielleicht zu spät oder gar nicht: Eine Erlaubnis fehlt. Tippe hier, um das zu beheben.';
+
+  @override
+  String get setupTitle => 'Alarme einrichten';
+
+  @override
+  String setupStep(int step, int count) {
+    return 'Schritt $step von $count';
+  }
+
+  @override
+  String get setupAllow => 'Erlauben';
+
+  @override
+  String get setupGranted => 'Erlaubt';
+
+  @override
+  String get setupNext => 'Weiter';
+
+  @override
+  String get setupDone => 'Fertig';
+
+  @override
+  String get permNotifications => 'Benachrichtigungen';
+
+  @override
+  String get permNotificationsWhy =>
+      'Routinen und Erinnerungen erscheinen als Benachrichtigung. Dort hakst du sie als erledigt ab oder verschiebst sie auf später – auch auf dem Sperrbildschirm.';
+
+  @override
+  String get permExactAlarms => 'Alarme auf die Minute';
+
+  @override
+  String get permExactAlarmsWhy =>
+      'Ohne diese Erlaubnis kann Android einen Alarm bis zu einer Viertelstunde zu spät bringen. Schalte sie auf der Seite, die sich öffnet, für Old Brain Fix ein.';
+
+  @override
+  String get permFullScreen => 'Vollbild-Alarme';
+
+  @override
+  String get permFullScreenWhy =>
+      'Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.';
 }

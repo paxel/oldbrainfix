@@ -543,4 +543,67 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notFiled => 'Not filed';
+
+  @override
+  String get alarmChannel => 'Routines and Reminders';
+
+  @override
+  String get snooze => 'Snooze';
+
+  @override
+  String get snoozeQuestion => 'Remind me again in …';
+
+  @override
+  String get snooze10 => '10 min';
+
+  @override
+  String get snooze30 => '30 min';
+
+  @override
+  String get snooze60 => '1 h';
+
+  @override
+  String get alarmsBanner =>
+      'Alarms may come late or not at all: a permission is missing. Tap to fix it.';
+
+  @override
+  String get setupTitle => 'Set up alarms';
+
+  @override
+  String setupStep(int step, int count) {
+    return 'Step $step of $count';
+  }
+
+  @override
+  String get setupAllow => 'Allow';
+
+  @override
+  String get setupGranted => 'Allowed';
+
+  @override
+  String get setupNext => 'Next';
+
+  @override
+  String get setupDone => 'Done';
+
+  @override
+  String get permNotifications => 'Notifications';
+
+  @override
+  String get permNotificationsWhy =>
+      'Routines and Reminders show up as notifications. Tick them off as Done or snooze them right there, even on the lock screen.';
+
+  @override
+  String get permExactAlarms => 'Alarms on the minute';
+
+  @override
+  String get permExactAlarmsWhy =>
+      'Without this, Android may bring an alarm up to a quarter of an hour late. Turn it on for Old Brain Fix on the page that opens.';
+
+  @override
+  String get permFullScreen => 'Full-screen alarms';
+
+  @override
+  String get permFullScreenWhy =>
+      'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.';
 }

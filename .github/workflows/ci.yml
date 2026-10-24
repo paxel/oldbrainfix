@@ -45,3 +45,6 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --debug
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest

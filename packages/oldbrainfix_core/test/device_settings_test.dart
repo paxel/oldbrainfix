@@ -43,4 +43,13 @@ void main() {
     expect(store.locationExplained, isTrue);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
+
+  test('the alarm setup is offered until this Device has walked it', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.alarmSetupDone, isFalse);
+    store.alarmSetupDone = true;
+    expect(store.alarmSetupDone, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
 }

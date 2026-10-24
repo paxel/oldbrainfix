@@ -949,6 +949,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not filed'**
   String get notFiled;
+
+  /// No description provided for @alarmChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines and Reminders'**
+  String get alarmChannel;
+
+  /// No description provided for @snooze.
+  ///
+  /// In en, this message translates to:
+  /// **'Snooze'**
+  String get snooze;
+
+  /// No description provided for @snoozeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me again in …'**
+  String get snoozeQuestion;
+
+  /// No description provided for @snooze10.
+  ///
+  /// In en, this message translates to:
+  /// **'10 min'**
+  String get snooze10;
+
+  /// No description provided for @snooze30.
+  ///
+  /// In en, this message translates to:
+  /// **'30 min'**
+  String get snooze30;
+
+  /// No description provided for @snooze60.
+  ///
+  /// In en, this message translates to:
+  /// **'1 h'**
+  String get snooze60;
+
+  /// No description provided for @alarmsBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms may come late or not at all: a permission is missing. Tap to fix it.'**
+  String get alarmsBanner;
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up alarms'**
+  String get setupTitle;
+
+  /// No description provided for @setupStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {count}'**
+  String setupStep(int step, int count);
+
+  /// No description provided for @setupAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get setupAllow;
+
+  /// No description provided for @setupGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get setupGranted;
+
+  /// No description provided for @setupNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get setupNext;
+
+  /// No description provided for @setupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get setupDone;
+
+  /// No description provided for @permNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get permNotifications;
+
+  /// No description provided for @permNotificationsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines and Reminders show up as notifications. Tick them off as Done or snooze them right there, even on the lock screen.'**
+  String get permNotificationsWhy;
+
+  /// No description provided for @permExactAlarms.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms on the minute'**
+  String get permExactAlarms;
+
+  /// No description provided for @permExactAlarmsWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Without this, Android may bring an alarm up to a quarter of an hour late. Turn it on for Old Brain Fix on the page that opens.'**
+  String get permExactAlarmsWhy;
+
+  /// No description provided for @permFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-screen alarms'**
+  String get permFullScreen;
+
+  /// No description provided for @permFullScreenWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.'**
+  String get permFullScreenWhy;
 }
 
 class _AppLocalizationsDelegate

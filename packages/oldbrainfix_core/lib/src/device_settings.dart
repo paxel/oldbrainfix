@@ -9,6 +9,7 @@ extension DeviceSettings on Store {
   static const _theme = 'theme';
   static const _starterSetOffered = 'starterSetOffered';
   static const _locationExplained = 'locationExplained';
+  static const _alarmSetupDone = 'alarmSetupDone';
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -30,4 +31,10 @@ extension DeviceSettings on Store {
 
   set locationExplained(bool explained) =>
       setLocalSetting(_locationExplained, '$explained');
+
+  /// Whether this Device has walked through the alarm setup once; after
+  /// that only the red banner leads back to it.
+  bool get alarmSetupDone => localSetting(_alarmSetupDone) == 'true';
+
+  set alarmSetupDone(bool done) => setLocalSetting(_alarmSetupDone, '$done');
 }

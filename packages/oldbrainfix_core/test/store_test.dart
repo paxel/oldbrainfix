@@ -65,4 +65,32 @@ void main() {
     expect(second.deviceId, device);
     expect(second.current('note:a', 'text'), 'kept');
   });
+
+  test('listeners hear each append, a batch once, and settings never', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    var heard = 0;
+    void listener() => heard++;
+    store.addListener(listener);
+    store.append('note:a', 'text', 'one');
+    expect(heard, 1);
+    store.batch(() {
+      store.append('note:a', 'text', 'two');
+      store.append('note:a', 'text', 'three');
+    });
+    expect(heard, 2);
+    store.setLocalSetting('theme', 'dark');
+    expect(heard, 2);
+    expect(
+      () => store.batch(() {
+        store.append('note:a', 'text', 'four');
+        throw StateError('no');
+      }),
+      throwsStateError,
+    );
+    expect(heard, 2, reason: 'a failing batch changed nothing');
+    store.removeListener(listener);
+    store.append('note:a', 'text', 'five');
+    expect(heard, 2);
+  });
 }

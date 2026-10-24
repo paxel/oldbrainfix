@@ -142,6 +142,15 @@ void main() {
       expect(routines.byId(id)?.doneAt(noon), isNull);
     });
 
+    test('Done keeps when it was tapped when it is applied later', () {
+      final note = notes.capture('pills');
+      final id = routines.spawn(note.id, daily([at(8)])).id;
+      final [morning] = routines.byId(id)!.schedule.on(today);
+      final tapped = now.subtract(const Duration(hours: 2));
+      routines.markDone(id, morning, at: tapped);
+      expect(routines.byId(id)?.doneAt(morning), tapped.toUtc());
+    });
+
     test('Done early or late never moves the schedule (ADR 0006)', () {
       final note = notes.capture('water the plants');
       final id = routines

@@ -281,5 +281,34 @@
     }
   },
   "markDone": "Done",
-  "notFiled": "Not filed"
+  "notFiled": "Not filed",
+  "alarmChannel": "Routines and Reminders",
+  "snooze": "Snooze",
+  "snoozeQuestion": "Remind me again in …",
+  "snooze10": "10 min",
+  "snooze30": "30 min",
+  "snooze60": "1 h",
+  "alarmsBanner": "Alarms may come late or not at all: a permission is missing. Tap to fix it.",
+  "setupTitle": "Set up alarms",
+  "setupStep": "Step {step} of {count}",
+  "@setupStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "setupAllow": "Allow",
+  "setupGranted": "Allowed",
+  "setupNext": "Next",
+  "setupDone": "Done",
+  "permNotifications": "Notifications",
+  "permNotificationsWhy": "Routines and Reminders show up as notifications. Tick them off as Done or snooze them right there, even on the lock screen.",
+  "permExactAlarms": "Alarms on the minute",
+  "permExactAlarmsWhy": "Without this, Android may bring an alarm up to a quarter of an hour late. Turn it on for Old Brain Fix on the page that opens.",
+  "permFullScreen": "Full-screen alarms",
+  "permFullScreenWhy": "Lets a Routine you keep ignoring turn into a full-screen alarm you can't miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens."
 }

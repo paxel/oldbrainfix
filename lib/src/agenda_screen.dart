@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'alarm_sync.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
@@ -13,6 +16,7 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'setup_screen.dart';
 
 /// An Agenda row with where its Note is filed, read once per change.
 typedef _PlacedRow = ({AgendaRow row, Area? area});
@@ -22,7 +26,9 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// is checked off as Done on its own, tomorrow's already today. "+"
 /// captures a Note, whose card then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar makes a Routine without a Note.
+/// the notes browser; the app bar makes a Routine without a Note. A red
+/// banner on top shows while alarms lack a permission, and leads to the
+/// setup. At local midnight the Agenda moves on to the new day.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow is faded.
   static const tomorrowOpacity = 0.55;
@@ -33,11 +39,15 @@ class AgendaScreen extends StatefulWidget {
   /// The notes browser's last selections, kept between visits.
   final BrowserTrail trail;
 
+  /// The Device's alarms: taps applied and permissions changed.
+  final AlarmSync alarms;
+
   const AgendaScreen({
     super.key,
     required this.notes,
     required this.places,
     required this.trail,
+    required this.alarms,
   });
 
   @override
@@ -47,6 +57,7 @@ class AgendaScreen extends StatefulWidget {
 class _AgendaScreenState extends State<AgendaScreen> {
   late final _routines = Routines(widget.notes.store);
   late final AppLifecycleListener _lifecycle;
+  Timer? _midnight;
   List<_PlacedRow> _today = const [];
   List<_PlacedRow> _tomorrow = const [];
 
@@ -65,15 +76,30 @@ class _AgendaScreenState extends State<AgendaScreen> {
       // Maybe a new day.
       onResume: _reload,
     );
+    widget.alarms.addListener(_reload);
   }
 
   @override
   void dispose() {
+    _midnight?.cancel();
+    widget.alarms.removeListener(_reload);
     _lifecycle.dispose();
     super.dispose();
   }
 
+  /// Reloads just after the next local midnight, while the Agenda is
+  /// open.
+  void _armMidnight() {
+    _midnight?.cancel();
+    final now = widget.notes.store.clock();
+    final wall = deviceWallClock(now.toUtc());
+    final next = DateTime(wall.year, wall.month, wall.day + 1);
+    final wait = next.difference(now) + const Duration(seconds: 1);
+    _midnight = Timer(wait.isNegative ? Duration.zero : wait, _reload);
+  }
+
   void _load() {
+    _armMidnight();
     final agenda = _routines.agenda(deviceWallClock);
     _today = [for (final row in agenda.todayRows) _place(row)];
     _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
@@ -116,6 +142,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
           notes: widget.notes,
           places: widget.places,
           trail: widget.trail,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _setUp() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => SetupScreen(
+          alarms: widget.alarms,
+          onDone: () => Navigator.of(context).pop(),
         ),
       ),
     );
@@ -204,6 +243,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         // Room under the last row for the floating buttons.
         padding: const EdgeInsets.only(top: 8, bottom: 160),
         children: [
+          if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
           if (captured != null) ...[
             _Heading(t.justCaptured),
             NoteCard(
@@ -255,6 +295,45 @@ class _AgendaScreenState extends State<AgendaScreen> {
             child: const Icon(Icons.add),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The red banner while alarms lack a permission; tapping it opens the
+/// setup.
+class _AlarmsBanner extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AlarmsBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: scheme.error,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.alarm_off, color: scheme.onError),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    context.t.alarmsBanner,
+                    style: TextStyle(color: scheme.onError),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
