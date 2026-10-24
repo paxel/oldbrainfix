@@ -23,6 +23,9 @@ class MainActivity : FlutterActivity() {
 
     private var photoChannel: MethodChannel? = null
 
+    /** The answers to the calendar's and Bluetooth's "request", by request code. */
+    private val contextAnswers = mutableMapOf<Int, MethodChannel.Result>()
+
     /** The answer to "take", until the camera app comes back. */
     private var photoAnswer: MethodChannel.Result? = null
 
@@ -61,6 +64,22 @@ class MainActivity : FlutterActivity() {
                     "granted" -> result.success(Location.granted(this))
                     "request" -> request(result)
                     "current" -> Location.current(this) { result.success(it) }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CONTEXT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "granted" -> result.success(
+                        when (call.arguments) {
+                            "calendar" -> Calendar.granted(this)
+                            "bluetooth" -> Bluetooth.granted(this)
+                            else -> false
+                        },
+                    )
+                    "request" -> requestContext(call.arguments as String?, result)
+                    "calendar" -> inBackground(result) { Calendar.current(this) }
+                    "bluetooth" -> Bluetooth.current(this) { result.success(it) }
                     else -> result.notImplemented()
                 }
             }
@@ -212,12 +231,29 @@ class MainActivity : FlutterActivity() {
         requestPermissions(Location.permissions, REQUEST_LOCATION)
     }
 
+    /** Asks for the calendar or Bluetooth [kind]; answers whether it is allowed now. */
+    private fun requestContext(kind: String?, result: MethodChannel.Result) {
+        val (code, permission, granted) = when (kind) {
+            "calendar" -> Triple(REQUEST_CALENDAR, Calendar.permission, Calendar.granted(this))
+            "bluetooth" -> Triple(REQUEST_BLUETOOTH, Bluetooth.permission, Bluetooth.granted(this))
+            else -> return result.success(false)
+        }
+        if (granted || permission == null) return result.success(granted)
+        contextAnswers.remove(code)?.success(false)
+        contextAnswers[code] = result
+        requestPermissions(arrayOf(permission), code)
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            REQUEST_CALENDAR -> contextAnswers.remove(requestCode)?.success(Calendar.granted(this))
+            REQUEST_BLUETOOTH -> contextAnswers.remove(requestCode)?.success(Bluetooth.granted(this))
+        }
         if (requestCode != REQUEST_LOCATION) return
         val answer = permissionAnswer ?: return
         permissionAnswer = null
@@ -253,8 +289,11 @@ class MainActivity : FlutterActivity() {
         private const val LOCATION_CHANNEL = "io.github.paxel.oldbrainfix/location"
         private const val ALARM_CHANNEL = "io.github.paxel.oldbrainfix/alarms"
         private const val PHOTO_CHANNEL = "io.github.paxel.oldbrainfix/photos"
+        private const val CONTEXT_CHANNEL = "io.github.paxel.oldbrainfix/context"
         private const val REQUEST_LOCATION = 1
         private const val REQUEST_PHOTO = 2
+        private const val REQUEST_CALENDAR = 10
+        private const val REQUEST_BLUETOOTH = 11
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */

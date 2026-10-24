@@ -213,5 +213,22 @@
   "deleteNoteRoutinesAndReminders": "{count, plural, other{Auch die {count} verknüpften Routinen und Erinnerungen löschen?}}",
   "deleteNoteLinkedDetail": "Mitgelöschte kommen mit der Notiz zurück, wenn du sie wiederherstellst. Behaltene erinnern dich weiter.",
   "noteInTrash": "Die Notiz liegt im Papierkorb",
-  "noteDeleted": "Die Notiz wurde gelöscht"
+  "noteDeleted": "Die Notiz wurde gelöscht",
+  "allowAccess": "Erlauben",
+  "captureContextTitle": "Erfassungskontext",
+  "captureContextIntro": "Außer wann und wo kann eine Notiz noch mehr darüber festhalten, was gerade los war. Alles hier ist aus, bis du es einschaltest, und bleibt in der Notiz auf deinen eigenen Geräten.",
+  "calendarContextSwitch": "Kalendertermin",
+  "calendarContextDetail": "Der Termin, der läuft, wenn du eine Notiz erfasst, etwa „während: Zahnarzt“.",
+  "bluetoothContextSwitch": "Bluetooth-Gerät",
+  "bluetoothContextDetail": "Das Gerät, das verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer.",
+  "calendarExplainTitle": "Deinen Termin merken?",
+  "calendarExplainBody": "Old Brain Fix kann notieren, welcher Kalendertermin gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.",
+  "bluetoothExplainTitle": "Merken, was verbunden war?",
+  "bluetoothExplainBody": "Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.",
+  "calendarNotAllowed": "Old Brain Fix darf deinen Kalender nicht lesen. Du kannst es in den Systemeinstellungen erlauben.",
+  "bluetoothNotAllowed": "Old Brain Fix darf deine Bluetooth-Geräte nicht sehen. Du kannst es in den Systemeinstellungen erlauben.",
+  "contextSourceApp": "Geteilt aus {app}",
+  "contextDuring": "Während: {events}",
+  "contextBluetooth": "Verbunden: {devices}",
+  "moreCaptureContext": "Mehr zur Erfassung"
 }

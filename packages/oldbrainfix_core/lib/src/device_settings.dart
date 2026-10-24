@@ -17,6 +17,8 @@ extension DeviceSettings on Store {
   static const _quietHours = 'quietHours';
   static const _quietHoursOff = 'quietHoursOff';
   static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
+  static const _calendarContext = 'calendarContext';
+  static const _bluetoothContext = 'bluetoothContext';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -115,4 +117,16 @@ extension DeviceSettings on Store {
     }
     setLocalSetting(_nudgeRepeatMinutes, '${interval.inMinutes}');
   }
+
+  /// Whether Notes captured on this Device record the calendar events
+  /// running; off until the user switches it on.
+  bool get calendarContextOn => localSetting(_calendarContext) == 'true';
+
+  set calendarContextOn(bool on) => setLocalSetting(_calendarContext, '$on');
+
+  /// Whether Notes captured on this Device record the connected
+  /// Bluetooth devices; off until the user switches it on.
+  bool get bluetoothContextOn => localSetting(_bluetoothContext) == 'true';
+
+  set bluetoothContextOn(bool on) => setLocalSetting(_bluetoothContext, '$on');
 }

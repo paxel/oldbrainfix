@@ -15,15 +15,24 @@ import java.util.UUID
  * them lasts; they are made into photos when the app takes them.
  */
 object Shares {
-    class Share(val subject: String?, val text: String?, val files: List<File>)
+    /**
+     * One share; [source] is the package and label of the app it came
+     * from, when Android said.
+     */
+    class Share(
+        val subject: String?,
+        val text: String?,
+        val files: List<File>,
+        val source: Pair<String, String?>? = null,
+    )
 
     private val waiting = ArrayDeque<Share>()
 
     /** Whether a share of MIME [type] carries pictures. */
     fun isImage(type: String?): Boolean = type?.startsWith("image/") == true
 
-    /** Keeps what [intent] shares: its text, subject and pictures. */
-    fun receive(context: Context, intent: Intent) {
+    /** Keeps what [intent] shares: its text, subject and pictures, from [source]. */
+    fun receive(context: Context, intent: Intent, source: Pair<String, String?>? = null) {
         val streams: List<Uri> = when (intent.action) {
             Intent.ACTION_SEND ->
                 if (isImage(intent.type)) {
@@ -49,7 +58,7 @@ object Shares {
         val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
         val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
         if (text.isNullOrBlank() && subject.isNullOrBlank() && files.isEmpty()) return
-        synchronized(waiting) { waiting.addLast(Share(subject, text, files)) }
+        synchronized(waiting) { waiting.addLast(Share(subject, text, files, source)) }
     }
 
     /**
@@ -72,7 +81,13 @@ object Shares {
         val photos = share.files.mapNotNull { file ->
             Photos.normalize { file.inputStream() }.also { file.delete() }
         }
-        return mapOf("subject" to share.subject, "text" to share.text, "photos" to photos)
+        return mapOf(
+            "subject" to share.subject,
+            "text" to share.text,
+            "photos" to photos,
+            "sourcePackage" to share.source?.first,
+            "sourceLabel" to share.source?.second,
+        )
     }
 }
 
@@ -85,7 +100,9 @@ object Shares {
 class ShareActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) Shares.receive(this, intent)
+        // Only this activity knows who shared: MainActivity's referrer
+        // is the app itself.
+        if (savedInstanceState == null) Shares.receive(this, intent, SourceApps.of(this))
         startActivity(
             Intent(this, MainActivity::class.java)
                 .putExtra(MainActivity.EXTRA_SHARED, true)

@@ -4,19 +4,21 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'context_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'photo_platform.dart';
 import 'photo_views.dart';
 
-/// A Note just captured, and whether its location got attached, once
-/// that is known.
-typedef Captured = ({String noteId, Future<bool> located});
+/// A Note just captured, and for its location and for the rest of its
+/// Capture Context whether it got attached, each once that is known.
+typedef Captured = ({String noteId, List<Future<bool>> attached});
 
 /// Opens text Capture, filing the new Note into the Area or Topic [place]
 /// when one is given, or with the [shared] item from another app filled
 /// in. [onChanged] runs once the user left Capture, for the caller to
-/// show the new Note, and again when its location arrived later.
+/// show the new Note, and again when its location or more of its Capture
+/// Context arrived later.
 /// [onCaptured] gets the new Note's id first, when there is one.
 ///
 /// After this Device's first Capture, while the location is not allowed
@@ -32,12 +34,14 @@ Future<void> captureNote(
 }) async {
   final location = LocationScope.of(context);
   final photos = PhotoScope.of(context);
+  final contextSource = ContextScope.of(context);
   final captured = await Navigator.of(context).push<Captured>(
     MaterialPageRoute(
       builder: (_) => CaptureScreen(
         notes: notes,
         location: location,
         photos: photos,
+        contextSource: contextSource,
         place: place,
         shared: shared,
       ),
@@ -46,7 +50,10 @@ Future<void> captureNote(
   if (captured != null) onCaptured?.call(captured.noteId);
   onChanged();
   if (captured == null) return;
-  unawaited(captured.located.then((located) => located ? onChanged() : null));
+  // Each shows as soon as it arrives, without waiting for the others.
+  for (final attached in captured.attached) {
+    unawaited(attached.then((attached) => attached ? onChanged() : null));
+  }
   final store = notes.store;
   if (!location.available || store.locationExplained) return;
   if (await location.granted()) return;
@@ -65,20 +72,23 @@ Future<void> captureNote(
 }
 
 /// Text capture: opens with the keyboard up, Save writes the Note. The
-/// position is looked up from the start, without asking, and attached
-/// when it arrives: it never holds the Note back. Leaving by Back saves
-/// too, and so does the app going to the background. While Unsorted the
-/// Note is nudged in 10 min, 30 min or 1 h, picked with the buttons at
-/// the bottom, each of which saves; Save means 1 h (UI laws, "Capture").
+/// position, and the calendar events and Bluetooth devices where they
+/// are switched on, are looked up from the start, without asking, and
+/// attached when they arrive: they never hold the Note back. Leaving by
+/// Back saves too, and so does the app going to the background. While
+/// Unsorted the Note is nudged in 10 min, 30 min or 1 h, picked with the
+/// buttons at the bottom, each of which saves; Save means 1 h (UI laws,
+/// "Capture").
 ///
 /// The camera button takes a photo into the Note; the text is then
 /// optional. Something shared in from another app opens here with its
-/// text and photos filled in. Photos are written at once, so none is
-/// lost.
+/// text and photos filled in, and the app it came from recorded. Photos
+/// are written at once, so none is lost.
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
   final LocationSource location;
   final PhotoPlatform photos;
+  final ContextSource contextSource;
 
   /// The Area or Topic the new Note is filed into; Unsorted when null.
   final String? place;
@@ -91,6 +101,7 @@ class CaptureScreen extends StatefulWidget {
     required this.notes,
     this.location = const NoLocation(),
     this.photos = const NoPhotos(),
+    this.contextSource = const NoContext(),
     this.place,
     this.shared,
   });
@@ -102,6 +113,7 @@ class CaptureScreen extends StatefulWidget {
 class _CaptureScreenState extends State<CaptureScreen> {
   final _text = TextEditingController();
   late final Future<Coordinates?> _here;
+  late final Future<ContextExtras> _extras;
   late final AppLifecycleListener _lifecycle;
 
   /// The Note once written: by leaving, by a photo, or when the app went
@@ -117,6 +129,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     super.initState();
     // The fix may take a while; it starts while the user types.
     _here = currentIfGranted(widget.location);
+    _extras = currentExtras(widget.notes.store, widget.contextSource);
     // A share is meant to be kept: it is written at once.
     final shared = widget.shared;
     if (shared != null && !shared.isEmpty) {
@@ -171,10 +184,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
       // Kept for a filed Note too: sent back to Unsorted, it is due.
       nudgeIn: nudgeIn ?? Notes.defaultNudge,
       photos: photos,
+      sourceApp: widget.shared?.sourceApp,
     );
     _captured = (
       noteId: note.id,
-      located: attachLocation(widget.notes, note.id, _here),
+      attached: [
+        attachLocation(widget.notes, note.id, _here),
+        attachExtras(widget.notes, note.id, _extras),
+      ],
     );
     _photos = note.photos;
   }

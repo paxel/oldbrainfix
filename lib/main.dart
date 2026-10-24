@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/alarm_platform.dart';
 import 'src/app.dart';
+import 'src/context_platform.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
 import 'src/photo_platform.dart';
@@ -21,6 +22,7 @@ Future<void> main() async {
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),
       photos: AndroidPhotos(),
+      context: const AndroidContext(),
     ),
   );
 }

@@ -1381,6 +1381,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The Note was deleted'**
   String get noteDeleted;
+
+  /// No description provided for @allowAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get allowAccess;
+
+  /// No description provided for @captureContextTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture Context'**
+  String get captureContextTitle;
+
+  /// No description provided for @captureContextIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Besides when and where, a Note can record more of what was going on. Each of these is off until you switch it on, and stays in the Note on your own devices.'**
+  String get captureContextIntro;
+
+  /// No description provided for @calendarContextSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar event'**
+  String get calendarContextSwitch;
+
+  /// No description provided for @calendarContextDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The event running when a Note is captured, like “during: Dentist”.'**
+  String get calendarContextDetail;
+
+  /// No description provided for @bluetoothContextSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth device'**
+  String get bluetoothContextSwitch;
+
+  /// No description provided for @bluetoothContextDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The device connected when a Note is captured, like your car or headphones.'**
+  String get bluetoothContextDetail;
+
+  /// No description provided for @calendarExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember your appointment?'**
+  String get calendarExplainTitle;
+
+  /// No description provided for @calendarExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can note the calendar event running when you capture a Note, so it says “during: Dentist” days later. It reads your calendar only at that moment. The event stays in the Note on your own devices and is never sent anywhere else.'**
+  String get calendarExplainBody;
+
+  /// No description provided for @bluetoothExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember what was connected?'**
+  String get bluetoothExplainTitle;
+
+  /// No description provided for @bluetoothExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name stays in the Note on your own devices and is never sent anywhere else.'**
+  String get bluetoothExplainBody;
+
+  /// No description provided for @calendarNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix may not read your calendar. You can allow it in the system settings.'**
+  String get calendarNotAllowed;
+
+  /// No description provided for @bluetoothNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix may not see your Bluetooth devices. You can allow it in the system settings.'**
+  String get bluetoothNotAllowed;
+
+  /// No description provided for @contextSourceApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared from {app}'**
+  String contextSourceApp(String app);
+
+  /// No description provided for @contextDuring.
+  ///
+  /// In en, this message translates to:
+  /// **'During: {events}'**
+  String contextDuring(String events);
+
+  /// No description provided for @contextBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected: {devices}'**
+  String contextBluetooth(String devices);
+
+  /// No description provided for @moreCaptureContext.
+  ///
+  /// In en, this message translates to:
+  /// **'More about the capture'**
+  String get moreCaptureContext;
 }
 
 class _AppLocalizationsDelegate

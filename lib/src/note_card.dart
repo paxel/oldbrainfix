@@ -35,12 +35,13 @@ String? whereCaptured(CaptureContext capture) =>
     };
 
 /// A Note drawn as a softly embossed card: its text, thumbnails of its
-/// first [shownPhotos] photos, capture time, the
-/// Named Place or coordinates it was captured at, and where it is filed. Its Area's colour runs down the left edge and its
-/// icon leads the place line. Its enrich options file it, spawn a
-/// Routine or Reminder from it, and merge it. An important Note gets an accent marker
-/// and a stronger emboss, an unimportant one is dimmed (UI laws,
-/// "Cards").
+/// first [shownPhotos] photos, capture time, the Named Place or
+/// coordinates it was captured at with an icon when there is more
+/// Capture Context, and where it is filed. Its Area's colour runs down
+/// the left edge and its icon leads the place line. Its enrich options
+/// file it, spawn a Routine or Reminder from it, and merge it. An
+/// important Note gets an accent marker and a stronger emboss, an
+/// unimportant one is dimmed (UI laws, "Cards").
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -178,6 +179,16 @@ class NoteCard extends StatelessWidget {
                                   color: scheme.onSurfaceVariant,
                                 ),
                                 Text(where, style: text.bodySmall),
+                              ],
+                              // The editor shows the rest.
+                              if (note.context.hasMore) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.more_horiz,
+                                  size: 16,
+                                  color: scheme.onSurfaceVariant,
+                                  semanticLabel: t.moreCaptureContext,
+                                ),
                               ],
                             ],
                           ),

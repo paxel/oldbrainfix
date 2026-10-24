@@ -838,4 +838,68 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteDeleted => 'The Note was deleted';
+
+  @override
+  String get allowAccess => 'Allow';
+
+  @override
+  String get captureContextTitle => 'Capture Context';
+
+  @override
+  String get captureContextIntro =>
+      'Besides when and where, a Note can record more of what was going on. Each of these is off until you switch it on, and stays in the Note on your own devices.';
+
+  @override
+  String get calendarContextSwitch => 'Calendar event';
+
+  @override
+  String get calendarContextDetail =>
+      'The event running when a Note is captured, like “during: Dentist”.';
+
+  @override
+  String get bluetoothContextSwitch => 'Bluetooth device';
+
+  @override
+  String get bluetoothContextDetail =>
+      'The device connected when a Note is captured, like your car or headphones.';
+
+  @override
+  String get calendarExplainTitle => 'Remember your appointment?';
+
+  @override
+  String get calendarExplainBody =>
+      'Old Brain Fix can note the calendar event running when you capture a Note, so it says “during: Dentist” days later. It reads your calendar only at that moment. The event stays in the Note on your own devices and is never sent anywhere else.';
+
+  @override
+  String get bluetoothExplainTitle => 'Remember what was connected?';
+
+  @override
+  String get bluetoothExplainBody =>
+      'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name stays in the Note on your own devices and is never sent anywhere else.';
+
+  @override
+  String get calendarNotAllowed =>
+      'Old Brain Fix may not read your calendar. You can allow it in the system settings.';
+
+  @override
+  String get bluetoothNotAllowed =>
+      'Old Brain Fix may not see your Bluetooth devices. You can allow it in the system settings.';
+
+  @override
+  String contextSourceApp(String app) {
+    return 'Shared from $app';
+  }
+
+  @override
+  String contextDuring(String events) {
+    return 'During: $events';
+  }
+
+  @override
+  String contextBluetooth(String devices) {
+    return 'Connected: $devices';
+  }
+
+  @override
+  String get moreCaptureContext => 'More about the capture';
 }

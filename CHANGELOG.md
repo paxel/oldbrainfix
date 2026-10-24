@@ -22,7 +22,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A trash that keeps deleted Notes, Routines and Reminders for 30 days.
 - Merge a Note into another; it becomes a dated part of that Note.
 - Typed text in the editor survives the app being closed or killed.
-- Every Note and every added part records when and where it was captured.
+- Every Note and every added part records when and where it was captured, the calendar event and Bluetooth device at the time, and for shares the app they came from.
 - Named Places that show "Home" or "Work" instead of coordinates, matched offline.
 - The Agenda as home screen: today's Routines and Reminders, then tomorrow's, dimmed.
 - Routines and Reminders made from any Note, each linking back to it.

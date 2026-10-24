@@ -2,14 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// Something another app shared into Old Brain Fix: its text, links
-/// included, and its photos.
+/// included, its photos, and the app it came from when Android said.
 class SharedItem {
   final String text;
   final List<Uint8List> photos;
+  final SourceApp? sourceApp;
 
-  const SharedItem({this.text = '', this.photos = const []});
+  const SharedItem({this.text = '', this.photos = const [], this.sourceApp});
 
   bool get isEmpty => text.trim().isEmpty && photos.isEmpty;
 }
@@ -94,12 +96,16 @@ class AndroidPhotos implements PhotoPlatform {
       return null;
     }
     if (raw == null) return null;
+    final package = raw['sourcePackage'];
     final item = SharedItem(
       text: sharedText(raw['subject'] as String?, raw['text'] as String?),
       photos: [
         for (final photo in raw['photos'] as List? ?? const [])
           if (photo is Uint8List) photo,
       ],
+      sourceApp: package is String && package.isNotEmpty
+          ? SourceApp(package, label: raw['sourceLabel'] as String?)
+          : null,
     );
     return item.isEmpty ? null : item;
   }

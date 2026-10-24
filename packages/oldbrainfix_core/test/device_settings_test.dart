@@ -44,6 +44,21 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('calendar and Bluetooth context are off until switched on', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.calendarContextOn, isFalse);
+    expect(store.bluetoothContextOn, isFalse);
+    store
+      ..calendarContextOn = true
+      ..bluetoothContextOn = true;
+    expect(store.calendarContextOn, isTrue);
+    expect(store.bluetoothContextOn, isTrue);
+    store.calendarContextOn = false;
+    expect(store.calendarContextOn, isFalse);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the alarm setup is offered until this Device has walked it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

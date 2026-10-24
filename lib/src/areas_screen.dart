@@ -4,7 +4,9 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'area_look.dart';
 import 'browser.dart';
+import 'capture_context_screen.dart';
 import 'capture_screen.dart';
+import 'context_platform.dart';
 import 'file_into_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -19,8 +21,8 @@ import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
-/// opens its Topics; the app bar leads to all Notes, Named Places and
-/// the trash.
+/// opens its Topics; the app bar leads to all Notes, Named Places, the
+/// Capture Context switches and the trash.
 class AreasScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -122,6 +124,15 @@ class _AreasScreenState extends State<AreasScreen> {
     );
     if (!mounted) return;
     _reload();
+  }
+
+  /// The Capture Context switches live here until Settings exist.
+  Future<void> _openCaptureContext() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CaptureContextScreen(store: widget.notes.store),
+      ),
+    );
   }
 
   Future<void> _openTrash() async {
@@ -230,6 +241,12 @@ class _AreasScreenState extends State<AreasScreen> {
             onPressed: _openNamedPlaces,
             icon: const Icon(Icons.place_outlined),
           ),
+          if (ContextScope.of(context).available)
+            IconButton(
+              tooltip: t.captureContextTitle,
+              onPressed: _openCaptureContext,
+              icon: const Icon(Icons.manage_history),
+            ),
           IconButton(
             tooltip: t.trashTitle,
             onPressed: _openTrash,

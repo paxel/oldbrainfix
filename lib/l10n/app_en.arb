@@ -481,5 +481,43 @@
   },
   "deleteNoteLinkedDetail": "Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.",
   "noteInTrash": "The Note is in the trash",
-  "noteDeleted": "The Note was deleted"
+  "noteDeleted": "The Note was deleted",
+  "allowAccess": "Allow",
+  "captureContextTitle": "Capture Context",
+  "captureContextIntro": "Besides when and where, a Note can record more of what was going on. Each of these is off until you switch it on, and stays in the Note on your own devices.",
+  "calendarContextSwitch": "Calendar event",
+  "calendarContextDetail": "The event running when a Note is captured, like “during: Dentist”.",
+  "bluetoothContextSwitch": "Bluetooth device",
+  "bluetoothContextDetail": "The device connected when a Note is captured, like your car or headphones.",
+  "calendarExplainTitle": "Remember your appointment?",
+  "calendarExplainBody": "Old Brain Fix can note the calendar event running when you capture a Note, so it says “during: Dentist” days later. It reads your calendar only at that moment. The event stays in the Note on your own devices and is never sent anywhere else.",
+  "bluetoothExplainTitle": "Remember what was connected?",
+  "bluetoothExplainBody": "Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name stays in the Note on your own devices and is never sent anywhere else.",
+  "calendarNotAllowed": "Old Brain Fix may not read your calendar. You can allow it in the system settings.",
+  "bluetoothNotAllowed": "Old Brain Fix may not see your Bluetooth devices. You can allow it in the system settings.",
+  "contextSourceApp": "Shared from {app}",
+  "@contextSourceApp": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "contextDuring": "During: {events}",
+  "@contextDuring": {
+    "placeholders": {
+      "events": {
+        "type": "String"
+      }
+    }
+  },
+  "contextBluetooth": "Connected: {devices}",
+  "@contextBluetooth": {
+    "placeholders": {
+      "devices": {
+        "type": "String"
+      }
+    }
+  },
+  "moreCaptureContext": "More about the capture"
 }

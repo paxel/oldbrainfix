@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'context_platform.dart';
 import 'drafts.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -188,13 +189,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (!mounted || trimmed == null || trimmed.isEmpty) return;
     final section = widget.notes.amend(widget.noteId, trimmed);
     _reload();
-    // The Section gets its own location when it arrives, without asking.
+    // The Section gets its own Capture Context when it arrives, without
+    // asking.
     final here = currentIfGranted(LocationScope.of(context));
-    unawaited(
-      attachLocation(widget.notes, section.id, here).then((located) {
-        if (located && mounted) _reload();
-      }),
-    );
+    final extras = currentExtras(widget.notes.store, ContextScope.of(context));
+    for (final attached in [
+      attachLocation(widget.notes, section.id, here),
+      attachExtras(widget.notes, section.id, extras),
+    ]) {
+      unawaited(
+        attached.then((attached) {
+          if (attached && mounted) _reload();
+        }),
+      );
+    }
   }
 
   Future<void> _spawn({required bool reminder}) async {
@@ -444,9 +452,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 }
 
-/// The Capture Context of a Note or Section, one line per thing known.
-/// For now that is the time and where it was: the Named Place with its
-/// coordinates, or the coordinates alone.
+/// The Capture Context of a Note or Section, one line per thing known:
+/// the time; where it was, the Named Place with its coordinates or the
+/// coordinates alone; the app it was shared in from; the calendar events
+/// running; the Bluetooth devices connected.
 class CaptureContextLines extends StatelessWidget {
   final CaptureContext capture;
   final DateFormat when;
@@ -459,37 +468,43 @@ class CaptureContextLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.t;
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final text = Theme.of(context).textTheme;
     final location = capture.location;
     final named = capture.namedPlace;
+    final lines = [
+      (Icons.schedule, when.format(capture.captured.toLocal())),
+      if (location != null)
+        (
+          Icons.place_outlined,
+          named == null
+              ? coordinatesText(location)
+              : '${named.name} (${coordinatesText(location)})',
+        ),
+      if (capture.sourceApp case final app?)
+        (Icons.apps, t.contextSourceApp(app.name)),
+      if (capture.calendarEvents.isNotEmpty)
+        (
+          Icons.event_outlined,
+          t.contextDuring(capture.calendarEvents.join(', ')),
+        ),
+      if (capture.bluetoothDevices.isNotEmpty)
+        (
+          Icons.bluetooth,
+          t.contextBluetooth(capture.bluetoothDevices.join(', ')),
+        ),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(Icons.schedule, size: 20, color: muted),
-            const SizedBox(width: 8),
-            Text(
-              when.format(capture.captured.toLocal()),
-              style: text.bodyMedium,
-            ),
-          ],
-        ),
-        if (location != null) ...[
-          const SizedBox(height: 4),
+        for (final (i, (icon, line)) in lines.indexed) ...[
+          if (i > 0) const SizedBox(height: 4),
           Row(
             children: [
-              Icon(Icons.place_outlined, size: 20, color: muted),
+              Icon(icon, size: 20, color: muted),
               const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  named == null
-                      ? coordinatesText(location)
-                      : '${named.name} (${coordinatesText(location)})',
-                  style: text.bodyMedium,
-                ),
-              ),
+              Flexible(child: Text(line, style: text.bodyMedium)),
             ],
           ),
         ],

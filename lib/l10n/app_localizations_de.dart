@@ -843,4 +843,68 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noteDeleted => 'Die Notiz wurde gelöscht';
+
+  @override
+  String get allowAccess => 'Erlauben';
+
+  @override
+  String get captureContextTitle => 'Erfassungskontext';
+
+  @override
+  String get captureContextIntro =>
+      'Außer wann und wo kann eine Notiz noch mehr darüber festhalten, was gerade los war. Alles hier ist aus, bis du es einschaltest, und bleibt in der Notiz auf deinen eigenen Geräten.';
+
+  @override
+  String get calendarContextSwitch => 'Kalendertermin';
+
+  @override
+  String get calendarContextDetail =>
+      'Der Termin, der läuft, wenn du eine Notiz erfasst, etwa „während: Zahnarzt“.';
+
+  @override
+  String get bluetoothContextSwitch => 'Bluetooth-Gerät';
+
+  @override
+  String get bluetoothContextDetail =>
+      'Das Gerät, das verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer.';
+
+  @override
+  String get calendarExplainTitle => 'Deinen Termin merken?';
+
+  @override
+  String get calendarExplainBody =>
+      'Old Brain Fix kann notieren, welcher Kalendertermin gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+
+  @override
+  String get bluetoothExplainTitle => 'Merken, was verbunden war?';
+
+  @override
+  String get bluetoothExplainBody =>
+      'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+
+  @override
+  String get calendarNotAllowed =>
+      'Old Brain Fix darf deinen Kalender nicht lesen. Du kannst es in den Systemeinstellungen erlauben.';
+
+  @override
+  String get bluetoothNotAllowed =>
+      'Old Brain Fix darf deine Bluetooth-Geräte nicht sehen. Du kannst es in den Systemeinstellungen erlauben.';
+
+  @override
+  String contextSourceApp(String app) {
+    return 'Geteilt aus $app';
+  }
+
+  @override
+  String contextDuring(String events) {
+    return 'Während: $events';
+  }
+
+  @override
+  String contextBluetooth(String devices) {
+    return 'Verbunden: $devices';
+  }
+
+  @override
+  String get moreCaptureContext => 'Mehr zur Erfassung';
 }

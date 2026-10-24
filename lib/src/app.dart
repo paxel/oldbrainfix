@@ -9,6 +9,7 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'browser.dart';
+import 'context_platform.dart';
 import 'drafts.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -41,6 +42,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// given.
   final PhotoPlatform photos;
 
+  /// The calendar and Bluetooth devices for the Capture Context; none
+  /// when not given.
+  final ContextSource context;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -49,6 +54,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.location = const NoLocation(),
     this.alarms = const NoAlarms(),
     this.photos = const NoPhotos(),
+    this.context = const NoContext(),
   });
 
   @override
@@ -105,12 +111,15 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
           announcements: _announcements,
           child: LocationScope(
             location: widget.location,
-            child: PhotoScope(
-              photos: widget.photos,
-              bytes: _notes.photoBytes,
-              child: DraftsScope(
-                drafts: _drafts,
-                child: child ?? const SizedBox.shrink(),
+            child: ContextScope(
+              source: widget.context,
+              child: PhotoScope(
+                photos: widget.photos,
+                bytes: _notes.photoBytes,
+                child: DraftsScope(
+                  drafts: _drafts,
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

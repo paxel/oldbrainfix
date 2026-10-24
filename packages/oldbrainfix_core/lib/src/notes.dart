@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'named_places.dart';
@@ -44,6 +45,20 @@ abstract final class NoteKeys {
   static const photoAdded = 'added';
 
   static String photo(String hash) => '$photoPrefix$hash';
+
+  /// The app something was shared in from, as [SourceApp.package] and
+  /// [SourceApp.label]; absent for anything not shared in, or when the
+  /// platform did not say.
+  static const sourcePackage = 'sourcePackage';
+  static const sourceLabel = 'sourceLabel';
+
+  /// The titles of the calendar events running at Capture, as a JSON
+  /// list; absent while unknown or off.
+  static const calendar = 'calendar';
+
+  /// The names of the Bluetooth devices connected at Capture, as a JSON
+  /// list; absent while unknown or off.
+  static const bluetooth = 'bluetooth';
 }
 
 /// Field keys of a Section.
@@ -58,14 +73,61 @@ abstract final class SectionKeys {
 
   /// Where the Section was captured, as for [NoteKeys.location].
   static const location = 'location';
+
+  /// The calendar events and Bluetooth devices at its capture, as for
+  /// [NoteKeys.calendar] and [NoteKeys.bluetooth].
+  static const calendar = NoteKeys.calendar;
+  static const bluetooth = NoteKeys.bluetooth;
 }
 
 /// How much a Note matters (CONTEXT.md).
 enum Importance { unimportant, normal, important }
 
-/// What was true when a Note or Section was captured (CONTEXT.md). For
-/// now that is the time and where it was; source app, calendar event and
-/// Bluetooth device join later.
+/// The app something was shared in from (CONTEXT.md, Capture Context).
+class SourceApp {
+  /// Its Android package, such as `com.whatsapp`.
+  final String package;
+
+  /// Its name as the Device showed it at capture time, or null when the
+  /// Device could not tell.
+  final String? label;
+
+  const SourceApp(this.package, {this.label});
+
+  /// What to show: the label, else the package.
+  String get name {
+    final label = this.label?.trim() ?? '';
+    return label.isEmpty ? package : label;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SourceApp && other.package == package && other.label == label;
+
+  @override
+  int get hashCode => Object.hash(package, label);
+}
+
+/// A calendar event the platform found running at capture time.
+typedef RunningEvent = ({String title, bool allDay});
+
+/// The titles of [events] worth keeping: the timed ones, or the all-day
+/// ones when nothing else runs, as a birthday says little about the
+/// moment. Blank and repeated titles are dropped.
+List<String> runningEventTitles(Iterable<RunningEvent> events) {
+  List<String> titles(bool allDay) => {
+    for (final event in events)
+      if (event.allDay == allDay && event.title.trim().isNotEmpty)
+        event.title.trim(),
+  }.toList();
+  final timed = titles(false);
+  return timed.isNotEmpty ? timed : titles(true);
+}
+
+/// What was true when a Note or Section was captured (CONTEXT.md): the
+/// time, where it was, the app it was shared in from, the calendar
+/// events running and the Bluetooth devices connected. All of it stays
+/// in the Note, on the user's Devices.
 class CaptureContext {
   final DateTime captured;
 
@@ -77,11 +139,33 @@ class CaptureContext {
   /// renamed, deleted or new Named Place shows on Notes captured before.
   final NamedPlace? namedPlace;
 
+  /// The app it was shared in from, or null when it was not shared in or
+  /// the platform did not say.
+  final SourceApp? sourceApp;
+
+  /// The titles of the calendar events running at capture; empty when
+  /// none, unknown or off.
+  final List<String> calendarEvents;
+
+  /// The names of the Bluetooth devices connected at capture; empty when
+  /// none, unknown or off.
+  final List<String> bluetoothDevices;
+
   const CaptureContext({
     required this.captured,
     this.location,
     this.namedPlace,
+    this.sourceApp,
+    this.calendarEvents = const [],
+    this.bluetoothDevices = const [],
   });
+
+  /// Whether there is more than the time and place a card shows (UI
+  /// laws, "Cards").
+  bool get hasMore =>
+      sourceApp != null ||
+      calendarEvents.isNotEmpty ||
+      bluetoothDevices.isNotEmpty;
 }
 
 /// A Note as the screens want it (CONTEXT.md).
@@ -207,12 +291,14 @@ class Notes {
   /// Captures a new Note at the store's now with [text] and [photos],
   /// filed into the Area or Topic [place] when one is given, nudged
   /// [nudgeIn] from now while it is Unsorted. The text may be empty for
-  /// a photo Note. The photos are kept without their metadata.
+  /// a photo Note. The photos are kept without their metadata. A Note
+  /// shared in from another app records it as [sourceApp].
   Note capture(
     String text, {
     String? place,
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
+    SourceApp? sourceApp,
   }) {
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
@@ -232,6 +318,13 @@ class Notes {
       }
       for (final hash in hashes) {
         store.append(id, NoteKeys.photo(hash), NoteKeys.photoAdded, date: now);
+      }
+      if (sourceApp != null) {
+        final app = sourceApp;
+        store.append(id, NoteKeys.sourcePackage, app.package, date: now);
+        if (app.label case final label?) {
+          store.append(id, NoteKeys.sourceLabel, label, date: now);
+        }
       }
     });
     return byId(id)!;
@@ -361,6 +454,29 @@ class Notes {
     store.append(id, field, location.encode());
   }
 
+  /// Records the calendar events running and the Bluetooth devices
+  /// connected when the Note or Section [id] was captured. Like the
+  /// position they are looked up while capturing and attached when they
+  /// arrive; an empty or missing list writes nothing.
+  void attachContext(
+    String id, {
+    List<String> calendarEvents = const [],
+    List<String> bluetoothDevices = const [],
+  }) {
+    final type = store.current(id, NoteKeys.type);
+    if (type != NoteKeys.typeNote && type != SectionKeys.typeSection) {
+      throw ArgumentError.value(id, 'id', 'not a Note or Section');
+    }
+    store.batch(() {
+      if (calendarEvents.isNotEmpty) {
+        store.append(id, NoteKeys.calendar, jsonEncode(calendarEvents));
+      }
+      if (bluetoothDevices.isNotEmpty) {
+        store.append(id, NoteKeys.bluetooth, jsonEncode(bluetoothDevices));
+      }
+    });
+  }
+
   /// Sets the Importance of the Note [noteId].
   void setImportance(String noteId, Importance importance) {
     _requireNote(noteId);
@@ -436,7 +552,7 @@ class Notes {
     return Note(
       id: id,
       text: fields[NoteKeys.text] ?? '',
-      context: _context(captured, fields[NoteKeys.location]),
+      context: _context(captured, fields),
       place: place != null && Places(store).isPlace(place) ? place : null,
       importance:
           Importance.values.asNameMap()[fields[NoteKeys.importance]] ??
@@ -521,19 +637,37 @@ class Notes {
       id: id,
       noteId: noteId ?? owner,
       text: fields[SectionKeys.text] ?? '',
-      context: _context(captured, fields[SectionKeys.location]),
+      context: _context(captured, fields),
     );
   }
 
-  /// The Capture Context from the stored capture time and location, with
-  /// the Named Place the location lies in.
-  CaptureContext _context(String captured, String? location) {
-    final at = Coordinates.decode(location);
+  /// The Capture Context from the stored capture time and the [fields]
+  /// of a Note or Section, with the Named Place its location lies in.
+  CaptureContext _context(String captured, Map<String, String?> fields) {
+    // Notes and Sections keep their Capture Context under the same keys.
+    final at = Coordinates.decode(fields[NoteKeys.location]);
+    final package = fields[NoteKeys.sourcePackage];
     return CaptureContext(
       captured: DateTime.parse(captured),
       location: at,
       namedPlace: at == null ? null : NamedPlaces(store).at(at),
+      sourceApp: package == null || package.isEmpty
+          ? null
+          : SourceApp(package, label: fields[NoteKeys.sourceLabel]),
+      calendarEvents: _names(fields[NoteKeys.calendar]),
+      bluetoothDevices: _names(fields[NoteKeys.bluetooth]),
     );
+  }
+
+  /// A stored JSON list of names; empty when absent or unreadable.
+  static List<String> _names(String? json) {
+    if (json == null) return const [];
+    try {
+      final decoded = jsonDecode(json);
+      return decoded is List ? decoded.whereType<String>().toList() : const [];
+    } on FormatException {
+      return const [];
+    }
   }
 
   void _requireNote(String id) {
