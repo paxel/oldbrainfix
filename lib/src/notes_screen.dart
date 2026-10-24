@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
 import 'l10n.dart';
@@ -9,8 +10,9 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 
-/// Every Note as a diary of cards, newest first, Unsorted ones included;
-/// reached from the top of the notes browser. Swipe right goes back.
+/// Every Note as a diary of cards, newest first, Unsorted ones included
+/// and those of closed locked Areas left out; reached from the top of
+/// the notes browser. Swipe right goes back.
 class AllNotesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -24,9 +26,13 @@ class AllNotesScreen extends StatefulWidget {
 class _AllNotesScreenState extends State<AllNotesScreen> {
   late List<PlacedNote> _shown = _load();
 
-  List<PlacedNote> _load() => [
-    for (final note in widget.notes.all()) placeNote(widget.places, note),
-  ];
+  List<PlacedNote> _load() {
+    final lock = LockScope.of(context);
+    return [
+      for (final note in widget.notes.all())
+        if (!(lock?.hides(note) ?? false)) placeNote(widget.places, note),
+    ];
+  }
 
   void _reload() => setState(() => _shown = _load());
 

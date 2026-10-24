@@ -8,14 +8,18 @@ import 'agenda_screen.dart';
 import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
+import 'app_lock.dart';
 import 'browser.dart';
 import 'calendar_mirror.dart';
 import 'calendar_platform.dart';
 import 'capture_requests.dart';
+import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'l10n.dart';
 import 'location.dart';
+import 'lock_platform.dart';
+import 'lock_screen.dart';
 import 'look.dart';
 import 'nudge_screen.dart';
 import 'ocr_platform.dart';
@@ -77,6 +81,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// How long the calendar mirror waits after a change for more to come.
   final Duration mirrorDelay;
 
+  /// Biometrics and the screen lock for the App Lock and the Area Locks;
+  /// none when not given, and the PIN unlocks.
+  final LockPlatform lock;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -93,6 +101,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.calendar = const NoCalendar(),
     this.mirror = const NoMirror(),
     this.mirrorDelay = CalendarMirror.defaultDelay,
+    this.lock = const NoBiometrics(),
   });
 
   @override
@@ -120,6 +129,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     bytes: _notes.recordingBytes,
   );
   late final _speechModel = SpeechModel(widget.speech);
+  late final _lock = AppLock(store: widget.store, platform: widget.lock);
+  final _routes = RouteStack();
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
 
@@ -153,6 +164,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _transcriber.dispose();
     _speechModel.dispose();
     _photoReader.dispose();
+    _lock.dispose();
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
@@ -166,7 +178,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     theme: _light,
     darkTheme: _dark,
     themeMode: _themeMode,
-    navigatorObservers: [_scroll],
+    navigatorObservers: [_scroll, _routes],
     builder: (context, child) => QuestionMarkBackground(
       scroll: _scroll,
       child: AnnouncementStrip(
@@ -194,7 +206,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                           mirror: _mirror,
                           child: DraftsScope(
                             drafts: _drafts,
-                            child: child ?? const SizedBox.shrink(),
+                            child: LockScope(
+                              lock: _lock,
+                              child: child ?? const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                       ),
@@ -214,6 +229,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       trail: _trail,
       alarms: _alarms,
       mirror: _mirror,
+      lock: _lock,
+      routes: _routes,
       requests: widget.requests,
       onThemeChanged: _themeChanged,
     ),
@@ -224,12 +241,49 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       setState(() => _themeMode = themeModeOf(widget.store.themeChoice));
 }
 
+/// Keeps track of the routes on the app's navigator, bottom first, so
+/// the browser can go when the app locks while Capture stays.
+class RouteStack extends NavigatorObserver {
+  final _routes = <Route<dynamic>>[];
+
+  /// The routes now, bottom first.
+  List<Route<dynamic>> get routes => List.unmodifiable(_routes);
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.add(route);
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.remove(route);
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _routes.remove(route);
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    final at = oldRoute == null ? -1 : _routes.indexOf(oldRoute);
+    if (newRoute == null) {
+      if (at >= 0) _routes.removeAt(at);
+    } else if (at < 0) {
+      _routes.add(newRoute);
+    } else {
+      _routes[at] = newRoute;
+    }
+  }
+}
+
 /// The Starter Set on this Device's first start, then the alarm setup
 /// where there are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, and the Unsorted list when the Agenda widget's Unsorted
-/// count was.
+/// count was. While the App Lock is locked, the lock screen stands in
+/// front of the Agenda, which still opens Capture for shares and quick
+/// entry points; what was open of the browser goes when the app locks
+/// again, while Capture and the full-screen alarm stay, and the Nudge
+/// screen and the Unsorted list wait for the unlock.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -237,6 +291,8 @@ class _Home extends StatefulWidget {
   final BrowserTrail trail;
   final AlarmSync alarms;
   final CalendarMirror mirror;
+  final AppLock lock;
+  final RouteStack routes;
   final CaptureRequests requests;
   final VoidCallback onThemeChanged;
 
@@ -247,6 +303,8 @@ class _Home extends StatefulWidget {
     required this.trail,
     required this.alarms,
     required this.mirror,
+    required this.lock,
+    required this.routes,
     required this.requests,
     required this.onThemeChanged,
   });
@@ -265,19 +323,28 @@ class _HomeState extends State<_Home> {
   Route<void>? _ringRoute;
   Ringing? _ringShown;
 
+  /// Whether the app is locked, as shown.
+  late bool _locked = widget.lock.locked;
+
+  /// The Nudge screen and the Unsorted list, asked for while locked.
+  var _nudgeWaiting = false;
+  var _unsortedWaiting = false;
+
   @override
   void initState() {
     super.initState();
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_unsortedOpened);
+    widget.lock.addListener(_lockChanged);
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
     // way out as well, so a changed Device setting is armed even when the
     // log did not change.
     _lifecycle = AppLifecycleListener(
       onResume: _resumed,
-      onHide: widget.alarms.refresh,
+      onHide: _hidden,
+      onShow: widget.lock.shown,
     );
   }
 
@@ -289,6 +356,11 @@ class _HomeState extends State<_Home> {
       Localizations.localeOf(context).toString(),
     );
     widget.mirror.setTexts(context.t);
+  }
+
+  void _hidden() {
+    widget.lock.hidden();
+    unawaited(widget.alarms.refresh());
   }
 
   /// Back from the background: the alarms as above, and the calendar
@@ -303,6 +375,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_ringChanged);
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_unsortedOpened);
+    widget.lock.removeListener(_lockChanged);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -320,6 +393,7 @@ class _HomeState extends State<_Home> {
     _ringShown = ringing;
     if (ringing == null) return;
     final route = MaterialPageRoute<void>(
+      settings: const RouteSettings(name: LockFreeRoutes.ring),
       fullscreenDialog: true,
       builder: (_) => RingScreen(alarms: widget.alarms, ring: ringing),
     );
@@ -327,9 +401,55 @@ class _HomeState extends State<_Home> {
     unawaited(navigator.push(route));
   }
 
+  /// Shows the lock screen when the app locks, with the browser gone,
+  /// and what waited for the unlock after it.
+  void _lockChanged() {
+    if (!mounted) return;
+    final locked = widget.lock.locked;
+    if (locked == _locked) return;
+    setState(() => _locked = locked);
+    if (locked) {
+      _clearBrowsing();
+      return;
+    }
+    if (_nudgeWaiting) _openNudge();
+    if (_unsortedWaiting) {
+      _unsortedWaiting = false;
+      unawaited(openUnsorted(context, widget.notes, widget.places));
+    }
+  }
+
+  /// Removes every route over the Agenda up to the first that needs no
+  /// unlocking: Capture, and what it opened, stays and the full-screen
+  /// alarm too, the browser goes. Unsaved text in the editor is kept in
+  /// its draft.
+  void _clearBrowsing() {
+    final navigator = Navigator.of(context);
+    final routes = widget.routes.routes;
+    final free = routes.indexWhere(LockFreeRoutes.contains);
+    final end = free < 0 ? routes.length : free;
+    if (end <= 1) return;
+    for (final route in routes.sublist(1, end).reversed) {
+      navigator.removeRoute(route);
+    }
+  }
+
+  /// Capture from the lock screen, the same as "+" on the Agenda.
+  void _capture() =>
+      unawaited(captureNote(context, widget.notes, onChanged: () {}));
+
   /// Opens the Nudge screen when the Nudge's notification was tapped.
   void _nudgeOpened() {
     if (!mounted || !widget.alarms.takeNudgeOpened()) return;
+    if (widget.lock.locked) {
+      _nudgeWaiting = true;
+      return;
+    }
+    _openNudge();
+  }
+
+  void _openNudge() {
+    _nudgeWaiting = false;
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -344,6 +464,10 @@ class _HomeState extends State<_Home> {
   /// was tapped.
   void _unsortedOpened() {
     if (!mounted || !widget.alarms.takeUnsortedOpened()) return;
+    if (widget.lock.locked) {
+      _unsortedWaiting = true;
+      return;
+    }
     unawaited(openUnsorted(context, widget.notes, widget.places));
   }
 
@@ -367,13 +491,27 @@ class _HomeState extends State<_Home> {
     if (!_alarmSetupDone) {
       return SetupScreen(alarms: widget.alarms, onDone: _setUp);
     }
-    return AgendaScreen(
-      notes: widget.notes,
-      places: widget.places,
-      trail: widget.trail,
-      alarms: widget.alarms,
-      requests: widget.requests,
-      onThemeChanged: widget.onThemeChanged,
+    // The Agenda stays behind the lock screen, hidden, so shares and
+    // quick entry points still open Capture.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(
+          offstage: _locked,
+          child: TickerMode(
+            enabled: !_locked,
+            child: AgendaScreen(
+              notes: widget.notes,
+              places: widget.places,
+              trail: widget.trail,
+              alarms: widget.alarms,
+              requests: widget.requests,
+              onThemeChanged: widget.onThemeChanged,
+            ),
+          ),
+        ),
+        if (_locked) LockScreen(lock: widget.lock, onCapture: _capture),
+      ],
     );
   }
 }

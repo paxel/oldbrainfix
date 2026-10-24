@@ -6,10 +6,12 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
+import 'app_lock.dart';
 import 'calendar_mirror.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
 import 'l10n.dart';
+import 'lock_settings.dart';
 import 'look.dart';
 import 'named_places_screen.dart';
 import 'routine_editor_screen.dart';
@@ -37,8 +39,8 @@ Future<void> openSettings(
 /// This Device's settings (ADR 0008), reached only through the Agenda's
 /// gear: the theme; the alarm setup and the default Re-nag interval; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
-/// switches and the speech model; the calendar mirror; whether Streaks
-/// show; and About. Each is a local setting, never synced, and applies at
+/// switches and the speech model; the calendar mirror; the App Lock and
+/// the Area Locks; whether Streaks show; and About. Each is a local setting, never synced, and applies at
 /// once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -205,6 +207,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (mirror != null && mirror.platform.available) ...[
               _Heading(t.settingsCalendar),
               MirrorSwitch(mirror: mirror),
+            ],
+            if (LockScope.of(context) case final lock?) ...[
+              _Heading(t.settingsPrivacy),
+              LockSettingsSection(
+                lock: lock,
+                alarms: widget.alarms,
+                places: Places(widget.store),
+              ),
             ],
             _Heading(t.settingsHistory),
             _Section(

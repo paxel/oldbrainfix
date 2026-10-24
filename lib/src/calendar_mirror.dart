@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'app_lock.dart';
 import 'l10n.dart';
 
 /// A calendar on the Device that events can be written into.
@@ -261,12 +262,11 @@ class CalendarMirror extends ChangeNotifier {
     return next;
   }
 
-  /// The text an event of [routine] is titled with.
-  ///
-  /// The one place titles come from: once Areas can be locked (#26), an
-  /// Occurrence of a Masked Area gets its placeholder title here, as it
-  /// does in alarms and on the Agenda.
+  /// The text an event of [routine] is titled with: its Note's, or the
+  /// masked text when it comes from a locked Area set to Masked, as in
+  /// alarms and on the Agenda.
   String _textOf(AppLocalizations t, Routines routines, Routine routine) {
+    if (AreaLocks(store).masks(routine)) return maskedText(t, '', routine);
     final note = routines.note(routine);
     return note == null ? t.noteGone : noteText(t, note);
   }

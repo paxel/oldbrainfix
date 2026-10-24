@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'context_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
@@ -41,6 +42,8 @@ Future<void> captureNote(
   final contextSource = ContextScope.of(context);
   final captured = await Navigator.of(context).push<Captured>(
     MaterialPageRoute(
+      // Capture never needs unlocking.
+      settings: const RouteSettings(name: LockFreeRoutes.capture),
       builder: (_) => CaptureScreen(
         notes: notes,
         location: location,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'note_card.dart';
@@ -54,10 +55,16 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
     super.dispose();
   }
 
-  List<PlacedNote> _load() => [
-    for (final note in Search(widget.notes.store).notes(_query.text))
-      if (note.id != widget.noteId) placeNote(widget.places, note),
-  ];
+  /// The Notes to merge into: not this one, nor those of closed locked
+  /// Areas.
+  List<PlacedNote> _load() {
+    final lock = LockScope.of(context);
+    return [
+      for (final note in Search(widget.notes.store).notes(_query.text))
+        if (note.id != widget.noteId && !(lock?.hides(note) ?? false))
+          placeNote(widget.places, note),
+    ];
+  }
 
   void _search(String _) => setState(() => _shown = _load());
 

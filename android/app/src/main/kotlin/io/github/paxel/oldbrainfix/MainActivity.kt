@@ -256,6 +256,17 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCK_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "available" -> result.success(Biometrics.available(this))
+                    "authenticate" -> {
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        Biometrics.authenticate(this, args["title"] as String? ?: "") { result.success(it) }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         captureChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAPTURE_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -535,6 +546,7 @@ class MainActivity : FlutterActivity() {
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
+        private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3

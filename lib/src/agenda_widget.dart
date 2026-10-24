@@ -1,6 +1,7 @@
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'app_lock.dart';
 import 'l10n.dart';
 import 'schedule_text.dart';
 
@@ -78,12 +79,13 @@ class AgendaSnapshot {
   ) {
     final agenda = Routines(store).agenda(wallClock);
     final unsorted = Notes(store).unsorted().length;
+    final locks = AreaLocks(store);
     List<WidgetRow> rows(List<AgendaRow> rows) => [
       for (final row in rows)
         WidgetRow(
           routineId: row.routine.id,
           occurrenceKey: row.occurrence.key,
-          title: _title(t, row),
+          title: _title(t, locale, locks, row),
           time: occurrenceTime(t, locale, row.occurrence),
           done: row.done != null,
         ),
@@ -103,12 +105,18 @@ class AgendaSnapshot {
   }
 
   /// The row's title: the first line of its Note, "Photo" for a photo
-  /// Note without words.
-  ///
-  /// Masked (#26): an Occurrence from a locked Area set to Masked must
-  /// not show its title here either, the home screen being as public as
-  /// the lock screen; once Area Locks exist, its masked text goes here.
-  static String _title(AppLocalizations t, AgendaRow row) {
+  /// Note without words. An Occurrence from a locked Area set to Masked
+  /// shows its masked text instead, the home screen being as public as
+  /// the lock screen.
+  static String _title(
+    AppLocalizations t,
+    String locale,
+    AreaLocks locks,
+    AgendaRow row,
+  ) {
+    if (locks.masks(row.routine)) {
+      return maskedText(t, locale, row.routine, row.occurrence);
+    }
     final note = row.note;
     if (note == null) return t.noteGone;
     return noteText(t, note).trim().split('\n').first.trim();

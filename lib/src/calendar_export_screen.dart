@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'browser.dart';
 import 'calendar_platform.dart';
 import 'l10n.dart';
@@ -34,11 +35,16 @@ class _CalendarExportScreenState extends State<CalendarExportScreen> {
   @override
   void initState() {
     super.initState();
-    _rows = [for (final r in _routines.all()) (r, _routines.note(r))]
-      ..sort((a, b) {
-        final byText = (a.$2?.text ?? '').compareTo(b.$2?.text ?? '');
-        return byText != 0 ? byText : a.$1.id.compareTo(b.$1.id);
-      });
+    // Those of closed locked Areas stay out, of the file too.
+    final lock = LockScope.of(context);
+    _rows =
+        [
+          for (final r in _routines.all())
+            if (!(lock?.hidesRoutine(r) ?? false)) (r, _routines.note(r)),
+        ]..sort((a, b) {
+          final byText = (a.$2?.text ?? '').compareTo(b.$2?.text ?? '');
+          return byText != 0 ? byText : a.$1.id.compareTo(b.$1.id);
+        });
     _picked = {for (final (routine, _) in _rows) routine.id};
   }
 

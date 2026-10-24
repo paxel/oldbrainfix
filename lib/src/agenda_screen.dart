@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'alarm_sync.dart';
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
@@ -18,6 +19,7 @@ import 'merge_into_screen.dart';
 import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'place_names.dart';
 import 'nudge_screen.dart';
 import 'photo_platform.dart';
 import 'routine_editor_screen.dart';
@@ -26,8 +28,9 @@ import 'schedule_text.dart';
 import 'settings_screen.dart';
 import 'setup_screen.dart';
 
-/// An Agenda row with where its Note is filed, read once per change.
-typedef _PlacedRow = ({AgendaRow row, Area? area});
+/// An Agenda row with where its Note is filed and whether it shows
+/// Masked, read once per change.
+typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours. Each
@@ -44,7 +47,10 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// Occurrence becomes Missed the summary takes it in. Whatever another
 /// app shares in opens in Capture over the Agenda, filled in and
 /// Unsorted, and so does the capture screen a shortcut, tile, widget or
-/// hardware button asked for, just as from "+".
+/// hardware button asked for, just as from "+". An Occurrence from a
+/// locked Area set to Masked shows its masked text and can still be
+/// checked off; opening it, or its history, asks to open its Area first.
+/// Back on the Agenda, every Area opened meanwhile is closed again.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow is faded.
   static const tomorrowOpacity = 0.55;
@@ -81,6 +87,7 @@ class AgendaScreen extends StatefulWidget {
 class _AgendaScreenState extends State<AgendaScreen> {
   late final _routines = Routines(widget.notes.store);
   late final _alarms = Alarms(widget.notes.store);
+  late final _locks = AreaLocks(widget.notes.store);
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
@@ -170,7 +177,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final captured = _capturedId == null
         ? null
         : widget.notes.byId(_capturedId ?? '');
-    _captured = captured == null || captured.isTrashed || captured.isMerged
+    _captured =
+        captured == null ||
+            captured.isTrashed ||
+            captured.isMerged ||
+            (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
   }
@@ -181,7 +192,26 @@ class _AgendaScreenState extends State<AgendaScreen> {
       final note? => placeNote(widget.places, note).area,
       null => null,
     },
+    masked: _locks.masks(row.routine),
   );
+
+  /// Back on the Agenda: the Areas opened meanwhile close again.
+  void _closeAreas() => LockScope.of(context)?.closeAreas();
+
+  /// Opens the locked Area [row] comes from first, when it is closed;
+  /// whether the way is open.
+  Future<bool> _openAreaOf(AgendaRow row) async {
+    final note = row.note;
+    final areaId = note == null ? null : _locks.lockedAreaOf(note);
+    if (areaId == null) return true;
+    final area = widget.places.areaById(areaId);
+    return openLockedArea(
+      context,
+      LockScope.of(context),
+      areaId,
+      area == null ? '' : areaName(context.t, area),
+    );
+  }
 
   void _reload() => setState(_load);
 
@@ -260,6 +290,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       ),
     );
     if (!mounted) return;
+    _closeAreas();
     _reload();
   }
 
@@ -326,8 +357,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   Future<void> _openRow(AgendaRow row) async {
+    if (!await _openAreaOf(row) || !mounted) return;
     await openRoutine(context, widget.notes, widget.places, row.routine);
     if (!mounted) return;
+    _closeAreas();
     _routineEdited();
   }
 
@@ -347,8 +380,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
       items: [PopupMenuItem(value: true, child: Text(t.historyTitle))],
     );
     if (!mounted || choice != true) return;
+    if (!await _openAreaOf(row) || !mounted) return;
     await openHistory(context, widget.notes, row.routine);
     if (!mounted) return;
+    _closeAreas();
     _reload();
   }
 
@@ -388,10 +423,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
     List<Widget> rows(List<_PlacedRow> rows) => [
-      for (final (:row, :area) in rows)
+      for (final (:row, :area, :masked) in rows)
         _OccurrenceRow(
           row: row,
-          area: area,
+          // A Masked row tells nothing of its Area either.
+          area: masked ? null : area,
+          masked: masked
+              ? maskedText(t, locale, row.routine, row.occurrence)
+              : null,
           time: occurrenceTime(t, locale, row.occurrence),
           onToggle: () => _toggle(row),
           onTap: () => _openRow(row),
@@ -428,6 +467,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
           if (!_missed.isEmpty)
             MissedSummaryCard(
               summary: _missed,
+              masks: _locks.masks,
               onCheck: _checkMissed,
               onSeen: _seen,
             ),
@@ -592,6 +632,10 @@ class _Heading extends StatelessWidget {
 class _OccurrenceRow extends StatelessWidget {
   final AgendaRow row;
   final Area? area;
+
+  /// The masked text shown instead of the Note's; null when it shows in
+  /// full.
+  final String? masked;
   final String time;
   final VoidCallback onToggle;
   final VoidCallback onTap;
@@ -600,6 +644,7 @@ class _OccurrenceRow extends StatelessWidget {
   const _OccurrenceRow({
     required this.row,
     required this.area,
+    this.masked,
     required this.time,
     required this.onToggle,
     required this.onTap,
@@ -614,7 +659,7 @@ class _OccurrenceRow extends StatelessWidget {
     final colour = areaColour(area?.colour);
     final done = row.done != null;
     final note = row.note;
-    final title = note == null ? t.noteGone : noteText(t, note);
+    final title = masked ?? (note == null ? t.noteGone : noteText(t, note));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Embossed(

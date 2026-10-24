@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'browser.dart';
 import 'capture_screen.dart';
@@ -66,7 +67,7 @@ class _AreasScreenState extends State<AreasScreen> {
           a,
         ).toLowerCase().compareTo(areaName(t, b).toLowerCase()),
       );
-    _hits = _search(widget.places, _query.text);
+    _hits = _search(widget.places, _query.text, lock: LockScope.of(context));
   }
 
   void _reload() => setState(_load);
@@ -78,7 +79,17 @@ class _AreasScreenState extends State<AreasScreen> {
     _reload();
   }
 
+  /// Opens the locked [area] first when it is closed; whether it is
+  /// open now.
+  Future<bool> _unlock(Area area) => openLockedArea(
+    context,
+    LockScope.of(context),
+    area.id,
+    areaName(context.t, area),
+  );
+
   Future<void> _open(Area area) async {
+    if (!await _unlock(area) || !mounted) return;
     widget.trail.choseArea(area);
     setState(() {});
     await Navigator.of(context).push(
@@ -153,6 +164,7 @@ class _AreasScreenState extends State<AreasScreen> {
   }
 
   Future<void> _act(Area area, _AreaAction action) async {
+    if (!await _unlock(area) || !mounted) return;
     final t = context.t;
     switch (action) {
       case _AreaAction.rename:
@@ -179,11 +191,13 @@ class _AreasScreenState extends State<AreasScreen> {
   List<Widget> _areaRows(AppLocalizations t) {
     if (_areas.isEmpty) return [BrowserEmpty(text: t.noAreasYet)];
     final last = widget.trail.area(widget.places)?.id;
+    final lock = LockScope.of(context);
     return [
       for (final area in _areas)
         _PlaceRow(
           title: areaName(t, area),
           leading: _AreaMark(area: area),
+          locked: lock?.isAreaClosed(area.id) ?? false,
           highlighted: area.id == last,
           onTap: () => _open(area),
           menu: PopupMenuButton<_AreaAction>(
@@ -320,6 +334,7 @@ class _AreaScreenState extends State<AreaScreen> {
       widget.places,
       _query.text,
       within: widget.areaId,
+      lock: LockScope.of(context),
       order: _order,
       hideUnimportant: _hideUnimportant,
     );
@@ -577,6 +592,7 @@ class _TopicScreenState extends State<TopicScreen> {
       widget.places,
       _query.text,
       within: widget.topicId,
+      lock: LockScope.of(context),
       order: _order,
       hideUnimportant: _hideUnimportant,
     );
@@ -697,11 +713,12 @@ class _TopicScreenState extends State<TopicScreen> {
 }
 
 /// The Notes matching [query] as a diary in [order], with where they
-/// are filed.
+/// are filed; those of closed locked Areas stay out.
 List<PlacedNote> _search(
   Places places,
   String query, {
   String? within,
+  AppLock? lock,
   DiaryOrder order = DiaryOrder.time,
   bool hideUnimportant = false,
 }) => [
@@ -710,7 +727,7 @@ List<PlacedNote> _search(
     order: order,
     hideUnimportant: hideUnimportant,
   ))
-    placeNote(places, note),
+    if (!(lock?.hides(note) ?? false)) placeNote(places, note),
 ];
 
 /// Every hit of a search on one page, or a line saying there is none.
@@ -774,12 +791,16 @@ class _PlaceRow extends StatelessWidget {
   /// The last selected one, where swipe left leads: ringed in the accent.
   final bool highlighted;
 
+  /// A locked Area that is closed: a padlock says so.
+  final bool locked;
+
   const _PlaceRow({
     required this.title,
     required this.menu,
     this.leading,
     this.onTap,
     this.highlighted = false,
+    this.locked = false,
   });
 
   @override
@@ -816,6 +837,11 @@ class _PlaceRow extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
+                  if (locked)
+                    Icon(
+                      Icons.lock_outline,
+                      semanticLabel: context.t.areaLocked,
+                    ),
                   menu,
                 ],
               ),

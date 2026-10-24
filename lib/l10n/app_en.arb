@@ -723,5 +723,74 @@
   "writeTheDeveloper": "Write to the developer",
   "buyCoffee": "Buy me a coffee",
   "coffeeSubtitle": "On Ko-fi, if Old Brain Fix helps you",
-  "openSourceLicenses": "Open-source licenses"
+  "openSourceLicenses": "Open-source licenses",
+  "settingsPrivacy": "Privacy",
+  "appLock": "App Lock",
+  "appLockDetail": "Asks for the PIN before showing your Notes. Capture and alarms never need it.",
+  "appLockOff": "Turn off the App Lock",
+  "unlockApp": "Unlock Old Brain Fix",
+  "lockedTitle": "Old Brain Fix is locked",
+  "lockedExplain": "Unlock to see your Notes. You can capture with + right away.",
+  "unlock": "Unlock",
+  "unlockBiometrics": "Unlock with fingerprint or screen lock",
+  "biometricsDetail": "The PIN always works as well.",
+  "pinLabel": "PIN",
+  "pinAgainLabel": "PIN again",
+  "pinWrong": "Wrong PIN",
+  "pinTooShort": "At least {count} digits",
+  "@pinTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pinMismatch": "The two PINs differ",
+  "pinNewTitle": "New PIN",
+  "pinNewExplain": "It unlocks the App Lock and the Area Locks on this phone.",
+  "pinChange": "Change PIN",
+  "relockAfter": "Lock again after",
+  "relockDetail": "How long the app may be in the background before it locks again.",
+  "relockAtOnce": "At once",
+  "areaLocksTitle": "Area Locks",
+  "areaLocksDetail": "Areas that stay locked even while the app is open.",
+  "areaLocksExplain": "A locked Area and its Notes stay hidden until you unlock it. Its alarms show Masked, “Private Routine, 08:00”, unless you choose to show them in full; they can be checked off either way.",
+  "areaLocked": "Locked",
+  "unlockArea": "Unlock {area}",
+  "@unlockArea": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "areaLockOff": "Unlock {area} for good",
+  "@areaLockOff": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "areaShowFull": "Show the alarms of {area} in full",
+  "@areaShowFull": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "areaAlarmsShow": "Alarms and Agenda show",
+  "areaAlarmsMasked": "Masked",
+  "areaAlarmsFull": "In full",
+  "maskedRoutine": "Private Routine",
+  "maskedRoutineAt": "Private Routine, {time}",
+  "@maskedRoutineAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "maskedReminder": "Private Reminder"
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -11,7 +12,8 @@ import 'schedule_text.dart';
 /// The deleted Notes, and the Routines and Reminders deleted on their
 /// own, most recently deleted first, each with how long it stays and a
 /// button to restore it. A Note comes back to where it was filed, with
-/// the Routines and Reminders deleted along with it.
+/// the Routines and Reminders deleted along with it. Those of closed
+/// locked Areas stay out.
 class TrashScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -30,15 +32,18 @@ class _TrashScreenState extends State<TrashScreen> {
   late List<_Trashed> _trashed = _load();
 
   List<_Trashed> _load() {
+    final lock = LockScope.of(context);
     final trashed = <_Trashed>[
       for (final note in widget.notes.trashed())
-        (
-          at: note.trashed ?? note.captured,
-          note: placeNote(widget.places, note),
-          routine: null,
-        ),
+        if (!(lock?.hides(note) ?? false))
+          (
+            at: note.trashed ?? note.captured,
+            note: placeNote(widget.places, note),
+            routine: null,
+          ),
       for (final routine in _routines.trashed())
-        (at: routine.trashed ?? DateTime(0), note: null, routine: routine),
+        if (!(lock?.hidesRoutine(routine) ?? false))
+          (at: routine.trashed ?? DateTime(0), note: null, routine: routine),
     ];
     trashed.sort((a, b) => b.at.compareTo(a.at));
     return trashed;

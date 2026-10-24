@@ -2059,6 +2059,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open-source licenses'**
   String get openSourceLicenses;
+
+  /// No description provided for @settingsPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get settingsPrivacy;
+
+  /// No description provided for @appLock.
+  ///
+  /// In en, this message translates to:
+  /// **'App Lock'**
+  String get appLock;
+
+  /// No description provided for @appLockDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Asks for the PIN before showing your Notes. Capture and alarms never need it.'**
+  String get appLockDetail;
+
+  /// No description provided for @appLockOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off the App Lock'**
+  String get appLockOff;
+
+  /// No description provided for @unlockApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Old Brain Fix'**
+  String get unlockApp;
+
+  /// No description provided for @lockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix is locked'**
+  String get lockedTitle;
+
+  /// No description provided for @lockedExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock to see your Notes. You can capture with + right away.'**
+  String get lockedExplain;
+
+  /// No description provided for @unlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get unlock;
+
+  /// No description provided for @unlockBiometrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock with fingerprint or screen lock'**
+  String get unlockBiometrics;
+
+  /// No description provided for @biometricsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The PIN always works as well.'**
+  String get biometricsDetail;
+
+  /// No description provided for @pinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN'**
+  String get pinLabel;
+
+  /// No description provided for @pinAgainLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN again'**
+  String get pinAgainLabel;
+
+  /// No description provided for @pinWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong PIN'**
+  String get pinWrong;
+
+  /// No description provided for @pinTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'At least {count} digits'**
+  String pinTooShort(int count);
+
+  /// No description provided for @pinMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The two PINs differ'**
+  String get pinMismatch;
+
+  /// No description provided for @pinNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New PIN'**
+  String get pinNewTitle;
+
+  /// No description provided for @pinNewExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'It unlocks the App Lock and the Area Locks on this phone.'**
+  String get pinNewExplain;
+
+  /// No description provided for @pinChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get pinChange;
+
+  /// No description provided for @relockAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock again after'**
+  String get relockAfter;
+
+  /// No description provided for @relockDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'How long the app may be in the background before it locks again.'**
+  String get relockDetail;
+
+  /// No description provided for @relockAtOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'At once'**
+  String get relockAtOnce;
+
+  /// No description provided for @areaLocksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Area Locks'**
+  String get areaLocksTitle;
+
+  /// No description provided for @areaLocksDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Areas that stay locked even while the app is open.'**
+  String get areaLocksDetail;
+
+  /// No description provided for @areaLocksExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'A locked Area and its Notes stay hidden until you unlock it. Its alarms show Masked, “Private Routine, 08:00”, unless you choose to show them in full; they can be checked off either way.'**
+  String get areaLocksExplain;
+
+  /// No description provided for @areaLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get areaLocked;
+
+  /// No description provided for @unlockArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock {area}'**
+  String unlockArea(String area);
+
+  /// No description provided for @areaLockOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock {area} for good'**
+  String areaLockOff(String area);
+
+  /// No description provided for @areaShowFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the alarms of {area} in full'**
+  String areaShowFull(String area);
+
+  /// No description provided for @areaAlarmsShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms and Agenda show'**
+  String get areaAlarmsShow;
+
+  /// No description provided for @areaAlarmsMasked.
+  ///
+  /// In en, this message translates to:
+  /// **'Masked'**
+  String get areaAlarmsMasked;
+
+  /// No description provided for @areaAlarmsFull.
+  ///
+  /// In en, this message translates to:
+  /// **'In full'**
+  String get areaAlarmsFull;
+
+  /// No description provided for @maskedRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Routine'**
+  String get maskedRoutine;
+
+  /// No description provided for @maskedRoutineAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Routine, {time}'**
+  String maskedRoutineAt(String time);
+
+  /// No description provided for @maskedReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Reminder'**
+  String get maskedReminder;
 }
 
 class _AppLocalizationsDelegate

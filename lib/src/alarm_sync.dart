@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
+import 'app_lock.dart';
 import 'schedule_text.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
@@ -183,13 +184,23 @@ class AlarmSync extends ChangeNotifier {
       _escalating = escalating;
       notifyListeners();
     }
+    final routines = Routines(store);
+    final locks = AreaLocks(store);
+    String title(PlannedAlarm alarm) {
+      final routine = routines.byId(alarm.routineId);
+      // From a locked Area set to Masked, on the lock screen too.
+      if (routine != null && locks.masks(routine)) {
+        return maskedText(t, _locale, routine, alarm.occurrence);
+      }
+      // A photo Note without words is still there.
+      return _title(alarm.text) ?? (alarm.text == null ? t.noteGone : t.photo);
+    }
+
     final armed = [
       for (final alarm in Alarms(store).plan(wallClock))
         ArmedAlarm(
           alarm: alarm,
-          // A photo Note without words is still there.
-          title:
-              _title(alarm.text) ?? (alarm.text == null ? t.noteGone : t.photo),
+          title: title(alarm),
           body: occurrenceTime(t, _locale, alarm.occurrence),
         ),
     ];

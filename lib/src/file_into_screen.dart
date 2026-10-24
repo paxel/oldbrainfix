@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'app_lock.dart';
 import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -30,14 +31,18 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
     final t = context.t;
     int byName(String a, String b) =>
         a.toLowerCase().compareTo(b.toLowerCase());
+    final lock = LockScope.of(context);
+    // A closed locked Area takes Notes, but keeps its Topics to itself.
     _tree = [
       for (final area
           in widget.places.areas()
             ..sort((a, b) => byName(areaName(t, a), areaName(t, b))))
         (
           area,
-          widget.places.topics(area.id)
-            ..sort((a, b) => byName(topicName(t, a), topicName(t, b))),
+          (lock?.isAreaClosed(area.id) ?? false)
+              ? <Topic>[]
+              : (widget.places.topics(area.id)
+                  ..sort((a, b) => byName(topicName(t, a), topicName(t, b)))),
         ),
     ];
     _loaded = true;

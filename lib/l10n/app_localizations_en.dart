@@ -1239,4 +1239,122 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openSourceLicenses => 'Open-source licenses';
+
+  @override
+  String get settingsPrivacy => 'Privacy';
+
+  @override
+  String get appLock => 'App Lock';
+
+  @override
+  String get appLockDetail =>
+      'Asks for the PIN before showing your Notes. Capture and alarms never need it.';
+
+  @override
+  String get appLockOff => 'Turn off the App Lock';
+
+  @override
+  String get unlockApp => 'Unlock Old Brain Fix';
+
+  @override
+  String get lockedTitle => 'Old Brain Fix is locked';
+
+  @override
+  String get lockedExplain =>
+      'Unlock to see your Notes. You can capture with + right away.';
+
+  @override
+  String get unlock => 'Unlock';
+
+  @override
+  String get unlockBiometrics => 'Unlock with fingerprint or screen lock';
+
+  @override
+  String get biometricsDetail => 'The PIN always works as well.';
+
+  @override
+  String get pinLabel => 'PIN';
+
+  @override
+  String get pinAgainLabel => 'PIN again';
+
+  @override
+  String get pinWrong => 'Wrong PIN';
+
+  @override
+  String pinTooShort(int count) {
+    return 'At least $count digits';
+  }
+
+  @override
+  String get pinMismatch => 'The two PINs differ';
+
+  @override
+  String get pinNewTitle => 'New PIN';
+
+  @override
+  String get pinNewExplain =>
+      'It unlocks the App Lock and the Area Locks on this phone.';
+
+  @override
+  String get pinChange => 'Change PIN';
+
+  @override
+  String get relockAfter => 'Lock again after';
+
+  @override
+  String get relockDetail =>
+      'How long the app may be in the background before it locks again.';
+
+  @override
+  String get relockAtOnce => 'At once';
+
+  @override
+  String get areaLocksTitle => 'Area Locks';
+
+  @override
+  String get areaLocksDetail =>
+      'Areas that stay locked even while the app is open.';
+
+  @override
+  String get areaLocksExplain =>
+      'A locked Area and its Notes stay hidden until you unlock it. Its alarms show Masked, “Private Routine, 08:00”, unless you choose to show them in full; they can be checked off either way.';
+
+  @override
+  String get areaLocked => 'Locked';
+
+  @override
+  String unlockArea(String area) {
+    return 'Unlock $area';
+  }
+
+  @override
+  String areaLockOff(String area) {
+    return 'Unlock $area for good';
+  }
+
+  @override
+  String areaShowFull(String area) {
+    return 'Show the alarms of $area in full';
+  }
+
+  @override
+  String get areaAlarmsShow => 'Alarms and Agenda show';
+
+  @override
+  String get areaAlarmsMasked => 'Masked';
+
+  @override
+  String get areaAlarmsFull => 'In full';
+
+  @override
+  String get maskedRoutine => 'Private Routine';
+
+  @override
+  String maskedRoutineAt(String time) {
+    return 'Private Routine, $time';
+  }
+
+  @override
+  String get maskedReminder => 'Private Reminder';
 }

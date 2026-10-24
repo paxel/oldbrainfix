@@ -1246,4 +1246,123 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get openSourceLicenses => 'Open-Source-Lizenzen';
+
+  @override
+  String get settingsPrivacy => 'Privatsphäre';
+
+  @override
+  String get appLock => 'App-Sperre';
+
+  @override
+  String get appLockDetail =>
+      'Fragt nach der PIN, bevor deine Notizen zu sehen sind. Erfassen und Alarme brauchen sie nie.';
+
+  @override
+  String get appLockOff => 'App-Sperre ausschalten';
+
+  @override
+  String get unlockApp => 'Old Brain Fix entsperren';
+
+  @override
+  String get lockedTitle => 'Old Brain Fix ist gesperrt';
+
+  @override
+  String get lockedExplain =>
+      'Entsperre, um deine Notizen zu sehen. Mit + kannst du sofort erfassen.';
+
+  @override
+  String get unlock => 'Entsperren';
+
+  @override
+  String get unlockBiometrics =>
+      'Mit Fingerabdruck oder Displaysperre entsperren';
+
+  @override
+  String get biometricsDetail => 'Die PIN funktioniert immer auch.';
+
+  @override
+  String get pinLabel => 'PIN';
+
+  @override
+  String get pinAgainLabel => 'PIN wiederholen';
+
+  @override
+  String get pinWrong => 'Falsche PIN';
+
+  @override
+  String pinTooShort(int count) {
+    return 'Mindestens $count Ziffern';
+  }
+
+  @override
+  String get pinMismatch => 'Die beiden PINs sind verschieden';
+
+  @override
+  String get pinNewTitle => 'Neue PIN';
+
+  @override
+  String get pinNewExplain =>
+      'Sie entsperrt die App-Sperre und die Bereichssperren auf diesem Handy.';
+
+  @override
+  String get pinChange => 'PIN ändern';
+
+  @override
+  String get relockAfter => 'Wieder sperren nach';
+
+  @override
+  String get relockDetail =>
+      'Wie lange die App im Hintergrund sein darf, bevor sie wieder sperrt.';
+
+  @override
+  String get relockAtOnce => 'Sofort';
+
+  @override
+  String get areaLocksTitle => 'Bereichssperren';
+
+  @override
+  String get areaLocksDetail =>
+      'Bereiche, die gesperrt bleiben, auch wenn die App offen ist.';
+
+  @override
+  String get areaLocksExplain =>
+      'Ein gesperrter Bereich und seine Notizen bleiben verborgen, bis du ihn entsperrst. Seine Alarme erscheinen maskiert, „Private Routine, 08:00“, außer du lässt sie vollständig zeigen; abhaken kannst du sie immer.';
+
+  @override
+  String get areaLocked => 'Gesperrt';
+
+  @override
+  String unlockArea(String area) {
+    return '$area entsperren';
+  }
+
+  @override
+  String areaLockOff(String area) {
+    return '$area dauerhaft entsperren';
+  }
+
+  @override
+  String areaShowFull(String area) {
+    return 'Alarme von $area vollständig zeigen';
+  }
+
+  @override
+  String get areaAlarmsShow => 'Alarme und Agenda zeigen';
+
+  @override
+  String get areaAlarmsMasked => 'Maskiert';
+
+  @override
+  String get areaAlarmsFull => 'Vollständig';
+
+  @override
+  String get maskedRoutine => 'Private Routine';
+
+  @override
+  String maskedRoutineAt(String time) {
+    return 'Private Routine, $time';
+  }
+
+  @override
+  String get maskedReminder => 'Private Erinnerung';
 }
