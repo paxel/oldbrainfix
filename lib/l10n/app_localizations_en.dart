@@ -28,7 +28,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dismissAnnouncement => 'Dismiss';
 
   @override
-  String get browseTooltip => 'Areas and Topics';
+  String get browseTooltip => 'Search and browse';
 
   @override
   String get areasTitle => 'Areas';
@@ -165,4 +165,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get starterMedication => 'Medication';
+
+  @override
+  String get searchAllHint => 'Search all Notes';
+
+  @override
+  String get searchAreaHint => 'Search this Area';
+
+  @override
+  String get searchTopicHint => 'Search this Topic';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String get nothingFound => 'No Note matches.';
+
+  @override
+  String get noNotesHere => 'No Notes here yet. Tap + to add one.';
 }

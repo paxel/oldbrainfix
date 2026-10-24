@@ -29,7 +29,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dismissAnnouncement => 'Ausblenden';
 
   @override
-  String get browseTooltip => 'Bereiche und Themen';
+  String get browseTooltip => 'Suchen und stöbern';
 
   @override
   String get areasTitle => 'Bereiche';
@@ -167,4 +167,23 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get starterMedication => 'Medikamente';
+
+  @override
+  String get searchAllHint => 'Alle Notizen durchsuchen';
+
+  @override
+  String get searchAreaHint => 'Diesen Bereich durchsuchen';
+
+  @override
+  String get searchTopicHint => 'Dieses Thema durchsuchen';
+
+  @override
+  String get clearSearch => 'Suche leeren';
+
+  @override
+  String get nothingFound => 'Keine Notiz passt.';
+
+  @override
+  String get noNotesHere =>
+      'Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen.';
 }

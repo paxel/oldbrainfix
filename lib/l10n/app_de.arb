@@ -6,7 +6,7 @@
   "captureHint": "Was geht dir durch den Kopf?",
   "save": "Speichern",
   "dismissAnnouncement": "Ausblenden",
-  "browseTooltip": "Bereiche und Themen",
+  "browseTooltip": "Suchen und stöbern",
   "areasTitle": "Bereiche",
   "noAreasYet": "Noch keine Bereiche. Tippe auf +, um einen anzulegen.",
   "noTopicsYet": "Noch keine Themen. Notizen können direkt im Bereich liegen, oder tippe auf +, um ein Thema anzulegen.",
@@ -46,5 +46,11 @@
   "starterRepairs": "Reparaturen",
   "starterHealth": "Gesundheit",
   "starterDoctor": "Arzt",
-  "starterMedication": "Medikamente"
+  "starterMedication": "Medikamente",
+  "searchAllHint": "Alle Notizen durchsuchen",
+  "searchAreaHint": "Diesen Bereich durchsuchen",
+  "searchTopicHint": "Dieses Thema durchsuchen",
+  "clearSearch": "Suche leeren",
+  "nothingFound": "Keine Notiz passt.",
+  "noNotesHere": "Hier gibt es noch keine Notizen. Tippe auf +, um eine hinzuzufügen."
 }

@@ -7,6 +7,18 @@ import 'l10n.dart';
 import 'look.dart';
 import 'place_names.dart';
 
+/// A Note with the Area and Topic it is filed in, read once per change.
+typedef PlacedNote = ({Note note, Area? area, Topic? topic});
+
+/// Looks up where [note] is filed.
+PlacedNote placeNote(Places places, Note note) {
+  final place = note.place;
+  if (place == null) return (note: note, area: null, topic: null);
+  final topic = places.topicById(place);
+  final area = places.areaById(topic?.areaId ?? place);
+  return (note: note, area: area, topic: topic);
+}
+
 /// A Note drawn as a softly embossed card: its text, capture time and
 /// where it is filed. Its Area's colour runs down the left edge and its
 /// icon leads the place line.

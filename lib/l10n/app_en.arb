@@ -6,7 +6,7 @@
   "captureHint": "What's on your mind?",
   "save": "Save",
   "dismissAnnouncement": "Dismiss",
-  "browseTooltip": "Areas and Topics",
+  "browseTooltip": "Search and browse",
   "areasTitle": "Areas",
   "noAreasYet": "No Areas yet. Tap + to make one.",
   "noTopicsYet": "No Topics yet. Notes can sit in the Area itself, or tap + to make a Topic.",
@@ -74,5 +74,11 @@
   "starterRepairs": "Repairs",
   "starterHealth": "Health",
   "starterDoctor": "Doctor",
-  "starterMedication": "Medication"
+  "starterMedication": "Medication",
+  "searchAllHint": "Search all Notes",
+  "searchAreaHint": "Search this Area",
+  "searchTopicHint": "Search this Topic",
+  "clearSearch": "Clear search",
+  "nothingFound": "No Note matches.",
+  "noNotesHere": "No Notes here yet. Tap + to add one."
 }

@@ -278,13 +278,7 @@ class Places {
   /// Whether [id] is an Area or a Topic that exists.
   bool isPlace(String id) => areaById(id) != null || topicById(id) != null;
 
-  List<Note> _notesInside(String id) {
-    final ids = {id, for (final topic in topics(id)) topic.id};
-    return [
-      for (final note in Notes(store).all())
-        if (ids.contains(note.place)) note,
-    ];
-  }
+  List<Note> _notesInside(String id) => Notes(store).inside(id);
 
   // The writes behind addArea and addTopic, for use inside one batch.
   String _appendArea(String name, String? starter) {

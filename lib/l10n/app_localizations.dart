@@ -137,7 +137,7 @@ abstract class AppLocalizations {
   /// No description provided for @browseTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Areas and Topics'**
+  /// **'Search and browse'**
   String get browseTooltip;
 
   /// No description provided for @areasTitle.
@@ -379,6 +379,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Medication'**
   String get starterMedication;
+
+  /// No description provided for @searchAllHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search all Notes'**
+  String get searchAllHint;
+
+  /// No description provided for @searchAreaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this Area'**
+  String get searchAreaHint;
+
+  /// No description provided for @searchTopicHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search this Topic'**
+  String get searchTopicHint;
+
+  /// No description provided for @clearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
+
+  /// No description provided for @nothingFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Note matches.'**
+  String get nothingFound;
+
+  /// No description provided for @noNotesHere.
+  ///
+  /// In en, this message translates to:
+  /// **'No Notes here yet. Tap + to add one.'**
+  String get noNotesHere;
 }
 
 class _AppLocalizationsDelegate

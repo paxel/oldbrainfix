@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'browser.dart';
 import 'look.dart';
 import 'notes_screen.dart';
 import 'question_mark_background.dart';
@@ -28,6 +29,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _themeMode = themeModeOf(widget.store.themeChoice);
   late final _notes = Notes(widget.store);
   late final _places = Places(widget.store);
+  final _trail = BrowserTrail();
 
   @override
   void dispose() {
@@ -52,7 +54,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
         child: child ?? const SizedBox.shrink(),
       ),
     ),
-    home: _Home(store: widget.store, notes: _notes, places: _places),
+    home: _Home(
+      store: widget.store,
+      notes: _notes,
+      places: _places,
+      trail: _trail,
+    ),
   );
 }
 
@@ -61,8 +68,14 @@ class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
   final Places places;
+  final BrowserTrail trail;
 
-  const _Home({required this.store, required this.notes, required this.places});
+  const _Home({
+    required this.store,
+    required this.notes,
+    required this.places,
+    required this.trail,
+  });
 
   @override
   State<_Home> createState() => _HomeState();
@@ -81,6 +94,10 @@ class _HomeState extends State<_Home> {
 
   @override
   Widget build(BuildContext context) => _starterSetOffered
-      ? NotesScreen(notes: widget.notes, places: widget.places)
+      ? NotesScreen(
+          notes: widget.notes,
+          places: widget.places,
+          trail: widget.trail,
+        )
       : StarterSetScreen(onDone: _plant);
 }

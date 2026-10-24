@@ -7,7 +7,10 @@ import 'l10n.dart';
 class CaptureScreen extends StatefulWidget {
   final Notes notes;
 
-  const CaptureScreen({super.key, required this.notes});
+  /// The Area or Topic the new Note is filed into; Unsorted when null.
+  final String? place;
+
+  const CaptureScreen({super.key, required this.notes, this.place});
 
   @override
   State<CaptureScreen> createState() => _CaptureScreenState();
@@ -24,7 +27,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   void _save() {
     final text = _text.text.trim();
-    if (text.isNotEmpty) widget.notes.capture(text);
+    if (text.isNotEmpty) {
+      widget.notes.capture(text, place: widget.place);
+    }
     Navigator.of(context).pop();
   }
 

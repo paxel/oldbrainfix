@@ -36,7 +36,13 @@ void main() {
   }
 
   Future<void> typeName(WidgetTester tester, String name, String button) async {
-    await tester.enterText(find.byType(TextField), name);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      ),
+      name,
+    );
     await tester.tap(find.text(button).last);
     await tester.pumpAndSettle();
   }

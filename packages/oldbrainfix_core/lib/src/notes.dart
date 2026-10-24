@@ -41,14 +41,19 @@ class Notes {
 
   Notes(this.store);
 
-  /// Captures a new text Note at the store's now.
-  Note capture(String text) {
+  /// Captures a new text Note at the store's now, filed into the Area or
+  /// Topic [place] when one is given.
+  Note capture(String text, {String? place}) {
+    if (place != null && !Places(store).isPlace(place)) {
+      throw ArgumentError.value(place, 'place', 'not an Area or Topic');
+    }
     final id = 'note:${Store.newId()}';
     final now = store.clock().toUtc();
     store.batch(() {
       store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
       store.append(id, NoteKeys.text, text, date: now);
+      if (place != null) store.append(id, NoteKeys.place, place, date: now);
     });
     return byId(id)!;
   }
@@ -88,5 +93,18 @@ class Notes {
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;
+  }
+
+  /// The Notes filed in the Area or Topic [placeId], newest capture
+  /// first; an Area holds its Topics' Notes too.
+  List<Note> inside(String placeId) {
+    final ids = {
+      placeId,
+      for (final topic in Places(store).topics(placeId)) topic.id,
+    };
+    return [
+      for (final note in all())
+        if (ids.contains(note.place)) note,
+    ];
   }
 }
