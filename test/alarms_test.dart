@@ -95,7 +95,7 @@ void main() {
       await tester.pump();
       expect(alarms.ids, ['occurrence:${dentist.id}@2026-10-24T16:00']);
 
-      routines.delete(dentist.id);
+      routines.trash(dentist.id);
       await tester.pump();
       expect(alarms.armed, isEmpty);
     });

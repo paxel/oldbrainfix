@@ -130,8 +130,8 @@
   "rruleInvalid": "Keine Regel, die die App versteht: {detail}",
   "nextOccurrences": "Als Nächstes",
   "neverDue": "Das kommt nie vor.",
-  "deleteRoutineQuestion": "Diese Routine löschen? Ihre Notiz bleibt.",
-  "deleteReminderQuestion": "Diese Erinnerung löschen? Ihre Notiz bleibt.",
+  "deleteRoutineQuestion": "Diese Routine löschen? Sie bleibt 30 Tage im Papierkorb. Ihre Notiz bleibt.",
+  "deleteReminderQuestion": "Diese Erinnerung löschen? Sie bleibt 30 Tage im Papierkorb. Ihre Notiz bleibt.",
   "routinesHeading": "Routinen und Erinnerungen",
   "everyNDays": "{count, plural, =1{Jeden Tag} other{Alle {count} Tage}}",
   "everyNWeeks": "{count, plural, =1{Jede Woche} other{Alle {count} Wochen}}",
@@ -200,5 +200,13 @@
   "quietHoursRange": "Ruhezeit {from} bis {until}",
   "quietHoursOff": "keine Ruhezeit",
   "quietFrom": "Von",
-  "quietUntil": "Bis"
+  "quietUntil": "Bis",
+  "yes": "Ja",
+  "no": "Nein",
+  "deleteNoteRoutines": "{count, plural, =1{Auch die verknüpfte Routine löschen?} other{Auch die {count} verknüpften Routinen löschen?}}",
+  "deleteNoteReminders": "{count, plural, =1{Auch die verknüpfte Erinnerung löschen?} other{Auch die {count} verknüpften Erinnerungen löschen?}}",
+  "deleteNoteRoutinesAndReminders": "{count, plural, other{Auch die {count} verknüpften Routinen und Erinnerungen löschen?}}",
+  "deleteNoteLinkedDetail": "Mitgelöschte kommen mit der Notiz zurück, wenn du sie wiederherstellst. Behaltene erinnern dich weiter.",
+  "noteInTrash": "Die Notiz liegt im Papierkorb",
+  "noteDeleted": "Die Notiz wurde gelöscht"
 }

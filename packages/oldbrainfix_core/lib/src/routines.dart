@@ -35,6 +35,14 @@ abstract final class RoutineKeys {
   /// to a full-screen alarm; absent when Escalation is off.
   static const escalation = 'escalation';
 
+  /// When the Routine was moved to the trash; absent while it is not
+  /// there.
+  static const trashed = 'trashed';
+
+  /// The Note the Routine went to the trash with, and comes back with;
+  /// absent when it was trashed on its own.
+  static const trashedWith = 'trashedWith';
+
   /// The fields that make up the schedule.
   static const scheduleFields = [start, times, rule];
 }
@@ -61,10 +69,19 @@ class Routine {
   /// alarm with sound (CONTEXT.md, Escalation); null when it is off.
   final int? escalation;
 
-  /// When the schedule was last written: Occurrences due before then
-  /// were never asked for, so they neither Re-nag nor count as Missed.
-  /// Null when unknown, which bounds nothing.
+  /// When the schedule was last written or the Routine last left the
+  /// trash: Occurrences due before then were never asked for, so they
+  /// neither Re-nag nor count as Missed. Null when unknown, which bounds
+  /// nothing.
   final DateTime? scheduledAt;
+
+  /// When the Routine was moved to the trash, or null when it is not
+  /// there.
+  final DateTime? trashed;
+
+  /// The Note it went to the trash with, or null when it went on its own
+  /// or is not in the trash.
+  final String? trashedWith;
 
   const Routine({
     required this.id,
@@ -74,9 +91,13 @@ class Routine {
     this.renag,
     this.escalation,
     this.scheduledAt,
+    this.trashed,
+    this.trashedWith,
   });
 
   bool get isReminder => schedule.once;
+
+  bool get isTrashed => trashed != null;
 
   /// When [occurrence] was checked off, or null while it is not Done.
   DateTime? doneAt(Occurrence occurrence) => done[occurrence.key];
@@ -179,10 +200,90 @@ class Routines {
     store.append(id, RoutineKeys.escalation, after?.toString());
   }
 
-  /// Deletes the Routine [id]. Its Note stays, and stays out of Unsorted.
-  void delete(String id) {
+  /// Moves the Routine [id] to the trash: it leaves the Agenda, fires
+  /// no more and is never Missed, and can be restored until
+  /// [Notes.trashKeep] has passed. Its Note stays, and stays out of
+  /// Unsorted.
+  void trash(String id) {
     _require(id);
-    store.append(id, RoutineKeys.type, null);
+    store.append(id, RoutineKeys.trashed, _now());
+  }
+
+  /// Brings the Routine [id] back from the trash. Its schedule goes on
+  /// where it always was (ADR 0006); what fell due while it was in the
+  /// trash is not Missed.
+  void restore(String id) {
+    final routine = byId(id);
+    if (routine == null || !routine.isTrashed) {
+      throw ArgumentError.value(id, 'id', 'not a Routine in the trash');
+    }
+    store.batch(() => _untrash(routine));
+  }
+
+  /// Moves the Note [noteId] to the trash, and with [withRoutines] the
+  /// Routines and Reminders it spawned too, those of the Notes merged
+  /// into it included: they come back with it ([restoreNote]). Without,
+  /// they stay and link back to a Note in the trash.
+  void trashNote(String noteId, {required bool withRoutines}) {
+    final routines = withRoutines ? ofNote(noteId) : const <Routine>[];
+    store.batch(() {
+      Notes(store).trash(noteId);
+      // The same moment as the Note's, so both are purged together.
+      final at = store.current(noteId, NoteKeys.trashed) ?? _now();
+      for (final routine in routines) {
+        store.append(routine.id, RoutineKeys.trashed, at);
+        store.append(routine.id, RoutineKeys.trashedWith, noteId);
+      }
+    });
+  }
+
+  /// Brings the Note [noteId] back from the trash, with the Routines and
+  /// Reminders that went there with it.
+  void restoreNote(String noteId) {
+    store.batch(() {
+      Notes(store).restore(noteId);
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
+        final routine = byId(id);
+        if (routine != null && routine.trashedWith == noteId) {
+          _untrash(routine);
+        }
+      }
+    });
+  }
+
+  /// When the trashed [routine] is purged; null when it is not in the
+  /// trash.
+  DateTime? purgeAt(Routine routine) => routine.trashed?.add(Notes.trashKeep);
+
+  /// The Routines and Reminders trashed on their own that can still be
+  /// restored, most recently deleted first. Those trashed with their
+  /// Note come back with it and are not listed.
+  List<Routine> trashed() {
+    final now = store.clock().toUtc();
+    final routines = [
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine))
+        if (byId(id) case final routine? when routine.trashedWith == null)
+          if (purgeAt(routine) case final at? when now.isBefore(at)) routine,
+    ];
+    routines.sort(
+      (a, b) => (b.trashed ?? DateTime(0)).compareTo(a.trashed ?? DateTime(0)),
+    );
+    return routines;
+  }
+
+  /// Purges every Routine and Reminder that has been in the trash for
+  /// [Notes.trashKeep]; those trashed with a Note go with it, on the same
+  /// day. The log keeps their entries; nothing shows them again.
+  void purgeTrash() {
+    final now = store.clock().toUtc();
+    store.batch(() {
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
+        final routine = byId(id);
+        final at = routine == null ? null : purgeAt(routine);
+        if (at == null || now.isBefore(at)) continue;
+        store.append(id, RoutineKeys.type, null);
+      }
+    });
   }
 
   /// Checks off [occurrence] of the Routine [id] as Done, at [at] or the
@@ -206,7 +307,7 @@ class Routines {
     store.append(id, RoutineKeys.done(occurrence), null);
   }
 
-  /// The Routine [id], or null when there is none.
+  /// The Routine [id], trashed or not, or null when there is none.
   Routine? byId(String id) {
     final fields = store.currentFields(id);
     if (fields[RoutineKeys.type] != RoutineKeys.typeRoutine) return null;
@@ -228,9 +329,14 @@ class Routines {
     }
     final renag = int.tryParse(fields[RoutineKeys.renag] ?? '');
     final escalation = int.tryParse(fields[RoutineKeys.escalation] ?? '');
+    final trashed = fields[RoutineKeys.trashed];
     DateTime? scheduledAt;
     for (final entry in store.history(id)) {
-      if (!RoutineKeys.scheduleFields.contains(entry.field)) continue;
+      // Leaving the trash bounds what was asked for like a new schedule.
+      if (!RoutineKeys.scheduleFields.contains(entry.field) &&
+          entry.field != RoutineKeys.trashed) {
+        continue;
+      }
       if (scheduledAt == null || entry.date.isAfter(scheduledAt)) {
         scheduledAt = entry.date;
       }
@@ -242,6 +348,8 @@ class Routines {
       renag: renag == null || renag < 1 ? null : Duration(minutes: renag),
       escalation: escalation == null || escalation < 1 ? null : escalation,
       scheduledAt: scheduledAt,
+      trashed: trashed == null ? null : DateTime.parse(trashed),
+      trashedWith: trashed == null ? null : fields[RoutineKeys.trashedWith],
       done: {
         for (final MapEntry(:key, :value) in fields.entries)
           if (key.startsWith(RoutineKeys.donePrefix) && value != null)
@@ -250,13 +358,15 @@ class Routines {
     );
   }
 
-  /// Every Routine and Reminder.
+  /// Every Routine and Reminder not in the trash.
   List<Routine> all() => [
-    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) ?byId(id),
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine))
+      if (byId(id) case final routine? when !routine.isTrashed) routine,
   ];
 
   /// The Note [routine] links back to: the Note it was spawned from, or
-  /// the one that Note was merged into. Null when it is gone for good.
+  /// the one that Note was merged into; it may be in the trash. Null when
+  /// it is gone for good.
   Note? note(Routine routine) {
     final notes = Notes(store);
     final note = notes.byId(routine.noteId);
@@ -265,7 +375,7 @@ class Routines {
   }
 
   /// The Routines and Reminders the Note [noteId] spawned, those of the
-  /// Notes merged into it included.
+  /// Notes merged into it included, without those in the trash.
   List<Routine> ofNote(String noteId) => [
     for (final routine in all())
       if (note(routine)?.id == noteId) routine,
@@ -311,9 +421,20 @@ class Routines {
     write(RoutineKeys.rule, schedule.rule?.format());
   }
 
+  // The writes behind restore, for use inside one batch.
+  void _untrash(Routine routine) {
+    store.append(routine.id, RoutineKeys.trashed, null);
+    if (routine.trashedWith != null) {
+      store.append(routine.id, RoutineKeys.trashedWith, null);
+    }
+  }
+
+  String _now() => store.clock().toUtc().toIso8601String();
+
+  /// The Routine [id], which must not be in the trash.
   Routine _require(String id) {
     final routine = byId(id);
-    if (routine == null) {
+    if (routine == null || routine.isTrashed) {
       throw ArgumentError.value(id, 'id', 'not a Routine');
     }
     return routine;

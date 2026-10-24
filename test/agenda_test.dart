@@ -387,16 +387,22 @@ void main() {
       expect(find.text('FREQ=MONTHLY;BYDAY=1MO'), findsOneWidget);
     });
 
-    testWidgets('a Routine is deleted after a confirm; its Note stays', (
+    testWidgets('a Routine is trashed after a confirm; its Note stays', (
       tester,
     ) async {
       final routine = routines.create('pills', daily([at(8)]));
       await start(tester);
       await tap(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
-      expect(find.text('Delete this Routine? Its Note stays.'), findsOneWidget);
+      expect(
+        find.text(
+          'Delete this Routine? It stays in the trash for 30 days. '
+          'Its Note stays.',
+        ),
+        findsOneWidget,
+      );
       await tap(tester, find.text('Delete').last);
-      expect(routines.byId(routine.id), isNull);
+      expect(routines.byId(routine.id)?.isTrashed, isTrue);
       expect(notes.all().single.isUnsorted, isFalse);
       expect(find.byType(Checkbox), findsNothing);
     });

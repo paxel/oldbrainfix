@@ -264,8 +264,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _change(() => _times = [..._times, ClockTime(picked.hour, picked.minute)]);
   }
 
-  bool get _canSave =>
-      _schedule != null && (_note != null || _text.text.trim().isNotEmpty);
+  /// A Routine saves whatever became of its Note; a new one needs a Note
+  /// in the lists to spawn from, or a text for one.
+  bool get _canSave {
+    if (_schedule == null) return false;
+    if (_routine != null) return true;
+    final note = _note;
+    return note == null ? _text.text.trim().isNotEmpty : !note.isTrashed;
+  }
 
   void _save() {
     final schedule = _schedule;
@@ -318,16 +324,27 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       ),
     );
     if (!mounted || sure != true) return;
-    _routines.delete(routine.id);
+    _routines.trash(routine.id);
     Navigator.of(context).pop(true);
   }
 
   Future<void> _openNote() async {
     final note = _note;
-    if (note == null) return;
+    if (note == null || note.isTrashed) return;
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
-    setState(() => _note = widget.notes.byId(note.id));
+    // Deleting the Note there may have taken this Routine along.
+    final routine = _routine;
+    if (routine != null && (_routines.byId(routine.id)?.isTrashed ?? true)) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    // A Merge there moves the back-link to the Note it went into.
+    setState(
+      () => _note = routine == null
+          ? widget.notes.byId(note.id)
+          : _routines.note(routine),
+    );
   }
 
   @override
@@ -379,7 +396,18 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             EditorPanel(
               heading: t.fromNote,
               child: note == null
-                  ? Text(t.noteGone)
+                  ? Text(t.noteDeleted)
+                  : note.isTrashed
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          note.text,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        Text(t.noteInTrash),
+                      ],
+                    )
                   : Material(
                       // The ink shows on the panel, not under it.
                       type: MaterialType.transparency,

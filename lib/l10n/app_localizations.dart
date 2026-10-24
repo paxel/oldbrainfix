@@ -881,13 +881,13 @@ abstract class AppLocalizations {
   /// No description provided for @deleteRoutineQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Routine? Its Note stays.'**
+  /// **'Delete this Routine? It stays in the trash for 30 days. Its Note stays.'**
   String get deleteRoutineQuestion;
 
   /// No description provided for @deleteReminderQuestion.
   ///
   /// In en, this message translates to:
-  /// **'Delete this Reminder? Its Note stays.'**
+  /// **'Delete this Reminder? It stays in the trash for 30 days. Its Note stays.'**
   String get deleteReminderQuestion;
 
   /// No description provided for @routinesHeading.
@@ -1303,6 +1303,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Until'**
   String get quietUntil;
+
+  /// No description provided for @yes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get no;
+
+  /// No description provided for @deleteNoteRoutines.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Also delete the linked Routine?} other{Also delete the {count} linked Routines?}}'**
+  String deleteNoteRoutines(int count);
+
+  /// No description provided for @deleteNoteReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Also delete the linked Reminder?} other{Also delete the {count} linked Reminders?}}'**
+  String deleteNoteReminders(int count);
+
+  /// No description provided for @deleteNoteRoutinesAndReminders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, other{Also delete the {count} linked Routines and Reminders?}}'**
+  String deleteNoteRoutinesAndReminders(int count);
+
+  /// No description provided for @deleteNoteLinkedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.'**
+  String get deleteNoteLinkedDetail;
+
+  /// No description provided for @noteInTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note is in the trash'**
+  String get noteInTrash;
+
+  /// No description provided for @noteDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note was deleted'**
+  String get noteDeleted;
 }
 
 class _AppLocalizationsDelegate

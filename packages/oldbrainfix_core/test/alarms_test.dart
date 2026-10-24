@@ -168,7 +168,7 @@ void main() {
             Schedule(start: Day(2026, 10, 25), times: [at(10)]),
           )
           .id;
-      routines.delete(gone);
+      routines.trash(gone);
       expect(plan(), isEmpty);
     });
 
@@ -258,7 +258,7 @@ void main() {
         now.add(const Duration(minutes: 10)),
       );
       expect(store.allEntries(), hasLength(entries), reason: 'never logged');
-      routines.delete(id);
+      routines.trash(id);
       expect(plan(), isEmpty);
     });
 
@@ -324,7 +324,7 @@ void main() {
         alarms.applyDone('routine:gone', '2026-10-24T08:00', now),
         isFalse,
       );
-      routines.delete(id);
+      routines.trash(id);
       expect(alarms.applyDone(id, '2026-10-24T08:00', now), isFalse);
     });
 

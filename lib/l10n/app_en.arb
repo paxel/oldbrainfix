@@ -221,8 +221,8 @@
   },
   "nextOccurrences": "Next",
   "neverDue": "This never comes up.",
-  "deleteRoutineQuestion": "Delete this Routine? Its Note stays.",
-  "deleteReminderQuestion": "Delete this Reminder? Its Note stays.",
+  "deleteRoutineQuestion": "Delete this Routine? It stays in the trash for 30 days. Its Note stays.",
+  "deleteReminderQuestion": "Delete this Reminder? It stays in the trash for 30 days. Its Note stays.",
   "routinesHeading": "Routines and Reminders",
   "everyNDays": "{count, plural, =1{Every day} other{Every {count} days}}",
   "@everyNDays": {
@@ -440,5 +440,34 @@
   },
   "quietHoursOff": "no Quiet Hours",
   "quietFrom": "From",
-  "quietUntil": "Until"
+  "quietUntil": "Until",
+  "yes": "Yes",
+  "no": "No",
+  "deleteNoteRoutines": "{count, plural, =1{Also delete the linked Routine?} other{Also delete the {count} linked Routines?}}",
+  "@deleteNoteRoutines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteNoteReminders": "{count, plural, =1{Also delete the linked Reminder?} other{Also delete the {count} linked Reminders?}}",
+  "@deleteNoteReminders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteNoteRoutinesAndReminders": "{count, plural, other{Also delete the {count} linked Routines and Reminders?}}",
+  "@deleteNoteRoutinesAndReminders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteNoteLinkedDetail": "Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.",
+  "noteInTrash": "The Note is in the trash",
+  "noteDeleted": "The Note was deleted"
 }

@@ -4,10 +4,14 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'browser.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'note_card.dart';
+import 'schedule_text.dart';
 
-/// The deleted Notes, most recently deleted first, each with how long it
-/// stays and a button to restore it to where it was filed.
+/// The deleted Notes, and the Routines and Reminders deleted on their
+/// own, most recently deleted first, each with how long it stays and a
+/// button to restore it. A Note comes back to where it was filed, with
+/// the Routines and Reminders deleted along with it.
 class TrashScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -18,23 +22,97 @@ class TrashScreen extends StatefulWidget {
   State<TrashScreen> createState() => _TrashScreenState();
 }
 
+/// One thing in the trash: a Note or a Routine, with when it was deleted.
+typedef _Trashed = ({DateTime at, PlacedNote? note, Routine? routine});
+
 class _TrashScreenState extends State<TrashScreen> {
-  late List<PlacedNote> _trashed = _load();
+  late final _routines = Routines(widget.notes.store);
+  late List<_Trashed> _trashed = _load();
 
-  List<PlacedNote> _load() => [
-    for (final note in widget.notes.trashed()) placeNote(widget.places, note),
-  ];
+  List<_Trashed> _load() {
+    final trashed = <_Trashed>[
+      for (final note in widget.notes.trashed())
+        (
+          at: note.trashed ?? note.captured,
+          note: placeNote(widget.places, note),
+          routine: null,
+        ),
+      for (final routine in _routines.trashed())
+        (at: routine.trashed ?? DateTime(0), note: null, routine: routine),
+    ];
+    trashed.sort((a, b) => b.at.compareTo(a.at));
+    return trashed;
+  }
 
-  void _restore(Note note) {
-    widget.notes.restore(note.id);
+  void _restoreNote(Note note) {
+    _routines.restoreNote(note.id);
     setState(() => _trashed = _load());
   }
 
-  /// Whole days until [note] is purged, by the store's clock.
-  int _daysLeft(Note note) {
-    final at = widget.notes.purgeAt(note);
+  void _restoreRoutine(Routine routine) {
+    _routines.restore(routine.id);
+    setState(() => _trashed = _load());
+  }
+
+  /// Whole days until [at], by the store's clock.
+  int _daysLeft(DateTime? at) {
     if (at == null) return 0;
     return at.difference(widget.notes.store.clock().toUtc()).inDays;
+  }
+
+  Widget _footer(DateTime? purgeAt, VoidCallback restore) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          context.t.goneIn(_daysLeft(purgeAt)),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ),
+      TextButton(onPressed: restore, child: Text(context.t.restore)),
+    ],
+  );
+
+  /// A Routine or Reminder: what it reminds of and when.
+  Widget _routineCard(Routine routine) {
+    final t = context.t;
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toString();
+    final note = _routines.note(routine);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Embossed(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 4, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    routine.isReminder
+                        ? Icons.notifications_outlined
+                        : Icons.repeat,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      note?.text ?? t.noteDeleted,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(scheduleText(t, locale, routine.schedule)),
+              _footer(
+                _routines.purgeAt(routine),
+                () => _restoreRoutine(routine),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -49,27 +127,24 @@ class _TrashScreenState extends State<TrashScreen> {
         children: _trashed.isEmpty
             ? [BrowserEmpty(text: t.trashEmpty)]
             : [
-                for (final (:note, :area, :topic) in _trashed)
-                  NoteCard(
-                    note: note,
-                    when: when,
-                    area: area,
-                    topic: topic,
-                    footer: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            t.goneIn(_daysLeft(note)),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => _restore(note),
-                          child: Text(t.restore),
-                        ),
-                      ],
-                    ),
-                  ),
+                for (final trashed in _trashed)
+                  if (trashed.note case (
+                    :final note,
+                    :final area,
+                    :final topic,
+                  ))
+                    NoteCard(
+                      note: note,
+                      when: when,
+                      area: area,
+                      topic: topic,
+                      footer: _footer(
+                        widget.notes.purgeAt(note),
+                        () => _restoreNote(note),
+                      ),
+                    )
+                  else if (trashed.routine case final routine?)
+                    _routineCard(routine),
               ],
       ),
     );

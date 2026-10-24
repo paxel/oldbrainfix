@@ -471,10 +471,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get neverDue => 'This never comes up.';
 
   @override
-  String get deleteRoutineQuestion => 'Delete this Routine? Its Note stays.';
+  String get deleteRoutineQuestion =>
+      'Delete this Routine? It stays in the trash for 30 days. Its Note stays.';
 
   @override
-  String get deleteReminderQuestion => 'Delete this Reminder? Its Note stays.';
+  String get deleteReminderQuestion =>
+      'Delete this Reminder? It stays in the trash for 30 days. Its Note stays.';
 
   @override
   String get routinesHeading => 'Routines and Reminders';
@@ -771,4 +773,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quietUntil => 'Until';
+
+  @override
+  String get yes => 'Yes';
+
+  @override
+  String get no => 'No';
+
+  @override
+  String deleteNoteRoutines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Also delete the $count linked Routines?',
+      one: 'Also delete the linked Routine?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteNoteReminders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Also delete the $count linked Reminders?',
+      one: 'Also delete the linked Reminder?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteNoteRoutinesAndReminders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Also delete the $count linked Routines and Reminders?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteNoteLinkedDetail =>
+      'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.';
+
+  @override
+  String get noteInTrash => 'The Note is in the trash';
+
+  @override
+  String get noteDeleted => 'The Note was deleted';
 }

@@ -39,6 +39,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Nudges for Unsorted Notes: the capture screen offers "remind me to sort it in" 10 min, 30 min or 1 h at the bottom, each saving the Note; Save or Back means 1 h. Typed text is never lost: leaving by Back saves it, and so does the app going to the background, without making a second Note when you come back. One Nudge comes at the earliest of these times and covers every Unsorted Note, then again every hour while anything is Unsorted, even with the app closed. It is a normal notification saying how many Notes wait, with snoozes of 10 min, 30 min and 1 h; tapping it opens the three oldest Unsorted cards, each opening its Note or sorting it right there, and "+x" for all of them.
 - An "x Unsorted" banner on the Agenda, under the Missed card, opens all Unsorted Notes, oldest first.
 - Quiet Hours (22:00 to 08:00 unless changed): Nudges wait until they end, Routines and Reminders still ring on time. Quiet Hours and how long an ignored Nudge waits (10 min, 30 min or 1 h) are set per phone in "Nudges on this phone" on the Unsorted list and the Nudge screen for now.
+- Deleting a Note that has Routines or Reminders asks whether to delete them too. Yes puts them in the trash with the Note, and restoring the Note brings them back; No keeps them ringing, and their editor shows that the Note is in the trash, or later that it was deleted.
+- Deleting a Routine or Reminder puts it in the trash for 30 days, next to the deleted Notes, where it can be restored; it rings again on its usual schedule, and nothing from its time in the trash counts as Missed.
 
 ---
 

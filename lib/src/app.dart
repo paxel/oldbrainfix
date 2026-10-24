@@ -66,6 +66,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     super.initState();
     // What has been in the trash for 30 days goes for good.
     _notes.purgeTrash();
+    Routines(widget.store).purgeTrash();
     _alarms = AlarmSync(
       store: widget.store,
       platform: widget.alarms,

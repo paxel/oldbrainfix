@@ -475,11 +475,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get deleteRoutineQuestion =>
-      'Diese Routine löschen? Ihre Notiz bleibt.';
+      'Diese Routine löschen? Sie bleibt 30 Tage im Papierkorb. Ihre Notiz bleibt.';
 
   @override
   String get deleteReminderQuestion =>
-      'Diese Erinnerung löschen? Ihre Notiz bleibt.';
+      'Diese Erinnerung löschen? Sie bleibt 30 Tage im Papierkorb. Ihre Notiz bleibt.';
 
   @override
   String get routinesHeading => 'Routinen und Erinnerungen';
@@ -778,4 +778,52 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get quietUntil => 'Bis';
+
+  @override
+  String get yes => 'Ja';
+
+  @override
+  String get no => 'Nein';
+
+  @override
+  String deleteNoteRoutines(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Auch die $count verknüpften Routinen löschen?',
+      one: 'Auch die verknüpfte Routine löschen?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteNoteReminders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Auch die $count verknüpften Erinnerungen löschen?',
+      one: 'Auch die verknüpfte Erinnerung löschen?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deleteNoteRoutinesAndReminders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Auch die $count verknüpften Routinen und Erinnerungen löschen?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteNoteLinkedDetail =>
+      'Mitgelöschte kommen mit der Notiz zurück, wenn du sie wiederherstellst. Behaltene erinnern dich weiter.';
+
+  @override
+  String get noteInTrash => 'Die Notiz liegt im Papierkorb';
+
+  @override
+  String get noteDeleted => 'Die Notiz wurde gelöscht';
 }

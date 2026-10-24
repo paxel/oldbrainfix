@@ -468,12 +468,14 @@ class Alarms {
 
   /// Applies a Done tapped on a notification at [at]: [occurrenceKey] of
   /// the Routine [routineId] is checked off as of then. Returns whether
-  /// it changed anything; a Routine deleted or rescheduled meanwhile, or
+  /// it changed anything; a Routine trashed or rescheduled meanwhile, or
   /// an Occurrence already Done, is left as it is.
   bool applyDone(String routineId, String occurrenceKey, DateTime at) {
     final occurrence = Occurrence.tryParse(occurrenceKey);
     final routine = Routines(store).byId(routineId);
-    if (occurrence == null || routine == null) return false;
+    if (occurrence == null || routine == null || routine.isTrashed) {
+      return false;
+    }
     if (routine.doneAt(occurrence) != null) return false;
     try {
       Routines(store).markDone(routineId, occurrence, at: at);

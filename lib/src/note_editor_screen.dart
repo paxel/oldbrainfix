@@ -229,8 +229,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
-  void _trash() {
-    widget.notes.trash(widget.noteId);
+  /// Moves the Note to the trash at once, as it can be restored. When it
+  /// spawned Routines or Reminders, asks first whether they go too; they
+  /// never vanish as a side effect.
+  Future<void> _trash() async {
+    final routines = _routineBook.ofNote(widget.noteId);
+    var withRoutines = false;
+    if (routines.isNotEmpty) {
+      final answer = await showDialog<bool>(
+        context: context,
+        builder: (_) => _TrashRoutinesDialog(routines: routines),
+      );
+      if (!mounted || answer == null) return;
+      withRoutines = answer;
+    }
+    _routineBook.trashNote(widget.noteId, withRoutines: withRoutines);
     Navigator.of(context).pop();
   }
 
@@ -492,6 +505,44 @@ class EditorPanel extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Asks whether the Routines and Reminders of a Note being deleted go
+/// to the trash too: true for yes, false for no, null to cancel.
+class _TrashRoutinesDialog extends StatelessWidget {
+  final List<Routine> routines;
+
+  const _TrashRoutinesDialog({required this.routines});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final count = routines.length;
+    final reminders = routines.where((r) => r.isReminder).length;
+    final question = reminders == count
+        ? t.deleteNoteReminders(count)
+        : reminders == 0
+        ? t.deleteNoteRoutines(count)
+        : t.deleteNoteRoutinesAndReminders(count);
+    return AlertDialog(
+      title: Text(question),
+      content: Text(t.deleteNoteLinkedDetail),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(t.no),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(t.yes),
+        ),
+      ],
+    );
+  }
 }
 
 /// Asks for the text of a new Section.

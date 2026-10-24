@@ -61,8 +61,8 @@ void main() {
       expect(notes.byId(pills.id)?.isUnsorted, isTrue);
       final routine = routines.spawn(pills.id, daily([at(8)]));
       expect(notes.byId(pills.id)?.isUnsorted, isFalse);
-      routines.delete(routine.id);
-      expect(routines.byId(routine.id), isNull);
+      routines.trash(routine.id);
+      expect(routines.all(), isEmpty);
       expect(notes.byId(pills.id)?.isUnsorted, isFalse);
     });
 
@@ -308,10 +308,197 @@ void main() {
       expect(agenda.tomorrowRows, isEmpty);
     });
 
-    test('a deleted Routine leaves the Agenda', () {
+    test('a trashed Routine leaves the Agenda', () {
       final routine = routines.create('pills', daily([at(8)]));
-      routines.delete(routine.id);
+      routines.trash(routine.id);
       expect(routines.agenda(europe).todayRows, isEmpty);
+    });
+  });
+
+  group('trash', () {
+    late Alarms alarms;
+    setUp(() => alarms = Alarms(store));
+
+    Set<String> planned() => {for (final a in alarms.plan(europe)) a.routineId};
+
+    Set<String> missed() => {
+      for (final r in alarms.missed(europe).routines) r.routine.id,
+    };
+
+    test('a Routine deleted on its own goes to the trash, its Note stays', () {
+      final pills = routines.create('pills', daily([at(8)]));
+      final note = routines.note(pills);
+      routines.trash(pills.id);
+      expect(routines.all(), isEmpty);
+      expect(routines.ofNote(note?.id ?? ''), isEmpty);
+      expect(routines.byId(pills.id)?.isTrashed, isTrue);
+      expect(routines.trashed().map((r) => r.id), [pills.id]);
+      expect(planned(), isEmpty);
+      expect(notes.all().single.isUnsorted, isFalse);
+      // A trashed Routine is neither changed nor checked off.
+      expect(
+        () => routines.markDone(pills.id, Occurrence(today, at(8))),
+        throwsArgumentError,
+      );
+      expect(alarms.applyDone(pills.id, '2026-10-24T08:00', now), isFalse);
+    });
+
+    test('the trash lists Routines on their own, latest deletion first', () {
+      final a = routines.create('a', daily([at(8)]));
+      final b = routines.create('b', daily([at(8)]));
+      routines.trash(b.id);
+      now = now.add(const Duration(minutes: 1));
+      routines.trash(a.id);
+      expect(routines.trashed().map((r) => r.id), [a.id, b.id]);
+    });
+
+    test('nothing is Missed or Re-nagged from its time in the trash; '
+        'restored, it goes on as scheduled (ADR 0006)', () {
+      final pills = routines.create('pills', daily([at(8), at(20)]));
+      routines.trash(pills.id);
+      // Two days in the trash, then restored at 09:00 on the 26th.
+      now = DateTime.utc(2026, 10, 26, 8);
+      expect(missed(), isEmpty);
+      routines.restore(pills.id);
+      expect(routines.byId(pills.id)?.isTrashed, isFalse);
+      expect(routines.trashed(), isEmpty);
+      expect(missed(), isEmpty);
+      final next = alarms.plan(europe).first;
+      expect(next.occurrence, Occurrence(Day(2026, 10, 26), at(20)));
+      expect(routines.agenda(europe).todayRows, hasLength(2));
+    });
+
+    test('after 30 days in the trash a Routine is purged', () {
+      final pills = routines.create('pills', daily([at(8)]));
+      routines.trash(pills.id);
+      final trashedAt = now;
+      expect(
+        routines.purgeAt(routines.trashed().single),
+        trashedAt.add(Notes.trashKeep),
+      );
+      now = trashedAt.add(Notes.trashKeep - const Duration(minutes: 1));
+      routines.purgeTrash();
+      expect(routines.trashed().map((r) => r.id), [pills.id]);
+      now = trashedAt.add(Notes.trashKeep);
+      routines.purgeTrash();
+      expect(routines.byId(pills.id), isNull);
+      expect(routines.trashed(), isEmpty);
+      expect(notes.all(), hasLength(1));
+    });
+
+    test('Yes: a Note goes to the trash with its Routines, and comes back '
+        'with them', () {
+      final dentist = notes.capture('dentist');
+      final dayBefore = routines.spawn(
+        dentist.id,
+        Schedule(start: today, times: [at(18)]),
+      );
+      final hourBefore = routines.spawn(
+        dentist.id,
+        Schedule(start: tomorrow, times: [at(9)]),
+      );
+      routines.trashNote(dentist.id, withRoutines: true);
+      expect(notes.byId(dentist.id)?.isTrashed, isTrue);
+      expect(routines.all(), isEmpty);
+      expect(planned(), isEmpty);
+      expect(routines.agenda(europe).todayRows, isEmpty);
+      // They are in the trash with the Note, not on their own.
+      expect(routines.trashed(), isEmpty);
+      expect(notes.trashed().map((n) => n.id), [dentist.id]);
+      // The same moment as the Note's, so both are purged together.
+      expect(routines.byId(dayBefore.id)?.trashed, isNotNull);
+      expect(
+        routines.byId(dayBefore.id)?.trashed,
+        notes.byId(dentist.id)?.trashed,
+      );
+
+      routines.restoreNote(dentist.id);
+      expect(notes.byId(dentist.id)?.isTrashed, isFalse);
+      expect(routines.ofNote(dentist.id).map((r) => r.id).toSet(), {
+        dayBefore.id,
+        hourBefore.id,
+      });
+      expect(planned(), {dayBefore.id, hourBefore.id});
+    });
+
+    test('Yes: Note and Routines are purged together', () {
+      final dentist = notes.capture('dentist');
+      final reminder = routines.spawn(
+        dentist.id,
+        Schedule(start: tomorrow, times: [at(9)]),
+      );
+      routines.trashNote(dentist.id, withRoutines: true);
+      now = now.add(Notes.trashKeep);
+      notes.purgeTrash();
+      routines.purgeTrash();
+      expect(notes.byId(dentist.id), isNull);
+      expect(routines.byId(reminder.id), isNull);
+    });
+
+    test('restoring a Note leaves a Routine trashed on its own in the '
+        'trash', () {
+      final pills = notes.capture('pills');
+      final morning = routines.spawn(pills.id, daily([at(8)]));
+      final evening = routines.spawn(pills.id, daily([at(20)]));
+      routines.trash(morning.id);
+      routines.trashNote(pills.id, withRoutines: true);
+      routines.restoreNote(pills.id);
+      expect(routines.ofNote(pills.id).map((r) => r.id), [evening.id]);
+      expect(routines.trashed().map((r) => r.id), [morning.id]);
+    });
+
+    test('No: the Routines stay, linking to the Note in the trash and then '
+        'to nothing once it is purged', () {
+      final pills = notes.capture('pills');
+      final routine = routines.spawn(pills.id, daily([at(20)]));
+      routines.trashNote(pills.id, withRoutines: false);
+      expect(routines.all().map((r) => r.id), [routine.id]);
+      expect(routines.note(routine)?.isTrashed, isTrue);
+      expect(planned(), {routine.id});
+
+      now = now.add(Notes.trashKeep);
+      notes.purgeTrash();
+      routines.purgeTrash();
+      expect(routines.all().map((r) => r.id), [routine.id]);
+      expect(routines.note(routine), isNull);
+    });
+
+    test('No, then the Note comes back: the Routines were never away', () {
+      final pills = notes.capture('pills');
+      final routine = routines.spawn(pills.id, daily([at(20)]));
+      routines.trashNote(pills.id, withRoutines: false);
+      routines.restoreNote(pills.id);
+      expect(routines.note(routine)?.isTrashed, isFalse);
+      // A second deletion with Yes takes them along after all.
+      routines.trashNote(pills.id, withRoutines: true);
+      expect(routines.all(), isEmpty);
+    });
+
+    test('a merged Note\'s Routines go with the Note it went into', () {
+      final target = notes.capture('dentist');
+      final merged = notes.capture('dentist Tuesday');
+      final routine = routines.spawn(merged.id, daily([at(8)]));
+      notes.merge(merged.id, target.id);
+      routines.trashNote(target.id, withRoutines: true);
+      expect(routines.all(), isEmpty);
+      routines.restoreNote(target.id);
+      expect(routines.ofNote(target.id).map((r) => r.id), [routine.id]);
+    });
+
+    test('a merged Note\'s kept Routines link to the trashed target, then '
+        'to nothing', () {
+      final target = notes.capture('dentist');
+      final merged = notes.capture('dentist Tuesday');
+      final routine = routines.spawn(merged.id, daily([at(8)]));
+      notes.merge(merged.id, target.id);
+      routines.trashNote(target.id, withRoutines: false);
+      final note = routines.note(routine);
+      expect(note?.id, target.id);
+      expect(note?.isTrashed, isTrue);
+      now = now.add(Notes.trashKeep);
+      notes.purgeTrash();
+      expect(routines.note(routine), isNull);
+      expect(routines.all().map((r) => r.id), [routine.id]);
     });
   });
 }
