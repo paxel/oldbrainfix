@@ -288,7 +288,9 @@ class Places {
     for (final note in _notesInside(id)) {
       switch (notesGo) {
         case NotesGo.unsorted:
+          // Back to Unsorted, even when it spawned a Routine (CONTEXT.md).
           store.append(note.id, NoteKeys.place, null);
+          if (note.spawned) store.append(note.id, NoteKeys.spawned, null);
         case NotesGo.area:
           store.append(note.id, NoteKeys.place, areaId);
         case NotesGo.trash:

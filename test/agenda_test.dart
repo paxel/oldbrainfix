@@ -1,0 +1,407 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
+import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+void main() {
+  late Store store;
+  late Notes notes;
+  late Routines routines;
+  // 09:00 on Saturday, 24 October 2026, on the test machine's clock.
+  var now = DateTime(2026, 10, 24, 9);
+  final today = Day(2026, 10, 24);
+  final tomorrow = Day(2026, 10, 25);
+
+  setUp(() {
+    now = DateTime(2026, 10, 24, 9);
+    store = Store.inMemory(clock: () => now)..starterSetOffered = true;
+    notes = Notes(store);
+    routines = Routines(store);
+  });
+  tearDown(() => store.close());
+
+  ClockTime at(int hour, [int minute = 0]) => ClockTime(hour, minute);
+
+  Schedule daily(List<ClockTime> times) => Schedule(
+    start: Day(2026, 10, 1),
+    times: times,
+    rule: Recurrence.parse('FREQ=DAILY'),
+  );
+
+  Future<void> start(WidgetTester tester) async {
+    await tester.pumpWidget(OldBrainFixApp(store: store));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> tap(WidgetTester tester, Finder finder) async {
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  /// The Agenda's rows from top to bottom as "time text", with [x] when
+  /// Done.
+  List<String> agendaRows(WidgetTester tester) => [
+    for (final box in tester.widgetList<Checkbox>(find.byType(Checkbox)))
+      () {
+        final row = find.ancestor(
+          of: find.byWidget(box),
+          matching: find.byType(Row),
+        );
+        final texts = tester
+            .widgetList<Text>(
+              find.descendant(of: row.first, matching: find.byType(Text)),
+            )
+            .map((t) => t.data)
+            .join(' ');
+        return '${box.value == true ? '[x] ' : ''}$texts';
+      }(),
+  ];
+
+  /// Whether [text] is drawn faded, as tomorrow is.
+  bool dimmed(WidgetTester tester, String text) => tester
+      .widgetList<Opacity>(
+        find.ancestor(of: find.text(text), matching: find.byType(Opacity)),
+      )
+      .any((o) => o.opacity == AgendaScreen.tomorrowOpacity);
+
+  group('the Agenda', () {
+    testWidgets('is the home screen, with "+" and the magnifier floating', (
+      tester,
+    ) async {
+      await start(tester);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsNWidgets(2));
+      expect(find.byTooltip('Capture a Note'), findsOneWidget);
+      expect(find.byTooltip('Search and browse'), findsOneWidget);
+      expect(
+        find.text('Nothing due today. Tap + to capture a thought.'),
+        findsOneWidget,
+      );
+      expect(find.text('Nothing due tomorrow.'), findsOneWidget);
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.bottomNavigationBar, isNull);
+      expect(scaffold.bottomSheet, isNull);
+    });
+
+    testWidgets('today all-day first, then by time; a gap; tomorrow dimmed', (
+      tester,
+    ) async {
+      routines.create('pills', daily([at(20), at(8)]));
+      routines.create('tidy up', daily([]));
+      routines.create('dentist', Schedule(start: tomorrow, times: [at(10)]));
+      routines.create('call Mum', Schedule(start: today, times: [at(12)]));
+      await start(tester);
+
+      expect(agendaRows(tester), [
+        'All day tidy up',
+        '08:00 pills',
+        '12:00 call Mum',
+        '20:00 pills',
+        'All day tidy up',
+        '08:00 pills',
+        '10:00 dentist',
+        '20:00 pills',
+      ]);
+      expect(find.text('Today'), findsOneWidget);
+      expect(dimmed(tester, 'Tomorrow'), isTrue);
+      expect(dimmed(tester, 'dentist'), isTrue);
+      expect(dimmed(tester, 'call Mum'), isFalse);
+      final todayEnd = tester.getRect(find.text('20:00').first).bottom;
+      final tomorrowStart = tester.getRect(find.text('Tomorrow')).top;
+      expect(tomorrowStart - todayEnd, greaterThan(32));
+    });
+
+    testWidgets('each time of day is checked off on its own', (tester) async {
+      final pills = routines.create('pills', daily([at(8), at(14)]));
+      await start(tester);
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).take(2), ['[x] 08:00 pills', '14:00 pills']);
+      expect(
+        routines.byId(pills.id)?.doneAt(Occurrence(today, at(8))),
+        isNotNull,
+      );
+      expect(
+        routines.byId(pills.id)?.doneAt(Occurrence(today, at(14))),
+        isNull,
+      );
+      // Unchecking takes it back.
+      await tap(tester, find.byType(Checkbox).first);
+      expect(agendaRows(tester).first, '08:00 pills');
+    });
+
+    testWidgets('tomorrow is checked off today, and stays where it is', (
+      tester,
+    ) async {
+      final report = routines.create(
+        'weekly report',
+        Schedule(start: tomorrow, rule: Recurrence.parse('FREQ=WEEKLY')),
+      );
+      await start(tester);
+      await tap(tester, find.byType(Checkbox));
+      expect(agendaRows(tester), ['[x] All day weekly report']);
+      expect(
+        routines.byId(report.id)?.doneAt(Occurrence(tomorrow)),
+        now.toUtc(),
+      );
+      expect(routines.byId(report.id)?.schedule.next(tomorrow, 2), [
+        Occurrence(tomorrow),
+        Occurrence(Day(2026, 11, 1)),
+      ]);
+    });
+  });
+
+  group('spawning', () {
+    testWidgets('a captured Note\'s card offers a Reminder; it leaves '
+        'Unsorted and shows on the Agenda', (tester) async {
+      await start(tester);
+      await tap(tester, find.byTooltip('Capture a Note'));
+      await tester.enterText(find.byType(TextField), 'call the plumber');
+      await tap(tester, find.text('Save'));
+
+      expect(find.text('Just captured'), findsOneWidget);
+      expect(find.byType(NoteCard), findsOneWidget);
+      await tap(tester, find.byTooltip('Routine or Reminder'));
+      expect(find.byType(BottomSheet), findsNothing);
+      await tap(tester, find.text('Reminder'));
+
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+      expect(find.text('New Reminder'), findsOneWidget);
+      expect(
+        find.text('call the plumber'),
+        findsOneWidget,
+        reason: 'back-link',
+      );
+      // Once, at the next full hour.
+      await tap(tester, find.text('Save'));
+
+      final note = notes.all().single;
+      expect(note.isUnsorted, isFalse);
+      final reminder = routines.ofNote(note.id).single;
+      expect(reminder.isReminder, isTrue);
+      expect(reminder.schedule.on(today), [Occurrence(today, at(10))]);
+      expect(agendaRows(tester), ['10:00 call the plumber']);
+      expect(find.text('Unsorted'), findsNothing, reason: 'nor on its card');
+      await tap(tester, find.text('call the plumber').first);
+      expect(find.text('Not filed'), findsOneWidget);
+    });
+
+    testWidgets('the captured card stays through a dialog, not a return', (
+      tester,
+    ) async {
+      await start(tester);
+      await tap(tester, find.byTooltip('Capture a Note'));
+      await tester.enterText(find.byType(TextField), 'milk');
+      await tap(tester, find.text('Save'));
+      final binding = tester.binding;
+      // A system dialog or the notification shade over the app.
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Just captured'), findsOneWidget);
+      // The app left for the background and came back.
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('Just captured'), findsNothing);
+      expect(find.byType(NoteCard), findsNothing);
+    });
+
+    testWidgets('a Note spawns several from its editor, each linking back', (
+      tester,
+    ) async {
+      final dentist = notes.capture('dentist');
+      await start(tester);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await tap(tester, find.text('dentist'));
+
+      await tap(tester, find.text('Reminder'));
+      await tap(tester, find.text('Save'));
+      await tap(tester, find.text('Routine'));
+      expect(find.text('New Routine'), findsOneWidget);
+      await tap(tester, find.text('Save'));
+
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+      expect(find.text('Every day · 08:00'), findsOneWidget);
+      expect(find.textContaining('Once, '), findsOneWidget);
+      final spawned = routines.ofNote(dentist.id);
+      expect(spawned, hasLength(2));
+      expect(spawned.where((r) => r.isReminder), hasLength(1));
+
+      await tap(tester, find.text('Every day · 08:00'));
+      expect(find.text('From the Note'), findsOneWidget);
+      await tap(tester, find.text('dentist'));
+      expect(find.byType(NoteEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('a browser card offers a Routine from a menu at the finger', (
+      tester,
+    ) async {
+      notes.capture('water the plants');
+      await start(tester);
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await tap(tester, find.byTooltip('Routine or Reminder'));
+      expect(find.byType(BottomSheet), findsNothing);
+      await tap(tester, find.text('Routine').last);
+      await tap(tester, find.text('Save'));
+      expect(routines.all().single.isReminder, isFalse);
+      expect(notes.all().single.isUnsorted, isFalse);
+    });
+
+    testWidgets('a Routine made directly makes its Note, not Unsorted', (
+      tester,
+    ) async {
+      await start(tester);
+      await tap(tester, find.byTooltip('New Routine or Reminder'));
+      expect(
+        tester
+            .widget<TextButton>(
+              find.ancestor(
+                of: find.text('Save'),
+                matching: find.byType(TextButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+        reason: 'nothing typed yet',
+      );
+      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Save'));
+
+      final note = notes.all().single;
+      expect(note.text, 'pills');
+      expect(note.isUnsorted, isFalse);
+      expect(routines.note(routines.all().single)?.id, note.id);
+      expect(agendaRows(tester), ['08:00 pills', '08:00 pills']);
+    });
+  });
+
+  group('schedule editor', () {
+    Future<void> openNew(WidgetTester tester) async {
+      await start(tester);
+      await tap(tester, find.byTooltip('New Routine or Reminder'));
+      await tester.enterText(find.byType(TextField), 'pills');
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('every N weeks, and several times a day', (tester) async {
+      await openNew(tester);
+      await tap(tester, find.byTooltip('More'));
+      await tap(tester, find.text('days'));
+      await tap(tester, find.text('weeks').last);
+      // A second time of day: the picker offers 08:00, after 08:00 went.
+      await tap(tester, find.byTooltip('Remove 08:00'));
+      expect(find.text('All day'), findsOneWidget);
+      await tap(tester, find.text('Add a time'));
+      await tap(tester, find.text('OK'));
+      await tap(tester, find.text('Save'));
+
+      final schedule = routines.all().single.schedule;
+      expect(schedule.rule?.format(), 'FREQ=WEEKLY;INTERVAL=2');
+      expect(schedule.times, [at(8)]);
+      expect(schedule.start, today);
+    });
+
+    testWidgets('chosen weekdays', (tester) async {
+      await openNew(tester);
+      await tap(tester, find.text('Weekdays'));
+      // Saturday, the start's weekday, comes ticked; add Monday.
+      await tester.ensureVisible(find.text('Mon'));
+      await tap(tester, find.text('Mon'));
+      await tap(tester, find.text('Save'));
+      expect(
+        routines.all().single.schedule.rule?.format(),
+        'FREQ=WEEKLY;BYDAY=MO,SA',
+      );
+    });
+
+    testWidgets('the advanced mode takes an RRULE and shows what comes', (
+      tester,
+    ) async {
+      await openNew(tester);
+      await tap(tester, find.text('Advanced'));
+      expect(find.text('FREQ=DAILY'), findsOneWidget);
+      await tester.enterText(
+        find.byType(TextField).last,
+        'FREQ=DAILY;BYSETPOS=1',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Not a rule this app understands: BYSETPOS'),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.ancestor(
+                of: find.text('Save'),
+                matching: find.byType(TextButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.enterText(
+        find.byType(TextField).last,
+        'FREQ=MONTHLY;BYDAY=1MO',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Mon, 11/2/2026  08:00'), findsOneWidget);
+      await tap(tester, find.text('Save'));
+
+      final routine = routines.all().single;
+      expect(routine.schedule.rule?.format(), 'FREQ=MONTHLY;BYDAY=1MO');
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await tap(tester, find.text('pills'));
+      await tap(tester, find.text('Rule: FREQ=MONTHLY;BYDAY=1MO · 08:00'));
+      // A rule the simple editor cannot show opens in the advanced mode.
+      expect(find.text('FREQ=MONTHLY;BYDAY=1MO'), findsOneWidget);
+    });
+
+    testWidgets('a Routine is deleted after a confirm; its Note stays', (
+      tester,
+    ) async {
+      final routine = routines.create('pills', daily([at(8)]));
+      await start(tester);
+      await tap(tester, find.text('pills').first);
+      await tap(tester, find.byTooltip('Delete'));
+      expect(find.text('Delete this Routine? Its Note stays.'), findsOneWidget);
+      await tap(tester, find.text('Delete').last);
+      expect(routines.byId(routine.id), isNull);
+      expect(notes.all().single.isUnsorted, isFalse);
+      expect(find.byType(Checkbox), findsNothing);
+    });
+
+    testWidgets('editor and Agenda fit a phone in German', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      routines.create('Tabletten', daily([at(8), at(20)]));
+      await start(tester);
+      expect(find.text('Morgen'), findsOneWidget);
+      await tap(tester, find.byTooltip('Neue Routine oder Erinnerung'));
+      await tap(tester, find.text('Alle …'));
+      await tap(tester, find.text('Wochentage'));
+      await tap(tester, find.text('Erweitert'));
+      expect(find.text('Wiederholregel (RRULE)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}

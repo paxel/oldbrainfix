@@ -1,7 +1,7 @@
 {
   "@@locale": "en",
   "appTitle": "Old Brain Fix",
-  "noNotesYet": "Nothing captured yet. Tap + to capture a thought.",
+  "noNotesYet": "Nothing captured yet.",
   "captureTooltip": "Capture a Note",
   "captureHint": "What's on your mind?",
   "save": "Save",
@@ -140,5 +140,146 @@
       }
     }
   },
-  "deleteNamedPlaceDetail": "Notes captured there show their coordinates again."
+  "deleteNamedPlaceDetail": "Notes captured there show their coordinates again.",
+  "agendaToday": "Today",
+  "agendaTomorrow": "Tomorrow",
+  "nothingToday": "Nothing due today. Tap + to capture a thought.",
+  "nothingTomorrow": "Nothing due tomorrow.",
+  "justCaptured": "Just captured",
+  "allNotesTitle": "All Notes",
+  "newRoutineTooltip": "New Routine or Reminder",
+  "routineOrReminder": "Routine or Reminder",
+  "routine": "Routine",
+  "reminder": "Reminder",
+  "newRoutine": "New Routine",
+  "newReminder": "New Reminder",
+  "routineWhatHint": "What is to be done?",
+  "fromNote": "From the Note",
+  "noteGone": "The Note is gone",
+  "scheduleSimple": "Simple",
+  "scheduleAdvanced": "Advanced",
+  "repeatOnce": "Once",
+  "repeatEvery": "Every …",
+  "repeatWeekdays": "Weekdays",
+  "everyLabel": "Every",
+  "fewer": "Fewer",
+  "more": "More",
+  "unitDays": "{count, plural, =1{day} other{days}}",
+  "@unitDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unitWeeks": "{count, plural, =1{week} other{weeks}}",
+  "@unitWeeks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unitMonths": "{count, plural, =1{month} other{months}}",
+  "@unitMonths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "unitYears": "{count, plural, =1{year} other{years}}",
+  "@unitYears": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "startsOn": "Starts",
+  "onDay": "On",
+  "timesHeading": "Times of day",
+  "allDay": "All day",
+  "addTime": "Add a time",
+  "removeTime": "Remove {time}",
+  "@removeTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "rruleLabel": "Repeat rule (RRULE)",
+  "rruleHelper": "Leave empty for once. Example: FREQ=MONTHLY;BYDAY=1MO",
+  "rruleInvalid": "Not a rule this app understands: {detail}",
+  "@rruleInvalid": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "nextOccurrences": "Next",
+  "neverDue": "This never comes up.",
+  "deleteRoutineQuestion": "Delete this Routine? Its Note stays.",
+  "deleteReminderQuestion": "Delete this Reminder? Its Note stays.",
+  "routinesHeading": "Routines and Reminders",
+  "everyNDays": "{count, plural, =1{Every day} other{Every {count} days}}",
+  "@everyNDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "everyNWeeks": "{count, plural, =1{Every week} other{Every {count} weeks}}",
+  "@everyNWeeks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "everyNMonths": "{count, plural, =1{Every month} other{Every {count} months}}",
+  "@everyNMonths": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "everyNYears": "{count, plural, =1{Every year} other{Every {count} years}}",
+  "@everyNYears": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onWeekdays": "Every {days}",
+  "@onWeekdays": {
+    "placeholders": {
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "onceOn": "Once, {date}",
+  "@onceOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ruleSummary": "Rule: {rule}",
+  "@ruleSummary": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "markDone": "Done",
+  "notFiled": "Not filed"
 }

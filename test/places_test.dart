@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
-import 'package:oldbrainfix/src/notes_screen.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -20,6 +20,12 @@ void main() {
 
   Future<void> openAreas(WidgetTester tester) async {
     await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openAllNotes(WidgetTester tester) async {
+    await openAreas(tester);
+    await tester.tap(find.byTooltip('All Notes'));
     await tester.pumpAndSettle();
   }
 
@@ -99,7 +105,7 @@ void main() {
       await tester.tap(find.text('Start'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(NotesScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsOneWidget);
       expect(store.starterSetOffered, isTrue);
       final places = Places(store);
       expect(places.areas().map((a) => a.name), ['Car', 'Health', 'Household']);
@@ -264,7 +270,7 @@ void main() {
 
       expect(places.areas(), isEmpty);
       expect(notes.all().every((n) => n.isUnsorted), isTrue);
-      await tester.pageBack();
+      await tester.tap(find.byTooltip('All Notes'));
       await tester.pumpAndSettle();
       expect(find.text('Unsorted'), findsNWidgets(2));
     });
@@ -343,6 +349,7 @@ void main() {
       places.addTopic(home.id, 'Kitchen');
       final note = Notes(store).capture('nees mor sauce');
       await tester.pumpWidget(OldBrainFixApp(store: store));
+      await openAllNotes(tester);
       expect(find.text('Unsorted'), findsOneWidget);
 
       await tester.tap(find.byTooltip('File into…'));
@@ -378,6 +385,7 @@ void main() {
       places.addTopic(home.id, 'Kitchen');
       final note = Notes(store).capture('nees mor sauce');
       await tester.pumpWidget(OldBrainFixApp(store: store));
+      await openAllNotes(tester);
 
       await tester.tap(find.byTooltip('File into…'));
       await tester.pumpAndSettle();

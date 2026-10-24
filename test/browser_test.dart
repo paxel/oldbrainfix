@@ -4,7 +4,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
-import 'package:oldbrainfix/src/notes_screen.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 void main() {
@@ -254,7 +254,7 @@ void main() {
       expect(find.byType(AreasScreen), findsOneWidget);
       await swipe(tester, 400);
       expect(find.byType(AreasScreen), findsNothing);
-      expect(find.byType(NotesScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsOneWidget);
     });
 
     testWidgets('left reopens the highlighted last Area and Topic', (

@@ -24,6 +24,12 @@ abstract final class NoteKeys {
 
   /// The Note this one was merged into; absent while it stands alone.
   static const merged = 'merged';
+
+  /// When the Note first spawned a Routine or Reminder; absent before.
+  /// Kept when its Routines are gone, so the Note stays out of Unsorted:
+  /// spawning was a conscious decision (CONTEXT.md). Only sending the
+  /// Notes of a deleted place back to Unsorted clears it.
+  static const spawned = 'spawned';
 }
 
 /// Field keys of a Section.
@@ -82,6 +88,9 @@ class Note {
   /// when it stands alone.
   final String? mergedInto;
 
+  /// Whether the Note ever spawned a Routine or Reminder.
+  final bool spawned;
+
   const Note({
     required this.id,
     required this.text,
@@ -90,6 +99,7 @@ class Note {
     this.importance = Importance.normal,
     this.trashed,
     this.mergedInto,
+    this.spawned = false,
   });
 
   /// When the Note was captured.
@@ -99,9 +109,9 @@ class Note {
 
   bool get isMerged => mergedInto != null;
 
-  /// Not yet filed into an Area or Topic, not merged and not deleted
-  /// (CONTEXT.md).
-  bool get isUnsorted => place == null && !isTrashed && !isMerged;
+  /// Not yet filed into an Area or Topic, not merged, not deleted and
+  /// without a Routine or Reminder spawned from it (CONTEXT.md).
+  bool get isUnsorted => place == null && !isTrashed && !isMerged && !spawned;
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
@@ -361,6 +371,7 @@ class Notes {
           Importance.normal,
       trashed: trashed == null ? null : DateTime.parse(trashed),
       mergedInto: _mergedInto(id),
+      spawned: fields[NoteKeys.spawned] != null,
     );
   }
 

@@ -8,6 +8,8 @@ export 'src/named_places.dart';
 export 'src/notes.dart';
 export 'src/places.dart';
 export 'src/question_marks.dart';
+export 'src/routines.dart';
+export 'src/schedule.dart';
 export 'src/search.dart';
 export 'src/signing.dart';
 export 'src/store.dart';

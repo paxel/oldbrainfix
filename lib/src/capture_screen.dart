@@ -13,7 +13,7 @@ typedef Captured = ({String noteId, Future<bool> located});
 /// Opens text Capture, filing the new Note into the Area or Topic [place]
 /// when one is given. [onChanged] runs once the user left Capture, for
 /// the caller to show the new Note, and again when its location arrived
-/// later.
+/// later. [onCaptured] gets the new Note's id first, when there is one.
 ///
 /// After this Device's first Capture, while the location is not allowed
 /// yet, it explains why Notes record where they were captured and asks;
@@ -23,6 +23,7 @@ Future<void> captureNote(
   Notes notes, {
   String? place,
   required VoidCallback onChanged,
+  ValueChanged<String>? onCaptured,
 }) async {
   final location = LocationScope.of(context);
   final captured = await Navigator.of(context).push<Captured>(
@@ -31,6 +32,7 @@ Future<void> captureNote(
           CaptureScreen(notes: notes, location: location, place: place),
     ),
   );
+  if (captured != null) onCaptured?.call(captured.noteId);
   onChanged();
   if (captured == null) return;
   unawaited(captured.located.then((located) => located ? onChanged() : null));

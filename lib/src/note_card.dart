@@ -35,7 +35,8 @@ String? whereCaptured(CaptureContext capture) =>
 
 /// A Note drawn as a softly embossed card: its text, capture time, the
 /// Named Place or coordinates it was captured at, and where it is filed. Its Area's colour runs down the left edge and its
-/// icon leads the place line. An important Note gets an accent marker
+/// icon leads the place line. Its enrich options file it, spawn a
+/// Routine or Reminder from it, and merge it. An important Note gets an accent marker
 /// and a stronger emboss, an unimportant one is dimmed (UI laws,
 /// "Cards").
 class NoteCard extends StatelessWidget {
@@ -55,6 +56,10 @@ class NoteCard extends StatelessWidget {
   /// Opens "merge into…"; no button when null.
   final VoidCallback? onMerge;
 
+  /// Spawns a Routine (false) or a Reminder (true) from the Note, picked
+  /// from a menu that opens at the button; no button when null.
+  final ValueChanged<bool>? onSchedule;
+
   /// Opens the Note's editor.
   final VoidCallback? onTap;
 
@@ -72,6 +77,7 @@ class NoteCard extends StatelessWidget {
     this.topic,
     this.onFile,
     this.onMerge,
+    this.onSchedule,
     this.onTap,
     this.footer,
   });
@@ -84,8 +90,9 @@ class NoteCard extends StatelessWidget {
     final area = this.area;
     final topic = this.topic;
     final colour = areaColour(area?.colour);
+    // A Note that spawned a Routine is not Unsorted, though not filed.
     final place = area == null
-        ? t.unsorted
+        ? (note.spawned ? null : t.unsorted)
         : [
             areaName(t, area),
             if (topic != null) topicName(t, topic),
@@ -141,23 +148,25 @@ class NoteCard extends StatelessWidget {
                               ],
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              if (areaIconData(area?.icon)
-                                  case final icon?) ...[
-                                Icon(
-                                  icon,
-                                  size: 16,
-                                  color: colour ?? scheme.onSurfaceVariant,
+                          if (place != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                if (areaIconData(area?.icon)
+                                    case final icon?) ...[
+                                  Icon(
+                                    icon,
+                                    size: 16,
+                                    color: colour ?? scheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Flexible(
+                                  child: Text(place, style: text.labelMedium),
                                 ),
-                                const SizedBox(width: 4),
                               ],
-                              Flexible(
-                                child: Text(place, style: text.labelMedium),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                           ?footer,
                         ],
                       ),
@@ -176,6 +185,16 @@ class NoteCard extends StatelessWidget {
                         tooltip: t.fileInto,
                         onPressed: onFile,
                         icon: const Icon(Icons.drive_file_move_outline),
+                      ),
+                    if (onSchedule case final onSchedule?)
+                      PopupMenuButton<bool>(
+                        tooltip: t.routineOrReminder,
+                        icon: const Icon(Icons.alarm_add_outlined),
+                        onSelected: onSchedule,
+                        itemBuilder: (_) => [
+                          PopupMenuItem(value: false, child: Text(t.routine)),
+                          PopupMenuItem(value: true, child: Text(t.reminder)),
+                        ],
                       ),
                     if (onMerge != null)
                       IconButton(

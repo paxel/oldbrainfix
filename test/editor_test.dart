@@ -41,6 +41,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Starts the app and opens every Note's card from the browser.
+  Future<void> startAtNotes(WidgetTester tester) async {
+    await start(tester);
+    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip('All Notes'));
+  }
+
   NoteCard card(WidgetTester tester, String text) => tester.widget<NoteCard>(
     find.ancestor(of: find.text(text), matching: find.byType(NoteCard)),
   );
@@ -64,7 +71,7 @@ void main() {
       final note = notes.capture('nees mor sauce', place: kitchen.id);
       tick(const Duration(days: 1));
       notes.amend(note.id, 'Update: sauce bought');
-      await start(tester);
+      await startAtNotes(tester);
 
       await tap(tester, find.text('nees mor sauce'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
@@ -83,7 +90,7 @@ void main() {
       tester,
     ) async {
       final note = notes.capture('nees mor sauce');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('nees mor sauce'));
 
       tick();
@@ -105,7 +112,7 @@ void main() {
 
     testWidgets('a blanked text keeps the old one', (tester) async {
       final note = notes.capture('milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('milk'));
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pageBack();
@@ -115,7 +122,7 @@ void main() {
 
     testWidgets('Add to Note appends a dated Section', (tester) async {
       final note = notes.capture('nees mor sauce');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('nees mor sauce'));
 
       tick(const Duration(hours: 3));
@@ -141,7 +148,7 @@ void main() {
       notes.capture('pills');
       notes.capture('plants');
       notes.capture('socks');
-      await start(tester);
+      await startAtNotes(tester);
       expect(emboss(tester, 'pills').strong, isFalse);
       expect(dimming(tester, 'pills'), isEmpty);
       expect(find.byIcon(Icons.label_important), findsNothing);
@@ -175,7 +182,7 @@ void main() {
 
     testWidgets('the editor has no bottom bar', (tester) async {
       notes.capture('milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('milk'));
       final scaffold = tester.widget<Scaffold>(
         find.descendant(
@@ -200,7 +207,7 @@ void main() {
     ) async {
       final note = notes.capture('nees mor sauce', place: home.id);
       notes.capture('milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('nees mor sauce'));
       await tap(tester, find.byTooltip('Move to trash'));
 
@@ -210,7 +217,9 @@ void main() {
       expect(notes.byId(note.id)?.isUnsorted, isFalse);
 
       tick(const Duration(days: 10));
-      await openTrash(tester);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tap(tester, find.byTooltip('Trash'));
       expect(find.byType(TrashScreen), findsOneWidget);
       expect(find.text('nees mor sauce'), findsOneWidget);
       expect(find.text('milk'), findsNothing);
@@ -222,8 +231,7 @@ void main() {
       expect(notes.byId(note.id)?.place, home.id);
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      await tap(tester, find.byTooltip('All Notes'));
       expect(find.text('nees mor sauce'), findsOneWidget);
     });
 
@@ -293,11 +301,13 @@ void main() {
     notes.trash(notes.capture('weg', place: long.id).id);
 
     await start(tester);
+    await tap(tester, find.byTooltip('Suchen und stöbern'));
+    await tap(tester, find.byTooltip('Alle Notizen'));
     await tap(tester, find.text('Soße kaufen'));
     await tap(tester, find.text('Unwichtig'));
     expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);
     await tap(tester, find.byType(BackButton));
-    await tap(tester, find.byTooltip('Suchen und stöbern'));
+    await tap(tester, find.byType(BackButton));
     await tap(tester, find.text('Ein ziemlich langer Bereichsname'));
     await tap(tester, find.byTooltip('Nach Wichtigkeit ordnen'));
     await tap(tester, find.byType(BackButton));

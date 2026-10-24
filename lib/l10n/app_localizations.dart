@@ -107,7 +107,7 @@ abstract class AppLocalizations {
   /// No description provided for @noNotesYet.
   ///
   /// In en, this message translates to:
-  /// **'Nothing captured yet. Tap + to capture a thought.'**
+  /// **'Nothing captured yet.'**
   String get noNotesYet;
 
   /// No description provided for @captureTooltip.
@@ -649,6 +649,306 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Notes captured there show their coordinates again.'**
   String get deleteNamedPlaceDetail;
+
+  /// No description provided for @agendaToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get agendaToday;
+
+  /// No description provided for @agendaTomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomorrow'**
+  String get agendaTomorrow;
+
+  /// No description provided for @nothingToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing due today. Tap + to capture a thought.'**
+  String get nothingToday;
+
+  /// No description provided for @nothingTomorrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing due tomorrow.'**
+  String get nothingTomorrow;
+
+  /// No description provided for @justCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Just captured'**
+  String get justCaptured;
+
+  /// No description provided for @allNotesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All Notes'**
+  String get allNotesTitle;
+
+  /// No description provided for @newRoutineTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'New Routine or Reminder'**
+  String get newRoutineTooltip;
+
+  /// No description provided for @routineOrReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine or Reminder'**
+  String get routineOrReminder;
+
+  /// No description provided for @routine.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine'**
+  String get routine;
+
+  /// No description provided for @reminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get reminder;
+
+  /// No description provided for @newRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'New Routine'**
+  String get newRoutine;
+
+  /// No description provided for @newReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'New Reminder'**
+  String get newReminder;
+
+  /// No description provided for @routineWhatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What is to be done?'**
+  String get routineWhatHint;
+
+  /// No description provided for @fromNote.
+  ///
+  /// In en, this message translates to:
+  /// **'From the Note'**
+  String get fromNote;
+
+  /// No description provided for @noteGone.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note is gone'**
+  String get noteGone;
+
+  /// No description provided for @scheduleSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Simple'**
+  String get scheduleSimple;
+
+  /// No description provided for @scheduleAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced'**
+  String get scheduleAdvanced;
+
+  /// No description provided for @repeatOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get repeatOnce;
+
+  /// No description provided for @repeatEvery.
+  ///
+  /// In en, this message translates to:
+  /// **'Every …'**
+  String get repeatEvery;
+
+  /// No description provided for @repeatWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekdays'**
+  String get repeatWeekdays;
+
+  /// No description provided for @everyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Every'**
+  String get everyLabel;
+
+  /// No description provided for @fewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Fewer'**
+  String get fewer;
+
+  /// No description provided for @more.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get more;
+
+  /// No description provided for @unitDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{day} other{days}}'**
+  String unitDays(int count);
+
+  /// No description provided for @unitWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{week} other{weeks}}'**
+  String unitWeeks(int count);
+
+  /// No description provided for @unitMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{month} other{months}}'**
+  String unitMonths(int count);
+
+  /// No description provided for @unitYears.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{year} other{years}}'**
+  String unitYears(int count);
+
+  /// No description provided for @startsOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts'**
+  String get startsOn;
+
+  /// No description provided for @onDay.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get onDay;
+
+  /// No description provided for @timesHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Times of day'**
+  String get timesHeading;
+
+  /// No description provided for @allDay.
+  ///
+  /// In en, this message translates to:
+  /// **'All day'**
+  String get allDay;
+
+  /// No description provided for @addTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a time'**
+  String get addTime;
+
+  /// No description provided for @removeTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {time}'**
+  String removeTime(String time);
+
+  /// No description provided for @rruleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat rule (RRULE)'**
+  String get rruleLabel;
+
+  /// No description provided for @rruleHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty for once. Example: FREQ=MONTHLY;BYDAY=1MO'**
+  String get rruleHelper;
+
+  /// No description provided for @rruleInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a rule this app understands: {detail}'**
+  String rruleInvalid(String detail);
+
+  /// No description provided for @nextOccurrences.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get nextOccurrences;
+
+  /// No description provided for @neverDue.
+  ///
+  /// In en, this message translates to:
+  /// **'This never comes up.'**
+  String get neverDue;
+
+  /// No description provided for @deleteRoutineQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this Routine? Its Note stays.'**
+  String get deleteRoutineQuestion;
+
+  /// No description provided for @deleteReminderQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this Reminder? Its Note stays.'**
+  String get deleteReminderQuestion;
+
+  /// No description provided for @routinesHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Routines and Reminders'**
+  String get routinesHeading;
+
+  /// No description provided for @everyNDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every day} other{Every {count} days}}'**
+  String everyNDays(int count);
+
+  /// No description provided for @everyNWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every week} other{Every {count} weeks}}'**
+  String everyNWeeks(int count);
+
+  /// No description provided for @everyNMonths.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every month} other{Every {count} months}}'**
+  String everyNMonths(int count);
+
+  /// No description provided for @everyNYears.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every year} other{Every {count} years}}'**
+  String everyNYears(int count);
+
+  /// No description provided for @onWeekdays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {days}'**
+  String onWeekdays(String days);
+
+  /// No description provided for @onceOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Once, {date}'**
+  String onceOn(String date);
+
+  /// No description provided for @ruleSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Rule: {rule}'**
+  String ruleSummary(String rule);
+
+  /// No description provided for @markDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get markDone;
+
+  /// No description provided for @notFiled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not filed'**
+  String get notFiled;
 }
 
 class _AppLocalizationsDelegate

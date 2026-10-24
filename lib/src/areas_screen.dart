@@ -12,12 +12,15 @@ import 'merge_into_screen.dart';
 import 'named_places_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'notes_screen.dart';
 import 'place_names.dart';
+import 'routine_editor_screen.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
-/// opens its Topics.
+/// opens its Topics; the app bar leads to all Notes, Named Places and
+/// the trash.
 class AreasScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -98,6 +101,17 @@ class _AreasScreenState extends State<AreasScreen> {
     if (widget.trail.area(widget.places) case final area?) _open(area);
   }
 
+  Future<void> _openAllNotes() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            AllNotesScreen(notes: widget.notes, places: widget.places),
+      ),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   /// The Named Places live here until Settings exist.
   Future<void> _openNamedPlaces() async {
     await Navigator.of(context).push(
@@ -136,6 +150,18 @@ class _AreasScreenState extends State<AreasScreen> {
 
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _schedule(Note note, bool reminder) async {
+    await spawnFromNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      reminder: reminder,
+    );
     if (!mounted) return;
     _reload();
   }
@@ -195,6 +221,11 @@ class _AreasScreenState extends State<AreasScreen> {
         title: Text(t.areasTitle),
         actions: [
           IconButton(
+            tooltip: t.allNotesTitle,
+            onPressed: _openAllNotes,
+            icon: const Icon(Icons.notes),
+          ),
+          IconButton(
             tooltip: t.namedPlacesTitle,
             onPressed: _openNamedPlaces,
             icon: const Icon(Icons.place_outlined),
@@ -219,7 +250,14 @@ class _AreasScreenState extends State<AreasScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _hits, _file, _merge, _openNote)
+                    ? _hitCards(
+                        context,
+                        _hits,
+                        _file,
+                        _merge,
+                        _openNote,
+                        _schedule,
+                      )
                     : _areaRows(t),
               ),
             ),
@@ -390,6 +428,18 @@ class _AreaScreenState extends State<AreaScreen> {
     _reload();
   }
 
+  Future<void> _schedule(Note note, bool reminder) async {
+    await spawnFromNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      reminder: reminder,
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _act(Area area, Topic topic, _TopicAction action) async {
     final t = context.t;
     switch (action) {
@@ -431,7 +481,14 @@ class _AreaScreenState extends State<AreaScreen> {
             ],
           ),
         ),
-      ...diaryCards(context, _diary, _file, _merge, _openNote),
+      ...diaryCards(
+        context,
+        _diary,
+        _file,
+        _merge,
+        _openNote,
+        onSchedule: _schedule,
+      ),
     ];
   }
 
@@ -471,7 +528,14 @@ class _AreaScreenState extends State<AreaScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file, _merge, _openNote)
+                    ? _hitCards(
+                        context,
+                        _diary,
+                        _file,
+                        _merge,
+                        _openNote,
+                        _schedule,
+                      )
                     : _browsing(t, area),
               ),
             ),
@@ -572,6 +636,18 @@ class _TopicScreenState extends State<TopicScreen> {
     _reload();
   }
 
+  Future<void> _schedule(Note note, bool reminder) async {
+    await spawnFromNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      reminder: reminder,
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -607,10 +683,24 @@ class _TopicScreenState extends State<TopicScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file, _merge, _openNote)
+                    ? _hitCards(
+                        context,
+                        _diary,
+                        _file,
+                        _merge,
+                        _openNote,
+                        _schedule,
+                      )
                     : _diary.isEmpty
                     ? [BrowserEmpty(text: t.noNotesHere)]
-                    : diaryCards(context, _diary, _file, _merge, _openNote),
+                    : diaryCards(
+                        context,
+                        _diary,
+                        _file,
+                        _merge,
+                        _openNote,
+                        onSchedule: _schedule,
+                      ),
               ),
             ),
           ],
@@ -649,9 +739,17 @@ List<Widget> _hitCards(
   void Function(Note note) onFile,
   void Function(Note note) onMerge,
   void Function(Note note) onOpen,
+  void Function(Note note, bool reminder) onSchedule,
 ) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
-    : diaryCards(context, hits, onFile, onMerge, onOpen);
+    : diaryCards(
+        context,
+        hits,
+        onFile,
+        onMerge,
+        onOpen,
+        onSchedule: onSchedule,
+      );
 
 /// Opens "file into…" for [note] and files it; true when it moved.
 Future<bool> fileNote(

@@ -13,6 +13,8 @@ import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'place_names.dart';
+import 'routine_editor_screen.dart';
+import 'schedule_text.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
 Future<void> openNote(
@@ -33,9 +35,10 @@ Future<void> openNote(
 
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its Importance, its Capture Context and where it is filed,
-/// and its Sections, each with its own Capture Context. "Add to Note"
-/// amends it; "merge into…" merges it into another Note; the trash
-/// button deletes it.
+/// its Routines and Reminders, and its Sections, each with its own
+/// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
+/// spawn one from it; "merge into…" merges it into another Note; the
+/// trash button deletes it.
 ///
 /// Typed text survives the app being killed: it goes to the log when the
 /// app goes to the background, and a [Draft] of it is kept after every
@@ -68,6 +71,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   Timer? _draftTimer;
   PlacedNote? _placed;
   List<Section> _sections = const [];
+  List<Routine> _routines = const [];
+  late final _routineBook = Routines(widget.notes.store);
 
   @override
   void initState() {
@@ -137,6 +142,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = widget.notes.byId(widget.noteId);
     _placed = note == null ? null : placeNote(widget.places, note);
     _sections = widget.notes.sections(widget.noteId);
+    _routines = _routineBook.ofNote(widget.noteId);
   }
 
   void _reload() => setState(_load);
@@ -189,6 +195,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
+  Future<void> _spawn({required bool reminder}) async {
+    final note = _placed?.note;
+    if (note == null) return;
+    _saveText();
+    await spawnFromNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      reminder: reminder,
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _openRoutine(Routine routine) async {
+    _saveText();
+    await openRoutine(context, widget.notes, widget.places, routine);
+    if (!mounted) return;
+    _reload();
+  }
+
   /// Merges the Note, with its text as typed, into the one picked; it
   /// then is a Section there and the editor closes.
   Future<void> _merge() async {
@@ -216,7 +244,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         .add_Hm();
     final colour = areaColour(area?.colour);
     final place = area == null
-        ? t.unsorted
+        ? (note.spawned ? t.notFiled : t.unsorted)
         : [
             areaName(t, area),
             if (topic != null) topicName(t, topic),
@@ -261,7 +289,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _Panel(
+            EditorPanel(
               heading: t.importance,
               child: SegmentedButton<Importance>(
                 segments: [
@@ -283,7 +311,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 onSelectionChanged: _setImportance,
               ),
             ),
-            _Panel(
+            EditorPanel(
               heading: t.capturedHeading,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,8 +338,52 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ],
               ),
             ),
+            EditorPanel(
+              heading: t.routinesHeading,
+              // The rows' ink shows on the panel, not under it.
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final routine in _routines)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          routine.isReminder
+                              ? Icons.notifications_outlined
+                              : Icons.repeat,
+                        ),
+                        title: Text(
+                          scheduleText(
+                            t,
+                            Localizations.localeOf(context).toString(),
+                            routine.schedule,
+                          ),
+                        ),
+                        onTap: () => _openRoutine(routine),
+                      ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () => _spawn(reminder: false),
+                          icon: const Icon(Icons.repeat),
+                          label: Text(t.routine),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: () => _spawn(reminder: true),
+                          icon: const Icon(Icons.notifications_outlined),
+                          label: Text(t.reminder),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
             for (final section in _sections)
-              _Panel(
+              EditorPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -394,12 +466,12 @@ class CaptureContextLines extends StatelessWidget {
   }
 }
 
-/// One embossed block of the editor, with an optional heading.
-class _Panel extends StatelessWidget {
+/// One embossed block of an editor, with an optional heading.
+class EditorPanel extends StatelessWidget {
   final String? heading;
   final Widget child;
 
-  const _Panel({required this.child, this.heading});
+  const EditorPanel({super.key, required this.child, this.heading});
 
   @override
   Widget build(BuildContext context) => Padding(

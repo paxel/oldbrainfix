@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/note_card.dart';
-import 'package:oldbrainfix/src/notes_screen.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/question_mark_background.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -20,7 +20,7 @@ void main() {
   }
 
   Brightness shownBrightness(WidgetTester tester) =>
-      Theme.of(tester.element(find.byType(NotesScreen))).brightness;
+      Theme.of(tester.element(find.byType(AgendaScreen))).brightness;
 
   Finder background() => find.byWidgetPredicate(
     (w) => w is CustomPaint && w.painter is QuestionMarkPainter,
@@ -141,6 +141,10 @@ void main() {
     final store = openStore();
     Notes(store).capture('nees mor sauce');
     await tester.pumpWidget(OldBrainFixApp(store: store));
+    await tester.tap(find.byTooltip('Search and browse'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('All Notes'));
+    await tester.pumpAndSettle();
 
     expect(find.byType(ListTile), findsNothing);
     final card = find.ancestor(
@@ -157,11 +161,18 @@ void main() {
   });
 
   group('parallax', () {
+    /// Scrolls an Agenda long enough to scroll; returns by how much.
     Future<double> scrollNotes(WidgetTester tester) async {
       final store = openStore();
-      final notes = Notes(store);
+      final routines = Routines(store);
       for (var i = 0; i < 40; i++) {
-        notes.capture('thought $i');
+        routines.create(
+          'thought $i',
+          Schedule(
+            start: Day(2000, 1, 1),
+            rule: Recurrence.parse('FREQ=DAILY'),
+          ),
+        );
       }
       await tester.pumpWidget(OldBrainFixApp(store: store));
       expect(painter(tester).shift, 0);

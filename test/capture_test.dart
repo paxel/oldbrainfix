@@ -40,6 +40,6 @@ void main() {
     await tester.pumpWidget(OldBrainFixApp(store: store));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Noch nichts erfasst'), findsOneWidget);
+    expect(find.textContaining('Heute steht nichts an'), findsOneWidget);
   });
 }

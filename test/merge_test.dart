@@ -36,6 +36,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Starts the app and opens every Note's card from the browser.
+  Future<void> startAtNotes(WidgetTester tester) async {
+    await start(tester);
+    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip('All Notes'));
+  }
+
   /// The "merge into…" button on the card showing [text].
   Finder mergeOn(String text) => find.descendant(
     of: find.ancestor(of: find.text(text), matching: find.byType(NoteCard)),
@@ -53,7 +60,7 @@ void main() {
     final target = notes.capture('sauce');
     tick();
     final merged = notes.capture('nees mor sauce');
-    await start(tester);
+    await startAtNotes(tester);
     await tap(tester, find.text('nees mor sauce'));
     await tester.enterText(find.byType(TextField), 'need more sauce');
     await tap(tester, find.byTooltip('Merge into…'));
@@ -78,7 +85,7 @@ void main() {
     notes.capture('pasta');
     tick();
     final merged = notes.capture('more sauce');
-    await start(tester);
+    await startAtNotes(tester);
     await tap(tester, mergeOn('more sauce'));
     expect(cards(), ['pasta', 'sauce']);
     await tester.enterText(find.byType(TextField), 'sau');
@@ -106,7 +113,7 @@ void main() {
 
   testWidgets('backing out of the picker merges nothing', (tester) async {
     notes.capture('sauce');
-    await start(tester);
+    await startAtNotes(tester);
     await tap(tester, mergeOn('sauce'));
     expect(find.text('There is no other Note to merge into.'), findsOneWidget);
     await tap(tester, find.byType(BackButton));

@@ -33,6 +33,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Starts the app and opens every Note's card from the browser.
+  Future<void> startAtNotes(WidgetTester tester) async {
+    await start(tester);
+    await tap(tester, find.byTooltip('Search and browse'));
+    await tap(tester, find.byTooltip('All Notes'));
+  }
+
   String field(WidgetTester tester) =>
       tester.widget<TextField>(find.byType(TextField)).controller?.text ?? '';
 
@@ -41,7 +48,7 @@ void main() {
       tester,
     ) async {
       final note = notes.capture('milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('milk'));
       tick();
       await tester.enterText(find.byType(TextField), 'oat milk');
@@ -70,7 +77,7 @@ void main() {
         saved: DateTime.utc(2026, 10, 24, 8, 5),
       ));
       tick(const Duration(hours: 1));
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('milk'));
       expect(field(tester), 'oat milk');
       expect(notes.byId(note.id)?.text, 'milk');
@@ -92,7 +99,7 @@ void main() {
       tick(const Duration(hours: 1));
       // Fixed later, e.g. on another Device.
       notes.edit(note.id, 'soy milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('soy milk'));
       expect(field(tester), 'soy milk');
       expect(await drafts.read(note.id), isNull);
@@ -102,7 +109,7 @@ void main() {
       tester,
     ) async {
       final note = notes.capture('milk');
-      await start(tester);
+      await startAtNotes(tester);
       await tap(tester, find.text('milk'));
       tick();
       await tester.enterText(find.byType(TextField), 'oat milk');

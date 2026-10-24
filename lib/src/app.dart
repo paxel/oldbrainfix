@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
+import 'agenda_screen.dart';
 import 'announcements.dart';
 import 'browser.dart';
 import 'drafts.dart';
 import 'location.dart';
 import 'look.dart';
-import 'notes_screen.dart';
 import 'question_mark_background.dart';
 import 'starter_set_screen.dart';
 
@@ -95,7 +95,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   );
 }
 
-/// The Starter Set on this Device's first start, the Notes after it.
+/// The Starter Set on this Device's first start, the Agenda after it.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -126,7 +126,7 @@ class _HomeState extends State<_Home> {
 
   @override
   Widget build(BuildContext context) => _starterSetOffered
-      ? NotesScreen(
+      ? AgendaScreen(
           notes: widget.notes,
           places: widget.places,
           trail: widget.trail,

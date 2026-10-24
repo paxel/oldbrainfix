@@ -177,6 +177,8 @@ void main() {
       final note = notes.capture('nees mor sauce');
       notes.locate(note.id, home);
       await start(tester);
+      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.byTooltip('All Notes'));
       await tap(tester, find.text('nees mor sauce'));
       expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
 
@@ -251,7 +253,7 @@ void main() {
       expect(notes.byId(note.id)?.context.location, home);
 
       await tap(tester, find.byType(BackButton));
-      await tap(tester, find.byType(BackButton));
+      await tap(tester, find.byTooltip('All Notes'));
       expect(find.text('48.1372, 11.5761'), findsOneWidget);
     });
 

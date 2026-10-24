@@ -13,8 +13,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get appTitle => 'Old Brain Fix';
 
   @override
-  String get noNotesYet =>
-      'Noch nichts erfasst. Tippe auf +, um einen Gedanken festzuhalten.';
+  String get noNotesYet => 'Noch nichts erfasst.';
 
   @override
   String get captureTooltip => 'Notiz erfassen';
@@ -321,4 +320,232 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get deleteNamedPlaceDetail =>
       'Notizen, die dort erfasst wurden, zeigen wieder ihre Koordinaten.';
+
+  @override
+  String get agendaToday => 'Heute';
+
+  @override
+  String get agendaTomorrow => 'Morgen';
+
+  @override
+  String get nothingToday =>
+      'Heute steht nichts an. Tippe auf +, um einen Gedanken festzuhalten.';
+
+  @override
+  String get nothingTomorrow => 'Morgen steht nichts an.';
+
+  @override
+  String get justCaptured => 'Gerade erfasst';
+
+  @override
+  String get allNotesTitle => 'Alle Notizen';
+
+  @override
+  String get newRoutineTooltip => 'Neue Routine oder Erinnerung';
+
+  @override
+  String get routineOrReminder => 'Routine oder Erinnerung';
+
+  @override
+  String get routine => 'Routine';
+
+  @override
+  String get reminder => 'Erinnerung';
+
+  @override
+  String get newRoutine => 'Neue Routine';
+
+  @override
+  String get newReminder => 'Neue Erinnerung';
+
+  @override
+  String get routineWhatHint => 'Was ist zu tun?';
+
+  @override
+  String get fromNote => 'Aus der Notiz';
+
+  @override
+  String get noteGone => 'Die Notiz gibt es nicht mehr';
+
+  @override
+  String get scheduleSimple => 'Einfach';
+
+  @override
+  String get scheduleAdvanced => 'Erweitert';
+
+  @override
+  String get repeatOnce => 'Einmal';
+
+  @override
+  String get repeatEvery => 'Alle …';
+
+  @override
+  String get repeatWeekdays => 'Wochentage';
+
+  @override
+  String get everyLabel => 'Alle';
+
+  @override
+  String get fewer => 'Weniger';
+
+  @override
+  String get more => 'Mehr';
+
+  @override
+  String unitDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Tage',
+      one: 'Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wochen',
+      one: 'Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Monate',
+      one: 'Monat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unitYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Jahre',
+      one: 'Jahr',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get startsOn => 'Ab';
+
+  @override
+  String get onDay => 'Am';
+
+  @override
+  String get timesHeading => 'Uhrzeiten';
+
+  @override
+  String get allDay => 'Ganztägig';
+
+  @override
+  String get addTime => 'Uhrzeit hinzufügen';
+
+  @override
+  String removeTime(String time) {
+    return '$time entfernen';
+  }
+
+  @override
+  String get rruleLabel => 'Wiederholregel (RRULE)';
+
+  @override
+  String get rruleHelper =>
+      'Leer lassen für einmal. Beispiel: FREQ=MONTHLY;BYDAY=1MO';
+
+  @override
+  String rruleInvalid(String detail) {
+    return 'Keine Regel, die die App versteht: $detail';
+  }
+
+  @override
+  String get nextOccurrences => 'Als Nächstes';
+
+  @override
+  String get neverDue => 'Das kommt nie vor.';
+
+  @override
+  String get deleteRoutineQuestion =>
+      'Diese Routine löschen? Ihre Notiz bleibt.';
+
+  @override
+  String get deleteReminderQuestion =>
+      'Diese Erinnerung löschen? Ihre Notiz bleibt.';
+
+  @override
+  String get routinesHeading => 'Routinen und Erinnerungen';
+
+  @override
+  String everyNDays(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Tage',
+      one: 'Jeden Tag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String everyNWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Wochen',
+      one: 'Jede Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String everyNMonths(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate',
+      one: 'Jeden Monat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String everyNYears(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Jahre',
+      one: 'Jedes Jahr',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String onWeekdays(String days) {
+    return 'Immer $days';
+  }
+
+  @override
+  String onceOn(String date) {
+    return 'Einmal, $date';
+  }
+
+  @override
+  String ruleSummary(String rule) {
+    return 'Regel: $rule';
+  }
+
+  @override
+  String get markDone => 'Erledigt';
+
+  @override
+  String get notFiled => 'Nicht abgelegt';
 }

@@ -1,37 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'areas_screen.dart';
 import 'browser.dart';
-import 'capture_screen.dart';
 import 'l10n.dart';
-import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'routine_editor_screen.dart';
 
-/// The list of captured Notes, newest first, with "+" to capture and the
-/// magnifier to open the notes browser. Stands in for the Agenda.
-class NotesScreen extends StatefulWidget {
+/// Every Note as a diary of cards, newest first, Unsorted ones included;
+/// reached from the top of the notes browser. Swipe right goes back.
+class AllNotesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
 
-  /// The notes browser's last selections, kept between visits.
-  final BrowserTrail trail;
-
-  const NotesScreen({
-    super.key,
-    required this.notes,
-    required this.places,
-    required this.trail,
-  });
+  const AllNotesScreen({super.key, required this.notes, required this.places});
 
   @override
-  State<NotesScreen> createState() => _NotesScreenState();
+  State<AllNotesScreen> createState() => _AllNotesScreenState();
 }
 
-class _NotesScreenState extends State<NotesScreen> {
+class _AllNotesScreenState extends State<AllNotesScreen> {
   late List<PlacedNote> _shown = _load();
 
   List<PlacedNote> _load() => [
@@ -39,28 +29,6 @@ class _NotesScreenState extends State<NotesScreen> {
   ];
 
   void _reload() => setState(() => _shown = _load());
-
-  Future<void> _capture() async {
-    await captureNote(context, widget.notes, onChanged: _reloadIfMounted);
-  }
-
-  void _reloadIfMounted() {
-    if (mounted) _reload();
-  }
-
-  Future<void> _browse() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AreasScreen(
-          notes: widget.notes,
-          places: widget.places,
-          trail: widget.trail,
-        ),
-      ),
-    );
-    if (!mounted) return;
-    _reload();
-  }
 
   Future<void> _file(Note note) async {
     if (await fileNote(context, widget.notes, widget.places, note)) {
@@ -82,57 +50,37 @@ class _NotesScreenState extends State<NotesScreen> {
     _reload();
   }
 
+  Future<void> _schedule(Note note, bool reminder) async {
+    await spawnFromNote(
+      context,
+      widget.notes,
+      widget.places,
+      note,
+      reminder: reminder,
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final when = DateFormat.yMd(Localizations.localeOf(context).toString())
-        .add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.appTitle)),
-      body: _shown.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Embossed(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(t.noNotesYet, textAlign: TextAlign.center),
-                  ),
+      appBar: AppBar(title: Text(t.allNotesTitle)),
+      body: BrowserSwipes(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: _shown.isEmpty
+              ? [BrowserEmpty(text: t.noNotesYet)]
+              : diaryCards(
+                  context,
+                  _shown,
+                  _file,
+                  _merge,
+                  _open,
+                  onSchedule: _schedule,
                 ),
-              ),
-            )
-          : ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                for (final (:note, :area, :topic) in _shown)
-                  NoteCard(
-                    note: note,
-                    when: when,
-                    area: area,
-                    topic: topic,
-                    onFile: () => _file(note),
-                    onMerge: () => _merge(note),
-                    onTap: () => _open(note),
-                  ),
-              ],
-            ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'browse',
-            tooltip: t.browseTooltip,
-            onPressed: _browse,
-            child: const Icon(Icons.search),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: 'capture',
-            tooltip: t.captureTooltip,
-            onPressed: _capture,
-            child: const Icon(Icons.add),
-          ),
-        ],
+        ),
       ),
     );
   }
