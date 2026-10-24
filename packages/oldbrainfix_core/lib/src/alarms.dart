@@ -8,6 +8,7 @@ import 'dart:convert';
 
 import 'device_settings.dart';
 import 'notes.dart';
+import 'nudges.dart';
 import 'routines.dart';
 import 'schedule.dart';
 import 'store.dart';
@@ -372,6 +373,7 @@ MissedSummary missedSummary({
 /// the notification's Done and Snooze leave to be applied.
 class Alarms {
   static const _snoozes = 'snoozes';
+  static const _nudgeSnooze = 'nudgeSnooze';
 
   final Store store;
 
@@ -404,6 +406,36 @@ class Alarms {
       renag: store.renagInterval,
     );
   }
+
+  /// The Nudge at the store's now over the Unsorted Notes, with this
+  /// Device's snooze, repeat interval and Quiet Hours; null when nothing
+  /// is Unsorted. Quiet Hours hold back only the Nudge, never the
+  /// Occurrences of [plan].
+  PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
+    unsorted: Notes(store).unsorted(),
+    snooze: nudgeSnooze,
+    now: store.clock(),
+    wallClock: wallClock,
+    repeat: store.nudgeRepeat,
+    quiet: store.quietHoursOn ? store.quietHours : null,
+  );
+
+  /// This Device's latest snooze of the Nudge; never synced (ADR 0008).
+  NudgeSnooze? get nudgeSnooze {
+    final parts = (store.localSetting(_nudgeSnooze) ?? '').split(' ');
+    final from = DateTime.tryParse(parts.first);
+    final to = parts.length == 2 ? DateTime.tryParse(parts.last) : null;
+    return from == null || to == null
+        ? null
+        : (at: from.toUtc(), until: to.toUtc());
+  }
+
+  /// Applies a snooze of the Nudge tapped at [at]: the Notes Unsorted
+  /// then wait until [until].
+  void applyNudgeSnooze(DateTime at, DateTime until) => store.setLocalSetting(
+    _nudgeSnooze,
+    '${at.toUtc().toIso8601String()} ${until.toUtc().toIso8601String()}',
+  );
 
   /// The Missed Summary at the store's now, since this Device last
   /// marked it "seen".

@@ -26,19 +26,23 @@ object Scheduler {
     private const val KEY_LABELS = "labels"
     private const val KEY_LAST_FIRED = "lastFired"
     private const val KEY_LAST_ARMED = "lastArmed"
+    private const val KEY_NUDGE = "nudge"
 
     const val EXTRA_ARMED = "oldbrainfix.armed"
 
     /**
-     * Keeps [plan] and the notification [labels], and arms the plan. The
-     * notifications of what is [done] go away, and so does a full-screen
-     * alarm the plan no longer escalates.
+     * Keeps [plan], the [nudge] and the notification [labels], and arms
+     * them. The notifications of what is [done] go away, and so does a
+     * full-screen alarm the plan no longer escalates, and the Nudge's
+     * once nothing is Unsorted.
      */
-    fun replace(context: Context, plan: JSONArray, labels: JSONObject, done: JSONArray) {
-        prefs(context).edit()
+    fun replace(context: Context, plan: JSONArray, labels: JSONObject, done: JSONArray, nudge: JSONObject?) {
+        val edit = prefs(context).edit()
             .putString(KEY_PLAN, plan.toString())
             .putString(KEY_LABELS, labels.toString())
-            .commit()
+        if (nudge == null) edit.remove(KEY_NUDGE) else edit.putString(KEY_NUDGE, nudge.toString())
+        edit.commit()
+        if (nudge == null) Notifications.cancelNudge(context)
         arm(context)
         RingService.ringing?.let { ringing ->
             if (!AlarmPlan.keepsRinging(alarms(context), ringing.routine, ringing.occurrence)) {
@@ -65,6 +69,12 @@ object Scheduler {
         return AlarmPlan.effective(alarms, EventQueue.pending(context))
     }
 
+    /** The Nudge with the snooze tapped and not applied yet; null while nothing is Unsorted. */
+    private fun nudge(context: Context): Nudge? {
+        val json = prefs(context).getString(KEY_NUDGE, null) ?: return null
+        return NudgePlan.effective(nudge(JSONObject(json)), EventQueue.pending(context))
+    }
+
     /**
      * After the phone was off (or its clock jumped ahead): what became
      * Missed meanwhile is told in one Catch-up Notification, not rung
@@ -89,7 +99,11 @@ object Scheduler {
         val now = System.currentTimeMillis()
         val lastFired = prefs(context).getLong(KEY_LAST_FIRED, 0)
         prefs(context).edit().putLong(KEY_LAST_ARMED, now).commit()
-        val next = AlarmPlan.next(alarms(context), TimeZone.getDefault(), lastFired, now)
+        val zone = TimeZone.getDefault()
+        val next = listOfNotNull(
+            AlarmPlan.next(alarms(context), zone, lastFired, now),
+            nudge(context)?.let { NudgePlan.next(it, zone, lastFired, now) },
+        ).minOrNull()
         if (next == null) {
             manager.cancel(fire(context, null))
             return
@@ -119,6 +133,7 @@ object Scheduler {
             if (alarm == ring && RingService.start(context, alarm, AlarmPlan.ringUntil(alarm, zone, now))) continue
             Notifications.show(context, alarm, urgent = AlarmPlan.escalates(alarm, zone, now))
         }
+        nudge(context)?.let { if (NudgePlan.due(it, zone, armed, lastFired, now)) Notifications.showNudge(context, it) }
         prefs(context).edit().putLong(KEY_LAST_FIRED, now).commit()
         arm(context)
     }
@@ -149,6 +164,23 @@ object Scheduler {
         end = json.optJSONArray("end")?.let { end -> (0 until end.length()).map { end.getInt(it) } },
         escalate = json.optInt("escalate"),
     )
+
+    private fun nudge(json: JSONObject): Nudge {
+        val anchors = json.getJSONArray("anchors")
+        return Nudge(
+            anchors = (0 until anchors.length()).map {
+                val anchor = anchors.getJSONArray(it)
+                anchor.getLong(0) to anchor.getLong(1)
+            },
+            snoozeAt = if (json.has("snoozeAt")) json.getLong("snoozeAt") else null,
+            snoozeUntil = if (json.has("snoozeUntil")) json.getLong("snoozeUntil") else null,
+            repeatMs = maxOf(1, json.optLong("repeat", 60)) * 60_000L,
+            quiet = json.optJSONArray("quiet")?.let { quiet -> (0 until quiet.length()).map { quiet.getInt(it) } },
+            since = if (json.has("since")) json.getLong("since") else null,
+            title = json.optString("title"),
+            body = json.optString("body"),
+        )
+    }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

@@ -30,6 +30,10 @@ abstract final class NoteKeys {
   /// spawning was a conscious decision (CONTEXT.md). Only sending the
   /// Notes of a deleted place back to Unsorted clears it.
   static const spawned = 'spawned';
+
+  /// When the Note's Nudge is due, chosen at Capture; absent means
+  /// [Notes.defaultNudge] after its capture.
+  static const nudge = 'nudge';
 }
 
 /// Field keys of a Section.
@@ -91,6 +95,9 @@ class Note {
   /// Whether the Note ever spawned a Routine or Reminder.
   final bool spawned;
 
+  /// When its Nudge was asked for at Capture, or null when it was not.
+  final DateTime? nudge;
+
   const Note({
     required this.id,
     required this.text,
@@ -100,6 +107,7 @@ class Note {
     this.trashed,
     this.mergedInto,
     this.spawned = false,
+    this.nudge,
   });
 
   /// When the Note was captured.
@@ -112,6 +120,10 @@ class Note {
   /// Not yet filed into an Area or Topic, not merged, not deleted and
   /// without a Routine or Reminder spawned from it (CONTEXT.md).
   bool get isUnsorted => place == null && !isTrashed && !isMerged && !spawned;
+
+  /// When the Note's Nudge is due while it is Unsorted: the time chosen
+  /// at Capture, else [Notes.defaultNudge] after it was captured.
+  DateTime get nudgeAt => nudge ?? captured.add(Notes.defaultNudge);
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
@@ -166,13 +178,18 @@ class Notes {
   /// How long a deleted Note stays in the trash before it is purged.
   static const trashKeep = Duration(days: 30);
 
+  /// How long after Capture the Nudge comes when none was picked (UI
+  /// laws, "Capture").
+  static const defaultNudge = Duration(hours: 1);
+
   final Store store;
 
   Notes(this.store);
 
   /// Captures a new text Note at the store's now, filed into the Area or
-  /// Topic [place] when one is given.
-  Note capture(String text, {String? place}) {
+  /// Topic [place] when one is given, nudged [nudgeIn] from now while it
+  /// is Unsorted.
+  Note capture(String text, {String? place, Duration? nudgeIn}) {
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
     }
@@ -183,6 +200,10 @@ class Notes {
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
       store.append(id, NoteKeys.text, text, date: now);
       if (place != null) store.append(id, NoteKeys.place, place, date: now);
+      if (nudgeIn != null) {
+        final due = now.add(nudgeIn).toIso8601String();
+        store.append(id, NoteKeys.nudge, due, date: now);
+      }
     });
     return byId(id)!;
   }
@@ -195,6 +216,14 @@ class Notes {
       throw ArgumentError.value(placeId, 'placeId', 'not an Area or Topic');
     }
     store.append(noteId, NoteKeys.place, placeId);
+  }
+
+  /// Nudges the Note [noteId] [nudgeIn] from now instead of when it was
+  /// set to before.
+  void setNudge(String noteId, Duration nudgeIn) {
+    _requireNote(noteId);
+    final due = store.clock().toUtc().add(nudgeIn);
+    store.append(noteId, NoteKeys.nudge, due.toIso8601String());
   }
 
   /// Fixes the text of the Note [noteId] in place. The old text stays in
@@ -372,6 +401,7 @@ class Notes {
       trashed: trashed == null ? null : DateTime.parse(trashed),
       mergedInto: _mergedInto(id),
       spawned: fields[NoteKeys.spawned] != null,
+      nudge: DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
     );
   }
 
@@ -385,6 +415,12 @@ class Notes {
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;
   }
+
+  /// Every Unsorted Note, oldest capture first.
+  List<Note> unsorted() => [
+    for (final note in all().reversed)
+      if (note.isUnsorted) note,
+  ];
 
   /// The Notes filed in the Area or Topic [placeId], newest capture
   /// first; an Area holds its Topics' Notes too.

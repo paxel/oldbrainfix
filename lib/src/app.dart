@@ -13,6 +13,7 @@ import 'drafts.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
+import 'nudge_screen.dart';
 import 'question_mark_background.dart';
 import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
@@ -117,8 +118,9 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
 
 /// The Starter Set on this Device's first start, then the alarm setup
 /// where there are alarms, the Agenda after them. Keeps the alarms in
-/// step while the app runs, and shows the full-screen alarm on top while
-/// one rings.
+/// step while the app runs, shows the full-screen alarm on top while
+/// one rings, and the Nudge screen when the Nudge's notification was
+/// tapped.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -152,6 +154,7 @@ class _HomeState extends State<_Home> {
   void initState() {
     super.initState();
     widget.alarms.addListener(_ringChanged);
+    widget.alarms.addListener(_nudgeOpened);
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
     // way out as well, so a changed Device setting (the Re-nag interval)
@@ -174,6 +177,7 @@ class _HomeState extends State<_Home> {
   @override
   void dispose() {
     widget.alarms.removeListener(_ringChanged);
+    widget.alarms.removeListener(_nudgeOpened);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -196,6 +200,22 @@ class _HomeState extends State<_Home> {
     );
     _ringRoute = route;
     unawaited(navigator.push(route));
+  }
+
+  /// Opens the Nudge screen when the Nudge's notification was tapped.
+  void _nudgeOpened() {
+    if (!mounted || !widget.alarms.takeNudgeOpened()) return;
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => NudgeScreen(
+            notes: widget.notes,
+            places: widget.places,
+            alarms: widget.alarms,
+          ),
+        ),
+      ),
+    );
   }
 
   /// Plants what the user kept of the Starter Set; it is not offered

@@ -23,7 +23,11 @@ object Notifications {
     private const val CHANNEL = "occurrences"
     private const val ESCALATED_CHANNEL = "escalated"
     private const val RING_CHANNEL = "ringing"
+    private const val NUDGE_CHANNEL = "nudges"
     private val CATCH_UP_ID = "catch-up".hashCode()
+
+    /** The one notification of the Nudge, and the request code opening the Nudge screen. */
+    private val NUDGE_ID = "nudge".hashCode()
 
     /** The notification of the full-screen alarm ringing. */
     val RING_ID = "ringing".hashCode()
@@ -116,6 +120,64 @@ object Notifications {
                 .build(),
         )
     }
+
+    /**
+     * The Nudge: a normal notification saying how many Notes are
+     * Unsorted, without their texts. Tapping it opens the Nudge screen;
+     * having no Done, it offers the three snoozes right away. A later one
+     * replaces it.
+     */
+    fun showNudge(context: Context, nudge: Nudge) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(NUDGE_CHANNEL, Scheduler.label(context, "nudgeChannel"), NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            Notification.Builder(context, NUDGE_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context).setDefaults(Notification.DEFAULT_ALL)
+        }
+        val screen = PendingIntent.getActivity(
+            context, NUDGE_ID,
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_NUDGE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val actions = snoozes.map { (minutes, label) ->
+            val intent = Intent(context, AlarmReceiver::class.java)
+                .setAction(AlarmReceiver.ACTION_NUDGE_SNOOZE)
+                .setData(Uri.parse("oldbrainfix://nudge/$minutes"))
+                .putExtra(AlarmReceiver.EXTRA_MINUTES, minutes)
+            val pending = PendingIntent.getBroadcast(
+                context, NUDGE_ID, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            Notification.Action.Builder(
+                Icon.createWithResource(context, R.mipmap.ic_launcher),
+                Scheduler.label(context, label),
+                pending,
+            ).build()
+        }
+        manager.notify(
+            NUDGE_ID,
+            builder
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(nudge.title)
+                .setContentText(nudge.body)
+                .setCategory(Notification.CATEGORY_REMINDER)
+                // Only the count shows, so the snoozes can work on the lock screen.
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setAutoCancel(true)
+                .setContentIntent(screen)
+                .setActions(*actions.toTypedArray())
+                .build(),
+        )
+    }
+
+    fun cancelNudge(context: Context) =
+        context.getSystemService(NotificationManager::class.java).cancel(NUDGE_ID)
 
     fun cancel(context: Context, alarm: Alarm) =
         context.getSystemService(NotificationManager::class.java)

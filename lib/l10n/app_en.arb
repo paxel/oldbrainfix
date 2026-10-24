@@ -381,5 +381,64 @@
   },
   "escalationExplain": "When this one is ignored again and again, it turns into a full-screen alarm with sound, even over the lock screen. It rings for up to 5 minutes, then Re-nags again, until it is Done or snoozed.",
   "escalationSwitch": "Escalate to a full-screen alarm",
-  "escalationAfter": "After ignored Re-nags"
+  "escalationAfter": "After ignored Re-nags",
+  "nudgeHeading": "Remind me to sort it in",
+  "unsortedBanner": "{count} Unsorted",
+  "@unsortedBanner": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noUnsorted": "Nothing is Unsorted. Well done!",
+  "nudgeScreenTitle": "Waiting to be sorted",
+  "nudgeMore": "+{count}",
+  "@nudgeMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nudgeMoreTooltip": "All Unsorted Notes",
+  "nudgeChannel": "Nudges",
+  "nudgeTitle": "{count, plural, =1{1 Note is Unsorted} other{{count} Notes are Unsorted}}",
+  "@nudgeTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nudgeBody": "Tap to sort them.",
+  "nudgeSettingsHeading": "Nudges on this phone",
+  "nudgeSettingsSummary": "Again after {minutes} min, {quiet}",
+  "@nudgeSettingsSummary": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "quiet": {
+        "type": "String"
+      }
+    }
+  },
+  "nudgeSettingsExplain": "While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.",
+  "nudgeRepeat": "Nudge again after",
+  "quietHours": "Quiet Hours",
+  "quietHoursRange": "Quiet Hours {from} to {until}",
+  "@quietHoursRange": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "quietHoursOff": "no Quiet Hours",
+  "quietFrom": "From",
+  "quietUntil": "Until"
 }

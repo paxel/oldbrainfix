@@ -1195,6 +1195,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'After ignored Re-nags'**
   String get escalationAfter;
+
+  /// No description provided for @nudgeHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me to sort it in'**
+  String get nudgeHeading;
+
+  /// No description provided for @unsortedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Unsorted'**
+  String unsortedBanner(int count);
+
+  /// No description provided for @noUnsorted.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is Unsorted. Well done!'**
+  String get noUnsorted;
+
+  /// No description provided for @nudgeScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting to be sorted'**
+  String get nudgeScreenTitle;
+
+  /// No description provided for @nudgeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count}'**
+  String nudgeMore(int count);
+
+  /// No description provided for @nudgeMoreTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'All Unsorted Notes'**
+  String get nudgeMoreTooltip;
+
+  /// No description provided for @nudgeChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudges'**
+  String get nudgeChannel;
+
+  /// No description provided for @nudgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Note is Unsorted} other{{count} Notes are Unsorted}}'**
+  String nudgeTitle(int count);
+
+  /// No description provided for @nudgeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to sort them.'**
+  String get nudgeBody;
+
+  /// No description provided for @nudgeSettingsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudges on this phone'**
+  String get nudgeSettingsHeading;
+
+  /// No description provided for @nudgeSettingsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Again after {minutes} min, {quiet}'**
+  String nudgeSettingsSummary(int minutes, String quiet);
+
+  /// No description provided for @nudgeSettingsExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.'**
+  String get nudgeSettingsExplain;
+
+  /// No description provided for @nudgeRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Nudge again after'**
+  String get nudgeRepeat;
+
+  /// No description provided for @quietHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet Hours'**
+  String get quietHours;
+
+  /// No description provided for @quietHoursRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet Hours {from} to {until}'**
+  String quietHoursRange(String from, String until);
+
+  /// No description provided for @quietHoursOff.
+  ///
+  /// In en, this message translates to:
+  /// **'no Quiet Hours'**
+  String get quietHoursOff;
+
+  /// No description provided for @quietFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get quietFrom;
+
+  /// No description provided for @quietUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Until'**
+  String get quietUntil;
 }
 
 class _AppLocalizationsDelegate

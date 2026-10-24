@@ -18,13 +18,21 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
+        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
         super.onCreate(savedInstanceState)
     }
 
-    /** The full-screen alarm opened the running app: the app shows it. */
+    /**
+     * The full-screen alarm or the Nudge opened the running app: the app
+     * shows it.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_NUDGE, false)) {
+            nudgeOpened = true
+            actionsArrived()
+        }
         if (!intent.getBooleanExtra(EXTRA_RING, false)) return
         showOverLockScreen(true)
         actionsArrived()
@@ -52,6 +60,7 @@ class MainActivity : FlutterActivity() {
                             json(args["alarms"]) as JSONArray,
                             json(args["labels"]) as JSONObject,
                             json(args["done"]) as JSONArray,
+                            json(args["nudge"]) as JSONObject?,
                         )
                         result.success(null)
                     }
@@ -100,6 +109,10 @@ class MainActivity : FlutterActivity() {
                             AlarmReceiver.snooze(this@MainActivity, alarm, minutes)
                         }
                         result.success(null)
+                    }
+                    "nudgeOpened" -> {
+                        result.success(nudgeOpened)
+                        nudgeOpened = false
                     }
                     "permissions" -> result.success(Permissions.granted(this@MainActivity))
                     "request" -> {
@@ -169,6 +182,12 @@ class MainActivity : FlutterActivity() {
 
         /** Marks the launch from the full-screen alarm's notification. */
         const val EXTRA_RING = "oldbrainfix.ring"
+
+        /** Marks the launch from the Nudge's notification. */
+        const val EXTRA_NUDGE = "oldbrainfix.nudge"
+
+        /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
+        private var nudgeOpened = false
 
         /**
          * The full-screen alarm stopped: the app no longer shows over the

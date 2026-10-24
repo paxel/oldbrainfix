@@ -15,6 +15,7 @@ import 'merge_into_screen.dart';
 import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
+import 'nudge_screen.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
@@ -29,7 +30,8 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// until the browser opens or the app comes back; the magnifier opens
 /// the notes browser; the app bar makes a Routine without a Note. A red
 /// banner on top shows while alarms lack a permission, and leads to the
-/// setup. Below it the Missed Summary shows until "seen". At local
+/// setup. Below it the Missed Summary shows until "seen", and under it
+/// the "x Unsorted" banner while Notes are Unsorted, opening them. At local
 /// midnight the Agenda moves on to the new day, and whenever an
 /// Occurrence becomes Missed the summary takes it in.
 class AgendaScreen extends StatefulWidget {
@@ -65,6 +67,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
   List<_PlacedRow> _today = const [];
   List<_PlacedRow> _tomorrow = const [];
+  var _unsorted = 0;
 
   /// The Note captured last from here, shown on top until it is let go.
   String? _capturedId;
@@ -82,12 +85,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
       onResume: _reload,
     );
     widget.alarms.addListener(_reload);
+    // Notes sorted on a page opened from elsewhere, like the Nudge
+    // screen, change the Unsorted count.
+    widget.notes.store.addListener(_logChanged);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     widget.alarms.removeListener(_reload);
+    widget.notes.store.removeListener(_logChanged);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -112,6 +119,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _today = [for (final row in agenda.todayRows) _place(row)];
     _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
     _missed = _alarms.missed(deviceWallClock);
+    _unsorted = widget.notes.unsorted().length;
     _armTimer();
     final captured = _capturedId == null
         ? null
@@ -135,6 +143,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
     if (mounted) _reload();
   }
 
+  var _reloadQueued = false;
+
+  /// Reloads once after the log changed, never in the middle of whatever
+  /// changed it.
+  void _logChanged() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    scheduleMicrotask(() {
+      _reloadQueued = false;
+      _reloadIfMounted();
+    });
+  }
+
   Future<void> _capture() async {
     await captureNote(
       context,
@@ -155,6 +176,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
         ),
       ),
     );
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _openUnsorted() async {
+    await openUnsorted(context, widget.notes, widget.places, widget.alarms);
     if (!mounted) return;
     _reload();
   }
@@ -279,6 +306,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
               onCheck: _checkMissed,
               onSeen: _seen,
             ),
+          if (_unsorted > 0)
+            _UnsortedBanner(count: _unsorted, onTap: _openUnsorted),
           if (captured != null) ...[
             _Heading(t.justCaptured),
             NoteCard(
@@ -365,6 +394,47 @@ class _AlarmsBanner extends StatelessWidget {
                     style: TextStyle(color: scheme.onError),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "x Unsorted" while Notes wait to be sorted; tapping it opens them.
+class _UnsortedBanner extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _UnsortedBanner({required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        key: const ValueKey('unsortedBanner'),
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.move_to_inbox, color: scheme.onSecondaryContainer),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    context.t.unsortedBanner(count),
+                    style: TextStyle(color: scheme.onSecondaryContainer),
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: scheme.onSecondaryContainer),
               ],
             ),
           ),

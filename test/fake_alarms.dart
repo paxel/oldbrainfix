@@ -44,13 +44,18 @@ class FakeAlarms implements AlarmPlatform {
   /// `routine@occurrence`.
   List<String> done = [];
 
+  /// The Nudge armed last; null when none was.
+  ArmedNudge? nudge;
+
   @override
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    ArmedNudge? nudge,
   }) async {
     armed = alarms;
+    this.nudge = nudge;
     this.labels = labels;
     this.done = [for (final (r, o) in done) '$r@${o.key}'];
     arms++;
@@ -102,6 +107,21 @@ class FakeAlarms implements AlarmPlatform {
               now.add(snooze),
             ),
     );
+  }
+
+  var _nudgeTapped = false;
+
+  /// The Nudge's notification is tapped while the app runs.
+  void tapNudge() {
+    _nudgeTapped = true;
+    _actions.add(null);
+  }
+
+  @override
+  Future<bool> nudgeOpened() async {
+    final tapped = _nudgeTapped;
+    _nudgeTapped = false;
+    return tapped;
   }
 
   @override

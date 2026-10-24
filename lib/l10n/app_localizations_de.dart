@@ -707,4 +707,75 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get escalationAfter => 'Nach so oft unbeachtetem Wiederklingeln';
+
+  @override
+  String get nudgeHeading => 'Erinnere mich ans Einsortieren in';
+
+  @override
+  String unsortedBanner(int count) {
+    return '$count unsortiert';
+  }
+
+  @override
+  String get noUnsorted => 'Nichts ist unsortiert. Gut gemacht!';
+
+  @override
+  String get nudgeScreenTitle => 'Warten aufs Einsortieren';
+
+  @override
+  String nudgeMore(int count) {
+    return '+$count';
+  }
+
+  @override
+  String get nudgeMoreTooltip => 'Alle unsortierten Notizen';
+
+  @override
+  String get nudgeChannel => 'Stupser';
+
+  @override
+  String nudgeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notizen sind unsortiert',
+      one: '1 Notiz ist unsortiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nudgeBody => 'Tippe, um sie einzusortieren.';
+
+  @override
+  String get nudgeSettingsHeading => 'Stupser auf diesem Handy';
+
+  @override
+  String nudgeSettingsSummary(int minutes, String quiet) {
+    return 'Erneut nach $minutes Min., $quiet';
+  }
+
+  @override
+  String get nudgeSettingsExplain =>
+      'Solange etwas unsortiert ist, kommt ein unbeachteter Stupser nach dieser Zeit wieder. In der Ruhezeit warten Stupser, bis sie endet; Routinen und Erinnerungen klingeln trotzdem pünktlich.';
+
+  @override
+  String get nudgeRepeat => 'Erneut stupsen nach';
+
+  @override
+  String get quietHours => 'Ruhezeit';
+
+  @override
+  String quietHoursRange(String from, String until) {
+    return 'Ruhezeit $from bis $until';
+  }
+
+  @override
+  String get quietHoursOff => 'keine Ruhezeit';
+
+  @override
+  String get quietFrom => 'Von';
+
+  @override
+  String get quietUntil => 'Bis';
 }

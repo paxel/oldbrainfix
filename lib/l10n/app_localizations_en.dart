@@ -700,4 +700,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get escalationAfter => 'After ignored Re-nags';
+
+  @override
+  String get nudgeHeading => 'Remind me to sort it in';
+
+  @override
+  String unsortedBanner(int count) {
+    return '$count Unsorted';
+  }
+
+  @override
+  String get noUnsorted => 'Nothing is Unsorted. Well done!';
+
+  @override
+  String get nudgeScreenTitle => 'Waiting to be sorted';
+
+  @override
+  String nudgeMore(int count) {
+    return '+$count';
+  }
+
+  @override
+  String get nudgeMoreTooltip => 'All Unsorted Notes';
+
+  @override
+  String get nudgeChannel => 'Nudges';
+
+  @override
+  String nudgeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Notes are Unsorted',
+      one: '1 Note is Unsorted',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nudgeBody => 'Tap to sort them.';
+
+  @override
+  String get nudgeSettingsHeading => 'Nudges on this phone';
+
+  @override
+  String nudgeSettingsSummary(int minutes, String quiet) {
+    return 'Again after $minutes min, $quiet';
+  }
+
+  @override
+  String get nudgeSettingsExplain =>
+      'While anything is Unsorted, a Nudge comes again after this long when you ignore it. In the Quiet Hours Nudges wait until they end; Routines and Reminders still ring on time.';
+
+  @override
+  String get nudgeRepeat => 'Nudge again after';
+
+  @override
+  String get quietHours => 'Quiet Hours';
+
+  @override
+  String quietHoursRange(String from, String until) {
+    return 'Quiet Hours $from to $until';
+  }
+
+  @override
+  String get quietHoursOff => 'no Quiet Hours';
+
+  @override
+  String get quietFrom => 'From';
+
+  @override
+  String get quietUntil => 'Until';
 }

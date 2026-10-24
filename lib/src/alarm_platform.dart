@@ -28,6 +28,19 @@ class ArmedAlarm {
   });
 }
 
+/// The planned Nudge with the texts its notification shows.
+class ArmedNudge {
+  final PlannedNudge nudge;
+  final String title;
+  final String body;
+
+  const ArmedNudge({
+    required this.nudge,
+    required this.title,
+    required this.body,
+  });
+}
+
 /// The texts of the alarm notifications, in the reader's language. The
 /// platform keeps them, so it can show alarms while the app is closed.
 class AlarmLabels {
@@ -50,6 +63,9 @@ class AlarmLabels {
   final String ringChannel;
   final String escalatedChannel;
 
+  /// The channel of the Nudge.
+  final String nudgeChannel;
+
   const AlarmLabels({
     required this.channel,
     required this.done,
@@ -63,6 +79,7 @@ class AlarmLabels {
     required this.catchUpMany,
     required this.ringChannel,
     required this.escalatedChannel,
+    required this.nudgeChannel,
   });
 
   Map<String, String> toMap() => {
@@ -78,6 +95,7 @@ class AlarmLabels {
     'catchUpMany': catchUpMany,
     'ringChannel': ringChannel,
     'escalatedChannel': escalatedChannel,
+    'nudgeChannel': nudgeChannel,
   };
 }
 
@@ -85,30 +103,43 @@ class AlarmLabels {
 sealed class AlarmAction {
   /// Counts up; acknowledging one acknowledges everything before it.
   final int seq;
-  final String routineId;
-  final String occurrenceKey;
 
   /// When it was tapped.
   final DateTime at;
 
-  const AlarmAction(this.seq, this.routineId, this.occurrenceKey, this.at);
+  const AlarmAction(this.seq, this.at);
 }
 
 class DoneTapped extends AlarmAction {
-  const DoneTapped(super.seq, super.routineId, super.occurrenceKey, super.at);
+  final String routineId;
+  final String occurrenceKey;
+
+  const DoneTapped(int seq, this.routineId, this.occurrenceKey, DateTime at)
+    : super(seq, at);
 }
 
 class SnoozeTapped extends AlarmAction {
+  final String routineId;
+  final String occurrenceKey;
+
   /// When the Occurrence rings again.
   final DateTime until;
 
   const SnoozeTapped(
-    super.seq,
-    super.routineId,
-    super.occurrenceKey,
-    super.at,
+    int seq,
+    this.routineId,
+    this.occurrenceKey,
+    DateTime at,
     this.until,
-  );
+  ) : super(seq, at);
+}
+
+/// A snooze tapped on the Nudge: the Notes Unsorted then wait until
+/// [until].
+class NudgeSnoozed extends AlarmAction {
+  final DateTime until;
+
+  const NudgeSnoozed(super.seq, super.at, this.until);
 }
 
 /// An Occurrence ringing as a full-screen alarm (Escalation), with the
@@ -145,14 +176,20 @@ abstract interface class AlarmPlatform {
   /// only show where it has.
   bool get available;
 
-  /// Arms exactly [alarms], replacing every alarm armed before, and
-  /// takes away the notifications of the Occurrences in [done], given as
-  /// Routine id and Occurrence.
+  /// Arms exactly [alarms] and the [nudge], replacing everything armed
+  /// before, and takes away the notifications of the Occurrences in
+  /// [done], given as Routine id and Occurrence, and the Nudge's when
+  /// there is none.
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    ArmedNudge? nudge,
   });
+
+  /// Whether the Nudge's notification was tapped since this was last
+  /// asked; asking clears it.
+  Future<bool> nudgeOpened();
 
   /// The taps not acknowledged yet, oldest first.
   Future<List<AlarmAction>> pendingActions();
@@ -190,7 +227,11 @@ class NoAlarms implements AlarmPlatform {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    ArmedNudge? nudge,
   }) async {}
+
+  @override
+  Future<bool> nudgeOpened() async => false;
 
   @override
   Future<List<AlarmAction>> pendingActions() async => const [];
@@ -233,6 +274,7 @@ class AndroidAlarms implements AlarmPlatform {
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
+    ArmedNudge? nudge,
   }) => _channel.invokeMethod('arm', {
     'alarms': [
       for (final ArmedAlarm(:alarm, :title, :body) in alarms)
@@ -271,7 +313,34 @@ class AndroidAlarms implements AlarmPlatform {
       for (final (routine, occurrence) in done)
         {'routine': routine, 'occurrence': occurrence.key},
     ],
+    if (nudge case ArmedNudge(:final nudge, :final title, :final body))
+      'nudge': {
+        'anchors': [
+          for (final (:due, :captured) in nudge.anchors)
+            [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
+        ],
+        if (nudge.snooze case (:final at, :final until)) ...{
+          'snoozeAt': at.millisecondsSinceEpoch,
+          'snoozeUntil': until.millisecondsSinceEpoch,
+        },
+        'repeat': nudge.repeat.inMinutes,
+        // On the wall clock, so they hold in whatever zone the phone is.
+        if (nudge.quiet case final quiet?)
+          'quiet': [
+            quiet.start.hour,
+            quiet.start.minute,
+            quiet.end.hour,
+            quiet.end.minute,
+          ],
+        'since': ?nudge.since?.millisecondsSinceEpoch,
+        'title': title,
+        'body': body,
+      },
   });
+
+  @override
+  Future<bool> nudgeOpened() async =>
+      await _channel.invokeMethod<bool>('nudgeOpened') ?? false;
 
   @override
   Future<List<AlarmAction>> pendingActions() async {
@@ -336,6 +405,11 @@ class AndroidAlarms implements AlarmPlatform {
     if (at is! int) return null;
     final tapped = DateTime.fromMillisecondsSinceEpoch(at, isUtc: true);
     return switch ((m['kind'], m['until'])) {
+      ('nudgeSnooze', final int until) => NudgeSnoozed(
+        seq,
+        tapped,
+        DateTime.fromMillisecondsSinceEpoch(until, isUtc: true),
+      ),
       ('done', _) => DoneTapped(seq, routine, occurrence, tapped),
       ('snooze', final int until) => SnoozeTapped(
         seq,

@@ -1,3 +1,5 @@
+import 'nudges.dart';
+import 'schedule.dart';
 import 'store.dart';
 
 /// Which theme this Device shows: the system's, or a fixed one.
@@ -12,9 +14,22 @@ extension DeviceSettings on Store {
   static const _alarmSetupDone = 'alarmSetupDone';
   static const _renagMinutes = 'renagMinutes';
   static const _missedSeen = 'missedSeen';
+  static const _quietHours = 'quietHours';
+  static const _quietHoursOff = 'quietHoursOff';
+  static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
+
+  /// How long an ignored Nudge waits before it comes again, when nothing
+  /// else is set.
+  static const defaultNudgeRepeat = Duration(hours: 1);
+
+  /// The Quiet Hours when nothing else is set: 22:00 to 08:00.
+  static final defaultQuietHours = QuietHours(
+    ClockTime(22, 0),
+    ClockTime(8, 0),
+  );
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -66,4 +81,38 @@ extension DeviceSettings on Store {
 
   set missedSeen(DateTime? seen) =>
       setLocalSetting(_missedSeen, seen?.toUtc().toIso8601String() ?? '');
+
+  /// This Device's Quiet Hours, kept while they are switched off.
+  QuietHours get quietHours {
+    final parts = (localSetting(_quietHours) ?? '').split('-');
+    final from = ClockTime.tryParse(parts.first);
+    final until = parts.length == 2 ? ClockTime.tryParse(parts.last) : null;
+    return from == null || until == null
+        ? defaultQuietHours
+        : QuietHours(from, until);
+  }
+
+  set quietHours(QuietHours quiet) =>
+      setLocalSetting(_quietHours, '${quiet.start}-${quiet.end}');
+
+  /// Whether Nudges wait out the Quiet Hours on this Device; on unless
+  /// switched off.
+  bool get quietHoursOn => localSetting(_quietHoursOff) != 'true';
+
+  set quietHoursOn(bool on) => setLocalSetting(_quietHoursOff, '${!on}');
+
+  /// How long an ignored Nudge waits before it comes again.
+  Duration get nudgeRepeat {
+    final minutes = int.tryParse(localSetting(_nudgeRepeatMinutes) ?? '');
+    return minutes == null || minutes < 1
+        ? defaultNudgeRepeat
+        : Duration(minutes: minutes);
+  }
+
+  set nudgeRepeat(Duration interval) {
+    if (interval.inMinutes < 1) {
+      throw ArgumentError.value(interval, 'interval', 'at least a minute');
+    }
+    setLocalSetting(_nudgeRepeatMinutes, '${interval.inMinutes}');
+  }
 }

@@ -13,7 +13,8 @@ import 'schedule_text.dart';
 /// meanwhile, so a Done reaches the log even when it was tapped while
 /// the app was not running. Tells its listeners when taps were applied,
 /// the granted permissions changed, Escalation was turned on or off
-/// anywhere, or a full-screen alarm started or stopped.
+/// anywhere, a full-screen alarm started or stopped, or the Nudge's
+/// notification was tapped.
 class AlarmSync extends ChangeNotifier {
   /// The permissions whose absence the red banner always shows; the
   /// full-screen one counts as well while any Routine escalates.
@@ -40,6 +41,7 @@ class AlarmSync extends ChangeNotifier {
   /// Whether any Routine escalates, as of the last arming.
   var _escalating = false;
   Ringing? _ringing;
+  var _nudgeOpened = false;
 
   AlarmSync({
     required this.store,
@@ -80,6 +82,14 @@ class AlarmSync extends ChangeNotifier {
   /// [refresh]; null when none rings.
   Ringing? get ringing => _ringing;
 
+  /// Whether the Nudge's notification was tapped and the Nudge screen
+  /// is still to show; taking it clears it.
+  bool takeNudgeOpened() {
+    final opened = _nudgeOpened;
+    _nudgeOpened = false;
+    return opened;
+  }
+
   /// Done, or a snooze for [snooze], from the full-screen alarm: the
   /// platform stops ringing and queues it, and it is applied at once.
   Future<void> answer(Ringing ring, {Duration? snooze}) async {
@@ -99,11 +109,15 @@ class AlarmSync extends ChangeNotifier {
           alarms.applyDone(routineId, occurrenceKey, at);
         case SnoozeTapped(:final routineId, :final occurrenceKey, :final until):
           alarms.applySnooze(routineId, occurrenceKey, until);
+        case NudgeSnoozed(:final at, :final until):
+          alarms.applyNudgeSnooze(at, until);
       }
     }
     final granted = await platform.permissions();
     final ringing = await platform.ringing();
+    final nudgeOpened = await platform.nudgeOpened();
     if (_disposed) return;
+    if (nudgeOpened) _nudgeOpened = true;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
     _granted = granted;
@@ -117,7 +131,10 @@ class AlarmSync extends ChangeNotifier {
       );
     }
     if (!_disposed &&
-        (actions.isNotEmpty || permissionsChanged || ringingChanged)) {
+        (actions.isNotEmpty ||
+            permissionsChanged ||
+            ringingChanged ||
+            nudgeOpened)) {
       notifyListeners();
     }
   });
@@ -157,9 +174,18 @@ class AlarmSync extends ChangeNotifier {
         ),
     ];
     final done = Alarms(store).recentlyDone(wallClock);
+    final planned = Alarms(store).nudge(wallClock);
+    final nudge = planned == null
+        ? null
+        : ArmedNudge(
+            nudge: planned,
+            title: t.nudgeTitle(planned.count),
+            body: t.nudgeBody,
+          );
     final signature = [
       for (final a in armed) '${a.alarm}|${a.title}|${a.body}',
       for (final (routine, occurrence) in done) 'done $routine@$occurrence',
+      if (nudge != null) '${nudge.nudge}|${nudge.title}|${nudge.body}',
     ].join('\n');
     if (!force && signature == _lastArmed) return;
     _lastArmed = signature;
@@ -179,8 +205,10 @@ class AlarmSync extends ChangeNotifier {
         catchUpMany: t.catchUpMany('{count}'),
         ringChannel: t.ringChannel,
         escalatedChannel: t.escalatedChannel,
+        nudgeChannel: t.nudgeChannel,
       ),
       done: done,
+      nudge: nudge,
     );
   }
 
