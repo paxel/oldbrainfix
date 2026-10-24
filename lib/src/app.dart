@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'browser.dart';
+import 'drafts.dart';
 import 'look.dart';
 import 'notes_screen.dart';
 import 'question_mark_background.dart';
@@ -15,7 +16,16 @@ class OldBrainFixApp extends StatefulWidget {
   /// What the app has to say; the app keeps its own when none is given.
   final Announcements? announcements;
 
-  const OldBrainFixApp({super.key, required this.store, this.announcements});
+  /// Where the Note editor keeps unsaved text; in memory when none is
+  /// given.
+  final Drafts? drafts;
+
+  const OldBrainFixApp({
+    super.key,
+    required this.store,
+    this.announcements,
+    this.drafts,
+  });
 
   @override
   State<OldBrainFixApp> createState() => _OldBrainFixAppState();
@@ -26,6 +36,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   final _light = lookTheme(Brightness.light);
   final _dark = lookTheme(Brightness.dark);
   late final _announcements = widget.announcements ?? Announcements();
+  late final _drafts = widget.drafts ?? MemoryDrafts();
   late final _themeMode = themeModeOf(widget.store.themeChoice);
   late final _notes = Notes(widget.store);
   late final _places = Places(widget.store);
@@ -58,7 +69,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       scroll: _scroll,
       child: AnnouncementStrip(
         announcements: _announcements,
-        child: child ?? const SizedBox.shrink(),
+        child: DraftsScope(
+          drafts: _drafts,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     ),
     home: _Home(

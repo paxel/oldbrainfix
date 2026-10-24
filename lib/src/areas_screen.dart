@@ -8,6 +8,7 @@ import 'capture_screen.dart';
 import 'file_into_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'place_names.dart';
@@ -113,6 +114,13 @@ class _AreasScreenState extends State<AreasScreen> {
     }
   }
 
+  Future<void> _merge(Note note) async {
+    if (await mergeNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      _reload();
+    }
+  }
+
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -193,7 +201,7 @@ class _AreasScreenState extends State<AreasScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _hits, _file, _openNote)
+                    ? _hitCards(context, _hits, _file, _merge, _openNote)
                     : _areaRows(t),
               ),
             ),
@@ -347,6 +355,13 @@ class _AreaScreenState extends State<AreaScreen> {
     }
   }
 
+  Future<void> _merge(Note note) async {
+    if (await mergeNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      _reload();
+    }
+  }
+
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -394,7 +409,7 @@ class _AreaScreenState extends State<AreaScreen> {
             ],
           ),
         ),
-      ...diaryCards(context, _diary, _file, _openNote),
+      ...diaryCards(context, _diary, _file, _merge, _openNote),
     ];
   }
 
@@ -434,7 +449,7 @@ class _AreaScreenState extends State<AreaScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file, _openNote)
+                    ? _hitCards(context, _diary, _file, _merge, _openNote)
                     : _browsing(t, area),
               ),
             ),
@@ -520,6 +535,13 @@ class _TopicScreenState extends State<TopicScreen> {
     }
   }
 
+  Future<void> _merge(Note note) async {
+    if (await mergeNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      _reload();
+    }
+  }
+
   Future<void> _openNote(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -561,10 +583,10 @@ class _TopicScreenState extends State<TopicScreen> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: searching
-                    ? _hitCards(context, _diary, _file, _openNote)
+                    ? _hitCards(context, _diary, _file, _merge, _openNote)
                     : _diary.isEmpty
                     ? [BrowserEmpty(text: t.noNotesHere)]
-                    : diaryCards(context, _diary, _file, _openNote),
+                    : diaryCards(context, _diary, _file, _merge, _openNote),
               ),
             ),
           ],
@@ -601,10 +623,11 @@ List<Widget> _hitCards(
   BuildContext context,
   List<PlacedNote> hits,
   void Function(Note note) onFile,
+  void Function(Note note) onMerge,
   void Function(Note note) onOpen,
 ) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
-    : diaryCards(context, hits, onFile, onOpen);
+    : diaryCards(context, hits, onFile, onMerge, onOpen);
 
 /// Opens "file into…" for [note] and files it; true when it moved.
 Future<bool> fileNote(

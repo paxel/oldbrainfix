@@ -104,12 +104,13 @@ class BrowserSearchField extends StatelessWidget {
   );
 }
 
-/// Notes as a diary of cards, each with "file into…"; tapping a card
-/// opens it.
+/// Notes as a diary of cards, each with "file into…" and "merge
+/// into…"; tapping a card opens it.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
   void Function(Note note) onFile,
+  void Function(Note note) onMerge,
   void Function(Note note) onOpen,
 ) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
@@ -122,6 +123,7 @@ List<Widget> diaryCards(
         area: area,
         topic: topic,
         onFile: () => onFile(note),
+        onMerge: () => onMerge(note),
         onTap: () => onOpen(note),
       ),
   ];

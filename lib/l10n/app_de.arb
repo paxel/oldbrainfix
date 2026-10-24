@@ -74,5 +74,7 @@
   "showUnimportant": "Unwichtige Notizen einblenden",
   "addHere": "Hier hinzufügen",
   "noteHere": "Notiz hier",
-  "topicChoice": "Thema"
+  "topicChoice": "Thema",
+  "mergeInto": "Zusammenführen mit …",
+  "noOtherNotes": "Es gibt keine andere Notiz zum Zusammenführen."
 }

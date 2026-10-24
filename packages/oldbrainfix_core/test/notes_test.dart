@@ -121,6 +121,17 @@ void main() {
       expect(notes.byId(note.id)?.captured, DateTime.utc(2026, 10, 24, 8));
     });
 
+    test('the time the text was last set is known', () {
+      final note = notes.capture('milk');
+      expect(notes.textSetAt(note.id), DateTime.utc(2026, 10, 24, 8));
+      tick();
+      notes.setImportance(note.id, Importance.important);
+      expect(notes.textSetAt(note.id), DateTime.utc(2026, 10, 24, 8));
+      notes.edit(note.id, 'oat milk');
+      expect(notes.textSetAt(note.id), DateTime.utc(2026, 10, 24, 8, 1));
+      expect(notes.textSetAt('note:gone'), isNull);
+    });
+
     test('an edit never empties a Note', () {
       final note = notes.capture('milk');
       expect(() => notes.edit(note.id, '  '), throwsArgumentError);
@@ -244,6 +255,180 @@ void main() {
       expect(notes.all().map((n) => n.id), [kept.id]);
       // The log still holds what the Note said.
       expect(store.history(note.id), isNotEmpty);
+    });
+  });
+
+  group('merge', () {
+    late Store store;
+    late Places places;
+    late Notes notes;
+    var now = DateTime.utc(2026, 10, 24, 8);
+
+    setUp(() {
+      now = DateTime.utc(2026, 10, 24, 8);
+      store = Store.inMemory(clock: () => now);
+      places = Places(store);
+      notes = Notes(store);
+    });
+    tearDown(() => store.close());
+
+    void tick([Duration by = const Duration(hours: 1)]) => now = now.add(by);
+
+    test('a merged Note becomes a Section with its own Capture Context', () {
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final target = notes.capture('sauce', place: home.id);
+      notes.setImportance(target.id, Importance.important);
+      tick();
+      final merged = notes.capture('nees mor sauce', place: kitchen.id);
+      tick();
+      notes.amend(merged.id, 'Update: sauce bought');
+      tick();
+      notes.merge(merged.id, target.id);
+
+      final sections = notes.sections(target.id);
+      expect(sections.map((s) => s.text), [
+        'nees mor sauce',
+        'Update: sauce bought',
+      ]);
+      expect(sections.map((s) => s.context.captured), [
+        DateTime.utc(2026, 10, 24, 9),
+        DateTime.utc(2026, 10, 24, 10),
+      ]);
+      expect(sections.first.id, merged.id);
+      expect(sections.map((s) => s.noteId), everyElement(target.id));
+      final kept = notes.byId(target.id);
+      expect(kept?.text, 'sauce');
+      expect(kept?.place, home.id);
+      expect(kept?.importance, Importance.important);
+      expect(notes.byId(merged.id)?.mergedInto, target.id);
+    });
+
+    test('a merged Note leaves every list and Unsorted', () {
+      final home = places.addArea('Household');
+      final target = notes.capture('sauce', place: home.id);
+      final filed = notes.capture('more sauce', place: home.id);
+      final unsorted = notes.capture('sauce bought');
+      notes.merge(filed.id, target.id);
+      notes.merge(unsorted.id, target.id);
+
+      expect(notes.all().map((n) => n.id), [target.id]);
+      expect(notes.inside(home.id).map((n) => n.id), [target.id]);
+      expect(places.notesInside(home.id), 1);
+      expect(Search(store).notes('sauce').map((n) => n.id), [target.id]);
+      expect(notes.trashed(), isEmpty);
+      expect(notes.byId(unsorted.id)?.isUnsorted, isFalse);
+    });
+
+    test('what reaches a merged Note later still shows in its target', () {
+      final target = notes.capture('sauce');
+      final merged = notes.capture('nees mor sauce');
+      notes.merge(merged.id, target.id);
+      // Another Device, not yet synced, fixed and amended the merged Note.
+      tick();
+      notes.edit(merged.id, 'need more sauce');
+      notes.amend(merged.id, 'and pasta');
+      expect(notes.sections(target.id).map((s) => s.text), [
+        'need more sauce',
+        'and pasta',
+      ]);
+    });
+
+    test('a Note merged into a merged Note ends in the last target', () {
+      final a = notes.capture('a');
+      tick();
+      final b = notes.capture('b');
+      tick();
+      final c = notes.capture('c');
+      notes.merge(a.id, b.id);
+      notes.merge(b.id, c.id);
+      expect(notes.all().map((n) => n.id), [c.id]);
+      expect(notes.byId(a.id)?.mergedInto, c.id);
+      expect(notes.sections(c.id).map((s) => s.text), ['a', 'b']);
+    });
+
+    test('a Note cannot be merged into itself or a gone Note', () {
+      final a = notes.capture('a');
+      final b = notes.capture('b');
+      final trashed = notes.capture('trashed');
+      notes.trash(trashed.id);
+      final merged = notes.capture('merged');
+      notes.merge(merged.id, b.id);
+      final before = store.allEntries().length;
+      for (final (from, into) in [
+        (a.id, a.id),
+        (a.id, 'note:gone'),
+        ('note:gone', a.id),
+        (a.id, trashed.id),
+        (trashed.id, a.id),
+        (a.id, merged.id),
+        (merged.id, a.id),
+      ]) {
+        expect(() => notes.merge(from, into), throwsArgumentError);
+      }
+      expect(store.allEntries(), hasLength(before));
+    });
+
+    test('Devices merging two Notes into each other keep the lower id', () {
+      final a = notes.capture('a');
+      final b = notes.capture('b');
+      // Both merges arrive, as after a sync of two Devices.
+      store.append(a.id, NoteKeys.merged, b.id);
+      store.append(b.id, NoteKeys.merged, a.id);
+      final kept = a.id.compareTo(b.id) < 0 ? a : b;
+      final folded = kept == a ? b : a;
+      expect(notes.all().map((n) => n.id), [kept.id]);
+      expect(notes.sections(kept.id).map((s) => s.id), [folded.id]);
+      expect(notes.sections(folded.id), isEmpty);
+    });
+
+    test('a merge into a Note that is gone keeps the Note', () {
+      final a = notes.capture('a');
+      store.append(a.id, NoteKeys.merged, 'note:never-synced');
+      expect(notes.all().map((n) => n.id), [a.id]);
+      expect(notes.byId(a.id)?.mergedInto, isNull);
+    });
+
+    test('merged Notes go to the trash, back and away with the target', () {
+      final target = notes.capture('sauce');
+      final merged = notes.capture('more sauce');
+      notes.amend(merged.id, 'bought');
+      notes.merge(merged.id, target.id);
+      tick();
+      notes.trash(target.id);
+      expect(notes.trashed().map((n) => n.id), [target.id]);
+      notes.restore(target.id);
+      expect(notes.sections(target.id), hasLength(2));
+
+      notes.trash(target.id);
+      now = now.add(Notes.trashKeep);
+      notes.purgeTrash();
+      expect(notes.byId(target.id), isNull);
+      expect(notes.byId(merged.id), isNull);
+      expect(notes.sections(target.id), isEmpty);
+      expect(notes.sections(merged.id), isEmpty);
+      expect(store.entitiesOfType(SectionKeys.typeSection), isEmpty);
+    });
+
+    test('a merge is in the log and survives a reopen', () {
+      final dir = Directory.systemTemp.createTempSync('obf');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/log.db';
+      final first = Store.open(path);
+      final target = Notes(first).capture('sauce');
+      final merged = Notes(first).capture('more sauce');
+      Notes(first).merge(merged.id, target.id);
+      expect(
+        first.history(merged.id).last,
+        isA<Entry>()
+            .having((e) => e.field, 'field', NoteKeys.merged)
+            .having((e) => e.value, 'value', target.id),
+      );
+      first.close();
+      final second = Store.open(path);
+      addTearDown(second.close);
+      expect(Notes(second).all().map((n) => n.id), [target.id]);
+      expect(Notes(second).sections(target.id).single.text, 'more sauce');
     });
   });
 

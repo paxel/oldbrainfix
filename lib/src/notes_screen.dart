@@ -7,6 +7,7 @@ import 'browser.dart';
 import 'capture_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 
@@ -70,6 +71,13 @@ class _NotesScreenState extends State<NotesScreen> {
     }
   }
 
+  Future<void> _merge(Note note) async {
+    if (await mergeNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      _reload();
+    }
+  }
+
   Future<void> _open(Note note) async {
     await openNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -105,6 +113,7 @@ class _NotesScreenState extends State<NotesScreen> {
                     area: area,
                     topic: topic,
                     onFile: () => _file(note),
+                    onMerge: () => _merge(note),
                     onTap: () => _open(note),
                   ),
               ],

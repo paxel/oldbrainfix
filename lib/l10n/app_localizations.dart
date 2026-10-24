@@ -547,6 +547,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Topic'**
   String get topicChoice;
+
+  /// No description provided for @mergeInto.
+  ///
+  /// In en, this message translates to:
+  /// **'Merge into…'**
+  String get mergeInto;
+
+  /// No description provided for @noOtherNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no other Note to merge into.'**
+  String get noOtherNotes;
 }
 
 class _AppLocalizationsDelegate

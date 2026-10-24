@@ -16,6 +16,9 @@ abstract final class NoteKeys {
 
   /// When the Note was moved to the trash; absent while it is not there.
   static const trashed = 'trashed';
+
+  /// The Note this one was merged into; absent while it stands alone.
+  static const merged = 'merged';
 }
 
 /// Field keys of a Section.
@@ -55,6 +58,10 @@ class Note {
   /// When the Note was moved to the trash, or null when it is not there.
   final DateTime? trashed;
 
+  /// The Note this one was merged into and now is a Section of, or null
+  /// when it stands alone.
+  final String? mergedInto;
+
   const Note({
     required this.id,
     required this.text,
@@ -62,6 +69,7 @@ class Note {
     this.place,
     this.importance = Importance.normal,
     this.trashed,
+    this.mergedInto,
   });
 
   /// When the Note was captured.
@@ -69,13 +77,17 @@ class Note {
 
   bool get isTrashed => trashed != null;
 
-  /// Not yet filed into an Area or Topic, and not deleted (CONTEXT.md).
-  bool get isUnsorted => place == null && !isTrashed;
+  bool get isMerged => mergedInto != null;
+
+  /// Not yet filed into an Area or Topic, not merged and not deleted
+  /// (CONTEXT.md).
+  bool get isUnsorted => place == null && !isTrashed && !isMerged;
 }
 
-/// A dated part of a Note, added by Amend (CONTEXT.md).
+/// A dated part of a Note, added by Amend or Merge (CONTEXT.md).
 class Section {
-  /// Entity id, `section:<id>`.
+  /// Entity id: `section:<id>` for an Amend, the merged Note's
+  /// `note:<id>` for a Merge.
   final String id;
   final String noteId;
   final String text;
@@ -162,6 +174,17 @@ class Notes {
     store.append(noteId, NoteKeys.text, _text(text));
   }
 
+  /// When the text of the Note [noteId] was last set, by capture or edit;
+  /// null when there is no such Note.
+  DateTime? textSetAt(String noteId) {
+    DateTime? latest;
+    for (final e in store.history(noteId)) {
+      if (e.field != NoteKeys.text) continue;
+      if (latest == null || e.date.isAfter(latest)) latest = e.date;
+    }
+    return latest;
+  }
+
   /// Amends the Note [noteId] with a new Section holding [text], captured
   /// at the store's now.
   Section amend(String noteId, String text) {
@@ -178,11 +201,47 @@ class Notes {
     return _section(id)!;
   }
 
-  /// The Sections of the Note [noteId], oldest first.
+  /// Merges the Note [noteId] into the Note [intoId]: it becomes a dated
+  /// Section of it, with its own Capture Context, and leaves every list
+  /// and Unsorted.
+  ///
+  /// Nothing is copied: the merged Note keeps its entity and only points
+  /// at its target, which shows it as a Section. Whatever belongs to it,
+  /// its Sections and whatever reaches it from other Devices after the
+  /// Merge included, travels along.
+  void merge(String noteId, String intoId) {
+    for (final (id, name) in [(noteId, 'noteId'), (intoId, 'intoId')]) {
+      final note = byId(id);
+      if (note == null || note.isTrashed || note.isMerged) {
+        throw ArgumentError.value(id, name, 'not a Note in the lists');
+      }
+    }
+    if (noteId == intoId) {
+      throw ArgumentError.value(intoId, 'intoId', 'the Note itself');
+    }
+    store.append(noteId, NoteKeys.merged, intoId);
+  }
+
+  /// The Sections of the Note [noteId], oldest first: its Amends, the
+  /// Notes merged into it, and their Amends.
   List<Section> sections(String noteId) {
+    final merged = {
+      for (final id in store.entitiesOfType(NoteKeys.typeNote))
+        if (_mergedInto(id) == noteId) id,
+    };
+    final owners = {noteId, ...merged};
     final sections = [
+      for (final id in merged)
+        if (byId(id) case final note?)
+          Section(
+            id: id,
+            noteId: noteId,
+            text: note.text,
+            context: note.context,
+          ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
-        if (store.current(id, SectionKeys.note) == noteId) ?_section(id),
+        if (owners.contains(store.current(id, SectionKeys.note)))
+          ?_section(id, noteId: noteId),
     ];
     sections.sort((a, b) => a.context.captured.compareTo(b.context.captured));
     return sections;
@@ -221,7 +280,8 @@ class Notes {
     final notes = [
       for (final id in store.entitiesOfType(NoteKeys.typeNote))
         if (byId(id) case final note?)
-          if (purgeAt(note) case final at? when now.isBefore(at)) note,
+          if (!note.isMerged)
+            if (purgeAt(note) case final at? when now.isBefore(at)) note,
     ];
     notes.sort(
       (a, b) => (b.trashed ?? b.captured).compareTo(a.trashed ?? a.captured),
@@ -230,14 +290,18 @@ class Notes {
   }
 
   /// Purges every Note that has been in the trash for [trashKeep], with
-  /// its Sections. The log keeps their entries; nothing shows them again.
+  /// its Sections, the Notes merged into it included. The log keeps their
+  /// entries; nothing shows them again.
   void purgeTrash() {
     final now = store.clock().toUtc();
     store.batch(() {
       for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
         final note = byId(id);
-        final at = note == null ? null : purgeAt(note);
+        // A merged Note goes with its target, never on its own.
+        final at = note == null || note.isMerged ? null : purgeAt(note);
         if (at == null || now.isBefore(at)) continue;
+        // A merged Note's Section is the Note itself; both keep their
+        // type under the same key.
         for (final section in sections(id)) {
           store.append(section.id, SectionKeys.type, null);
         }
@@ -264,14 +328,16 @@ class Notes {
           Importance.values.asNameMap()[fields[NoteKeys.importance]] ??
           Importance.normal,
       trashed: trashed == null ? null : DateTime.parse(trashed),
+      mergedInto: _mergedInto(id),
     );
   }
 
-  /// Every Note not in the trash, newest capture first.
+  /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {
     final notes = [
       for (final id in store.entitiesOfType(NoteKeys.typeNote))
-        if (byId(id) case final note? when !note.isTrashed) note,
+        if (byId(id) case final note? when !note.isTrashed && !note.isMerged)
+          note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return notes;
@@ -290,15 +356,41 @@ class Notes {
     ];
   }
 
-  Section? _section(String id) {
+  /// The Note [id] ends up in at the end of its Merge chain, or null when
+  /// it stands alone. A chain stops before a Note this Device does not
+  /// hold. A loop, from Devices merging both ways before they synced,
+  /// stops at its lowest id, so every Device keeps the same Note.
+  String? _mergedInto(String id) {
+    final chain = [id];
+    while (true) {
+      final next = store.current(chain.last, NoteKeys.merged);
+      if (next == null ||
+          store.current(next, NoteKeys.type) != NoteKeys.typeNote) {
+        break;
+      }
+      final loop = chain.indexOf(next);
+      if (loop >= 0) {
+        final kept = chain
+            .sublist(loop)
+            .reduce((a, b) => a.compareTo(b) <= 0 ? a : b);
+        return kept == id ? null : kept;
+      }
+      chain.add(next);
+    }
+    return chain.last == id ? null : chain.last;
+  }
+
+  /// The Section [id]; shown under [noteId] when given, for the Amends of
+  /// a merged Note.
+  Section? _section(String id, {String? noteId}) {
     final fields = store.currentFields(id);
     if (fields[SectionKeys.type] != SectionKeys.typeSection) return null;
-    final noteId = fields[SectionKeys.note];
+    final owner = fields[SectionKeys.note];
     final captured = fields[SectionKeys.captured];
-    if (noteId == null || captured == null) return null;
+    if (owner == null || captured == null) return null;
     return Section(
       id: id,
-      noteId: noteId,
+      noteId: noteId ?? owner,
       text: fields[SectionKeys.text] ?? '',
       context: CaptureContext(captured: DateTime.parse(captured)),
     );

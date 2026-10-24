@@ -261,4 +261,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get topicChoice => 'Thema';
+
+  @override
+  String get mergeInto => 'Zusammenführen mit …';
+
+  @override
+  String get noOtherNotes => 'Es gibt keine andere Notiz zum Zusammenführen.';
 }

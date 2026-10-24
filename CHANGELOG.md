@@ -19,6 +19,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Tap a card to open the Note's editor, showing its text, when it was captured, where it is filed and everything added to it later. Fix the text in place (saved when you leave), file the Note, or tap "Add to Note" to add a dated part with its own capture time.
 - Mark a Note unimportant, normal or important: important cards stand out with an accent marker and a stronger emboss, unimportant ones are dimmed.
 - The editor's trash button deletes a Note: it goes to the trash for 30 days, where it can be restored to where it was, and after that it is gone for good. The trash opens from the top level of the notes browser. A deleted Note no longer counts as Unsorted.
+- Merge a Note into another from its card or its editor: pick the other Note on a page that lists and searches your Notes. The merged Note becomes a dated part of the other one, with its own capture time and everything added to it, and leaves every list and Unsorted.
+- Text you type in a Note's editor is kept even if the app is closed or killed: it is saved when the app goes to the background, and an unsaved draft comes back the next time you open the Note.
 - On first start, pick from a Starter Set of Areas and Topics (Household, Work, Car, Health), all ticked; everything stays editable afterwards and shows in your language until you rename it.
 
 ---

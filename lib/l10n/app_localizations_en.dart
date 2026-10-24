@@ -258,4 +258,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get topicChoice => 'Topic';
+
+  @override
+  String get mergeInto => 'Merge into…';
+
+  @override
+  String get noOtherNotes => 'There is no other Note to merge into.';
 }

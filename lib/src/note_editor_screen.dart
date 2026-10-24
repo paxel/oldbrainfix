@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'drafts.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'place_names.dart';
 
@@ -17,24 +21,39 @@ Future<void> openNote(
   Note note,
 ) => Navigator.of(context).push(
   MaterialPageRoute<void>(
-    builder: (_) =>
-        NoteEditorScreen(notes: notes, places: places, noteId: note.id),
+    builder: (_) => NoteEditorScreen(
+      notes: notes,
+      places: places,
+      drafts: DraftsScope.of(context),
+      noteId: note.id,
+    ),
   ),
 );
 
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its Importance, its Capture Context and where it is filed,
 /// and its Sections, each with its own Capture Context. "Add to Note"
-/// amends it; the trash button deletes it.
+/// amends it; "merge into…" merges it into another Note; the trash
+/// button deletes it.
+///
+/// Typed text survives the app being killed: it goes to the log when the
+/// app goes to the background, and a [Draft] of it is kept after every
+/// [draftPause] of typing until it does. A draft newer than the Note's
+/// text comes back into the field when the Note is opened again.
 class NoteEditorScreen extends StatefulWidget {
+  /// How long typing rests before the draft is written.
+  static const draftPause = Duration(seconds: 1);
+
   final Notes notes;
   final Places places;
+  final Drafts drafts;
   final String noteId;
 
   const NoteEditorScreen({
     super.key,
     required this.notes,
     required this.places,
+    required this.drafts,
     required this.noteId,
   });
 
@@ -44,6 +63,8 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _text = TextEditingController();
+  late final AppLifecycleListener _lifecycle;
+  Timer? _draftTimer;
   PlacedNote? _placed;
   List<Section> _sections = const [];
 
@@ -52,12 +73,63 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     super.initState();
     _load();
     _text.text = _placed?.note.text ?? '';
+    _text.addListener(_typed);
+    _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
+    _restoreDraft();
   }
 
   @override
   void dispose() {
+    _draftTimer?.cancel();
+    _lifecycle.dispose();
     _text.dispose();
     super.dispose();
+  }
+
+  /// Going to the background may be the last chance before the app is
+  /// killed: the text goes to the log.
+  void _lifecycleChanged(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      setState(_saveText);
+    }
+  }
+
+  void _typed() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(NoteEditorScreen.draftPause, _writeDraft);
+  }
+
+  /// Keeps the text as typed in a draft while it differs from the Note's.
+  void _writeDraft() {
+    final note = _placed?.note;
+    if (note == null) return;
+    final text = _text.text;
+    if (text.trim().isEmpty || text.trim() == note.text) {
+      unawaited(widget.drafts.delete(note.id));
+    } else {
+      unawaited(
+        widget.drafts.write(note.id, (
+          text: text,
+          saved: widget.notes.store.clock().toUtc(),
+        )),
+      );
+    }
+  }
+
+  /// Puts a draft newer than the Note's text back into the field, unless
+  /// the user already started typing; an older draft is dropped.
+  Future<void> _restoreDraft() async {
+    final draft = await widget.drafts.read(widget.noteId);
+    if (!mounted || draft == null) return;
+    final note = _placed?.note;
+    final setAt = widget.notes.textSetAt(widget.noteId);
+    if (note == null || setAt == null) return;
+    if (draft.saved.isAfter(setAt) && draft.text.trim() != note.text) {
+      if (_text.text == note.text) _text.text = draft.text;
+    } else {
+      unawaited(widget.drafts.delete(widget.noteId));
+    }
   }
 
   void _load() {
@@ -69,10 +141,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _reload() => setState(_load);
 
   /// Writes the text when it changed; a blank text keeps the old one.
+  /// The draft goes either way: the log now holds what counts.
   void _saveText() {
+    _draftTimer?.cancel();
     final note = _placed?.note;
+    if (note == null) return;
+    unawaited(widget.drafts.delete(note.id));
     final text = _text.text.trim();
-    if (note == null || text.isEmpty || text == note.text) return;
+    if (text.isEmpty || text == note.text) return;
     widget.notes.edit(note.id, text);
     _load();
   }
@@ -105,6 +181,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reload();
   }
 
+  /// Merges the Note, with its text as typed, into the one picked; it
+  /// then is a Section there and the editor closes.
+  Future<void> _merge() async {
+    final note = _placed?.note;
+    if (note == null) return;
+    _saveText();
+    if (await mergeNote(context, widget.notes, widget.places, note)) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    }
+  }
+
   void _trash() {
     widget.notes.trash(widget.noteId);
     Navigator.of(context).pop();
@@ -133,6 +221,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         appBar: AppBar(
           title: Text(t.noteTitle),
           actions: [
+            IconButton(
+              tooltip: t.mergeInto,
+              onPressed: _merge,
+              icon: const Icon(Icons.call_merge),
+            ),
             IconButton(
               tooltip: t.moveToTrash,
               onPressed: _trash,

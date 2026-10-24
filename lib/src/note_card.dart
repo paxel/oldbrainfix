@@ -38,6 +38,9 @@ class NoteCard extends StatelessWidget {
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
 
+  /// Opens "merge into…"; no button when null.
+  final VoidCallback? onMerge;
+
   /// Opens the Note's editor.
   final VoidCallback? onTap;
 
@@ -54,6 +57,7 @@ class NoteCard extends StatelessWidget {
     this.area,
     this.topic,
     this.onFile,
+    this.onMerge,
     this.onTap,
     this.footer,
   });
@@ -142,6 +146,12 @@ class NoteCard extends StatelessWidget {
                         tooltip: t.fileInto,
                         onPressed: onFile,
                         icon: const Icon(Icons.drive_file_move_outline),
+                      ),
+                    if (onMerge != null)
+                      IconButton(
+                        tooltip: t.mergeInto,
+                        onPressed: onMerge,
+                        icon: const Icon(Icons.call_merge),
                       ),
                   ],
                 ),

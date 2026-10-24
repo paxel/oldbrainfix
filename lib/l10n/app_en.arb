@@ -109,5 +109,7 @@
   "showUnimportant": "Show unimportant Notes",
   "addHere": "Add here",
   "noteHere": "Note here",
-  "topicChoice": "Topic"
+  "topicChoice": "Topic",
+  "mergeInto": "Merge into…",
+  "noOtherNotes": "There is no other Note to merge into."
 }
