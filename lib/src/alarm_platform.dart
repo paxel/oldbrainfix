@@ -45,6 +45,11 @@ class AlarmLabels {
   final String catchUpOne;
   final String catchUpMany;
 
+  /// The channels of the full-screen alarm and of its high-priority
+  /// fallback.
+  final String ringChannel;
+  final String escalatedChannel;
+
   const AlarmLabels({
     required this.channel,
     required this.done,
@@ -56,6 +61,8 @@ class AlarmLabels {
     required this.catchUpTitle,
     required this.catchUpOne,
     required this.catchUpMany,
+    required this.ringChannel,
+    required this.escalatedChannel,
   });
 
   Map<String, String> toMap() => {
@@ -69,6 +76,8 @@ class AlarmLabels {
     'catchUpTitle': catchUpTitle,
     'catchUpOne': catchUpOne,
     'catchUpMany': catchUpMany,
+    'ringChannel': ringChannel,
+    'escalatedChannel': escalatedChannel,
   };
 }
 
@@ -102,6 +111,33 @@ class SnoozeTapped extends AlarmAction {
   );
 }
 
+/// An Occurrence ringing as a full-screen alarm (Escalation), with the
+/// texts its notification shows.
+class Ringing {
+  final String routineId;
+  final String occurrenceKey;
+  final String title;
+  final String body;
+
+  const Ringing({
+    required this.routineId,
+    required this.occurrenceKey,
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is Ringing &&
+      other.routineId == routineId &&
+      other.occurrenceKey == occurrenceKey &&
+      other.title == title &&
+      other.body == body;
+
+  @override
+  int get hashCode => Object.hash(routineId, occurrenceKey, title, body);
+}
+
 /// The seam to the platform's alarm layer (android/…/Scheduler.kt).
 /// Widget tests hand in a fake.
 abstract interface class AlarmPlatform {
@@ -124,8 +160,16 @@ abstract interface class AlarmPlatform {
   /// The taps up to [seq] are applied; the platform forgets them.
   Future<void> acknowledge(int seq);
 
-  /// A notification was tapped while the app runs.
+  /// A notification was tapped while the app runs, or a full-screen
+  /// alarm started or stopped.
   Stream<void> get actionsArrived;
+
+  /// The Occurrence ringing as a full-screen alarm now, or null.
+  Future<Ringing?> ringing();
+
+  /// Done, or a snooze for [snooze], from the full-screen alarm: it stops
+  /// ringing, and the answer is queued like a tap on the notification.
+  Future<void> answerRing(Ringing ring, {Duration? snooze});
 
   Future<Map<AlarmPermission, bool>> permissions();
 
@@ -156,6 +200,12 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Stream<void> get actionsArrived => const Stream.empty();
+
+  @override
+  Future<Ringing?> ringing() async => null;
+
+  @override
+  Future<void> answerRing(Ringing ring, {Duration? snooze}) async {}
 
   @override
   Future<Map<AlarmPermission, bool>> permissions() async => const {};
@@ -203,6 +253,7 @@ class AndroidAlarms implements AlarmPlatform {
           else
             'at': alarm.at.millisecondsSinceEpoch,
           'renag': alarm.renag.inMinutes,
+          'escalate': ?alarm.escalation,
           // On the wall clock as well, like 'local'.
           'end': [
             alarm.ends.day.year,
@@ -233,6 +284,35 @@ class AndroidAlarms implements AlarmPlatform {
 
   @override
   Stream<void> get actionsArrived => _actions.stream;
+
+  @override
+  Future<Ringing?> ringing() async {
+    final raw = await _channel.invokeMapMethod<String, Object?>('ringing');
+    if (raw == null) return null;
+    final (routine, occurrence, title, body) = (
+      raw['routine'],
+      raw['occurrence'],
+      raw['title'],
+      raw['body'],
+    );
+    if (routine is! String || occurrence is! String) return null;
+    return Ringing(
+      routineId: routine,
+      occurrenceKey: occurrence,
+      title: title is String ? title : '',
+      body: body is String ? body : '',
+    );
+  }
+
+  @override
+  Future<void> answerRing(Ringing ring, {Duration? snooze}) =>
+      _channel.invokeMethod('answerRing', {
+        'routine': ring.routineId,
+        'occurrence': ring.occurrenceKey,
+        'title': ring.title,
+        'body': ring.body,
+        'snooze': ?snooze?.inMinutes,
+      });
 
   @override
   Future<Map<AlarmPermission, bool>> permissions() async {

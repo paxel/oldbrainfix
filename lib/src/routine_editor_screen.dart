@@ -56,7 +56,9 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// advanced mode, with its times of day. The next Occurrences show while
 /// it is edited. A folded Re-nag section sets how often it rings again
 /// when ignored: its own interval or this Device's default, which is
-/// set there too, for now (it moves to Settings later). Save writes the
+/// set there too, for now (it moves to Settings later). A folded
+/// Escalation section below it turns on the full-screen alarm after a
+/// number of ignored Re-nags (3 when first turned on). Save writes the
 /// Routine; leaving without saving drops the edit, but not a changed
 /// Device default, which applies at once.
 class RoutineEditorScreen extends StatefulWidget {
@@ -93,6 +95,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// The Re-nag intervals offered, in minutes.
   static const _renagChoices = [5, 10, 15, 30, 60];
 
+  /// The numbers of ignored Re-nags offered before Escalation.
+  static const _escalationChoices = [1, 2, 3, 5, 10];
+
   late final _routines = Routines(widget.notes.store);
   final _text = TextEditingController();
   final _rule = TextEditingController();
@@ -112,6 +117,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   Duration? _renag;
   late Duration _deviceRenag = widget.notes.store.renagInterval;
 
+  /// After how many ignored Re-nags it escalates; null when it does not.
+  int? _escalation;
+
   /// What is edited now, or null while the advanced rule is no rule.
   Schedule? _schedule;
   String? _ruleError;
@@ -130,6 +138,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     if (routine != null) {
       _note = _routines.note(routine);
       _renag = routine.renag;
+      _escalation = routine.escalation;
       _load(routine.schedule);
     } else {
       final noteId = widget.noteId;
@@ -275,6 +284,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       id = _routines.create(text, schedule).id;
     }
     _routines.setRenag(id, _renag);
+    _routines.setEscalation(id, _escalation);
     Navigator.of(context).pop(true);
   }
 
@@ -467,6 +477,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ),
           ),
           _renagPanel(t),
+          _escalationPanel(t),
         ],
       ),
     );
@@ -530,6 +541,57 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// The folded Escalation section: off, or after how many ignored
+  /// Re-nags it becomes a full-screen alarm.
+  Widget _escalationPanel(AppLocalizations t) {
+    final after = _escalation;
+    return Embossed(
+      child: ExpansionTile(
+        key: const ValueKey('escalation'),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(t.escalationHeading),
+        subtitle: Text(
+          after == null ? t.escalationOff : t.escalationSummary(after),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.escalationExplain),
+          SwitchListTile(
+            key: const ValueKey('escalationOn'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.escalationSwitch),
+            value: after != null,
+            onChanged: (on) =>
+                setState(() => _escalation = on ? defaultEscalation : null),
+          ),
+          if (after != null)
+            Row(
+              children: [
+                Expanded(child: Text(t.escalationAfter)),
+                DropdownButton<int>(
+                  key: const ValueKey('escalationAfter'),
+                  value: after,
+                  onChanged: (count) {
+                    if (count != null) setState(() => _escalation = count);
+                  },
+                  items: [
+                    // A value set elsewhere stays pickable.
+                    for (final n in {
+                      ..._escalationChoices,
+                      after,
+                    }.toList()..sort())
+                      DropdownMenuItem(value: n, child: Text('$n')),
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     );

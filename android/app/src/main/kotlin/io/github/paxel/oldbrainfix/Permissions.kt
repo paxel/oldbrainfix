@@ -24,9 +24,14 @@ object Permissions {
         return mapOf(
             "notifications" to notifications.areNotificationsEnabled(),
             "exactAlarms" to Scheduler.exactAllowed(context),
-            "fullScreen" to (Build.VERSION.SDK_INT < 34 || notifications.canUseFullScreenIntent()),
+            "fullScreen" to fullScreenAllowed(context),
         )
     }
+
+    /** Whether alarms may show full screen; granted by default before Android 14. */
+    fun fullScreenAllowed(context: Context): Boolean =
+        Build.VERSION.SDK_INT < 34 ||
+            context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
 
     /** Asks for [permission] with the system dialog or opens its settings page. */
     fun request(activity: Activity, permission: String) {

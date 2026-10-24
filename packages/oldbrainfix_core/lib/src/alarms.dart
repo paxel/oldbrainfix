@@ -27,6 +27,10 @@ const alarmsPerRoutine = 128;
 /// At most this many alarms in all, the soonest first.
 const alarmLimit = 2000;
 
+/// After how many ignored Re-nags Escalation starts when it is turned on
+/// for a Routine.
+const defaultEscalation = 3;
+
 /// The instant [day] at [time] is on [wallClock]. A time the clock shows
 /// twice (when daylight saving ends) fires once, at the first; a time it
 /// skips (when daylight saving starts) fires at the next valid instant,
@@ -146,7 +150,8 @@ enum AlarmKind {
 
 /// One alarm that should exist. While its Occurrence is not Done it
 /// fires at [at] and then Re-nags every [renag], up to [endsAt], when
-/// the Occurrence counts as Missed.
+/// the Occurrence counts as Missed. With [escalation] on, every firing
+/// from [escalatesAt] on is a full-screen alarm with sound.
 class PlannedAlarm {
   final AlarmKind kind;
   final String routineId;
@@ -162,6 +167,10 @@ class PlannedAlarm {
 
   /// How often it fires again while ignored.
   final Duration renag;
+
+  /// After how many ignored Re-nags it becomes a full-screen alarm; null
+  /// when its Routine does not escalate.
+  final int? escalation;
 
   /// When the Occurrence counts as Missed and the alarm stops, on the
   /// wall clock and as the instant [endsAt].
@@ -179,6 +188,7 @@ class PlannedAlarm {
     required this.at,
     required this.wall,
     required this.renag,
+    this.escalation,
     required this.ends,
     required this.endsAt,
     required this.text,
@@ -198,10 +208,22 @@ class PlannedAlarm {
     return next.isBefore(endsAt) ? next : null;
   }
 
+  /// When it first fires as a full-screen alarm: the firing after the
+  /// first one and [escalation] Re-nags went ignored, counted from [at],
+  /// so a snooze starts the count anew. Null when it does not escalate
+  /// or stops before. The platform's alarm layer follows the same rule.
+  DateTime? get escalatesAt {
+    final after = escalation;
+    if (after == null) return null;
+    final first = at.add(renag * (after + 1));
+    return first.isBefore(endsAt) ? first : null;
+  }
+
   @override
   String toString() =>
       '$id at ${at.toIso8601String()} every ${renag.inMinutes} min '
-      'until ${endsAt.toIso8601String()}';
+      'until ${endsAt.toIso8601String()}'
+      '${escalation == null ? '' : ' escalating after $escalation'}';
 }
 
 /// The key a snooze of [occurrence] of the Routine [routineId] is kept
@@ -216,7 +238,7 @@ String snoozeKey(String routineId, Occurrence occurrence) =>
 /// rung stays while it Re-nags. A snoozed one rings at its snooze
 /// instead and Re-nags from there; a snooze reaching past when the
 /// Occurrence counts as Missed is dropped. Each Re-nags at its Routine's
-/// interval, else at [renag]. [snoozes] are this Device's (ADR 0008),
+/// interval, else at [renag], and escalates as its Routine says. [snoozes] are this Device's (ADR 0008),
 /// keyed by [snoozeKey].
 List<PlannedAlarm> alarmPlan({
   required List<(Routine, Note?)> routines,
@@ -250,6 +272,7 @@ List<PlannedAlarm> alarmPlan({
           at: snoozed ?? t.start,
           wall: snoozed == null ? startOf(occurrence) : null,
           renag: routine.renag ?? renag,
+          escalation: routine.escalation,
           ends: t.ends,
           endsAt: t.endsAt,
           text: note?.text,

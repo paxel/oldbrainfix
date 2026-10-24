@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -12,6 +14,7 @@ import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
 import 'question_mark_background.dart';
+import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
 import 'setup_screen.dart';
 import 'starter_set_screen.dart';
@@ -114,7 +117,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
 
 /// The Starter Set on this Device's first start, then the alarm setup
 /// where there are alarms, the Agenda after them. Keeps the alarms in
-/// step while the app runs.
+/// step while the app runs, and shows the full-screen alarm on top while
+/// one rings.
 class _Home extends StatefulWidget {
   final Store store;
   final Notes notes;
@@ -140,9 +144,14 @@ class _HomeState extends State<_Home> {
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
 
+  /// The full-screen alarm on screen, and what it shows.
+  Route<void>? _ringRoute;
+  Ringing? _ringShown;
+
   @override
   void initState() {
     super.initState();
+    widget.alarms.addListener(_ringChanged);
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
     // way out as well, so a changed Device setting (the Re-nag interval)
@@ -164,8 +173,29 @@ class _HomeState extends State<_Home> {
 
   @override
   void dispose() {
+    widget.alarms.removeListener(_ringChanged);
     _lifecycle.dispose();
     super.dispose();
+  }
+
+  /// Opens the full-screen alarm when one starts ringing, and closes it
+  /// once it is answered or stops.
+  void _ringChanged() {
+    if (!mounted) return;
+    final ringing = widget.alarms.ringing;
+    if (ringing == _ringShown) return;
+    final navigator = Navigator.of(context);
+    final open = _ringRoute;
+    if (open != null && open.isActive) navigator.removeRoute(open);
+    _ringRoute = null;
+    _ringShown = ringing;
+    if (ringing == null) return;
+    final route = MaterialPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => RingScreen(alarms: widget.alarms, ring: ringing),
+    );
+    _ringRoute = route;
+    unawaited(navigator.push(route));
   }
 
   /// Plants what the user kept of the Starter Set; it is not offered

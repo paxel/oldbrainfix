@@ -68,6 +68,42 @@ class FakeAlarms implements AlarmPlatform {
   @override
   Stream<void> get actionsArrived => _actions.stream;
 
+  /// What rings full screen now.
+  Ringing? ringingNow;
+
+  /// The answers from the full-screen alarm: null for Done, else the
+  /// snooze.
+  final answers = <Duration?>[];
+
+  /// A full-screen alarm starts ringing, or stops with null.
+  void ring(Ringing? ringing) {
+    ringingNow = ringing;
+    _actions.add(null);
+  }
+
+  @override
+  Future<Ringing?> ringing() async => ringingNow;
+
+  /// Answered, it stops ringing and is queued like a tap.
+  @override
+  Future<void> answerRing(Ringing ring, {Duration? snooze}) async {
+    answers.add(snooze);
+    ringingNow = null;
+    final seq = (pending.isEmpty ? acknowledged ?? 0 : pending.last.seq) + 1;
+    final now = DateTime.now().toUtc();
+    pending.add(
+      snooze == null
+          ? DoneTapped(seq, ring.routineId, ring.occurrenceKey, now)
+          : SnoozeTapped(
+              seq,
+              ring.routineId,
+              ring.occurrenceKey,
+              now,
+              now.add(snooze),
+            ),
+    );
+  }
+
   @override
   Future<Map<AlarmPermission, bool>> permissions() async => Map.of(granted);
 

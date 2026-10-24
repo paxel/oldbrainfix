@@ -31,6 +31,10 @@ abstract final class RoutineKeys {
   /// Device's default.
   static const renag = 'renag';
 
+  /// After how many ignored Re-nags the Routine's Occurrences escalate
+  /// to a full-screen alarm; absent when Escalation is off.
+  static const escalation = 'escalation';
+
   /// The fields that make up the schedule.
   static const scheduleFields = [start, times, rule];
 }
@@ -53,6 +57,10 @@ class Routine {
   /// default.
   final Duration? renag;
 
+  /// After how many ignored Re-nags an Occurrence becomes a full-screen
+  /// alarm with sound (CONTEXT.md, Escalation); null when it is off.
+  final int? escalation;
+
   /// When the schedule was last written: Occurrences due before then
   /// were never asked for, so they neither Re-nag nor count as Missed.
   /// Null when unknown, which bounds nothing.
@@ -64,6 +72,7 @@ class Routine {
     required this.schedule,
     this.done = const {},
     this.renag,
+    this.escalation,
     this.scheduledAt,
   });
 
@@ -159,6 +168,17 @@ class Routines {
     store.append(id, RoutineKeys.renag, renag?.inMinutes.toString());
   }
 
+  /// Turns Escalation on for the Routine [id], after [after] ignored
+  /// Re-nags, or off with null.
+  void setEscalation(String id, int? after) {
+    final routine = _require(id);
+    if (routine.escalation == after) return;
+    if (after != null && after < 1) {
+      throw ArgumentError.value(after, 'after', 'at least one Re-nag');
+    }
+    store.append(id, RoutineKeys.escalation, after?.toString());
+  }
+
   /// Deletes the Routine [id]. Its Note stays, and stays out of Unsorted.
   void delete(String id) {
     _require(id);
@@ -207,6 +227,7 @@ class Routines {
       return null;
     }
     final renag = int.tryParse(fields[RoutineKeys.renag] ?? '');
+    final escalation = int.tryParse(fields[RoutineKeys.escalation] ?? '');
     DateTime? scheduledAt;
     for (final entry in store.history(id)) {
       if (!RoutineKeys.scheduleFields.contains(entry.field)) continue;
@@ -219,6 +240,7 @@ class Routines {
       noteId: noteId,
       schedule: schedule,
       renag: renag == null || renag < 1 ? null : Duration(minutes: renag),
+      escalation: escalation == null || escalation < 1 ? null : escalation,
       scheduledAt: scheduledAt,
       done: {
         for (final MapEntry(:key, :value) in fields.entries)

@@ -11,12 +11,12 @@ import 'schedule_text.dart';
 /// start, on every change to the log, and whenever the app comes back.
 /// Before each full sync it applies what was tapped on notifications
 /// meanwhile, so a Done reaches the log even when it was tapped while
-/// the app was not running. Tells its listeners when taps were applied
-/// or the granted permissions changed.
+/// the app was not running. Tells its listeners when taps were applied,
+/// the granted permissions changed, Escalation was turned on or off
+/// anywhere, or a full-screen alarm started or stopped.
 class AlarmSync extends ChangeNotifier {
-  /// The permissions whose absence the red banner shows. The full-screen
-  /// permission only matters for Escalation (#12); the setup asks for
-  /// it, the banner does not nag about it yet.
+  /// The permissions whose absence the red banner always shows; the
+  /// full-screen one counts as well while any Routine escalates.
   static const needed = [
     AlarmPermission.notifications,
     AlarmPermission.exactAlarms,
@@ -36,6 +36,10 @@ class AlarmSync extends ChangeNotifier {
 
   /// What was handed to the platform last, to skip handing it again.
   String? _lastArmed;
+
+  /// Whether any Routine escalates, as of the last arming.
+  var _escalating = false;
+  Ringing? _ringing;
 
   AlarmSync({
     required this.store,
@@ -63,13 +67,25 @@ class AlarmSync extends ChangeNotifier {
   /// the platform has answered.
   bool granted(AlarmPermission permission) => _granted[permission] ?? true;
 
-  /// The [needed] permissions missing, for the red banner; none where
-  /// there is no alarm layer.
+  /// The [needed] permissions missing, for the red banner, and the
+  /// full-screen one while any Routine escalates; none where there is no
+  /// alarm layer.
   List<AlarmPermission> get missing => [
     if (platform.available)
-      for (final p in needed)
+      for (final p in [...needed, if (_escalating) AlarmPermission.fullScreen])
         if (!granted(p)) p,
   ];
+
+  /// The Occurrence ringing as a full-screen alarm, as of the last
+  /// [refresh]; null when none rings.
+  Ringing? get ringing => _ringing;
+
+  /// Done, or a snooze for [snooze], from the full-screen alarm: the
+  /// platform stops ringing and queues it, and it is applied at once.
+  Future<void> answer(Ringing ring, {Duration? snooze}) async {
+    await platform.answerRing(ring, snooze: snooze);
+    await refresh();
+  }
 
   /// Applies the taps waiting on the platform, reads the permissions and
   /// arms the plan anew.
@@ -86,9 +102,12 @@ class AlarmSync extends ChangeNotifier {
       }
     }
     final granted = await platform.permissions();
+    final ringing = await platform.ringing();
     if (_disposed) return;
     final permissionsChanged = !mapEquals(granted, _granted);
+    final ringingChanged = ringing != _ringing;
     _granted = granted;
+    _ringing = ringing;
     await _arm(force: true);
     // Acknowledged only once applied and armed: a crash in between
     // applies them again, which changes nothing.
@@ -97,7 +116,8 @@ class AlarmSync extends ChangeNotifier {
         actions.map((a) => a.seq).reduce((a, b) => a > b ? a : b),
       );
     }
-    if (!_disposed && (actions.isNotEmpty || permissionsChanged)) {
+    if (!_disposed &&
+        (actions.isNotEmpty || permissionsChanged || ringingChanged)) {
       notifyListeners();
     }
   });
@@ -121,6 +141,13 @@ class AlarmSync extends ChangeNotifier {
   Future<void> _arm({bool force = false}) async {
     final t = _t;
     if (t == null || _disposed) return;
+    final escalating = Routines(store)
+        .all()
+        .any((routine) => routine.escalation != null);
+    if (escalating != _escalating) {
+      _escalating = escalating;
+      notifyListeners();
+    }
     final armed = [
       for (final alarm in Alarms(store).plan(wallClock))
         ArmedAlarm(
@@ -150,6 +177,8 @@ class AlarmSync extends ChangeNotifier {
         catchUpOne: t.catchUpOne,
         // The platform puts in the number.
         catchUpMany: t.catchUpMany('{count}'),
+        ringChannel: t.ringChannel,
+        escalatedChannel: t.escalatedChannel,
       ),
       done: done,
     );

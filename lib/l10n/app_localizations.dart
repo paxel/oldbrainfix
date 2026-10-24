@@ -1147,6 +1147,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{minutes} min'**
   String renagMinutes(int minutes);
+
+  /// No description provided for @ringChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-screen alarms'**
+  String get ringChannel;
+
+  /// No description provided for @escalatedChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalated alarms'**
+  String get escalatedChannel;
+
+  /// No description provided for @escalationHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalation'**
+  String get escalationHeading;
+
+  /// No description provided for @escalationOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off: it only Re-nags'**
+  String get escalationOff;
+
+  /// No description provided for @escalationSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Full-screen alarm after 1 ignored Re-nag} other{Full-screen alarm after {count} ignored Re-nags}}'**
+  String escalationSummary(int count);
+
+  /// No description provided for @escalationExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'When this one is ignored again and again, it turns into a full-screen alarm with sound, even over the lock screen. It rings for up to 5 minutes, then Re-nags again, until it is Done or snoozed.'**
+  String get escalationExplain;
+
+  /// No description provided for @escalationSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalate to a full-screen alarm'**
+  String get escalationSwitch;
+
+  /// No description provided for @escalationAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'After ignored Re-nags'**
+  String get escalationAfter;
 }
 
 class _AppLocalizationsDelegate

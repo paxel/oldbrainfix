@@ -1,7 +1,9 @@
 package io.github.paxel.oldbrainfix
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 import java.util.TimeZone
@@ -255,5 +257,96 @@ class AlarmPlanTest {
         )
         val lastNag = utc(2026, 10, 24, 21, 50)
         assertEquals(0, AlarmPlan.catchUp(listOf(reminder), berlin, lastNag, lastNag, utc(2026, 10, 25, 6)))
+    }
+
+    /** 08:00 in Berlin, Re-nagging every 10 min until 14:00, escalating after [after]. */
+    private fun escalating(after: Int) = Alarm(
+        "occurrence:routine:r@2026-10-24T08:00", "routine:r", "2026-10-24T08:00",
+        listOf(2026, 10, 24, 8, 0), null, "pills", "08:00",
+        renagMs = 10 * 60_000L, end = listOf(2026, 10, 24, 14, 0), escalate = after,
+    )
+
+    @Test
+    fun escalatesOnceTheRingAndXReNagsWentIgnored() {
+        val alarm = escalating(3)
+        // Rung at 08:00 (06:00 UTC), Re-nags at 08:10, 08:20, 08:30 ignored.
+        assertFalse(AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 6, 0)))
+        assertFalse(AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 6, 30)))
+        assertTrue(AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 6, 40)))
+        assertTrue(
+            "every later Re-nag rings again",
+            AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 7, 50)),
+        )
+        assertTrue(
+            "a late inexact alarm escalates by the Re-nags passed",
+            AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 6, 47)),
+        )
+        assertFalse(
+            "not once the Occurrence counts as Missed",
+            AlarmPlan.escalates(alarm, berlin, utc(2026, 10, 24, 12, 0)),
+        )
+    }
+
+    @Test
+    fun withoutEscalationItNeverRingsFullScreen() {
+        assertFalse(AlarmPlan.escalates(escalating(0), berlin, utc(2026, 10, 24, 11, 0)))
+        val once = escalating(1).copy(renagMs = 0)
+        assertFalse("rings once, so no Re-nag is ignored", AlarmPlan.escalates(once, berlin, utc(2026, 10, 24, 11, 0)))
+    }
+
+    @Test
+    fun aSnoozeCountsTheReNagsFromTheSnooze() {
+        val alarm = escalating(1)
+        val tap = Action(1, "snooze", "routine:r", "2026-10-24T08:00", 0, utc(2026, 10, 24, 7, 0), "pills", "08:00")
+        val (snoozed) = AlarmPlan.effective(listOf(alarm), listOf(tap))
+        assertEquals("the snooze keeps Escalation", 1, snoozed.escalate)
+        assertFalse(AlarmPlan.escalates(snoozed, berlin, utc(2026, 10, 24, 7, 10)))
+        assertTrue(AlarmPlan.escalates(snoozed, berlin, utc(2026, 10, 24, 7, 20)))
+    }
+
+    @Test
+    fun aRingStopsAfterItsMaximumOrWhenTheOccurrenceIsMissed() {
+        val alarm = escalating(1)
+        val now = utc(2026, 10, 24, 7, 0)
+        assertEquals(now + AlarmPlan.RING_MAX_MS, AlarmPlan.ringUntil(alarm, berlin, now))
+        assertEquals(
+            utc(2026, 10, 24, 12, 0),
+            AlarmPlan.ringUntil(alarm, berlin, utc(2026, 10, 24, 11, 58)),
+        )
+    }
+
+    @Test
+    fun aShortReNagIntervalLeavesQuietBeforeTheNextRing() {
+        val alarm = escalating(1).copy(renagMs = 5 * 60_000L)
+        val rings = utc(2026, 10, 24, 6, 10)
+        assertTrue(AlarmPlan.escalates(alarm, berlin, rings))
+        val until = AlarmPlan.ringUntil(alarm, berlin, rings)
+        val next = AlarmPlan.firesAfter(alarm, berlin, rings)!!
+        assertTrue("stops before the next Re-nag rings", until < next)
+        assertEquals(rings + 150_000L, until)
+    }
+
+    @Test
+    fun oneRingsTheOthersShowAsNotificationsAndNoneWithoutFullScreen() {
+        val quiet = escalating(0)
+        val loud = escalating(1).copy(id = "occurrence:routine:s@2026-10-24T08:00", routine = "routine:s")
+        val now = utc(2026, 10, 24, 6, 20)
+        assertEquals(loud, AlarmPlan.toRing(listOf(quiet, loud), berlin, now, fullScreen = true))
+        assertNull(
+            "falls back to a high-priority notification",
+            AlarmPlan.toRing(listOf(quiet, loud), berlin, now, fullScreen = false),
+        )
+    }
+
+    @Test
+    fun aRingStopsWhenDoneGoneOrNoLongerEscalating() {
+        val alarm = escalating(1)
+        assertTrue(AlarmPlan.keepsRinging(listOf(alarm), "routine:r", "2026-10-24T08:00"))
+        assertFalse(AlarmPlan.keepsRinging(emptyList(), "routine:r", "2026-10-24T08:00"))
+        assertFalse(AlarmPlan.keepsRinging(listOf(escalating(0)), "routine:r", "2026-10-24T08:00"))
+        val done = Action(1, "done", "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        assertFalse(
+            AlarmPlan.keepsRinging(AlarmPlan.effective(listOf(alarm), listOf(done)), "routine:r", "2026-10-24T08:00"),
+        )
     }
 }

@@ -366,5 +366,20 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ringChannel": "Full-screen alarms",
+  "escalatedChannel": "Escalated alarms",
+  "escalationHeading": "Escalation",
+  "escalationOff": "Off: it only Re-nags",
+  "escalationSummary": "{count, plural, =1{Full-screen alarm after 1 ignored Re-nag} other{Full-screen alarm after {count} ignored Re-nags}}",
+  "@escalationSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "escalationExplain": "When this one is ignored again and again, it turns into a full-screen alarm with sound, even over the lock screen. It rings for up to 5 minutes, then Re-nags again, until it is Done or snoozed.",
+  "escalationSwitch": "Escalate to a full-screen alarm",
+  "escalationAfter": "After ignored Re-nags"
 }

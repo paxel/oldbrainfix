@@ -432,6 +432,63 @@ void main() {
         expect(last.ends, (day: Day(2026, 10, 25), time: at(0)));
       });
 
+      test('Escalation: after the ring and X ignored Re-nags, full screen', () {
+        final pills = early('pills', daily([at(8)]));
+        final morning = Occurrence(Day(2026, 10, 24), at(8));
+        expect(alarmOf(pills, morning).escalation, isNull);
+        expect(alarmOf(pills, morning).escalatesAt, isNull, reason: 'opt-in');
+
+        routines.setEscalation(pills, defaultEscalation);
+        final alarm = alarmOf(pills, morning);
+        expect(alarm.escalation, 3);
+        expect(
+          alarm.escalatesAt,
+          DateTime.utc(2026, 10, 24, 6, 40),
+          reason: 'rung at 08:00, Re-nags at 08:10, 08:20, 08:30 ignored',
+        );
+        expect(
+          alarm.toString(),
+          contains('escalating after 3'),
+          reason: 'a changed Escalation is armed anew',
+        );
+
+        routines.setRenag(pills, const Duration(minutes: 5));
+        routines.setEscalation(pills, 1);
+        expect(
+          alarmOf(pills, morning).escalatesAt,
+          DateTime.utc(2026, 10, 24, 6, 10),
+        );
+      });
+
+      test('a snooze starts the count anew', () {
+        final pills = early('pills', daily([at(8)]));
+        routines.setEscalation(pills, 2);
+        final morning = Occurrence(Day(2026, 10, 24), at(8));
+        alarms.applySnooze(
+          pills,
+          morning.key,
+          now.add(const Duration(minutes: 30)),
+        );
+        final snooze = alarmOf(pills, morning);
+        expect(snooze.kind, AlarmKind.snooze);
+        expect(snooze.escalation, 2);
+        expect(snooze.escalatesAt, DateTime.utc(2026, 10, 24, 8));
+      });
+
+      test('no Escalation when the Occurrence is Missed before it', () {
+        // 08:00 and 08:30: the morning one stops at 08:30.
+        final pills = early('pills', daily([at(8), at(8, 30)]));
+        now = DateTime.utc(2026, 10, 24, 5);
+        routines.setEscalation(pills, 3);
+        final morning = Occurrence(Day(2026, 10, 24), at(8));
+        expect(alarmOf(pills, morning).escalatesAt, isNull);
+        routines.setEscalation(pills, 1);
+        expect(
+          alarmOf(pills, morning).escalatesAt,
+          DateTime.utc(2026, 10, 24, 6, 20),
+        );
+      });
+
       test('nothing due before the Routine was made Re-nags', () {
         // Made at 09:00, after this morning's 08:00.
         routines.spawn(notes.capture('pills').id, daily([at(8)]));

@@ -8,7 +8,8 @@ import java.util.TimeZone
  * found again in whatever zone the phone is in when it is armed; a
  * snooze waits a fixed time and keeps its instant in [at]. While
  * ignored it Re-nags every [renagMs] until [end], when its Occurrence
- * counts as Missed.
+ * counts as Missed; with [escalate] set, it rings full screen once the
+ * first ring and that many Re-nags went ignored.
  */
 data class Alarm(
     val id: String,
@@ -24,6 +25,8 @@ data class Alarm(
     val renagMs: Long = 0,
     /** [year, month, day, hour, minute] on the wall clock when it stops, or null. */
     val end: List<Int>? = null,
+    /** After how many ignored Re-nags it escalates; 0 never does. */
+    val escalate: Int = 0,
 )
 
 /** Done or a snooze tapped on a notification, kept until the app applied it. */
@@ -50,6 +53,12 @@ data class Action(
 object AlarmPlan {
     /** An alarm that came due this long before it was armed still fires. */
     const val GRACE_MS = 60_000L
+
+    /**
+     * A full-screen alarm rings at most this long; then its Occurrence
+     * goes back to Re-nagging, and the next Re-nag rings again.
+     */
+    const val RING_MAX_MS = 5 * 60_000L
 
     /**
      * The instant [local] shows on [zone]'s clock. A time the clock shows
@@ -124,10 +133,52 @@ object AlarmPlan {
                     body = tap.body,
                     renagMs = was?.renagMs ?: 0,
                     end = was?.end,
+                    escalate = was?.escalate ?: 0,
                 )
             }
         return kept + added
     }
+
+    /**
+     * Whether [alarm], firing at [now], rings as a full-screen alarm: its
+     * first ring and [Alarm.escalate] Re-nags after it went ignored, and
+     * it has not stopped. Counted by the Re-nags passed, so a late
+     * inexact alarm escalates as well; a snooze counts from the snooze.
+     * The same rule as the core's `PlannedAlarm.escalatesAt`.
+     */
+    fun escalates(alarm: Alarm, zone: TimeZone, now: Long): Boolean {
+        if (alarm.escalate <= 0 || alarm.renagMs <= 0) return false
+        val first = instantOf(alarm, zone)
+        if (now < first || now >= endOf(alarm, zone)) return false
+        return (now - first) / alarm.renagMs >= alarm.escalate + 1L
+    }
+
+    /**
+     * When a full-screen alarm of [alarm] starting at [now] stops: after
+     * [RING_MAX_MS], or halfway to its next Re-nag, so a short interval
+     * still leaves quiet between rings, or when its Occurrence counts as
+     * Missed, whichever comes first.
+     */
+    fun ringUntil(alarm: Alarm, zone: TimeZone, now: Long): Long {
+        val half = if (alarm.renagMs > 0) alarm.renagMs / 2 else RING_MAX_MS
+        return minOf(now + minOf(RING_MAX_MS, half), endOf(alarm, zone))
+    }
+
+    /**
+     * Which of the alarms [due] at [now] rings full screen: the first that
+     * escalates, none when [fullScreen] is not allowed. One rings at a
+     * time; the others show as notifications.
+     */
+    fun toRing(due: List<Alarm>, zone: TimeZone, now: Long, fullScreen: Boolean): Alarm? =
+        if (fullScreen) due.firstOrNull { escalates(it, zone, now) } else null
+
+    /**
+     * Whether the full-screen alarm of [routine]'s [occurrence] may go on
+     * ringing under the plan [alarms] (with the taps applied): not once
+     * it is Done, gone, or its Routine no longer escalates.
+     */
+    fun keepsRinging(alarms: List<Alarm>, routine: String, occurrence: String): Boolean =
+        alarms.any { it.routine == routine && it.occurrence == occurrence && it.escalate > 0 }
 
     /**
      * When the next alarm after [lastFired] fires: the soonest one later

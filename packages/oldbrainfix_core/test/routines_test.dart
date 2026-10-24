@@ -218,6 +218,19 @@ void main() {
       expect(routines.byId(id)?.renag, isNull);
     });
 
+    test('Escalation is off until turned on, after a number of Re-nags', () {
+      final id = routines.create('pills', daily([at(8)])).id;
+      expect(routines.byId(id)?.escalation, isNull);
+      routines.setEscalation(id, 3);
+      expect(routines.byId(id)?.escalation, 3);
+      final entries = store.allEntries().length;
+      routines.setEscalation(id, 3);
+      expect(store.allEntries(), hasLength(entries), reason: 'unchanged');
+      expect(() => routines.setEscalation(id, 0), throwsArgumentError);
+      routines.setEscalation(id, null);
+      expect(routines.byId(id)?.escalation, isNull);
+    });
+
     test('the same schedule again writes nothing', () {
       final id = routines.create('pills', daily([at(8)])).id;
       final entries = store.allEntries().length;

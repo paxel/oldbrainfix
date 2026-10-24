@@ -8,43 +8,23 @@ import android.content.Intent
  * The armed alarm firing, and Done and Snooze tapped on a notification.
  * A tap is queued for the app (it applies it to the log on its next
  * start or at once while it runs) and takes effect on the alarms right
- * away: what is Done no longer rings, a snooze rings again.
+ * away: what is Done no longer rings, a snooze rings again. Either stops
+ * the Occurrence's full-screen alarm, and so does the first Snooze tap,
+ * before its length is picked.
  */
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_FIRE -> Scheduler.fired(context, intent.getLongExtra(Scheduler.EXTRA_ARMED, 0))
-            ACTION_DONE -> {
+            ACTION_DONE -> done(context, alarmOf(intent))
+            ACTION_SNOOZE -> {
                 val alarm = alarmOf(intent)
-                EventQueue.add(context, "done", alarm)
-                Notifications.cancel(context, alarm)
-                tapped(context)
+                RingService.stop(alarm.routine, alarm.occurrence)
+                Notifications.showSnoozeChoices(context, alarm)
             }
-            ACTION_SNOOZE -> Notifications.showSnoozeChoices(context, alarmOf(intent))
-            ACTION_SNOOZE_FOR -> {
-                val alarm = alarmOf(intent)
-                val minutes = intent.getIntExtra(EXTRA_MINUTES, 60)
-                EventQueue.add(context, "snooze", alarm, System.currentTimeMillis() + minutes * 60_000L)
-                Notifications.cancel(context, alarm)
-                tapped(context)
-            }
+            ACTION_SNOOZE_FOR -> snooze(context, alarmOf(intent), intent.getIntExtra(EXTRA_MINUTES, 60))
         }
     }
-
-    private fun tapped(context: Context) {
-        Scheduler.arm(context)
-        MainActivity.actionsArrived()
-    }
-
-    private fun alarmOf(intent: Intent) = Alarm(
-        id = intent.getStringExtra(EXTRA_ID) ?: "",
-        routine = intent.getStringExtra(EXTRA_ROUTINE) ?: "",
-        occurrence = intent.getStringExtra(EXTRA_OCCURRENCE) ?: "",
-        local = null,
-        at = null,
-        title = intent.getStringExtra(EXTRA_TITLE) ?: "",
-        body = intent.getStringExtra(EXTRA_BODY) ?: "",
-    )
 
     companion object {
         const val ACTION_FIRE = "io.github.paxel.oldbrainfix.FIRE"
@@ -57,5 +37,43 @@ class AlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TITLE = "oldbrainfix.title"
         const val EXTRA_BODY = "oldbrainfix.body"
         const val EXTRA_MINUTES = "oldbrainfix.minutes"
+
+        /** Done, from a notification or the full-screen alarm. */
+        fun done(context: Context, alarm: Alarm) {
+            EventQueue.add(context, "done", alarm)
+            answered(context, alarm)
+        }
+
+        /** A snooze of [minutes], from a notification or the full-screen alarm. */
+        fun snooze(context: Context, alarm: Alarm, minutes: Int) {
+            EventQueue.add(context, "snooze", alarm, System.currentTimeMillis() + minutes * 60_000L)
+            answered(context, alarm)
+        }
+
+        private fun answered(context: Context, alarm: Alarm) {
+            RingService.stop(alarm.routine, alarm.occurrence)
+            Notifications.cancel(context, alarm)
+            Scheduler.arm(context)
+            MainActivity.actionsArrived()
+        }
+
+        /** The Occurrence an action or a ringing travels with. */
+        fun alarmOf(intent: Intent) = Alarm(
+            id = intent.getStringExtra(EXTRA_ID) ?: "",
+            routine = intent.getStringExtra(EXTRA_ROUTINE) ?: "",
+            occurrence = intent.getStringExtra(EXTRA_OCCURRENCE) ?: "",
+            local = null,
+            at = null,
+            title = intent.getStringExtra(EXTRA_TITLE) ?: "",
+            body = intent.getStringExtra(EXTRA_BODY) ?: "",
+        )
+
+        /** Puts [alarm] on [intent], for [alarmOf]. */
+        fun intentOf(intent: Intent, alarm: Alarm): Intent = intent
+            .putExtra(EXTRA_ID, alarm.id)
+            .putExtra(EXTRA_ROUTINE, alarm.routine)
+            .putExtra(EXTRA_OCCURRENCE, alarm.occurrence)
+            .putExtra(EXTRA_TITLE, alarm.title)
+            .putExtra(EXTRA_BODY, alarm.body)
     }
 }

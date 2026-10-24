@@ -266,12 +266,34 @@ void main() {
       expect(banner, findsNothing);
     });
 
-    testWidgets('a missing full-screen permission alone raises no banner', (
-      tester,
-    ) async {
+    testWidgets('a missing full-screen permission raises no banner while no '
+        'Routine escalates', (tester) async {
+      routines.create('plants', daily([at(20)]));
       alarms.granted[AlarmPermission.fullScreen] = false;
       await start(tester);
       expect(banner, findsNothing);
+    });
+
+    testWidgets('a missing full-screen permission raises the banner once a '
+        'Routine escalates, and lowers it when none does', (tester) async {
+      final pills = routines.create('pills', daily([at(20)]));
+      alarms.granted[AlarmPermission.fullScreen] = false;
+      await start(tester);
+      expect(banner, findsNothing);
+
+      routines.setEscalation(pills.id, 3);
+      await tester.pumpAndSettle();
+      expect(banner, findsOneWidget);
+
+      routines.setEscalation(pills.id, null);
+      await tester.pumpAndSettle();
+      expect(banner, findsNothing);
+
+      routines.setEscalation(pills.id, 3);
+      await tester.pumpAndSettle();
+      alarms.granted[AlarmPermission.fullScreen] = true;
+      await resume(tester);
+      expect(banner, findsNothing, reason: 'granted in the settings');
     });
   });
 }

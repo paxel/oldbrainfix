@@ -673,4 +673,38 @@ class AppLocalizationsDe extends AppLocalizations {
   String renagMinutes(int minutes) {
     return '$minutes Min.';
   }
+
+  @override
+  String get ringChannel => 'Vollbild-Alarme';
+
+  @override
+  String get escalatedChannel => 'Eskalierte Alarme';
+
+  @override
+  String get escalationHeading => 'Eskalation';
+
+  @override
+  String get escalationOff => 'Aus: klingelt nur wieder';
+
+  @override
+  String escalationSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Vollbild-Alarm, nachdem es $count-mal unbeachtet wieder geklingelt hat',
+      one: 'Vollbild-Alarm, nachdem es einmal unbeachtet wieder geklingelt hat',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get escalationExplain =>
+      'Wird diese immer wieder übergangen, wird sie zu einem Vollbild-Alarm mit Ton, auch über dem Sperrbildschirm. Er klingelt bis zu 5 Minuten lang und klingelt danach in gewohntem Abstand wieder, bis sie erledigt oder verschoben ist.';
+
+  @override
+  String get escalationSwitch => 'Zum Vollbild-Alarm eskalieren';
+
+  @override
+  String get escalationAfter => 'Nach so oft unbeachtetem Wiederklingeln';
 }

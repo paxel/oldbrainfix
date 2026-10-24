@@ -174,5 +174,13 @@
   "renagThis": "Für diese",
   "renagDevice": "Standard auf diesem Handy",
   "renagDeviceDefault": "Standard ({minutes} Min.)",
-  "renagMinutes": "{minutes} Min."
+  "renagMinutes": "{minutes} Min.",
+  "ringChannel": "Vollbild-Alarme",
+  "escalatedChannel": "Eskalierte Alarme",
+  "escalationHeading": "Eskalation",
+  "escalationOff": "Aus: klingelt nur wieder",
+  "escalationSummary": "{count, plural, =1{Vollbild-Alarm, nachdem es einmal unbeachtet wieder geklingelt hat} other{Vollbild-Alarm, nachdem es {count}-mal unbeachtet wieder geklingelt hat}}",
+  "escalationExplain": "Wird diese immer wieder übergangen, wird sie zu einem Vollbild-Alarm mit Ton, auch über dem Sperrbildschirm. Er klingelt bis zu 5 Minuten lang und klingelt danach in gewohntem Abstand wieder, bis sie erledigt oder verschoben ist.",
+  "escalationSwitch": "Zum Vollbild-Alarm eskalieren",
+  "escalationAfter": "Nach so oft unbeachtetem Wiederklingeln"
 }

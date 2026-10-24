@@ -17,7 +17,8 @@ import java.util.TimeZone
  * So a reboot, a clock change or a new time zone re-arms it at the same
  * local times without the app running, and the plan reaches weeks ahead
  * without hitting Android's limit on pending alarms. An ignored alarm
- * Re-nags from the same one pending alarm.
+ * Re-nags from the same one pending alarm, and escalates to a
+ * full-screen alarm from there.
  */
 object Scheduler {
     private const val PREFS = "oldbrainfix_alarms"
@@ -30,7 +31,8 @@ object Scheduler {
 
     /**
      * Keeps [plan] and the notification [labels], and arms the plan. The
-     * notifications of what is [done] go away.
+     * notifications of what is [done] go away, and so does a full-screen
+     * alarm the plan no longer escalates.
      */
     fun replace(context: Context, plan: JSONArray, labels: JSONObject, done: JSONArray) {
         prefs(context).edit()
@@ -38,6 +40,11 @@ object Scheduler {
             .putString(KEY_LABELS, labels.toString())
             .commit()
         arm(context)
+        RingService.ringing?.let { ringing ->
+            if (!AlarmPlan.keepsRinging(alarms(context), ringing.routine, ringing.occurrence)) {
+                RingService.stop(ringing.routine, ringing.occurrence)
+            }
+        }
         val notifications = context.getSystemService(NotificationManager::class.java)
         for (i in 0 until done.length()) {
             val occurrence = done.getJSONObject(i)
@@ -98,13 +105,19 @@ object Scheduler {
 
     /**
      * The alarm armed for [armed] fired: shows everything due since then
-     * and arms the next one.
+     * and arms the next one. An escalated one rings full screen; without
+     * the full-screen permission, or when Android does not let the
+     * ringing start, it shows as a high-priority notification instead.
      */
     fun fired(context: Context, armed: Long) {
         val now = System.currentTimeMillis()
+        val zone = TimeZone.getDefault()
         val lastFired = prefs(context).getLong(KEY_LAST_FIRED, 0)
-        for (alarm in AlarmPlan.due(alarms(context), TimeZone.getDefault(), armed, lastFired, now)) {
-            Notifications.show(context, alarm)
+        val due = AlarmPlan.due(alarms(context), zone, armed, lastFired, now)
+        val ring = AlarmPlan.toRing(due, zone, now, Permissions.fullScreenAllowed(context))
+        for (alarm in due) {
+            if (alarm == ring && RingService.start(context, alarm, AlarmPlan.ringUntil(alarm, zone, now))) continue
+            Notifications.show(context, alarm, urgent = AlarmPlan.escalates(alarm, zone, now))
         }
         prefs(context).edit().putLong(KEY_LAST_FIRED, now).commit()
         arm(context)
@@ -134,6 +147,7 @@ object Scheduler {
         body = json.optString("body"),
         renagMs = json.optLong("renag") * 60_000L,
         end = json.optJSONArray("end")?.let { end -> (0 until end.length()).map { end.getInt(it) } },
+        escalate = json.optInt("escalate"),
     )
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

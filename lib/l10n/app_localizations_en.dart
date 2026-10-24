@@ -667,4 +667,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String renagMinutes(int minutes) {
     return '$minutes min';
   }
+
+  @override
+  String get ringChannel => 'Full-screen alarms';
+
+  @override
+  String get escalatedChannel => 'Escalated alarms';
+
+  @override
+  String get escalationHeading => 'Escalation';
+
+  @override
+  String get escalationOff => 'Off: it only Re-nags';
+
+  @override
+  String escalationSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Full-screen alarm after $count ignored Re-nags',
+      one: 'Full-screen alarm after 1 ignored Re-nag',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get escalationExplain =>
+      'When this one is ignored again and again, it turns into a full-screen alarm with sound, even over the lock screen. It rings for up to 5 minutes, then Re-nags again, until it is Done or snoozed.';
+
+  @override
+  String get escalationSwitch => 'Escalate to a full-screen alarm';
+
+  @override
+  String get escalationAfter => 'After ignored Re-nags';
 }
