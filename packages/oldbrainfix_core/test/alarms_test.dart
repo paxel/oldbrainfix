@@ -140,7 +140,9 @@ void main() {
       }
       final planned = alarms.plan(europe);
       expect(planned, hasLength(alarmLimit));
-      expect(planned.first.at, DateTime.utc(2026, 10, 24, 8));
+      // 09:00, due as they were made, still Re-nags; 10:00 comes next.
+      expect(planned.first.at, DateTime.utc(2026, 10, 24, 7));
+      expect(planned[16].at, DateTime.utc(2026, 10, 24, 8));
       for (var i = 1; i < planned.length; i++) {
         expect(planned[i].at.isBefore(planned[i - 1].at), isFalse);
       }
@@ -202,8 +204,11 @@ void main() {
       expect(planned.single.at, DateTime.utc(2026, 10, 25, 0, 30));
     });
 
-    test('a snooze rings again at its time until it is over or Done', () {
+    test('a snooze rings at its time and Re-nags from there until Done', () {
+      // Made at 07:00, so this morning's 08:00 was asked for.
+      now = DateTime.utc(2026, 10, 24, 5);
       final id = routines.spawn(notes.capture('pills').id, daily([at(8)])).id;
+      now = DateTime.utc(2026, 10, 24, 7);
       final morning = Occurrence(Day(2026, 10, 24), at(8));
       alarms.applySnooze(id, morning.key, now.add(const Duration(minutes: 30)));
       expect(
@@ -211,13 +216,37 @@ void main() {
         'snooze 2026-10-24T08:00 2026-10-24T07:30:00.000Z pills',
       );
       expect(alarms.plan(europe).first.id, 'snooze:$id@2026-10-24T08:00');
+      expect(
+        alarms.plan(europe).where((a) => a.occurrence == morning),
+        hasLength(1),
+        reason: 'the snooze takes the place of the Occurrence alarm',
+      );
 
       now = now.add(const Duration(minutes: 31));
-      expect(plan().first, startsWith('occurrence 2026-10-25T08:00'));
+      final [snooze, ...] = alarms.plan(europe);
+      expect(snooze.kind, AlarmKind.snooze);
+      expect(
+        snooze.firesAfter(now),
+        DateTime.utc(2026, 10, 24, 7, 40),
+        reason: 'ignored, it Re-nags from the snooze on',
+      );
 
-      now = DateTime.utc(2026, 10, 24, 7);
       routines.markDone(id, morning);
       expect(plan().first, startsWith('occurrence 2026-10-25T08:00'));
+    });
+
+    test('a snooze past the next Occurrence is dropped', () {
+      now = DateTime.utc(2026, 10, 24, 5);
+      final id = routines
+          .spawn(notes.capture('pills').id, daily([at(8), at(9)]))
+          .id;
+      now = DateTime.utc(2026, 10, 24, 6, 50);
+      alarms.applySnooze(
+        id,
+        '2026-10-24T08:00',
+        now.add(const Duration(minutes: 30)),
+      );
+      expect(alarms.plan(europe).first.id, 'occurrence:$id@2026-10-24T09:00');
     });
 
     test('a snooze of a deleted Routine is dropped; snoozes stay local', () {
@@ -233,7 +262,7 @@ void main() {
       expect(plan(), isEmpty);
     });
 
-    test('snoozes that are over are dropped when the next one comes', () {
+    test('snoozes over for longer than the plan looks back are dropped', () {
       final id = routines
           .spawn(notes.capture('pills').id, daily([at(8), at(9)]))
           .id;
@@ -243,6 +272,13 @@ void main() {
         now.add(const Duration(minutes: 10)),
       );
       now = now.add(const Duration(hours: 1));
+      alarms.applySnooze(
+        id,
+        '2026-10-24T09:00',
+        now.add(const Duration(minutes: 10)),
+      );
+      expect(alarms.snoozes, hasLength(2));
+      now = now.add(const Duration(days: alarmHorizonDays + 2));
       alarms.applySnooze(
         id,
         '2026-10-24T09:00',
@@ -290,6 +326,219 @@ void main() {
       );
       routines.delete(id);
       expect(alarms.applyDone(id, '2026-10-24T08:00', now), isFalse);
+    });
+
+    group('Re-nag', () {
+      /// A Routine made at 06:00 on the 24th, before its Occurrences.
+      String early(String text, Schedule schedule) {
+        final saved = now;
+        now = DateTime.utc(2026, 10, 24, 4);
+        final id = routines.spawn(notes.capture(text).id, schedule).id;
+        now = saved;
+        return id;
+      }
+
+      PlannedAlarm alarmOf(String id, Occurrence occurrence) => alarms
+          .plan(europe)
+          .singleWhere((a) => a.routineId == id && a.occurrence == occurrence);
+
+      test('an ignored Occurrence fires again every 10 min by default', () {
+        final id = early('pills', daily([at(8)]));
+        final morning = alarmOf(id, Occurrence(Day(2026, 10, 24), at(8)));
+        expect(morning.at, DateTime.utc(2026, 10, 24, 6));
+        expect(morning.renag, const Duration(minutes: 10));
+        expect(
+          morning.firesAfter(now),
+          DateTime.utc(2026, 10, 24, 7, 10),
+          reason: 'rung at 08:00 and still Re-nagging at 09:00',
+        );
+      });
+
+      test('the Device interval and a Routine\'s own one', () {
+        final pills = early('pills', daily([at(8)]));
+        final plants = early('plants', daily([at(8)]));
+        store.renagInterval = const Duration(minutes: 30);
+        routines.setRenag(pills, const Duration(minutes: 5));
+        final morning = Occurrence(Day(2026, 10, 24), at(8));
+        expect(alarmOf(pills, morning).renag, const Duration(minutes: 5));
+        expect(alarmOf(plants, morning).renag, const Duration(minutes: 30));
+        expect(
+          alarmOf(pills, morning).firesAfter(now),
+          DateTime.utc(2026, 10, 24, 7, 5),
+        );
+        routines.setRenag(pills, null);
+        expect(alarmOf(pills, morning).renag, const Duration(minutes: 30));
+      });
+
+      test('stops when the next Occurrence starts; then it is Missed', () {
+        final id = early('pills', daily([at(8), at(14)]));
+        final morning = alarmOf(id, Occurrence(Day(2026, 10, 24), at(8)));
+        expect(morning.ends, (day: Day(2026, 10, 24), time: at(14)));
+        expect(morning.endsAt, DateTime.utc(2026, 10, 24, 12));
+        expect(
+          morning.firesAfter(DateTime.utc(2026, 10, 24, 11, 49)),
+          DateTime.utc(2026, 10, 24, 11, 50),
+        );
+        expect(morning.firesAfter(DateTime.utc(2026, 10, 24, 11, 50)), isNull);
+
+        now = DateTime.utc(2026, 10, 24, 12);
+        expect(
+          alarms
+              .plan(europe)
+              .where(
+                (a) => a.occurrence == Occurrence(Day(2026, 10, 24), at(8)),
+              ),
+          isEmpty,
+          reason: 'Missed now, so no longer planned',
+        );
+      });
+
+      test('a Reminder stops at midnight', () {
+        final id = early(
+          'call mum',
+          Schedule(start: Day(2026, 10, 24), times: [at(8)]),
+        );
+        final call = alarmOf(id, Occurrence(Day(2026, 10, 24), at(8)));
+        expect(call.ends, (day: Day(2026, 10, 25), time: at(0)));
+        expect(call.endsAt, DateTime.utc(2026, 10, 24, 22));
+        expect(call.firesAfter(DateTime.utc(2026, 10, 24, 21, 55)), isNull);
+        now = DateTime.utc(2026, 10, 24, 22);
+        expect(alarms.plan(europe), isEmpty);
+      });
+
+      test('an all-day Occurrence nags until its next day begins', () {
+        final id = early(
+          'water plants',
+          Schedule(
+            start: Day(2026, 10, 1),
+            rule: Recurrence.parse('FREQ=DAILY'),
+          ),
+        );
+        final today = alarmOf(id, Occurrence(Day(2026, 10, 24)));
+        expect(today.at, DateTime.utc(2026, 10, 24, 7));
+        expect(today.ends, (day: Day(2026, 10, 25), time: at(0)));
+      });
+
+      test('the last Occurrence of a rule stops at midnight', () {
+        final id = early(
+          'antibiotics',
+          Schedule(
+            start: Day(2026, 10, 22),
+            times: [at(8)],
+            rule: Recurrence.parse('FREQ=DAILY;COUNT=3'),
+          ),
+        );
+        final last = alarmOf(id, Occurrence(Day(2026, 10, 24), at(8)));
+        expect(last.ends, (day: Day(2026, 10, 25), time: at(0)));
+      });
+
+      test('nothing due before the Routine was made Re-nags', () {
+        // Made at 09:00, after this morning's 08:00.
+        routines.spawn(notes.capture('pills').id, daily([at(8)]));
+        expect(plan().first, startsWith('occurrence 2026-10-25T08:00'));
+      });
+    });
+
+    group('Missed', () {
+      List<String> summary() => [
+        for (final r in alarms.missed(europe).routines)
+          '${r.note?.text} ${r.count}: '
+              '${[for (final m in r.missed) m.occurrence.key].join(', ')}',
+      ];
+
+      test('an Occurrence not Done is Missed when the next one starts', () {
+        now = DateTime.utc(2026, 10, 20, 4);
+        final id = routines.spawn(notes.capture('pills').id, daily([at(8)])).id;
+        routines.markDone(id, Occurrence(Day(2026, 10, 21), at(8)));
+        now = DateTime.utc(2026, 10, 24, 7);
+        // 20th, 22nd and 23rd were Missed; the 24th is still open.
+        expect(summary(), [
+          'pills 3: 2026-10-23T08:00, 2026-10-22T08:00, 2026-10-20T08:00',
+        ]);
+        expect(alarms.missed(europe).count, 3);
+        expect(
+          alarms.missed(europe).nextChange,
+          DateTime.utc(2026, 10, 25, 7),
+          reason: 'the 24th becomes Missed when the 25th starts',
+        );
+      });
+
+      test('a Reminder is Missed at midnight', () {
+        now = DateTime.utc(2026, 10, 23, 4);
+        routines.spawn(
+          notes.capture('call mum').id,
+          Schedule(start: Day(2026, 10, 24), times: [at(8)]),
+        );
+        now = DateTime.utc(2026, 10, 24, 21, 59);
+        expect(summary(), isEmpty);
+        now = DateTime.utc(2026, 10, 24, 22);
+        expect(summary(), ['call mum 1: 2026-10-24T08:00']);
+      });
+
+      test('"seen" starts it over; later ones show again', () {
+        now = DateTime.utc(2026, 10, 22, 4);
+        routines.spawn(notes.capture('pills').id, daily([at(8)]));
+        now = DateTime.utc(2026, 10, 24, 7);
+        expect(alarms.missed(europe).count, 2);
+        alarms.markSeen();
+        expect(store.missedSeen, now);
+        expect(summary(), isEmpty);
+        now = DateTime.utc(2026, 10, 25, 8);
+        expect(summary(), ['pills 1: 2026-10-24T08:00']);
+      });
+
+      test('checking one off late takes it out', () {
+        now = DateTime.utc(2026, 10, 22, 4);
+        final id = routines.spawn(notes.capture('pills').id, daily([at(8)])).id;
+        now = DateTime.utc(2026, 10, 24, 7);
+        final missed = Occurrence(Day(2026, 10, 22), at(8));
+        routines.markDone(id, missed);
+        expect(routines.byId(id)?.doneAt(missed), now, reason: 'Done late');
+        expect(summary(), ['pills 1: 2026-10-23T08:00']);
+      });
+
+      test('the latest Missed Routine first; nothing from before it was '
+          'made', () {
+        now = DateTime.utc(2026, 10, 23, 4);
+        routines.spawn(
+          notes.capture('dentist').id,
+          Schedule(start: Day(2026, 10, 23), times: [at(10)]),
+        );
+        // Daily since the 1st, but made on the 23rd at 06:00.
+        routines.spawn(notes.capture('pills').id, daily([at(7)]));
+        now = DateTime.utc(2026, 10, 24, 7);
+        expect(summary(), [
+          // Missed at 07:00 on the 24th.
+          'pills 1: 2026-10-23T07:00',
+          // Missed at midnight before.
+          'dentist 1: 2026-10-23T10:00',
+        ]);
+      });
+
+      test('saving the same schedule again keeps what was Missed', () {
+        now = DateTime.utc(2026, 10, 22, 4);
+        final id = routines.spawn(notes.capture('pills').id, daily([at(8)])).id;
+        now = DateTime.utc(2026, 10, 24, 7);
+        routines.reschedule(id, daily([at(8)]));
+        routines.setRenag(id, const Duration(minutes: 5));
+        expect(alarms.missed(europe).count, 2);
+        routines.reschedule(id, daily([at(8), at(20)]));
+        expect(
+          summary(),
+          isEmpty,
+          reason: 'a new schedule was not asked for before now',
+        );
+      });
+
+      test('looks back no further than the plan does', () {
+        now = DateTime.utc(2026, 1, 1);
+        routines.spawn(
+          notes.capture('pills').id,
+          daily([at(8)], start: Day(2026, 1, 1)),
+        );
+        now = DateTime.utc(2026, 10, 24, 7);
+        expect(alarms.missed(europe).count, alarmHorizonDays);
+      });
     });
   });
 }

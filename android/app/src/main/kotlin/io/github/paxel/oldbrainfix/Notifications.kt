@@ -18,6 +18,7 @@ import android.os.Build
  */
 object Notifications {
     private const val CHANNEL = "occurrences"
+    private val CATCH_UP_ID = "catch-up".hashCode()
 
     /** Minutes of each snooze choice, with the label naming it. */
     val snoozes = listOf(10 to "snooze10", 30 to "snooze30", 60 to "snooze60")
@@ -38,6 +39,30 @@ object Notifications {
         post(context, alarm, Scheduler.label(context, "snoozeQuestion"), actions, alertOnce = true)
     }
 
+    /**
+     * The one Catch-up Notification after the phone was off: how many
+     * Occurrences were Missed meanwhile. Tapping it opens the Agenda with
+     * the Missed Summary; a later one replaces it.
+     */
+    fun showCatchUp(context: Context, missed: Int) {
+        val text = if (missed == 1) {
+            Scheduler.label(context, "catchUpOne")
+        } else {
+            Scheduler.label(context, "catchUpMany").replace("{count}", missed.toString())
+        }
+        context.getSystemService(NotificationManager::class.java).notify(
+            CATCH_UP_ID,
+            builder(context)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(Scheduler.label(context, "catchUpTitle"))
+                .setContentText(text)
+                .setCategory(Notification.CATEGORY_REMINDER)
+                .setAutoCancel(true)
+                .setContentIntent(openApp(context))
+                .build(),
+        )
+    }
+
     fun cancel(context: Context, alarm: Alarm) =
         context.getSystemService(NotificationManager::class.java)
             .cancel(AlarmPlan.notificationId(alarm.routine, alarm.occurrence))
@@ -50,8 +75,24 @@ object Notifications {
         alertOnce: Boolean,
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
+        val notification = builder(context)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(alarm.title)
+            .setContentText(text)
+            .setCategory(Notification.CATEGORY_REMINDER)
+            // Shown in full on the lock screen, so its actions work there.
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(alertOnce)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context))
+            .setActions(*actions.toTypedArray())
+            .build()
+        manager.notify(AlarmPlan.notificationId(alarm.routine, alarm.occurrence), notification)
+    }
+
+    private fun builder(context: Context): Notification.Builder =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(CHANNEL, Scheduler.label(context, "channel"), NotificationManager.IMPORTANCE_HIGH),
             )
             Notification.Builder(context, CHANNEL)
@@ -61,26 +102,13 @@ object Notifications {
                 .setPriority(Notification.PRIORITY_HIGH)
                 .setDefaults(Notification.DEFAULT_ALL)
         }
-        val open = PendingIntent.getActivity(
-            context, 0,
-            Intent(context, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val notification = builder
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(alarm.title)
-            .setContentText(text)
-            .setCategory(Notification.CATEGORY_REMINDER)
-            // Shown in full on the lock screen, so its actions work there.
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setOnlyAlertOnce(alertOnce)
-            .setAutoCancel(true)
-            .setContentIntent(open)
-            .setActions(*actions.toTypedArray())
-            .build()
-        manager.notify(AlarmPlan.notificationId(alarm.routine, alarm.occurrence), notification)
-    }
+
+    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
+        context, 0,
+        Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
     private fun action(
         context: Context,

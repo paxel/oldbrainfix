@@ -160,5 +160,19 @@
   "permExactAlarms": "Alarme auf die Minute",
   "permExactAlarmsWhy": "Ohne diese Erlaubnis kann Android einen Alarm bis zu einer Viertelstunde zu spät bringen. Schalte sie auf der Seite, die sich öffnet, für Old Brain Fix ein.",
   "permFullScreen": "Vollbild-Alarme",
-  "permFullScreenWhy": "Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein."
+  "permFullScreenWhy": "Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.",
+  "catchUpTitle": "Verpasst, während das Handy aus war",
+  "catchUpOne": "Ein Alarm wurde verpasst. Öffne die App, um ihn zu sehen.",
+  "catchUpMany": "{count} Alarme wurden verpasst. Öffne die App, um sie zu sehen.",
+  "missedTitle": "Verpasst",
+  "missedTimes": "{count, plural, =1{einmal} other{{count}-mal}}",
+  "missedMore": "und {count} weitere",
+  "missedSeen": "Gesehen",
+  "renagHeading": "Erneut erinnern",
+  "renagSummary": "Klingelt alle {minutes} Min. wieder, bis es erledigt ist",
+  "renagExplain": "Ein unbeachteter Alarm klingelt in diesem Abstand wieder, bis er erledigt oder verschoben ist oder der nächste fällig wird; dann gilt er als verpasst. Eine Erinnerung hört um Mitternacht auf.",
+  "renagThis": "Für diese",
+  "renagDevice": "Standard auf diesem Handy",
+  "renagDeviceDefault": "Standard ({minutes} Min.)",
+  "renagMinutes": "{minutes} Min."
 }

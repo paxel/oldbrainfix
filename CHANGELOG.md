@@ -32,6 +32,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Alarms keep coming after a restart, an app update, and a change of the clock or the time zone, at the same local time. A time skipped when daylight saving starts rings when the clock jumps past it; a time the clock shows twice rings once.
 - A step-by-step setup on first start asks for notifications, alarms on the minute and full-screen alarms. Any step can be passed by: without alarms on the minute they come at a less exact time, and while notifications or alarms on the minute are not allowed a red banner on the Agenda says so; tapping it opens the setup again. Full-screen alarms are asked for now and used later for Escalation.
 - The Agenda moves on to the new day at midnight while it is open.
+- An ignored alarm rings again every 10 minutes until you tick it off or snooze it; after a snooze it rings again at the snooze and keeps going from there. A Routine stops when its next one is due and then counts as Missed; a Reminder stops at midnight. Each Routine and Reminder can have its own interval (5 min to 1 h) in the Re-nag section of its editor, where the phone's default can be changed too for now.
+- A Missed card on top of the Agenda lists what was Missed since you last tapped "Seen" and how often, with the latest ones to tick off late. Opening the app never clears it; only "Seen" does.
+- After the phone was off or dead, old alarms no longer ring in a burst: one notification says how many were Missed meanwhile, and tapping it opens the Agenda.
 
 ---
 

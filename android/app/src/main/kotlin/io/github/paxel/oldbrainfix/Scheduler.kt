@@ -16,13 +16,15 @@ import java.util.TimeZone
  * the next alarm is armed; when it fires, the one after it is armed.
  * So a reboot, a clock change or a new time zone re-arms it at the same
  * local times without the app running, and the plan reaches weeks ahead
- * without hitting Android's limit on pending alarms.
+ * without hitting Android's limit on pending alarms. An ignored alarm
+ * Re-nags from the same one pending alarm.
  */
 object Scheduler {
     private const val PREFS = "oldbrainfix_alarms"
     private const val KEY_PLAN = "plan"
     private const val KEY_LABELS = "labels"
     private const val KEY_LAST_FIRED = "lastFired"
+    private const val KEY_LAST_ARMED = "lastArmed"
 
     const val EXTRA_ARMED = "oldbrainfix.armed"
 
@@ -56,11 +58,31 @@ object Scheduler {
         return AlarmPlan.effective(alarms, EventQueue.pending(context))
     }
 
+    /**
+     * After the phone was off (or its clock jumped ahead): what became
+     * Missed meanwhile is told in one Catch-up Notification, not rung
+     * late, and the next alarm is armed.
+     */
+    fun rearm(context: Context) {
+        val prefs = prefs(context)
+        val missed = AlarmPlan.catchUp(
+            alarms(context),
+            TimeZone.getDefault(),
+            prefs.getLong(KEY_LAST_FIRED, 0),
+            prefs.getLong(KEY_LAST_ARMED, 0),
+            System.currentTimeMillis(),
+        )
+        if (missed > 0) Notifications.showCatchUp(context, missed)
+        arm(context)
+    }
+
     /** Arms the next alarm of the stored plan, in place of the one before. */
     fun arm(context: Context) {
         val manager = context.getSystemService(AlarmManager::class.java)
+        val now = System.currentTimeMillis()
         val lastFired = prefs(context).getLong(KEY_LAST_FIRED, 0)
-        val next = AlarmPlan.next(alarms(context), TimeZone.getDefault(), lastFired, System.currentTimeMillis())
+        prefs(context).edit().putLong(KEY_LAST_ARMED, now).commit()
+        val next = AlarmPlan.next(alarms(context), TimeZone.getDefault(), lastFired, now)
         if (next == null) {
             manager.cancel(fire(context, null))
             return
@@ -110,6 +132,8 @@ object Scheduler {
         at = if (json.has("at")) json.getLong("at") else null,
         title = json.optString("title"),
         body = json.optString("body"),
+        renagMs = json.optLong("renag") * 60_000L,
+        end = json.optJSONArray("end")?.let { end -> (0 until end.length()).map { end.getInt(it) } },
     )
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

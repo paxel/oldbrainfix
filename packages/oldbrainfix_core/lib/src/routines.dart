@@ -26,6 +26,13 @@ abstract final class RoutineKeys {
   static String done(Occurrence occurrence) => '$donePrefix${occurrence.key}';
 
   static const donePrefix = 'done@';
+
+  /// The Routine's own Re-nag interval in minutes; absent for this
+  /// Device's default.
+  static const renag = 'renag';
+
+  /// The fields that make up the schedule.
+  static const scheduleFields = [start, times, rule];
 }
 
 /// Something to be done on a schedule, spawned from a Note (CONTEXT.md).
@@ -42,11 +49,22 @@ class Routine {
   /// When each Done Occurrence was checked off, by [Occurrence.key].
   final Map<String, DateTime> done;
 
+  /// How often an ignored Occurrence fires again; null for the Device's
+  /// default.
+  final Duration? renag;
+
+  /// When the schedule was last written: Occurrences due before then
+  /// were never asked for, so they neither Re-nag nor count as Missed.
+  /// Null when unknown, which bounds nothing.
+  final DateTime? scheduledAt;
+
   const Routine({
     required this.id,
     required this.noteId,
     required this.schedule,
     this.done = const {},
+    this.renag,
+    this.scheduledAt,
   });
 
   bool get isReminder => schedule.once;
@@ -124,9 +142,21 @@ class Routines {
       spawn(Notes(store).capture(_text(text)).id, schedule);
 
   /// Gives the Routine [id] a new schedule. What was Done stays Done.
+  /// The same schedule again writes nothing, so it keeps what was Missed.
   void reschedule(String id, Schedule schedule) {
     _require(id);
     store.batch(() => _writeSchedule(id, schedule));
+  }
+
+  /// Gives the Routine [id] its own Re-nag interval, or back the
+  /// Device's default with null.
+  void setRenag(String id, Duration? renag) {
+    final routine = _require(id);
+    if (routine.renag == renag) return;
+    if (renag != null && renag.inMinutes < 1) {
+      throw ArgumentError.value(renag, 'renag', 'at least a minute');
+    }
+    store.append(id, RoutineKeys.renag, renag?.inMinutes.toString());
   }
 
   /// Deletes the Routine [id]. Its Note stays, and stays out of Unsorted.
@@ -176,10 +206,20 @@ class Routines {
     } on ArgumentError {
       return null;
     }
+    final renag = int.tryParse(fields[RoutineKeys.renag] ?? '');
+    DateTime? scheduledAt;
+    for (final entry in store.history(id)) {
+      if (!RoutineKeys.scheduleFields.contains(entry.field)) continue;
+      if (scheduledAt == null || entry.date.isAfter(scheduledAt)) {
+        scheduledAt = entry.date;
+      }
+    }
     return Routine(
       id: id,
       noteId: noteId,
       schedule: schedule,
+      renag: renag == null || renag < 1 ? null : Duration(minutes: renag),
+      scheduledAt: scheduledAt,
       done: {
         for (final MapEntry(:key, :value) in fields.entries)
           if (key.startsWith(RoutineKeys.donePrefix) && value != null)
@@ -236,10 +276,17 @@ class Routines {
     );
   }
 
+  /// Writes the fields of [schedule] that differ from what is there.
   void _writeSchedule(String id, Schedule schedule) {
-    store.append(id, RoutineKeys.start, schedule.start.toString());
-    store.append(id, RoutineKeys.times, schedule.times.join(','));
-    store.append(id, RoutineKeys.rule, schedule.rule?.format());
+    final current = store.currentFields(id);
+    void write(String field, String? value) {
+      if (current.containsKey(field) && current[field] == value) return;
+      store.append(id, field, value);
+    }
+
+    write(RoutineKeys.start, schedule.start.toString());
+    write(RoutineKeys.times, schedule.times.join(','));
+    write(RoutineKeys.rule, schedule.rule?.format());
   }
 
   Routine _require(String id) {

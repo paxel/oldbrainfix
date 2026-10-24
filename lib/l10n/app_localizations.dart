@@ -1063,6 +1063,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.'**
   String get permFullScreenWhy;
+
+  /// No description provided for @catchUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed while the phone was off'**
+  String get catchUpTitle;
+
+  /// No description provided for @catchUpOne.
+  ///
+  /// In en, this message translates to:
+  /// **'One alarm was Missed. Open the app to see it.'**
+  String get catchUpOne;
+
+  /// No description provided for @catchUpMany.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} alarms were Missed. Open the app to see them.'**
+  String catchUpMany(String count);
+
+  /// No description provided for @missedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed'**
+  String get missedTitle;
+
+  /// No description provided for @missedTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{once} other{{count} times}}'**
+  String missedTimes(int count);
+
+  /// No description provided for @missedMore.
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String missedMore(int count);
+
+  /// No description provided for @missedSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Seen'**
+  String get missedSeen;
+
+  /// No description provided for @renagHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-nag'**
+  String get renagHeading;
+
+  /// No description provided for @renagSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Rings again every {minutes} min until Done'**
+  String renagSummary(int minutes);
+
+  /// No description provided for @renagExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'An ignored alarm rings again at this interval until it is Done or snoozed, or until the next one is due; then it counts as Missed. A Reminder stops at midnight.'**
+  String get renagExplain;
+
+  /// No description provided for @renagThis.
+  ///
+  /// In en, this message translates to:
+  /// **'This one'**
+  String get renagThis;
+
+  /// No description provided for @renagDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Default on this phone'**
+  String get renagDevice;
+
+  /// No description provided for @renagDeviceDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default ({minutes} min)'**
+  String renagDeviceDefault(int minutes);
+
+  /// No description provided for @renagMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String renagMinutes(int minutes);
 }
 
 class _AppLocalizationsDelegate

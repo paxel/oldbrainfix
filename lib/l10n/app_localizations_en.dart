@@ -606,4 +606,65 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get permFullScreenWhy =>
       'Lets a Routine you keep ignoring turn into a full-screen alarm you can\'t miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.';
+
+  @override
+  String get catchUpTitle => 'Missed while the phone was off';
+
+  @override
+  String get catchUpOne => 'One alarm was Missed. Open the app to see it.';
+
+  @override
+  String catchUpMany(String count) {
+    return '$count alarms were Missed. Open the app to see them.';
+  }
+
+  @override
+  String get missedTitle => 'Missed';
+
+  @override
+  String missedTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count times',
+      one: 'once',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missedMore(int count) {
+    return 'and $count more';
+  }
+
+  @override
+  String get missedSeen => 'Seen';
+
+  @override
+  String get renagHeading => 'Re-nag';
+
+  @override
+  String renagSummary(int minutes) {
+    return 'Rings again every $minutes min until Done';
+  }
+
+  @override
+  String get renagExplain =>
+      'An ignored alarm rings again at this interval until it is Done or snoozed, or until the next one is due; then it counts as Missed. A Reminder stops at midnight.';
+
+  @override
+  String get renagThis => 'This one';
+
+  @override
+  String get renagDevice => 'Default on this phone';
+
+  @override
+  String renagDeviceDefault(int minutes) {
+    return 'Default ($minutes min)';
+  }
+
+  @override
+  String renagMinutes(int minutes) {
+    return '$minutes min';
+  }
 }

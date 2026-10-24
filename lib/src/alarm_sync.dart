@@ -146,6 +146,10 @@ class AlarmSync extends ChangeNotifier {
         snooze10: t.snooze10,
         snooze30: t.snooze30,
         snooze60: t.snooze60,
+        catchUpTitle: t.catchUpTitle,
+        catchUpOne: t.catchUpOne,
+        // The platform puts in the number.
+        catchUpMany: t.catchUpMany('{count}'),
       ),
       done: done,
     );

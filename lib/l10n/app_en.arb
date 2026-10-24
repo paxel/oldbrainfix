@@ -310,5 +310,61 @@
   "permExactAlarms": "Alarms on the minute",
   "permExactAlarmsWhy": "Without this, Android may bring an alarm up to a quarter of an hour late. Turn it on for Old Brain Fix on the page that opens.",
   "permFullScreen": "Full-screen alarms",
-  "permFullScreenWhy": "Lets a Routine you keep ignoring turn into a full-screen alarm you can't miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens."
+  "permFullScreenWhy": "Lets a Routine you keep ignoring turn into a full-screen alarm you can't miss, if you switch that on for it. Turn it on for Old Brain Fix on the page that opens.",
+  "catchUpTitle": "Missed while the phone was off",
+  "catchUpOne": "One alarm was Missed. Open the app to see it.",
+  "catchUpMany": "{count} alarms were Missed. Open the app to see them.",
+  "@catchUpMany": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "missedTitle": "Missed",
+  "missedTimes": "{count, plural, =1{once} other{{count} times}}",
+  "@missedTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "missedMore": "and {count} more",
+  "@missedMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "missedSeen": "Seen",
+  "renagHeading": "Re-nag",
+  "renagSummary": "Rings again every {minutes} min until Done",
+  "@renagSummary": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "renagExplain": "An ignored alarm rings again at this interval until it is Done or snoozed, or until the next one is due; then it counts as Missed. A Reminder stops at midnight.",
+  "renagThis": "This one",
+  "renagDevice": "Default on this phone",
+  "renagDeviceDefault": "Default ({minutes} min)",
+  "@renagDeviceDefault": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "renagMinutes": "{minutes} min",
+  "@renagMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

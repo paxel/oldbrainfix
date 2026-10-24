@@ -6,6 +6,7 @@ library;
 
 import 'dart:convert';
 
+import 'device_settings.dart';
 import 'notes.dart';
 import 'routines.dart';
 import 'schedule.dart';
@@ -78,6 +79,62 @@ DateTime instantOf(Day day, ClockTime time, WallClock wallClock) {
   return DateTime.fromMillisecondsSinceEpoch(hi, isUtc: true);
 }
 
+/// A moment on the wall clock.
+typedef WallMoment = ({Day day, ClockTime time});
+
+/// When [occurrence] starts: at its time, an all-day one at
+/// [allDayAlarmTime].
+WallMoment startOf(Occurrence occurrence) =>
+    (day: occurrence.day, time: occurrence.time ?? allDayAlarmTime);
+
+/// When [occurrence] counts as Missed unless it is Done (CONTEXT.md):
+/// when [next], the Occurrence after it, starts (an all-day one at the
+/// start of its day, so it never nags through the night); at midnight
+/// after its day when there is no next one, as for a Reminder.
+WallMoment missedFrom(Occurrence occurrence, Occurrence? next) => next == null
+    ? (day: occurrence.day.addDays(1), time: ClockTime(0, 0))
+    : (day: next.day, time: next.time ?? ClockTime(0, 0));
+
+/// One Occurrence of a Routine placed in time: when it starts and when
+/// it counts as Missed.
+class _Timed {
+  final Occurrence occurrence;
+  final DateTime start;
+  final WallMoment ends;
+  final DateTime endsAt;
+
+  _Timed(this.occurrence, this.start, this.ends, this.endsAt);
+}
+
+/// The Occurrences of [routine] from [from] to [to] that were asked for
+/// (due at or after [Routine.scheduledAt]), placed on [wallClock].
+List<_Timed> _timed(Routine routine, Day from, Day to, WallClock wallClock) {
+  final schedule = routine.schedule;
+  final occurrences = schedule.between(from, to);
+  final after = schedule.once ? null : schedule.next(to.addDays(1), 1);
+  final since = routine.scheduledAt;
+  final timed = <_Timed>[];
+  for (var i = 0; i < occurrences.length; i++) {
+    final next = i + 1 < occurrences.length
+        ? occurrences[i + 1]
+        : after?.firstOrNull;
+    final t = _place(occurrences[i], next, wallClock);
+    if (since == null || !t.start.isBefore(since)) timed.add(t);
+  }
+  return timed;
+}
+
+_Timed _place(Occurrence occurrence, Occurrence? next, WallClock wallClock) {
+  final start = startOf(occurrence);
+  final ends = missedFrom(occurrence, next);
+  return _Timed(
+    occurrence,
+    instantOf(start.day, start.time, wallClock),
+    ends,
+    instantOf(ends.day, ends.time, wallClock),
+  );
+}
+
 /// Why an alarm fires.
 enum AlarmKind {
   /// An Occurrence is due.
@@ -87,19 +144,29 @@ enum AlarmKind {
   snooze,
 }
 
-/// One alarm that should exist.
+/// One alarm that should exist. While its Occurrence is not Done it
+/// fires at [at] and then Re-nags every [renag], up to [endsAt], when
+/// the Occurrence counts as Missed.
 class PlannedAlarm {
   final AlarmKind kind;
   final String routineId;
   final Occurrence occurrence;
 
-  /// When it fires, in UTC.
+  /// When it fires first, in UTC; past for an Occurrence still Re-nagging.
   final DateTime at;
 
   /// The wall-clock moment an Occurrence alarm fires at, so the platform
   /// re-arms it at the same local time after a time-zone change; null
   /// for a snooze, which waits a fixed time.
-  final ({Day day, ClockTime time})? wall;
+  final WallMoment? wall;
+
+  /// How often it fires again while ignored.
+  final Duration renag;
+
+  /// When the Occurrence counts as Missed and the alarm stops, on the
+  /// wall clock and as the instant [endsAt].
+  final WallMoment ends;
+  final DateTime endsAt;
 
   /// The text of the Note the Routine links back to; null when it is
   /// gone.
@@ -111,14 +178,30 @@ class PlannedAlarm {
     required this.occurrence,
     required this.at,
     required this.wall,
+    required this.renag,
+    required this.ends,
+    required this.endsAt,
     required this.text,
   });
 
   /// Names the alarm for good: one per kind and Occurrence.
   String get id => '${kind.name}:${snoozeKey(routineId, occurrence)}';
 
+  /// When it fires first after [after]: at [at], or at a Re-nag; null
+  /// when it has stopped by then. The platform's alarm layer follows the
+  /// same rule.
+  DateTime? firesAfter(DateTime after) {
+    if (at.isAfter(after)) return at.isBefore(endsAt) ? at : null;
+    final step = renag.inMilliseconds;
+    final passed = after.difference(at).inMilliseconds;
+    final next = at.add(Duration(milliseconds: (passed ~/ step + 1) * step));
+    return next.isBefore(endsAt) ? next : null;
+  }
+
   @override
-  String toString() => '$id at ${at.toIso8601String()}';
+  String toString() =>
+      '$id at ${at.toIso8601String()} every ${renag.inMinutes} min '
+      'until ${endsAt.toIso8601String()}';
 }
 
 /// The key a snooze of [occurrence] of the Routine [routineId] is kept
@@ -126,69 +209,140 @@ class PlannedAlarm {
 String snoozeKey(String routineId, Occurrence occurrence) =>
     '$routineId@${occurrence.key}';
 
-/// The alarms that should exist at [now]: for each Routine its next
-/// Occurrences within [alarmHorizonDays] that are not Done, at most
-/// [alarmsPerRoutine], and every snooze still ahead whose Occurrence is
-/// not Done, the soonest first and at most [alarmLimit]. [snoozes] are
-/// this Device's (ADR 0008), keyed by [snoozeKey].
+/// The alarms that should exist at [now]: for each Routine its
+/// Occurrences that are not Done and not yet Missed, from
+/// [alarmHorizonDays] back to as far ahead, at most [alarmsPerRoutine],
+/// the soonest first and at most [alarmLimit]. An Occurrence already
+/// rung stays while it Re-nags. A snoozed one rings at its snooze
+/// instead and Re-nags from there; a snooze reaching past when the
+/// Occurrence counts as Missed is dropped. Each Re-nags at its Routine's
+/// interval, else at [renag]. [snoozes] are this Device's (ADR 0008),
+/// keyed by [snoozeKey].
 List<PlannedAlarm> alarmPlan({
   required List<(Routine, Note?)> routines,
   required Map<String, DateTime> snoozes,
   required DateTime now,
   required WallClock wallClock,
+  Duration renag = DeviceSettings.defaultRenag,
 }) {
   final today = Day.today(now, wallClock);
-  final last = today.addDays(alarmHorizonDays);
   final alarms = <PlannedAlarm>[];
-  final byId = <String, (Routine, Note?)>{};
   for (final (routine, note) in routines) {
-    byId[routine.id] = (routine, note);
     var planned = 0;
-    for (final occurrence in routine.schedule.between(today, last)) {
+    final timed = _timed(
+      routine,
+      today.addDays(-alarmHorizonDays),
+      today.addDays(alarmHorizonDays),
+      wallClock,
+    );
+    for (final t in timed) {
       if (planned >= alarmsPerRoutine) break;
+      final occurrence = t.occurrence;
       if (routine.doneAt(occurrence) != null) continue;
-      final time = occurrence.time ?? allDayAlarmTime;
-      final at = instantOf(occurrence.day, time, wallClock);
-      if (!at.isAfter(now)) continue;
+      if (!t.endsAt.isAfter(now)) continue;
+      final snoozed = snoozes[snoozeKey(routine.id, occurrence)]?.toUtc();
+      if (snoozed != null && !snoozed.isBefore(t.endsAt)) continue;
       alarms.add(
         PlannedAlarm(
-          kind: AlarmKind.occurrence,
+          kind: snoozed == null ? AlarmKind.occurrence : AlarmKind.snooze,
           routineId: routine.id,
           occurrence: occurrence,
-          at: at,
-          wall: (day: occurrence.day, time: time),
+          at: snoozed ?? t.start,
+          wall: snoozed == null ? startOf(occurrence) : null,
+          renag: routine.renag ?? renag,
+          ends: t.ends,
+          endsAt: t.endsAt,
           text: note?.text,
         ),
       );
       planned++;
     }
   }
-  for (final MapEntry(:key, value: until) in snoozes.entries) {
-    if (!until.isAfter(now)) continue;
-    final at = key.lastIndexOf('@');
-    if (at < 0) continue;
-    final found = byId[key.substring(0, at)];
-    final occurrence = Occurrence.tryParse(key.substring(at + 1));
-    if (found == null || occurrence == null) continue;
-    final (routine, note) = found;
-    if (!routine.schedule.has(occurrence)) continue;
-    if (routine.doneAt(occurrence) != null) continue;
-    alarms.add(
-      PlannedAlarm(
-        kind: AlarmKind.snooze,
-        routineId: routine.id,
-        occurrence: occurrence,
-        at: until.toUtc(),
-        wall: null,
-        text: note?.text,
-      ),
-    );
-  }
   alarms.sort((a, b) {
     final byTime = a.at.compareTo(b.at);
     return byTime != 0 ? byTime : a.id.compareTo(b.id);
   });
   return alarms.length > alarmLimit ? alarms.sublist(0, alarmLimit) : alarms;
+}
+
+/// One Missed Occurrence and when it became Missed.
+typedef MissedOccurrence = ({Occurrence occurrence, DateTime missedAt});
+
+/// What one Routine Missed, the latest first.
+class MissedRoutine {
+  final Routine routine;
+
+  /// The Note it links back to; null when it is gone.
+  final Note? note;
+  final List<MissedOccurrence> missed;
+
+  const MissedRoutine({
+    required this.routine,
+    required this.note,
+    required this.missed,
+  });
+
+  /// How often it was Missed.
+  int get count => missed.length;
+}
+
+/// The Missed Summary (CONTEXT.md): what was Missed since the user last
+/// tapped "seen", by Routine, the one Missed latest first.
+class MissedSummary {
+  final List<MissedRoutine> routines;
+
+  /// When the next Occurrence not Done becomes Missed, so a screen
+  /// showing the summary knows when to look again; null when none will.
+  final DateTime? nextChange;
+
+  const MissedSummary({required this.routines, required this.nextChange});
+
+  bool get isEmpty => routines.isEmpty;
+
+  /// How many Occurrences were Missed in all.
+  int get count => routines.fold(0, (sum, r) => sum + r.count);
+}
+
+/// The Missed Summary at [now]: every Occurrence not Done that became
+/// Missed after [seen] (or within [alarmHorizonDays] when never seen, and
+/// never further back than that), by Routine.
+MissedSummary missedSummary({
+  required List<(Routine, Note?)> routines,
+  required DateTime? seen,
+  required DateTime now,
+  required WallClock wallClock,
+}) {
+  final today = Day.today(now, wallClock);
+  final from = today.addDays(-alarmHorizonDays);
+  final result = <MissedRoutine>[];
+  DateTime? nextChange;
+  for (final (routine, note) in routines) {
+    final missed = <MissedOccurrence>[];
+    for (final t in _timed(routine, from, today, wallClock)) {
+      if (routine.doneAt(t.occurrence) != null) continue;
+      if (t.endsAt.isAfter(now)) {
+        if (nextChange == null || t.endsAt.isBefore(nextChange)) {
+          nextChange = t.endsAt;
+        }
+        continue;
+      }
+      if (seen != null && !t.endsAt.isAfter(seen)) continue;
+      missed.add((occurrence: t.occurrence, missedAt: t.endsAt));
+    }
+    if (missed.isEmpty) continue;
+    result.add(
+      MissedRoutine(
+        routine: routine,
+        note: note,
+        missed: missed.reversed.toList(),
+      ),
+    );
+  }
+  result.sort((a, b) {
+    final byTime = b.missed.first.missedAt.compareTo(a.missed.first.missedAt);
+    return byTime != 0 ? byTime : a.routine.id.compareTo(b.routine.id);
+  });
+  return MissedSummary(routines: result, nextChange: nextChange);
 }
 
 /// This Device's alarms: its snoozes, the plan over the store, and what
@@ -224,8 +378,24 @@ class Alarms {
       snoozes: snoozes,
       now: store.clock(),
       wallClock: wallClock,
+      renag: store.renagInterval,
     );
   }
+
+  /// The Missed Summary at the store's now, since this Device last
+  /// marked it "seen".
+  MissedSummary missed(WallClock wallClock) {
+    final routines = Routines(store);
+    return missedSummary(
+      routines: [for (final r in routines.all()) (r, routines.note(r))],
+      seen: store.missedSeen,
+      now: store.clock(),
+      wallClock: wallClock,
+    );
+  }
+
+  /// The user tapped "seen": the Missed Summary starts over from now.
+  void markSeen() => store.missedSeen = store.clock();
 
   /// The Occurrences Done from yesterday to tomorrow on [wallClock], by
   /// Routine id: their notifications, if still showing, can go.
@@ -259,15 +429,18 @@ class Alarms {
   }
 
   /// Applies a Snooze tapped on a notification: [occurrenceKey] of the
-  /// Routine [routineId] fires again at [until]. Snoozes already over
-  /// are dropped on the way.
+  /// Routine [routineId] fires again at [until] and Re-nags from there.
+  /// Snoozes over for longer than the plan looks back are dropped on
+  /// the way.
   void applySnooze(String routineId, String occurrenceKey, DateTime until) {
     final occurrence = Occurrence.tryParse(occurrenceKey);
     if (occurrence == null) return;
-    final now = store.clock();
+    final oldest = store.clock().subtract(
+      const Duration(days: alarmHorizonDays + 1),
+    );
     final kept = {
       for (final MapEntry(:key, :value) in snoozes.entries)
-        if (value.isAfter(now)) key: value,
+        if (value.isAfter(oldest)) key: value,
       snoozeKey(routineId, occurrence): until,
     };
     store.setLocalSetting(

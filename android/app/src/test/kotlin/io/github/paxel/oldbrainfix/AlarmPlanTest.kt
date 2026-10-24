@@ -147,4 +147,113 @@ class AlarmPlanTest {
         )
         assertEquals("snooze:routine:r@2026-10-24T08:00", AlarmPlan.snoozeId("routine:r", "2026-10-24T08:00"))
     }
+
+    /** Pills at 08:00 on the 24th, Re-nagging every 10 min until 14:00. */
+    private fun nagging(occurrence: String = "2026-10-24T08:00") =
+        Alarm(
+            "occurrence:routine:r@$occurrence", "routine:r", occurrence,
+            listOf(2026, 10, 24, 8, 0), null, "pills", "08:00",
+            renagMs = 10 * 60_000L, end = listOf(2026, 10, 24, 14, 0),
+        )
+
+    @Test
+    fun anIgnoredAlarmRenagsUntilItsEnd() {
+        val alarm = nagging()
+        // 08:00 in Berlin is 06:00 UTC.
+        assertEquals(utc(2026, 10, 24, 6), AlarmPlan.firesAfter(alarm, berlin, utc(2026, 10, 24, 5)))
+        assertEquals(utc(2026, 10, 24, 6, 10), AlarmPlan.firesAfter(alarm, berlin, utc(2026, 10, 24, 6)))
+        assertEquals(utc(2026, 10, 24, 11, 50), AlarmPlan.firesAfter(alarm, berlin, utc(2026, 10, 24, 11, 45)))
+        assertNull(AlarmPlan.firesAfter(alarm, berlin, utc(2026, 10, 24, 11, 50)))
+        assertEquals(
+            utc(2026, 10, 24, 6, 10),
+            AlarmPlan.next(listOf(alarm), berlin, utc(2026, 10, 24, 6), utc(2026, 10, 24, 6, 1)),
+        )
+        assertNull(AlarmPlan.next(listOf(alarm), berlin, 0, utc(2026, 10, 24, 12)))
+    }
+
+    @Test
+    fun anAlarmWithoutRenagRingsOnce() {
+        val alarm = occurrence("2026-10-24T08:00", listOf(2026, 10, 24, 8, 0))
+        assertNull(AlarmPlan.firesAfter(alarm, berlin, utc(2026, 10, 24, 6)))
+    }
+
+    @Test
+    fun aLateFireShowsEachOccurrenceOnceHoweverManyRenagsCameDue() {
+        val armed = utc(2026, 10, 24, 6, 10)
+        val due = AlarmPlan.due(listOf(nagging()), berlin, armed, utc(2026, 10, 24, 6), utc(2026, 10, 24, 6, 45))
+        assertEquals(listOf("occurrence:routine:r@2026-10-24T08:00"), due.map { it.id })
+        assertEquals(
+            emptyList<Alarm>(),
+            AlarmPlan.due(listOf(nagging()), berlin, utc(2026, 10, 24, 12), 0, utc(2026, 10, 24, 12, 30)),
+        )
+    }
+
+    @Test
+    fun aSnoozeTakesTheOccurrencesPlaceAndRenagsFromThere() {
+        val until = utc(2026, 10, 24, 6, 30)
+        val tapped = Action(1, "snooze", "routine:r", "2026-10-24T08:00", 0, until, "pills", "08:00")
+        val effective = AlarmPlan.effective(listOf(nagging()), listOf(tapped)).single()
+        assertEquals("snooze:routine:r@2026-10-24T08:00", effective.id)
+        assertEquals(utc(2026, 10, 24, 6, 40), AlarmPlan.firesAfter(effective, berlin, until))
+        // Nothing rings before the snooze.
+        assertEquals(until, AlarmPlan.next(listOf(effective), berlin, utc(2026, 10, 24, 6, 5), utc(2026, 10, 24, 6, 5)))
+    }
+
+    @Test
+    fun aSnoozePastTheEndNeverRings() {
+        val tapped = Action(1, "snooze", "routine:r", "2026-10-24T08:00", 0, utc(2026, 10, 24, 12, 30), "pills", "08:00")
+        val effective = AlarmPlan.effective(listOf(nagging()), listOf(tapped))
+        assertNull(AlarmPlan.next(effective, berlin, 0, utc(2026, 10, 24, 11, 59)))
+    }
+
+    @Test
+    fun afterDowntimeNothingRingsLateAndWhatEndedIsCaughtUp() {
+        val plan = listOf(
+            nagging(),
+            // Still open at boot: it goes on Re-nagging, not counted.
+            Alarm(
+                "occurrence:routine:s@2026-10-24T13:00", "routine:s", "2026-10-24T13:00",
+                listOf(2026, 10, 24, 13, 0), null, "plants", "13:00",
+                renagMs = 10 * 60_000L, end = listOf(2026, 10, 25, 0, 0),
+            ),
+        )
+        val off = utc(2026, 10, 24, 5)
+        val back = utc(2026, 10, 24, 13, 3)
+        assertEquals(1, AlarmPlan.catchUp(plan, berlin, off, off, back))
+        // No burst: the next ring is a Re-nag ahead of now.
+        assertEquals(utc(2026, 10, 24, 13, 10), AlarmPlan.next(plan, berlin, off, back))
+    }
+
+    @Test
+    fun noCatchUpWithoutDowntimeOrAfterTheClockWasSetBack() {
+        val plan = listOf(nagging())
+        val now = utc(2026, 10, 24, 13)
+        assertEquals(0, AlarmPlan.catchUp(plan, berlin, 0, 0, now))
+        assertEquals(0, AlarmPlan.catchUp(plan, berlin, utc(2026, 10, 24, 14), utc(2026, 10, 24, 14), now))
+        assertEquals(0, AlarmPlan.catchUp(plan, berlin, utc(2026, 10, 24, 12), utc(2026, 10, 24, 12), now))
+        assertEquals(0, AlarmPlan.catchUp(plan, berlin, utc(2026, 10, 24, 5), utc(2026, 10, 24, 5), utc(2026, 10, 24, 11)))
+    }
+
+    @Test
+    fun aDoneTappedButNotAppliedIsNotCaughtUp() {
+        val done = Action(1, "done", "routine:r", "2026-10-24T08:00", 0, 0, "pills", "08:00")
+        val effective = AlarmPlan.effective(listOf(nagging()), listOf(done))
+        assertEquals(0, AlarmPlan.catchUp(effective, berlin, utc(2026, 10, 24, 5), 0, utc(2026, 10, 24, 13)))
+    }
+
+    @Test
+    fun whatWasMissedWhileThePhoneWasOnIsNotCaughtUp() {
+        // The last Re-nag rang at 13:50 Berlin; it became Missed at 14:00
+        // with the phone on, and nothing rang after.
+        val lastTick = utc(2026, 10, 24, 11, 50)
+        assertEquals(0, AlarmPlan.catchUp(listOf(nagging()), berlin, lastTick, lastTick, utc(2026, 10, 24, 15)))
+        // A Reminder ignored until midnight, then a reboot in the morning.
+        val reminder = Alarm(
+            "occurrence:routine:m@2026-10-24T20:00", "routine:m", "2026-10-24T20:00",
+            listOf(2026, 10, 24, 20, 0), null, "call mum", "20:00",
+            renagMs = 10 * 60_000L, end = listOf(2026, 10, 25, 0, 0),
+        )
+        val lastNag = utc(2026, 10, 24, 21, 50)
+        assertEquals(0, AlarmPlan.catchUp(listOf(reminder), berlin, lastNag, lastNag, utc(2026, 10, 25, 6)))
+    }
 }

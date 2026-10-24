@@ -204,6 +204,33 @@ void main() {
     });
   });
 
+  group('Re-nag override', () {
+    test('a Routine has its own Re-nag interval, or the Device\'s', () {
+      final id = routines.create('pills', daily([at(8)])).id;
+      expect(routines.byId(id)?.renag, isNull);
+      routines.setRenag(id, const Duration(minutes: 5));
+      expect(routines.byId(id)?.renag, const Duration(minutes: 5));
+      expect(
+        () => routines.setRenag(id, const Duration(seconds: 30)),
+        throwsArgumentError,
+      );
+      routines.setRenag(id, null);
+      expect(routines.byId(id)?.renag, isNull);
+    });
+
+    test('the same schedule again writes nothing', () {
+      final id = routines.create('pills', daily([at(8)])).id;
+      final entries = store.allEntries().length;
+      routines.reschedule(id, daily([at(8)]));
+      expect(store.allEntries(), hasLength(entries));
+      expect(routines.byId(id)?.scheduledAt, now);
+      now = now.add(const Duration(hours: 1));
+      routines.reschedule(id, daily([at(9)]));
+      expect(store.allEntries(), hasLength(entries + 1));
+      expect(routines.byId(id)?.scheduledAt, now);
+    });
+  });
+
   group('Agenda', () {
     test('today all-day first, then timed by time; then tomorrow', () {
       routines.create('pills', daily([at(20), at(8)]));

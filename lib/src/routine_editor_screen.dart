@@ -54,7 +54,11 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// text for a new Note), and its schedule in a simple editor (once, every
 /// N days, weeks, months or years, chosen weekdays) or as an RRULE in the
 /// advanced mode, with its times of day. The next Occurrences show while
-/// it is edited. Save writes it; leaving without saving drops the edit.
+/// it is edited. A folded Re-nag section sets how often it rings again
+/// when ignored: its own interval or this Device's default, which is
+/// set there too, for now (it moves to Settings later). Save writes the
+/// Routine; leaving without saving drops the edit, but not a changed
+/// Device default, which applies at once.
 class RoutineEditorScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -86,6 +90,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// How many coming Occurrences the editor shows.
   static const _preview = 3;
 
+  /// The Re-nag intervals offered, in minutes.
+  static const _renagChoices = [5, 10, 15, 30, 60];
+
   late final _routines = Routines(widget.notes.store);
   final _text = TextEditingController();
   final _rule = TextEditingController();
@@ -100,6 +107,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   Set<int> _weekdays = {};
   late Day _start;
   List<ClockTime> _times = [];
+
+  /// The Routine's own Re-nag interval; null for the Device's default.
+  Duration? _renag;
+  late Duration _deviceRenag = widget.notes.store.renagInterval;
 
   /// What is edited now, or null while the advanced rule is no rule.
   Schedule? _schedule;
@@ -118,6 +129,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     _routine = routine;
     if (routine != null) {
       _note = _routines.note(routine);
+      _renag = routine.renag;
       _load(routine.schedule);
     } else {
       final noteId = widget.noteId;
@@ -251,16 +263,24 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     if (schedule == null) return;
     final routine = _routine;
     final note = _note;
+    final String id;
     if (routine != null) {
       _routines.reschedule(routine.id, schedule);
+      id = routine.id;
     } else if (note != null) {
-      _routines.spawn(note.id, schedule);
+      id = _routines.spawn(note.id, schedule).id;
     } else {
       final text = _text.text.trim();
       if (text.isEmpty) return;
-      _routines.create(text, schedule);
+      id = _routines.create(text, schedule).id;
     }
+    _routines.setRenag(id, _renag);
     Navigator.of(context).pop(true);
+  }
+
+  void _setDeviceRenag(Duration interval) {
+    widget.notes.store.renagInterval = interval;
+    setState(() => _deviceRenag = interval);
   }
 
   Future<void> _delete() async {
@@ -445,6 +465,70 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   ),
               ],
             ),
+          ),
+          _renagPanel(t),
+        ],
+      ),
+    );
+  }
+
+  /// The folded Re-nag section: this one's interval and the Device's.
+  Widget _renagPanel(AppLocalizations t) {
+    final own = _renag?.inMinutes;
+    final device = _deviceRenag.inMinutes;
+    // A value set elsewhere stays pickable.
+    List<int> choices(int? kept) => {..._renagChoices, ?kept}.toList()..sort();
+    return Embossed(
+      child: ExpansionTile(
+        key: const ValueKey('renag'),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        title: Text(t.renagHeading),
+        subtitle: Text(t.renagSummary(own ?? device)),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(t.renagExplain),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: Text(t.renagThis)),
+              DropdownButton<int?>(
+                key: const ValueKey('renagThis'),
+                value: own,
+                onChanged: (minutes) => setState(
+                  () => _renag = minutes == null
+                      ? null
+                      : Duration(minutes: minutes),
+                ),
+                items: [
+                  DropdownMenuItem(
+                    value: null,
+                    child: Text(t.renagDeviceDefault(device)),
+                  ),
+                  for (final m in choices(own))
+                    DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
+                ],
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: Text(t.renagDevice)),
+              DropdownButton<int>(
+                key: const ValueKey('renagDevice'),
+                value: device,
+                onChanged: (minutes) {
+                  if (minutes != null) {
+                    _setDeviceRenag(Duration(minutes: minutes));
+                  }
+                },
+                items: [
+                  for (final m in choices(device))
+                    DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
+                ],
+              ),
+            ],
           ),
         ],
       ),

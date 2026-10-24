@@ -10,6 +10,11 @@ extension DeviceSettings on Store {
   static const _starterSetOffered = 'starterSetOffered';
   static const _locationExplained = 'locationExplained';
   static const _alarmSetupDone = 'alarmSetupDone';
+  static const _renagMinutes = 'renagMinutes';
+  static const _missedSeen = 'missedSeen';
+
+  /// The Re-nag interval when nothing else is set.
+  static const defaultRenag = Duration(minutes: 10);
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -37,4 +42,28 @@ extension DeviceSettings on Store {
   bool get alarmSetupDone => localSetting(_alarmSetupDone) == 'true';
 
   set alarmSetupDone(bool done) => setLocalSetting(_alarmSetupDone, '$done');
+
+  /// How often an ignored Occurrence fires again, unless its Routine has
+  /// its own interval.
+  Duration get renagInterval {
+    final minutes = int.tryParse(localSetting(_renagMinutes) ?? '');
+    return minutes == null || minutes < 1
+        ? defaultRenag
+        : Duration(minutes: minutes);
+  }
+
+  set renagInterval(Duration interval) {
+    if (interval.inMinutes < 1) {
+      throw ArgumentError.value(interval, 'interval', 'at least a minute');
+    }
+    setLocalSetting(_renagMinutes, '${interval.inMinutes}');
+  }
+
+  /// When the user last tapped "seen" on the Missed Summary on this
+  /// Device; null before the first time.
+  DateTime? get missedSeen =>
+      DateTime.tryParse(localSetting(_missedSeen) ?? '')?.toUtc();
+
+  set missedSeen(DateTime? seen) =>
+      setLocalSetting(_missedSeen, seen?.toUtc().toIso8601String() ?? '');
 }

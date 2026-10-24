@@ -611,4 +611,66 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get permFullScreenWhy =>
       'Damit kann eine Routine, die du immer wieder übergehst, zu einem Vollbild-Alarm werden, den du nicht übersiehst – wenn du das für sie einschaltest. Schalte es auf der Seite, die sich öffnet, für Old Brain Fix ein.';
+
+  @override
+  String get catchUpTitle => 'Verpasst, während das Handy aus war';
+
+  @override
+  String get catchUpOne =>
+      'Ein Alarm wurde verpasst. Öffne die App, um ihn zu sehen.';
+
+  @override
+  String catchUpMany(String count) {
+    return '$count Alarme wurden verpasst. Öffne die App, um sie zu sehen.';
+  }
+
+  @override
+  String get missedTitle => 'Verpasst';
+
+  @override
+  String missedTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count-mal',
+      one: 'einmal',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String missedMore(int count) {
+    return 'und $count weitere';
+  }
+
+  @override
+  String get missedSeen => 'Gesehen';
+
+  @override
+  String get renagHeading => 'Erneut erinnern';
+
+  @override
+  String renagSummary(int minutes) {
+    return 'Klingelt alle $minutes Min. wieder, bis es erledigt ist';
+  }
+
+  @override
+  String get renagExplain =>
+      'Ein unbeachteter Alarm klingelt in diesem Abstand wieder, bis er erledigt oder verschoben ist oder der nächste fällig wird; dann gilt er als verpasst. Eine Erinnerung hört um Mitternacht auf.';
+
+  @override
+  String get renagThis => 'Für diese';
+
+  @override
+  String get renagDevice => 'Standard auf diesem Handy';
+
+  @override
+  String renagDeviceDefault(int minutes) {
+    return 'Standard ($minutes Min.)';
+  }
+
+  @override
+  String renagMinutes(int minutes) {
+    return '$minutes Min.';
+  }
 }

@@ -12,6 +12,7 @@ import 'capture_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
+import 'missed_summary_card.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
@@ -28,7 +29,9 @@ typedef _PlacedRow = ({AgendaRow row, Area? area});
 /// until the browser opens or the app comes back; the magnifier opens
 /// the notes browser; the app bar makes a Routine without a Note. A red
 /// banner on top shows while alarms lack a permission, and leads to the
-/// setup. At local midnight the Agenda moves on to the new day.
+/// setup. Below it the Missed Summary shows until "seen". At local
+/// midnight the Agenda moves on to the new day, and whenever an
+/// Occurrence becomes Missed the summary takes it in.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow is faded.
   static const tomorrowOpacity = 0.55;
@@ -56,8 +59,10 @@ class AgendaScreen extends StatefulWidget {
 
 class _AgendaScreenState extends State<AgendaScreen> {
   late final _routines = Routines(widget.notes.store);
+  late final _alarms = Alarms(widget.notes.store);
   late final AppLifecycleListener _lifecycle;
-  Timer? _midnight;
+  Timer? _timer;
+  MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
   List<_PlacedRow> _today = const [];
   List<_PlacedRow> _tomorrow = const [];
 
@@ -81,28 +86,33 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   @override
   void dispose() {
-    _midnight?.cancel();
+    _timer?.cancel();
     widget.alarms.removeListener(_reload);
     _lifecycle.dispose();
     super.dispose();
   }
 
-  /// Reloads just after the next local midnight, while the Agenda is
+  /// Reloads just after the next local midnight, or when the next
+  /// Occurrence becomes Missed if that comes first, while the Agenda is
   /// open.
-  void _armMidnight() {
-    _midnight?.cancel();
+  void _armTimer() {
+    _timer?.cancel();
     final now = widget.notes.store.clock();
     final wall = deviceWallClock(now.toUtc());
-    final next = DateTime(wall.year, wall.month, wall.day + 1);
-    final wait = next.difference(now) + const Duration(seconds: 1);
-    _midnight = Timer(wait.isNegative ? Duration.zero : wait, _reload);
+    final midnight = DateTime(wall.year, wall.month, wall.day + 1);
+    var wait = midnight.difference(now);
+    final missed = _missed.nextChange?.difference(now);
+    if (missed != null && missed < wait) wait = missed;
+    wait += const Duration(seconds: 1);
+    _timer = Timer(wait.isNegative ? Duration.zero : wait, _reload);
   }
 
   void _load() {
-    _armMidnight();
     final agenda = _routines.agenda(deviceWallClock);
     _today = [for (final row in agenda.todayRows) _place(row)];
     _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
+    _missed = _alarms.missed(deviceWallClock);
+    _armTimer();
     final captured = _capturedId == null
         ? null
         : widget.notes.byId(_capturedId ?? '');
@@ -165,6 +175,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Future<void> _newRoutine() async {
     await newRoutine(context, widget.notes, widget.places);
     if (!mounted) return;
+    _routineEdited();
+  }
+
+  /// Back from a Routine's editor, which may have changed the Device's
+  /// Re-nag interval: a setting, not the log, so the alarms are armed
+  /// again here.
+  void _routineEdited() {
+    unawaited(widget.alarms.refresh());
     _reload();
   }
 
@@ -177,10 +195,21 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  /// Checks off a Missed Occurrence: Done, late.
+  void _checkMissed(Routine routine, Occurrence occurrence) {
+    _routines.markDone(routine.id, occurrence);
+    _reload();
+  }
+
+  void _seen() {
+    _alarms.markSeen();
+    _reload();
+  }
+
   Future<void> _openRow(AgendaRow row) async {
     await openRoutine(context, widget.notes, widget.places, row.routine);
     if (!mounted) return;
-    _reload();
+    _routineEdited();
   }
 
   Future<void> _file(Note note) async {
@@ -244,6 +273,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
         padding: const EdgeInsets.only(top: 8, bottom: 160),
         children: [
           if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
+          if (!_missed.isEmpty)
+            MissedSummaryCard(
+              summary: _missed,
+              onCheck: _checkMissed,
+              onSeen: _seen,
+            ),
           if (captured != null) ...[
             _Heading(t.justCaptured),
             NoteCard(

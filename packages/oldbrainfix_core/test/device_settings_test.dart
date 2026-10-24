@@ -52,4 +52,26 @@ void main() {
     expect(store.alarmSetupDone, isTrue);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
+
+  test('Re-nag every 10 min until this Device sets its own interval', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.renagInterval, const Duration(minutes: 10));
+    store.renagInterval = const Duration(minutes: 30);
+    expect(store.renagInterval, const Duration(minutes: 30));
+    expect(() => store.renagInterval = Duration.zero, throwsArgumentError);
+    store.setLocalSetting('renagMinutes', 'often');
+    expect(store.renagInterval, const Duration(minutes: 10));
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('"seen" is kept per Device', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.missedSeen, isNull);
+    final seen = DateTime.utc(2026, 10, 24, 7);
+    store.missedSeen = seen;
+    expect(store.missedSeen, seen);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
 }

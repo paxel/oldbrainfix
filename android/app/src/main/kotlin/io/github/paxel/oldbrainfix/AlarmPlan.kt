@@ -6,7 +6,9 @@ import java.util.TimeZone
  * One alarm the app handed over, or a snooze tapped on a notification.
  * An Occurrence alarm keeps its wall-clock moment in [local], so it is
  * found again in whatever zone the phone is in when it is armed; a
- * snooze waits a fixed time and keeps its instant in [at].
+ * snooze waits a fixed time and keeps its instant in [at]. While
+ * ignored it Re-nags every [renagMs] until [end], when its Occurrence
+ * counts as Missed.
  */
 data class Alarm(
     val id: String,
@@ -18,6 +20,10 @@ data class Alarm(
     val at: Long?,
     val title: String,
     val body: String,
+    /** The Re-nag interval in millis; 0 rings once. */
+    val renagMs: Long = 0,
+    /** [year, month, day, hour, minute] on the wall clock when it stops, or null. */
+    val end: List<Int>? = null,
 )
 
 /** Done or a snooze tapped on a notification, kept until the app applied it. */
@@ -71,9 +77,29 @@ object AlarmPlan {
         return hi
     }
 
-    /** When [alarm] fires in [zone]. */
+    /** When [alarm] fires first in [zone]. */
     fun instantOf(alarm: Alarm, zone: TimeZone): Long =
         alarm.local?.let { instantOf(it, zone) } ?: alarm.at ?: Long.MAX_VALUE
+
+    /** When [alarm] stops in [zone]: its Occurrence counts as Missed. */
+    fun endOf(alarm: Alarm, zone: TimeZone): Long =
+        alarm.end?.let { instantOf(it, zone) } ?: Long.MAX_VALUE
+
+    /**
+     * When [alarm] fires first after [after]: at its instant or at a
+     * Re-nag, never at or past its end; null when it has stopped. The
+     * same rule as the core's `PlannedAlarm.firesAfter`.
+     */
+    fun firesAfter(alarm: Alarm, zone: TimeZone, after: Long): Long? {
+        val first = instantOf(alarm, zone)
+        val end = endOf(alarm, zone)
+        val next = when {
+            first > after -> first
+            alarm.renagMs <= 0 -> return null
+            else -> first + ((after - first) / alarm.renagMs + 1) * alarm.renagMs
+        }
+        return if (next < end) next else null
+    }
 
     /**
      * The plan with the taps the app has not applied yet: what was
@@ -81,19 +107,23 @@ object AlarmPlan {
      */
     fun effective(plan: List<Alarm>, queued: List<Action>): List<Alarm> {
         val done = queued.filter { it.kind == "done" }.map { it.routine to it.occurrence }.toSet()
-        val snoozes = queued.filter { it.kind == "snooze" }.associateBy { snoozeId(it.routine, it.occurrence) }
-        val kept = plan.filter { (it.routine to it.occurrence) !in done && it.id !in snoozes }
+        val snoozes = queued.filter { it.kind == "snooze" }.associateBy { it.routine to it.occurrence }
+        val kept = plan.filter { (it.routine to it.occurrence) !in done && (it.routine to it.occurrence) !in snoozes }
         val added = snoozes.values
             .filter { (it.routine to it.occurrence) !in done }
-            .map {
+            .map { tap ->
+                // Re-nags from the snooze on, as the Occurrence did.
+                val was = plan.firstOrNull { it.routine == tap.routine && it.occurrence == tap.occurrence }
                 Alarm(
-                    id = snoozeId(it.routine, it.occurrence),
-                    routine = it.routine,
-                    occurrence = it.occurrence,
+                    id = snoozeId(tap.routine, tap.occurrence),
+                    routine = tap.routine,
+                    occurrence = tap.occurrence,
                     local = null,
-                    at = it.until,
-                    title = it.title,
-                    body = it.body,
+                    at = tap.until,
+                    title = tap.title,
+                    body = tap.body,
+                    renagMs = was?.renagMs ?: 0,
+                    end = was?.end,
                 )
             }
         return kept + added
@@ -107,20 +137,37 @@ object AlarmPlan {
      */
     fun next(alarms: List<Alarm>, zone: TimeZone, lastFired: Long, now: Long): Long? {
         val after = maxOf(if (lastFired > now) 0 else lastFired, now - GRACE_MS)
-        return alarms.map { instantOf(it, zone) }.filter { it > after }.minOrNull()
+        return alarms.mapNotNull { firesAfter(it, zone, after) }.minOrNull()
     }
 
     /**
      * What to show when the alarm armed for [armed] fires at [now]: every
-     * alarm from then to now, so a late inexact alarm brings all it held
-     * up, but nothing that already fired.
+     * alarm due from then to now, so a late inexact alarm brings all it
+     * held up, but nothing that already fired, and each Occurrence once
+     * however many of its Re-nags came due meanwhile.
      */
     fun due(alarms: List<Alarm>, zone: TimeZone, armed: Long, lastFired: Long, now: Long): List<Alarm> {
         val fired = if (lastFired > now) 0 else lastFired
-        return alarms.filter {
-            val at = instantOf(it, zone)
-            at in armed..now && at > fired
-        }
+        val after = maxOf(armed - 1, fired)
+        return alarms
+            .filter { alarm -> firesAfter(alarm, zone, after)?.let { it <= now } ?: false }
+            .distinctBy { it.routine to it.occurrence }
+    }
+
+    /**
+     * How many Occurrences became Missed while the phone was off: Missed
+     * by [now], with a ring or Re-nag due after the scheduler last ran
+     * (at [lastFired] or [lastArmed]) that never came. None when it never
+     * ran, or when the clock was set back past it. Their alarms do not
+     * ring late; one Catch-up Notification tells about them instead.
+     */
+    fun catchUp(alarms: List<Alarm>, zone: TimeZone, lastFired: Long, lastArmed: Long, now: Long): Int {
+        val since = maxOf(lastFired, lastArmed)
+        if (since <= 0 || since > now) return 0
+        return alarms
+            .filter { endOf(it, zone) <= now && firesAfter(it, zone, since) != null }
+            .distinctBy { it.routine to it.occurrence }
+            .size
     }
 
     /** The notification of an Occurrence; its snooze shows in the same one. */

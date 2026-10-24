@@ -144,8 +144,13 @@ class _HomeState extends State<_Home> {
   void initState() {
     super.initState();
     // Back from the background, or from a settings page: apply what was
-    // tapped meanwhile, see what is allowed now, arm again.
-    _lifecycle = AppLifecycleListener(onResume: widget.alarms.refresh);
+    // tapped meanwhile, see what is allowed now, arm again. Arms on the
+    // way out as well, so a changed Device setting (the Re-nag interval)
+    // is armed even when the log did not change.
+    _lifecycle = AppLifecycleListener(
+      onResume: widget.alarms.refresh,
+      onHide: widget.alarms.refresh,
+    );
   }
 
   @override

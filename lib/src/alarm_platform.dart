@@ -39,6 +39,12 @@ class AlarmLabels {
   final String snooze30;
   final String snooze60;
 
+  /// The Catch-up Notification's title, and its text for one and for
+  /// several Missed; the latter holds `{count}` for the number.
+  final String catchUpTitle;
+  final String catchUpOne;
+  final String catchUpMany;
+
   const AlarmLabels({
     required this.channel,
     required this.done,
@@ -47,6 +53,9 @@ class AlarmLabels {
     required this.snooze10,
     required this.snooze30,
     required this.snooze60,
+    required this.catchUpTitle,
+    required this.catchUpOne,
+    required this.catchUpMany,
   });
 
   Map<String, String> toMap() => {
@@ -57,6 +66,9 @@ class AlarmLabels {
     'snooze10': snooze10,
     'snooze30': snooze30,
     'snooze60': snooze60,
+    'catchUpTitle': catchUpTitle,
+    'catchUpOne': catchUpOne,
+    'catchUpMany': catchUpMany,
   };
 }
 
@@ -190,6 +202,15 @@ class AndroidAlarms implements AlarmPlatform {
             ]
           else
             'at': alarm.at.millisecondsSinceEpoch,
+          'renag': alarm.renag.inMinutes,
+          // On the wall clock as well, like 'local'.
+          'end': [
+            alarm.ends.day.year,
+            alarm.ends.day.month,
+            alarm.ends.day.day,
+            alarm.ends.time.hour,
+            alarm.ends.time.minute,
+          ],
           'title': title,
           'body': body,
         },

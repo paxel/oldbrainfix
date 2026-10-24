@@ -7,10 +7,12 @@ import android.content.Intent
 /**
  * After a reboot, an update, a clock change, a new time zone or a change
  * of the exact-alarm permission, arms the stored plan again at the same
- * local times (from Chaos Alert).
+ * local times (from Chaos Alert). Alarms that came due meanwhile do not
+ * ring in a burst; what became Missed is told in one Catch-up
+ * Notification.
  */
 class RearmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        Scheduler.arm(context)
+        Scheduler.rearm(context)
     }
 }

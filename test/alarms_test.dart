@@ -169,7 +169,10 @@ void main() {
     testWidgets('a snooze rings again and outlives the next sync', (
       tester,
     ) async {
+      // Made before 08:00, so this morning's rang.
+      now = DateTime(2026, 10, 24, 6);
       final pills = routines.create('pills', daily([at(8)]));
+      now = DateTime(2026, 10, 24, 9);
       await start(tester);
       final until = now.add(const Duration(minutes: 30)).toUtc();
       alarms.tap(
