@@ -1,26 +1,50 @@
 import 'notes.dart';
 import 'store.dart';
 
-/// Finding Notes by what they say. For now that is the Note text;
-/// Transcripts, OCR text and Capture Context join later.
+/// Finding Notes by what they say: their text and the text of their
+/// Sections (Amends and merged Notes). Transcripts, OCR text and Capture
+/// Context join later.
 class Search {
   final Store store;
 
   Search(this.store);
 
-  /// The Notes whose text holds [query], ignoring case, newest capture
-  /// first. The query counts as typed, inner spaces included; only its
-  /// ends are trimmed, and a blank one finds everything. With [within],
-  /// only the Notes inside that Area or Topic count (an Area's Topics
-  /// included).
+  /// The Notes whose text, or the text of one of their Sections, holds
+  /// [query], ignoring case, newest capture first. The query counts as
+  /// typed, inner spaces included; only its ends are trimmed, and a
+  /// blank one finds everything. With [within], only the Notes inside
+  /// that Area or Topic count (an Area's Topics included).
   List<Note> notes(String query, {String? within}) {
     final notes = Notes(store);
     final scope = within == null ? notes.all() : notes.inside(within);
     final wanted = query.trim().toLowerCase();
     if (wanted.isEmpty) return scope;
+    final sections = _sectionTexts(notes);
+    bool holds(String text) => text.toLowerCase().contains(wanted);
     return [
       for (final note in scope)
-        if (note.text.toLowerCase().contains(wanted)) note,
+        if (holds(note.text) || (sections[note.id] ?? const []).any(holds))
+          note,
     ];
+  }
+
+  /// The texts of every Section, by the Note they show under, read in one
+  /// pass: a merged Note under the end of its Merge chain, an Amend under
+  /// its Note, or where that Note was merged into.
+  Map<String, List<String>> _sectionTexts(Notes notes) {
+    final texts = <String, List<String>>{};
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      if (notes.byId(id) case Note(mergedInto: final into?, :final text)) {
+        (texts[into] ??= []).add(text);
+      }
+    }
+    for (final id in store.entitiesOfType(SectionKeys.typeSection)) {
+      final fields = store.currentFields(id);
+      final owner = fields[SectionKeys.note];
+      if (owner == null) continue;
+      final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
+      (texts[shownUnder] ??= []).add(fields[SectionKeys.text] ?? '');
+    }
+    return texts;
   }
 }

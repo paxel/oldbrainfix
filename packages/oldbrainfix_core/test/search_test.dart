@@ -75,4 +75,52 @@ void main() {
       'sauce in the kitchen',
     ]);
   });
+
+  test('finds a Note by the text of its Amends', () {
+    final note = capture('nees mor sauce');
+    capture('call the garage');
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(note.id, 'Update: bought tomatoes');
+    expect(search.notes('TOMATO').map((n) => n.id), [note.id]);
+  });
+
+  test('finds merged text under the Note it was merged into, once', () {
+    final target = capture('shopping');
+    final merged = capture('nees mor sauce');
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(merged.id, 'and basil');
+    notes.merge(merged.id, target.id);
+    expect(search.notes('sauce').map((n) => n.id), [target.id]);
+    expect(search.notes('basil').map((n) => n.id), [target.id]);
+  });
+
+  test('follows a Merge chain to the Note at its end', () {
+    final first = capture('first');
+    final middle = capture('middle');
+    final last = capture('last sauce');
+    notes.merge(last.id, middle.id);
+    notes.merge(middle.id, first.id);
+    expect(search.notes('sauce').map((n) => n.id), [first.id]);
+  });
+
+  test('Section text of a trashed Note is not found', () {
+    final note = capture('shopping');
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(note.id, 'sauce');
+    notes.trash(note.id);
+    expect(search.notes('sauce'), isEmpty);
+  });
+
+  test('Section text counts only inside the searched Area or Topic', () {
+    final home = places.addArea('Household');
+    final work = places.addArea('Work');
+    final atHome = capture('at home', home.id);
+    final atWork = capture('at work', work.id);
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(atHome.id, 'sauce');
+    notes.amend(atWork.id, 'sauce');
+    expect(search.notes('sauce', within: home.id).map((n) => n.id), [
+      atHome.id,
+    ]);
+  });
 }

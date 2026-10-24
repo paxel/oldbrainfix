@@ -111,5 +111,34 @@
   "noteHere": "Note here",
   "topicChoice": "Topic",
   "mergeInto": "Merge into…",
-  "noOtherNotes": "There is no other Note to merge into."
+  "noOtherNotes": "There is no other Note to merge into.",
+  "locationExplainTitle": "Remember where you were?",
+  "locationExplainBody": "Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. Your location stays on this phone and is never sent anywhere.",
+  "notNow": "Not now",
+  "allowLocation": "Allow",
+  "locationNotAllowed": "Old Brain Fix may not use your location, so it cannot tell where you are. You can allow it in the system settings.",
+  "locationUnknown": "Could not find out where you are. Is location turned on?",
+  "namedPlacesTitle": "Named Places",
+  "noNamedPlacesYet": "No Named Places yet. Go to a spot like Home or Work and tap + to name it.",
+  "newNamedPlace": "Name this place",
+  "editNamedPlace": "Rename or resize",
+  "namedPlaceHint": "Name, like Home",
+  "radiusHeading": "Counts within",
+  "radiusMetres": "{metres} m",
+  "@radiusMetres": {
+    "placeholders": {
+      "metres": {
+        "type": "int"
+      }
+    }
+  },
+  "deleteNamedPlaceQuestion": "Delete the Named Place “{name}”?",
+  "@deleteNamedPlaceQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteNamedPlaceDetail": "Notes captured there show their coordinates again."
 }

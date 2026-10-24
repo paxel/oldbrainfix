@@ -11,7 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A light teal look with a teal accent, anthracite in dark mode; the theme follows the system.
 - Notes show as softly embossed cards over a background of hand-drawn question marks that drift slowly as you scroll and stay still when the system's "remove animations" setting is on.
 - Areas and Topics: make, rename and delete your own Areas and the Topics inside them (two levels), and give an Area a colour and an icon that mark its Notes' cards.
-- The magnifier opens the notes browser: a search field on top finds Notes by their text and shows every hit on one page (✕ clears it); with the field empty it shows your Areas. An Area shows its Topics and its Notes as a diary of cards, newest first; a Topic shows its own. In an Area or Topic, order the cards by time or by Importance and hide the unimportant ones. Inside an Area or Topic the search field only searches its cards.
+- The magnifier opens the notes browser: a search field on top finds Notes by their text, including what was added to them and the Notes merged into them, and shows every hit on one page (✕ clears it); with the field empty it shows your Areas. An Area shows its Topics and its Notes as a diary of cards, newest first; a Topic shows its own. In an Area or Topic, order the cards by time or by Importance and hide the unimportant ones. Inside an Area or Topic the search field only searches its cards.
 - In the notes browser, swipe right to go back (Topic, Area, home screen) and swipe left to go forward into the last Area or Topic you opened, which is highlighted.
 - Every level of the notes browser has a +: a new Area; in an Area a menu offering a Note filed straight into the Area or a new Topic; inside a Topic a new Note filed straight into it.
 - File a Note into an Area or a Topic from its card; a Note that is not filed anywhere shows as Unsorted.
@@ -21,6 +21,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - The editor's trash button deletes a Note: it goes to the trash for 30 days, where it can be restored to where it was, and after that it is gone for good. The trash opens from the top level of the notes browser. A deleted Note no longer counts as Unsorted.
 - Merge a Note into another from its card or its editor: pick the other Note on a page that lists and searches your Notes. The merged Note becomes a dated part of the other one, with its own capture time and everything added to it, and leaves every list and Unsorted.
 - Text you type in a Note's editor is kept even if the app is closed or killed: it is saved when the app goes to the background, and an unsaved draft comes back the next time you open the Note.
+- Every Note remembers where it was captured, and so does everything added to it later. The Note is saved at once; the place is added when the phone knows it, or left out when location is off or not allowed. After your first Note the app explains why and asks for the location once; capturing itself never asks.
+- Named Places: name the spot you are at (Home, Work, Mum's) with a radius from 50 m to 1 km, and rename, resize or delete it later. A Note captured near one shows its name, everywhere else the coordinates; this works offline and your location never leaves the phone. Named Places open from the top of the notes browser for now.
+- Cards show the date, time and place a Note was captured; the editor shows the place for the Note and for each part added to it.
 - On first start, pick from a Starter Set of Areas and Topics (Household, Work, Car, Health), all ticked; everything stays editable afterwards and shows in your language until you rename it.
 
 ---

@@ -24,6 +24,27 @@ class Announcements extends ChangeNotifier {
   }
 }
 
+/// Hands the app's [Announcements] down to every screen.
+class AnnouncementsScope extends InheritedWidget {
+  final Announcements announcements;
+
+  const AnnouncementsScope({
+    super.key,
+    required this.announcements,
+    required super.child,
+  });
+
+  /// The app's [Announcements], if there is an app; read once, so it
+  /// does not listen.
+  static Announcements? of(BuildContext context) => context
+      .getInheritedWidgetOfExactType<AnnouncementsScope>()
+      ?.announcements;
+
+  @override
+  bool updateShouldNotify(AnnouncementsScope oldWidget) =>
+      announcements != oldWidget.announcements;
+}
+
 /// Shows the visible announcement at the top of the screen, under the
 /// status bar, and pushes [child] down below it. Tapping it dismisses
 /// it. Nothing ever comes from the bottom (adapted from Catlog's

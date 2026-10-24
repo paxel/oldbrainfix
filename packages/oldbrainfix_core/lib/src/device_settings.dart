@@ -8,6 +8,7 @@ enum ThemeChoice { system, light, dark }
 extension DeviceSettings on Store {
   static const _theme = 'theme';
   static const _starterSetOffered = 'starterSetOffered';
+  static const _locationExplained = 'locationExplained';
 
   /// The theme override; anything unknown follows the system.
   ThemeChoice get themeChoice =>
@@ -22,4 +23,11 @@ extension DeviceSettings on Store {
 
   set starterSetOffered(bool offered) =>
       setLocalSetting(_starterSetOffered, '$offered');
+
+  /// Whether this Device has already explained why Notes record where
+  /// they were captured and asked for the location permission.
+  bool get locationExplained => localSetting(_locationExplained) == 'true';
+
+  set locationExplained(bool explained) =>
+      setLocalSetting(_locationExplained, '$explained');
 }

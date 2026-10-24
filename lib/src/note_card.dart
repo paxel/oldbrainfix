@@ -19,8 +19,22 @@ PlacedNote placeNote(Places places, Note note) {
   return (note: note, area: area, topic: topic);
 }
 
-/// A Note drawn as a softly embossed card: its text, capture time and
-/// where it is filed. Its Area's colour runs down the left edge and its
+/// [location] as shown: degrees to four places, about ten metres.
+String coordinatesText(Coordinates location) =>
+    '${location.latitude.toStringAsFixed(4)}, '
+    '${location.longitude.toStringAsFixed(4)}';
+
+/// Where [capture] happened as shown on a card: its Named Place, else its
+/// coordinates; null while unknown.
+String? whereCaptured(CaptureContext capture) =>
+    capture.namedPlace?.name ??
+    switch (capture.location) {
+      final location? => coordinatesText(location),
+      null => null,
+    };
+
+/// A Note drawn as a softly embossed card: its text, capture time, the
+/// Named Place or coordinates it was captured at, and where it is filed. Its Area's colour runs down the left edge and its
 /// icon leads the place line. An important Note gets an accent marker
 /// and a stronger emboss, an unimportant one is dimmed (UI laws,
 /// "Cards").
@@ -107,9 +121,25 @@ class NoteCard extends StatelessWidget {
                         children: [
                           Text(note.text, style: text.bodyLarge),
                           const SizedBox(height: 6),
-                          Text(
-                            when.format(note.captured.toLocal()),
-                            style: text.bodySmall,
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            children: [
+                              Text(
+                                when.format(note.captured.toLocal()),
+                                style: text.bodySmall,
+                              ),
+                              if (whereCaptured(note.context)
+                                  case final where?) ...[
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.place_outlined,
+                                  size: 14,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                                Text(where, style: text.bodySmall),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Row(

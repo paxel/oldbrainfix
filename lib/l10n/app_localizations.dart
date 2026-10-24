@@ -559,6 +559,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There is no other Note to merge into.'**
   String get noOtherNotes;
+
+  /// No description provided for @locationExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember where you were?'**
+  String get locationExplainTitle;
+
+  /// No description provided for @locationExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. Your location stays on this phone and is never sent anywhere.'**
+  String get locationExplainBody;
+
+  /// No description provided for @notNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get notNow;
+
+  /// No description provided for @allowLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get allowLocation;
+
+  /// No description provided for @locationNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix may not use your location, so it cannot tell where you are. You can allow it in the system settings.'**
+  String get locationNotAllowed;
+
+  /// No description provided for @locationUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not find out where you are. Is location turned on?'**
+  String get locationUnknown;
+
+  /// No description provided for @namedPlacesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Named Places'**
+  String get namedPlacesTitle;
+
+  /// No description provided for @noNamedPlacesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Named Places yet. Go to a spot like Home or Work and tap + to name it.'**
+  String get noNamedPlacesYet;
+
+  /// No description provided for @newNamedPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Name this place'**
+  String get newNamedPlace;
+
+  /// No description provided for @editNamedPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename or resize'**
+  String get editNamedPlace;
+
+  /// No description provided for @namedPlaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Name, like Home'**
+  String get namedPlaceHint;
+
+  /// No description provided for @radiusHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts within'**
+  String get radiusHeading;
+
+  /// No description provided for @radiusMetres.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m'**
+  String radiusMetres(int metres);
+
+  /// No description provided for @deleteNamedPlaceQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the Named Place “{name}”?'**
+  String deleteNamedPlaceQuestion(String name);
+
+  /// No description provided for @deleteNamedPlaceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes captured there show their coordinates again.'**
+  String get deleteNamedPlaceDetail;
 }
 
 class _AppLocalizationsDelegate

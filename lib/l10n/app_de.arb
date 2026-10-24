@@ -76,5 +76,20 @@
   "noteHere": "Notiz hier",
   "topicChoice": "Thema",
   "mergeInto": "Zusammenführen mit …",
-  "noOtherNotes": "Es gibt keine andere Notiz zum Zusammenführen."
+  "noOtherNotes": "Es gibt keine andere Notiz zum Zusammenführen.",
+  "locationExplainTitle": "Merken, wo du warst?",
+  "locationExplainBody": "Old Brain Fix kann notieren, wo du bist, wenn du eine Notiz erfasst – damit „mehr soße kaufn“ auch Tage später noch Sinn ergibt. Gib deinen Orten eigene Namen wie Zuhause oder Arbeit, dann steht bei einer Notiz „Zuhause“ statt Koordinaten. Dein Standort bleibt auf diesem Handy und wird nirgendwohin gesendet.",
+  "notNow": "Jetzt nicht",
+  "allowLocation": "Erlauben",
+  "locationNotAllowed": "Old Brain Fix darf deinen Standort nicht verwenden und weiß daher nicht, wo du bist. Du kannst ihn in den Systemeinstellungen erlauben.",
+  "locationUnknown": "Konnte nicht herausfinden, wo du bist. Ist der Standort eingeschaltet?",
+  "namedPlacesTitle": "Benannte Orte",
+  "noNamedPlacesYet": "Noch keine benannten Orte. Geh an einen Ort wie Zuhause oder Arbeit und tippe auf +, um ihn zu benennen.",
+  "newNamedPlace": "Diesen Ort benennen",
+  "editNamedPlace": "Umbenennen oder Größe ändern",
+  "namedPlaceHint": "Name, z. B. Zuhause",
+  "radiusHeading": "Zählt im Umkreis von",
+  "radiusMetres": "{metres} m",
+  "deleteNamedPlaceQuestion": "Den benannten Ort „{name}“ löschen?",
+  "deleteNamedPlaceDetail": "Notizen, die dort erfasst wurden, zeigen wieder ihre Koordinaten."
 }

@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'browser.dart';
 import 'drafts.dart';
+import 'location.dart';
 import 'look.dart';
 import 'notes_screen.dart';
 import 'question_mark_background.dart';
@@ -20,11 +21,15 @@ class OldBrainFixApp extends StatefulWidget {
   /// given.
   final Drafts? drafts;
 
+  /// Where the Device is, for the Capture Context; none when not given.
+  final LocationSource location;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
     this.announcements,
     this.drafts,
+    this.location = const NoLocation(),
   });
 
   @override
@@ -69,9 +74,15 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       scroll: _scroll,
       child: AnnouncementStrip(
         announcements: _announcements,
-        child: DraftsScope(
-          drafts: _drafts,
-          child: child ?? const SizedBox.shrink(),
+        child: AnnouncementsScope(
+          announcements: _announcements,
+          child: LocationScope(
+            location: widget.location,
+            child: DraftsScope(
+              drafts: _drafts,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
         ),
       ),
     ),

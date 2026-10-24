@@ -267,4 +267,58 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noOtherNotes => 'Es gibt keine andere Notiz zum Zusammenführen.';
+
+  @override
+  String get locationExplainTitle => 'Merken, wo du warst?';
+
+  @override
+  String get locationExplainBody =>
+      'Old Brain Fix kann notieren, wo du bist, wenn du eine Notiz erfasst – damit „mehr soße kaufn“ auch Tage später noch Sinn ergibt. Gib deinen Orten eigene Namen wie Zuhause oder Arbeit, dann steht bei einer Notiz „Zuhause“ statt Koordinaten. Dein Standort bleibt auf diesem Handy und wird nirgendwohin gesendet.';
+
+  @override
+  String get notNow => 'Jetzt nicht';
+
+  @override
+  String get allowLocation => 'Erlauben';
+
+  @override
+  String get locationNotAllowed =>
+      'Old Brain Fix darf deinen Standort nicht verwenden und weiß daher nicht, wo du bist. Du kannst ihn in den Systemeinstellungen erlauben.';
+
+  @override
+  String get locationUnknown =>
+      'Konnte nicht herausfinden, wo du bist. Ist der Standort eingeschaltet?';
+
+  @override
+  String get namedPlacesTitle => 'Benannte Orte';
+
+  @override
+  String get noNamedPlacesYet =>
+      'Noch keine benannten Orte. Geh an einen Ort wie Zuhause oder Arbeit und tippe auf +, um ihn zu benennen.';
+
+  @override
+  String get newNamedPlace => 'Diesen Ort benennen';
+
+  @override
+  String get editNamedPlace => 'Umbenennen oder Größe ändern';
+
+  @override
+  String get namedPlaceHint => 'Name, z. B. Zuhause';
+
+  @override
+  String get radiusHeading => 'Zählt im Umkreis von';
+
+  @override
+  String radiusMetres(int metres) {
+    return '$metres m';
+  }
+
+  @override
+  String deleteNamedPlaceQuestion(String name) {
+    return 'Den benannten Ort „$name“ löschen?';
+  }
+
+  @override
+  String get deleteNamedPlaceDetail =>
+      'Notizen, die dort erfasst wurden, zeigen wieder ihre Koordinaten.';
 }

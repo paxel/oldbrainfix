@@ -1,3 +1,4 @@
+import 'named_places.dart';
 import 'places.dart';
 import 'store.dart';
 
@@ -7,6 +8,10 @@ abstract final class NoteKeys {
   static const typeNote = 'note';
   static const text = 'text';
   static const captured = 'captured';
+
+  /// Where the Note was captured, as [Coordinates.encode] writes it;
+  /// absent while unknown.
+  static const location = 'location';
 
   /// The Area or Topic the Note is filed in; absent while Unsorted.
   static const place = 'place';
@@ -30,18 +35,33 @@ abstract final class SectionKeys {
   static const note = 'note';
   static const text = 'text';
   static const captured = 'captured';
+
+  /// Where the Section was captured, as for [NoteKeys.location].
+  static const location = 'location';
 }
 
 /// How much a Note matters (CONTEXT.md).
 enum Importance { unimportant, normal, important }
 
 /// What was true when a Note or Section was captured (CONTEXT.md). For
-/// now that is the time; place, source app, calendar event and
+/// now that is the time and where it was; source app, calendar event and
 /// Bluetooth device join later.
 class CaptureContext {
   final DateTime captured;
 
-  const CaptureContext({required this.captured});
+  /// Where it was captured, or null when that is unknown: denied,
+  /// unavailable, or not arrived yet.
+  final Coordinates? location;
+
+  /// The Named Place [location] lies in, resolved when read, so a
+  /// renamed, deleted or new Named Place shows on Notes captured before.
+  final NamedPlace? namedPlace;
+
+  const CaptureContext({
+    required this.captured,
+    this.location,
+    this.namedPlace,
+  });
 }
 
 /// A Note as the screens want it (CONTEXT.md).
@@ -247,6 +267,18 @@ class Notes {
     return sections;
   }
 
+  /// Records where the Note or Section [id] was captured. The position
+  /// arrives after Capture, so it is attached later and never holds the
+  /// Note back.
+  void locate(String id, Coordinates location) {
+    final field = switch (store.current(id, NoteKeys.type)) {
+      NoteKeys.typeNote => NoteKeys.location,
+      SectionKeys.typeSection => SectionKeys.location,
+      _ => throw ArgumentError.value(id, 'id', 'not a Note or Section'),
+    };
+    store.append(id, field, location.encode());
+  }
+
   /// Sets the Importance of the Note [noteId].
   void setImportance(String noteId, Importance importance) {
     _requireNote(noteId);
@@ -322,7 +354,7 @@ class Notes {
     return Note(
       id: id,
       text: fields[NoteKeys.text] ?? '',
-      context: CaptureContext(captured: DateTime.parse(captured)),
+      context: _context(captured, fields[NoteKeys.location]),
       place: place != null && Places(store).isPlace(place) ? place : null,
       importance:
           Importance.values.asNameMap()[fields[NoteKeys.importance]] ??
@@ -392,7 +424,18 @@ class Notes {
       id: id,
       noteId: noteId ?? owner,
       text: fields[SectionKeys.text] ?? '',
-      context: CaptureContext(captured: DateTime.parse(captured)),
+      context: _context(captured, fields[SectionKeys.location]),
+    );
+  }
+
+  /// The Capture Context from the stored capture time and location, with
+  /// the Named Place the location lies in.
+  CaptureContext _context(String captured, String? location) {
+    final at = Coordinates.decode(location);
+    return CaptureContext(
+      captured: DateTime.parse(captured),
+      location: at,
+      namedPlace: at == null ? null : NamedPlaces(store).at(at),
     );
   }
 

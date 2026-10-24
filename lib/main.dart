@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'src/app.dart';
 import 'src/drafts.dart';
+import 'src/location.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,7 @@ Future<void> main() async {
     OldBrainFixApp(
       store: store,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
+      location: const AndroidLocation(),
     ),
   );
 }

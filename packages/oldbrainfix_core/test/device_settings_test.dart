@@ -34,4 +34,13 @@ void main() {
     expect(store.starterSetOffered, isTrue);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
+
+  test('the location is explained until this Device has explained it', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.locationExplained, isFalse);
+    store.locationExplained = true;
+    expect(store.locationExplained, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
 }

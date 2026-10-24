@@ -264,4 +264,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noOtherNotes => 'There is no other Note to merge into.';
+
+  @override
+  String get locationExplainTitle => 'Remember where you were?';
+
+  @override
+  String get locationExplainBody =>
+      'Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. Your location stays on this phone and is never sent anywhere.';
+
+  @override
+  String get notNow => 'Not now';
+
+  @override
+  String get allowLocation => 'Allow';
+
+  @override
+  String get locationNotAllowed =>
+      'Old Brain Fix may not use your location, so it cannot tell where you are. You can allow it in the system settings.';
+
+  @override
+  String get locationUnknown =>
+      'Could not find out where you are. Is location turned on?';
+
+  @override
+  String get namedPlacesTitle => 'Named Places';
+
+  @override
+  String get noNamedPlacesYet =>
+      'No Named Places yet. Go to a spot like Home or Work and tap + to name it.';
+
+  @override
+  String get newNamedPlace => 'Name this place';
+
+  @override
+  String get editNamedPlace => 'Rename or resize';
+
+  @override
+  String get namedPlaceHint => 'Name, like Home';
+
+  @override
+  String get radiusHeading => 'Counts within';
+
+  @override
+  String radiusMetres(int metres) {
+    return '$metres m';
+  }
+
+  @override
+  String deleteNamedPlaceQuestion(String name) {
+    return 'Delete the Named Place “$name”?';
+  }
+
+  @override
+  String get deleteNamedPlaceDetail =>
+      'Notes captured there show their coordinates again.';
 }

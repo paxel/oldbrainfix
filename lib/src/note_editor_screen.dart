@@ -8,6 +8,7 @@ import 'area_look.dart';
 import 'areas_screen.dart';
 import 'drafts.dart';
 import 'l10n.dart';
+import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
@@ -177,8 +178,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
     final trimmed = text?.trim();
     if (!mounted || trimmed == null || trimmed.isEmpty) return;
-    widget.notes.amend(widget.noteId, trimmed);
+    final section = widget.notes.amend(widget.noteId, trimmed);
     _reload();
+    // The Section gets its own location when it arrives, without asking.
+    final here = currentIfGranted(LocationScope.of(context));
+    unawaited(
+      attachLocation(widget.notes, section.id, here).then((located) {
+        if (located && mounted) _reload();
+      }),
+    );
   }
 
   /// Merges the Note, with its text as typed, into the one picked; it
@@ -333,7 +341,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 }
 
 /// The Capture Context of a Note or Section, one line per thing known.
-/// For now that is the time.
+/// For now that is the time and where it was: the Named Place with its
+/// coordinates, or the coordinates alone.
 class CaptureContextLines extends StatelessWidget {
   final CaptureContext capture;
   final DateFormat when;
@@ -347,14 +356,39 @@ class CaptureContextLines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Row(
+    final text = Theme.of(context).textTheme;
+    final location = capture.location;
+    final named = capture.namedPlace;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.schedule, size: 20, color: muted),
-        const SizedBox(width: 8),
-        Text(
-          when.format(capture.captured.toLocal()),
-          style: Theme.of(context).textTheme.bodyMedium,
+        Row(
+          children: [
+            Icon(Icons.schedule, size: 20, color: muted),
+            const SizedBox(width: 8),
+            Text(
+              when.format(capture.captured.toLocal()),
+              style: text.bodyMedium,
+            ),
+          ],
         ),
+        if (location != null) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.place_outlined, size: 20, color: muted),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  named == null
+                      ? coordinatesText(location)
+                      : '${named.name} (${coordinatesText(location)})',
+                  style: text.bodyMedium,
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

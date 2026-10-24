@@ -41,13 +41,11 @@ class _NotesScreenState extends State<NotesScreen> {
   void _reload() => setState(() => _shown = _load());
 
   Future<void> _capture() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => CaptureScreen(notes: widget.notes),
-      ),
-    );
-    if (!mounted) return;
-    _reload();
+    await captureNote(context, widget.notes, onChanged: _reloadIfMounted);
+  }
+
+  void _reloadIfMounted() {
+    if (mounted) _reload();
   }
 
   Future<void> _browse() async {

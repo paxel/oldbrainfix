@@ -9,6 +9,7 @@ import 'file_into_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
+import 'named_places_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'place_names.dart';
@@ -97,6 +98,18 @@ class _AreasScreenState extends State<AreasScreen> {
     if (widget.trail.area(widget.places) case final area?) _open(area);
   }
 
+  /// The Named Places live here until Settings exist.
+  Future<void> _openNamedPlaces() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            NamedPlacesScreen(namedPlaces: NamedPlaces(widget.notes.store)),
+      ),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _openTrash() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -181,6 +194,11 @@ class _AreasScreenState extends State<AreasScreen> {
       appBar: AppBar(
         title: Text(t.areasTitle),
         actions: [
+          IconButton(
+            tooltip: t.namedPlacesTitle,
+            onPressed: _openNamedPlaces,
+            icon: const Icon(Icons.place_outlined),
+          ),
           IconButton(
             tooltip: t.trashTitle,
             onPressed: _openTrash,
@@ -290,6 +308,10 @@ class _AreaScreenState extends State<AreaScreen> {
 
   void _reload() => setState(_load);
 
+  void _reloadIfMounted() {
+    if (mounted) _reload();
+  }
+
   /// "+" opens a menu at the button: a Note filed straight into this
   /// Area, or a new Topic.
   Future<void> _add(BuildContext button) async {
@@ -312,13 +334,13 @@ class _AreaScreenState extends State<AreaScreen> {
     if (!mounted || choice == null) return;
     switch (choice) {
       case _AreaAdd.note:
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) =>
-                CaptureScreen(notes: widget.notes, place: widget.areaId),
-          ),
+        await captureNote(
+          context,
+          widget.notes,
+          place: widget.areaId,
+          onChanged: _reloadIfMounted,
         );
-        if (!mounted) return;
+        return;
       case _AreaAdd.topic:
         final name = await askName(context, title: t.newTopic);
         if (!mounted || name == null) return;
@@ -518,14 +540,16 @@ class _TopicScreenState extends State<TopicScreen> {
   void _reload() => setState(_load);
 
   Future<void> _add() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            CaptureScreen(notes: widget.notes, place: widget.topicId),
-      ),
+    await captureNote(
+      context,
+      widget.notes,
+      place: widget.topicId,
+      onChanged: _reloadIfMounted,
     );
-    if (!mounted) return;
-    _reload();
+  }
+
+  void _reloadIfMounted() {
+    if (mounted) _reload();
   }
 
   Future<void> _file(Note note) async {
