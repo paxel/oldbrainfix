@@ -4,5 +4,6 @@
   "noNotesYet": "Noch nichts erfasst. Tippe auf +, um einen Gedanken festzuhalten.",
   "captureTooltip": "Notiz erfassen",
   "captureHint": "Was geht dir durch den Kopf?",
-  "save": "Speichern"
+  "save": "Speichern",
+  "dismissAnnouncement": "Ausblenden"
 }

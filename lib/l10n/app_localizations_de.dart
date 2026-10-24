@@ -24,4 +24,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get save => 'Speichern';
+
+  @override
+  String get dismissAnnouncement => 'Ausblenden';
 }

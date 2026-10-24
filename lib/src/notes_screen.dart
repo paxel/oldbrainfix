@@ -4,6 +4,8 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'capture_screen.dart';
 import 'l10n.dart';
+import 'look.dart';
+import 'note_card.dart';
 
 /// The list of captured Notes, newest first, with "+" to capture.
 class NotesScreen extends StatefulWidget {
@@ -39,16 +41,18 @@ class _NotesScreenState extends State<NotesScreen> {
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(t.noNotesYet, textAlign: TextAlign.center),
+                child: Embossed(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(t.noNotesYet, textAlign: TextAlign.center),
+                  ),
+                ),
               ),
             )
           : ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                for (final note in _notes)
-                  ListTile(
-                    title: Text(note.text),
-                    subtitle: Text(when.format(note.captured.toLocal())),
-                  ),
+                for (final note in _notes) NoteCard(note: note, when: when),
               ],
             ),
       floatingActionButton: FloatingActionButton(

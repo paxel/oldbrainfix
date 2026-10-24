@@ -4,5 +4,6 @@
   "noNotesYet": "Nothing captured yet. Tap + to capture a thought.",
   "captureTooltip": "Capture a Note",
   "captureHint": "What's on your mind?",
-  "save": "Save"
+  "save": "Save",
+  "dismissAnnouncement": "Dismiss"
 }

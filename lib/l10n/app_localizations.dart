@@ -127,6 +127,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get save;
+
+  /// No description provided for @dismissAnnouncement.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get dismissAnnouncement;
 }
 
 class _AppLocalizationsDelegate
