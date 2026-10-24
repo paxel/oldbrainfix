@@ -1,0 +1,29 @@
+name: oldbrainfix
+description: "Old Brain Fix — capture a thought in one tap, get nagged until it is sorted or done."
+publish_to: 'none'
+
+# App version. Keep in sync with CHANGELOG.md.
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  oldbrainfix_core:
+    path: packages/oldbrainfix_core
+  intl: any
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true

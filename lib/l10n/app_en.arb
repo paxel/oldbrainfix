@@ -1,0 +1,8 @@
+{
+  "@@locale": "en",
+  "appTitle": "Old Brain Fix",
+  "noNotesYet": "Nothing captured yet. Tap + to capture a thought.",
+  "captureTooltip": "Capture a Note",
+  "captureHint": "What's on your mind?",
+  "save": "Save"
+}
