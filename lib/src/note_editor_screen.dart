@@ -13,6 +13,7 @@ import 'location.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
 import 'note_card.dart';
+import 'ocr_platform.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
@@ -39,8 +40,9 @@ Future<void> openNote(
 
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its photos at full width, each opening full screen when
-/// tapped, a play button per voice recording with its Transcript under
-/// it, its Importance, its Capture Context and where it is filed,
+/// tapped and with its Photo Text under it, a play button per voice
+/// recording with its Transcript under it, its Importance, its Capture
+/// Context and where it is filed,
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
 /// spawn one from it; "merge into…" merges it into another Note; the
@@ -321,6 +323,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 hash: hash,
                 onTap: () => viewPhoto(context, hash),
               ),
+              PhotoText(
+                key: ValueKey('ocr:$hash'),
+                noteId: note.id,
+                hash: hash,
+                photoText: note.photoTexts[hash],
+              ),
             ],
             for (final hash in note.recordings) ...[
               const SizedBox(height: 16),
@@ -450,6 +458,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         key: ValueKey(hash),
                         hash: hash,
                         onTap: () => viewPhoto(context, hash),
+                      ),
+                      PhotoText(
+                        key: ValueKey('ocr:$hash'),
+                        noteId: section.id,
+                        hash: hash,
+                        photoText: section.photoTexts[hash],
                       ),
                     ],
                     for (final hash in section.recordings) ...[

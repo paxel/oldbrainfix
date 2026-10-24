@@ -18,3 +18,5 @@ decisions in [docs/adr](docs/adr), the plan in the GitHub issues.
 
 Dual-licensed under [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
 your option.
+The bundled ocrs text recognition models are CC BY-SA 4.0; see
+[their NOTICE](android/app/src/main/assets/ocrs/NOTICE).

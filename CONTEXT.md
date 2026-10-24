@@ -25,6 +25,10 @@ _Avoid_: location, geofence, favourite
 **Transcript**:
 Text recognised from a Note's voice recording, kept next to the recording, never replacing it.
 
+**Photo Text**:
+Text recognised in a Note's photo or screenshot, kept next to the photo, never replacing it.
+_Avoid_: OCR (in the UI), caption
+
 **Section**:
 A dated part of a Note, added by Amend or Merge, carrying its own Capture Context.
 _Avoid_: comment, update, revision

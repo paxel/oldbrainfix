@@ -47,6 +47,9 @@ class MainActivity : FlutterActivity() {
     /** The answer to the speech model's "pick", until the file picker comes back. */
     private var modelAnswer: MethodChannel.Result? = null
 
+    /** ocrs and its bundled models for the Photo Texts of photos. */
+    private val ocr by lazy { Ocr(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
@@ -193,6 +196,20 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "supported" -> result.success(OcrNative.loaded)
+                    "read" -> ocr.read(call.arguments as ByteArray) {
+                        runOnUiThread { result.success(it) }
+                    }
+                    "idle" -> {
+                        ocr.idle()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         captureChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CAPTURE_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -291,6 +308,7 @@ class MainActivity : FlutterActivity() {
         if (active === this) active = null
         voice.release()
         speech.release()
+        ocr.release()
         super.onDestroy()
     }
 
@@ -460,6 +478,7 @@ class MainActivity : FlutterActivity() {
         private const val VOICE_CHANNEL = "io.github.paxel.oldbrainfix/voice"
         private const val CAPTURE_CHANNEL = "io.github.paxel.oldbrainfix/capture"
         private const val SPEECH_CHANNEL = "io.github.paxel.oldbrainfix/speech"
+        private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3

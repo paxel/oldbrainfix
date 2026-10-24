@@ -43,6 +43,14 @@ jobs:
         with:
           channel: stable
           cache: true
+      # ocrs for Photo Texts is Rust, cross-built by the APK build.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+      - run: cargo install cargo-ndk --locked --version 4.1.2
+      - name: OCR library — unit tests
+        working-directory: android/ocr
+        run: cargo test --locked
       - run: flutter pub get
       - run: flutter build apk --debug
       - name: Kotlin unit tests

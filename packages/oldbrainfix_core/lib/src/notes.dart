@@ -62,6 +62,14 @@ abstract final class NoteKeys {
 
   static String transcript(String hash) => '$transcriptPrefix$hash';
 
+  /// The Photo Text of a photo, `ocr:<hash>` = the text ocrs recognised
+  /// in it, on the Note holding `photo:<hash>`, next to the photo and
+  /// never in its place (CONTEXT.md). An empty text means no text was
+  /// found; absent means not read (yet).
+  static const ocrPrefix = 'ocr:';
+
+  static String ocr(String hash) => '$ocrPrefix$hash';
+
   /// The app something was shared in from, as [SourceApp.package] and
   /// [SourceApp.label]; absent for anything not shared in, or when the
   /// platform did not say.
@@ -218,6 +226,10 @@ class Note {
   /// recording not transcribed yet has none.
   final Map<String, String> transcripts;
 
+  /// The Photo Texts of its photos, by photo hash; a photo not read yet
+  /// has none.
+  final Map<String, String> photoTexts;
+
   const Note({
     required this.id,
     required this.text,
@@ -231,6 +243,7 @@ class Note {
     this.photos = const [],
     this.recordings = const [],
     this.transcripts = const {},
+    this.photoTexts = const {},
   });
 
   /// When the Note was captured.
@@ -269,6 +282,10 @@ class Section {
   /// [Note.transcripts].
   final Map<String, String> transcripts;
 
+  /// The Photo Texts of [photos], by photo hash, as for
+  /// [Note.photoTexts].
+  final Map<String, String> photoTexts;
+
   const Section({
     required this.id,
     required this.noteId,
@@ -277,6 +294,7 @@ class Section {
     this.photos = const [],
     this.recordings = const [],
     this.transcripts = const {},
+    this.photoTexts = const {},
   });
 }
 
@@ -426,6 +444,33 @@ class Notes {
     ];
   }
 
+  /// Keeps [text] as the Photo Text of the photo [hash] of the Note
+  /// [noteId], a merged one included, next to the photo; the photo stays
+  /// as it is. An empty [text] records that no text was found, so the
+  /// photo is not read again.
+  void setPhotoText(String noteId, String hash, String text) {
+    if (byId(noteId)?.photos.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a photo of $noteId');
+    }
+    store.append(noteId, NoteKeys.ocr(hash), text.trim());
+  }
+
+  /// The photos without a Photo Text, newest capture first: those of
+  /// every Note not in the trash, merged ones included.
+  List<({String noteId, String hash})> unreadPhotos() {
+    final notes = [
+      for (final id in store.entitiesOfType(NoteKeys.typeNote))
+        if (byId(id) case final note? when !note.isTrashed)
+          if (note.photos.any((h) => !note.photoTexts.containsKey(h))) note,
+    ];
+    notes.sort((a, b) => b.captured.compareTo(a.captured));
+    return [
+      for (final note in notes)
+        for (final hash in note.photos)
+          if (!note.photoTexts.containsKey(hash)) (noteId: note.id, hash: hash),
+    ];
+  }
+
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
   /// wherever it was before.
   void file(String noteId, String placeId) {
@@ -518,6 +563,7 @@ class Notes {
             photos: note.photos,
             recordings: note.recordings,
             transcripts: note.transcripts,
+            photoTexts: note.photoTexts,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -663,6 +709,11 @@ class Notes {
         for (final MapEntry(:key, :value) in fields.entries)
           if (key.startsWith(NoteKeys.transcriptPrefix) && value != null)
             key.substring(NoteKeys.transcriptPrefix.length): value,
+      },
+      photoTexts: {
+        for (final MapEntry(:key, :value) in fields.entries)
+          if (key.startsWith(NoteKeys.ocrPrefix) && value != null)
+            key.substring(NoteKeys.ocrPrefix.length): value,
       },
     );
   }

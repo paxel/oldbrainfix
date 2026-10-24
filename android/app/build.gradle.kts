@@ -1,3 +1,5 @@
+import javax.inject.Inject
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -53,11 +55,97 @@ android {
     }
 }
 
-// A debug build is for a 64-bit phone or the emulator: Whisper is built
-// for arm64-v8a only there, which halves the native build.
+// A debug build is for a 64-bit phone or the emulator: Whisper and ocrs
+// are built for arm64-v8a only there, which halves the native build.
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.externalNativeBuild?.abiFilters?.set(setOf("arm64-v8a"))
+    }
+    onVariants { variant ->
+        val ocr = rootProject.layout.projectDirectory.dir("ocr")
+        val task = tasks.register<CargoNdk>(
+            "cargoNdk" + variant.name.replaceFirstChar { it.uppercase() },
+        ) {
+            crate.set(ocr)
+            sources.from(ocr.dir("src"), ocr.file("Cargo.toml"), ocr.file("Cargo.lock"))
+            abis.set(
+                if (variant.buildType == "debug") {
+                    listOf("arm64-v8a")
+                } else {
+                    listOf("arm64-v8a", "armeabi-v7a")
+                },
+            )
+            platform.set(flutter.minSdkVersion)
+            ndk.set(androidComponents.sdkComponents.ndkDirectory.map { it.asFile.absolutePath })
+            targetDir.set(layout.buildDirectory.dir("ocr/target"))
+        }
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(task, CargoNdk::outputDir)
+    }
+}
+
+/**
+ * ocrs for Photo Texts (ADR 0007): the Rust library in android/ocr,
+ * cross-built with cargo-ndk into liboldbrainfix_ocr.so per ABI. Always
+ * optimised, in debug builds too: ocrs is far too slow otherwise. At most
+ * two compile jobs, so the build never takes the machine down. Up to
+ * date, and not run, while the crate's sources and lock file stay the
+ * same; cargo's own target directory keeps the rest incremental.
+ */
+abstract class CargoNdk @Inject constructor(
+    private val exec: ExecOperations,
+    private val files: FileSystemOperations,
+) : DefaultTask() {
+    @get:Internal
+    abstract val crate: DirectoryProperty
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:Input
+    abstract val abis: ListProperty<String>
+
+    @get:Input
+    abstract val platform: Property<Int>
+
+    @get:Input
+    abstract val ndk: Property<String>
+
+    @get:Internal
+    abstract val targetDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun build() {
+        val target = targetDir.get().asFile
+        exec.exec {
+            workingDir = crate.get().asFile
+            environment("ANDROID_NDK_HOME", ndk.get())
+            environment("CARGO_TARGET_DIR", target.absolutePath)
+            commandLine(
+                listOf("cargo", "ndk", "--platform", platform.get().toString()) +
+                    abis.get().flatMap { listOf("--target", it) } +
+                    listOf("build", "--release", "--locked", "-j", "2"),
+            )
+        }
+        files.sync {
+            for (abi in abis.get()) {
+                from(File(target, "${TRIPLES.getValue(abi)}/release/liboldbrainfix_ocr.so")) {
+                    into(abi)
+                }
+            }
+            into(outputDir)
+        }
+    }
+
+    companion object {
+        /** The Rust target of each Android ABI built. */
+        val TRIPLES = mapOf(
+            "arm64-v8a" to "aarch64-linux-android",
+            "armeabi-v7a" to "armv7-linux-androideabi",
+        )
     }
 }
 

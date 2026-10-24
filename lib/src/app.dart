@@ -16,6 +16,7 @@ import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
 import 'nudge_screen.dart';
+import 'ocr_platform.dart';
 import 'photo_platform.dart';
 import 'question_mark_background.dart';
 import 'ring_screen.dart';
@@ -60,6 +61,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// Whisper and its model for Transcripts; none when not given.
   final SpeechPlatform speech;
 
+  /// ocrs for Photo Texts; none when not given.
+  final OcrPlatform ocr;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -72,6 +76,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.context = const NoContext(),
     this.requests = const NoCaptureRequests(),
     this.speech = const NoSpeech(),
+    this.ocr = const NoOcr(),
   });
 
   @override
@@ -95,6 +100,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   );
   late final _speechModel = SpeechModel(widget.speech);
   late final Transcriber _transcriber;
+  late final PhotoReader _photoReader;
 
   @override
   void initState() {
@@ -114,6 +120,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       platform: widget.speech,
     );
     unawaited(_speechModel.check());
+    // Photo Texts come in the background too, never holding Capture up.
+    _photoReader = PhotoReader(notes: _notes, platform: widget.ocr);
   }
 
   @override
@@ -122,6 +130,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _playback.dispose();
     _transcriber.dispose();
     _speechModel.dispose();
+    _photoReader.dispose();
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
@@ -155,9 +164,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                   child: SpeechScope(
                     model: _speechModel,
                     transcriber: _transcriber,
-                    child: DraftsScope(
-                      drafts: _drafts,
-                      child: child ?? const SizedBox.shrink(),
+                    child: PhotoReaderScope(
+                      reader: _photoReader,
+                      child: DraftsScope(
+                        drafts: _drafts,
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   ),
                 ),

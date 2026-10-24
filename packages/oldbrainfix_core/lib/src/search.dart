@@ -2,18 +2,18 @@ import 'notes.dart';
 import 'store.dart';
 
 /// Finding Notes by what they say: their text, the Transcripts of their
-/// voice recordings and the same of their Sections (Amends and merged
-/// Notes). OCR text and Capture Context join later.
+/// voice recordings, the Photo Texts of their photos and the same of
+/// their Sections (Amends and merged Notes). Capture Context joins later.
 class Search {
   final Store store;
 
   Search(this.store);
 
-  /// The Notes whose text or Transcripts, or those of one of their
-  /// Sections, hold [query], ignoring case, newest capture first. The query counts as
-  /// typed, inner spaces included; only its ends are trimmed, and a
-  /// blank one finds everything. With [within], only the Notes inside
-  /// that Area or Topic count (an Area's Topics included).
+  /// The Notes whose text, Transcripts or Photo Texts, or those of one of
+  /// their Sections, hold [query], ignoring case, newest capture first.
+  /// The query counts as typed, inner spaces included; only its ends are
+  /// trimmed, and a blank one finds everything. With [within], only the
+  /// Notes inside that Area or Topic count (an Area's Topics included).
   List<Note> notes(String query, {String? within}) {
     final notes = Notes(store);
     final scope = within == null ? notes.all() : notes.inside(within);
@@ -25,14 +25,16 @@ class Search {
       for (final note in scope)
         if (holds(note.text) ||
             note.transcripts.values.any(holds) ||
+            note.photoTexts.values.any(holds) ||
             (sections[note.id] ?? const []).any(holds))
           note,
     ];
   }
 
   /// The texts of every Section, by the Note they show under, read in one
-  /// pass: a merged Note's text and Transcripts under the end of its Merge
-  /// chain, an Amend under its Note, or where that Note was merged into.
+  /// pass: a merged Note's text, Transcripts and Photo Texts under the end
+  /// of its Merge chain, an Amend under its Note, or where that Note was
+  /// merged into.
   Map<String, List<String>> _sectionTexts(Notes notes) {
     final texts = <String, List<String>>{};
     for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
@@ -40,8 +42,13 @@ class Search {
         mergedInto: final into?,
         :final text,
         :final transcripts,
+        :final photoTexts,
       )) {
-        (texts[into] ??= []).addAll([text, ...transcripts.values]);
+        (texts[into] ??= []).addAll([
+          text,
+          ...transcripts.values,
+          ...photoTexts.values,
+        ]);
       }
     }
     for (final id in store.entitiesOfType(SectionKeys.typeSection)) {

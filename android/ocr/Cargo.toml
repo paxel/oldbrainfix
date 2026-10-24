@@ -1,0 +1,31 @@
+[package]
+name = "oldbrainfix_ocr"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Text in photos for Old Brain Fix on Android: ocrs behind JNI (ADR 0007)."
+publish = false
+
+[lib]
+# liboldbrainfix_ocr.so, loaded by OcrNative in the app.
+crate-type = ["cdylib"]
+
+[dependencies]
+# Only the .rten model format: the bundled models are .rten, so the ONNX
+# parser is not built in.
+ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
+rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
+jni = "0.21.1"
+
+[dev-dependencies]
+image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+panic = "unwind"
+strip = true
+
+# ocrs is far too slow unoptimised, also in `cargo test`.
+[profile.dev.package."*"]
+opt-level = 3

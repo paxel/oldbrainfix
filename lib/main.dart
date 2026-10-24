@@ -10,6 +10,7 @@ import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/drafts.dart';
 import 'src/location.dart';
+import 'src/ocr_platform.dart';
 import 'src/photo_platform.dart';
 import 'src/speech_platform.dart';
 import 'src/voice_platform.dart';
@@ -29,6 +30,7 @@ Future<void> main() async {
       context: const AndroidContext(),
       requests: AndroidCaptureRequests(),
       speech: AndroidSpeech(),
+      ocr: const AndroidOcr(),
     ),
   );
 }
