@@ -15,6 +15,7 @@ import 'note_editor_screen.dart';
 import 'notes_screen.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
+import 'share_area_screen.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
@@ -39,6 +40,11 @@ class AreasScreen extends StatefulWidget {
 class _AreasScreenState extends State<AreasScreen> {
   final _query = TextEditingController();
   List<Area> _areas = const [];
+
+  /// What this Device may do in each Area, and who shares the shared
+  /// ones (ADR 0013).
+  Map<String, AreaAccess> _access = const {};
+  Map<String, List<Person>> _people = const {};
   List<PlacedNote> _hits = const [];
   bool _loaded = false;
 
@@ -67,6 +73,12 @@ class _AreasScreenState extends State<AreasScreen> {
           a,
         ).toLowerCase().compareTo(areaName(t, b).toLowerCase()),
       );
+    final store = widget.places.store;
+    _access = {for (final a in _areas) a.id: store.accessIn(a.id)};
+    _people = {
+      for (final a in _areas)
+        if (store.isShared(a.id)) a.id: store.people(a.id),
+    };
     _hits = _search(widget.places, _query.text, lock: LockScope.of(context));
   }
 
@@ -184,6 +196,22 @@ class _AreasScreenState extends State<AreasScreen> {
         final go = await confirmDeleteArea(context, widget.places, area);
         if (!mounted || go == null) return;
         widget.places.deleteArea(area.id, go);
+      case _AreaAction.share:
+        await Navigator.of(context).push(
+          MaterialPageRoute<bool>(
+            builder: (_) =>
+                ShareAreaScreen(store: widget.places.store, areaId: area.id),
+          ),
+        );
+        if (!mounted) return;
+      case _AreaAction.people:
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                PeopleScreen(store: widget.places.store, areaId: area.id),
+          ),
+        );
+        if (!mounted) return;
     }
     _reload();
   }
@@ -196,20 +224,43 @@ class _AreasScreenState extends State<AreasScreen> {
       for (final area in _areas)
         _PlaceRow(
           title: areaName(t, area),
+          subtitle: _people[area.id] == null
+              ? null
+              : [
+                  for (final p in _people[area.id] ?? const <Person>[])
+                    p.name.isEmpty ? t.peopleNoName : p.name,
+                ].join(', '),
           leading: _AreaMark(area: area),
           locked: lock?.isAreaClosed(area.id) ?? false,
+          shared: _people.containsKey(area.id),
           highlighted: area.id == last,
           onTap: () => _open(area),
-          menu: PopupMenuButton<_AreaAction>(
-            onSelected: (action) => _act(area, action),
-            itemBuilder: (_) => [
-              PopupMenuItem(value: _AreaAction.rename, child: Text(t.rename)),
-              PopupMenuItem(value: _AreaAction.look, child: Text(t.areaLook)),
-              PopupMenuItem(value: _AreaAction.delete, child: Text(t.delete)),
-            ],
-          ),
+          menu: _areaMenu(t, area),
         ),
     ];
+  }
+
+  /// What may be done to [area] here: everything by its owner or a
+  /// Manager, only seeing who is in by anyone else.
+  Widget _areaMenu(AppLocalizations t, Area area) {
+    final access = _access[area.id] ?? AreaAccess.owner;
+    final manages = access == AreaAccess.owner || access == AreaAccess.manager;
+    final shared = _people.containsKey(area.id);
+    return PopupMenuButton<_AreaAction>(
+      key: ValueKey('area-menu-${area.id}'),
+      onSelected: (action) => _act(area, action),
+      itemBuilder: (_) => [
+        if (manages) ...[
+          PopupMenuItem(value: _AreaAction.rename, child: Text(t.rename)),
+          PopupMenuItem(value: _AreaAction.look, child: Text(t.areaLook)),
+          PopupMenuItem(value: _AreaAction.share, child: Text(t.shareArea)),
+        ],
+        if (shared)
+          PopupMenuItem(value: _AreaAction.people, child: Text(t.peopleTitle)),
+        if (manages)
+          PopupMenuItem(value: _AreaAction.delete, child: Text(t.delete)),
+      ],
+    );
   }
 
   @override
@@ -268,7 +319,7 @@ class _AreasScreenState extends State<AreasScreen> {
   }
 }
 
-enum _AreaAction { rename, look, delete }
+enum _AreaAction { rename, look, share, people, delete }
 
 enum _TopicAction { rename, delete }
 
@@ -304,6 +355,11 @@ class _AreaScreenState extends State<AreaScreen> {
   bool _hideUnimportant = false;
   bool _loaded = false;
 
+  /// Whether this Device may change the Area and its Topics, and write
+  /// in it at all (ADR 0013).
+  bool _manages = true;
+  bool _writes = true;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -323,6 +379,8 @@ class _AreaScreenState extends State<AreaScreen> {
   void _load() {
     final t = context.t;
     _area = widget.places.areaById(widget.areaId);
+    _manages = widget.places.store.mayManage(widget.areaId);
+    _writes = widget.places.store.mayWriteIn(widget.areaId);
     _topics = widget.places.topics(widget.areaId)
       ..sort(
         (a, b) => topicName(
@@ -350,6 +408,16 @@ class _AreaScreenState extends State<AreaScreen> {
   /// Area, or a new Topic.
   Future<void> _add(BuildContext button) async {
     final t = context.t;
+    if (!_manages) {
+      // A Member adds Notes only.
+      await captureNote(
+        context,
+        widget.notes,
+        place: widget.areaId,
+        onChanged: _reloadIfMounted,
+      );
+      return;
+    }
     final box = button.findRenderObject() as RenderBox?;
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -469,13 +537,21 @@ class _AreaScreenState extends State<AreaScreen> {
           title: topicName(t, topic),
           highlighted: topic.id == last,
           onTap: () => _open(topic),
-          menu: PopupMenuButton<_TopicAction>(
-            onSelected: (action) => _act(area, topic, action),
-            itemBuilder: (_) => [
-              PopupMenuItem(value: _TopicAction.rename, child: Text(t.rename)),
-              PopupMenuItem(value: _TopicAction.delete, child: Text(t.delete)),
-            ],
-          ),
+          menu: !_manages
+              ? null
+              : PopupMenuButton<_TopicAction>(
+                  onSelected: (action) => _act(area, topic, action),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: _TopicAction.rename,
+                      child: Text(t.rename),
+                    ),
+                    PopupMenuItem(
+                      value: _TopicAction.delete,
+                      child: Text(t.delete),
+                    ),
+                  ],
+                ),
         ),
       ...diaryCards(
         context,
@@ -538,13 +614,15 @@ class _AreaScreenState extends State<AreaScreen> {
           ],
         ),
       ),
-      floatingActionButton: Builder(
-        builder: (button) => FloatingActionButton(
-          tooltip: t.addHere,
-          onPressed: () => _add(button),
-          child: const Icon(Icons.add),
-        ),
-      ),
+      floatingActionButton: !_writes
+          ? null
+          : Builder(
+              builder: (button) => FloatingActionButton(
+                tooltip: t.addHere,
+                onPressed: () => _add(button),
+                child: const Icon(Icons.add),
+              ),
+            ),
     );
   }
 }
@@ -586,8 +664,12 @@ class _TopicScreenState extends State<TopicScreen> {
     super.dispose();
   }
 
+  /// Whether this Device may write in the Topic's Area (ADR 0013).
+  bool _writes = true;
+
   void _load() {
     _topic = widget.places.topicById(widget.topicId);
+    _writes = widget.places.store.mayWriteIn(widget.topicId);
     _diary = _search(
       widget.places,
       _query.text,
@@ -703,11 +785,13 @@ class _TopicScreenState extends State<TopicScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: t.captureTooltip,
-        onPressed: _add,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: !_writes
+          ? null
+          : FloatingActionButton(
+              tooltip: t.captureTooltip,
+              onPressed: _add,
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }
@@ -784,9 +868,14 @@ class _AreaMark extends StatelessWidget {
 /// One Area or Topic as an embossed row with its menu.
 class _PlaceRow extends StatelessWidget {
   final String title;
+
+  /// Under the title: who a Shared Area is shared with.
+  final String? subtitle;
   final Widget? leading;
   final VoidCallback? onTap;
-  final Widget menu;
+
+  /// What may be done to it; none for a Member.
+  final Widget? menu;
 
   /// The last selected one, where swipe left leads: ringed in the accent.
   final bool highlighted;
@@ -794,13 +883,18 @@ class _PlaceRow extends StatelessWidget {
   /// A locked Area that is closed: a padlock says so.
   final bool locked;
 
+  /// A Shared Area: two people say so.
+  final bool shared;
+
   const _PlaceRow({
     required this.title,
     required this.menu,
+    this.subtitle,
     this.leading,
     this.onTap,
     this.highlighted = false,
     this.locked = false,
+    this.shared = false,
   });
 
   @override
@@ -832,17 +926,35 @@ class _PlaceRow extends StatelessWidget {
                     const SizedBox(width: 16),
                   ],
                   Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (subtitle case final subtitle?)
+                          Text(
+                            subtitle,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                      ],
                     ),
                   ),
+                  if (shared)
+                    Icon(
+                      Icons.people_outline,
+                      semanticLabel: context.t.areaShared,
+                    ),
                   if (locked)
                     Icon(
                       Icons.lock_outline,
                       semanticLabel: context.t.areaLocked,
                     ),
-                  menu,
+                  if (menu case final menu?)
+                    menu
+                  else
+                    const SizedBox(width: 48, height: 48),
                 ],
               ),
             ),

@@ -48,6 +48,9 @@ class TestHost {
   final sessions = <SyncSession>[];
   final bodies = <Map<String, Object?>>[];
 
+  /// The invite this host hands out, as one inviting to a Shared Area.
+  Invite? inviting;
+
   /// Every request that reached the host, and the nonces it handed out.
   var requests = 0;
   final nonces = <String>[];
@@ -111,19 +114,33 @@ class TestHost {
       if (req.method == 'GET' && path == '/vector') {
         res.headers.set(formatHeader, '$syncFormat');
         res.headers.set(deviceHeader, store.deviceId);
+        if (inviting != null) res.headers.set(inviteHeader, '1');
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(store.versionVector()));
       } else if (req.method == 'POST' && path == '/sync') {
         final sent = (jsonDecode(utf8.decode(body)) as Map)
             .cast<String, Object?>();
         bodies.add(sent);
-        final done = answerSync(store, sent, name: name);
+        final done = answerSync(store, sent, name: name, inviting: inviting);
         if (done == null) {
           res.statusCode = HttpStatus.forbidden;
           res.write(jsonEncode({'refusal': 'format', 'format': syncFormat}));
           return;
         }
         sessions.add(done.session);
+        if (done.session.sharedArea != null) {
+          store.rememberDevice(
+            PairedDevice(
+              id: done.session.peer,
+              name: done.session.name,
+              fingerprint: '',
+              host: null,
+              port: null,
+              lastSync: store.clock(),
+              shared: true,
+            ),
+          );
+        }
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(done.answer));
       } else if (path.startsWith('/blob/')) {

@@ -228,6 +228,13 @@ impl<'a> Notes<'a> {
         {
             return Err(Error::Invalid(format!("not an Area or Topic: {place}")));
         }
+        if let Some(place) = place
+            && !self.store.may_write_in(place)?
+        {
+            return Err(Error::Invalid(format!(
+                "no role in the Shared Area of {place}"
+            )));
+        }
         let id = format!("note:{}", self.store.new_id()?);
         let now = self.store.now();
         let at = Some(now);
@@ -399,6 +406,11 @@ impl<'a> Notes<'a> {
     /// captured at the store's now.
     pub fn amend(&self, note_id: &str, text: &str) -> Result<Section> {
         self.require_note(note_id)?;
+        if !self.store.may_write_in(note_id)? {
+            return Err(Error::Invalid(format!(
+                "no role in the Shared Area of {note_id}"
+            )));
+        }
         let text = Self::text(text)?;
         let id = format!("section:{}", self.store.new_id()?);
         let now = self.store.now();

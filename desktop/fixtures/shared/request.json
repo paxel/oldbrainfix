@@ -1,0 +1,19 @@
+{
+  "format": 3,
+  "deviceId": "c945cbf2a5602002141e2fb9d17054d6",
+  "name": "Phone",
+  "proof": "5j6AQVNKnP9PSJglUkHC60PclIm7BM755EuZncibvM5rQ4PBVOjrsW0mbmJzUSA2/VdSo5LeYrpH3Fr4IYGwAg==",
+  "vector": {
+    "c945cbf2a5602002141e2fb9d17054d6": 3
+  },
+  "entries": [],
+  "keys": [
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ],
+  "areaKeys": [],
+  "invited": true
+}

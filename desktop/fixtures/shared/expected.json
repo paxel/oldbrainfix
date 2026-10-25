@@ -1,0 +1,919 @@
+{
+  "area": "area:00000000000000000000000000000101",
+  "person": "c945cbf2a5602002141e2fb9d17054d6",
+  "ids": 256,
+  "keysAfterShare": [
+    [
+      "areakey:091829fce9ffd70f",
+      "{\"key\":\"gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:433b042ce43517cc",
+      "{\"key\":\"FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ=\",\"scope\":\"area:00000000000000000000000000000101\"}"
+    ],
+    [
+      "areakey:666ca2d92a14e93f",
+      "{\"key\":\"pqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMU=\",\"scope\":\"area:starter-health\"}"
+    ],
+    [
+      "areakey:772c696bbf5e6f98",
+      "{\"key\":\"y8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6eo=\",\"scope\":\"area:starter-household\"}"
+    ]
+  ],
+  "shareAt": "2026-02-01T09:00:00.000Z",
+  "sessionAt": "2026-02-01T10:00:00.000Z",
+  "syncAt": "2026-02-01T12:00:00.000Z",
+  "roleAt": "2026-02-01T13:00:00.000Z",
+  "promoteSyncAt": "2026-02-01T13:15:00.000Z",
+  "managerSyncAt": "2026-02-01T13:45:00.000Z",
+  "removeAt": "2026-02-01T14:00:00.000Z",
+  "lastAt": "2026-02-01T15:00:00.000Z",
+  "afterInvite": {
+    "host": {
+      "now": "2026-02-01T10:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:starter-health",
+          "name": "Health",
+          "starter": "health",
+          "colour": null,
+          "icon": null,
+          "topics": []
+        },
+        {
+          "id": "area:00000000000000000000000000000101",
+          "name": "Household",
+          "starter": "household",
+          "colour": null,
+          "icon": null,
+          "topics": [
+            {
+              "id": "topic:00000000000000000000000000000102",
+              "areaId": "area:00000000000000000000000000000101",
+              "name": "Kitchen",
+              "starter": "kitchen"
+            }
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000001",
+          "text": "Buy milk",
+          "captured": "2026-01-01T10:00:11.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000003",
+          "text": "Blood results",
+          "captured": "2026-01-01T10:00:23.000Z",
+          "place": "area:starter-health",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000004",
+          "text": "Fix the tap",
+          "captured": "2026-01-01T10:00:28.000Z",
+          "place": null,
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000004",
+        "note:00000000000000000000000000000003",
+        "note:00000000000000000000000000000001"
+      ],
+      "unsorted": [
+        "note:00000000000000000000000000000004"
+      ],
+      "trashed": [],
+      "inside": {
+        "area:starter-health": [
+          "note:00000000000000000000000000000003"
+        ],
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000004": [
+          {
+            "id": "section:00000000000000000000000000000005",
+            "noteId": "note:00000000000000000000000000000004",
+            "text": "The hot one",
+            "captured": "2026-01-01T10:00:32.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {}
+          }
+        ],
+        "note:00000000000000000000000000000003": [],
+        "note:00000000000000000000000000000001": []
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "search": {
+        "": [
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000003",
+          "note:00000000000000000000000000000001"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000001"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000003"
+        ]
+      },
+      "searchWithin": {
+        "area:starter-health": [
+          "note:00000000000000000000000000000003"
+        ],
+        "area:00000000000000000000000000000101": [],
+        "topic:00000000000000000000000000000102": []
+      },
+      "conflicts": []
+    },
+    "joiner": {
+      "now": "2026-02-01T10:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000101",
+          "name": "Household",
+          "starter": "household",
+          "colour": null,
+          "icon": null,
+          "topics": [
+            {
+              "id": "topic:00000000000000000000000000000102",
+              "areaId": "area:00000000000000000000000000000101",
+              "name": "Kitchen",
+              "starter": "kitchen"
+            }
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000001",
+          "text": "Buy milk",
+          "captured": "2026-01-01T10:00:11.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000006",
+          "text": "Ben private",
+          "captured": "2026-01-01T10:00:37.000Z",
+          "place": null,
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000006",
+        "note:00000000000000000000000000000001"
+      ],
+      "unsorted": [
+        "note:00000000000000000000000000000006"
+      ],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000006": [],
+        "note:00000000000000000000000000000001": []
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "search": {
+        "": [
+          "note:00000000000000000000000000000006",
+          "note:00000000000000000000000000000001"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000001"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [
+          "note:00000000000000000000000000000006"
+        ]
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000101": [],
+        "topic:00000000000000000000000000000102": []
+      },
+      "conflicts": []
+    }
+  },
+  "after": {
+    "host": {
+      "now": "2026-02-01T12:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:starter-health",
+          "name": "Health",
+          "starter": "health",
+          "colour": null,
+          "icon": null,
+          "topics": []
+        },
+        {
+          "id": "area:00000000000000000000000000000101",
+          "name": "Household",
+          "starter": "household",
+          "colour": null,
+          "icon": null,
+          "topics": [
+            {
+              "id": "topic:00000000000000000000000000000102",
+              "areaId": "area:00000000000000000000000000000101",
+              "name": "Kitchen",
+              "starter": "kitchen"
+            }
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000001",
+          "text": "Buy milk",
+          "captured": "2026-01-01T10:00:11.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000003",
+          "text": "Blood results",
+          "captured": "2026-01-01T10:00:23.000Z",
+          "place": "area:starter-health",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000004",
+          "text": "Fix the tap",
+          "captured": "2026-01-01T10:00:28.000Z",
+          "place": "area:00000000000000000000000000000101",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000103",
+          "text": "Ben buys rye bread",
+          "captured": "2026-02-01T11:00:00.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000105",
+          "text": "Still private",
+          "captured": "2026-02-01T11:30:00.000Z",
+          "place": null,
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000105",
+        "note:00000000000000000000000000000103",
+        "note:00000000000000000000000000000004",
+        "note:00000000000000000000000000000003",
+        "note:00000000000000000000000000000001"
+      ],
+      "unsorted": [
+        "note:00000000000000000000000000000105"
+      ],
+      "trashed": [],
+      "inside": {
+        "area:starter-health": [
+          "note:00000000000000000000000000000003"
+        ],
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000105": [],
+        "note:00000000000000000000000000000103": [],
+        "note:00000000000000000000000000000004": [
+          {
+            "id": "section:00000000000000000000000000000005",
+            "noteId": "note:00000000000000000000000000000004",
+            "text": "The hot one",
+            "captured": "2026-01-01T10:00:32.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {}
+          }
+        ],
+        "note:00000000000000000000000000000003": [],
+        "note:00000000000000000000000000000001": [
+          {
+            "id": "section:00000000000000000000000000000104",
+            "noteId": "note:00000000000000000000000000000001",
+            "text": "Oat milk please",
+            "captured": "2026-02-01T11:00:00.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {}
+          }
+        ]
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "search": {
+        "": [
+          "note:00000000000000000000000000000105",
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000003",
+          "note:00000000000000000000000000000001"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000001"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [
+          "note:00000000000000000000000000000105",
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000003",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "searchWithin": {
+        "area:starter-health": [
+          "note:00000000000000000000000000000003"
+        ],
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "conflicts": []
+    },
+    "joiner": {
+      "now": "2026-02-01T12:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000101",
+          "name": "Household",
+          "starter": "household",
+          "colour": null,
+          "icon": null,
+          "topics": [
+            {
+              "id": "topic:00000000000000000000000000000102",
+              "areaId": "area:00000000000000000000000000000101",
+              "name": "Kitchen",
+              "starter": "kitchen"
+            }
+          ]
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000001",
+          "text": "Buy milk",
+          "captured": "2026-01-01T10:00:11.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000004",
+          "text": "Fix the tap",
+          "captured": "2026-01-01T10:00:28.000Z",
+          "place": "area:00000000000000000000000000000101",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000006",
+          "text": "Ben private",
+          "captured": "2026-01-01T10:00:37.000Z",
+          "place": null,
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        },
+        {
+          "id": "note:00000000000000000000000000000103",
+          "text": "Ben buys rye bread",
+          "captured": "2026-02-01T11:00:00.000Z",
+          "place": "topic:00000000000000000000000000000102",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000103",
+        "note:00000000000000000000000000000006",
+        "note:00000000000000000000000000000004",
+        "note:00000000000000000000000000000001"
+      ],
+      "unsorted": [
+        "note:00000000000000000000000000000006"
+      ],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000103": [],
+        "note:00000000000000000000000000000006": [],
+        "note:00000000000000000000000000000004": [
+          {
+            "id": "section:00000000000000000000000000000005",
+            "noteId": "note:00000000000000000000000000000004",
+            "text": "The hot one",
+            "captured": "2026-01-01T10:00:32.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {}
+          }
+        ],
+        "note:00000000000000000000000000000001": [
+          {
+            "id": "section:00000000000000000000000000000104",
+            "noteId": "note:00000000000000000000000000000001",
+            "text": "Oat milk please",
+            "captured": "2026-02-01T11:00:00.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {}
+          }
+        ]
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "search": {
+        "": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000006",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000001"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000006",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000101": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000004",
+          "note:00000000000000000000000000000001"
+        ],
+        "topic:00000000000000000000000000000102": [
+          "note:00000000000000000000000000000103",
+          "note:00000000000000000000000000000001"
+        ]
+      },
+      "conflicts": []
+    },
+    "hostRoles": {
+      "access": "manager",
+      "shared": true,
+      "people": [
+        {
+          "id": "65b60673d6ed884bf01c2c222d82ada0",
+          "name": "Ann",
+          "role": "manager",
+          "devices": [
+            "65b60673d6ed884bf01c2c222d82ada0"
+          ]
+        },
+        {
+          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "name": "Ben",
+          "role": "member",
+          "devices": [
+            "c945cbf2a5602002141e2fb9d17054d6"
+          ]
+        }
+      ],
+      "mayChange": {
+        "note:00000000000000000000000000000001": true,
+        "note:00000000000000000000000000000103": true,
+        "note:00000000000000000000000000000004": true,
+        "note:00000000000000000000000000000003": true
+      },
+      "mayManage": true,
+      "ignored": [
+        "c945cbf2a5602002141e2fb9d17054d6:14",
+        "c945cbf2a5602002141e2fb9d17054d6:15",
+        "c945cbf2a5602002141e2fb9d17054d6:16",
+        "c945cbf2a5602002141e2fb9d17054d6:17",
+        "c945cbf2a5602002141e2fb9d17054d6:18",
+        "c945cbf2a5602002141e2fb9d17054d6:25"
+      ],
+      "routines": [
+        {
+          "id": "routine:00000000000000000000000000000002",
+          "noteId": "note:00000000000000000000000000000001",
+          "start": "2026-01-05",
+          "times": [
+            "08:00"
+          ],
+          "rule": "FREQ=DAILY",
+          "done": {
+            "2026-02-01T08:00": "2026-02-01T11:00:00.000Z"
+          },
+          "renag": null,
+          "escalation": null,
+          "scheduledAt": "2026-01-01T10:00:20.000Z",
+          "trashed": null,
+          "trashedWith": null,
+          "reminder": false
+        }
+      ]
+    },
+    "joinerRoles": {
+      "access": "member",
+      "shared": true,
+      "people": [
+        {
+          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "name": "Ben",
+          "role": "member",
+          "devices": [
+            "c945cbf2a5602002141e2fb9d17054d6"
+          ]
+        },
+        {
+          "id": "65b60673d6ed884bf01c2c222d82ada0",
+          "name": "Ann",
+          "role": "manager",
+          "devices": [
+            "65b60673d6ed884bf01c2c222d82ada0"
+          ]
+        }
+      ],
+      "mayChange": {
+        "note:00000000000000000000000000000001": false,
+        "note:00000000000000000000000000000103": true,
+        "note:00000000000000000000000000000004": false,
+        "note:00000000000000000000000000000003": true
+      },
+      "mayManage": false,
+      "ignored": [
+        "c945cbf2a5602002141e2fb9d17054d6:14",
+        "c945cbf2a5602002141e2fb9d17054d6:15",
+        "c945cbf2a5602002141e2fb9d17054d6:16",
+        "c945cbf2a5602002141e2fb9d17054d6:17",
+        "c945cbf2a5602002141e2fb9d17054d6:18",
+        "c945cbf2a5602002141e2fb9d17054d6:20",
+        "c945cbf2a5602002141e2fb9d17054d6:22",
+        "c945cbf2a5602002141e2fb9d17054d6:23",
+        "c945cbf2a5602002141e2fb9d17054d6:24",
+        "c945cbf2a5602002141e2fb9d17054d6:25"
+      ],
+      "routines": [
+        {
+          "id": "routine:00000000000000000000000000000002",
+          "noteId": "note:00000000000000000000000000000001",
+          "start": "2026-01-05",
+          "times": [
+            "08:00"
+          ],
+          "rule": "FREQ=DAILY",
+          "done": {
+            "2026-02-01T08:00": "2026-02-01T11:00:00.000Z"
+          },
+          "renag": null,
+          "escalation": null,
+          "scheduledAt": "2026-01-01T10:00:20.000Z",
+          "trashed": null,
+          "trashedWith": null,
+          "reminder": false
+        }
+      ]
+    }
+  },
+  "promoted": {
+    "host": {
+      "access": "manager",
+      "shared": true,
+      "people": [
+        {
+          "id": "65b60673d6ed884bf01c2c222d82ada0",
+          "name": "Ann",
+          "role": "manager",
+          "devices": [
+            "65b60673d6ed884bf01c2c222d82ada0"
+          ]
+        },
+        {
+          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "name": "Ben",
+          "role": "manager",
+          "devices": [
+            "c945cbf2a5602002141e2fb9d17054d6"
+          ]
+        }
+      ],
+      "mayChange": {
+        "note:00000000000000000000000000000001": true,
+        "note:00000000000000000000000000000103": true,
+        "note:00000000000000000000000000000004": true,
+        "note:00000000000000000000000000000003": true
+      },
+      "mayManage": true,
+      "ignored": [
+        "c945cbf2a5602002141e2fb9d17054d6:14",
+        "c945cbf2a5602002141e2fb9d17054d6:15",
+        "c945cbf2a5602002141e2fb9d17054d6:16",
+        "c945cbf2a5602002141e2fb9d17054d6:17",
+        "c945cbf2a5602002141e2fb9d17054d6:18",
+        "c945cbf2a5602002141e2fb9d17054d6:25"
+      ],
+      "routines": [
+        {
+          "id": "routine:00000000000000000000000000000002",
+          "noteId": "note:00000000000000000000000000000001",
+          "start": "2026-01-05",
+          "times": [
+            "09:00"
+          ],
+          "rule": "FREQ=DAILY",
+          "done": {
+            "2026-02-01T08:00": "2026-02-01T11:00:00.000Z"
+          },
+          "renag": null,
+          "escalation": null,
+          "scheduledAt": "2026-02-01T13:30:00.000Z",
+          "trashed": null,
+          "trashedWith": null,
+          "reminder": false
+        }
+      ]
+    },
+    "joiner": {
+      "access": "manager",
+      "shared": true,
+      "people": [
+        {
+          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "name": "Ben",
+          "role": "manager",
+          "devices": [
+            "c945cbf2a5602002141e2fb9d17054d6"
+          ]
+        },
+        {
+          "id": "65b60673d6ed884bf01c2c222d82ada0",
+          "name": "Ann",
+          "role": "manager",
+          "devices": [
+            "65b60673d6ed884bf01c2c222d82ada0"
+          ]
+        }
+      ],
+      "mayChange": {
+        "note:00000000000000000000000000000001": true,
+        "note:00000000000000000000000000000103": true,
+        "note:00000000000000000000000000000004": true,
+        "note:00000000000000000000000000000003": true
+      },
+      "mayManage": true,
+      "ignored": [
+        "c945cbf2a5602002141e2fb9d17054d6:14",
+        "c945cbf2a5602002141e2fb9d17054d6:15",
+        "c945cbf2a5602002141e2fb9d17054d6:16",
+        "c945cbf2a5602002141e2fb9d17054d6:17",
+        "c945cbf2a5602002141e2fb9d17054d6:18",
+        "c945cbf2a5602002141e2fb9d17054d6:20",
+        "c945cbf2a5602002141e2fb9d17054d6:22",
+        "c945cbf2a5602002141e2fb9d17054d6:23",
+        "c945cbf2a5602002141e2fb9d17054d6:24",
+        "c945cbf2a5602002141e2fb9d17054d6:25"
+      ],
+      "routines": [
+        {
+          "id": "routine:00000000000000000000000000000002",
+          "noteId": "note:00000000000000000000000000000001",
+          "start": "2026-01-05",
+          "times": [
+            "09:00"
+          ],
+          "rule": "FREQ=DAILY",
+          "done": {
+            "2026-02-01T08:00": "2026-02-01T11:00:00.000Z"
+          },
+          "renag": null,
+          "escalation": null,
+          "scheduledAt": "2026-02-01T13:30:00.000Z",
+          "trashed": null,
+          "trashedWith": null,
+          "reminder": false
+        }
+      ]
+    }
+  },
+  "removed": {
+    "access": "manager",
+    "shared": true,
+    "people": [
+      {
+        "id": "65b60673d6ed884bf01c2c222d82ada0",
+        "name": "Ann",
+        "role": "manager",
+        "devices": [
+          "65b60673d6ed884bf01c2c222d82ada0"
+        ]
+      }
+    ],
+    "mayChange": {
+      "note:00000000000000000000000000000001": true,
+      "note:00000000000000000000000000000103": true,
+      "note:00000000000000000000000000000004": true,
+      "note:00000000000000000000000000000003": true
+    },
+    "mayManage": true,
+    "ignored": [
+      "c945cbf2a5602002141e2fb9d17054d6:14",
+      "c945cbf2a5602002141e2fb9d17054d6:15",
+      "c945cbf2a5602002141e2fb9d17054d6:16",
+      "c945cbf2a5602002141e2fb9d17054d6:17",
+      "c945cbf2a5602002141e2fb9d17054d6:18",
+      "c945cbf2a5602002141e2fb9d17054d6:25"
+    ],
+    "routines": [
+      {
+        "id": "routine:00000000000000000000000000000002",
+        "noteId": "note:00000000000000000000000000000001",
+        "start": "2026-01-05",
+        "times": [
+          "09:00"
+        ],
+        "rule": "FREQ=DAILY",
+        "done": {
+          "2026-02-01T08:00": "2026-02-01T11:00:00.000Z"
+        },
+        "renag": null,
+        "escalation": null,
+        "scheduledAt": "2026-02-01T13:30:00.000Z",
+        "trashed": null,
+        "trashedWith": null,
+        "reminder": false
+      }
+    ]
+  }
+}

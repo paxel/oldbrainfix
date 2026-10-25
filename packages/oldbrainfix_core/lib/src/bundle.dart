@@ -8,6 +8,7 @@ import 'conflicts.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
 import 'pairing.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -90,8 +91,11 @@ const maxBundleBlobBytes = 256 << 20;
 /// carries; null, writing nothing, when there is nothing to send. For
 /// the paired Device [forDevice] it holds what lies beyond what that
 /// Device last said it holds ([Pairing.heldBy]), else everything; the
-/// blobs only of the entries in it. A bundle that never arrived loses
-/// nothing: the next one for the same Device carries it again.
+/// blobs only of the entries in it. For another person's Device, paired
+/// by invite, only what lies in the Areas it shares, with the whole
+/// history of Notes filed into them meanwhile (ADR 0013). A bundle that
+/// never arrived loses nothing: the next one for the same Device carries
+/// it again.
 ///
 /// The nonces come from [nonce] in the folder's order; the fixture
 /// generator hands in a counter.
@@ -101,9 +105,11 @@ Future<({int entries, int blobs})?> writeBundle(
   String? forDevice,
   Uint8List Function()? nonce,
 }) async {
-  final entries = store.entriesSince(
-    forDevice == null ? const {} : store.heldBy(forDevice),
-  );
+  final entries = forDevice != null && store.isSharedPeer(forDevice)
+      ? store.entriesFor(forDevice, store.heldBy(forDevice))
+      : store.entriesSince(
+          forDevice == null ? const {} : store.heldBy(forDevice),
+        );
   if (entries.isEmpty) return null;
   final blobs = <String>{
     for (final e in entries)

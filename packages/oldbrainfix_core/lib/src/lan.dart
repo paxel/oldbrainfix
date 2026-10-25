@@ -9,6 +9,7 @@ import 'conflicts.dart';
 import 'entry.dart';
 import 'pair_code.dart';
 import 'pairing.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -38,14 +39,20 @@ const pinHeader = 'x-oldbrainfix-pin';
 const deviceHeader = 'x-oldbrainfix-device';
 const formatHeader = 'x-oldbrainfix-format';
 
+/// On a host's `/vector` answer while it invites the joiner to a Shared
+/// Area (ADR 0013): the joiner then sends nothing of its own.
+const inviteHeader = 'x-oldbrainfix-invite';
+
 /// A paired Device's nonce from `/challenge` and its signature over it.
 const nonceHeader = 'x-oldbrainfix-nonce';
 const proofHeader = 'x-oldbrainfix-proof';
 
 /// The wire format this build speaks; a peer speaking another one is
 /// refused with the reason, never half understood. Format 2 carries the
-/// entries' causal contexts, which format 1 would refuse as forged.
-const syncFormat = 2;
+/// entries' causal contexts, which format 1 would refuse as forged;
+/// format 3 the invites to Shared Areas, which format 2 would answer
+/// with everything it holds.
+const syncFormat = 3;
 
 const pinFailuresPerAddress = 5;
 const pinFailuresTotal = 20;
@@ -67,6 +74,9 @@ class SyncSession {
   final ImportReport report;
   final List<Conflict> conflicts;
 
+  /// The Shared Area this session invited one side to, if it did.
+  final String? sharedArea;
+
   const SyncSession({
     required this.peer,
     required this.name,
@@ -74,7 +84,18 @@ class SyncSession {
     required this.moment,
     required this.report,
     this.conflicts = const [],
+    this.sharedArea,
   });
+}
+
+/// What the inviting side of a session hands out (ADR 0013): the Area,
+/// the role the other Device gets there and the name its person goes by.
+class Invite {
+  final String areaId;
+  final AreaRole role;
+  final String name;
+
+  const Invite(this.areaId, {required this.role, required this.name});
 }
 
 Map<String, int> _vector(Object? json) => {
@@ -134,24 +155,78 @@ bool trustsPairedJoiner(
 /// paired with it before lets it in without asking only then. The
 /// Area keys travel along (ADR 0012): only over this session, which the
 /// pair code or the pinned certificate authenticated.
+///
+/// To another person's Device (ADR 0013) only what it shares goes: when
+/// the host invites this Device ([invited]), nothing at all; when this
+/// Device invites the host ([invite]), the grant written first and the
+/// Area's whole history; to a Device paired by invite before, what lies
+/// in the Areas it holds a role in.
 Map<String, Object?> syncRequest(
   Store store,
   Map<String, int> hostVector, {
   required String name,
   String hostDevice = '',
   String pin = '',
+  bool invited = false,
+  Invite? invite,
 }) {
   store.ensureAreaKeys();
+  final List<Entry> entries;
+  final List<AreaKey> areaKeys;
+  if (invited) {
+    entries = const [];
+    areaKeys = const [];
+  } else if (invite != null) {
+    store.invite(
+      invite.areaId,
+      hostDevice,
+      role: invite.role,
+      name: invite.name,
+    );
+    entries = store.entriesFor(
+      hostDevice,
+      const {},
+      whole: true,
+      also: {invite.areaId},
+    );
+    areaKeys = store.areaKeysFor(hostDevice, also: {invite.areaId});
+  } else if (store.isSharedPeer(hostDevice)) {
+    entries = store.entriesFor(hostDevice, hostVector);
+    areaKeys = store.areaKeysFor(hostDevice);
+  } else {
+    entries = store.entriesSince(hostVector);
+    areaKeys = store.areaKeys();
+  }
   return {
     'format': syncFormat,
     'deviceId': store.deviceId,
     'name': name,
     'proof': store.signingKey.sign(pairingProofBytes(hostDevice, pin)),
     'vector': store.versionVector(),
-    'entries': [for (final e in store.entriesSince(hostVector)) e.toJson()],
+    'entries': [for (final e in entries) e.toJson()],
     'keys': [for (final k in store.keyRecords()) k.toJson()],
-    'areaKeys': [for (final k in store.areaKeys()) k.toJson()],
+    'areaKeys': [for (final k in areaKeys) k.toJson()],
+    if (invited) 'invited': true,
+    if (invite != null) 'invite': {'area': invite.areaId},
   };
+}
+
+/// The Area a `POST /sync` body or an answer invites to, if any.
+String? _invitedTo(Object? json) {
+  if (json case {'area': final String area} when area.startsWith('area:')) {
+    return area;
+  }
+  return null;
+}
+
+/// The blobs this Device lacks that [peer], another person's Device,
+/// may be asked for: those of the Areas it holds a role in.
+List<String> _missingFor(Store store, String peer) {
+  final areas = store.areasSharedWith(peer);
+  return [
+    for (final ref in store.missingBlobs())
+      if (store.blobIn(ref, areas)) ref,
+  ];
 }
 
 /// Takes in a joiner's `POST /sync` [body] (applied as one batch, with
@@ -159,26 +234,70 @@ Map<String, Object?> syncRequest(
 /// joiner lacks, the blobs this Device wants, its keys, id and [name].
 /// The joiner's own key is pinned as verified: it came over a session
 /// the pair code authenticated. Null when the joiner speaks another
-/// format.
+/// format, ignores this host's [inviting], or invites it to an Area it
+/// holds as its own.
+///
+/// Another person's Device (ADR 0013), [inviting] or inviting this one
+/// or paired by invite before ([isShared] says which), gets only what it
+/// shares, and only the keys of those Areas are taken from it. A Device
+/// of this one's own group gets this one's roles in the Shared Areas it
+/// has none in ([SharedAreas.extendRolesTo]) before the answer is made.
 ({Map<String, Object?> answer, SyncSession session})? answerSync(
   Store store,
   Map<String, Object?> body, {
   required String name,
+  Invite? inviting,
+  bool Function(String peer)? isShared,
 }) {
   if (body['format'] != syncFormat) return null;
   final peer = body['deviceId'] is String ? body['deviceId'] as String : '';
   final peerName = body['name'] is String ? body['name'] as String : '';
   final peerVector = _vector(body['vector']);
+  final invitedTo = _invitedTo(body['invite']);
+  if (inviting != null && (body['invited'] != true || peer.isEmpty)) {
+    return null;
+  }
+  if (invitedTo != null &&
+      (inviting != null || store.refusesInvite(invitedTo))) {
+    return null;
+  }
+  // A Device of this one's own group is no other person: inviting it
+  // would cut its sync down to one Area.
+  if ((inviting != null || invitedTo != null) && store.isOwnDevice(peer)) {
+    return null;
+  }
+  final shared =
+      inviting != null ||
+      invitedTo != null ||
+      (isShared ?? store.isSharedPeer)(peer);
+  final sharedArea = inviting?.areaId ?? invitedTo;
   final report = ImportReport();
   final before = store.currentSeq();
-  store.learnAreaKeys(areaKeysOf(body['areaKeys']));
+  if (!shared) store.learnAreaKeys(areaKeysOf(body['areaKeys']));
   final applied = store.applyEntries(
-    _entries(body['entries']),
+    inviting != null ? const [] : _entries(body['entries']),
     keys: _keys(body['keys']),
     verifiedDevice: peer.isEmpty ? null : peer,
     report: report,
   );
+  if (shared) {
+    final areas = {...store.areasSharedWith(peer), ?invitedTo};
+    store.learnAreaKeys([
+      for (final k in areaKeysOf(body['areaKeys']))
+        if (areas.contains(k.scope)) k,
+    ]);
+  }
   store.ensureAreaKeys();
+  if (inviting != null) {
+    store.invite(
+      inviting.areaId,
+      peer,
+      role: inviting.role,
+      name: inviting.name,
+    );
+  } else if (!shared) {
+    store.extendRolesTo(peer);
+  }
   final moment = store.momentFor(
     before: before,
     changed: applied.isNotEmpty,
@@ -194,10 +313,20 @@ Map<String, Object?> syncRequest(
       'format': syncFormat,
       'deviceId': store.deviceId,
       'name': name,
-      'entries': [for (final e in store.entriesSince(peerVector)) e.toJson()],
-      'wantBlobs': store.missingBlobs(),
+      'entries': [
+        for (final e
+            in !shared
+                ? store.entriesSince(peerVector)
+                : store.entriesFor(peer, peerVector, whole: inviting != null))
+          e.toJson(),
+      ],
+      'wantBlobs': shared ? _missingFor(store, peer) : store.missingBlobs(),
       'keys': [for (final k in store.keyRecords()) k.toJson()],
-      'areaKeys': [for (final k in store.areaKeys()) k.toJson()],
+      'areaKeys': [
+        for (final k in shared ? store.areaKeysFor(peer) : store.areaKeys())
+          k.toJson(),
+      ],
+      if (inviting != null) 'invite': {'area': inviting.areaId},
     },
     session: SyncSession(
       peer: peer,
@@ -206,24 +335,48 @@ Map<String, Object?> syncRequest(
       moment: moment,
       report: report,
       conflicts: store.conflictsAmong(applied),
+      sharedArea: sharedArea,
     ),
   );
 }
 
 /// The joiner takes in the host's `/sync` [answer]; the host's own key
-/// is verified, the session was authenticated by the pair code.
-SyncSession applyAnswer(Store store, Map<String, Object?> answer) {
+/// is verified, the session was authenticated by the pair code. From
+/// another person's Device ([shared], ADR 0013) only the keys of the
+/// Areas it shares are taken, and an invite to an Area this Device holds
+/// as its own is refused before anything is taken, as `declined`. A Device
+/// of this one's own group gets this one's roles in the Shared Areas it
+/// has none in, to go out with the next sync.
+SyncSession applyAnswer(
+  Store store,
+  Map<String, Object?> answer, {
+  bool shared = false,
+  String? invitedBy,
+}) {
   final host = answer['deviceId'] is String ? answer['deviceId'] as String : '';
   final name = answer['name'] is String ? answer['name'] as String : '';
+  final invitedTo = _invitedTo(answer['invite']);
+  if (invitedTo != null && store.refusesInvite(invitedTo)) {
+    throw const SyncException(SyncFailure.declined);
+  }
   final report = ImportReport();
   final before = store.currentSeq();
-  store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
+  if (!shared) store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
   final applied = store.applyEntries(
     _entries(answer['entries']),
     keys: _keys(answer['keys']),
     verifiedDevice: host.isEmpty ? null : host,
     report: report,
   );
+  if (shared) {
+    final areas = {...store.areasSharedWith(host), ?invitedTo};
+    store.learnAreaKeys([
+      for (final k in areaKeysOf(answer['areaKeys']))
+        if (areas.contains(k.scope)) k,
+    ]);
+  } else {
+    store.extendRolesTo(host);
+  }
   return SyncSession(
     peer: host,
     name: name,
@@ -236,6 +389,7 @@ SyncSession applyAnswer(Store store, Map<String, Object?> answer) {
     ),
     report: report,
     conflicts: store.conflictsAmong(applied),
+    sharedArea: invitedTo ?? invitedBy,
   );
 }
 
@@ -307,11 +461,14 @@ bool fingerprintMatches(List<int> actual, List<int> expected) {
 /// [name]. After a session the host is remembered as a paired Device,
 /// with the whole fingerprint of its certificate. Throws a
 /// [SyncException]; an address outside the local network is refused
-/// before anything is sent.
+/// before anything is sent. With [invite], the host is another person's
+/// Device, invited to a Shared Area (ADR 0013); a host that invites this
+/// Device itself says so before anything is sent.
 Future<SyncResult> lanSync(
   Store store,
   PairInfo info, {
   required String name,
+  Invite? invite,
   Duration timeout = const Duration(seconds: 20),
 }) async {
   if (!isPrivateHost(info.host)) {
@@ -324,6 +481,7 @@ Future<SyncResult> lanSync(
     fingerprint: info.fingerprint,
     pin: info.pin,
     name: name,
+    invite: invite,
     timeout: timeout,
   );
 }
@@ -375,6 +533,7 @@ Future<SyncResult> _sync(
   String pin = '',
   String? paired,
   required String name,
+  Invite? invite,
   required Duration timeout,
 }) async {
   List<int>? seen;
@@ -486,12 +645,27 @@ Future<SyncResult> _sync(
       throw const SyncException(SyncFailure.wrongHost);
     }
     final hostVector = _vector(decode(vectorBytes));
+    final invited = headers.value(inviteHeader) == '1';
+    // Two Devices inviting each other: neither gets what it meant.
+    if (invited && invite != null) {
+      throw const SyncException(SyncFailure.declined);
+    }
+    if (invite != null && hostDevice.isEmpty) {
+      throw const SyncException(SyncFailure.failed);
+    }
+    // A Device of this one's own group is no other person to invite.
+    if ((invited || invite != null) && store.isOwnDevice(hostDevice)) {
+      throw const SyncException(SyncFailure.declined);
+    }
+    final shared = invited || invite != null || store.isSharedPeer(hostDevice);
     final request = syncRequest(
       store,
       hostVector,
       name: name,
       hostDevice: hostDevice,
       pin: pin,
+      invited: invited,
+      invite: invite,
     );
     final syncCall = await call(
       'POST',
@@ -503,7 +677,14 @@ Future<SyncResult> _sync(
     final answer = decode(syncCall.$2);
     final SyncSession session;
     try {
-      session = applyAnswer(store, answer);
+      session = applyAnswer(
+        store,
+        answer,
+        shared: shared,
+        invitedBy: invite?.areaId,
+      );
+    } on SyncException {
+      rethrow;
     } on Object {
       // Entries that are not entries: nothing of them was kept.
       throw const SyncException(SyncFailure.failed);
@@ -517,6 +698,7 @@ Future<SyncResult> _sync(
           host: host,
           port: port,
           lastSync: store.clock().toUtc(),
+          shared: shared,
         ),
       );
       // The host took in everything beyond its vector, as it answered.
@@ -527,8 +709,10 @@ Future<SyncResult> _sync(
     // The entries are in and the Moment recorded; whatever happens to the
     // blobs now, the next sync fetches what is still missing.
     var blobsIn = 0, blobsOut = 0;
+    final sharedAreas = shared ? store.areasSharedWith(session.peer) : null;
     try {
       for (final ref in store.missingBlobs()) {
+        if (sharedAreas != null && !store.blobIn(ref, sharedAreas)) continue;
         final got = await call('GET', '/blob/$ref');
         if (got == null) continue;
         final (kind, hash) = splitBlobRef(ref);
@@ -537,6 +721,7 @@ Future<SyncResult> _sync(
       final wanted = answer['wantBlobs'];
       for (final ref in wanted is List ? wanted : const []) {
         if (ref is! String) continue;
+        if (sharedAreas != null && !store.blobIn(ref, sharedAreas)) continue;
         final (kind, hash) = splitBlobRef(ref);
         final bytes = store.blob(kind, hash);
         if (bytes == null) continue;

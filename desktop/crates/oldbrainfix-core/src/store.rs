@@ -17,7 +17,9 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
-use parking_lot::ReentrantMutex;
+use std::sync::Arc;
+
+use parking_lot::{Mutex, ReentrantMutex};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use sha2::{Digest, Sha256};
 
@@ -25,6 +27,7 @@ use crate::blobs::{Blobs, FileBlobs, MemoryBlobs};
 use crate::conflicts::{conflict_unit, conflict_unit_fields, encode_context};
 use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
 use crate::photos::strip_jpeg_metadata;
+use crate::shared::{JudgedLog, judge_log};
 use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
 use crate::{Error, Result};
 
@@ -110,6 +113,12 @@ pub struct Store {
     ids: IdMaker,
     photos: Box<dyn Blobs>,
     audio: Box<dyn Blobs>,
+    /// What the roles of the Shared Areas allow, worked out after every
+    /// change ([`Store::judged`]).
+    judged: Mutex<Option<Arc<JudgedLog>>>,
+    /// Counts the changes, so a judgement worked out while another
+    /// thread wrote is not kept.
+    generation: std::sync::atomic::AtomicU64,
 }
 
 impl Store {
@@ -162,6 +171,8 @@ impl Store {
             ids: Box::new(random_id),
             photos,
             audio,
+            judged: Mutex::new(None),
+            generation: std::sync::atomic::AtomicU64::new(0),
         };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;
@@ -191,9 +202,50 @@ impl Store {
     pub fn batch<T>(&self, body: impl FnOnce() -> Result<T>) -> Result<T> {
         let db = self.db.lock();
         let tx = db.unchecked_transaction()?;
-        let out = body()?;
+        let out = body();
+        // Rolled back or not, what was worked out from inside is stale.
+        self.changed();
+        let out = out?;
         tx.commit()?;
         Ok(out)
+    }
+
+    /// Forgets what was worked out from the log.
+    fn changed(&self) {
+        let mut judged = self.judged.lock();
+        self.generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        *judged = None;
+    }
+
+    /// What the roles of the Shared Areas allow (ADR 0013), worked out
+    /// from the whole log after every change, as the Dart core's
+    /// `judged`; nothing to work out while no Area was ever shared.
+    pub fn judged(&self) -> Result<Arc<JudgedLog>> {
+        if let Some(held) = self.judged.lock().as_ref() {
+            return Ok(held.clone());
+        }
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        let shared = self
+            .db
+            .lock()
+            .query_row(
+                "SELECT 1 FROM entries WHERE substr(field, 1, 5) = 'role:' LIMIT 1",
+                [],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        let judged = Arc::new(if shared {
+            judge_log(&self.all_entries()?)
+        } else {
+            JudgedLog::default()
+        });
+        let mut held = self.judged.lock();
+        if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
+            *held = Some(judged.clone());
+        }
+        Ok(judged)
     }
 
     /// This installation's stable device id.
@@ -366,6 +418,7 @@ impl Store {
                 ctx
             ],
         )?;
+        self.changed();
         self.entries(
             "SELECT * FROM entries WHERE device = ? AND dseq = ?",
             params![device, dseq],
@@ -443,6 +496,9 @@ impl Store {
                 entry.ctx
             ],
         )?;
+        if changed > 0 {
+            self.changed();
+        }
         Ok(changed > 0)
     }
 
@@ -554,12 +610,34 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Every entry of `entity`, in log order.
+    /// Every entry of `entity` that counts, in log order: what no role
+    /// in a Shared Area allows is left out ([`Store::judged`]).
     pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
-        self.entries(
+        let all = self.entries(
             "SELECT * FROM entries WHERE entity = ? ORDER BY seq",
             params![entity],
-        )
+        )?;
+        let judged = self.judged()?;
+        if judged.ignored.is_empty() {
+            return Ok(all);
+        }
+        Ok(all
+            .into_iter()
+            .filter(|e| !judged.ignored.contains(&e.id()))
+            .collect())
+    }
+
+    /// Every entry of `entities` as it is, none left out, by (device,
+    /// dseq): what is relayed to another Device, which judges for itself.
+    pub fn raw_history_of(
+        &self,
+        entities: &std::collections::HashSet<String>,
+    ) -> Result<Vec<Entry>> {
+        Ok(self
+            .entries("SELECT * FROM entries ORDER BY device, dseq", params![])?
+            .into_iter()
+            .filter(|e| entities.contains(&e.entity))
+            .collect())
     }
 
     /// Every entry, in log order.

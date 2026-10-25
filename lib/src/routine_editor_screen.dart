@@ -123,6 +123,12 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// After how many ignored Re-nags it escalates; null when it does not.
   int? _escalation;
 
+  /// A Routine in a Shared Area that only a Manager may change: shown,
+  /// not edited (ADR 0013).
+  late final bool _locked =
+      widget.routineId != null &&
+      !widget.notes.store.mayChangeRoutine(widget.routineId ?? '');
+
   /// What is edited now, or null while the advanced rule is no rule.
   Schedule? _schedule;
   String? _ruleError;
@@ -387,151 +393,171 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               onPressed: () => openHistory(context, widget.notes, routine),
               icon: const Icon(Icons.history),
             ),
-          if (routine != null)
+          if (routine != null && !_locked)
             IconButton(
               tooltip: t.delete,
               onPressed: _delete,
               icon: const Icon(Icons.delete_outline),
             ),
-          TextButton(onPressed: _canSave ? _save : null, child: Text(t.save)),
+          if (!_locked)
+            TextButton(onPressed: _canSave ? _save : null, child: Text(t.save)),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (widget.noteId == null && routine == null)
-            Embossed(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _text,
-                  autofocus: true,
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: InputDecoration(
-                    hintText: t.routineWhatHint,
-                    filled: false,
-                    border: InputBorder.none,
-                  ),
+      body: AbsorbPointer(
+        absorbing: _locked,
+        child: _body(context, t, locale, routine, note, once: once),
+      ),
+    );
+  }
+
+  Widget _body(
+    BuildContext context,
+    AppLocalizations t,
+    String locale,
+    Routine? routine,
+    Note? note, {
+    required bool once,
+  }) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_locked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(t.onlyManagers),
+          ),
+        if (widget.noteId == null && routine == null)
+          Embossed(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _text,
+                autofocus: true,
+                maxLines: null,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: t.routineWhatHint,
+                  filled: false,
+                  border: InputBorder.none,
                 ),
               ),
-            )
-          else
-            EditorPanel(
-              heading: t.fromNote,
-              child: note == null
-                  ? Text(t.noteDeleted)
-                  : note.isTrashed
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          noteText(t, note),
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        Text(t.noteInTrash),
-                      ],
-                    )
-                  : Material(
-                      // The ink shows on the panel, not under it.
-                      type: MaterialType.transparency,
-                      child: InkWell(
-                        onTap: _openNote,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.sticky_note_2_outlined),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                noteText(t, note),
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
+            ),
+          )
+        else
+          EditorPanel(
+            heading: t.fromNote,
+            child: note == null
+                ? Text(t.noteDeleted)
+                : note.isTrashed
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        noteText(t, note),
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      Text(t.noteInTrash),
+                    ],
+                  )
+                : Material(
+                    // The ink shows on the panel, not under it.
+                    type: MaterialType.transparency,
+                    child: InkWell(
+                      onTap: _openNote,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.sticky_note_2_outlined),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              noteText(t, note),
+                              style: Theme.of(context).textTheme.bodyLarge,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-            ),
-          const SizedBox(height: 16),
-          EditorPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SegmentedButton<bool>(
-                  segments: [
-                    ButtonSegment(value: false, label: Text(t.scheduleSimple)),
-                    ButtonSegment(value: true, label: Text(t.scheduleAdvanced)),
-                  ],
-                  selected: {_advanced},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (picked) => _switchMode(picked.single),
+                  ),
+          ),
+        const SizedBox(height: 16),
+        EditorPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(value: false, label: Text(t.scheduleSimple)),
+                  ButtonSegment(value: true, label: Text(t.scheduleAdvanced)),
+                ],
+                selected: {_advanced},
+                showSelectedIcon: false,
+                onSelectionChanged: (picked) => _switchMode(picked.single),
+              ),
+              const SizedBox(height: 16),
+              if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
+              const SizedBox(height: 8),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(once ? t.onDay : t.startsOn),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: _pickStart,
+                    icon: const Icon(Icons.event),
+                    label: Text(dayText(locale, _start)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        EditorPanel(
+          heading: t.timesHeading,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (_times.isEmpty) Chip(label: Text(t.allDay)),
+              for (final time in _times)
+                InputChip(
+                  label: Text(clockText(locale, time)),
+                  deleteButtonTooltipMessage: t.removeTime(
+                    clockText(locale, time),
+                  ),
+                  onDeleted: () => _change(
+                    () => _times = [
+                      for (final kept in _times)
+                        if (kept != time) kept,
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
-                if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
-                const SizedBox(height: 8),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(once ? t.onDay : t.startsOn),
-                    const SizedBox(width: 8),
-                    TextButton.icon(
-                      onPressed: _pickStart,
-                      icon: const Icon(Icons.event),
-                      label: Text(dayText(locale, _start)),
-                    ),
-                  ],
+              if (!once || _times.isEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.add),
+                  label: Text(t.addTime),
+                  onPressed: _addTime,
                 ),
-              ],
-            ),
+            ],
           ),
-          EditorPanel(
-            heading: t.timesHeading,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (_times.isEmpty) Chip(label: Text(t.allDay)),
-                for (final time in _times)
-                  InputChip(
-                    label: Text(clockText(locale, time)),
-                    deleteButtonTooltipMessage: t.removeTime(
-                      clockText(locale, time),
-                    ),
-                    onDeleted: () => _change(
-                      () => _times = [
-                        for (final kept in _times)
-                          if (kept != time) kept,
-                      ],
-                    ),
-                  ),
-                if (!once || _times.isEmpty)
-                  ActionChip(
-                    avatar: const Icon(Icons.add),
-                    label: Text(t.addTime),
-                    onPressed: _addTime,
-                  ),
-              ],
-            ),
+        ),
+        EditorPanel(
+          heading: t.nextOccurrences,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_schedule != null && _next.isEmpty) Text(t.neverDue),
+              for (final o in _next)
+                Text(
+                  '${dayText(locale, o.day)}  '
+                  '${occurrenceTime(t, locale, o)}',
+                ),
+            ],
           ),
-          EditorPanel(
-            heading: t.nextOccurrences,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_schedule != null && _next.isEmpty) Text(t.neverDue),
-                for (final o in _next)
-                  Text(
-                    '${dayText(locale, o.day)}  '
-                    '${occurrenceTime(t, locale, o)}',
-                  ),
-              ],
-            ),
-          ),
-          _renagPanel(t),
-          _escalationPanel(t),
-        ],
-      ),
+        ),
+        _renagPanel(t),
+        _escalationPanel(t),
+      ],
     );
   }
 

@@ -26,18 +26,28 @@ pub struct PairedDevice {
     pub host: Option<String>,
     pub port: Option<u16>,
     pub last_sync: DateTime<Utc>,
+    /// Whether it is another person's Device, paired by invite to a
+    /// Shared Area: it gets only what it shares (ADR 0013). Once one,
+    /// always one.
+    pub shared: bool,
 }
 
 impl PairedDevice {
     pub fn to_json(&self) -> Value {
-        json!({
+        let mut json = json!({
             "id": self.id,
             "name": self.name,
             "fingerprint": self.fingerprint,
             "host": self.host,
             "port": self.port,
             "lastSync": dart_iso(self.last_sync),
-        })
+        });
+        if self.shared
+            && let Some(map) = json.as_object_mut()
+        {
+            map.insert("shared".to_string(), Value::Bool(true));
+        }
+        json
     }
 
     pub fn from_json(json: &Value) -> Option<PairedDevice> {
@@ -54,6 +64,7 @@ impl PairedDevice {
                 .and_then(|p| p.as_u64())
                 .and_then(|p| u16::try_from(p).ok()),
             last_sync: parse_time(json.get("lastSync")?.as_str()?).ok()?,
+            shared: json.get("shared").and_then(Value::as_bool) == Some(true),
         })
     }
 }
@@ -80,15 +91,17 @@ impl Store {
     }
 
     /// Remembers `device`, keeping the fingerprint and address of a
-    /// Device that hosted before when it only joined now.
+    /// Device that hosted before when it only joined now; one paired by
+    /// invite stays shared.
     pub fn remember_device(&self, device: &PairedDevice) -> Result<()> {
         let mut kept = device.clone();
-        if device.fingerprint.is_empty()
-            && let Some(held) = self.paired_device(&device.id)?
-        {
-            kept.fingerprint = held.fingerprint;
-            kept.host = held.host;
-            kept.port = held.port;
+        if let Some(held) = self.paired_device(&device.id)? {
+            kept.shared |= held.shared;
+            if device.fingerprint.is_empty() {
+                kept.fingerprint = held.fingerprint;
+                kept.host = held.host;
+                kept.port = held.port;
+            }
         }
         self.set_local_setting(
             &format!("{PREFIX}{}", device.id),
@@ -197,6 +210,7 @@ mod tests {
             host: Some("192.168.1.5".into()),
             port: Some(4000),
             last_sync: at,
+            shared: false,
         })?;
         s.remember_device(&PairedDevice {
             id: "desk".into(),
@@ -205,6 +219,7 @@ mod tests {
             host: None,
             port: None,
             last_sync: at,
+            shared: false,
         })?;
         let held = s.paired_device("desk")?;
         assert_eq!(held.as_ref().map(|d| d.port), Some(Some(4000)));

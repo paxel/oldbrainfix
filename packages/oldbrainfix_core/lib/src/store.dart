@@ -9,6 +9,7 @@ import 'blobs.dart';
 import 'conflicts.dart';
 import 'entry.dart';
 import 'photos.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 
 /// The log: an append-only entry log over SQLite with a latest-wins
@@ -40,6 +41,7 @@ class Store {
   void removeListener(void Function() listener) => _listeners.remove(listener);
 
   void _changed() {
+    _judged = null;
     if (_inBatch) return;
     for (final listener in List.of(_listeners)) {
       listener();
@@ -413,6 +415,7 @@ class Store {
       _db.execute('COMMIT');
     } catch (_) {
       _db.execute('ROLLBACK');
+      _judged = null;
       rethrow;
     } finally {
       _inBatch = false;
@@ -429,9 +432,44 @@ class Store {
       row['device'] as String: row['m'] as int,
   };
 
-  /// Every entry of [entity], in log order.
-  List<Entry> history(String entity) =>
-      _entries('SELECT * FROM entries WHERE entity = ? ORDER BY seq', [entity]);
+  /// Every entry of [entity] that counts, in log order: what no role in
+  /// a Shared Area allows is left out ([judged]).
+  List<Entry> history(String entity) {
+    final all = _entries(
+      'SELECT * FROM entries WHERE entity = ? ORDER BY seq',
+      [entity],
+    );
+    final ignored = judged.ignored;
+    if (ignored.isEmpty) return all;
+    return [
+      for (final e in all)
+        if (!ignored.contains(e.id)) e,
+    ];
+  }
+
+  /// Every entry of [entities] as it is, none left out, by (device,
+  /// dseq): what is relayed to another Device, which judges for itself.
+  List<Entry> rawHistoryOf(Iterable<String> entities) {
+    final ids = entities.toSet();
+    return [
+      for (final e in _entries('SELECT * FROM entries ORDER BY device, dseq'))
+        if (ids.contains(e.entity)) e,
+    ];
+  }
+
+  JudgedLog? _judged;
+
+  /// What the roles of the Shared Areas allow (ADR 0013), worked out
+  /// from the whole log after every change; nothing to work out while no
+  /// Area was ever shared.
+  JudgedLog get judged => _judged ??=
+      _db
+          .select(
+            "SELECT 1 FROM entries WHERE substr(field, 1, 5) = 'role:' LIMIT 1",
+          )
+          .isEmpty
+      ? JudgedLog.none
+      : judgeLog(_entries('SELECT * FROM entries ORDER BY seq'));
 
   /// Every entry, in log order.
   List<Entry> allEntries() => _entries('SELECT * FROM entries ORDER BY seq');

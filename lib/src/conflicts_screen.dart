@@ -25,17 +25,27 @@ class ConflictsScreen extends StatefulWidget {
 class _ConflictsScreenState extends State<ConflictsScreen> {
   var _conflicts = <Conflict>[];
 
+  /// The Conflicts this Device may pick a version of, by entity and unit.
+  var _picks = <(String, String)>{};
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _read();
   }
 
-  void _read() => _conflicts = visibleConflicts(
-    widget.store,
-    LockScope.of(context),
-    widget.store.conflicts(),
-  );
+  void _read() {
+    _conflicts = visibleConflicts(
+      widget.store,
+      LockScope.of(context),
+      widget.store.conflicts(),
+    );
+    // In a Shared Area only who may change a thing picks for it.
+    _picks = {
+      for (final c in _conflicts)
+        if (widget.store.mayResolve(c.entity, c.type)) (c.entity, c.unit),
+    };
+  }
 
   void _keep(Conflict conflict, ConflictVersion version) {
     widget.store.resolveConflict(conflict, version);
@@ -55,7 +65,9 @@ class _ConflictsScreenState extends State<ConflictsScreen> {
             _ConflictCard(
               store: widget.store,
               conflict: conflict,
-              onKeep: (version) => _keep(conflict, version),
+              onKeep: _picks.contains((conflict.entity, conflict.unit))
+                  ? (version) => _keep(conflict, version)
+                  : null,
             ),
         ],
       ),
@@ -66,7 +78,9 @@ class _ConflictsScreenState extends State<ConflictsScreen> {
 class _ConflictCard extends StatelessWidget {
   final Store store;
   final Conflict conflict;
-  final ValueChanged<ConflictVersion> onKeep;
+
+  /// Keeps a version; null where this Device may not pick.
+  final ValueChanged<ConflictVersion>? onKeep;
 
   const _ConflictCard({
     required this.store,
@@ -97,11 +111,15 @@ class _ConflictCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             if (note != null) Text(note),
+            if (onKeep == null) Text(t.onlyManagers),
             for (final version in conflict.versions)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: OutlinedButton(
-                  onPressed: () => onKeep(version),
+                  onPressed: switch (onKeep) {
+                    final keep? => () => keep(version),
+                    null => null,
+                  },
                   child: Semantics(
                     hint: t.conflictKeep,
                     child: Padding(

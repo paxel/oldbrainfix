@@ -41,9 +41,9 @@ use egui::{
     Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, ClockTime, Day, DeviceSettings, Importance, MissedSummary,
-    Note, Notes, NotesGo, Occurrence, Places, QuietHours, Routine, Routines, Search, Section,
-    Store, Topic, bundle,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
+    Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, Person, Places,
+    QuietHours, Routine, Routines, Search, Section, Store, Topic, bundle,
 };
 
 use crate::about_view;
@@ -115,10 +115,38 @@ struct AgendaView {
     unsorted: usize,
 }
 
+/// What this Device may do to the selected Note in a Shared Area
+/// (ADR 0013): change it (edit, file, merge, delete), give it Routines,
+/// and Amend it.
+#[derive(Debug, Clone, Copy)]
+struct NoteMay {
+    changes: bool,
+    schedules: bool,
+    amends: bool,
+}
+
+impl Default for NoteMay {
+    fn default() -> NoteMay {
+        NoteMay {
+            changes: true,
+            schedules: true,
+            amends: true,
+        }
+    }
+}
+
 /// What the panes show, read once per change.
 #[derive(Debug, Clone, Default)]
 struct View {
     areas: Vec<(Area, Vec<Topic>)>,
+    /// What this Device may do in each Area, and who shares the shared
+    /// ones.
+    access: std::collections::HashMap<String, AreaAccess>,
+    people: std::collections::HashMap<String, Vec<Person>>,
+    /// The person this Device belongs to in each Shared Area.
+    mine: std::collections::HashMap<String, String>,
+    /// What this Device may do to the selected Note.
+    may: NoteMay,
     notes: Vec<Placed>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
@@ -183,6 +211,24 @@ enum Dialog {
     },
     /// Whether the edited Routine or Reminder goes to the trash.
     DeleteRoutine {
+        question: String,
+    },
+    /// Sharing the Area `area`: both names and the role the other
+    /// person gets.
+    Share {
+        area: String,
+        own: String,
+        their: String,
+        role: AreaRole,
+    },
+    /// The people of the Shared Area `area`.
+    People {
+        area: String,
+    },
+    /// Whether `person` goes from the Shared Area `area`.
+    RemovePerson {
+        area: String,
+        person: String,
         question: String,
     },
 }
@@ -270,6 +316,24 @@ enum Action {
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window.
     ImportBundle(std::path::PathBuf),
+    /// Asks how the Area is to be shared.
+    Share(String),
+    /// Shares the Area of the Share dialog and hosts its invite.
+    StartInvite,
+    /// Shows who shares the Area.
+    People(String),
+    SetRole {
+        area: String,
+        person: String,
+        role: AreaRole,
+    },
+    /// Asks whether the person goes from the Area.
+    AskRemovePerson {
+        area: String,
+        person: String,
+    },
+    /// Takes the person asked about out of the Area.
+    RemovePerson,
 }
 
 /// A change in the Settings.
@@ -759,8 +823,18 @@ impl App {
         let notes = Notes::new(&self.store);
         let places = Places::new(&self.store);
         let mut areas = Vec::new();
+        let mut access = std::collections::HashMap::new();
+        let mut people = std::collections::HashMap::new();
+        let mut mine = std::collections::HashMap::new();
         for area in places.areas()? {
             let topics = places.topics(&area.id)?;
+            access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
+            if let Some(grants) = self.store.grants_of(&area.id)? {
+                people.insert(area.id.clone(), self.store.people(&area.id)?);
+                if let Some(person) = grants.person_of(&self.store.device_id()?) {
+                    mine.insert(area.id.clone(), person.to_string());
+                }
+            }
             areas.push((area, topics));
         }
         let routines = Routines::new(&self.store);
@@ -807,6 +881,16 @@ impl App {
             Some((p, _)) if !p.note.is_trashed() => routines.of_note(&p.note.id)?,
             _ => Vec::new(),
         };
+        let may = match &detail {
+            Some((p, _)) => NoteMay {
+                changes: self.store.may_change(&p.note.id)?,
+                schedules: self
+                    .store
+                    .may_manage(self.store.area_of(&p.note.id)?.as_deref())?,
+                amends: self.store.may_write_in(&p.note.id)?,
+            },
+            None => NoteMay::default(),
+        };
         let agenda = match self.selection {
             Selection::Agenda => {
                 let wall = &*self.wall;
@@ -844,6 +928,10 @@ impl App {
         }
         Ok(View {
             areas,
+            access,
+            people,
+            mine,
+            may,
             notes: placed,
             detail,
             routines: note_routines,
@@ -876,7 +964,11 @@ impl App {
     fn act(&mut self, action: Action) -> oldbrainfix_core::Result<()> {
         if matches!(
             action,
-            Action::NewArea | Action::NewTopic(_) | Action::Rename(_) | Action::StartMerge
+            Action::NewArea
+                | Action::NewTopic(_)
+                | Action::Rename(_)
+                | Action::StartMerge
+                | Action::Share(_)
         ) {
             self.focus = true;
         }
@@ -970,7 +1062,16 @@ impl App {
                 self.amend.clear();
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
-            Action::File { note, place } => notes.file(&note, &place)?,
+            Action::File { note, place } => {
+                // A card dragged by a Member that is not theirs, or into
+                // an Area this Device was taken out of, stays (ADR 0013).
+                if !self.store.may_change(&note)? || !self.store.may_write_in(&place)? {
+                    return Err(oldbrainfix_core::Error::Invalid(
+                        self.t.only_managers().into(),
+                    ));
+                }
+                notes.file(&note, &place)?;
+            }
             Action::Trash => {
                 self.save_text()?;
                 let linked = Routines::new(&self.store).of_note(&selected)?;
@@ -1096,6 +1197,14 @@ impl App {
             Action::OpenRoutine(id) => {
                 self.save_text()?;
                 let routines = Routines::new(&self.store);
+                // What only a Manager may change shows its Note instead.
+                if !self.store.may_change_routine(&id)? {
+                    if let Some(routine) = routines.by_id(&id)? {
+                        self.editor = None;
+                        self.selected_note = Some(routine.note_id);
+                    }
+                    return Ok(());
+                }
                 if let Some(routine) = routines.by_id(&id)? {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
@@ -1172,6 +1281,62 @@ impl App {
                 }
             }
             Action::ImportBundle(path) => self.import_bundle(&path),
+            Action::Share(area) => {
+                self.dialog = Some(Dialog::Share {
+                    area,
+                    own: self.store.local_setting(SHARE_NAME)?.unwrap_or_default(),
+                    their: String::new(),
+                    role: AreaRole::Member,
+                });
+            }
+            Action::StartInvite => {
+                if let Some(Dialog::Share {
+                    area,
+                    own,
+                    their,
+                    role,
+                }) = self.dialog.clone()
+                {
+                    self.store.set_local_setting(SHARE_NAME, own.trim())?;
+                    let area = self.store.share(&area, &own)?;
+                    self.dialog = None;
+                    self.save_text()?;
+                    self.query.clear();
+                    self.selection = Selection::Sync;
+                    self.sync.start_inviting(
+                        &self.store,
+                        Invite {
+                            area,
+                            role,
+                            name: their.trim().to_string(),
+                        },
+                    );
+                }
+            }
+            Action::Sync(SyncAction::StopInviting) => self.sync.stop_inviting(&self.store),
+            Action::People(area) => self.dialog = Some(Dialog::People { area }),
+            Action::SetRole { area, person, role } => self.store.set_role(&area, &person, role)?,
+            Action::AskRemovePerson { area, person } => {
+                let name = self
+                    .view
+                    .people
+                    .get(&area)
+                    .and_then(|people| people.iter().find(|p| p.id == person))
+                    .map(|p| person_name(&self.t, p))
+                    .unwrap_or_default();
+                let shown = self.shown_name(&area);
+                self.dialog = Some(Dialog::RemovePerson {
+                    question: self.t.remove_person_question(&name, &shown),
+                    area,
+                    person,
+                });
+            }
+            Action::RemovePerson => {
+                if let Some(Dialog::RemovePerson { area, person, .. }) = self.dialog.take() {
+                    self.store.remove_person(&area, &person)?;
+                    self.dialog = Some(Dialog::People { area });
+                }
+            }
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
             Action::Sync(SyncAction::Keep {
                 entity,
@@ -1552,13 +1717,42 @@ impl App {
                     let on = self.selection == Selection::Place(area.id.clone());
                     let resp = row(ui, tones, on, 0.0, icon, &area_name(&t, area), true);
                     place_row(&resp, &area.id, actions);
+                    let access = self.view.access.get(&area.id).copied();
+                    let manages =
+                        matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
+                    let people = self.view.people.get(&area.id);
+                    if let Some(people) = people {
+                        let names: Vec<String> =
+                            people.iter().map(|p| person_name(&t, p)).collect();
+                        ui.horizontal(|ui| {
+                            ui.add_space(32.0);
+                            ui.label(
+                                RichText::new(format!(
+                                    "{} · {}",
+                                    t.area_shared(),
+                                    names.join(", ")
+                                ))
+                                .small()
+                                .color(ui.visuals().weak_text_color()),
+                            );
+                        });
+                    }
                     resp.context_menu(|ui| {
-                        let items = [
-                            (t.new_topic(), Action::NewTopic(area.id.clone())),
-                            (t.rename(), Action::Rename(area.id.clone())),
-                            (t.area_look(), Action::Look(area.id.clone())),
-                            (t.delete(), Action::Delete(area.id.clone())),
-                        ];
+                        let mut items = Vec::new();
+                        if manages {
+                            items.extend([
+                                (t.new_topic(), Action::NewTopic(area.id.clone())),
+                                (t.rename(), Action::Rename(area.id.clone())),
+                                (t.area_look(), Action::Look(area.id.clone())),
+                                (t.share_area(), Action::Share(area.id.clone())),
+                            ]);
+                        }
+                        if people.is_some() {
+                            items.push((t.people_title(), Action::People(area.id.clone())));
+                        }
+                        if manages {
+                            items.push((t.delete(), Action::Delete(area.id.clone())));
+                        }
                         for (label, action) in items {
                             if ui.button(RichText::new(label).color(text)).clicked() {
                                 actions.push(action);
@@ -1569,6 +1763,9 @@ impl App {
                         let on = self.selection == Selection::Place(topic.id.clone());
                         let resp = row(ui, tones, on, 24.0, None, &topic_name(&t, topic), true);
                         place_row(&resp, &topic.id, actions);
+                        if !manages {
+                            continue;
+                        }
                         resp.context_menu(|ui| {
                             let items = [
                                 (t.rename(), Action::Rename(topic.id.clone())),
@@ -1719,6 +1916,10 @@ impl App {
             // An Area's level adds Topics (UI laws, "Navigation").
             if let Selection::Place(id) = &self.selection
                 && self.view.area(id).is_some()
+                && matches!(
+                    self.view.access.get(id),
+                    None | Some(AreaAccess::Owner | AreaAccess::Manager)
+                )
                 && icon_button(ui, icons::ADD, self.t.new_topic(), text).clicked()
             {
                 actions.push(Action::NewTopic(id.clone()));
@@ -1815,6 +2016,7 @@ impl App {
             return;
         };
         let linked = &self.view.routines;
+        let may = self.view.may;
         let t = self.t;
         let note = &placed.note;
         let trashed = note.is_trashed();
@@ -1836,7 +2038,8 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 embossed(ui, tones, false, None, |ui| {
-                    if trashed {
+                    // A Member reads someone else's Note (ADR 0013).
+                    if trashed || !may.changes {
                         ui.label(RichText::new(&note.text).size(18.0).color(text));
                         return;
                     }
@@ -1892,7 +2095,7 @@ impl App {
                     ];
                     for (importance, label) in choices {
                         let on = note.importance == importance;
-                        if trashed {
+                        if trashed || !may.changes {
                             if on {
                                 ui.label(RichText::new(label).color(text));
                             }
@@ -1925,6 +2128,9 @@ impl App {
                             icons::show(ui, icons::TRASH, 18.0, weak);
                             ui.label(RichText::new(t.trash_title()).color(text));
                         });
+                        return;
+                    }
+                    if !may.changes {
                         return;
                     }
                     ui.menu_button(RichText::new(t.file_into()).color(text), |ui| {
@@ -1977,7 +2183,7 @@ impl App {
                     });
                 }
                 if trashed {
-                    if ui.button(RichText::new(t.restore()).color(text)).clicked() {
+                    if may.changes && ui.button(RichText::new(t.restore()).color(text)).clicked() {
                         actions.push(Action::Restore);
                     }
                     return;
@@ -1995,6 +2201,10 @@ impl App {
                             actions.push(Action::OpenRoutine(routine.id.clone()));
                         }
                     }
+                    if !may.schedules {
+                        ui.label(RichText::new(t.only_managers()).small().color(weak));
+                        return;
+                    }
                     ui.horizontal(|ui| {
                         for (reminder, label) in [(false, t.routine()), (true, t.reminder())] {
                             if ui.button(RichText::new(label).color(text)).clicked() {
@@ -2006,6 +2216,9 @@ impl App {
                         }
                     });
                 });
+                if !may.amends {
+                    return;
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.add(
                         TextEdit::multiline(amend)
@@ -2025,6 +2238,9 @@ impl App {
                         actions.push(Action::Amend);
                     }
                 });
+                if !may.changes {
+                    return;
+                }
                 ui.horizontal(|ui| {
                     if ui
                         .button(RichText::new(t.merge_into()).color(text))
@@ -2098,6 +2314,35 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.delete()) {
                                 actions.push(Action::DeleteRoutine);
+                            }
+                        });
+                    }
+                    Dialog::Share {
+                        area,
+                        own,
+                        their,
+                        role,
+                    } => {
+                        let shown = view
+                            .area(area)
+                            .map(|a| area_name(&t, a))
+                            .unwrap_or_default();
+                        share_form(ui, &t, &shown, (own, their, role), focus, actions);
+                    }
+                    Dialog::People { area } => {
+                        let manages = view.access.get(area) == Some(&AreaAccess::Manager);
+                        let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
+                        let mine = view.mine.get(area).map(String::as_str);
+                        people_form(ui, &t, area, (people, mine), manages, actions);
+                    }
+                    Dialog::RemovePerson { question, .. } => {
+                        title(ui, question);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.remove_person_detail()).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove_person()) {
+                                actions.push(Action::RemovePerson);
                             }
                         });
                     }
@@ -2545,6 +2790,104 @@ fn name_form(
     });
 }
 
+/// How an Area is shared: both names, the role, and the button that
+/// shows the invite's code.
+fn share_form(
+    ui: &mut Ui,
+    t: &L10n,
+    area: &str,
+    (own, their, role): (&mut String, &mut String, &mut AreaRole),
+    focus: bool,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, &t.share_title(area));
+    ui.label(RichText::new(t.share_host_intro()).color(weak));
+    ui.label(RichText::new(t.share_your_name()).color(text));
+    focused_field(ui, (&mut *own, focus), "share own", t.name_hint());
+    ui.label(RichText::new(t.share_their_name()).color(text));
+    ui.add(
+        TextEdit::singleline(their)
+            .id(Id::new("share their"))
+            .hint_text(t.name_hint())
+            .text_color(text),
+    );
+    ui.label(RichText::new(t.role_heading()).strong().color(text));
+    for (choice, label, detail) in [
+        (AreaRole::Member, t.role_member(), t.role_member_detail()),
+        (AreaRole::Manager, t.role_manager(), t.role_manager_detail()),
+    ] {
+        ui.radio_value(role, choice, RichText::new(label).color(text));
+        ui.label(RichText::new(detail).small().color(weak));
+    }
+    let ready = !own.trim().is_empty() && !their.trim().is_empty();
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        let button = egui::Button::new(RichText::new(t.share_show_code()).color(text));
+        if ui.add_enabled(ready, button).clicked() {
+            actions.push(Action::StartInvite);
+        }
+    });
+}
+
+/// The people of a Shared Area with their roles; a Manager changes them
+/// and takes them out here.
+fn people_form(
+    ui: &mut Ui,
+    t: &L10n,
+    area: &str,
+    (people, mine): (&[Person], Option<&str>),
+    manages: bool,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, t.people_title());
+    ui.label(RichText::new(t.people_intro()).small().color(weak));
+    for person in people {
+        let own = Some(person.id.as_str()) == mine;
+        let name = person_name(t, person);
+        let name = if own { t.people_you(&name) } else { name };
+        let role = match person.role {
+            AreaRole::Manager => t.role_manager(),
+            AreaRole::Member => t.role_member(),
+        };
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(name).color(text));
+            ui.label(RichText::new(role).small().color(weak));
+            if !manages || own {
+                return;
+            }
+            let (label, next) = match person.role {
+                AreaRole::Member => (t.make_manager(), AreaRole::Manager),
+                AreaRole::Manager => (t.make_member(), AreaRole::Member),
+            };
+            if ui.button(RichText::new(label).color(text)).clicked() {
+                actions.push(Action::SetRole {
+                    area: area.to_string(),
+                    person: person.id.clone(),
+                    role: next,
+                });
+            }
+            if ui
+                .button(RichText::new(t.remove_person()).color(text))
+                .clicked()
+            {
+                actions.push(Action::AskRemovePerson {
+                    area: area.to_string(),
+                    person: person.id.clone(),
+                });
+            }
+        });
+    }
+    ui.horizontal(|ui| {
+        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+            actions.push(Action::CloseDialog);
+        }
+    });
+}
+
 /// An Area's colour and icon, each kept as it is picked.
 fn look_form(ui: &mut Ui, t: &L10n, area: Option<&Area>, actions: &mut Vec<Action>) {
     let Some(area) = area else {
@@ -2693,6 +3036,19 @@ fn merge_form(
 /// How much tomorrow is faded on the Agenda (the phone's
 /// `tomorrowOpacity`).
 pub const TOMORROW_OPACITY: f32 = 0.55;
+
+/// The local setting holding the name this Device's person last shared
+/// an Area under, as the phone keeps it.
+const SHARE_NAME: &str = "shareName";
+
+/// The name `person` goes by, or a word for someone without one.
+fn person_name(t: &L10n, person: &Person) -> String {
+    if person.name.is_empty() {
+        t.people_no_name().to_string()
+    } else {
+        person.name.clone()
+    }
+}
 
 /// The Settings' card on the capture popup's hotkey and the
 /// `oldbrainfix capture` command: the chord as typed, and how the hotkey

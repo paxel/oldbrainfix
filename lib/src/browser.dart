@@ -105,7 +105,8 @@ class BrowserSearchField extends StatelessWidget {
 }
 
 /// Notes as a diary of cards, each with "file into…", "merge into…"
-/// and, with [onSchedule], Routine or Reminder; tapping a card opens it.
+/// and, with [onSchedule], Routine or Reminder, as far as this Device
+/// may; tapping a card opens it.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
@@ -117,15 +118,16 @@ List<Widget> diaryCards(
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
   return [
-    for (final (:note, :area, :topic) in shown)
+    for (final (:note, :area, :topic, :changes, :schedules) in shown)
       NoteCard(
         note: note,
         when: when,
         area: area,
         topic: topic,
-        onFile: () => onFile(note),
-        onMerge: () => onMerge(note),
-        onSchedule: onSchedule == null
+        // What a Member may not do to it is not offered (ADR 0013).
+        onFile: changes ? () => onFile(note) : null,
+        onMerge: changes ? () => onMerge(note) : null,
+        onSchedule: onSchedule == null || !schedules
             ? null
             : (reminder) => onSchedule(note, reminder),
         onTap: () => onOpen(note),

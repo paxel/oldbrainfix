@@ -131,5 +131,13 @@
   "aboutVersion": "Version {version}",
   "@aboutVersion": {"placeholders": {"version": {"type": "String"}}},
   "licensesIntro": "Every third-party component in this app, with its license. Click one to read it.",
-  "@licensesIntro": {"description": "Top of the desktop licenses page."}
+  "@licensesIntro": {"description": "Top of the desktop licenses page."},
+  "shareShowCode": "Show the code",
+  "@shareShowCode": {"description": "In the desktop's Share dialog: starts hosting the invite and shows its code in the Sync view."},
+  "shareHostIntro": "The other person's phone scans this code in Sync. It gets this Area and nothing else.",
+  "@shareHostIntro": {"description": "In the desktop's Share dialog, above its fields."},
+  "invitingBanner": "Inviting {name} to {area} as {role}. The code below is for them.",
+  "@invitingBanner": {"description": "Above the pair code in the Sync view while it invites someone to a Shared Area.", "placeholders": {"name": {"type": "String"}, "area": {"type": "String"}, "role": {"type": "String"}}},
+  "stopInviting": "Stop inviting",
+  "@stopInviting": {"description": "Ends the invite in the Sync view; hosting goes on with a fresh code."}
 }

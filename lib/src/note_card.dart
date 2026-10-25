@@ -11,15 +11,41 @@ import 'speech_platform.dart';
 import 'voice_platform.dart';
 
 /// A Note with the Area and Topic it is filed in, read once per change.
-typedef PlacedNote = ({Note note, Area? area, Topic? topic});
+/// A Note with where it is filed and what this Device may do to it in a
+/// Shared Area (ADR 0013): change it ([changes]: file, merge, edit,
+/// delete) and give it Routines or Reminders ([schedules]).
+typedef PlacedNote = ({
+  Note note,
+  Area? area,
+  Topic? topic,
+  bool changes,
+  bool schedules,
+});
 
-/// Looks up where [note] is filed.
+/// Looks up where [note] is filed, and what this Device may do to it.
 PlacedNote placeNote(Places places, Note note) {
+  final store = places.store;
+  final changes = store.mayChange(note.id);
+  final schedules = store.mayManage(store.areaOf(note.id));
   final place = note.place;
-  if (place == null) return (note: note, area: null, topic: null);
+  if (place == null) {
+    return (
+      note: note,
+      area: null,
+      topic: null,
+      changes: changes,
+      schedules: schedules,
+    );
+  }
   final topic = places.topicById(place);
   final area = places.areaById(topic?.areaId ?? place);
-  return (note: note, area: area, topic: topic);
+  return (
+    note: note,
+    area: area,
+    topic: topic,
+    changes: changes,
+    schedules: schedules,
+  );
 }
 
 /// [location] as shown: degrees to four places, about ten metres.

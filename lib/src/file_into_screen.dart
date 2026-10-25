@@ -32,18 +32,21 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
     int byName(String a, String b) =>
         a.toLowerCase().compareTo(b.toLowerCase());
     final lock = LockScope.of(context);
-    // A closed locked Area takes Notes, but keeps its Topics to itself.
+    // A closed locked Area takes Notes, but keeps its Topics to itself;
+    // a Shared Area this Device was removed from takes none (ADR 0013).
+    final store = widget.places.store;
     _tree = [
       for (final area
           in widget.places.areas()
             ..sort((a, b) => byName(areaName(t, a), areaName(t, b))))
-        (
-          area,
-          (lock?.isAreaClosed(area.id) ?? false)
-              ? <Topic>[]
-              : (widget.places.topics(area.id)
-                  ..sort((a, b) => byName(topicName(t, a), topicName(t, b)))),
-        ),
+        if (store.mayWriteIn(area.id))
+          (
+            area,
+            (lock?.isAreaClosed(area.id) ?? false)
+                ? <Topic>[]
+                : (widget.places.topics(area.id)
+                    ..sort((a, b) => byName(topicName(t, a), topicName(t, b)))),
+          ),
     ];
     _loaded = true;
   }

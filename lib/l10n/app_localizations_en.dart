@@ -1647,4 +1647,96 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bundleNoApp => 'No app here can take the bundle.';
+
+  @override
+  String get shareArea => 'Share…';
+
+  @override
+  String get areaShared => 'Shared';
+
+  @override
+  String get peopleTitle => 'People';
+
+  @override
+  String shareTitle(String area) {
+    return 'Share $area';
+  }
+
+  @override
+  String get shareIntro =>
+      'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.';
+
+  @override
+  String get shareYourName => 'Your name';
+
+  @override
+  String get shareTheirName => 'Their name';
+
+  @override
+  String get roleHeading => 'They may';
+
+  @override
+  String get roleManager => 'Manager';
+
+  @override
+  String get roleMember => 'Member';
+
+  @override
+  String get roleManagerDetail => 'Everything in this Area.';
+
+  @override
+  String get roleMemberDetail =>
+      'Add Notes and change their own, add to any Note and check off Routines and Reminders.';
+
+  @override
+  String get shareInvite => 'Invite';
+
+  @override
+  String get shareNamesMissing => 'Fill in both names first.';
+
+  @override
+  String shareDone(String area, String name) {
+    return '$area is now shared with $name.';
+  }
+
+  @override
+  String sharedWithYou(String name, String area) {
+    return '$name shared $area with you.';
+  }
+
+  @override
+  String peopleYou(String name) {
+    return '$name (you)';
+  }
+
+  @override
+  String get peopleNoName => 'Someone';
+
+  @override
+  String get makeManager => 'Make Manager';
+
+  @override
+  String get makeMember => 'Make Member';
+
+  @override
+  String get removePerson => 'Remove';
+
+  @override
+  String removePersonQuestion(String name, String area) {
+    return 'Remove $name from $area?';
+  }
+
+  @override
+  String get removePersonDetail =>
+      'Nothing more of this Area goes to them. What they already have stays with them.';
+
+  @override
+  String get peopleIntro =>
+      'A Manager may do everything here. A Member may add Notes and change their own, add to any Note and check off Routines and Reminders.';
+
+  @override
+  String get onlyManagers => 'Only a Manager of this Area can change this.';
+
+  @override
+  String get pairedPerson => 'Another person\'s Device';
 }

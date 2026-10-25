@@ -30,6 +30,7 @@ pub mod routines;
 pub mod schedule;
 pub mod search;
 pub mod settings;
+pub mod shared;
 pub mod signing;
 pub mod store;
 pub mod sync;
@@ -49,6 +50,7 @@ pub use schedule::{
 };
 pub use search::Search;
 pub use settings::DeviceSettings;
+pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, Store};
 pub use sync::Moment;

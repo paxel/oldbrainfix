@@ -109,10 +109,12 @@ class _TrashScreenState extends State<TrashScreen> {
               ),
               const SizedBox(height: 4),
               Text(scheduleText(t, locale, routine.schedule)),
-              _footer(
-                _routines.purgeAt(routine),
-                () => _restoreRoutine(routine),
-              ),
+              // Only a Manager restores it in a Shared Area (ADR 0013).
+              if (widget.notes.store.mayChangeRoutine(routine.id))
+                _footer(
+                  _routines.purgeAt(routine),
+                  () => _restoreRoutine(routine),
+                ),
             ],
           ),
         ),
@@ -137,16 +139,21 @@ class _TrashScreenState extends State<TrashScreen> {
                     :final note,
                     :final area,
                     :final topic,
+                    :final changes,
+                    schedules: _,
                   ))
                     NoteCard(
                       note: note,
                       when: when,
                       area: area,
                       topic: topic,
-                      footer: _footer(
-                        widget.notes.purgeAt(note),
-                        () => _restoreNote(note),
-                      ),
+                      // Only who may change it restores it (ADR 0013).
+                      footer: changes
+                          ? _footer(
+                              widget.notes.purgeAt(note),
+                              () => _restoreNote(note),
+                            )
+                          : null,
                     )
                   else if (trashed.routine case final routine?)
                     _routineCard(routine),

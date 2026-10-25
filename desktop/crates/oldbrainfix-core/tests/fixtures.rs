@@ -1520,3 +1520,253 @@ fn the_bundle_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
     }
     Ok(())
 }
+
+// -------------------------------------------------------- Shared Areas
+
+/// A clock held where a test puts it.
+fn held_clock(
+    at: &str,
+) -> Result<std::sync::Arc<parking_lot::Mutex<DateTime<Utc>>>, Box<dyn std::error::Error>> {
+    Ok(std::sync::Arc::new(parking_lot::Mutex::new(parse_time(
+        at,
+    )?)))
+}
+
+/// One Device of the `shared` fixture: the log `file`, the keys its side
+/// of `settings.json` holds, on the held `clock`.
+fn shared_device(
+    file: &str,
+    side: &str,
+    key: fn() -> SigningKey,
+    clock: &std::sync::Arc<parking_lot::Mutex<DateTime<Utc>>>,
+) -> Result<Store, Box<dyn std::error::Error>> {
+    let dir = fixtures().join("shared");
+    let held = clock.clone();
+    let store = Store::in_memory(Box::new(move || *held.lock()), move || Ok(key()))?;
+    store.set_local_setting("author", "Ada")?;
+    insert_lines(&store, &dir.join(file))?;
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings[side].as_array().ok_or("settings")? {
+        store.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    Ok(store)
+}
+
+fn insert_lines(store: &Store, path: &Path) -> TestResult {
+    let text = std::fs::read_to_string(path)?;
+    for line in text.lines().filter(|l| !l.is_empty()) {
+        store.insert(&serde_json::from_str(line)?)?;
+    }
+    Ok(())
+}
+
+/// The entries `store` wrote after `mark`, as lines of the log files.
+fn lines_after(store: &Store, mark: i64) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    Ok(store
+        .entries_after(mark)?
+        .iter()
+        .map(|e| serde_json::to_string(&e.wire()))
+        .collect::<Result<_, _>>()?)
+}
+
+fn lines_of(path: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    Ok(std::fs::read_to_string(path)?
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+/// What the roles of `area` come to on `store`, in the shape of the
+/// generator's `_roles`.
+fn roles_json(
+    store: &Store,
+    area: &str,
+    ids: &[String],
+) -> Result<Value, Box<dyn std::error::Error>> {
+    let mut may = serde_json::Map::new();
+    for id in ids {
+        may.insert(id.clone(), json!(store.may_change(id)?));
+    }
+    let mut ignored: Vec<String> = store.judged()?.ignored.iter().cloned().collect();
+    ignored.sort();
+    let mut routines = Vec::new();
+    let mut ids_of = store.entities_of_type("routine")?;
+    ids_of.sort();
+    for id in ids_of {
+        if let Some(r) = Routines::new(store).by_id(&id)? {
+            routines.push(routine_json(&r));
+        }
+    }
+    Ok(json!({
+        "access": store.access_in(area, None)?.name(),
+        "shared": store.is_shared(area)?,
+        "people": store.people(area)?.iter().map(|p| json!({
+            "id": p.id,
+            "name": p.name,
+            "role": p.role.name(),
+            "devices": p.devices,
+        })).collect::<Vec<_>>(),
+        "mayChange": may,
+        "mayManage": store.may_manage(Some(area))?,
+        "ignored": ignored,
+        "routines": routines,
+    }))
+}
+
+fn without_device(mut value: Value) -> Value {
+    if let Some(map) = value.as_object_mut() {
+        map.remove("device");
+    }
+    value
+}
+
+#[test]
+fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
+    use oldbrainfix_core::lan::{
+        Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
+    };
+    use oldbrainfix_core::{AreaRole, Invite, PairedDevice};
+    let dir = fixtures().join("shared");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let at = |key: &str| -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+        Ok(parse_time(expected[key].as_str().ok_or("a time")?)?)
+    };
+    let clock = held_clock(expected["shareAt"].as_str().ok_or("shareAt")?)?;
+    let mut ann = shared_device("before.jsonl", "host", writer_key, &clock)?;
+    let ids = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(
+        expected["ids"].as_u64().ok_or("ids")?,
+    ));
+    ann.set_id_maker(Box::new(move || {
+        let n = ids.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        Ok(format!("{n:032x}"))
+    }));
+
+    // Sharing the starter Household moves it and makes Ann its Manager,
+    // to the same entries.
+    let mark = ann.current_seq()?;
+    let area = ann.share(
+        &oldbrainfix_core::places::starter_id("area", "household"),
+        "Ann",
+    )?;
+    assert_eq!(area, expected["area"].as_str().ok_or("area")?);
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("share.jsonl"))?
+    );
+    for pair in expected["keysAfterShare"].as_array().ok_or("keys")? {
+        ann.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+
+    // The invite session: Ben sends nothing of his own, Ann only the Area.
+    *clock.lock() = at("sessionAt")?;
+    let ben = shared_device("joiner.jsonl", "joiner", joiner_key, &clock)?;
+    let ann_id = ann.device_id()?;
+    let request = sync_request_as(
+        &ben,
+        &ann.version_vector()?,
+        "Phone",
+        &ann_id,
+        "246810",
+        Joining::Invited,
+    )?;
+    assert_eq!(request, read_json(&dir.join("request.json"))?);
+    let invite = Invite {
+        area: area.clone(),
+        role: AreaRole::Member,
+        name: "Ben".into(),
+    };
+    let (answer, session) =
+        answer_sync_inviting(&ann, &request, "Desk", Some(&invite))?.ok_or("an answer")?;
+    assert_eq!(answer, read_json(&dir.join("answer.json"))?);
+    assert_eq!(session.shared_area.as_deref(), Some(area.as_str()));
+    let back = apply_answer_as(&ben, &answer, true, None)?;
+    assert_eq!(back.shared_area.as_deref(), Some(area.as_str()));
+    // A plain joiner is not answered by a host that invites.
+    let plain = sync_request(&ben, &ann.version_vector()?, "Phone", &ann_id, "")?;
+    assert!(answer_sync_inviting(&ann, &plain, "Desk", Some(&invite))?.is_none());
+    let now = at("sessionAt")?;
+    for (store, peer, name) in [
+        (&ann, ben.device_id()?, "Phone"),
+        (&ben, ann_id.clone(), "Desk"),
+    ] {
+        store.remember_device(&PairedDevice {
+            id: peer,
+            name: name.into(),
+            fingerprint: String::new(),
+            host: None,
+            port: None,
+            last_sync: now,
+            shared: true,
+        })?;
+    }
+    let after_invite = &expected["afterInvite"];
+    assert_eq!(without_device(read(&ann)?), after_invite["host"]);
+    assert_eq!(without_device(read(&ben)?), after_invite["joiner"]);
+
+    // What Ben wrote, allowed and not, and Ann filing a Note in; then a
+    // paired session: only the Area goes, the filed Note whole.
+    insert_lines(&ben, &dir.join("member.jsonl"))?;
+    insert_lines(&ann, &dir.join("owner.jsonl"))?;
+    *clock.lock() = at("syncAt")?;
+    let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann_id, "")?;
+    assert_eq!(request, read_json(&dir.join("request2.json"))?);
+    let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+    assert_eq!(answer, read_json(&dir.join("answer2.json"))?);
+    apply_answer_as(&ben, &answer, true, None)?;
+    let after = &expected["after"];
+    let ids: Vec<String> = after["hostRoles"]["mayChange"]
+        .as_object()
+        .ok_or("mayChange")?
+        .keys()
+        .cloned()
+        .collect();
+    assert_eq!(without_device(read(&ann)?), after["host"]);
+    assert_eq!(without_device(read(&ben)?), after["joiner"]);
+    assert_eq!(roles_json(&ann, &area, &ids)?, after["hostRoles"]);
+    assert_eq!(roles_json(&ben, &area, &ids)?, after["joinerRoles"]);
+
+    // Ann makes Ben a Manager, then removes him: the same entries, and
+    // nothing more goes to him.
+    let person = expected["person"].as_str().ok_or("person")?;
+    *clock.lock() = at("roleAt")?;
+    let mark = ann.current_seq()?;
+    ann.set_role(&area, person, AreaRole::Manager)?;
+    assert_eq!(lines_after(&ann, mark)?, lines_of(&dir.join("role.jsonl"))?);
+    // Ben learns of it and writes as a Manager: that counts now, what he
+    // wrote as a Member still not.
+    let session = |at: DateTime<Utc>| -> TestResult {
+        *clock.lock() = at;
+        let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann_id, "")?;
+        let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+        apply_answer_as(&ben, &answer, true, None)?;
+        Ok(())
+    };
+    session(at("promoteSyncAt")?)?;
+    insert_lines(&ben, &dir.join("manager.jsonl"))?;
+    session(at("managerSyncAt")?)?;
+    assert_eq!(roles_json(&ann, &area, &ids)?, expected["promoted"]["host"]);
+    assert_eq!(
+        roles_json(&ben, &area, &ids)?,
+        expected["promoted"]["joiner"]
+    );
+    *clock.lock() = at("removeAt")?;
+    let mark = ann.current_seq()?;
+    ann.remove_person(&area, person)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("remove.jsonl"))?
+    );
+    *clock.lock() = at("lastAt")?;
+    let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann_id, "")?;
+    let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+    assert_eq!(answer, read_json(&dir.join("answer3.json"))?);
+    assert_eq!(roles_json(&ann, &area, &ids)?, expected["removed"]);
+    Ok(())
+}

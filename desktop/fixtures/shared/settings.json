@@ -1,0 +1,22 @@
+{
+  "host": [
+    [
+      "areakey:091829fce9ffd70f",
+      "{\"key\":\"gYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6A=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:666ca2d92a14e93f",
+      "{\"key\":\"pqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMU=\",\"scope\":\"area:starter-health\"}"
+    ],
+    [
+      "areakey:772c696bbf5e6f98",
+      "{\"key\":\"y8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6eo=\",\"scope\":\"area:starter-household\"}"
+    ]
+  ],
+  "joiner": [
+    [
+      "areakey:b92e87964e56e1bd",
+      "{\"key\":\"8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8=\",\"scope\":\"personal\"}"
+    ]
+  ]
+}

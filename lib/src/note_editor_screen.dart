@@ -84,6 +84,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   List<Routine> _routines = const [];
   late final _routineBook = Routines(widget.notes.store);
 
+  /// Whether this Device may Amend the Note: anywhere it holds a role.
+  bool _amends = true;
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +154,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _load() {
     final note = widget.notes.byId(widget.noteId);
     _placed = note == null ? null : placeNote(widget.places, note);
+    _amends = widget.notes.store.mayWriteIn(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
   }
@@ -162,7 +166,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _saveText() {
     _draftTimer?.cancel();
     final note = _placed?.note;
-    if (note == null) return;
+    if (note == null || !(_placed?.changes ?? false)) return;
     unawaited(widget.drafts.delete(note.id));
     final text = _text.text.trim();
     if (text.isEmpty || text == note.text) return;
@@ -302,7 +306,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final t = context.t;
     final placed = _placed;
     if (placed == null) return Scaffold(appBar: AppBar());
-    final (:note, :area, :topic) = placed;
+    final (:note, :area, :topic, :changes, :schedules) = placed;
+    // In a Shared Area a Member changes only their own Notes, and only a
+    // Manager their Routines (ADR 0013); Amend stays.
+    final amends = _amends;
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     final colour = areaColour(area?.colour);
@@ -321,16 +328,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           title: Text(t.noteTitle),
           actions: [
             CalendarButton(choices: _calendarChoices),
-            IconButton(
-              tooltip: t.mergeInto,
-              onPressed: _merge,
-              icon: const Icon(Icons.call_merge),
-            ),
-            IconButton(
-              tooltip: t.moveToTrash,
-              onPressed: _trash,
-              icon: const Icon(Icons.delete_outline),
-            ),
+            if (changes) ...[
+              IconButton(
+                tooltip: t.mergeInto,
+                onPressed: _merge,
+                icon: const Icon(Icons.call_merge),
+              ),
+              IconButton(
+                tooltip: t.moveToTrash,
+                onPressed: _trash,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
           ],
         ),
         body: ListView(
@@ -342,6 +351,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
                   controller: _text,
+                  readOnly: !changes,
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
                   style: Theme.of(context).textTheme.bodyLarge,
@@ -404,7 +414,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ],
                 selected: {note.importance},
                 showSelectedIcon: false,
-                onSelectionChanged: _setImportance,
+                onSelectionChanged: changes ? _setImportance : null,
               ),
             ),
             EditorPanel(
@@ -424,11 +434,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(child: Text(place)),
-                      IconButton(
-                        tooltip: t.fileInto,
-                        onPressed: _file,
-                        icon: const Icon(Icons.drive_file_move_outline),
-                      ),
+                      if (changes)
+                        IconButton(
+                          tooltip: t.fileInto,
+                          onPressed: _file,
+                          icon: const Icon(Icons.drive_file_move_outline),
+                        ),
                     ],
                   ),
                 ],
@@ -459,21 +470,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         ),
                         onTap: () => _openRoutine(routine),
                       ),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        FilledButton.tonalIcon(
-                          onPressed: () => _spawn(reminder: false),
-                          icon: const Icon(Icons.repeat),
-                          label: Text(t.routine),
-                        ),
-                        FilledButton.tonalIcon(
-                          onPressed: () => _spawn(reminder: true),
-                          icon: const Icon(Icons.notifications_outlined),
-                          label: Text(t.reminder),
-                        ),
-                      ],
-                    ),
+                    if (!schedules)
+                      Text(t.onlyManagers)
+                    else
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: () => _spawn(reminder: false),
+                            icon: const Icon(Icons.repeat),
+                            label: Text(t.routine),
+                          ),
+                          FilledButton.tonalIcon(
+                            onPressed: () => _spawn(reminder: true),
+                            icon: const Icon(Icons.notifications_outlined),
+                            label: Text(t.reminder),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -523,14 +537,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.tonalIcon(
-                onPressed: _amend,
-                icon: const Icon(Icons.add),
-                label: Text(t.amend),
+            if (amends)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  onPressed: _amend,
+                  icon: const Icon(Icons.add),
+                  label: Text(t.amend),
+                ),
               ),
-            ),
           ],
         ),
       ),

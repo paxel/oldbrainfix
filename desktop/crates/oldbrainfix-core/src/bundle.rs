@@ -87,7 +87,9 @@ fn path_of(dir: &str, name: &str) -> String {
 /// returns how many entries and blobs it carries; none, writing nothing,
 /// when there is nothing to send. For the paired Device `for_device` it
 /// holds what lies beyond what that Device last said it holds, else
-/// everything; the blobs only of the entries in it.
+/// everything; the blobs only of the entries in it. For another person's
+/// Device, paired by invite, only what lies in the Areas it shares, with
+/// the whole history of Notes filed into them meanwhile (ADR 0013).
 pub fn write_bundle(
     store: &Store,
     path: &Path,
@@ -98,7 +100,12 @@ pub fn write_bundle(
         Some(device) => store.held_by(device)?,
         None => HashMap::new(),
     };
-    let entries = store.entries_since(&since)?;
+    let entries = match for_device {
+        Some(device) if store.is_shared_peer(device)? => {
+            store.entries_for(device, &since, false, &[])?
+        }
+        _ => store.entries_since(&since)?,
+    };
     if entries.is_empty() {
         return Ok(None);
     }

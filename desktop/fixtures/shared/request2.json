@@ -1,0 +1,211 @@
+{
+  "format": 3,
+  "deviceId": "c945cbf2a5602002141e2fb9d17054d6",
+  "name": "Phone",
+  "proof": "h2abveNbJ58jdblj9aIX7Jy9G9gvc7pEVFOWWYW1tJD8Vlv5JJEUo+U1hYUYCe4dcGe0odqeM9UKvmPdHCfmCQ==",
+  "vector": {
+    "65b60673d6ed884bf01c2c222d82ada0": 44,
+    "c945cbf2a5602002141e2fb9d17054d6": 25
+  },
+  "entries": [
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 4,
+      "entity": "note:00000000000000000000000000000103",
+      "field": "$type",
+      "value": "note",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "p9tbmS1g3f4Z2xFjcx5VtPHU9HdNy+TX9Byz8+C1rFSCQO8tBo6eppmE3wgtob6hOOdIr8T3EGgpNsz3B+ykCA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 5,
+      "entity": "note:00000000000000000000000000000103",
+      "field": "captured",
+      "value": "2026-02-01T11:00:00.000Z",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "4c/88WsruRME5m7EAXSdKJFSSdr77ZlBJXFN65EZRHantXimdEA1WLUpuh8EU8S3lqt9lctnax1VRCSV50gtCA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 6,
+      "entity": "note:00000000000000000000000000000103",
+      "field": "text",
+      "value": "Ben buys bread",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "SwTjHmy19fuukuGLUqSo5A9i6QtTH/UB2qjmGWenMtOfRDftuAD1ohHhpZCb7gOdH3vyGcQkl8YJQIoV8MsTBw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 7,
+      "entity": "note:00000000000000000000000000000103",
+      "field": "place",
+      "value": "topic:00000000000000000000000000000102",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "9wD3q8bFGPaqmQRA+wV0R+ZX3W3wKy5RBgC6o36yAWrA+rLe/HGXDRqVwbKrl3wePdlF1krvNotLrmOGfRqWAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 8,
+      "entity": "note:00000000000000000000000000000103",
+      "field": "text",
+      "value": "Ben buys rye bread",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "",
+      "sig": "8l3UVei5DL77oDxYZrj0H9w1DLl+eXvGtjcwh5AH6KFcZsMQVokivom+bR/fw7HUolxGT/BuF1IzZGxLMtqPCw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 9,
+      "entity": "section:00000000000000000000000000000104",
+      "field": "$type",
+      "value": "section",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "Iy7ERd0VdMv2zfOVEyiq6nIFjKNDHIlOetUOiVzPqVRvdHqWu3Q2qAaFgU9czuoKMAe3pso6tnQjHC2B8SpDBA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 10,
+      "entity": "section:00000000000000000000000000000104",
+      "field": "note",
+      "value": "note:00000000000000000000000000000001",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "Oe6CbERqKOrKP0/wKFU1YR6mkXckKYjFiLzMvx5Aq5qEww32SqKUp/2H0HEWmI6Ap5Y6oviJHQuRQ2WaZUGmDw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 11,
+      "entity": "section:00000000000000000000000000000104",
+      "field": "captured",
+      "value": "2026-02-01T11:00:00.000Z",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "ZUIAVLszFHrupyrtzvUGdoK3XPvm7rTm3KWVMMHo/FAyu0Df040dYoFXN4O9kcK7APX6H8RM+pBsP0Fp6CaeBw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 12,
+      "entity": "section:00000000000000000000000000000104",
+      "field": "text",
+      "value": "Oat milk please",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "1uIZISh4tuiIPDSgdIzan8sqI5ZSrjmo5CxFKQj4ngctRGD2/Qs9t0AuLzixT0ycJ14gMrBuf6Z+UvCVHPfDDg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 13,
+      "entity": "routine:00000000000000000000000000000002",
+      "field": "done@2026-02-01T08:00",
+      "value": "2026-02-01T11:00:00.000Z",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "WQfX4wKwJ0OCeAO4Ki7pmxNvNcEkoxV3Q2X7itYJIaQI3pUSH0k7JN8jYnkHWqBGoDC+9osSQeVsTch/Ws1TCw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 14,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "text",
+      "value": "Buy beer",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
+      "sig": "HRR6TO/Fu9LrWhTRuWmDHD4qiDfFzezyU3TOsMRFMIZCAsMiVcn3dLMOFKrqEFlP92OtloCQyUQY0uIPmYM3BA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 15,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "trashed",
+      "value": "2026-02-01T11:00:00.000Z",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "w0UATX5RTP4SKvPjvD99P3fZyfLooelZU5OLrZXBB5kApL0nH9x1UHD/0WUVofRV/pCBE6o/I+JxBAZvgaTnAw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 16,
+      "entity": "area:00000000000000000000000000000101",
+      "field": "name",
+      "value": "Ben's",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
+      "sig": "IcKt7KSKC0ijSG5entCWndRqyrFAvRKc3ObrFR3PNYORV7vFEvw3/HZSi21FNd+n7kaWcsNT/ySk4uB+46O7Bg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 17,
+      "entity": "routine:00000000000000000000000000000002",
+      "field": "times",
+      "value": "06:00",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
+      "sig": "HZ6XTlBkLd6Zni5xf+0NQlWlajV/I+WRA7TMIyXboXpm6GQJmSeboBgTwyxkhYRDzDC8ubrSetLrB5HaNJSACg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 18,
+      "entity": "routine:00000000000000000000000000000002",
+      "field": "rule",
+      "value": null,
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
+      "sig": "8dt6ykeNPyK40+wez2qM7TQGNVCVT0XJ9gLIHwaqc39woSiFYphwpY2b4H+nrlzRljlrZzXZPLY/Ts2sGx5qAg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 25,
+      "entity": "area:00000000000000000000000000000101",
+      "field": "role:c945cbf2a5602002141e2fb9d17054d6",
+      "value": "{\"name\":\"Ben\",\"person\":\"nobody\",\"role\":\"manager\"}",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "fBSp4NFTd2mpuY8oS7WR35f4iGqDTLyDmkTPHRoXE3mu8HpKm3LDDALoPg2Z+LR/TDW2dgMbNmbdFwC0t0X4Bw=="
+    }
+  ],
+  "keys": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "key": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "sig": "A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ],
+  "areaKeys": [
+    {
+      "key": "FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ=",
+      "scope": "area:00000000000000000000000000000101"
+    }
+  ]
+}

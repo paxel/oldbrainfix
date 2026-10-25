@@ -75,5 +75,9 @@
   "bundleDrop": "Oder zieh eine Paket-Datei auf das Fenster.",
   "aboutSettingsDetail": "Die Version, der Quellcode und jede Fremdkomponente mit ihrer Lizenz.",
   "aboutVersion": "Version {version}",
-  "licensesIntro": "Jede Fremdkomponente in dieser App mit ihrer Lizenz. Klick auf eine, um sie zu lesen."
+  "licensesIntro": "Jede Fremdkomponente in dieser App mit ihrer Lizenz. Klick auf eine, um sie zu lesen.",
+  "shareShowCode": "Code zeigen",
+  "shareHostIntro": "Das Telefon der anderen Person scannt diesen Code unter Sync. Es bekommt diesen Bereich und sonst nichts.",
+  "invitingBanner": "{name} wird als {role} zu {area} eingeladen. Der Code unten ist für sie.",
+  "stopInviting": "Nicht mehr einladen"
 }

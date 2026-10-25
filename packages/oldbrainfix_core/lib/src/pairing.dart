@@ -23,6 +23,10 @@ class PairedDevice {
   /// When the last sync with it ended.
   final DateTime lastSync;
 
+  /// Whether it is another person's Device, paired by invite to a Shared
+  /// Area: it gets only what it shares (ADR 0013). Once one, always one.
+  final bool shared;
+
   const PairedDevice({
     required this.id,
     required this.name,
@@ -30,6 +34,7 @@ class PairedDevice {
     required this.host,
     required this.port,
     required this.lastSync,
+    this.shared = false,
   });
 
   Map<String, Object?> toJson() => {
@@ -39,6 +44,7 @@ class PairedDevice {
     'host': host,
     'port': port,
     'lastSync': lastSync.toUtc().toIso8601String(),
+    if (shared) 'shared': true,
   };
 
   static PairedDevice? fromJson(Object? json) {
@@ -62,6 +68,7 @@ class PairedDevice {
       host: host is String ? host : null,
       port: port is int ? port : null,
       lastSync: lastSync,
+      shared: json['shared'] == true,
     );
   }
 }
@@ -84,19 +91,20 @@ extension Pairing on Store {
   }
 
   /// Remembers [device], or what changed about it. A Device that only
-  /// joined keeps the fingerprint and address it had when it hosted.
+  /// joined keeps the fingerprint and address it had when it hosted; one
+  /// paired by invite stays [PairedDevice.shared].
   void rememberDevice(PairedDevice device) {
     final held = pairedDevice(device.id);
-    final kept = held == null || device.fingerprint.isNotEmpty
-        ? device
-        : PairedDevice(
-            id: device.id,
-            name: device.name,
-            fingerprint: held.fingerprint,
-            host: held.host,
-            port: held.port,
-            lastSync: device.lastSync,
-          );
+    final hosted = held == null || device.fingerprint.isNotEmpty;
+    final kept = PairedDevice(
+      id: device.id,
+      name: device.name,
+      fingerprint: hosted ? device.fingerprint : held.fingerprint,
+      host: hosted ? device.host : held.host,
+      port: hosted ? device.port : held.port,
+      lastSync: device.lastSync,
+      shared: device.shared || (held?.shared ?? false),
+    );
     setLocalSetting('$_prefix${device.id}', jsonEncode(kept.toJson()));
   }
 

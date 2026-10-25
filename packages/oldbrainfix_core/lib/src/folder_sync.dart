@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'area_keys.dart';
 import 'conflicts.dart';
 import 'entry.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -622,7 +623,12 @@ Future<int> _publishEntries(
       previous == null ||
       previous.format != manifestFormat ||
       !previous.segments.every((s) => present.contains(s.name));
-  final entries = store.entriesSince(afresh ? const {} : previous.vector);
+  // A Note filed into a Shared Area goes out whole under its key: what
+  // it held before was sealed with another (ADR 0013).
+  final entries = store.withFiled(
+    store.entriesSince(afresh ? const {} : previous.vector),
+    store.isShared,
+  );
   if (!afresh && entries.isEmpty) return 0;
 
   if (afresh) {

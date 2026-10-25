@@ -1544,6 +1544,283 @@ Future<void> _bundle(Directory root) async {
   }
 }
 
+/// What the roles of [area] come to on [store]: this Device's access,
+/// the people, what it may change and every entry no role allows.
+Map<String, Object?> _roles(Store store, String area, List<String> ids) => {
+  'access': store.accessIn(area).name,
+  'shared': store.isShared(area),
+  'people': [
+    for (final p in store.people(area))
+      {'id': p.id, 'name': p.name, 'role': p.role.name, 'devices': p.devices},
+  ],
+  'mayChange': {for (final id in ids) id: store.mayChange(id)},
+  'mayManage': store.mayManage(area),
+  'ignored': store.judged.ignored.toList()..sort(),
+  'routines': [
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+      if (Routines(store).byId(id) case final r?) _routine(r),
+  ],
+};
+
+/// Writes the entries [store] holds after the mark [seq] to [file].
+void _writeAfter(Store store, int seq, File file) {
+  final out = StringBuffer();
+  for (final e in store.entriesAfter(seq)) {
+    out.writeln(jsonEncode(e.toJson()));
+  }
+  _write(file, out.toString());
+}
+
+/// Ann shares her Household, a Starter Set Area, with Ben as a Member and
+/// keeps her Health and Unsorted Notes private; Ben writes what a Member
+/// may and, as a modified app would, what not; Ann files a Note into the
+/// Area, they sync, she makes Ben a Manager and then removes him. Every
+/// write of the sharing itself, and every session, is at a held clock so
+/// the desktop core writes the same.
+void _sharedFixture(Directory root) {
+  final out = Directory('${root.path}/shared');
+  final keep = secretBytes;
+  secretBytes = _counted(300);
+  final ann = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    Places(ann).plantStarterSet({'household', 'kitchen', 'health'});
+    final kitchen = Places.starterId(PlaceKeys.typeTopic, 'kitchen');
+    final health = Places.starterId(PlaceKeys.typeArea, 'health');
+    final milk = Notes(ann).capture('Buy milk', place: kitchen);
+    final bins = Routines(ann).spawn(
+      milk.id,
+      Schedule(
+        start: Day(2026, 1, 5),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    final blood = Notes(ann).capture('Blood results', place: health);
+    final loose = Notes(ann).capture('Fix the tap');
+    Notes(ann).amend(loose.id, 'The hot one');
+    Notes(ben).capture('Ben private');
+    ann.ensureAreaKeys();
+    ben.ensureAreaKeys();
+    _write(File('${out.path}/before.jsonl'), _log(ann));
+    _write(File('${out.path}/joiner.jsonl'), _log(ben));
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'host': _keySettings(ann), 'joiner': _keySettings(ben)})}\n',
+    );
+
+    // Ann shares the Household: fresh ids, she its first Manager.
+    var ids = 0x100;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final shareAt = DateTime.utc(2026, 2, 1, 9);
+    _held = shareAt;
+    var mark = ann.currentSeq();
+    final area = ann.share(
+      Places.starterId(PlaceKeys.typeArea, 'household'),
+      name: 'Ann',
+    );
+    _writeAfter(ann, mark, File('${out.path}/share.jsonl'));
+    // The moved Area's key, made here so the desktop core holds the same.
+    ann.ensureAreaKeys();
+    final keysAfterShare = _keySettings(ann);
+
+    // Her desktop invites Ben's phone: he sends nothing of his own.
+    final sessionAt = DateTime.utc(2026, 2, 1, 10);
+    _held = sessionAt;
+    final invite = Invite(area, role: AreaRole.member, name: 'Ben');
+    final request = syncRequest(
+      ben,
+      ann.versionVector(),
+      name: 'Phone',
+      hostDevice: ann.deviceId,
+      pin: '246810',
+      invited: true,
+    );
+    final done = answerSync(ann, request, name: 'Desk', inviting: invite)!;
+    _write(File('${out.path}/request.json'), '${_json.convert(request)}\n');
+    _write(File('${out.path}/answer.json'), '${_json.convert(done.answer)}\n');
+    applyAnswer(ben, done.answer, shared: true);
+    for (final (store, peer, name) in [
+      (ann, ben.deviceId, 'Phone'),
+      (ben, ann.deviceId, 'Desk'),
+    ]) {
+      store.rememberDevice(
+        PairedDevice(
+          id: peer,
+          name: name,
+          fingerprint: '',
+          host: null,
+          port: null,
+          lastSync: sessionAt,
+          shared: true,
+        ),
+      );
+    }
+    final afterInvite = {
+      'host': _expected(ann)..remove('device'),
+      'joiner': _expected(ben)..remove('device'),
+    };
+
+    // Ben, a Member: his own Note, an Amend and a Done count; editing
+    // and trashing Ann's Note, renaming the Area, rescheduling and a
+    // Topic and a Routine of his own are ignored everywhere.
+    _held = DateTime.utc(2026, 2, 1, 11);
+    mark = ben.currentSeq();
+    final topic = Places(ben).topics(area).single.id;
+    final own = Notes(ben).capture('Ben buys bread', place: topic);
+    Notes(ben).edit(own.id, 'Ben buys rye bread');
+    Notes(ben).amend(milk.id, 'Oat milk please');
+    Routines(ben).markDone(bins.id, Occurrence(Day(2026, 2, 1), _at(8)));
+    Notes(ben).edit(milk.id, 'Buy beer');
+    Notes(ben).trash(milk.id);
+    Places(ben).rename(area, "Ben's");
+    Routines(ben)
+        .reschedule(bins.id, Schedule(start: Day(2026, 1, 5), times: [_at(6)]));
+    ben.batch(() {
+      ben.append('topic:garage', PlaceKeys.type, PlaceKeys.typeTopic);
+      ben.append('topic:garage', PlaceKeys.area, area);
+      ben.append('topic:garage', PlaceKeys.name, 'Garage');
+      ben.append('routine:ben', RoutineKeys.type, RoutineKeys.typeRoutine);
+      ben.append('routine:ben', RoutineKeys.note, own.id);
+      ben.append('routine:ben', RoutineKeys.start, '2026-02-03');
+      // And a grant of his own making.
+      ben.append(
+        area,
+        ShareKeys.role(ben.deviceId),
+        const Grant(AreaRole.manager, 'nobody', 'Ben').encode(),
+      );
+    });
+    _writeAfter(ben, mark, File('${out.path}/member.jsonl'));
+
+    // Ann files the Note she captured Unsorted into the Area, and writes
+    // one more private one.
+    _held = DateTime.utc(2026, 2, 1, 11, 30);
+    mark = ann.currentSeq();
+    Notes(ann).file(loose.id, area);
+    Notes(ann).capture('Still private');
+    _writeAfter(ann, mark, File('${out.path}/owner.jsonl'));
+
+    // They sync as paired Devices: only the Area, the filed Note whole.
+    final syncAt = DateTime.utc(2026, 2, 1, 12);
+    _held = syncAt;
+    final request2 = syncRequest(
+      ben,
+      ann.versionVector(),
+      name: 'Phone',
+      hostDevice: ann.deviceId,
+    );
+    final done2 = answerSync(ann, request2, name: 'Desk')!;
+    _write(File('${out.path}/request2.json'), '${_json.convert(request2)}\n');
+    _write(
+      File('${out.path}/answer2.json'),
+      '${_json.convert(done2.answer)}\n',
+    );
+    applyAnswer(ben, done2.answer, shared: true);
+    final checked = [milk.id, own.id, loose.id, blood.id];
+    final after = {
+      'host': _expected(ann)..remove('device'),
+      'joiner': _expected(ben)..remove('device'),
+      'hostRoles': _roles(ann, area, checked),
+      'joinerRoles': _roles(ben, area, checked),
+    };
+    // What no role allows of the Topic and the Routine Ben made up lies
+    // nowhere for him, so it never even went to Ann.
+    if (Notes(ben).byId(blood.id) != null ||
+        Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
+        Notes(ann).byId(milk.id)?.text != 'Buy milk') {
+      throw StateError('the two Devices of the shared fixture disagree');
+    }
+
+    // Ann makes Ben a Manager, then removes him.
+    final person = ann.people(area).firstWhere((p) => p.name == 'Ben').id;
+    final roleAt = DateTime.utc(2026, 2, 1, 13);
+    _held = roleAt;
+    mark = ann.currentSeq();
+    ann.setRole(area, person, AreaRole.manager);
+    _writeAfter(ann, mark, File('${out.path}/role.jsonl'));
+    // Ben learns of it, then reschedules the Routine and renames the
+    // Topic as a Manager: both count now, his edit as a Member still not.
+    void session(DateTime at) {
+      _held = at;
+      final asked = syncRequest(
+        ben,
+        ann.versionVector(),
+        name: 'Phone',
+        hostDevice: ann.deviceId,
+      );
+      applyAnswer(
+        ben,
+        answerSync(ann, asked, name: 'Desk')!.answer,
+        shared: true,
+      );
+    }
+
+    final promoteSyncAt = DateTime.utc(2026, 2, 1, 13, 15);
+    session(promoteSyncAt);
+    _held = DateTime.utc(2026, 2, 1, 13, 30);
+    mark = ben.currentSeq();
+    Routines(ben).reschedule(
+      bins.id,
+      Schedule(
+        start: Day(2026, 1, 5),
+        times: [_at(9)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Places(ben).rename(topic, 'Fridge');
+    _writeAfter(ben, mark, File('${out.path}/manager.jsonl'));
+    final managerSyncAt = DateTime.utc(2026, 2, 1, 13, 45);
+    session(managerSyncAt);
+    final promoted = {
+      'host': _roles(ann, area, checked),
+      'joiner': _roles(ben, area, checked),
+    };
+    if (Routines(ann).byId(bins.id)?.schedule.times.single != _at(9) ||
+        Places(ann).topicById(topic)?.name != 'Fridge' ||
+        Notes(ann).byId(milk.id)?.text != 'Buy milk') {
+      throw StateError('the Manager of the shared fixture did not count');
+    }
+    final removeAt = DateTime.utc(2026, 2, 1, 14);
+    _held = removeAt;
+    mark = ann.currentSeq();
+    ann.removePerson(area, person);
+    _writeAfter(ann, mark, File('${out.path}/remove.jsonl'));
+    final lastAt = DateTime.utc(2026, 2, 1, 15);
+    _held = lastAt;
+    final request3 = syncRequest(
+      ben,
+      ann.versionVector(),
+      name: 'Phone',
+      hostDevice: ann.deviceId,
+    );
+    final done3 = answerSync(ann, request3, name: 'Desk')!;
+    _write(
+      File('${out.path}/answer3.json'),
+      '${_json.convert(done3.answer)}\n',
+    );
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    ann.close();
+    ben.close();
+  }
+}
+
+/// [store]'s log, one entry per line.
+String _log(Store store) {
+  final log = StringBuffer();
+  for (final entry in store.allEntries()) {
+    log.writeln(jsonEncode(entry.toJson()));
+  }
+  return log.toString();
+}
+
 /// Sealed messages, key ids and blob names the desktop core must make
 /// the same.
 Map<String, Object?> _crypto() {
@@ -1822,7 +2099,18 @@ Future<void> main(List<String> args) async {
     '(`settings.json`), the bundle (`host.$bundleExtension`, nonces counted '
     'from 2001 on), and what the joiner reads from it (`expected.json`). '
     'The desktop core compares the files inside the zip byte for byte, not '
-    'the zip itself, whose headers its zip library writes its own way.\n',
+    'the zip itself, whose headers its zip library writes its own way.\n'
+    '- `shared/`: Ann shares a Starter Set Area with Ben as a Member: her '
+    'log before (`before.jsonl`), what sharing wrote (`share.jsonl`, ids '
+    'counted from 0x101, at a held clock), Ben\'s log (`joiner.jsonl`), the '
+    'invite session (`request.json`, `answer.json`), what Ben wrote, '
+    'allowed and not (`member.jsonl`), Ann filing a Note in '
+    '(`owner.jsonl`), the paired session after (`request2.json`, '
+    '`answer2.json`), Ben made Manager (`role.jsonl`) and writing as one '
+    '(`manager.jsonl`), then removed '
+    '(`remove.jsonl`) with the answer he gets then (`answer3.json`), and '
+    'what both read and which entries the roles leave out '
+    '(`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -1849,6 +2137,7 @@ Future<void> main(List<String> args) async {
   _conflictsFixture(root);
   await _folder(root);
   await _bundle(root);
+  _sharedFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

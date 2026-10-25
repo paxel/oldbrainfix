@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'named_places.dart';
 import 'places.dart';
+import 'shared_areas.dart';
 import 'store.dart';
 
 /// Field keys of a Note.
@@ -358,6 +359,9 @@ class Notes {
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
     }
+    if (place != null && !store.mayWriteIn(place)) {
+      throw StateError('no role in the Shared Area of $place');
+    }
     final id = 'note:${Store.newId()}';
     final now = store.clock().toUtc();
     // The bytes are kept before the log names them.
@@ -511,6 +515,9 @@ class Notes {
   /// at the store's now.
   Section amend(String noteId, String text) {
     _requireNote(noteId);
+    if (!store.mayWriteIn(noteId)) {
+      throw StateError('no role in the Shared Area of $noteId');
+    }
     final trimmed = _text(text);
     final id = 'section:${Store.newId()}';
     final now = store.clock().toUtc();
@@ -660,11 +667,15 @@ class Notes {
         final note = byId(id);
         // A merged Note goes with its target, never on its own.
         final at = note == null || note.isMerged ? null : purgeAt(note);
-        if (at == null || now.isBefore(at)) continue;
+        // What this Device may not change in a Shared Area waits for
+        // someone who may: written here, it would be ignored every time.
+        if (at == null || now.isBefore(at) || !store.mayChange(id)) continue;
         // A merged Note's Section is the Note itself; both keep their
         // type under the same key.
         for (final section in sections(id)) {
-          store.append(section.id, SectionKeys.type, null);
+          if (store.mayChange(section.id)) {
+            store.append(section.id, SectionKeys.type, null);
+          }
         }
         store.append(id, NoteKeys.type, null);
       }

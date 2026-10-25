@@ -1,5 +1,6 @@
 import 'notes.dart';
 import 'schedule.dart';
+import 'shared_areas.dart';
 import 'store.dart';
 
 /// Field keys of a Routine.
@@ -150,6 +151,9 @@ class Routines {
     if (note == null || note.isTrashed || note.isMerged) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
     }
+    if (!store.mayManage(store.areaOf(noteId))) {
+      throw StateError('not a Manager of the Area of $noteId');
+    }
     final id = 'routine:${Store.newId()}';
     store.batch(() {
       store.append(id, RoutineKeys.type, RoutineKeys.typeRoutine);
@@ -280,7 +284,10 @@ class Routines {
       for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)) {
         final routine = byId(id);
         final at = routine == null ? null : purgeAt(routine);
-        if (at == null || now.isBefore(at)) continue;
+        // Only where this Device may change it (ADR 0013).
+        if (at == null || now.isBefore(at) || !store.mayChangeRoutine(id)) {
+          continue;
+        }
         store.append(id, RoutineKeys.type, null);
       }
     });

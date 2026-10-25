@@ -951,5 +951,75 @@
   "bundlePairFirst": "This bundle is from a Device this one is not paired with, so nothing in it can be read. Pair them first, then import it again.",
   "bundleNotABundle": "This file is no sync bundle this app can read.",
   "bundleFailed": "The bundle did not work out. Nothing was lost; try again.",
-  "bundleNoApp": "No app here can take the bundle."
+  "bundleNoApp": "No app here can take the bundle.",
+  "shareArea": "Share…",
+  "areaShared": "Shared",
+  "peopleTitle": "People",
+  "shareTitle": "Share {area}",
+  "@shareTitle": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "shareIntro": "Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.",
+  "shareYourName": "Your name",
+  "shareTheirName": "Their name",
+  "roleHeading": "They may",
+  "roleManager": "Manager",
+  "roleMember": "Member",
+  "roleManagerDetail": "Everything in this Area.",
+  "roleMemberDetail": "Add Notes and change their own, add to any Note and check off Routines and Reminders.",
+  "shareInvite": "Invite",
+  "shareNamesMissing": "Fill in both names first.",
+  "shareDone": "{area} is now shared with {name}.",
+  "@shareDone": {
+    "placeholders": {
+      "area": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sharedWithYou": "{name} shared {area} with you.",
+  "@sharedWithYou": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "peopleYou": "{name} (you)",
+  "@peopleYou": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "peopleNoName": "Someone",
+  "makeManager": "Make Manager",
+  "makeMember": "Make Member",
+  "removePerson": "Remove",
+  "removePersonQuestion": "Remove {name} from {area}?",
+  "@removePersonQuestion": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "removePersonDetail": "Nothing more of this Area goes to them. What they already have stays with them.",
+  "peopleIntro": "A Manager may do everything here. A Member may add Notes and change their own, add to any Note and check off Routines and Reminders.",
+  "onlyManagers": "Only a Manager of this Area can change this.",
+  "pairedPerson": "Another person's Device"
 }

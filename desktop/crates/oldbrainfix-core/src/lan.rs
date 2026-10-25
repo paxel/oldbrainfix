@@ -40,6 +40,7 @@ use crate::conflicts::Conflict;
 use crate::entry::WireEntry;
 use crate::keys::{AreaKey, area_keys_of};
 use crate::pairing::PairedDevice;
+use crate::shared::Invite;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
 use crate::sync::{Moment, cause, split_blob_ref, wire};
@@ -47,8 +48,9 @@ use crate::{Error, Result};
 
 /// The wire format this build speaks, the Dart core's `syncFormat`.
 /// Format 2 carries the entries' causal contexts, which format 1 would
-/// refuse as forged.
-pub const SYNC_FORMAT: i64 = 2;
+/// refuse as forged; format 3 the invites to Shared Areas, which format
+/// 2 would answer with everything it holds.
+pub const SYNC_FORMAT: i64 = 3;
 
 pub const PIN_FAILURES_PER_ADDRESS: u32 = 5;
 pub const PIN_FAILURES_TOTAL: u32 = 20;
@@ -69,6 +71,9 @@ pub const TLS_KEY_KEY: &str = "tls:key";
 pub const PIN_HEADER: &str = "x-oldbrainfix-pin";
 pub const DEVICE_HEADER: &str = "x-oldbrainfix-device";
 pub const FORMAT_HEADER: &str = "x-oldbrainfix-format";
+/// On `/vector` while this host invites the joiner to a Shared Area
+/// (ADR 0013): the joiner then sends nothing of its own.
+pub const INVITE_HEADER: &str = "x-oldbrainfix-invite";
 /// A paired Device's nonce from `/challenge` and its signature over it;
 /// its id goes in [`DEVICE_HEADER`].
 pub const NONCE_HEADER: &str = "x-oldbrainfix-nonce";
@@ -906,6 +911,8 @@ pub struct Session {
     pub moment: Option<Moment>,
     pub report: ImportReport,
     pub conflicts: Vec<Conflict>,
+    /// The Shared Area this session invited one side to, if it did.
+    pub shared_area: Option<String>,
 }
 
 fn vector_of(value: Option<&Value>) -> HashMap<String, i64> {
@@ -954,15 +961,31 @@ fn keys_json(store: &Store) -> Result<Value> {
     ))
 }
 
-/// The Area keys, as they travel over an authenticated session only.
-fn area_keys_json(store: &Store) -> Result<Value> {
-    Ok(json!(
-        store
-            .area_keys()?
-            .iter()
-            .map(AreaKey::to_json)
-            .collect::<Vec<_>>()
-    ))
+/// Area keys, as they travel over an authenticated session only.
+fn area_keys_json(keys: &[AreaKey]) -> Value {
+    json!(keys.iter().map(AreaKey::to_json).collect::<Vec<_>>())
+}
+
+/// The Area a `POST /sync` body or an answer invites to, if any.
+fn invited_to(value: Option<&Value>) -> Option<String> {
+    value?
+        .get("area")?
+        .as_str()
+        .filter(|a| a.starts_with("area:"))
+        .map(str::to_string)
+}
+
+/// How a joiner's request goes to the host, as the Dart core's
+/// `syncRequest` options (ADR 0013).
+#[derive(Debug, Clone, Copy)]
+pub enum Joining<'a> {
+    /// To a Device of this one's own group, or one paired by invite
+    /// before, which [`Store::is_shared_peer`] tells.
+    Plain,
+    /// The host invites this Device: nothing of its own goes.
+    Invited,
+    /// This Device invites the host: the grant, then the Area's history.
+    Inviting(&'a Invite),
 }
 
 /// The joiner's `POST /sync` body, as the Dart core's `syncRequest`,
@@ -974,52 +997,178 @@ pub fn sync_request(
     host_device: &str,
     pin: &str,
 ) -> Result<Value> {
+    sync_request_as(store, host_vector, name, host_device, pin, Joining::Plain)
+}
+
+/// [`sync_request`] as `joining` says: to another person's Device only
+/// what it shares.
+pub fn sync_request_as(
+    store: &Store,
+    host_vector: &HashMap<String, i64>,
+    name: &str,
+    host_device: &str,
+    pin: &str,
+    joining: Joining,
+) -> Result<Value> {
     store.ensure_area_keys()?;
-    Ok(json!({
+    let (entries, area_keys) = match joining {
+        Joining::Invited => (Vec::new(), Vec::new()),
+        Joining::Inviting(invite) => {
+            store.invite(&invite.area, host_device, invite.role, &invite.name)?;
+            let also = [invite.area.clone()];
+            (
+                store.entries_for(host_device, &HashMap::new(), true, &also)?,
+                store.area_keys_for(host_device, &also)?,
+            )
+        }
+        Joining::Plain if store.is_shared_peer(host_device)? => (
+            store.entries_for(host_device, host_vector, false, &[])?,
+            store.area_keys_for(host_device, &[])?,
+        ),
+        Joining::Plain => (store.entries_since(host_vector)?, store.area_keys()?),
+    };
+    let mut body = json!({
         "format": SYNC_FORMAT,
         "deviceId": store.device_id()?,
         "name": name,
         "proof": store.signing_key()?.sign(&pairing_proof_bytes(host_device, pin)),
         "vector": store.version_vector()?,
-        "entries": wire(&store.entries_since(host_vector)?),
+        "entries": wire(&entries),
         "keys": keys_json(store)?,
-        "areaKeys": area_keys_json(store)?,
-    }))
+        "areaKeys": area_keys_json(&area_keys),
+    });
+    if let Some(map) = body.as_object_mut() {
+        match joining {
+            Joining::Invited => {
+                map.insert("invited".to_string(), Value::Bool(true));
+            }
+            Joining::Inviting(invite) => {
+                map.insert("invite".to_string(), json!({"area": invite.area}));
+            }
+            Joining::Plain => {}
+        }
+    }
+    Ok(body)
+}
+
+/// The blobs this Device lacks that `peer`, another person's Device, may
+/// be asked for: those of the Areas it holds a role in.
+fn missing_for(store: &Store, peer: &str) -> Result<Vec<String>> {
+    let areas = store.areas_shared_with(peer)?;
+    let mut out = Vec::new();
+    for reference in store.missing_blobs()? {
+        if store.blob_in(&reference, &areas)? {
+            out.push(reference);
+        }
+    }
+    Ok(out)
 }
 
 /// Takes in a joiner's `POST /sync` body and answers it, as the Dart
 /// core's `answerSync`; none when the joiner speaks another format.
 pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Value, Session)>> {
+    answer_sync_inviting(store, body, name, None)
+}
+
+/// [`answer_sync`] while this host hands out `inviting`. None as well
+/// when the joiner ignores the invite, or invites this Device to an Area
+/// it holds as its own. Another person's Device gets only what it
+/// shares and only those Areas' keys are taken from it; a Device of this
+/// one's own group gets this one's roles it lacks before the answer.
+pub fn answer_sync_inviting(
+    store: &Store,
+    body: &Value,
+    name: &str,
+    inviting: Option<&Invite>,
+) -> Result<Option<(Value, Session)>> {
     if body.get("format").and_then(|f| f.as_i64()) != Some(SYNC_FORMAT) {
         return Ok(None);
     }
     let peer = text_of(body, "deviceId");
     let peer_name = text_of(body, "name");
+    let peer_vector = vector_of(body.get("vector"));
+    let invited = invited_to(body.get("invite"));
+    if inviting.is_some()
+        && (body.get("invited").and_then(Value::as_bool) != Some(true) || peer.is_empty())
+    {
+        return Ok(None);
+    }
+    if let Some(area) = &invited
+        && (inviting.is_some() || store.refuses_invite(area)?)
+    {
+        return Ok(None);
+    }
+    // A Device of this one's own group is no other person: inviting it
+    // would cut its sync down to one Area.
+    if (inviting.is_some() || invited.is_some()) && store.is_own_device(&peer)? {
+        return Ok(None);
+    }
+    let shared = inviting.is_some() || invited.is_some() || store.is_shared_peer(&peer)?;
+    let shared_area = inviting.map(|i| i.area.clone()).or_else(|| invited.clone());
     let mut report = ImportReport::default();
     let before = store.current_seq()?;
-    store.learn_area_keys(&area_keys_of(body.get("areaKeys")))?;
+    let offered = area_keys_of(body.get("areaKeys"));
+    if !shared {
+        store.learn_area_keys(&offered)?;
+    }
+    let entries = if inviting.is_some() {
+        Vec::new()
+    } else {
+        entries_of(body.get("entries"))
+    };
     let applied = store.apply_entries(
-        &entries_of(body.get("entries")),
+        &entries,
         &keys_of(body.get("keys")),
         (!peer.is_empty()).then_some(peer.as_str()),
         &mut report,
     )?;
+    if shared {
+        let mut areas = store.areas_shared_with(&peer)?;
+        areas.extend(invited.iter().cloned());
+        let taken: Vec<AreaKey> = offered
+            .into_iter()
+            .filter(|k| areas.contains(&k.scope))
+            .collect();
+        store.learn_area_keys(&taken)?;
+    }
     store.ensure_area_keys()?;
+    if let Some(invite) = inviting {
+        store.invite(&invite.area, &peer, invite.role, &invite.name)?;
+    } else if !shared {
+        store.extend_roles_to(&peer)?;
+    }
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&peer_name))?;
-    let peer_vector = vector_of(body.get("vector"));
     // The answer carries everything beyond what the joiner holds: once it
     // took it in, it holds what this Device holds now.
     store.note_held_by(&peer, &peer_vector)?;
     store.note_held_by(&peer, &store.version_vector()?)?;
-    let answer = json!({
+    let (entries, want, area_keys) = if shared {
+        (
+            store.entries_for(&peer, &peer_vector, inviting.is_some(), &[])?,
+            missing_for(store, &peer)?,
+            store.area_keys_for(&peer, &[])?,
+        )
+    } else {
+        (
+            store.entries_since(&peer_vector)?,
+            store.missing_blobs()?,
+            store.area_keys()?,
+        )
+    };
+    let mut answer = json!({
         "format": SYNC_FORMAT,
         "deviceId": store.device_id()?,
         "name": name,
-        "entries": wire(&store.entries_since(&peer_vector)?),
-        "wantBlobs": store.missing_blobs()?,
+        "entries": wire(&entries),
+        "wantBlobs": want,
         "keys": keys_json(store)?,
-        "areaKeys": area_keys_json(store)?,
+        "areaKeys": area_keys_json(&area_keys),
     });
+    if let Some(invite) = inviting
+        && let Some(map) = answer.as_object_mut()
+    {
+        map.insert("invite".to_string(), json!({"area": invite.area}));
+    }
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Some((
         answer,
@@ -1030,6 +1179,7 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
             moment,
             report,
             conflicts,
+            shared_area,
         },
     )))
 }
@@ -1037,17 +1187,52 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
 /// The joiner takes in the host's `/sync` answer, as the Dart core's
 /// `applyAnswer`.
 pub fn apply_answer(store: &Store, answer: &Value) -> Result<Session> {
+    apply_answer_as(store, answer, false, None)
+}
+
+/// [`apply_answer`] from another person's Device when `shared`: only the
+/// keys of the Areas it shares are taken, and an invite to an Area this
+/// Device holds as its own is refused before anything is taken. A Device
+/// of this one's own group gets this one's roles it lacks.
+pub fn apply_answer_as(
+    store: &Store,
+    answer: &Value,
+    shared: bool,
+    invited_by: Option<&str>,
+) -> Result<Session> {
     let host = text_of(answer, "deviceId");
     let name = text_of(answer, "name");
+    let invited = invited_to(answer.get("invite"));
+    if let Some(area) = &invited
+        && store.refuses_invite(area)?
+    {
+        return Err(Error::Invalid(format!(
+            "declined: {area} is this Device's own"
+        )));
+    }
     let mut report = ImportReport::default();
     let before = store.current_seq()?;
-    store.learn_area_keys(&area_keys_of(answer.get("areaKeys")))?;
+    let offered = area_keys_of(answer.get("areaKeys"));
+    if !shared {
+        store.learn_area_keys(&offered)?;
+    }
     let applied = store.apply_entries(
         &entries_of(answer.get("entries")),
         &keys_of(answer.get("keys")),
         (!host.is_empty()).then_some(host.as_str()),
         &mut report,
     )?;
+    if shared {
+        let mut areas = store.areas_shared_with(&host)?;
+        areas.extend(invited.iter().cloned());
+        let taken: Vec<AreaKey> = offered
+            .into_iter()
+            .filter(|k| areas.contains(&k.scope))
+            .collect();
+        store.learn_area_keys(&taken)?;
+    } else {
+        store.extend_roles_to(&host)?;
+    }
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&name))?;
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Session {
@@ -1057,6 +1242,7 @@ pub fn apply_answer(store: &Store, answer: &Value) -> Result<Session> {
         moment,
         report,
         conflicts,
+        shared_area: invited.or_else(|| invited_by.map(str::to_string)),
     })
 }
 
@@ -1064,13 +1250,54 @@ impl Store {
     /// Answers one request as the host, going by `name`. A completed
     /// `/sync` comes back as its session.
     pub fn serve(&self, request: &Request, name: &str) -> Result<(Response, Option<Session>)> {
+        self.serve_as(request, name, None, None)
+    }
+
+    /// [`Store::serve`] while this host hands out `inviting` (ADR 0013):
+    /// `/vector` says so, and only the invited Area's blobs are handed out.
+    pub fn serve_inviting(
+        &self,
+        request: &Request,
+        name: &str,
+        inviting: Option<&Invite>,
+    ) -> Result<(Response, Option<Session>)> {
+        self.serve_as(request, name, inviting, None)
+    }
+
+    /// Answers `request`, from the paired Device `joiner` when known: one
+    /// paired by invite gets only the blobs of the Areas it shares.
+    fn serve_as(
+        &self,
+        request: &Request,
+        name: &str,
+        inviting: Option<&Invite>,
+        joiner: Option<&str>,
+    ) -> Result<(Response, Option<Session>)> {
         let path = request.path.as_str();
         Ok(match (request.method.as_str(), path) {
-            ("GET", "/vector") => (self.serve_vector()?, None),
-            ("POST", "/sync") => self.serve_sync(&request.body, name)?,
+            ("GET", "/vector") => (self.serve_vector_inviting(inviting.is_some())?, None),
+            ("POST", "/sync") => self.serve_sync_inviting(&request.body, name, inviting)?,
             ("GET", p) if p.starts_with("/blob/") => {
-                let (kind, hash) = split_blob_ref(&p["/blob/".len()..]);
-                match self.blob(kind, hash) {
+                let reference = &p["/blob/".len()..];
+                let (kind, hash) = split_blob_ref(reference);
+                let mut areas: Option<std::collections::HashSet<String>> = None;
+                if let Some(invite) = inviting {
+                    areas
+                        .get_or_insert_with(Default::default)
+                        .insert(invite.area.clone());
+                }
+                if let Some(device) = joiner
+                    && self.is_shared_peer(device)?
+                {
+                    areas
+                        .get_or_insert_with(Default::default)
+                        .extend(self.areas_shared_with(device)?);
+                }
+                let allowed = match &areas {
+                    Some(areas) => self.blob_in(reference, areas)?,
+                    None => true,
+                };
+                match self.blob(kind, hash).filter(|_| allowed) {
                     Some(bytes) => (Response::bytes(bytes), None),
                     None => (Response::status(404), None),
                 }
@@ -1091,6 +1318,11 @@ impl Store {
     /// `/vector`: the version vector, with the wire format and this
     /// Device's id in the headers.
     pub fn serve_vector(&self) -> Result<Response> {
+        self.serve_vector_inviting(false)
+    }
+
+    /// [`Store::serve_vector`], saying so when this host invites.
+    pub fn serve_vector_inviting(&self, inviting: bool) -> Result<Response> {
         let mut response = Response::json(200, &json!(self.version_vector()?));
         response
             .headers
@@ -1098,15 +1330,34 @@ impl Store {
         response
             .headers
             .push((DEVICE_HEADER.to_string(), self.device_id()?));
+        if inviting {
+            response
+                .headers
+                .push((INVITE_HEADER.to_string(), "1".to_string()));
+        }
         Ok(response)
     }
 
     /// `/sync`: refuses another format with its reason, answers the rest.
     pub fn serve_sync(&self, body: &[u8], name: &str) -> Result<(Response, Option<Session>)> {
+        self.serve_sync_inviting(body, name, None)
+    }
+
+    /// [`Store::serve_sync`] while this host hands out `inviting`. An
+    /// invite this Device must refuse, or a joiner ignoring this host's,
+    /// is declined.
+    pub fn serve_sync_inviting(
+        &self,
+        body: &[u8],
+        name: &str,
+        inviting: Option<&Invite>,
+    ) -> Result<(Response, Option<Session>)> {
         let body: Value =
             serde_json::from_slice(body).map_err(|e| Error::Invalid(format!("sync body: {e}")))?;
-        Ok(match answer_sync(self, &body, name)? {
+        let speaks = body.get("format").and_then(|f| f.as_i64()) == Some(SYNC_FORMAT);
+        Ok(match answer_sync_inviting(self, &body, name, inviting)? {
             Some((answer, session)) => (Response::json(200, &answer), Some(session)),
+            None if speaks => (Response::declined(), None),
             None => (
                 Response::json(403, &json!({"refusal": "format", "format": SYNC_FORMAT})),
                 None,
@@ -1131,7 +1382,7 @@ impl Store {
         {
             return Ok((Response::declined(), None));
         }
-        let (response, session) = self.serve(request, name)?;
+        let (response, session) = self.serve_as(request, name, None, Some(&device))?;
         if let Some(session) = &session {
             self.remember_device(&PairedDevice {
                 id: device,
@@ -1140,6 +1391,7 @@ impl Store {
                 host: None,
                 port: None,
                 last_sync: self.now(),
+                shared: session.shared_area.is_some(),
             })?;
         }
         Ok((response, session))
@@ -1510,6 +1762,7 @@ mod tests {
             host: None,
             port: None,
             last_sync: desk.now(),
+            shared: false,
         })?;
         assert!(desk.trusts_joiner(&ask, "123456")?);
         assert!(!desk.trusts_joiner(&ask, "654321")?, "another session");
@@ -1637,6 +1890,7 @@ mod tests {
                 host: None,
                 port: None,
                 last_sync: desk.now(),
+                shared: false,
             })?;
             Notes::new(&desk).capture("Done on the desk", None, None)?;
             let host = desk.start_paired_host(IpAddr::V4(Ipv4Addr::LOCALHOST))?;
@@ -1713,6 +1967,7 @@ mod tests {
                 host: None,
                 port: None,
                 last_sync: desk.now(),
+                shared: false,
             })?;
         }
         let desk_id = desk.device_id()?;
@@ -1782,5 +2037,126 @@ mod tests {
                 proof: Some("x".into()),
             })
         );
+    }
+
+    fn get(path: &str) -> Request {
+        let (reply, _) = channel();
+        Request {
+            method: "GET".into(),
+            path: path.into(),
+            headers: Vec::new(),
+            body: Vec::new(),
+            from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            challenged: false,
+            reply,
+        }
+    }
+
+    #[test]
+    fn a_host_inviting_says_so_and_hands_out_only_the_area() -> TestResult {
+        use crate::shared::{AreaRole, Invite};
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let places = crate::Places::new(&desk);
+        let house = places.add_area("Household")?;
+        let inside =
+            Notes::new(&desk).capture_with("In", Some(&house.id), None, &[vec![1; 8]], &[])?;
+        let outside = Notes::new(&desk).capture_with("Out", None, None, &[vec![2; 8]], &[])?;
+        Notes::new(&phone).capture("Phone private", None, None)?;
+        let area = desk.share(&house.id, "Ann")?;
+        let invite = Invite {
+            area: area.clone(),
+            role: AreaRole::Member,
+            name: "Ben".into(),
+        };
+        let vector = desk.serve_vector_inviting(true)?;
+        assert!(
+            vector
+                .headers
+                .contains(&(INVITE_HEADER.to_string(), "1".to_string()))
+        );
+
+        // A joiner that does not know it is invited is declined.
+        let plain = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+        let (response, _) =
+            desk.serve_sync_inviting(plain.to_string().as_bytes(), "Desk", Some(&invite))?;
+        assert_eq!(response.status, 403);
+        assert_eq!(response.body, b"declined");
+        assert!(
+            Notes::new(&desk)
+                .all()?
+                .iter()
+                .all(|n| n.text != "Phone private")
+        );
+
+        let body = sync_request_as(
+            &phone,
+            &desk.version_vector()?,
+            "Pixel",
+            &desk.device_id()?,
+            "",
+            Joining::Invited,
+        )?;
+        assert_eq!(body["entries"], json!([]));
+        assert_eq!(body["areaKeys"], json!([]));
+        let (response, session) =
+            desk.serve_sync_inviting(body.to_string().as_bytes(), "Desk", Some(&invite))?;
+        assert_eq!(response.status, 200);
+        assert_eq!(session.and_then(|s| s.shared_area), Some(area.clone()));
+        let answer: Value = serde_json::from_slice(&response.body)?;
+        let scopes: Vec<&str> = answer["areaKeys"]
+            .as_array()
+            .ok_or("keys")?
+            .iter()
+            .filter_map(|k| k["scope"].as_str())
+            .collect();
+        assert_eq!(scopes, vec![area.as_str()]);
+        apply_answer_as(&phone, &answer, true, None)?;
+        let texts: Vec<String> = Notes::new(&phone)
+            .all()?
+            .into_iter()
+            .map(|n| n.text)
+            .collect();
+        assert!(texts.contains(&"In".to_string()));
+        assert!(!texts.contains(&"Out".to_string()));
+        assert_eq!(phone.access_in(&area, None)?, crate::AreaAccess::Member);
+
+        // While inviting, only the Area's blobs go out.
+        let photo = |n: &crate::Note| format!("/blob/photo/{}", n.photos[0]);
+        let (ok, _) = desk.serve_inviting(&get(&photo(&inside)), "Desk", Some(&invite))?;
+        assert_eq!(ok.status, 200);
+        let (no, _) = desk.serve_inviting(&get(&photo(&outside)), "Desk", Some(&invite))?;
+        assert_eq!(no.status, 404);
+        Ok(())
+    }
+
+    #[test]
+    fn an_invite_to_an_area_held_as_ones_own_is_declined() -> TestResult {
+        use crate::shared::{AreaRole, Invite};
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let house = crate::Places::new(&phone).add_area("Household")?;
+        // The desk holds the same Area as its own, unshared.
+        for e in phone.all_entries()? {
+            desk.insert(&e.wire())?;
+        }
+        let area = phone.share(&house.id, "Ann")?;
+        let invite = Invite {
+            area,
+            role: AreaRole::Member,
+            name: "Ben".into(),
+        };
+        let body = sync_request_as(
+            &phone,
+            &desk.version_vector()?,
+            "Pixel",
+            &desk.device_id()?,
+            "",
+            Joining::Inviting(&invite),
+        )?;
+        let (response, session) = desk.serve_sync(body.to_string().as_bytes(), "Desk")?;
+        assert!(session.is_none());
+        assert_eq!(response.body, b"declined");
+        Ok(())
     }
 }

@@ -1658,4 +1658,97 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bundleNoApp => 'Keine App hier kann das Paket annehmen.';
+
+  @override
+  String get shareArea => 'Teilen …';
+
+  @override
+  String get areaShared => 'Geteilt';
+
+  @override
+  String get peopleTitle => 'Personen';
+
+  @override
+  String shareTitle(String area) {
+    return '$area teilen';
+  }
+
+  @override
+  String get shareIntro =>
+      'Triff die andere Person. Auf ihrem Computer Sync öffnen und den Code zeigen lassen; scanne ihn oder tippe ihn hier ein. Sie bekommt diesen Bereich und sonst nichts.';
+
+  @override
+  String get shareYourName => 'Dein Name';
+
+  @override
+  String get shareTheirName => 'Ihr Name';
+
+  @override
+  String get roleHeading => 'Sie darf';
+
+  @override
+  String get roleManager => 'Verwalter';
+
+  @override
+  String get roleMember => 'Mitglied';
+
+  @override
+  String get roleManagerDetail => 'Alles in diesem Bereich.';
+
+  @override
+  String get roleMemberDetail =>
+      'Notizen anlegen und die eigenen ändern, jede Notiz ergänzen und Routinen und Erinnerungen abhaken.';
+
+  @override
+  String get shareInvite => 'Einladen';
+
+  @override
+  String get shareNamesMissing => 'Trag zuerst beide Namen ein.';
+
+  @override
+  String shareDone(String area, String name) {
+    return '$area ist jetzt mit $name geteilt.';
+  }
+
+  @override
+  String sharedWithYou(String name, String area) {
+    return '$name hat $area mit dir geteilt.';
+  }
+
+  @override
+  String peopleYou(String name) {
+    return '$name (du)';
+  }
+
+  @override
+  String get peopleNoName => 'Jemand';
+
+  @override
+  String get makeManager => 'Zum Verwalter machen';
+
+  @override
+  String get makeMember => 'Zum Mitglied machen';
+
+  @override
+  String get removePerson => 'Entfernen';
+
+  @override
+  String removePersonQuestion(String name, String area) {
+    return '$name aus $area entfernen?';
+  }
+
+  @override
+  String get removePersonDetail =>
+      'Von diesem Bereich geht nichts mehr an sie. Was sie schon hat, bleibt bei ihr.';
+
+  @override
+  String get peopleIntro =>
+      'Ein Verwalter darf hier alles. Ein Mitglied darf Notizen anlegen und die eigenen ändern, jede Notiz ergänzen und Routinen und Erinnerungen abhaken.';
+
+  @override
+  String get onlyManagers =>
+      'Das kann nur ein Verwalter dieses Bereichs ändern.';
+
+  @override
+  String get pairedPerson => 'Gerät einer anderen Person';
 }

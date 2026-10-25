@@ -187,6 +187,9 @@ impl<'a> Places<'a> {
     /// Area holds Topics: there is no third level.
     pub fn add_topic(&self, area_id: &str, name: &str) -> Result<Topic> {
         self.require_area(area_id)?;
+        if !self.store.may_manage(Some(area_id))? {
+            return Err(Error::Invalid(format!("not a Manager of {area_id}")));
+        }
         let name = Self::name(name)?;
         let id = self
             .store

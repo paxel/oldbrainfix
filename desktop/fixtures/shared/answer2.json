@@ -1,0 +1,114 @@
+{
+  "format": 3,
+  "deviceId": "65b60673d6ed884bf01c2c222d82ada0",
+  "name": "Desk",
+  "entries": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 25,
+      "entity": "note:00000000000000000000000000000004",
+      "field": "$type",
+      "value": "note",
+      "date": "2026-01-01T10:00:28.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:29.000Z",
+      "sig": "JWzOodD8fMY/Qgmj1C0VaZGR1CYEYqYjHfk9HFZdT/7xlkLGFSwLkhKv5BIuHDO6pWVgf8b5/pyiHWwdUXZ2CQ=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 26,
+      "entity": "note:00000000000000000000000000000004",
+      "field": "captured",
+      "value": "2026-01-01T10:00:28.000Z",
+      "date": "2026-01-01T10:00:28.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:30.000Z",
+      "sig": "IPNSj42TrvCJvpRympnoJgVPUfD4INgdxcD8UEPBvQYfZf/MWZZXt4SJEhbU7guoQuNnSS9206toXCF2xhqdCA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 27,
+      "entity": "note:00000000000000000000000000000004",
+      "field": "text",
+      "value": "Fix the tap",
+      "date": "2026-01-01T10:00:28.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:31.000Z",
+      "sig": "9U5nEm4dAYNzYQHLMcdPZc2Wt8abWJWEe1UohATMAMhkObE1BwsDeM0q3pkFdPYyhc+/zBayMzXVaUEgHMByCA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 28,
+      "entity": "section:00000000000000000000000000000005",
+      "field": "$type",
+      "value": "section",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:33.000Z",
+      "sig": "Ss7X50krv1PTpiR2fhY+odq/x0qYPrbS2IL32SL0s2jGeOsCUNED9iG4BEKOD5IibafG6c6JiQmmUPKM2yAECQ=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 29,
+      "entity": "section:00000000000000000000000000000005",
+      "field": "note",
+      "value": "note:00000000000000000000000000000004",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:34.000Z",
+      "sig": "ymgtH3XLjVi51514d2x1zO/ek02dHFbrSYa5gwXvVLsN0K1bfHWP8rWW+tHl0yHuJ4XBLmVYEcSjsZOuICWQDg=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 30,
+      "entity": "section:00000000000000000000000000000005",
+      "field": "captured",
+      "value": "2026-01-01T10:00:32.000Z",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:35.000Z",
+      "sig": "V8cTHpJsO91c6YeD7ieftx3VY70G0UyGHUxO6DxYjX4+GU6HQTLav9vVMu4SZiI2EDdxwsxJoFtICjCifvF4CQ=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 31,
+      "entity": "section:00000000000000000000000000000005",
+      "field": "text",
+      "value": "The hot one",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:36.000Z",
+      "sig": "dh8cXHI8HhANg21QmHFTJde7CxvnMoaIZI0ti1qQ8jqklpSGuuVeZQ2RdGdVgYVWZutS3NAc61HuT+/5kmnuDw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 45,
+      "entity": "note:00000000000000000000000000000004",
+      "field": "place",
+      "value": "area:00000000000000000000000000000101",
+      "date": "2026-02-01T11:30:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:30:00.000Z",
+      "sig": "vWasG9MpAL0CekXWaYdycEnLYgnUo+HF6ASIbA5hRn4FYxnMlCn3LV3Pro+aGSe3pbxduJQ71CEWujufWFauDQ=="
+    }
+  ],
+  "wantBlobs": [],
+  "keys": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "key": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "sig": "A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ],
+  "areaKeys": [
+    {
+      "key": "FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ=",
+      "scope": "area:00000000000000000000000000000101"
+    }
+  ]
+}

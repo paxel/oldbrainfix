@@ -27,6 +27,7 @@ export 'src/question_marks.dart';
 export 'src/routines.dart';
 export 'src/schedule.dart';
 export 'src/search.dart';
+export 'src/shared_areas.dart';
 export 'src/signing.dart';
 export 'src/store.dart';
 export 'src/sync.dart';

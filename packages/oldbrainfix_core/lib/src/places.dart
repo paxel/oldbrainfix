@@ -1,5 +1,6 @@
 import 'device_settings.dart';
 import 'notes.dart';
+import 'shared_areas.dart';
 import 'store.dart';
 
 /// Field keys of Areas and Topics.
@@ -154,6 +155,9 @@ class Places {
   Topic addTopic(String areaId, String name, {String? starter}) {
     if (areaById(areaId) == null) {
       throw ArgumentError.value(areaId, 'areaId', 'not an Area');
+    }
+    if (!store.mayManage(areaId)) {
+      throw StateError('not a Manager of $areaId');
     }
     final trimmed = _name(name);
     return topicById(

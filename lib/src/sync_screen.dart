@@ -14,6 +14,7 @@ import 'folder_platform.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
+import 'place_names.dart';
 
 /// How a sync is run; the app passes the core's [lanSync], tests a fake.
 typedef Join = Future<SyncResult> Function(
@@ -178,6 +179,12 @@ class _SyncScreenState extends State<SyncScreen> {
       _announce(
         t.syncCameIn(result.session.name, result.session.applied.length),
       );
+      final shared = result.session.sharedArea == null
+          ? null
+          : Places(widget.store).areaById(result.session.sharedArea ?? '');
+      if (shared != null) {
+        _announce(t.sharedWithYou(result.session.name, areaName(t, shared)));
+      }
       final refused = result.session.report.refusedCount;
       if (refused > 0) _announce(t.syncRefused(refused));
       final conflicts = visibleConflicts(
@@ -197,7 +204,7 @@ class _SyncScreenState extends State<SyncScreen> {
       _code.clear();
     } on SyncException catch (e) {
       if (!mounted) return;
-      _announce(_failure(t, e.failure));
+      _announce(syncFailureText(t, e.failure));
     } on Object {
       // Whatever else broke on the way: nothing half-taken stays.
       if (!mounted) return;
@@ -272,7 +279,10 @@ class _SyncScreenState extends State<SyncScreen> {
     final store = widget.store;
     final device = _bundleFor;
     final since = device == null ? const <String, int>{} : store.heldBy(device);
-    if (store.entriesSince(since).isEmpty) {
+    final nothing = device != null && store.isSharedPeer(device)
+        ? store.entriesFor(device, since).isEmpty
+        : store.entriesSince(since).isEmpty;
+    if (nothing) {
       final name = device == null ? null : store.pairedDevice(device)?.name;
       _announce(t.bundleNothingNew(name ?? t.bundleEverything));
       return;
@@ -376,18 +386,6 @@ class _SyncScreenState extends State<SyncScreen> {
     ];
   }
 
-  static String _failure(AppLocalizations t, SyncFailure failure) =>
-      switch (failure) {
-        SyncFailure.notPrivate => t.syncFailNotPrivate,
-        SyncFailure.unreachable => t.syncFailUnreachable,
-        SyncFailure.wrongHost => t.syncFailWrongHost,
-        SyncFailure.wrongPin => t.syncFailWrongPin,
-        SyncFailure.locked => t.syncFailLocked,
-        SyncFailure.declined => t.syncFailDeclined,
-        SyncFailure.format => t.syncFailFormat,
-        SyncFailure.failed => t.syncFailFailed,
-      };
-
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -464,10 +462,15 @@ class _SyncScreenState extends State<SyncScreen> {
           for (final device in _paired) ...[
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.computer_outlined),
+              leading: Icon(
+                device.shared ? Icons.people_outline : Icons.computer_outlined,
+              ),
               title: Text(device.name),
               subtitle: Text(
-                t.pairedLastSync(when.format(device.lastSync.toLocal())),
+                [
+                  if (device.shared) t.pairedPerson,
+                  t.pairedLastSync(when.format(device.lastSync.toLocal())),
+                ].join('\n'),
               ),
               trailing: TextButton(
                 onPressed: () => _forget(device),
@@ -493,3 +496,16 @@ class _SyncScreenState extends State<SyncScreen> {
     );
   }
 }
+
+/// Why a sync did not happen, in words.
+String syncFailureText(AppLocalizations t, SyncFailure failure) =>
+    switch (failure) {
+      SyncFailure.notPrivate => t.syncFailNotPrivate,
+      SyncFailure.unreachable => t.syncFailUnreachable,
+      SyncFailure.wrongHost => t.syncFailWrongHost,
+      SyncFailure.wrongPin => t.syncFailWrongPin,
+      SyncFailure.locked => t.syncFailLocked,
+      SyncFailure.declined => t.syncFailDeclined,
+      SyncFailure.format => t.syncFailFormat,
+      SyncFailure.failed => t.syncFailFailed,
+    };

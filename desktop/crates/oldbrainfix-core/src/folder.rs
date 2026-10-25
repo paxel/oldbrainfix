@@ -599,7 +599,12 @@ fn publish_entries(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>
         .as_ref()
         .map(|p| p.vector.clone().into_iter().collect())
         .unwrap_or_default();
-    let entries = store.entries_since(&since)?;
+    // A Note filed into a Shared Area goes out whole under its key: what
+    // it held before was sealed with another (ADR 0013).
+    let judged = store.judged()?;
+    let entries = store.with_filed(store.entries_since(&since)?, &|area| {
+        judged.areas.contains_key(area)
+    })?;
     if previous.is_some() && entries.is_empty() {
         return Ok(0);
     }

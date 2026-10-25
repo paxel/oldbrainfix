@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'routines.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 
@@ -172,8 +173,9 @@ extension LockSettings on Store {
     setLocalSetting(_relockMinutes, '${after.inMinutes}');
   }
 
-  /// The Areas locked on this Device, by id.
-  Set<String> get lockedAreas => _ids(_lockedAreas);
+  /// The Areas locked on this Device, by id: an Area moved to fresh ids
+  /// when it was shared ([ShareKeys.movedTo]) stays locked as it goes on.
+  Set<String> get lockedAreas => _followed(_ids(_lockedAreas));
 
   /// Whether the Area [areaId] is locked on this Device.
   bool isAreaLocked(String areaId) => lockedAreas.contains(areaId);
@@ -190,7 +192,8 @@ extension LockSettings on Store {
 
   /// Whether the locked Area [areaId] shows its alarms and Agenda rows
   /// Masked rather than in full; Masked unless set otherwise.
-  bool isAreaMasked(String areaId) => !_ids(_fullAreas).contains(areaId);
+  bool isAreaMasked(String areaId) =>
+      !_followed(_ids(_fullAreas)).contains(areaId);
 
   void setAreaMasked(String areaId, bool masked) {
     final ids = _ids(_fullAreas);
@@ -202,6 +205,18 @@ extension LockSettings on Store {
     for (final id in (localSetting(key) ?? '').split(','))
       if (id.isNotEmpty) id,
   };
+
+  /// [ids] with every Area each of them was moved on to.
+  Set<String> _followed(Set<String> ids) {
+    final all = {...ids};
+    for (final id in ids) {
+      var next = current(id, ShareKeys.movedTo);
+      while (next != null && all.add(next)) {
+        next = current(next, ShareKeys.movedTo);
+      }
+    }
+    return all;
+  }
 
   void _setIds(String key, Set<String> ids) =>
       setLocalSetting(key, (ids.toList()..sort()).join(','));

@@ -130,6 +130,14 @@ impl<'a> Routines<'a> {
                 "not a Note in the lists: {note_id}"
             )));
         };
+        if !self
+            .store
+            .may_manage(self.store.area_of(note_id)?.as_deref())?
+        {
+            return Err(Error::Invalid(format!(
+                "not a Manager of the Area of {note_id}"
+            )));
+        }
         let id = format!("routine:{}", self.store.new_id()?);
         self.store.batch(|| {
             let s = self.store;

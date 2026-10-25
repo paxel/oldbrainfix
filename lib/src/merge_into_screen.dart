@@ -94,7 +94,14 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                       ),
                     ]
                   : [
-                      for (final (:note, :area, :topic) in _shown)
+                      for (final (
+                            :note,
+                            :area,
+                            :topic,
+                            changes: _,
+                            schedules: _,
+                          )
+                          in _shown)
                         NoteCard(
                           note: note,
                           when: when,

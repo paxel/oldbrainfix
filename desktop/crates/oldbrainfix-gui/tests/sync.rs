@@ -253,6 +253,7 @@ fn pair(desk: &Store, id: &str) -> TestResult {
         host: None,
         port: None,
         last_sync: desk.now(),
+        shared: false,
     })?;
     Ok(())
 }

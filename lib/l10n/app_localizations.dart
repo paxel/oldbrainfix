@@ -2659,6 +2659,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No app here can take the bundle.'**
   String get bundleNoApp;
+
+  /// No description provided for @shareArea.
+  ///
+  /// In en, this message translates to:
+  /// **'Share…'**
+  String get shareArea;
+
+  /// No description provided for @areaShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get areaShared;
+
+  /// No description provided for @peopleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get peopleTitle;
+
+  /// No description provided for @shareTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share {area}'**
+  String shareTitle(String area);
+
+  /// No description provided for @shareIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.'**
+  String get shareIntro;
+
+  /// No description provided for @shareYourName.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name'**
+  String get shareYourName;
+
+  /// No description provided for @shareTheirName.
+  ///
+  /// In en, this message translates to:
+  /// **'Their name'**
+  String get shareTheirName;
+
+  /// No description provided for @roleHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'They may'**
+  String get roleHeading;
+
+  /// No description provided for @roleManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get roleManager;
+
+  /// No description provided for @roleMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get roleMember;
+
+  /// No description provided for @roleManagerDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything in this Area.'**
+  String get roleManagerDetail;
+
+  /// No description provided for @roleMemberDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Notes and change their own, add to any Note and check off Routines and Reminders.'**
+  String get roleMemberDetail;
+
+  /// No description provided for @shareInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite'**
+  String get shareInvite;
+
+  /// No description provided for @shareNamesMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in both names first.'**
+  String get shareNamesMissing;
+
+  /// No description provided for @shareDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{area} is now shared with {name}.'**
+  String shareDone(String area, String name);
+
+  /// No description provided for @sharedWithYou.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} shared {area} with you.'**
+  String sharedWithYou(String name, String area);
+
+  /// No description provided for @peopleYou.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (you)'**
+  String peopleYou(String name);
+
+  /// No description provided for @peopleNoName.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone'**
+  String get peopleNoName;
+
+  /// No description provided for @makeManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Make Manager'**
+  String get makeManager;
+
+  /// No description provided for @makeMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Make Member'**
+  String get makeMember;
+
+  /// No description provided for @removePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removePerson;
+
+  /// No description provided for @removePersonQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} from {area}?'**
+  String removePersonQuestion(String name, String area);
+
+  /// No description provided for @removePersonDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing more of this Area goes to them. What they already have stays with them.'**
+  String get removePersonDetail;
+
+  /// No description provided for @peopleIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A Manager may do everything here. A Member may add Notes and change their own, add to any Note and check off Routines and Reminders.'**
+  String get peopleIntro;
+
+  /// No description provided for @onlyManagers.
+  ///
+  /// In en, this message translates to:
+  /// **'Only a Manager of this Area can change this.'**
+  String get onlyManagers;
+
+  /// No description provided for @pairedPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Another person\'s Device'**
+  String get pairedPerson;
 }
 
 class _AppLocalizationsDelegate

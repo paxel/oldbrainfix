@@ -20,10 +20,13 @@ use oldbrainfix_core::lan::{
 };
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
-use oldbrainfix_core::{Conflict, Entry, Error, Fields, PairedDevice, Routines, Store};
+use oldbrainfix_core::{
+    AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, Routines, Store,
+};
 
 use crate::app::{Wall, embossed};
 use crate::l10n::L10n;
+use crate::names::area_name;
 use crate::schedule_text::schedule_text;
 use crate::theme::Tones;
 
@@ -53,6 +56,9 @@ pub enum SyncAction {
     SaveBundle(Option<String>),
     /// Import a bundle chosen with the system's dialog.
     OpenBundle,
+    /// End the invite to a Shared Area; hosting goes on with a fresh
+    /// code.
+    StopInviting,
 }
 
 /// The desktop's hosting state.
@@ -78,12 +84,17 @@ pub struct SyncHost {
     pub bind: Option<IpAddr>,
     /// The paired Device the next bundle is for; everything when none.
     pub bundle_for: Option<String>,
+    /// The invite to a Shared Area this host hands out while it shows
+    /// (ADR 0013): whoever joins with its code gets that Area only.
+    pub inviting: Option<Invite>,
+    /// The last session that shared an Area: with whom, and which.
+    shared: Option<(String, String)>,
 }
 
 impl SyncHost {
     /// Starts hosting with a fresh PIN and this Device's certificate.
     pub fn start(&mut self, store: &Store) {
-        self.stop();
+        self.halt();
         self.error = None;
         self.last = None;
         self.refused = 0;
@@ -99,8 +110,31 @@ impl SyncHost {
         }
     }
 
+    /// Starts hosting an invite to a Shared Area.
+    pub fn start_inviting(&mut self, store: &Store, invite: Invite) {
+        self.inviting = Some(invite);
+        self.start(store);
+        self.shared = None;
+    }
+
+    /// Ends the invite and hosts on with a fresh code, so the one shown
+    /// to the other person pairs nobody else.
+    pub fn stop_inviting(&mut self, store: &Store) {
+        self.inviting = None;
+        let shared = self.shared.take();
+        self.start(store);
+        self.shared = shared;
+    }
+
     /// Stops hosting; a Device still waiting for an answer is refused.
+    /// An invite ends with it.
     pub fn stop(&mut self) {
+        self.inviting = None;
+        self.halt();
+    }
+
+    /// Stops the host, the invite left as it is.
+    fn halt(&mut self) {
         if let Some((request, _)) = self.asking.take() {
             request.reply(Response::declined());
         }
@@ -177,7 +211,7 @@ impl SyncHost {
     }
 
     fn serve(&mut self, store: &Store, request: Request, name: &str) -> bool {
-        match store.serve(&request, name) {
+        match store.serve_inviting(&request, name, self.inviting.as_ref()) {
             Ok((response, session)) => {
                 request.reply(response);
                 let Some(session) = session else {
@@ -191,10 +225,18 @@ impl SyncHost {
                         host: None,
                         port: None,
                         last_sync: store.now(),
+                        shared: session.shared_area.is_some(),
                     });
                     if let Err(e) = remembered {
                         self.error = Some(e.to_string());
                     }
+                }
+                if let Some(area) = &session.shared_area {
+                    let who = match &self.inviting {
+                        Some(invite) => invite.name.clone(),
+                        None => session.name.clone(),
+                    };
+                    self.shared = Some((who, area.clone()));
                 }
                 self.refused = session.report.refused_count();
                 self.found = session.conflicts.len();
@@ -262,6 +304,31 @@ impl SyncHost {
                         });
                     });
                 }
+                if let Some(invite) = &self.inviting {
+                    let area = Places::new(store)
+                        .area_by_id(&invite.area)
+                        .ok()
+                        .flatten()
+                        .map(|a| area_name(t, &a))
+                        .unwrap_or_default();
+                    let role = match invite.role {
+                        AreaRole::Manager => t.role_manager(),
+                        AreaRole::Member => t.role_member(),
+                    };
+                    embossed(ui, tones, true, None, |ui| {
+                        ui.label(
+                            RichText::new(t.inviting_banner(&invite.name, &area, role))
+                                .strong()
+                                .color(text),
+                        );
+                        if ui
+                            .button(RichText::new(t.stop_inviting()).color(text))
+                            .clicked()
+                        {
+                            action = Some(SyncAction::StopInviting);
+                        }
+                    });
+                }
                 if let Some(host) = &self.host {
                     embossed(ui, tones, false, None, |ui| {
                         if self.no_network {
@@ -299,6 +366,17 @@ impl SyncHost {
                 }
                 if let Some((name, count)) = &self.last {
                     ui.label(RichText::new(t.sync_came_in(name, *count as i64)).color(text));
+                    if let Some((who, area)) = &self.shared
+                        && let Ok(Some(area)) = Places::new(store).area_by_id(area)
+                    {
+                        let area = area_name(t, &area);
+                        let said = if self.inviting.is_some() {
+                            t.share_done(&area, who)
+                        } else {
+                            t.shared_with_you(who, &area)
+                        };
+                        ui.label(RichText::new(said).strong().color(text));
+                    }
                     if self.refused > 0 {
                         ui.label(RichText::new(t.sync_refused(self.refused as i64)).color(error));
                     }
@@ -327,6 +405,13 @@ impl SyncHost {
                         if let Some(note) = routine_note(store, conflict) {
                             ui.label(RichText::new(note).color(text));
                         }
+                        // In a Shared Area only who may change it picks.
+                        let picks = store
+                            .may_resolve(&conflict.entity, &conflict.entity_type)
+                            .unwrap_or(false);
+                        if !picks {
+                            ui.label(RichText::new(t.only_managers()).color(weak));
+                        }
                         for (index, version) in conflict.versions.iter().enumerate() {
                             let value = conflict_value(t, conflict, &version.values);
                             let when = wall(version.entry.recorded_at)
@@ -336,7 +421,11 @@ impl SyncHost {
                             let button = egui::Button::new(
                                 RichText::new(format!("{value}\n{origin}")).color(text),
                             );
-                            if ui.add(button).on_hover_text(t.conflict_keep()).clicked() {
+                            if ui
+                                .add_enabled(picks, button)
+                                .on_hover_text(t.conflict_keep())
+                                .clicked()
+                            {
                                 action = Some(SyncAction::Keep {
                                     entity: conflict.entity.clone(),
                                     unit: conflict.unit.clone(),
@@ -368,6 +457,9 @@ impl SyncHost {
                                 device.name.clone()
                             };
                             ui.label(RichText::new(name).color(text));
+                            if device.shared {
+                                ui.label(RichText::new(t.paired_person()).small().color(weak));
+                            }
                             let when = wall(device.last_sync).format("%Y-%m-%d %H:%M").to_string();
                             ui.label(RichText::new(t.paired_last_sync(&when)).small().color(weak));
                             let mut on = store.auto_sync_on(&device.id).unwrap_or(true);
@@ -397,7 +489,7 @@ impl SyncHost {
 
 impl Drop for SyncHost {
     fn drop(&mut self) {
-        self.stop();
+        self.halt();
     }
 }
 
