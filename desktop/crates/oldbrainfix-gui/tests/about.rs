@@ -1,6 +1,7 @@
-//! The About view driven headless: reached from the Settings, it opens
-//! the licences page, which lists every third-party component and opens
-//! its licence on a click.
+//! The About view driven headless: reached from the Settings, it links
+//! the documentation site and its privacy policy, and opens the licences
+//! page, which lists every third-party component and opens its licence on
+//! a click.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -41,6 +42,8 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::About);
     assert!(shows(&harness, "Version 0.1.0"));
+    harness.get_by_label("Documentation");
+    harness.get_by_label("Privacy policy");
     harness
         .get_by_label("Open-source licenses")
         .click_accesskit();
@@ -78,6 +81,8 @@ fn the_about_view_speaks_german() -> TestResult {
     let mut harness = harness("de")?;
     harness.get_by_label("Über Old Brain Fix").click_accesskit();
     harness.run();
+    harness.get_by_label("Dokumentation");
+    harness.get_by_label("Datenschutzerklärung");
     harness
         .get_by_label("Open-Source-Lizenzen")
         .click_accesskit();

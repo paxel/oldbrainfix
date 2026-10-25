@@ -1,0 +1,56 @@
+<!-- page: title="Privacy policy" track="reference" order=3 summary="Old Brain Fix keeps everything on your own devices: no server, no account, no analytics. The few times it goes online, and why it asks for each permission." alias="privacy-policy.html" -->
+<p class="lede">Old Brain Fix keeps your Notes, photos, voice recordings, Routines, Reminders and their history on your own devices. There is no server, no account and no analytics, advertising or crash reporting. Nothing is collected by, sent to or stored with the developer or any third party.</p>
+<p>This policy covers the Android app, the desktop app for Linux, Windows and macOS, and this site. Old Brain Fix is free and open source; you can check every word of this page against <a href="https://github.com/paxel/oldbrainfix">its source code</a>.</p>
+
+<h2>What the app keeps, and where</h2>
+<p>Everything you capture, with its Capture Context (time, place, the calendar event running, the connected Bluetooth device, the app something was shared from), stays in the app's own storage on the device you captured it on, and on the Devices you paired with it. Photos are stored without any location data. Settings belong to each Device and are never synced.</p>
+<p>The developer never receives any of it. No data is sold or shared, and nothing is used for advertising or profiling.</p>
+
+<h2>When the app goes online</h2>
+<p>Only for these, and each only once you set it up:</p>
+<ul>
+  <li><strong>Sync on your local network.</strong> A phone and a desktop you paired, by scanning or typing the code the desktop shows, connect directly to each other over your home network, encrypted with TLS and checked against the certificate pinned at Pairing. They sync on their own while the app is open and about every 15 minutes in the background. Nothing goes over the internet and no server is involved.</li>
+  <li><strong>Finding each other.</strong> To find a paired desktop, the desktop announces itself on the local network by mDNS (service <code>_oldbrainfix._tcp</code>), carrying only a random device id: no name, no computer name. Anyone on the same network can see that announcement, not what it syncs.</li>
+  <li><strong>The shared folder.</strong> If you pick a shared folder, the app only writes files into it, every one end-to-end encrypted with the key of its Area. Whatever moves that folder (Syncthing, Nextcloud, a cloud drive, a USB stick) is your choice and works under its own terms; it can see that files exist, not what they hold.</li>
+  <li><strong>Shared Areas.</strong> If you share an Area with another person, that Area's Notes, Routines, Reminders and their history go to the Devices of the people you invited, the same ways as your own sync (directly on the local network or through a shared folder), encrypted with the Area's key. Every other Area stays private.</li>
+  <li><strong>The speech model.</strong> Transcripts are written on your device by Whisper. Its model is downloaded once, only when you ask for it, from Old Brain Fix's own release on GitHub, and checked against a fixed checksum; you can also pick a model file of your own instead. GitHub, and the download host it forwards to, see your IP address as with any download, under <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>. Recognising speech and text in photos never goes online.</li>
+  <li><strong>Google backup (Android, opt-in).</strong> If you switch it on, Android's backup to your Google account keeps the newest encrypted Backup file, and nothing else: never the app's database. Google cannot read it without your passphrase or recovery key. Google's privacy policy applies to your Google account. With it off, the app gives Android nothing to back up.</li>
+</ul>
+
+<h2>When you send something yourself</h2>
+<p>Some things leave the app only through apps you pick, in your platform's share menu or file dialog, and are then in their hands:</p>
+<ul>
+  <li>sync bundle files, encrypted, and Sent Items, signed and encrypted when you know the receiver, sent through any messenger or mail;</li>
+  <li>Backups, encrypted, written into a folder you choose;</li>
+  <li>calendar files you export, and Notes, Routines or Reminders you add to your calendar app;</li>
+  <li>the Recovery Sheet, which you print or save.</li>
+</ul>
+<p>If you switch on keeping your Routines and Reminders in a device calendar, the app writes them into the one calendar you choose, as "Private Routine" for a locked Area set to Masked. If that calendar is synced with an online account, its provider receives those entries under its own terms. The links on the About page (this site, GitHub, Ko-fi, mail) open in your browser or mail app.</p>
+
+<h2>Permissions on Android</h2>
+<p>Each is asked for only when the feature needs it, and each feature works without the others.</p>
+<ul>
+  <li><strong>Location</strong>: where a Note was captured, read only at Capture while the app is open and matched against your Named Places on the phone.</li>
+  <li><strong>Microphone</strong>: records only while you record a voice Note.</li>
+  <li><strong>Camera</strong>: the app has no camera permission; a photo Note is taken with your camera app.</li>
+  <li><strong>Calendar (read)</strong>: once you switch it on, the calendar event running at Capture. <strong>Calendar (write)</strong>: once you switch it on, your Routines and Reminders in the one calendar you chose; only events the app wrote are ever changed or removed.</li>
+  <li><strong>Nearby devices (Bluetooth)</strong>: once you switch it on, the name of the Bluetooth device connected at Capture.</li>
+  <li><strong>Notifications, alarms and reminders, full-screen alarms, starting at boot, staying awake, a foreground service</strong>: so Routines and Reminders ring on the minute, from the lock screen, after a restart, and as a full-screen alarm with sound when you turned Escalation on.</li>
+  <li><strong>Biometrics</strong>: unlocking the App Lock and Area Locks with a fingerprint or the screen lock.</li>
+  <li><strong>Internet and network state</strong>: only for the sync, the discovery and the speech model download above.</li>
+</ul>
+
+<h2>On the desktop</h2>
+<p>The desktop uses the microphone only while you record a voice Note, shows notifications for your Routines and Reminders, starts at login unless you switch that off, and listens for its capture hotkey. It goes online only for the local-network sync, its mDNS announcement and the speech model download described above.</p>
+
+<h2>Deleting your data</h2>
+<p>Uninstalling the app deletes everything it keeps on that device. Backups and shared-folder files stay where you put them until you delete them; the Google backup is removed in your Google account's backup settings. Since nothing is ever on a server of the developer's, there is nothing there to delete.</p>
+
+<h2>Children</h2>
+<p>Old Brain Fix collects no data from anyone, children included.</p>
+
+<h2>This site</h2>
+<p>This site is served by GitHub Pages, which sees your IP address as any web host does, under <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>. It sets no cookies, loads nothing from anyone else, and remembers your light or dark choice only in your own browser.</p>
+
+<h2>Changes and contact</h2>
+<p>Changes to this policy come with a release of the app and are listed under <a href="../reference/whats-new.html">What's new</a>. Questions: <a href="mailto:taum@tuta.io">taum@tuta.io</a>, or <a href="https://github.com/paxel/oldbrainfix/issues">GitHub issues</a>.</p>

@@ -1,0 +1,156 @@
+# Glossar auf Deutsch
+
+Die deutschen Einträge zum Glossar in CONTEXT.md, einer je Begriff, mit dem englischen Begriff in Klammern; die Seite "Glossar" wird daraus gebaut, und der Bau schlägt fehl, wenn ein Begriff fehlt.
+
+## Erfassen
+
+**Notiz** [Note]:
+Alles, was du erfasst hast: Text, eine Sprachaufnahme, ein Foto oder etwas, das aus einer anderen App geteilt wurde, zusammen mit seinem Erfassungskontext. Der Tagebucheintrag, an dem alles andere hängt.
+_Avoid_: Eintrag, Memo, Element, Karte (eine Karte ist nur, wie eine Notiz gezeichnet wird)
+
+**Erfassen** [Capture]:
+Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widget, eine Kachel, eine Verknüpfung, eine Hardwaretaste, das Tastenkürzel am Computer. Erfassen fragt nie nach Sortieren oder Entsperren.
+_Avoid_: Schnell hinzufügen, Aufnehmen
+
+**Erfassungskontext** [Capture Context]:
+Was beim Erfassen einer Notiz galt und ihr Tage später Sinn gibt: die Zeit, der benannte Ort oder die Koordinaten, die App, aus der geteilt wurde, der laufende Kalendertermin, das verbundene Bluetooth-Gerät.
+_Avoid_: Metadaten (in der App), Schlagwörter
+
+**Benannter Ort** [Named Place]:
+Ein Ort, dem du einen Namen gegeben hast ("Zuhause", "Arbeit", "Bei Mama"). Eine Notiz, die in seiner Nähe erfasst wird, trägt diesen Namen in ihrem Erfassungskontext.
+_Avoid_: Standort, Geofence, Favorit
+
+**Transkript** [Transcript]:
+Der aus der Sprachaufnahme einer Notiz erkannte Text, neben der Aufnahme aufbewahrt, nie an ihrer Stelle.
+
+**Fototext** [Photo Text]:
+Der in einem Foto oder Bildschirmfoto einer Notiz erkannte Text, neben dem Foto aufbewahrt, nie an seiner Stelle.
+_Avoid_: OCR (in der App), Bildunterschrift
+
+**Abschnitt** [Section]:
+Ein datierter Teil einer Notiz, angelegt durch Ergänzen oder Zusammenführen, mit seinem eigenen Erfassungskontext.
+_Avoid_: Kommentar, Aktualisierung, Revision
+
+**Ergänzen** [Amend]:
+Einer Notiz einen neuen Abschnitt hinzufügen. Den Text einer Notiz an Ort und Stelle zu verbessern ist Bearbeiten, kein Ergänzen.
+_Avoid_: Anhängen, Antworten
+
+**Zusammenführen** [Merge]:
+Eine Notiz in eine andere falten: die zusammengeführte Notiz wird ein Abschnitt der anderen und verschwindet aus jeder Liste.
+_Avoid_: Kombinieren, Verbinden, Verknüpfen
+
+**Wichtigkeit** [Importance]:
+Wie viel eine Notiz zählt: unwichtig, normal (Standard) oder wichtig.
+_Avoid_: Priorität, Stern
+
+## Sortieren
+
+**Bereich** [Area]:
+Die oberste Ebene, unter der du Notizen ablegst, etwa Haushalt, Arbeit, Kinder, Arzt. Mit optionaler Farbe und optionalem Symbol.
+_Avoid_: Domäne, Kategorie, Ordner
+
+**Thema** [Topic]:
+Die zweite und letzte Ebene, innerhalb eines Bereichs, etwa Haushalt/Küche, Kinder/Schule.
+_Avoid_: Kategorie, Unterkategorie, Schlagwort
+
+**Unsortiert** [Unsorted]:
+Der Zustand einer Notiz, um die sich noch niemand gekümmert hat. Eine Notiz verlässt Unsortiert, wenn sie einen Bereich oder ein Thema bekommt, eine Routine oder Erinnerung hervorbringt, zusammengeführt oder gelöscht wird. Sie wird wieder unsortiert, wenn ihr Bereich oder Thema gelöscht wird und du seine Notizen nach Unsortiert zurückschickst.
+_Avoid_: Unkategorisiert, Posteingang
+
+**Stupser** [Nudge]:
+Die Erinnerung, dass unsortierte Notizen warten. Ihre Zeit wird beim Erfassen gewählt (10 Min., 30 Min., 1 Std.), ein Stupser gilt für alle unsortierten Notizen, und Stupser kommen so lange, bis keine mehr übrig ist.
+_Avoid_: Erinnerung (das ist etwas anderes), Nörgeln (das ist Erneut erinnern)
+
+**Ruhezeit** [Quiet Hours]:
+Ein tägliches Zeitfenster, in dem Stupser warten. Routinen und Erinnerungen sind davon nicht betroffen.
+
+**Startauswahl** [Starter Set]:
+Die Bereiche und Themen, die beim ersten Start angeboten werden; du wählst, welche du behältst.
+
+## Routinen und Erinnerungen
+
+**Routine** [Routine]:
+Etwas, das nach einem wiederkehrenden Plan zu tun ist (Tabletten, Hausaufgaben, Putzen), immer aus einer Notiz hervorgegangen und mit ihr verknüpft.
+_Avoid_: Pflicht, Aufgabe, Gewohnheit, To-do
+
+**Erinnerung** [Reminder]:
+Eine Routine, die nur einmal stattfindet.
+_Avoid_: Alarm, Termin, Ereignis
+
+**Fälligkeit** [Occurrence]:
+Ein fälliger Moment einer Routine, etwa Dienstag 08:00. Jede Fälligkeit wird für sich abgehakt.
+_Avoid_: Instanz, Slot
+
+**Erledigt** [Done]:
+Eine Fälligkeit, die du abgehakt hast. Früh oder spät abhaken verschiebt nie den Plan.
+_Avoid_: Abgeschlossen, Abgehakt (in der App)
+
+**Erneut erinnern** [Re-nag]:
+Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledigt ist, verschoben wird oder die nächste Fälligkeit beginnt.
+_Avoid_: Wiederholen, Erinnerung
+
+**Eskalation** [Escalation]:
+Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton.
+
+**Verpasst** [Missed]:
+Eine Fälligkeit, die nie erledigt wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
+_Avoid_: Überfällig, Übersprungen
+
+**Verpasst-Übersicht** [Missed Summary]:
+Die Karte in der Agenda, die auflistet, was verpasst wurde und wie oft, seit du es zuletzt bestätigt hast.
+
+**Nachhol-Benachrichtigung** [Catch-up Notification]:
+Die eine Benachrichtigung, nachdem das Gerät aus oder leer war, die sagt, wie viel in der Zeit verpasst wurde.
+
+**Serie** [Streak]:
+Die Folge aufeinanderfolgender Fälligkeiten einer Routine, die erledigt wurden.
+
+**Einhaltung** [Adherence]:
+Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurden, etwa "92 % in diesem Monat".
+
+**Agenda** [Agenda]:
+Der Startbildschirm: die Fälligkeiten von heute, dann gedimmt morgen, mit der Verpasst-Übersicht und der Zahl der unsortierten Notizen obenauf.
+_Avoid_: Dashboard, Tagesansicht, Startseite
+
+## Menschen und Geräte
+
+**Gerät** [Device]:
+Eine Installation der App, auf einem Handy oder einem Computer. Einstellungen gehören zu einem Gerät und werden nie abgeglichen.
+
+**Koppeln** [Pairing]:
+Zwei Geräte oder eine Person miteinander bekannt machen, persönlich oder per Code, wobei sie die Schlüssel bekommen, die sie brauchen.
+
+**Geteilter Bereich** [Shared Area]:
+Ein Bereich, den andere Menschen mit abgleichen. Alles außerhalb bleibt privat.
+
+**Verwalter** [Manager]:
+Eine Person, die in einem geteilten Bereich alles darf.
+
+**Mitglied** [Member]:
+Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen und Fälligkeiten abhaken darf, aber keine Routinen, Erinnerungen oder Notizen anderer ändern.
+_Avoid_: Gast, Betrachter
+
+**Gesendete Notiz** [Sent Item]:
+Eine einzelne Notiz mit ihren Routinen oder Erinnerungen, als Datei an einen anderen Menschen mit Old Brain Fix geschickt, außerhalb jedes geteilten Bereichs. Wer sie bekommt, sieht sie vorher an und nimmt sie an; wer sie geschickt hat, kann später eine Aktualisierung oder eine Absage nachschicken.
+_Avoid_: Einladung, Teilen, Paket (ein Paket ist ein Weg zum Abgleichen)
+
+**Konflikt** [Conflict]:
+Zwei Fassungen desselben von Hand bearbeiteten Feldes, auf verschiedenen Geräten geschrieben, ohne dass eines das andere gesehen hatte. Bis dahin zeigt sich die neueste; du wählst, welche bleibt.
+_Avoid_: Zusammenstoß, Merge-Konflikt
+
+## Privatsphäre
+
+**App-Sperre** [App Lock]:
+Eine optionale Sperre vor dem Stöbern in der App. Das Erfassen braucht sie nie.
+
+**Bereichssperre** [Area Lock]:
+Eine optionale Sperre auf einem einzelnen Bereich, die zu bleibt, auch während die App offen ist.
+
+**Maskiert** [Masked]:
+Wie eine Fälligkeit aus einem gesperrten Bereich in Alarmen und in der Agenda erscheint, wenn ihr Bereich das so will: "Private Routine, 08:00", trotzdem abhakbar.
+
+**Sicherung** [Backup]:
+Eine verschlüsselte Datei mit allem, was auf einem Gerät ist, geöffnet mit einer Passphrase.
+
+**Wiederherstellungsblatt** [Recovery Sheet]:
+Eine druckbare Seite mit dem Wiederherstellungsschlüssel für Sicherungen, für eine Schublade oder einen Passwortmanager.

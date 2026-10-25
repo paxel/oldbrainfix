@@ -321,6 +321,7 @@
   "aboutTagline": "Einen Gedanken mit einem Tipp festhalten. Erinnert werden, bis er einsortiert oder erledigt ist.",
   "versionLabel": "Version {version} ({build})",
   "documentation": "Dokumentation",
+  "privacyPolicy": "Datenschutzerklärung",
   "sourceCode": "Quellcode",
   "reportProblem": "Ein Problem oder eine Idee melden",
   "githubIssues": "GitHub-Issues",

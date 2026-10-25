@@ -51,3 +51,6 @@ app.*.map.json
 *.jks
 *.keystore
 key.properties
+
+# The documentation site, built by tool/site/build.js
+/site-dist/

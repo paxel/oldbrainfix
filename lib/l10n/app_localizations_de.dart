@@ -1231,6 +1231,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get documentation => 'Dokumentation';
 
   @override
+  String get privacyPolicy => 'Datenschutzerklärung';
+
+  @override
   String get sourceCode => 'Quellcode';
 
   @override

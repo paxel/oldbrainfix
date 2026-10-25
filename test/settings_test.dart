@@ -217,12 +217,13 @@ void main() {
       );
     });
 
-    testWidgets('opens the docs, source, issues, mail and Ko-fi', (
+    testWidgets('opens the docs, policy, source, issues, mail and Ko-fi', (
       tester,
     ) async {
       await about(tester);
       for (final title in [
         'Documentation',
+        'Privacy policy',
         'Source code',
         'Report a problem or an idea',
         'Write to the developer',
@@ -232,6 +233,7 @@ void main() {
       }
       expect(opened.map((u) => u.toString()), [
         'https://paxel.github.io/oldbrainfix/en/',
+        'https://paxel.github.io/oldbrainfix/en/reference/privacy-policy.html',
         'https://github.com/paxel/oldbrainfix',
         'https://github.com/paxel/oldbrainfix/issues',
         'mailto:taum@tuta.io?subject=Old%20Brain%20Fix%20feedback',
@@ -243,13 +245,16 @@ void main() {
       );
     });
 
-    testWidgets('links the German docs in German', (tester) async {
+    testWidgets('links the German docs and privacy policy in German', (
+      tester,
+    ) async {
       await about(tester, locale: const Locale('de'));
       await tap(tester, find.text('Dokumentation'));
-      expect(
-        opened.single.toString(),
+      await tap(tester, find.text('Datenschutzerklärung'));
+      expect(opened.map((u) => u.toString()), [
         'https://paxel.github.io/oldbrainfix/de/',
-      );
+        'https://paxel.github.io/oldbrainfix/de/reference/privacy-policy.html',
+      ]);
     });
 
     testWidgets('a link nothing can open does nothing', (tester) async {

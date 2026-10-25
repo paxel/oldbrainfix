@@ -719,6 +719,8 @@
     }
   },
   "documentation": "Documentation",
+  "privacyPolicy": "Privacy policy",
+  "@privacyPolicy": {"description": "About: opens the privacy policy on the documentation site."},
   "sourceCode": "Source code",
   "reportProblem": "Report a problem or an idea",
   "githubIssues": "GitHub issues",

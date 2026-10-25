@@ -13,10 +13,19 @@ const _issuesUrl = '$_repoUrl/issues';
 const _feedbackMail = 'taum@tuta.io';
 const _donateUrl = 'https://ko-fi.com/paxel7';
 
+const _siteUrl = 'https://paxel.github.io/oldbrainfix';
+
+String _siteLanguage(String languageCode) => languageCode == 'de' ? 'de' : 'en';
+
 /// The documentation site, in the app's language where the site has one
 /// (English and German), English otherwise.
 String documentationUrl(String languageCode) =>
-    'https://paxel.github.io/oldbrainfix/${languageCode == 'de' ? 'de' : 'en'}/';
+    '$_siteUrl/${_siteLanguage(languageCode)}/';
+
+/// The privacy policy on the documentation site, in the app's language
+/// where the site has one, English otherwise.
+String privacyPolicyUrl(String languageCode) =>
+    '$_siteUrl/${_siteLanguage(languageCode)}/reference/privacy-policy.html';
 
 /// Opens [url] outside the app; what opens it is the system's choice.
 Future<void> openExternally(Uri url) async {
@@ -53,7 +62,9 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final docs = documentationUrl(Localizations.localeOf(context).languageCode);
+    final language = Localizations.localeOf(context).languageCode;
+    final docs = documentationUrl(language);
+    final privacy = privacyPolicyUrl(language);
     final accent = LookTones.of(Theme.of(context).brightness).accent;
     return Scaffold(
       appBar: AppBar(title: Text(t.aboutTitle)),
@@ -89,6 +100,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 16),
           for (final (icon, title, subtitle, url) in [
             (Icons.menu_book_outlined, t.documentation, docs, docs),
+            (Icons.privacy_tip_outlined, t.privacyPolicy, privacy, privacy),
             (
               Icons.code,
               t.sourceCode,

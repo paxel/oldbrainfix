@@ -126,7 +126,7 @@
   "bundleSaved": "{count, plural, =1{Bundle saved with 1 change. Send it to the other Device and import it there.} other{Bundle saved with {count} changes. Send it to the other Device and import it there.}}",
   "@bundleSaved": {"placeholders": {"count": {"type": "int"}}},
   "bundleDrop": "Or drop a bundle or a sent Note onto the window.",
-  "aboutSettingsDetail": "The version, the source code and every third-party component with its license.",
+  "aboutSettingsDetail": "The version, the documentation and privacy policy, the source code and every third-party component with its license.",
   "@aboutSettingsDetail": {"description": "Under the About button in the desktop Settings."},
   "aboutVersion": "Version {version}",
   "@aboutVersion": {"placeholders": {"version": {"type": "String"}}},

@@ -1224,6 +1224,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get documentation => 'Documentation';
 
   @override
+  String get privacyPolicy => 'Privacy policy';
+
+  @override
   String get sourceCode => 'Source code';
 
   @override

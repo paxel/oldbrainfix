@@ -2024,6 +2024,12 @@ abstract class AppLocalizations {
   /// **'Documentation'**
   String get documentation;
 
+  /// About: opens the privacy policy on the documentation site.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get privacyPolicy;
+
   /// No description provided for @sourceCode.
   ///
   /// In en, this message translates to:

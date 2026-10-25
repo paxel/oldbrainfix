@@ -12,6 +12,27 @@ use crate::l10n::L10n;
 use crate::theme::Tones;
 
 const REPO: &str = "https://github.com/paxel/oldbrainfix";
+const SITE: &str = "https://paxel.github.io/oldbrainfix";
+
+/// The site's language for the app's `locale`: German or English.
+fn site_language(locale: &str) -> &'static str {
+    if locale == "de" { "de" } else { "en" }
+}
+
+/// The documentation site, in the app's language where the site has one
+/// (English and German), English otherwise.
+pub fn documentation_url(locale: &str) -> String {
+    format!("{SITE}/{}/", site_language(locale))
+}
+
+/// The privacy policy on the documentation site, in the app's language
+/// where the site has one, English otherwise.
+pub fn privacy_policy_url(locale: &str) -> String {
+    format!(
+        "{SITE}/{}/reference/privacy-policy.html",
+        site_language(locale)
+    )
+}
 
 /// The lists: what the phone ships too (the ocrs models, whisper.cpp,
 /// the Whisper model, Material Icons, Rust's standard library), what only
@@ -63,6 +84,9 @@ pub fn about(ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.about_tagline()).color(text));
         ui.add_space(8.0);
+        ui.hyperlink_to(t.documentation(), documentation_url(t.locale()));
+        ui.hyperlink_to(t.privacy_policy(), privacy_policy_url(t.locale()));
+        ui.add_space(8.0);
         ui.label(RichText::new(t.source_code()).strong().color(text));
         ui.horizontal_wrapped(|ui| {
             ui.hyperlink(REPO);
@@ -111,6 +135,30 @@ pub fn licences_page(ui: &mut Ui, t: &L10n) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_site_links_follow_the_language_english_otherwise() {
+        assert_eq!(
+            documentation_url("en"),
+            "https://paxel.github.io/oldbrainfix/en/"
+        );
+        assert_eq!(
+            documentation_url("de"),
+            "https://paxel.github.io/oldbrainfix/de/"
+        );
+        assert_eq!(
+            documentation_url("fr"),
+            "https://paxel.github.io/oldbrainfix/en/"
+        );
+        assert_eq!(
+            privacy_policy_url("de"),
+            "https://paxel.github.io/oldbrainfix/de/reference/privacy-policy.html"
+        );
+        assert_eq!(
+            privacy_policy_url("fr"),
+            "https://paxel.github.io/oldbrainfix/en/reference/privacy-policy.html"
+        );
+    }
 
     #[test]
     fn every_list_reads_into_named_entries() {

@@ -73,7 +73,7 @@
   "bundleOpenTitle": "Ein Paket oder eine gesendete Notiz öffnen",
   "bundleSaved": "{count, plural, =1{Paket mit 1 Änderung gespeichert. Schick es an das andere Gerät und importiere es dort.} other{Paket mit {count} Änderungen gespeichert. Schick es an das andere Gerät und importiere es dort.}}",
   "bundleDrop": "Oder zieh ein Paket oder eine gesendete Notiz auf das Fenster.",
-  "aboutSettingsDetail": "Die Version, der Quellcode und jede Fremdkomponente mit ihrer Lizenz.",
+  "aboutSettingsDetail": "Die Version, die Dokumentation und Datenschutzerklärung, der Quellcode und jede Fremdkomponente mit ihrer Lizenz.",
   "aboutVersion": "Version {version}",
   "licensesIntro": "Jede Fremdkomponente in dieser App mit ihrer Lizenz. Klick auf eine, um sie zu lesen.",
   "shareShowCode": "Code zeigen",

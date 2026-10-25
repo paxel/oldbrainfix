@@ -1,0 +1,56 @@
+<!-- page: title="Datenschutzerklärung" track="reference" order=3 summary="Old Brain Fix behält alles auf deinen eigenen Geräten: kein Server, kein Konto, keine Analyse. Die wenigen Male, die die App online geht, und wofür sie jede Berechtigung braucht." -->
+<p class="lede">Old Brain Fix behält deine Notizen, Fotos, Sprachaufnahmen, Routinen, Erinnerungen und ihren Verlauf auf deinen eigenen Geräten. Es gibt keinen Server, kein Konto und keine Analyse, Werbung oder Absturzberichte. Nichts wird vom Entwickler oder von Dritten gesammelt, an sie geschickt oder bei ihnen gespeichert.</p>
+<p>Diese Erklärung gilt für die Android-App, die Computer-App für Linux, Windows und macOS und diese Seite. Old Brain Fix ist kostenlos und quelloffen; du kannst jedes Wort dieser Seite am <a href="https://github.com/paxel/oldbrainfix">Quellcode</a> nachprüfen.</p>
+
+<h2>Was die App behält, und wo</h2>
+<p>Alles, was du erfasst, mit seinem Erfassungskontext (Zeit, Ort, der laufende Kalendertermin, das verbundene Bluetooth-Gerät, die App, aus der etwas geteilt wurde), bleibt im eigenen Speicher der App auf dem Gerät, auf dem du es erfasst hast, und auf den Geräten, die du damit gekoppelt hast. Fotos werden ohne Ortsdaten gespeichert. Einstellungen gehören zu jedem Gerät und werden nie abgeglichen.</p>
+<p>Der Entwickler bekommt nichts davon. Keine Daten werden verkauft oder weitergegeben, und nichts wird für Werbung oder Profilbildung verwendet.</p>
+
+<h2>Wann die App online geht</h2>
+<p>Nur dafür, und jedes erst, wenn du es einrichtest:</p>
+<ul>
+  <li><strong>Abgleich im lokalen Netz.</strong> Ein Handy und ein Computer, die du gekoppelt hast, indem du den Code scannst oder eintippst, den der Computer zeigt, verbinden sich direkt miteinander über dein Heimnetz, mit TLS verschlüsselt und gegen das beim Koppeln gemerkte Zertifikat geprüft. Sie gleichen von selbst ab, solange die App offen ist, und etwa alle 15 Minuten im Hintergrund. Nichts geht über das Internet, und kein Server ist beteiligt.</li>
+  <li><strong>Einander finden.</strong> Damit ein gekoppelter Computer gefunden wird, kündigt er sich im lokalen Netz per mDNS an (Dienst <code>_oldbrainfix._tcp</code>), nur mit einer zufälligen Geräte-ID: kein Name, kein Computername. Alle im selben Netz können diese Ankündigung sehen, nicht aber, was abgeglichen wird.</li>
+  <li><strong>Der geteilte Ordner.</strong> Wenn du einen geteilten Ordner wählst, schreibt die App nur Dateien hinein, jede Ende-zu-Ende-verschlüsselt mit dem Schlüssel ihres Bereichs. Was den Ordner weiterträgt (Syncthing, Nextcloud, ein Cloud-Speicher, ein USB-Stick), ist deine Wahl und arbeitet nach seinen eigenen Bedingungen; es sieht, dass es Dateien gibt, nicht, was darin steht.</li>
+  <li><strong>Geteilte Bereiche.</strong> Wenn du einen Bereich mit einem anderen Menschen teilst, gehen seine Notizen, Routinen, Erinnerungen und ihr Verlauf an die Geräte der Menschen, die du eingeladen hast, auf denselben Wegen wie dein eigener Abgleich (direkt im lokalen Netz oder über einen geteilten Ordner), verschlüsselt mit dem Schlüssel des Bereichs. Jeder andere Bereich bleibt privat.</li>
+  <li><strong>Das Sprachmodell.</strong> Transkripte schreibt Whisper auf deinem Gerät. Sein Modell wird einmal heruntergeladen, nur wenn du darum bittest, von der eigenen Veröffentlichung von Old Brain Fix auf GitHub, und gegen eine feste Prüfsumme geprüft; du kannst stattdessen auch eine eigene Modelldatei wählen. GitHub und der Download-Server, an den es weiterleitet, sehen wie bei jedem Download deine IP-Adresse, nach der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>. Sprache und Text in Fotos zu erkennen geht nie online.</li>
+  <li><strong>Google-Sicherung (Android, nur wenn eingeschaltet).</strong> Wenn du sie einschaltest, behält die Android-Sicherung in deinem Google-Konto die neueste verschlüsselte Sicherungsdatei und sonst nichts: nie die Datenbank der App. Google kann sie ohne deine Passphrase oder deinen Wiederherstellungsschlüssel nicht lesen. Für dein Google-Konto gilt die Datenschutzerklärung von Google. Ist sie aus, gibt die App Android nichts zu sichern.</li>
+</ul>
+
+<h2>Wenn du selbst etwas verschickst</h2>
+<p>Manches verlässt die App nur über Apps, die du im Teilen-Menü oder Dateidialog deines Systems auswählst, und liegt dann in deren Hand:</p>
+<ul>
+  <li>Abgleich-Paketdateien, verschlüsselt, und gesendete Notizen, signiert und verschlüsselt, wenn du den Empfänger kennst, verschickt über einen beliebigen Messenger oder per Mail;</li>
+  <li>Sicherungen, verschlüsselt, in einen Ordner deiner Wahl geschrieben;</li>
+  <li>Kalenderdateien, die du exportierst, und Notizen, Routinen oder Erinnerungen, die du in deine Kalender-App übernimmst;</li>
+  <li>das Wiederherstellungsblatt, das du druckst oder speicherst.</li>
+</ul>
+<p>Wenn du einschaltest, dass deine Routinen und Erinnerungen in einem Gerätekalender geführt werden, schreibt die App sie in den einen Kalender, den du wählst, als "Private Routine" bei einem gesperrten Bereich, der auf Maskiert steht. Wird dieser Kalender mit einem Online-Konto abgeglichen, bekommt dessen Anbieter diese Einträge nach seinen eigenen Bedingungen. Die Links auf der Seite "Über" (diese Seite, GitHub, Ko-fi, Mail) öffnen sich in deinem Browser oder deiner Mail-App.</p>
+
+<h2>Berechtigungen auf Android</h2>
+<p>Jede wird erst erfragt, wenn die Funktion sie braucht, und jede Funktion geht ohne die anderen.</p>
+<ul>
+  <li><strong>Standort</strong>: wo eine Notiz erfasst wurde, nur beim Erfassen gelesen, während die App offen ist, und auf dem Handy mit deinen benannten Orten abgeglichen.</li>
+  <li><strong>Mikrofon</strong>: nimmt nur auf, während du eine Sprachnotiz aufnimmst.</li>
+  <li><strong>Kamera</strong>: die App hat keine Kameraberechtigung; eine Fotonotiz wird mit deiner Kamera-App aufgenommen.</li>
+  <li><strong>Kalender (lesen)</strong>: wenn du es einschaltest, der Termin, der beim Erfassen läuft. <strong>Kalender (schreiben)</strong>: wenn du es einschaltest, deine Routinen und Erinnerungen in dem einen Kalender, den du gewählt hast; nur Termine, die die App geschrieben hat, werden je geändert oder entfernt.</li>
+  <li><strong>Geräte in der Nähe (Bluetooth)</strong>: wenn du es einschaltest, der Name des Bluetooth-Geräts, das beim Erfassen verbunden ist.</li>
+  <li><strong>Benachrichtigungen, Wecker und Erinnerungen, Vollbild-Alarme, Start nach dem Hochfahren, wach bleiben, ein Vordergrunddienst</strong>: damit Routinen und Erinnerungen auf die Minute klingeln, vom Sperrbildschirm aus, nach einem Neustart und als Vollbild-Alarm mit Ton, wenn du Eskalation eingeschaltet hast.</li>
+  <li><strong>Biometrie</strong>: die App-Sperre und die Bereichssperren mit Fingerabdruck oder Bildschirmsperre entsperren.</li>
+  <li><strong>Internet und Netzwerkstatus</strong>: nur für den Abgleich, das Finden und den Download des Sprachmodells oben.</li>
+</ul>
+
+<h2>Am Computer</h2>
+<p>Die Computer-App benutzt das Mikrofon nur, während du eine Sprachnotiz aufnimmst, zeigt Benachrichtigungen für deine Routinen und Erinnerungen, startet bei der Anmeldung, wenn du das nicht ausschaltest, und wartet auf ihr Tastenkürzel zum Erfassen. Sie geht nur für den Abgleich im lokalen Netz, ihre mDNS-Ankündigung und den Download des Sprachmodells online, wie oben beschrieben.</p>
+
+<h2>Deine Daten löschen</h2>
+<p>Wer die App deinstalliert, löscht alles, was sie auf diesem Gerät behält. Sicherungen und Dateien im geteilten Ordner bleiben, wo du sie abgelegt hast, bis du sie löschst; die Google-Sicherung entfernst du in den Sicherungseinstellungen deines Google-Kontos. Da nie etwas auf einem Server des Entwicklers liegt, gibt es dort nichts zu löschen.</p>
+
+<h2>Kinder</h2>
+<p>Old Brain Fix sammelt von niemandem Daten, auch nicht von Kindern.</p>
+
+<h2>Diese Seite</h2>
+<p>Diese Seite wird von GitHub Pages ausgeliefert, das wie jeder Webserver deine IP-Adresse sieht, nach der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>. Sie setzt keine Cookies, lädt nichts von anderen und merkt sich deine Wahl zwischen hell und dunkel nur in deinem eigenen Browser.</p>
+
+<h2>Änderungen und Kontakt</h2>
+<p>Änderungen an dieser Erklärung kommen mit einer Version der App und stehen unter <a href="../reference/whats-new.html">Was ist neu</a>. Fragen: <a href="mailto:taum@tuta.io">taum@tuta.io</a>, oder <a href="https://github.com/paxel/oldbrainfix/issues">GitHub-Issues</a>.</p>
