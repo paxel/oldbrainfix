@@ -28,7 +28,9 @@ finish-args:
   # Notifications with Done and Snooze, and the tray icon.
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
-  - --own-name=org.kde.StatusNotifierItem-*
+  # ksni registers org.kde.StatusNotifierItem-<pid>-<n>; flatpak only
+  # accepts a wildcard as a whole last segment.
+  - --own-name=org.kde.*
 modules:
   - name: oldbrainfix
     buildsystem: simple
