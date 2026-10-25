@@ -15,7 +15,8 @@ import java.util.concurrent.Executors
  * tree URI, good for shared storage, a USB stick and cloud providers
  * alike, none of which is a path an app may read. Dart sees the folder
  * as `oldbrainfix-sync` with `keys` and `blobs` inside, addressed by
- * name. Everything here needs only a [Context], so the background
+ * name; Backups go straight into the folder picked for them ([put]).
+ * Everything here needs only a [Context], so the background
  * sync's engine (SyncWorker) answers it as the app does; picking the
  * tree is the Activity's ([MainActivity]). The files are read and
  * written off the main thread, one call after the other.
@@ -29,7 +30,7 @@ object FolderChannel {
 
     /** Answers [call] and returns true, or false when it is not one of these. */
     fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("name", "list", "read", "write", "delete", "ensure")) return false
+        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure")) return false
         val app = context.applicationContext
         io.execute {
             val answer = try {
@@ -69,6 +70,10 @@ object FolderChannel {
             out.use { it.write(bytes) }
             null
         }
+        "put" -> {
+            put(context, call)
+            null
+        }
         "delete" -> {
             dir(context, call, create = false)?.findFile(name(call))?.delete()
             null
@@ -77,6 +82,36 @@ object FolderChannel {
             dir(context, call, create = true)
             null
         }
+    }
+
+    /**
+     * Copies the app's own file at `path` into the folder as `name`, a
+     * Backup too big to cross the channel: streamed in beside, then
+     * renamed, so a cloud client never takes half a file for the whole;
+     * where the provider cannot rename, written in place.
+     */
+    private fun put(context: Context, call: MethodCall) {
+        val dir = dir(context, call, create = true) ?: throw IllegalStateException("no folder")
+        val name = name(call)
+        val from = java.io.File(call.argument<String>("path") ?: throw IllegalArgumentException("no path"))
+        val tmp = "$name.tmp"
+        dir.findFile(tmp)?.delete()
+        val beside = dir.createFile("application/octet-stream", tmp)
+            ?: throw IllegalStateException("cannot create $tmp")
+        copy(context, from, beside)
+        dir.findFile(name)?.delete()
+        if (!beside.renameTo(name)) {
+            beside.delete()
+            val file = dir.createFile("application/octet-stream", name)
+                ?: throw IllegalStateException("cannot create $name")
+            copy(context, from, file)
+        }
+    }
+
+    private fun copy(context: Context, from: java.io.File, to: DocumentFile) {
+        val out = context.contentResolver.openOutputStream(to.uri, "wt")
+            ?: throw IllegalStateException("cannot write ${to.name}")
+        out.use { sink -> from.inputStream().use { it.copyTo(sink) } }
     }
 
     private fun tree(context: Context, call: MethodCall): DocumentFile? {

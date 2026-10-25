@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
  * any screen and runs `backgroundSyncMain` (lib/main.dart) in it, which
  * applies what was tapped on notifications, finds the paired hosts here
  * ([Discovery]), syncs with them and through the shared folder
- * ([FolderChannel]) and arms the alarms anew. The engine is gone when
+ * ([FolderChannel]), writes the weekly Backup when it is due, and arms
+ * the alarms anew. The engine is gone when
  * Dart says it finished, or after [LIMIT_MINUTES] at the latest. While
  * the app is open it syncs itself instead.
  */

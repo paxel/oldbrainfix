@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +10,7 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/auto_sync.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
+import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/sync_platform.dart';
@@ -455,6 +457,67 @@ void main() {
         join: join,
       );
       expect(joined, hasLength(2));
+    });
+  });
+
+  group('weekly Backups', () {
+    const cheap = BackupKdf(memory: 64, iterations: 1);
+
+    test('keep the background work on without a network, and one due is '
+        'written when the app shows', () async {
+      final folder = Directory.systemTemp.createTempSync('weekly_');
+      addTearDown(() => folder.deleteSync(recursive: true));
+      await setUpBackups(phone, 'correct horse', kdf: cheap);
+      phone.backupFolder = folder.path;
+      final auto = AutoSync(
+        store: phone,
+        platform: sync,
+        deviceName: () async => 'Pixel',
+        join: join,
+        clock: () => now,
+        folders: const NoFolders(),
+        workDir: Directory.systemTemp.path,
+      );
+      addTearDown(auto.dispose);
+      auto.devicesChanged();
+      expect(sync.background, isTrue);
+      expect(sync.folderBackground, isTrue);
+
+      auto.shown();
+      await auto.backUpWhenDue();
+      expect(folder.listSync(), hasLength(1));
+      expect(phone.lastBackup, now.toUtc());
+    });
+
+    test('the background work writes one when it is due, and only '
+        'then', () async {
+      final folder = Directory.systemTemp.createTempSync('weekly_');
+      addTearDown(() => folder.deleteSync(recursive: true));
+      await setUpBackups(phone, 'correct horse', kdf: cheap);
+      phone.backupFolder = folder.path;
+      final armed = AlarmSync(
+        store: phone,
+        platform: FakeAlarms(),
+        wallClock: deviceWallClock,
+      );
+      addTearDown(armed.dispose);
+      armed.setTexts(lookupAppLocalizations(const Locale('en')), 'en');
+      Future<void> run() => backgroundSync(
+        store: phone,
+        platform: sync,
+        alarms: armed,
+        name: 'Pixel',
+        join: join,
+        workDir: Directory.systemTemp.path,
+      );
+      await run();
+      expect(folder.listSync(), hasLength(1));
+      now = now.add(const Duration(days: 3));
+      await run();
+      expect(folder.listSync(), hasLength(1));
+      now = now.add(const Duration(days: 4));
+      await run();
+      expect(folder.listSync(), hasLength(2));
     });
   });
 }

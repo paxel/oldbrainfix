@@ -34,6 +34,7 @@ use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Notes, SigningKey, Stor
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
+use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
 use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
 use oldbrainfix_gui::folder_sync;
@@ -223,6 +224,8 @@ impl Shell {
         app.set_folder_wanted(self.folder_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
+        // Nothing written here yet: a Backup may be restored first.
+        app.offer_restore();
         let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
         app.set_hotkey(Some(hotkey));
         app.set_recorder(Box::new(MicRecorder::default()));
@@ -452,6 +455,13 @@ fn run() -> Result<i32, String> {
             });
         })
     };
+    // The weekly Backup while the app runs; the window reads its status
+    // again after each.
+    let backup_thread = {
+        let store = store.clone();
+        let (stop, wake_window) = (auto_stop.clone(), waker(&window));
+        std::thread::spawn(move || backups::run(&store, &stop, wake_window))
+    };
     // Transcripts and Photo Texts, each kept one tells the window.
     let enriched = {
         let (changes, window) = (changes.clone(), window.clone());
@@ -617,6 +627,7 @@ fn run() -> Result<i32, String> {
     auto_stop.store(true, Ordering::SeqCst);
     let _ = auto_sync.join();
     let _ = folder_sync.join();
+    let _ = backup_thread.join();
     let _ = std::fs::remove_file(&socket);
     Ok(cli::OK)
 }

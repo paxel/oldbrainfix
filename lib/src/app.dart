@@ -30,6 +30,7 @@ import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'question_mark_background.dart';
+import 'restore_screen.dart';
 import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
 import 'sent_item_screen.dart';
@@ -108,6 +109,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// Sharing and importing bundle files; none when not given.
   final BundlePlatform bundles;
 
+  /// Where a Backup is written before it goes into its folder; while
+  /// none is given, no Backup is written on its own while the app shows.
+  final String? workDir;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -130,6 +135,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.autoJoin = quickPairedSync,
     this.folders = const NoFolders(),
     this.bundles = const NoBundles(),
+    this.workDir,
   });
 
   @override
@@ -165,6 +171,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     deviceName: widget.pairing.deviceName,
     join: widget.autoJoin,
     folders: widget.folders,
+    workDir: widget.workDir,
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
@@ -372,6 +379,11 @@ class _HomeState extends State<_Home> {
   /// Not offered once Areas arrived from another Device, which planted
   /// its own (ADR 0008: the flag is this Device's).
   late bool _starterSetOffered = !widget.places.starterSetDue;
+
+  /// Whether a Backup may be restored: only into an empty log, and only
+  /// where a file can be picked; worked out once.
+  late final bool _restorable =
+      widget.bundles.available && widget.store.currentSeq() == 0;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
@@ -622,6 +634,19 @@ class _HomeState extends State<_Home> {
     setState(() => _starterSetOffered = true);
   }
 
+  /// Restores a Backup into the empty log; the Starter Set is not
+  /// offered after, the Areas came with it.
+  Future<void> _restore() async {
+    final restored = await Navigator.of(context).push<RestoreResult>(
+      MaterialPageRoute(builder: (_) => RestoreScreen(store: widget.store)),
+    );
+    if (!mounted || restored == null) return;
+    widget.store.starterSetOffered = true;
+    setState(() => _starterSetOffered = true);
+    unawaited(widget.alarms.refresh());
+    widget.autoSync.devicesChanged();
+  }
+
   /// The alarm setup was walked through; it is not offered again here.
   void _setUp() {
     widget.store.alarmSetupDone = true;
@@ -630,7 +655,12 @@ class _HomeState extends State<_Home> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_starterSetOffered) return StarterSetScreen(onDone: _plant);
+    if (!_starterSetOffered) {
+      return StarterSetScreen(
+        onDone: _plant,
+        onRestore: _restorable ? () => unawaited(_restore()) : null,
+      );
+    }
     if (!_alarmSetupDone) {
       return SetupScreen(alarms: widget.alarms, onDone: _setUp);
     }

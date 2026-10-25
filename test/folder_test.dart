@@ -38,6 +38,9 @@ class FakeFolders implements FolderPlatform {
   @override
   SyncFolder open(String folder) =>
       folder.isEmpty ? throw ArgumentError('no folder') : this.folder;
+
+  @override
+  BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
 }
 
 void main() {

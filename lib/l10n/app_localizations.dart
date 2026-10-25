@@ -3103,6 +3103,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get sentItemClose;
+
+  /// No description provided for @backupsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups'**
+  String get backupsTitle;
+
+  /// No description provided for @backupsSettingsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up this Device'**
+  String get backupsSettingsEntry;
+
+  /// No description provided for @backupsSettingsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted files of everything on this Device, in a folder you choose.'**
+  String get backupsSettingsDetail;
+
+  /// No description provided for @backupsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out.'**
+  String get backupsIntro;
+
+  /// No description provided for @backupPassphrase.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase'**
+  String get backupPassphrase;
+
+  /// No description provided for @backupPassphraseAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase again'**
+  String get backupPassphraseAgain;
+
+  /// No description provided for @backupPassphraseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters. A short sentence is easy to remember.'**
+  String get backupPassphraseHint;
+
+  /// No description provided for @backupPassphraseShort.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters, please.'**
+  String get backupPassphraseShort;
+
+  /// No description provided for @backupPassphraseMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The two do not match.'**
+  String get backupPassphraseMismatch;
+
+  /// No description provided for @backupSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up Backups'**
+  String get backupSetUp;
+
+  /// No description provided for @backupSettingUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Setting up… this takes a few seconds.'**
+  String get backupSettingUp;
+
+  /// No description provided for @backupSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery Sheet'**
+  String get backupSheetTitle;
+
+  /// No description provided for @backupSheetIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens your Backups when the passphrase is forgotten.'**
+  String get backupSheetIntro;
+
+  /// No description provided for @backupSheetPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print or save'**
+  String get backupSheetPrint;
+
+  /// No description provided for @backupSheetShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get backupSheetShare;
+
+  /// No description provided for @backupSheetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Recovery Sheet could not be made. Try again.'**
+  String get backupSheetFailed;
+
+  /// No description provided for @backupSheetNoApp.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the Recovery Sheet.'**
+  String get backupSheetNoApp;
+
+  /// No description provided for @backupFolderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get backupFolderTitle;
+
+  /// No description provided for @backupFolderNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No folder chosen yet. Backups go into a folder you choose: on this Device, on a USB stick or in a cloud app.'**
+  String get backupFolderNone;
+
+  /// No description provided for @backupFolderChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups go into {name}.'**
+  String backupFolderChosen(String name);
+
+  /// No description provided for @backupChooseFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder'**
+  String get backupChooseFolder;
+
+  /// No description provided for @backupWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up every week'**
+  String get backupWeekly;
+
+  /// No description provided for @backupWeeklyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The last 4 Backups of this Device are kept; older ones go.'**
+  String get backupWeeklyDetail;
+
+  /// No description provided for @backupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get backupNow;
+
+  /// No description provided for @backupWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up…'**
+  String get backupWorking;
+
+  /// No description provided for @backupLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Backup: {when}'**
+  String backupLast(String when);
+
+  /// No description provided for @backupNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Backup yet.'**
+  String get backupNotYet;
+
+  /// No description provided for @backupFailedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup of {when} could not be written. Is the folder still there?'**
+  String backupFailedAt(String when);
+
+  /// No description provided for @backupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup written.'**
+  String get backupDone;
+
+  /// No description provided for @backupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup could not be written. Is the folder still there?'**
+  String get backupFailed;
+
+  /// No description provided for @restoreOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from a Backup'**
+  String get restoreOffer;
+
+  /// No description provided for @restoreOfferDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming from another Device? Bring everything back from a Backup file.'**
+  String get restoreOfferDetail;
+
+  /// No description provided for @restoreIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the Backup file, then open it with your passphrase or with the recovery key from the Recovery Sheet. Settings are not in a Backup: set them again afterwards, and pair your other Devices again.'**
+  String get restoreIntro;
+
+  /// No description provided for @restorePick.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the Backup file'**
+  String get restorePick;
+
+  /// No description provided for @restoreNotABackup.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a Backup of Old Brain Fix.'**
+  String get restoreNotABackup;
+
+  /// No description provided for @restoreFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup of {when}'**
+  String restoreFile(String when);
+
+  /// No description provided for @restoreOr.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get restoreOr;
+
+  /// No description provided for @restoreCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery key'**
+  String get restoreCodeLabel;
+
+  /// No description provided for @restoreScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the Recovery Sheet'**
+  String get restoreScan;
+
+  /// No description provided for @restoreNoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'No recovery key found in the photo. Try again a little closer, or type it.'**
+  String get restoreNoCode;
+
+  /// No description provided for @restoreInvalidCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a recovery key. Check it against the Recovery Sheet.'**
+  String get restoreInvalidCode;
+
+  /// No description provided for @restoreStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get restoreStart;
+
+  /// No description provided for @restoreWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring… this takes a moment.'**
+  String get restoreWorking;
+
+  /// No description provided for @restoreWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'This passphrase or recovery key does not open the Backup.'**
+  String get restoreWrong;
+
+  /// No description provided for @restoreDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup is damaged or incomplete. Nothing was restored; try an older one.'**
+  String get restoreDamaged;
+
+  /// No description provided for @restoreNotEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device holds Notes already, so nothing was restored.'**
+  String get restoreNotEmpty;
+
+  /// No description provided for @restoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup could not be restored. Nothing was changed.'**
+  String get restoreFailed;
+
+  /// No description provided for @restoreDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Restored: {count, plural, =1{1 change} other{{count} changes}}. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.'**
+  String restoreDone(int count);
+
+  /// No description provided for @recoverySheetPdfTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix: Recovery Sheet'**
+  String get recoverySheetPdfTitle;
+
+  /// No description provided for @recoverySheetMade.
+  ///
+  /// In en, this message translates to:
+  /// **'Made on {date}'**
+  String recoverySheetMade(String date);
+
+  /// No description provided for @recoverySheetDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device: {name}'**
+  String recoverySheetDevice(String name);
+
+  /// No description provided for @recoverySheetPdfIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'This recovery key opens the Backups of this Device, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.'**
+  String get recoverySheetPdfIntro;
+
+  /// No description provided for @recoverySheetKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery key'**
+  String get recoverySheetKey;
+
+  /// No description provided for @recoverySheetStepRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'To restore, install Old Brain Fix, choose “Restore from a Backup” on the first screen, pick the newest Backup file and type this key, or scan the QR code.'**
+  String get recoverySheetStepRestore;
+
+  /// No description provided for @recoverySheetStepSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.'**
+  String get recoverySheetStepSettings;
 }
 
 class _AppLocalizationsDelegate

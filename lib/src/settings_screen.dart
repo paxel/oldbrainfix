@@ -7,6 +7,7 @@ import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
+import 'backup_screen.dart';
 import 'calendar_mirror.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
@@ -41,7 +42,7 @@ Future<void> openSettings(
 /// gear: the theme; the alarm setup and the default Re-nag interval; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; the calendar mirror; the App Lock and
-/// the Area Locks; whether Streaks show; Sync; and About. Each is a local setting, never synced, and applies at
+/// the Area Locks; whether Streaks show; Sync; Backups; and About. Each is a local setting, never synced, and applies at
 /// once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -239,6 +240,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(t.syncSettingsEntry),
                   subtitle: Text(t.syncSettingsDetail),
                   onTap: () => _push(SyncScreen(store: widget.store)),
+                ),
+              ],
+            ),
+            _Heading(t.backupsTitle),
+            _Section(
+              children: [
+                ListTile(
+                  key: const ValueKey('backups'),
+                  leading: const Icon(Icons.backup_outlined),
+                  title: Text(t.backupsSettingsEntry),
+                  subtitle: Text(t.backupsSettingsDetail),
+                  onTap: () => _push(BackupScreen(store: widget.store)),
                 ),
               ],
             ),

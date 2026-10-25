@@ -13,7 +13,9 @@ import java.util.concurrent.TimeUnit
 /**
  * The background sync's periodic work (ADR 0003): about every 15
  * minutes, Android's shortest period, while some paired Device syncs on
- * its own or a shared folder is chosen; no persistent connection.
+ * its own, a shared folder is chosen or Backups are written weekly (ADR
+ * 0016); no persistent connection. A Backup folder needs no network
+ * either, so it counts as a folder here.
  * Without a shared folder it waits for a network, and the worker itself
  * goes on only on Wi-Fi or Ethernet, where a computer at home can be,
  * so a Wi-Fi marked metered still syncs and mobile data never wakes the

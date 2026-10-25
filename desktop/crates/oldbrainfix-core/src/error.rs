@@ -11,6 +11,9 @@ pub enum Error {
     /// A file that is no sync bundle this app can read.
     #[error("no sync bundle")]
     NotABundle,
+    /// A Backup that could not be restored, and why.
+    #[error("backup: {0:?}")]
+    Backup(crate::backup::Problem),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

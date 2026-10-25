@@ -1,0 +1,28 @@
+{
+  "device": [
+    [
+      "key:c945cbf2a5602002141e2fb9d17054d6",
+      "{\"box\":\"NpiOI37NKcQmhuv9Zt92gze8GE9ERdBaZWk8gmVJvjc=\",\"boxSig\":\"CR+HkKAeMw4FvMzO+UZTDRPI/4qFAzqiJLCQxk5OXcOsuKJM+lwr++fmMLvm8ixSoYdd10bAj/tiG0iqe6+VDw==\",\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:65563a8dc505cfc0",
+      "{\"key\":\"3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/w=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:6f103f3d9ba4c7e4",
+      "{\"key\":\"AgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICE=\",\"scope\":\"area:00000000000000000000000000000001\"}"
+    ],
+    [
+      "areakey:a6d5b433214c6aaa",
+      "{\"key\":\"JygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUY=\",\"scope\":\"area:00000000000000000000000000000006\"}"
+    ],
+    [
+      "backup:key",
+      "TE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpams="
+    ],
+    [
+      "backup:pass",
+      "{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"sealed\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"t\":3}"
+    ]
+  ]
+}

@@ -59,6 +59,10 @@ class AutoSync extends ChangeNotifier {
   /// The wall clock the schedule runs on.
   final DateTime Function() clock;
 
+  /// Where a Backup is written before it goes into its folder; without
+  /// one, the weekly Backup waits for the background work.
+  final String? workDir;
+
   final _schedule = AutoSyncSchedule();
 
   /// Where discovery last heard each Device.
@@ -83,6 +87,7 @@ class AutoSync extends ChangeNotifier {
     this.join = quickPairedSync,
     this.folders = const NoFolders(),
     this.clock = DateTime.now,
+    this.workDir,
   }) {
     _own = _ownSeq();
     store.addListener(_changed);
@@ -121,12 +126,36 @@ class AutoSync extends ChangeNotifier {
     });
   }
 
-  /// The app shows: discovery runs, every Device is synced at once, and
-  /// what a background sync brought is announced.
+  /// The Backup being written, while one is.
+  Future<void>? _backingUp;
+
+  /// Writes the weekly Backup when it is due (ADR 0016): the background
+  /// work does not run while the app shows. One at a time: while one is
+  /// written, that one is waited for. A failure is kept for the Backups
+  /// page and tried again next time.
+  Future<void> backUpWhenDue() {
+    final work = workDir;
+    if (work == null || _disposed) return Future.value();
+    if (_backingUp case final running?) return running;
+    final run = backUpIfDue(store, folders.openBackups, work).then(
+      (_) {},
+      // Kept as the Backups page's status.
+      onError: (Object _) {},
+    );
+    _backingUp = run;
+    return run.whenComplete(() {
+      if (identical(_backingUp, run)) _backingUp = null;
+    });
+  }
+
+  /// The app shows: discovery runs, every Device is synced at once, a
+  /// Backup due is written, and what a background sync brought is
+  /// announced.
   void shown() {
     if (_disposed) return;
     _open = true;
     devicesChanged();
+    unawaited(backUpWhenDue());
     unawaited(platform.startDiscovery());
     if (store.conflictsArrived) {
       store.conflictsArrived = false;
@@ -147,14 +176,16 @@ class AutoSync extends ChangeNotifier {
     unawaited(_run());
   }
 
-  /// The paired Devices or their switches changed: the periodic work runs
-  /// while one syncs on its own.
+  /// The paired Devices or their switches changed, or the Backups': the
+  /// periodic work runs while one syncs on its own or Backups are
+  /// written weekly, and needs no network for a folder.
   void devicesChanged() {
     if (_disposed) return;
+    final backups = store.backupsScheduled;
     unawaited(
       platform.setBackground(
-        _devices.isNotEmpty,
-        folder: store.syncFolder != null,
+        _devices.isNotEmpty || backups,
+        folder: store.syncFolder != null || backups,
       ),
     );
     _arm();
@@ -269,7 +300,8 @@ class AutoSync extends ChangeNotifier {
 /// and synced where it answers; then the shared folder, wherever the
 /// Device is; Conflicts they brought are kept to be announced when the
 /// app opens; and the alarms are armed anew, so a Done on another Device
-/// silences the alarm here. [alarms] has its texts already.
+/// silences the alarm here. A weekly Backup due is written through
+/// [workDir] (ADR 0016). [alarms] has its texts already.
 Future<void> backgroundSync({
   required Store store,
   required SyncPlatform platform,
@@ -278,6 +310,7 @@ Future<void> backgroundSync({
   PairedJoin join = quickPairedSync,
   FolderPlatform folders = const NoFolders(),
   Duration look = const Duration(seconds: 8),
+  String? workDir,
 }) async {
   await alarms.refresh();
   final devices = store.autoSyncDevices();
@@ -292,6 +325,13 @@ Future<void> backgroundSync({
       }
     } on Object {
       // Not now: the next run tries again.
+    }
+  }
+  if (workDir != null) {
+    try {
+      await backUpIfDue(store, folders.openBackups, workDir);
+    } on Object {
+      // Kept as the Backups page's status; the next run tries again.
     }
   }
   await alarms.refresh();

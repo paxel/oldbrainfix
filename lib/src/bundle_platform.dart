@@ -15,7 +15,8 @@ import 'l10n.dart';
 /// picks, picking one to import, and the bundles other apps opened with
 /// this one. Every bundle to import is a copy of the app's own, removed
 /// once imported. Sent Items go in and out the same way, told apart by
-/// what is in them. Widget tests hand in a fake.
+/// what is in them, and so do Backups to restore and the Recovery Sheet
+/// to share or print. Widget tests hand in a fake.
 abstract interface class BundlePlatform {
   /// Whether bundles can be shared and imported here.
   bool get available;
@@ -30,6 +31,10 @@ abstract interface class BundlePlatform {
   /// Opens the system's file picker; the copy of the file picked, or
   /// null when the user backed out.
   Future<String?> pick();
+
+  /// Opens the system's print dialog for the PDF at [path], written
+  /// where [exportPath] said, titled [name]; false when there is none.
+  Future<bool> print(String path, String name);
 
   /// The copies of the bundles other apps opened with this one that are
   /// not imported yet, oldest first; each is handed out once.
@@ -55,6 +60,9 @@ class NoBundles implements BundlePlatform {
 
   @override
   Future<String?> pick() async => null;
+
+  @override
+  Future<bool> print(String path, String name) async => false;
 
   @override
   Future<List<String>> takeOpened() async => const [];
@@ -89,6 +97,10 @@ class AndroidBundles implements BundlePlatform {
 
   @override
   Future<String?> pick() => _ask<String>('pick', null);
+
+  @override
+  Future<bool> print(String path, String name) async =>
+      await _ask<bool>('print', {'path': path, 'name': name}) ?? false;
 
   @override
   Future<List<String>> takeOpened() async {

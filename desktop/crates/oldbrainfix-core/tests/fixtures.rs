@@ -2037,3 +2037,103 @@ fn joiner_key_record_box() -> Result<[u8; 32], Box<dyn std::error::Error>> {
         .verified_box_key()
         .ok_or("a box key")?)
 }
+
+// ------------------------------------------------------------- Backups
+
+/// The restored Device's key in the backup fixture: seed bytes 65 to 96.
+fn restored_key() -> SigningKey {
+    SigningKey::from_seed(std::array::from_fn(|i| i as u8 + 65))
+}
+
+fn wire_lines(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut lines = Vec::new();
+    for e in store.all_entries()? {
+        lines.push(serde_json::to_string(&e.wire())?);
+    }
+    Ok(lines)
+}
+
+#[test]
+fn the_backup_the_dart_core_wrote_is_restored_here_and_written_the_same() -> TestResult {
+    use oldbrainfix_core::backup::{read_header, restore, unlock, write_backup};
+    let dir = fixtures().join("backup");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let file = dir.join("backup.obfbackup");
+    let header = read_header(&file)?.ok_or("a header")?;
+    assert_eq!(
+        Some(dart_iso(header.created).as_str()),
+        expected["created"].as_str()
+    );
+
+    // Opened with the passphrase and with the recovery key alike.
+    let passphrase = expected["passphrase"].as_str().ok_or("passphrase")?;
+    let code = expected["recoveryCode"].as_str().ok_or("code")?;
+    let key = unlock(&header, Some(passphrase), None)?.ok_or("the passphrase opens it")?;
+    assert_eq!(unlock(&header, None, Some(code))?, Some(key));
+    assert_eq!(
+        Some(hex::encode(key).as_str()),
+        expected["backupKey"].as_str()
+    );
+
+    // A new Device restores it as the Dart core did, entry for entry.
+    let at = parse_time(expected["restoredAt"].as_str().ok_or("restoredAt")?)?;
+    let restored = Store::in_memory(Box::new(move || at), || Ok(restored_key()))?;
+    let got = restore(&restored, &file, &key)?;
+    assert_eq!(got.roles as u64, expected["roles"].as_u64().ok_or("roles")?);
+    assert_eq!(
+        wire_lines(&restored)?,
+        lines_of(&dir.join("restored.jsonl"))?
+    );
+    let moments: Vec<Value> = restored
+        .moment_rows()?
+        .iter()
+        .map(|m| json!({"seq": m.seq, "cause": m.cause, "label": m.label, "at": m.at}))
+        .collect();
+    assert_eq!(Value::Array(moments), expected["moments"]);
+    let settings: Vec<Value> = restored
+        .local_settings_with_prefix("")?
+        .into_iter()
+        .filter(|(k, _)| k != "device" && k != "signseed")
+        .map(|(k, v)| json!([k, v]))
+        .collect();
+    assert_eq!(Value::Array(settings), expected["settings"]);
+    let mut actual = read(&restored)?;
+    let mut read_back = expected["read"].clone();
+    for value in [&mut actual, &mut read_back] {
+        if let Some(map) = value.as_object_mut() {
+            map.remove("device");
+        }
+    }
+    assert_eq!(actual, read_back);
+
+    // The same Device writes the very same file here, byte for byte.
+    let created = dart_iso(header.created);
+    let source = fixture_device("backup", "device", writer_key, &created)?;
+    for m in read_json(&dir.join("moments.json"))?
+        .as_array()
+        .ok_or("moments")?
+    {
+        source.add_moment_at(
+            m["seq"].as_i64().ok_or("seq")?,
+            m["cause"].as_str().ok_or("cause")?,
+            m["label"].as_str(),
+            m["at"].as_str().ok_or("at")?,
+        )?;
+    }
+    let ours = tempfile::tempdir()?;
+    let path = ours.path().join("backup.obfbackup");
+    let counts = write_backup(&source, &path, &mut counted_after(5000))?;
+    assert_eq!(
+        counts.entries as u64,
+        expected["counts"]["entries"].as_u64().ok_or("entries")?
+    );
+    assert_eq!(
+        counts.blobs as u64,
+        expected["counts"]["blobs"].as_u64().ok_or("blobs")?
+    );
+    assert!(
+        std::fs::read(&path)? == std::fs::read(&file)?,
+        "the Backup differs"
+    );
+    Ok(())
+}

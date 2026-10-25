@@ -83,5 +83,12 @@
   "sendButton": "Senden …",
   "sendSaveTitle": "Die Notiz zum Senden speichern",
   "sentSaved": "Gespeichert. Schick die Datei über einen beliebigen Messenger oder per Mail.",
-  "sendFailed": "Die Datei ließ sich nicht schreiben. Nichts ging verloren; versuch es noch einmal."
+  "sendFailed": "Die Datei ließ sich nicht schreiben. Nichts ging verloren; versuch es noch einmal.",
+  "backupSheetSave": "Wiederherstellungsblatt speichern …",
+  "backupSheetSaveTitle": "Wiederherstellungsblatt speichern",
+  "backupSheetSaved": "Das Wiederherstellungsblatt ist gespeichert. Druck es von dort aus und bewahre es sicher auf.",
+  "backupFolderPickTitle": "Ordner für Sicherungen wählen",
+  "restoreOpenTitle": "Sicherungsdatei wählen",
+  "welcomeTitle": "Willkommen bei Old Brain Fix",
+  "welcomeFresh": "Neu anfangen"
 }

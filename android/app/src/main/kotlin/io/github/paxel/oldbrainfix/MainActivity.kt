@@ -270,6 +270,13 @@ class MainActivity : FlutterActivity() {
                     )
                     "pick" -> pickBundle(result)
                     "take" -> result.success(Bundles.take())
+                    "print" -> result.success(
+                        Printing.print(
+                            this@MainActivity,
+                            args["path"] as? String ?: "",
+                            args["name"] as? String ?: "",
+                        ),
+                    )
                     else -> result.notImplemented()
                 }
             }

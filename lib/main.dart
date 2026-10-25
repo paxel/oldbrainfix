@@ -32,6 +32,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerLicenses();
   final dir = await getApplicationSupportDirectory();
+  final work = await getTemporaryDirectory();
   final store = Store.open('${dir.path}/oldbrainfix.db');
   runApp(
     OldBrainFixApp(
@@ -52,13 +53,14 @@ Future<void> main() async {
       sync: AndroidSync(),
       folders: const AndroidFolders(),
       bundles: AndroidBundles(),
+      workDir: work.path,
     ),
   );
 }
 
 /// The background sync the periodic work starts in an engine of its own
 /// while the app is closed (android/…/SyncWorker.kt): paired Devices and
-/// the shared folder, the same store,
+/// the shared folder, the same store, the weekly Backup when it is due,
 /// the alarms armed with the texts in the Device's language, and the
 /// work told when it is over.
 @pragma('vm:entry-point')
@@ -85,6 +87,7 @@ Future<void> backgroundSyncMain() async {
         alarms: alarms,
         name: await const AndroidPairing().deviceName(),
         folders: const AndroidFolders(),
+        workDir: (await getTemporaryDirectory()).path,
       );
     } finally {
       alarms.dispose();

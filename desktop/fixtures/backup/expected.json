@@ -1,0 +1,173 @@
+{
+  "passphrase": "Grüße an die Katze",
+  "recoveryCode": "9H6M-WKTG-A595-6N2N-ASBN-GPAT-BDE5-TQJZ-C1GP-4RV4-CNK6-ET39-D9NY",
+  "backupKey": "4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b",
+  "created": "2026-01-02T10:00:31.000Z",
+  "counts": {
+    "entries": 25,
+    "moments": 1,
+    "keys": 3,
+    "pinned": 1,
+    "blobs": 2
+  },
+  "restoredAt": "2026-01-03T10:00:31.000Z",
+  "roles": 1,
+  "moments": [
+    {
+      "seq": 2,
+      "cause": "sync",
+      "label": "Desk",
+      "at": "2026-01-01T10:00:10.000Z"
+    }
+  ],
+  "settings": [
+    [
+      "areakey:65563a8dc505cfc0",
+      "{\"key\":\"3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/w=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:6f103f3d9ba4c7e4",
+      "{\"key\":\"AgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICE=\",\"scope\":\"area:00000000000000000000000000000001\"}"
+    ],
+    [
+      "areakey:a6d5b433214c6aaa",
+      "{\"key\":\"JygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUY=\",\"scope\":\"area:00000000000000000000000000000006\"}"
+    ],
+    [
+      "backup:key",
+      "TE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpams="
+    ],
+    [
+      "backup:pass",
+      "{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"sealed\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"t\":3}"
+    ],
+    [
+      "key:65b60673d6ed884bf01c2c222d82ada0",
+      "{\"box\":\"IFL4kek96jMZf0W5Z/CN+CJY5WudNp3/VqCqF+w21gU=\",\"boxSig\":\"fZkgUlocFs99Q6B2R/OlJhZ8ydDSUGwCKMisqawVbCJOXEzRGpsdf6tezn4hLsBgtXlG9EQP43Cl2g49LXyIDQ==\",\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "key:c945cbf2a5602002141e2fb9d17054d6",
+      "{\"box\":\"NpiOI37NKcQmhuv9Zt92gze8GE9ERdBaZWk8gmVJvjc=\",\"boxSig\":\"CR+HkKAeMw4FvMzO+UZTDRPI/4qFAzqiJLCQxk5OXcOsuKJM+lwr++fmMLvm8ixSoYdd10bAj/tiG0iqe6+VDw==\",\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+    ]
+  ],
+  "read": {
+    "now": "2026-01-03T10:00:31.000Z",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000006",
+        "name": "Family",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      },
+      {
+        "id": "area:00000000000000000000000000000001",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Buy milk",
+        "captured": "2026-01-01T10:00:03.000Z",
+        "place": "area:00000000000000000000000000000001",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [
+          "bda8f56e957a41b23c58ed8a6a501e94988c9641324d323893cc12cf663baef5"
+        ],
+        "recordings": [
+          "3babb7c90981a09e02f53c650d9dba7629c56b7c1947cfa010d3571cf0a5ce3e"
+        ],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000004",
+        "text": "Pills",
+        "captured": "2026-01-01T10:00:16.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000002"
+    ],
+    "unsorted": [],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000006": [],
+      "area:00000000000000000000000000000001": [
+        "note:00000000000000000000000000000002"
+      ]
+    },
+    "sections": {
+      "note:00000000000000000000000000000004": [],
+      "note:00000000000000000000000000000002": [
+        {
+          "id": "section:00000000000000000000000000000003",
+          "noteId": "note:00000000000000000000000000000002",
+          "text": "Oat milk, \"the green one\"",
+          "captured": "2026-01-01T10:00:11.000Z",
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ]
+    },
+    "untranscribed": [
+      {
+        "noteId": "note:00000000000000000000000000000002",
+        "hash": "3babb7c90981a09e02f53c650d9dba7629c56b7c1947cfa010d3571cf0a5ce3e"
+      }
+    ],
+    "unreadPhotos": [
+      {
+        "noteId": "note:00000000000000000000000000000002",
+        "hash": "bda8f56e957a41b23c58ed8a6a501e94988c9641324d323893cc12cf663baef5"
+      }
+    ],
+    "search": {
+      "": [
+        "note:00000000000000000000000000000004",
+        "note:00000000000000000000000000000002"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000002"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000002"
+      ]
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000006": [],
+      "area:00000000000000000000000000000001": [
+        "note:00000000000000000000000000000002"
+      ]
+    },
+    "conflicts": []
+  }
+}

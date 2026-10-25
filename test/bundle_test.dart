@@ -45,6 +45,15 @@ class FakeBundles implements BundlePlatform {
   @override
   Future<String?> pick() async => picks;
 
+  /// What was handed to the print dialog.
+  final printed = <String>[];
+
+  @override
+  Future<bool> print(String path, String name) async {
+    printed.add(path);
+    return shares;
+  }
+
   @override
   Future<List<String>> takeOpened() async {
     final taken = [...waiting];

@@ -15,6 +15,7 @@ dependencies:
   # XChaCha20-Poly1305, pure Dart.
   cryptography: ^2.9.0
   ed25519_edwards: ^0.3.2
+  qr: ^4.0.0
   sqlite3: ^3.0.0
 
 dev_dependencies:

@@ -144,5 +144,14 @@
   "@sendButton": {"description": "Opens the dialog sending the selected Note as a Sent Item."},
   "sendSaveTitle": "Save the Note to send",
   "sentSaved": "Saved. Send the file to them through any messenger or mail.",
-  "sendFailed": "The file could not be written. Nothing was lost; try again."
+  "sendFailed": "The file could not be written. Nothing was lost; try again.",
+  "backupSheetSave": "Save the Recovery Sheet…",
+  "@backupSheetSave": {"description": "Saves the Recovery Sheet PDF from the desktop's Backups settings with the system's dialog."},
+  "backupSheetSaveTitle": "Save the Recovery Sheet",
+  "backupSheetSaved": "The Recovery Sheet is saved. Print it from there, then keep it somewhere safe.",
+  "backupFolderPickTitle": "Choose the folder for Backups",
+  "restoreOpenTitle": "Choose the Backup file",
+  "welcomeTitle": "Welcome to Old Brain Fix",
+  "welcomeFresh": "Start fresh",
+  "@welcomeFresh": {"description": "On the desktop's first start: skips restoring and starts with an empty log."}
 }

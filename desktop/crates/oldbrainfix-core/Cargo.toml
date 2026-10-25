@@ -42,6 +42,11 @@ curve25519-dalek = { version = "4.1", default-features = false }
 # The bundle file (ADR 0003): a zip of stored files only, as the Dart
 # core's `archive` writes it; no compression, no encryption of its own.
 zip = { version = "=8.6.0", default-features = false }
+# Backups (ADR 0016): the passphrase's key by Argon2id, as the Dart
+# core's `cryptography` derives it.
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+# The recovery key as a QR on the Recovery Sheet.
+qrcode = { version = "0.14", default-features = false }
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

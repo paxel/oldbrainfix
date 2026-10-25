@@ -1935,4 +1935,212 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemClose => 'Schließen';
+
+  @override
+  String get backupsTitle => 'Sicherungen';
+
+  @override
+  String get backupsSettingsEntry => 'Dieses Gerät sichern';
+
+  @override
+  String get backupsSettingsDetail =>
+      'Verschlüsselte Dateien mit allem auf diesem Gerät, in einem Ordner deiner Wahl.';
+
+  @override
+  String get backupsIntro =>
+      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen.';
+
+  @override
+  String get backupPassphrase => 'Passphrase';
+
+  @override
+  String get backupPassphraseAgain => 'Passphrase wiederholen';
+
+  @override
+  String get backupPassphraseHint =>
+      'Mindestens 8 Zeichen. Ein kurzer Satz ist leicht zu merken.';
+
+  @override
+  String get backupPassphraseShort => 'Bitte mindestens 8 Zeichen.';
+
+  @override
+  String get backupPassphraseMismatch => 'Die beiden stimmen nicht überein.';
+
+  @override
+  String get backupSetUp => 'Sicherungen einrichten';
+
+  @override
+  String get backupSettingUp =>
+      'Wird eingerichtet … das dauert ein paar Sekunden.';
+
+  @override
+  String get backupSheetTitle => 'Wiederherstellungsblatt';
+
+  @override
+  String get backupSheetIntro =>
+      'Drucke das Wiederherstellungsblatt aus oder bewahre es sicher auf. Sein Wiederherstellungsschlüssel öffnet deine Sicherungen, wenn die Passphrase vergessen ist.';
+
+  @override
+  String get backupSheetPrint => 'Drucken oder speichern';
+
+  @override
+  String get backupSheetShare => 'Teilen';
+
+  @override
+  String get backupSheetFailed =>
+      'Das Wiederherstellungsblatt konnte nicht erstellt werden. Versuch es noch einmal.';
+
+  @override
+  String get backupSheetNoApp =>
+      'Keine App hier kann das Wiederherstellungsblatt annehmen.';
+
+  @override
+  String get backupFolderTitle => 'Ordner';
+
+  @override
+  String get backupFolderNone =>
+      'Noch kein Ordner gewählt. Sicherungen kommen in einen Ordner deiner Wahl: auf diesem Gerät, auf einem USB-Stick oder in einer Cloud-App.';
+
+  @override
+  String backupFolderChosen(String name) {
+    return 'Sicherungen kommen nach $name.';
+  }
+
+  @override
+  String get backupChooseFolder => 'Ordner wählen';
+
+  @override
+  String get backupWeekly => 'Jede Woche sichern';
+
+  @override
+  String get backupWeeklyDetail =>
+      'Die letzten 4 Sicherungen dieses Geräts bleiben, ältere gehen.';
+
+  @override
+  String get backupNow => 'Jetzt sichern';
+
+  @override
+  String get backupWorking => 'Wird gesichert …';
+
+  @override
+  String backupLast(String when) {
+    return 'Letzte Sicherung: $when';
+  }
+
+  @override
+  String get backupNotYet => 'Noch keine Sicherung.';
+
+  @override
+  String backupFailedAt(String when) {
+    return 'Die Sicherung vom $when konnte nicht geschrieben werden. Gibt es den Ordner noch?';
+  }
+
+  @override
+  String get backupDone => 'Sicherung geschrieben.';
+
+  @override
+  String get backupFailed =>
+      'Die Sicherung konnte nicht geschrieben werden. Gibt es den Ordner noch?';
+
+  @override
+  String get restoreOffer => 'Aus einer Sicherung wiederherstellen';
+
+  @override
+  String get restoreOfferDetail =>
+      'Du kommst von einem anderen Gerät? Hol alles aus einer Sicherungsdatei zurück.';
+
+  @override
+  String get restoreIntro =>
+      'Wähle die Sicherungsdatei und öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt. Einstellungen sind nicht in einer Sicherung: Stell sie danach neu ein und kopple deine anderen Geräte noch einmal.';
+
+  @override
+  String get restorePick => 'Sicherungsdatei wählen';
+
+  @override
+  String get restoreNotABackup =>
+      'Diese Datei ist keine Sicherung von Old Brain Fix.';
+
+  @override
+  String restoreFile(String when) {
+    return 'Sicherung vom $when';
+  }
+
+  @override
+  String get restoreOr => 'oder';
+
+  @override
+  String get restoreCodeLabel => 'Wiederherstellungsschlüssel';
+
+  @override
+  String get restoreScan => 'Wiederherstellungsblatt scannen';
+
+  @override
+  String get restoreNoCode =>
+      'Kein Wiederherstellungsschlüssel im Foto gefunden. Versuch es etwas näher noch einmal oder tippe ihn ein.';
+
+  @override
+  String get restoreInvalidCode =>
+      'Das ist kein Wiederherstellungsschlüssel. Vergleich ihn mit dem Wiederherstellungsblatt.';
+
+  @override
+  String get restoreStart => 'Wiederherstellen';
+
+  @override
+  String get restoreWorking =>
+      'Wird wiederhergestellt … das dauert einen Moment.';
+
+  @override
+  String get restoreWrong =>
+      'Diese Passphrase oder dieser Wiederherstellungsschlüssel öffnet die Sicherung nicht.';
+
+  @override
+  String get restoreDamaged =>
+      'Die Sicherung ist beschädigt oder unvollständig. Nichts wurde wiederhergestellt; versuch eine ältere.';
+
+  @override
+  String get restoreNotEmpty =>
+      'Auf diesem Gerät gibt es schon Notizen, deshalb wurde nichts wiederhergestellt.';
+
+  @override
+  String get restoreFailed =>
+      'Die Sicherung konnte nicht wiederhergestellt werden. Nichts wurde geändert.';
+
+  @override
+  String restoreDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen',
+      one: '1 Änderung',
+    );
+    return 'Wiederhergestellt: $_temp0. Stell Alarme und Sperren neu ein, wähl den Ordner für Sicherungen noch einmal und kopple deine anderen Geräte noch einmal.';
+  }
+
+  @override
+  String get recoverySheetPdfTitle => 'Old Brain Fix: Wiederherstellungsblatt';
+
+  @override
+  String recoverySheetMade(String date) {
+    return 'Erstellt am $date';
+  }
+
+  @override
+  String recoverySheetDevice(String name) {
+    return 'Gerät: $name';
+  }
+
+  @override
+  String get recoverySheetPdfIntro =>
+      'Dieser Wiederherstellungsschlüssel öffnet die Sicherungen dieses Geräts, auch wenn die Passphrase vergessen ist. Wer ihn hat, kann sie lesen: Bewahre dieses Blatt sicher auf, in einer Schublade oder einem Passwort-Manager, nie neben den Sicherungen.';
+
+  @override
+  String get recoverySheetKey => 'Wiederherstellungsschlüssel';
+
+  @override
+  String get recoverySheetStepRestore =>
+      'Zum Wiederherstellen installiere Old Brain Fix, wähle auf dem ersten Bildschirm „Aus einer Sicherung wiederherstellen“, nimm die neueste Sicherungsdatei und tippe diesen Schlüssel ein oder scanne den QR-Code.';
+
+  @override
+  String get recoverySheetStepSettings =>
+      'Einstellungen wie Alarme, Ruhezeiten und Sperren sind nicht in einer Sicherung. Stell sie auf dem neuen Gerät neu ein und kopple es noch einmal mit deinen anderen Geräten.';
 }

@@ -7,8 +7,9 @@
 //! command line, the capture popup and its hotkey, voice recordings and
 //! photos, the Transcripts and Photo Texts made of them, the LAN sync it
 //! hosts, for pairing in the Sync view and for paired Devices on their
-//! own, the shared folder it syncs through, and the About view with
-//! every third-party component's licence.
+//! own, the shared folder it syncs through, the Backups it writes and
+//! restores, and the About view with every third-party component's
+//! licence.
 
 pub mod about_view;
 pub mod alerts;
@@ -16,6 +17,8 @@ pub mod app;
 pub mod auto_sync;
 pub mod autostart;
 pub mod background;
+pub mod backup_view;
+pub mod backups;
 pub mod cli;
 pub mod enrich;
 pub mod folder_sync;

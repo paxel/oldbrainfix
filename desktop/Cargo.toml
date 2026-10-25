@@ -33,6 +33,11 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.rten-vecmath]
 opt-level = 3
+# Argon2id at the Backups' 64 MiB is far too slow unoptimised too.
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
 
 [profile.release]
 strip = true

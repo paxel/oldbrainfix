@@ -6,12 +6,16 @@ import 'look.dart';
 import 'place_names.dart';
 
 /// First start: the Starter Set, every Area and Topic ticked. A Topic
-/// can only stay ticked with its Area.
+/// can only stay ticked with its Area. Restoring a Backup is offered
+/// above it, where [onRestore] is given.
 class StarterSetScreen extends StatefulWidget {
   /// Gets the slugs left ticked.
   final ValueChanged<Set<String>> onDone;
 
-  const StarterSetScreen({super.key, required this.onDone});
+  /// Opens the restore from a Backup; none where it is not offered.
+  final VoidCallback? onRestore;
+
+  const StarterSetScreen({super.key, required this.onDone, this.onRestore});
 
   @override
   State<StarterSetScreen> createState() => _StarterSetScreenState();
@@ -65,6 +69,14 @@ class _StarterSetScreenState extends State<StarterSetScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          if (widget.onRestore case final restore?)
+            ListTile(
+              key: const ValueKey('restore-offer'),
+              leading: const Icon(Icons.settings_backup_restore),
+              title: Text(t.restoreOffer),
+              subtitle: Text(t.restoreOfferDetail),
+              onTap: restore,
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: Text(t.starterSetIntro),

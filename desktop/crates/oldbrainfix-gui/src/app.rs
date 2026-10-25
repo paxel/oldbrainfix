@@ -43,6 +43,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, Sense, TextEdit,
     Ui, WidgetInfo, WidgetType,
 };
+use oldbrainfix_core::backup;
 use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, SentItemState};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
@@ -54,6 +55,8 @@ use crate::about_view;
 use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
+use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
+use crate::backups;
 use crate::enrich::Enricher;
 use crate::folder_sync;
 use crate::hotkey::{self, Chord};
@@ -358,6 +361,10 @@ enum Action {
     },
     /// Takes the person asked about out of the Area.
     RemovePerson,
+    /// Something asked of the Backups card in the Settings.
+    Backup(BackupAction),
+    /// Something asked of the first start's view.
+    Welcome(WelcomeAction),
 }
 
 /// A change in the Settings.
@@ -464,6 +471,13 @@ pub struct App {
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
+    /// The passphrase being typed into the Backups card.
+    backup_form: Passphrase,
+    /// The first start's view, while it shows instead of the panes.
+    welcome: Option<Welcome>,
+    /// Ask where to save the Recovery Sheet and which Backup to restore.
+    sheet_saver: FileSaver,
+    backup_opener: FolderPicker,
 }
 
 /// Asks for a folder, or a file to open, with the dialog's title.
@@ -479,6 +493,20 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
         oldbrainfix_core::APP_NAME,
         &[bundle::EXTENSION, sent::EXTENSION],
     )
+}
+
+/// The save dialog's filter for the Recovery Sheet.
+fn sheet_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter("PDF", &["pdf"])
+}
+
+/// The open dialog's filter for a Backup.
+fn backup_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(oldbrainfix_core::APP_NAME, &[backup::EXTENSION])
 }
 
 /// The save dialog's filter for a Sent Item.
@@ -543,6 +571,12 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             handed: None,
             notice: None,
+            backup_form: Passphrase::default(),
+            welcome: None,
+            sheet_saver: Box::new(|title, name| {
+                sheet_dialog(title).set_file_name(name).save_file()
+            }),
+            backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -575,6 +609,128 @@ impl App {
     pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.bundle_saver = saver;
         self.bundle_opener = opener;
+    }
+
+    /// Hands in the dialogs asking where to save the Recovery Sheet and
+    /// which Backup to restore.
+    pub fn set_backup_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
+        self.sheet_saver = saver;
+        self.backup_opener = opener;
+    }
+
+    /// Shows the first start's view instead of the panes when it is due:
+    /// nothing written yet here, and the view not answered before.
+    pub fn offer_restore(&mut self) {
+        if backup_view::restore_due(&self.store).unwrap_or(false) {
+            self.welcome = Some(Welcome::default());
+        }
+    }
+
+    /// Whether the first start's view shows.
+    pub fn welcoming(&self) -> bool {
+        self.welcome.is_some()
+    }
+
+    /// Does what the Backups card asked.
+    fn backup(&mut self, asked: BackupAction) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        match asked {
+            BackupAction::SetUp => {
+                let Some(passphrase) = self.backup_form.taken(&t) else {
+                    return Ok(());
+                };
+                backup::set_up(
+                    &self.store,
+                    &passphrase,
+                    backup::Kdf::STANDARD,
+                    &mut backup::system_random,
+                )?;
+                self.backup_form = Passphrase::default();
+                self.backup(BackupAction::SaveSheet)?;
+            }
+            BackupAction::SaveSheet => {
+                let Some(pdf) = backup_view::sheet(&t, &self.store, &self.sync_name, &self.wall)
+                else {
+                    return Ok(());
+                };
+                let Some(mut path) = (self.sheet_saver)(
+                    t.backup_sheet_save_title(),
+                    "oldbrainfix-recovery-sheet.pdf",
+                ) else {
+                    return Ok(());
+                };
+                if path.extension().is_none_or(|e| e != "pdf") {
+                    path.set_extension("pdf");
+                }
+                self.notice = Some(match std::fs::write(&path, pdf) {
+                    Ok(()) => t.backup_sheet_saved().to_string(),
+                    Err(e) => format!("{} ({e})", t.backup_sheet_failed()),
+                });
+            }
+            BackupAction::PickFolder => {
+                if let Some(path) = (self.folder_picker)(t.backup_folder_pick_title()) {
+                    self.store
+                        .set_backup_folder(Some(&path.to_string_lossy()))?;
+                    self.backup(BackupAction::Now)?;
+                }
+            }
+            BackupAction::Weekly(on) => self.store.set_backups_weekly(on)?,
+            BackupAction::Now => {
+                self.notice = Some(match backups::now(&self.store) {
+                    Ok(_) => t.backup_done().to_string(),
+                    Err(e) => format!("{} ({e})", t.backup_failed()),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Does what the first start's view asked.
+    fn welcome_action(&mut self, asked: WelcomeAction) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        match asked {
+            WelcomeAction::Pick => {
+                if let Some(path) = (self.backup_opener)(t.restore_open_title()) {
+                    match backup::read_header(&path) {
+                        Ok(Some(header)) => {
+                            if let Some(welcome) = &mut self.welcome {
+                                welcome.file = Some((path, header));
+                            }
+                            self.notice = None;
+                        }
+                        _ => self.notice = Some(t.restore_not_a_backup().to_string()),
+                    }
+                }
+            }
+            WelcomeAction::Fresh => {
+                backup_view::restore_answered(&self.store)?;
+                self.welcome = None;
+            }
+            WelcomeAction::Restore => {
+                let Some(welcome) = &self.welcome else {
+                    return Ok(());
+                };
+                let key = match backup_view::unlock(&t, welcome) {
+                    Ok(key) => key,
+                    Err(text) => {
+                        self.notice = Some(text);
+                        return Ok(());
+                    }
+                };
+                let Some((path, _)) = &welcome.file else {
+                    return Ok(());
+                };
+                match backup::restore(&self.store, path, &key) {
+                    Ok(restored) => {
+                        backup_view::restore_answered(&self.store)?;
+                        self.welcome = None;
+                        self.notice = Some(t.restore_done(restored.entries as i64));
+                    }
+                    Err(e) => self.notice = Some(backup_view::restore_failure(&t, &e)),
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Hands in the dialog asking where to save a Sent Item.
@@ -1394,6 +1550,8 @@ impl App {
                 }
             }
             Action::OpenFile(path) => self.open_file(&path),
+            Action::Backup(asked) => self.backup(asked)?,
+            Action::Welcome(asked) => self.welcome_action(asked)?,
             Action::StartSend => {
                 self.save_text()?;
                 let recipients = self.store.sent_item_recipients()?;
@@ -1818,6 +1976,25 @@ impl App {
                         actions.push(Action::Select(Selection::Sync));
                     }
                 });
+        }
+        // The first start's view, instead of the panes, until answered.
+        if self.welcome.is_some() {
+            let (t, wall) = (self.t, self.wall.clone());
+            let mut asked = Vec::new();
+            if let Some(welcome) = &mut self.welcome {
+                egui::CentralPanel::default()
+                    .frame(Frame::NONE.inner_margin(Margin::same(24)))
+                    .show(ui, |ui| {
+                        ui.set_max_width(640.0);
+                        embossed(ui, tones, false, None, |ui| {
+                            backup_view::welcome(ui, &t, &wall, welcome, &mut asked);
+                        });
+                    });
+            }
+            for asked in asked {
+                self.apply(Action::Welcome(asked));
+            }
+            return;
         }
         egui::Panel::left("places")
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
@@ -2662,6 +2839,7 @@ impl App {
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
         let model_path = &mut self.model_path;
+        let (store, wall, backup_form) = (&self.store, &self.wall, &mut self.backup_form);
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -2696,6 +2874,11 @@ impl App {
                         actions.push(Action::Select(Selection::Sync));
                     }
                     ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    let mut asked = Vec::new();
+                    backup_view::card(ui, &t, store, wall, backup_form, &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Backup));
                 });
                 embossed(ui, tones, false, None, |ui| {
                     if ui

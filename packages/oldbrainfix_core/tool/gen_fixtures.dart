@@ -1544,6 +1544,123 @@ Future<void> _bundle(Directory root) async {
   }
 }
 
+/// The new Device's fixed key seed in the backup fixture: bytes 65 to 96.
+final _restoredSeed = Uint8List.fromList(List<int>.generate(32, (i) => 65 + i));
+
+/// Ada's Device with Areas, a Shared Area, Notes with a photo and a
+/// recording longer than a chunk, a Routine checked off, a Moment and
+/// another Device's key sets Backups up with the standard cost and
+/// writes a Backup with counted random bytes; a new Device restores it
+/// with the passphrase at a held clock.
+Future<void> _backupFixture(Directory root) async {
+  final out = Directory('${root.path}/backup')..createSync(recursive: true);
+  final keep = secretBytes;
+  secretBytes = _counted(600);
+  final ada = _store();
+  final restored = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_restoredSeed),
+  );
+  try {
+    final house = Places(ada).addArea('Household');
+    final mark = ada.currentSeq();
+    final milk = Notes(ada).capture(
+      'Buy milk',
+      place: house.id,
+      photos: [_photo(13)],
+      recordings: [
+        Uint8List.fromList(List.generate(140000, (i) => (i * 7 + 3) & 0xff)),
+      ],
+    );
+    ada.addMoment(seq: mark, cause: MomentCause.sync, label: 'Desk');
+    Notes(ada).amend(milk.id, 'Oat milk, "the green one"');
+    final pills = Routines(ada).create(
+      'Pills',
+      Schedule(start: Day(2026, 1, 5), times: [ClockTime(8, 0)]),
+    );
+    Routines(ada)
+        .markDone(pills.id, Occurrence(Day(2026, 1, 5), ClockTime(8, 0)));
+    final family = Places(ada).addArea('Family');
+    ada.ensureAreaKeys();
+    ada.share(family.id, name: 'Ada');
+    final joiner = Store.inMemory(
+      newKey: () => SigningKey.fromSeed(_joinerSeed),
+    );
+    ada.learnKeys([joiner.ownKeyRecord], verifiedDevice: joiner.deviceId);
+    joiner.close();
+    const passphrase = 'Grüße an die Katze';
+    final code = await setUpBackups(ada, passphrase);
+    final moment = ada.momentRows().single;
+
+    _writeDevice(ada, out, 'device');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({
+        'device': [
+          ..._keySettings(ada),
+          for (final (key, value) in ada.localSettingsWithPrefix('backup:')) [key, value],
+        ],
+      })}\n',
+    );
+    _write(
+      File('${out.path}/moments.json'),
+      '${_json.convert([
+        {'seq': moment.seq, 'cause': moment.cause, 'label': moment.label, 'at': moment.at.toIso8601String()},
+      ])}\n',
+    );
+    _held = _tick.add(const Duration(days: 1));
+    secretBytes = _counted(5000);
+    final file = '${out.path}/backup.$backupExtension';
+    final counts = await writeBackup(ada, file);
+
+    final header = readBackupHeader(file);
+    if (header == null) throw StateError('the backup fixture has no header');
+    final byPass = await unlockBackup(header, passphrase: passphrase);
+    final byCode = await unlockBackup(header, recoveryCode: code);
+    if (byPass == null || byCode == null || hex(byPass) != hex(byCode)) {
+      throw StateError('the backup fixture does not open');
+    }
+    _held = _held!.add(const Duration(days: 1));
+    final result = await restoreBackup(restored, file, byPass);
+    final log = StringBuffer();
+    for (final entry in restored.allEntries()) {
+      log.writeln(jsonEncode(entry.toJson()));
+    }
+    _write(File('${out.path}/restored.jsonl'), log.toString());
+    final expected = _expected(restored)..remove('device');
+    final before = _expected(ada)..remove('device');
+    before['now'] = expected['now'];
+    if (result.roles != 1 ||
+        jsonEncode(expected['notes']) != jsonEncode(before['notes'])) {
+      throw StateError('the backup fixture did not restore it all');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'passphrase': passphrase,
+        'recoveryCode': code,
+        'backupKey': hex(byPass),
+        'created': header.created.toIso8601String(),
+        'counts': {'entries': counts.entries, 'moments': counts.moments, 'keys': counts.keys, 'pinned': counts.pinned, 'blobs': counts.blobs},
+        'restoredAt': restored.clock().toIso8601String(),
+        'roles': result.roles,
+        'moments': [
+          for (final m in restored.momentRows()) {'seq': m.seq, 'cause': m.cause, 'label': m.label, 'at': m.at.toIso8601String()},
+        ],
+        'settings': [
+          for (final (key, value) in restored.localSettingsWithPrefix(''))
+            if (key != 'device' && key != 'signseed') [key, value],
+        ],
+        'read': expected,
+      })}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    ada.close();
+    restored.close();
+  }
+}
+
 /// Ada sends a Note with a Section, a Routine and a Reminder to Ben,
 /// once signed only and once encrypted to his X25519 key, with counted
 /// random bytes; Ben opens both and accepts. The send and the accept
@@ -2372,7 +2489,16 @@ Future<void> main(List<String> args) async {
     '`cancel.$sentItemExtension`), Ben accepts that (`cancelled.jsonl`), '
     'and refuses a cancellation another key signed '
     '(`forged.$sentItemExtension`); what he reads at each step '
-    '(`expected.json`).\n',
+    '(`expected.json`).\n'
+    '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
+    'recording longer than a chunk, a Routine checked off, a Moment and '
+    'another Device\'s key: her log with its blobs (`device.jsonl`), the '
+    'keys and the backup key she holds (`settings.json`), her Moments '
+    '(`moments.json`), the Backup she wrote with the standard Argon2id '
+    'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
+    'at a held clock), and a new Device restoring it with the passphrase '
+    'a day later: its log (`restored.jsonl`), the settings it keeps and '
+    'what it reads (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -2401,6 +2527,7 @@ Future<void> main(List<String> args) async {
   await _bundle(root);
   _sharedFixture(root);
   _sentFixture(root);
+  await _backupFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

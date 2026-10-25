@@ -20,6 +20,9 @@ abstract interface class FolderPlatform {
 
   /// The [folder] kept by [pick], as the sync reads and writes it.
   SyncFolder open(String folder);
+
+  /// The [folder] kept by [pick], as Backups go into it (ADR 0016).
+  BackupFolder openBackups(String folder);
 }
 
 /// No shared folder: the default where none is handed in.
@@ -37,6 +40,9 @@ class NoFolders implements FolderPlatform {
 
   @override
   SyncFolder open(String folder) => LocalSyncFolder(folder);
+
+  @override
+  BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
 }
 
 /// Android's folder picker and the document tree it grants (Storage
@@ -76,6 +82,52 @@ class AndroidFolders implements FolderPlatform {
 
   @override
   SyncFolder open(String folder) => SafSyncFolder(folder);
+
+  @override
+  BackupFolder openBackups(String folder) => SafBackupFolder(folder);
+}
+
+/// The Backup folder through the document tree the picker granted:
+/// Backups lie in the folder itself, and each goes in from the app's
+/// own file, streamed by the platform, never through the channel whole.
+class SafBackupFolder implements BackupFolder {
+  /// The tree URI the picker returned.
+  final String tree;
+
+  const SafBackupFolder(this.tree);
+
+  Map<String, Object> _args([String? name]) => {
+    'tree': tree,
+    'root': '',
+    'dir': '',
+    'name': ?name,
+  };
+
+  Future<T?> _call<T>(String method, Map<String, Object> args) async {
+    try {
+      return await AndroidFolders.channel.invokeMethod<T>(method, args);
+    } on PlatformException catch (e) {
+      throw FileSystemException(e.message ?? method, tree);
+    } on MissingPluginException {
+      throw FileSystemException('No folder access here', tree);
+    }
+  }
+
+  @override
+  Future<List<String>> list() async {
+    final names = await _call<List<Object?>>('list', _args());
+    return [
+      for (final n in names ?? const [])
+        if (n is String) n,
+    ]..sort();
+  }
+
+  @override
+  Future<void> put(String name, String path) =>
+      _call<void>('put', {..._args(name), 'path': path});
+
+  @override
+  Future<void> delete(String name) => _call<void>('delete', _args(name));
 }
 
 /// The shared folder through the document tree the picker granted: every

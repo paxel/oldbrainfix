@@ -142,6 +142,16 @@ abstract final class SealedAs {
   static const entry = 'oldbrainfix:entry';
   static String keys(String device) => 'oldbrainfix:keys:$device';
   static String blob(String ref) => 'oldbrainfix:blob:$ref';
+
+  /// The backup key, sealed with the key the passphrase derives.
+  static const backupPass = 'oldbrainfix:backup-pass';
+
+  /// A Backup's content key, sealed with the backup key.
+  static const backupKey = 'oldbrainfix:backup-key';
+
+  /// Chunk [index] of the Backup whose header line hashes to [header].
+  static String backupChunk(String header, int index, {required bool last}) =>
+      'oldbrainfix:backup:$header:$index${last ? ':last' : ''}';
 }
 
 // ---------------------------------------------------------------- store

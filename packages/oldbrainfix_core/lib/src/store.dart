@@ -375,12 +375,18 @@ class Store {
 
   // ------------------------------------------------------------ moments
 
-  /// Records a Moment at the mark [seq], at the store's now: why
-  /// ([cause]) and with whom or what ([label]). Returns its id.
-  int addMoment({required int seq, required String cause, String? label}) {
+  /// Records a Moment at the mark [seq], at the store's now unless [at]
+  /// says when (a restored one): why ([cause]) and with whom or what
+  /// ([label]). Returns its id.
+  int addMoment({
+    required int seq,
+    required String cause,
+    String? label,
+    DateTime? at,
+  }) {
     _db.execute(
       'INSERT INTO moments (seq, cause, label, at) VALUES (?, ?, ?, ?)',
-      [seq, cause, label, clock().toUtc().toIso8601String()],
+      [seq, cause, label, (at ?? clock()).toUtc().toIso8601String()],
     );
     return _db.lastInsertRowId;
   }

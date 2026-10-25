@@ -585,6 +585,23 @@ impl Store {
         Ok(db.last_insert_rowid())
     }
 
+    /// Records a restored Moment at the mark `seq`, at `at` as it was
+    /// stored. Returns its id.
+    pub fn add_moment_at(
+        &self,
+        seq: i64,
+        cause: &str,
+        label: Option<&str>,
+        at: &str,
+    ) -> Result<i64> {
+        let db = self.db.lock();
+        db.execute(
+            "INSERT INTO moments (seq, cause, label, at) VALUES (?, ?, ?, ?)",
+            params![seq, cause, label, at],
+        )?;
+        Ok(db.last_insert_rowid())
+    }
+
     /// Every Moment as stored, newest first.
     pub fn moment_rows(&self) -> Result<Vec<MomentRow>> {
         let db = self.db.lock();

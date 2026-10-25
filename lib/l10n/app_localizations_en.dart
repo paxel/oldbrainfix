@@ -1920,4 +1920,208 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sentItemClose => 'Close';
+
+  @override
+  String get backupsTitle => 'Backups';
+
+  @override
+  String get backupsSettingsEntry => 'Back up this Device';
+
+  @override
+  String get backupsSettingsDetail =>
+      'Encrypted files of everything on this Device, in a folder you choose.';
+
+  @override
+  String get backupsIntro =>
+      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out.';
+
+  @override
+  String get backupPassphrase => 'Passphrase';
+
+  @override
+  String get backupPassphraseAgain => 'Passphrase again';
+
+  @override
+  String get backupPassphraseHint =>
+      'At least 8 characters. A short sentence is easy to remember.';
+
+  @override
+  String get backupPassphraseShort => 'At least 8 characters, please.';
+
+  @override
+  String get backupPassphraseMismatch => 'The two do not match.';
+
+  @override
+  String get backupSetUp => 'Set up Backups';
+
+  @override
+  String get backupSettingUp => 'Setting up… this takes a few seconds.';
+
+  @override
+  String get backupSheetTitle => 'Recovery Sheet';
+
+  @override
+  String get backupSheetIntro =>
+      'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens your Backups when the passphrase is forgotten.';
+
+  @override
+  String get backupSheetPrint => 'Print or save';
+
+  @override
+  String get backupSheetShare => 'Share';
+
+  @override
+  String get backupSheetFailed =>
+      'The Recovery Sheet could not be made. Try again.';
+
+  @override
+  String get backupSheetNoApp => 'No app here can take the Recovery Sheet.';
+
+  @override
+  String get backupFolderTitle => 'Folder';
+
+  @override
+  String get backupFolderNone =>
+      'No folder chosen yet. Backups go into a folder you choose: on this Device, on a USB stick or in a cloud app.';
+
+  @override
+  String backupFolderChosen(String name) {
+    return 'Backups go into $name.';
+  }
+
+  @override
+  String get backupChooseFolder => 'Choose folder';
+
+  @override
+  String get backupWeekly => 'Back up every week';
+
+  @override
+  String get backupWeeklyDetail =>
+      'The last 4 Backups of this Device are kept; older ones go.';
+
+  @override
+  String get backupNow => 'Back up now';
+
+  @override
+  String get backupWorking => 'Backing up…';
+
+  @override
+  String backupLast(String when) {
+    return 'Last Backup: $when';
+  }
+
+  @override
+  String get backupNotYet => 'No Backup yet.';
+
+  @override
+  String backupFailedAt(String when) {
+    return 'The Backup of $when could not be written. Is the folder still there?';
+  }
+
+  @override
+  String get backupDone => 'Backup written.';
+
+  @override
+  String get backupFailed =>
+      'The Backup could not be written. Is the folder still there?';
+
+  @override
+  String get restoreOffer => 'Restore from a Backup';
+
+  @override
+  String get restoreOfferDetail =>
+      'Coming from another Device? Bring everything back from a Backup file.';
+
+  @override
+  String get restoreIntro =>
+      'Choose the Backup file, then open it with your passphrase or with the recovery key from the Recovery Sheet. Settings are not in a Backup: set them again afterwards, and pair your other Devices again.';
+
+  @override
+  String get restorePick => 'Choose the Backup file';
+
+  @override
+  String get restoreNotABackup => 'This file is not a Backup of Old Brain Fix.';
+
+  @override
+  String restoreFile(String when) {
+    return 'Backup of $when';
+  }
+
+  @override
+  String get restoreOr => 'or';
+
+  @override
+  String get restoreCodeLabel => 'Recovery key';
+
+  @override
+  String get restoreScan => 'Scan the Recovery Sheet';
+
+  @override
+  String get restoreNoCode =>
+      'No recovery key found in the photo. Try again a little closer, or type it.';
+
+  @override
+  String get restoreInvalidCode =>
+      'That is not a recovery key. Check it against the Recovery Sheet.';
+
+  @override
+  String get restoreStart => 'Restore';
+
+  @override
+  String get restoreWorking => 'Restoring… this takes a moment.';
+
+  @override
+  String get restoreWrong =>
+      'This passphrase or recovery key does not open the Backup.';
+
+  @override
+  String get restoreDamaged =>
+      'The Backup is damaged or incomplete. Nothing was restored; try an older one.';
+
+  @override
+  String get restoreNotEmpty =>
+      'This Device holds Notes already, so nothing was restored.';
+
+  @override
+  String get restoreFailed =>
+      'The Backup could not be restored. Nothing was changed.';
+
+  @override
+  String restoreDone(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes',
+      one: '1 change',
+    );
+    return 'Restored: $_temp0. Set alarms and locks again, choose the Backup folder again, and pair your other Devices again.';
+  }
+
+  @override
+  String get recoverySheetPdfTitle => 'Old Brain Fix: Recovery Sheet';
+
+  @override
+  String recoverySheetMade(String date) {
+    return 'Made on $date';
+  }
+
+  @override
+  String recoverySheetDevice(String name) {
+    return 'Device: $name';
+  }
+
+  @override
+  String get recoverySheetPdfIntro =>
+      'This recovery key opens the Backups of this Device, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.';
+
+  @override
+  String get recoverySheetKey => 'Recovery key';
+
+  @override
+  String get recoverySheetStepRestore =>
+      'To restore, install Old Brain Fix, choose “Restore from a Backup” on the first screen, pick the newest Backup file and type this key, or scan the QR code.';
+
+  @override
+  String get recoverySheetStepSettings =>
+      'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.';
 }
