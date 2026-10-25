@@ -62,6 +62,40 @@ void main() {
       expect(stranger.folderStatus?.unreadable, greaterThan(0));
     });
 
+    test('a newer manifest is announced once and its data not read; '
+        'format 1 is never written (ADR 0019)', () async {
+      final clock = ticking();
+      final phone = device(clock, 'Ada');
+      final desk = device(clock, 'Ada');
+      exchange(phone, desk);
+      final folder = MemorySyncFolder();
+      Notes(phone).capture('Written later');
+      await folderSync(phone, folder);
+      final name = manifestName(phone.deviceId);
+      final bytes = folder.dirs['']![name]!;
+      final manifest = jsonDecode(utf8.decode(bytes)) as Map<String, Object?>;
+      expect(manifest.containsKey('format'), isFalse);
+      expect(FolderManifest.parse(bytes), isNotNull);
+      folder.dirs['']![name] = utf8.encode(
+        jsonEncode({...manifest, 'format': manifestFormat + 1}),
+      );
+      final read = await folderRound(desk, folder);
+      expect(read?.newer, 1);
+      expect(read?.applied, isEmpty);
+      expect(texts(desk), isEmpty);
+      expect(desk.folderStatus?.newer, 1);
+      expect(desk.takeUpdateNotices(), [
+        (UpdateNotices.folderSource, UpdateNeeded.here),
+      ]);
+      await folderRound(desk, folder);
+      expect(desk.takeUpdateNotices(), isEmpty, reason: 'announced once');
+      folder.dirs['']![name] = bytes;
+      expect((await folderRound(desk, folder))?.newer, 0);
+      expect(texts(desk), ['Written later']);
+      desk.noteFolderNewer(newer: true);
+      expect(desk.takeUpdateNotices(), hasLength(1), reason: 'news again');
+    });
+
     test(
       'another folder is read whole; forgetting touches nothing in it',
       () async {

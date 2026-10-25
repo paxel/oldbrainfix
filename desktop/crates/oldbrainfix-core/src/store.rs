@@ -38,6 +38,10 @@ pub type Clock = Box<dyn Fn() -> DateTime<Utc> + Send + Sync>;
 /// counts them as the Dart core's fixture generator does.
 pub type IdMaker = Box<dyn Fn() -> Result<String> + Send + Sync>;
 
+/// The entries this version applies (ADR 0019), as the Dart core's
+/// `_applied`: those of a later structure are only held and passed on.
+const APPLIED: &str = "(v IS NULL OR v <= 1)";
+
 /// The tables, word for word as the Dart core creates them.
 const SCHEMA: &str = "
       CREATE TABLE IF NOT EXISTS entries (
@@ -51,7 +55,9 @@ const SCHEMA: &str = "
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
         sig      TEXT,
-        ctx      TEXT
+        ctx      TEXT,
+        raw      TEXT,
+        v        INTEGER
       );
       CREATE TABLE IF NOT EXISTS local_settings (
         key   TEXT PRIMARY KEY,
@@ -170,6 +176,21 @@ impl Store {
         if !has_ctx {
             db.execute_batch("ALTER TABLE entries ADD COLUMN ctx TEXT")?;
         }
+        // And the entries kept as they came, of a later structure among
+        // them (ADR 0019); none in a log from before.
+        let has_raw = {
+            let mut stmt = db.prepare("PRAGMA table_info(entries)")?;
+            let names = stmt.query_map([], |r| r.get::<_, String>("name"))?;
+            names
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .iter()
+                .any(|n| n == "raw")
+        };
+        if !has_raw {
+            db.execute_batch(
+                "ALTER TABLE entries ADD COLUMN raw TEXT; ALTER TABLE entries ADD COLUMN v INTEGER",
+            )?;
+        }
         let store = Store {
             db: ReentrantMutex::new(db),
             clock,
@@ -237,14 +258,19 @@ impl Store {
             .db
             .lock()
             .query_row(
-                "SELECT 1 FROM entries WHERE substr(field, 1, 5) = 'role:' LIMIT 1",
+                &format!(
+                    "SELECT 1 FROM entries WHERE {APPLIED} AND substr(field, 1, 5) = 'role:' LIMIT 1"
+                ),
                 [],
                 |_| Ok(()),
             )
             .optional()?
             .is_some();
         let judged = Arc::new(if shared {
-            judge_log(&self.all_entries()?)
+            judge_log(&self.entries(
+                &format!("SELECT * FROM entries WHERE {APPLIED} ORDER BY seq"),
+                params![],
+            )?)
         } else {
             JudgedLog::default()
         });
@@ -449,7 +475,8 @@ impl Store {
             let db = self.db.lock();
             let marks = vec!["?"; fields.len()].join(", ");
             let mut stmt = db.prepare(&format!(
-                "SELECT DISTINCT device FROM entries WHERE entity = ? AND field IN ({marks})"
+                "SELECT DISTINCT device FROM entries WHERE {APPLIED} AND entity = ? \
+                 AND field IN ({marks})"
             ))?;
             let mut args: Vec<&str> = vec![entity];
             args.extend(fields.iter().copied());
@@ -476,7 +503,7 @@ impl Store {
         let db = self.db.lock();
         let marks = vec!["?"; fields.len()].join(", ");
         let mut stmt = db.prepare(&format!(
-            "SELECT DISTINCT entity, field, device FROM entries WHERE field IN ({marks})"
+            "SELECT DISTINCT entity, field, device FROM entries WHERE {APPLIED} AND field IN ({marks})"
         ))?;
         let rows = stmt.query_map(rusqlite::params_from_iter(fields.iter()), |r| {
             Ok((r.get(0)?, r.get(1)?, r.get(2)?))
@@ -485,11 +512,19 @@ impl Store {
     }
 
     /// Takes in an entry another Device wrote, as it is; one already held
-    /// is skipped. Returns whether it was new.
+    /// is skipped. Returns whether it was new. What it came as is kept
+    /// when this version would write it otherwise, and its version when
+    /// it is not 1.
     pub fn insert(&self, entry: &WireEntry) -> Result<bool> {
+        let v = entry.v();
+        // Keys of a later version live only in what the entry came as.
+        let raw = match &entry.raw {
+            None if !entry.extra.is_empty() => Some(entry.line()?),
+            raw => raw.clone(),
+        };
         let changed = self.db.lock().execute(
-            "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx, raw, v) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 entry.device,
                 entry.dseq,
@@ -500,7 +535,9 @@ impl Store {
                 entry.author,
                 entry.recorded,
                 entry.sig,
-                entry.ctx
+                entry.ctx,
+                raw,
+                (v != 1).then_some(v)
             ],
         )?;
         if changed > 0 {
@@ -536,10 +573,10 @@ impl Store {
     /// entity and field.
     pub fn fields_with_prefix(&self, prefix: &str) -> Result<Vec<(String, String)>> {
         let db = self.db.lock();
-        let mut stmt = db.prepare(
-            "SELECT DISTINCT entity, field FROM entries WHERE substr(field, 1, ?) = ? \
-             ORDER BY entity, field",
-        )?;
+        let mut stmt = db.prepare(&format!(
+            "SELECT DISTINCT entity, field FROM entries WHERE {APPLIED} \
+                 AND substr(field, 1, ?) = ? ORDER BY entity, field"
+        ))?;
         let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| {
             Ok((r.get(0)?, r.get(1)?))
         })?;
@@ -552,7 +589,7 @@ impl Store {
             .db
             .lock()
             .query_row(
-                "SELECT 1 FROM entries WHERE field = ? LIMIT 1",
+                &format!("SELECT 1 FROM entries WHERE {APPLIED} AND field = ? LIMIT 1"),
                 [field],
                 |_| Ok(()),
             )
@@ -638,7 +675,7 @@ impl Store {
     /// in a Shared Area allows is left out ([`Store::judged`]).
     pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
         let all = self.entries(
-            "SELECT * FROM entries WHERE entity = ? ORDER BY seq",
+            &format!("SELECT * FROM entries WHERE {APPLIED} AND entity = ? ORDER BY seq"),
             params![entity],
         )?;
         let judged = self.judged()?;
@@ -664,7 +701,8 @@ impl Store {
             .collect())
     }
 
-    /// Every entry, in log order.
+    /// Every entry, in log order, those of a later structure too: what a
+    /// Backup carries.
     pub fn all_entries(&self) -> Result<Vec<Entry>> {
         self.entries("SELECT * FROM entries ORDER BY seq", params![])
     }
@@ -696,9 +734,10 @@ impl Store {
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
         let ids: Vec<String> = {
             let db = self.db.lock();
-            let mut stmt = db.prepare(
-                "SELECT DISTINCT entity FROM entries WHERE field = '$type' AND value = ?",
-            )?;
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
+                     AND field = '$type' AND value = ?"
+            ))?;
             let rows = stmt.query_map([ty], |r| r.get(0))?;
             rows.collect::<rusqlite::Result<_>>()?
         };
@@ -730,6 +769,8 @@ impl Store {
             let (seq, wire) = row?;
             out.push(Entry {
                 seq,
+                extra: wire.extra,
+                raw: wire.raw,
                 date_at: parse_time(&wire.date)?,
                 recorded_at: parse_time(&wire.recorded)?,
                 device: wire.device,
@@ -749,9 +790,18 @@ impl Store {
 }
 
 fn raw_row(r: &Row) -> rusqlite::Result<(i64, WireEntry)> {
+    let raw: Option<String> = r.get("raw")?;
+    // What the entry carries beyond version 1 lies in what it came as.
+    let extra = raw
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<WireEntry>(raw).ok())
+        .map(|e| e.extra)
+        .unwrap_or_default();
     Ok((
         r.get("seq")?,
         WireEntry {
+            extra,
+            raw,
             device: r.get("device")?,
             dseq: r.get("dseq")?,
             entity: r.get("entity")?,

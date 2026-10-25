@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
 import 'box_keys.dart';
+import 'entry.dart';
 
 /// Signed entries (ADR 0002): every Device signs what it writes with an
 /// Ed25519 key made once per install and bound to its device id, so
@@ -90,7 +91,10 @@ bool verifySignature(
 /// a null value and an empty one differ and free text needs no escaping
 /// rules of its own. Dates go in as the store writes them. The causal
 /// context [ctx] goes last, and only when there is one: entries without
-/// it keep the bytes they were signed with.
+/// it keep the bytes they were signed with. The keys a later version
+/// added ([Entry.extra], `v` among them) follow as one object, keys
+/// sorted, after the context or a null in its place (ADR 0019), so a
+/// Device that knows none of them still checks and passes them on.
 Uint8List entryBytes({
   required String device,
   required int dseq,
@@ -101,6 +105,7 @@ Uint8List entryBytes({
   required String author,
   required String recordedIso,
   String? ctx,
+  Map<String, Object?> extra = const {},
 }) => Uint8List.fromList(
   utf8.encode(
     jsonEncode([
@@ -112,7 +117,8 @@ Uint8List entryBytes({
       dateIso,
       author,
       recordedIso,
-      ?ctx,
+      if (extra.isEmpty) ?ctx else ctx,
+      if (extra.isNotEmpty) sortedJson(extra),
     ]),
   ),
 );

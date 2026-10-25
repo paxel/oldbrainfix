@@ -19,3 +19,7 @@ A reader takes only the segments of keys it holds and remembers how far it read 
 - An entry relayed from a third Device below the writer's published vector is not written to the folder again; that Device's own segments carry it.
 - Moving a Note into a Shared Area (#37) leaves its earlier entries under the old key; sharing will have to write the Note's history again under the Area's key.
 - LAN deltas by version vector assume a Device holds every entry below its vector; a Device that cannot read some Areas breaks that, which Shared Areas (#37) have to settle.
+
+## Versions (ADR 0019)
+
+Amended by ADR 0019 (#59): the manifest writes its `format` only above 1, and a missing one reads as 1. A manifest of a newer format is announced as needing an update, not skipped silently, and nothing of its writer is read.

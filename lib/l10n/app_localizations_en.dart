@@ -1445,8 +1445,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncFailDeclined => 'The computer said no to this Device.';
 
   @override
-  String get syncFailFormat =>
-      'The other Device runs another version of Old Brain Fix. Update both.';
+  String get syncFailUpdateHere =>
+      'Old Brain Fix on this Device needs an update to sync with the other Device.';
+
+  @override
+  String get syncFailUpdateThere =>
+      'Old Brain Fix on the other Device needs an update to sync with this one.';
+
+  @override
+  String syncUpdateHereWith(String name) {
+    return 'Old Brain Fix on this Device needs an update to sync with $name.';
+  }
+
+  @override
+  String syncUpdateThereWith(String name) {
+    return 'Old Brain Fix on $name needs an update to sync with this Device.';
+  }
+
+  @override
+  String get folderNeedsUpdate =>
+      'Another Device writes a newer format into the shared folder. Old Brain Fix on this Device needs an update to read it.';
 
   @override
   String get syncFailFailed => 'Sync broke off. Nothing was lost; try again.';
@@ -1651,6 +1669,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bundleNotABundle =>
       'This file is no sync bundle this app can read.';
+
+  @override
+  String get bundleNeedsUpdate =>
+      'This bundle comes from a newer Old Brain Fix. Old Brain Fix on this Device needs an update to read it.';
 
   @override
   String get bundleFailed =>

@@ -41,6 +41,8 @@ pub const EXTENSION: &str = "obfbackup";
 /// What the header line says a Backup is.
 pub const TYPE: &str = "oldbrainfix-backup";
 
+/// The format a Backup says it is in, in its header and its first
+/// record: `format`, 1 when missing, and 1 is never written (ADR 0019).
 pub const FORMAT: i64 = 1;
 
 /// How many payload bytes each sealed chunk holds.
@@ -233,7 +235,6 @@ impl Header {
         json!({
             "chunk": chunk,
             "created": dart_iso(created),
-            "format": FORMAT,
             "kdf": pass.kdf_json(),
             "key": BASE64.encode(sealed_key),
             "pass": BASE64.encode(&pass.sealed),
@@ -246,7 +247,7 @@ impl Header {
     /// The header in `line`, or none when it is none this format reads.
     pub fn parse(line: &[u8]) -> Option<Header> {
         let json: Value = serde_json::from_slice(line).ok()?;
-        if json.get("type")?.as_str()? != TYPE || json.get("format")?.as_i64()? != FORMAT {
+        if json.get("type")?.as_str()? != TYPE || !in_format(&json) {
             return None;
         }
         let chunk = usize::try_from(json.get("chunk")?.as_u64()?).ok()?;
@@ -584,7 +585,6 @@ pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts
     out.line(
         &json!({"about": {
             "device": store.device_id()?,
-            "format": FORMAT,
             "seed": store.signing_key()?.seed_hex(),
         }})
         .to_string(),
@@ -600,10 +600,7 @@ pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts
     }
     let entries = store.all_entries()?;
     for e in &entries {
-        out.line(&format!(
-            "{{\"entry\":{}}}",
-            serde_json::to_string(&e.wire()).map_err(|e| Error::Invalid(e.to_string()))?
-        ))?;
+        out.line(&format!("{{\"entry\":{}}}", e.wire().line()?))?;
     }
     let seqs: Vec<i64> = entries.iter().map(|e| e.seq).collect();
     let mut moments = store.moment_rows()?;
@@ -752,10 +749,19 @@ impl<R: Read> ChunkReader<R> {
     }
 }
 
+/// Whether `json`, the header or the `about` record, is in the format
+/// this version reads: `format`, 1 when missing (ADR 0019).
+fn in_format(json: &Value) -> bool {
+    match json.get("format") {
+        None => true,
+        Some(format) => format.as_i64() == Some(FORMAT),
+    }
+}
+
 /// The old Device's signing key in the `about` record, or none.
 fn about(json: &Value) -> Option<SigningKey> {
     let about = json.get("about")?;
-    if about.get("format")?.as_i64()? != FORMAT {
+    if !in_format(about) {
         return None;
     }
     let seed = about.get("seed")?.as_str()?;
@@ -829,7 +835,15 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             continue;
         }
         if let Some(e) = json.get("entry") {
-            entries.push(serde_json::from_value(e.clone()).map_err(|_| damaged())?);
+            // Kept byte for byte as it was written (ADR 0019).
+            let entry = match text
+                .strip_prefix("{\"entry\":")
+                .and_then(|t| t.strip_suffix('}'))
+            {
+                Some(written) => WireEntry::parse(written),
+                None => WireEntry::from_value(e),
+            };
+            entries.push(entry.ok_or_else(damaged)?);
         } else if let Some(m) = json.get("moment") {
             let at = m.get("at").and_then(Value::as_str).ok_or_else(damaged)?;
             parse_time(at).map_err(|_| damaged())?;
@@ -975,6 +989,8 @@ fn hand_roles(store: &Store, old: &SigningKey) -> Result<usize> {
             recorded: iso,
             ctx: None,
             sig: Some(sig),
+            extra: Default::default(),
+            raw: None,
         })?;
         handed += 1;
     }

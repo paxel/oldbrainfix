@@ -151,12 +151,14 @@ pub fn write_bundle_now(
 
 /// Imports the bundle at `path`, as the Dart core's `importBundle`:
 /// takes in what is new and the blobs the log lacks, and keeps what the
-/// writer said it holds. [`Error::NotABundle`] for a file that is none.
+/// writer said it holds. [`Error::NotABundle`] for a file that is none,
+/// [`Error::BundleNeedsUpdate`] for one holding only newer formats.
 pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
     let file = File::open(path).map_err(|_| Error::NotABundle)?;
     let archive = ZipArchive::new(file).map_err(|_| Error::NotABundle)?;
     let folder = ZipReadFolder::new(archive);
     let mut writers: BTreeMap<String, Manifest> = BTreeMap::new();
+    let mut newer = false;
     for name in folder.list("")? {
         let Some(device) = name.strip_suffix(".manifest") else {
             continue;
@@ -164,9 +166,14 @@ pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
         if device.is_empty() {
             continue;
         }
-        if let Some(manifest) = Manifest::parse(folder.read("", &name)?.as_deref()) {
+        let bytes = folder.read("", &name)?;
+        if let Some(manifest) = Manifest::parse(bytes.as_deref()) {
             writers.insert(device.to_string(), manifest);
         }
+        newer |= Manifest::is_newer(bytes.as_deref());
+    }
+    if writers.is_empty() && newer {
+        return Err(Error::BundleNeedsUpdate);
     }
     let own = store.device_id()?;
     let from = writers
@@ -472,6 +479,22 @@ mod tests {
         assert!(matches!(
             import_bundle(&phone, &zip),
             Err(Error::NotABundle)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn a_bundle_of_only_newer_formats_needs_an_update() -> TestResult {
+        let phone = device(1)?;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("later.obfsync");
+        let mut writer = ZipWriter::new(File::create(&path)?);
+        writer.start_file("abc.manifest", SimpleFileOptions::default())?;
+        writer.write_all(br#"{"format":2,"later":true}"#)?;
+        writer.finish()?;
+        assert!(matches!(
+            import_bundle(&phone, &path),
+            Err(Error::BundleNeedsUpdate)
         ));
         Ok(())
     }

@@ -162,6 +162,18 @@ void main() {
     expect(importBundle(phone, zip), throwsA(isA<NotABundle>()));
   });
 
+  test('a bundle of only newer formats says this app needs an '
+      'update', () async {
+    final phone = device(ticking(), 'Ada');
+    final later = path();
+    final encoder = ZipFileEncoder()..create(later);
+    encoder.addArchiveFile(
+      ArchiveFile.string('abc.manifest', '{"format":2,"later":true}'),
+    );
+    encoder.closeSync();
+    expect(importBundle(phone, later), throwsA(isA<BundleNeedsUpdate>()));
+  });
+
   test('the file name tells the day', () {
     expect(
       bundleFileName(DateTime(2026, 3, 1)),

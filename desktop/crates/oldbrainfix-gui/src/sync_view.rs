@@ -20,6 +20,7 @@ use oldbrainfix_core::lan::{
 };
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
+use oldbrainfix_core::sync::{FOLDER_SOURCE, UpdateNeeded};
 use oldbrainfix_core::{
     AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, ProfileChoice,
     Routines, Store, StoredText,
@@ -714,7 +715,29 @@ pub fn import_bundle_text(t: &L10n, store: &Store, path: &Path) -> Result<String
             Ok(bundle_result_text(t, &result))
         }
         Err(Error::NotABundle) => Err(t.bundle_not_a_bundle().to_string()),
+        Err(Error::BundleNeedsUpdate) => Err(t.bundle_needs_update().to_string()),
         Err(e) => Err(format!("{} ({e})", t.bundle_failed())),
+    }
+}
+
+/// What a sync that needs an update (ADR 0019) says at the top, as the
+/// phone's `updateNoticeText`: which Device needs it, by the name it is
+/// paired under where known.
+pub fn update_notice_text(t: &L10n, store: &Store, source: &str, update: UpdateNeeded) -> String {
+    if source == FOLDER_SOURCE {
+        return t.folder_needs_update().to_string();
+    }
+    let name = store
+        .paired_device(source)
+        .ok()
+        .flatten()
+        .map(|d| d.name)
+        .unwrap_or_default();
+    match (update, name.is_empty()) {
+        (UpdateNeeded::Here, false) => t.sync_update_here_with(&name).to_string(),
+        (UpdateNeeded::There, false) => t.sync_update_there_with(&name).to_string(),
+        (UpdateNeeded::Here, true) => t.sync_fail_update_here().to_string(),
+        (UpdateNeeded::There, true) => t.sync_fail_update_there().to_string(),
     }
 }
 

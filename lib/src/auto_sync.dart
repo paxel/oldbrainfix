@@ -39,9 +39,11 @@ Future<SyncResult> quickPairedSync(
 /// when the app shows, when the periodic work comes due meanwhile and
 /// when a Device shows up on the network, 5 s after the last change made
 /// here, and every minute while it stays open ([AutoSyncSchedule]). One
-/// sync at a time; failures stay quiet, the next try comes anyway. Tells
-/// its listeners when a sync brought Conflicts, or a background sync did
-/// while the app was closed, for the announcement at the top.
+/// sync at a time; failures stay quiet, the next try comes anyway, except
+/// one that needs an update of the app here or there: that one is
+/// announced once (ADR 0019). Tells its listeners when a sync brought
+/// Conflicts or needs an update, or a background sync did while the app
+/// was closed, for the announcement at the top.
 class AutoSync extends ChangeNotifier {
   final Store store;
   final SyncPlatform platform;
@@ -80,6 +82,9 @@ class AutoSync extends ChangeNotifier {
   /// Conflicts brought since the announcement last took them.
   var _conflicts = 0;
 
+  /// Syncs that need an update, not announced yet ([UpdateNotices]).
+  final _updates = <(String, UpdateNeeded)>[];
+
   AutoSync({
     required this.store,
     required this.platform,
@@ -117,6 +122,7 @@ class AutoSync extends ChangeNotifier {
     _folderQueue = run.then((_) {}, onError: (Object _) {});
     return run.then((result) {
       if (result == null || _disposed) return result;
+      _takeUpdates();
       _schedule.succeeded(folderId, clock());
       if (result.conflicts.isNotEmpty) {
         _conflicts += result.conflicts.length;
@@ -167,6 +173,7 @@ class AutoSync extends ChangeNotifier {
       _conflicts++;
       notifyListeners();
     }
+    _takeUpdates();
     _wantAll();
   }
 
@@ -202,6 +209,24 @@ class AutoSync extends ChangeNotifier {
     final count = _conflicts;
     _conflicts = 0;
     return count;
+  }
+
+  /// The syncs that need an update since last asked, by the Device synced
+  /// with or the shared folder; taking them clears them.
+  List<(String source, UpdateNeeded where)> takeUpdates() {
+    final updates = List.of(_updates);
+    _updates.clear();
+    return updates;
+  }
+
+  /// Takes the update notices not announced yet, and tells the listeners
+  /// when there are any.
+  void _takeUpdates() {
+    if (_disposed) return;
+    final fresh = store.takeUpdateNotices();
+    if (fresh.isEmpty) return;
+    _updates.addAll(fresh);
+    notifyListeners();
   }
 
   void _wantAll() {
@@ -275,6 +300,10 @@ class AutoSync extends ChangeNotifier {
               _conflicts += result.session.conflicts.length;
               notifyListeners();
             }
+          } on SyncException catch (e) {
+            // An update is needed: announced once, tried again all the same.
+            _noteUpdate(store, device.id, e);
+            _takeUpdates();
           } on Object {
             // Not there, or not now: tried again on the next occasion.
           }
@@ -369,10 +398,24 @@ Future<void> _lanInBackground(
         name: name,
       );
       if (result.session.conflicts.isNotEmpty) store.conflictsArrived = true;
+    } on SyncException catch (e) {
+      // Kept to be announced when the app opens.
+      _noteUpdate(store, device.id, e);
     } on Object {
       // Not there now: the next run tries again.
     }
   }
+}
+
+/// Keeps that a sync with [device] needs an update, when [e] says so.
+void _noteUpdate(Store store, String device, SyncException e) {
+  if (!e.needsUpdate) return;
+  store.noteUpdateNeeded(
+    device,
+    e.failure == SyncFailure.updateHere
+        ? UpdateNeeded.here
+        : UpdateNeeded.there,
+  );
 }
 
 /// Hands the app's [AutoSync] down to the Sync page.

@@ -35,8 +35,17 @@ pub const EXTENSION: &str = "oldbrain";
 /// The type a Sent Item is shared as.
 pub const MIME_TYPE: &str = "application/vnd.oldbrainfix.item";
 
-/// The format a file says it is in.
+/// The format a file says it is in: `format`, 1 when missing, and 1 is
+/// never written (ADR 0019).
 pub const FORMAT: i64 = 1;
+
+/// Whether `json` is in the format this version reads.
+fn in_format(json: &Value) -> bool {
+    match json.get("format") {
+        None => true,
+        Some(format) => format.as_i64() == Some(FORMAT),
+    }
+}
 
 /// A file larger than this is no Sent Item: it holds only texts.
 pub const MAX_BYTES: usize = 1 << 20;
@@ -946,7 +955,6 @@ pub fn encode(
 ) -> Result<Vec<u8>> {
     let payload = item.encode();
     let signed = object(vec![
-        ("format", json!(FORMAT)),
         ("item", json!(payload)),
         ("sig", json!(key.sign(&signed_bytes(&payload)))),
     ])
@@ -977,7 +985,6 @@ pub fn encode(
         ]));
     }
     Ok(object(vec![
-        ("format", json!(FORMAT)),
         ("sealed", json!(BASE64.encode(sealed))),
         ("to", Value::Array(stanzas)),
     ])
@@ -1072,7 +1079,7 @@ impl Store {
         };
         let mut signed = outer.clone();
         let mut encrypted = false;
-        if outer.get("format").and_then(Value::as_i64) == Some(FORMAT)
+        if in_format(&outer)
             && let (Some(sealed), Some(to)) = (
                 outer.get("sealed").and_then(Value::as_str),
                 outer.get("to").and_then(Value::as_array),
@@ -1090,8 +1097,8 @@ impl Store {
             signed = inner;
             encrypted = true;
         }
-        let (Some(FORMAT), Some(payload), Some(sig)) = (
-            signed.get("format").and_then(Value::as_i64),
+        let (true, Some(payload), Some(sig)) = (
+            in_format(&signed),
             signed.get("item").and_then(Value::as_str),
             signed.get("sig").and_then(Value::as_str),
         ) else {

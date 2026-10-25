@@ -84,7 +84,8 @@ extension Sync on Store {
   /// here, is refused and counted in [report], never recorded, so it
   /// cannot move the version vector past the real entry. An entry under
   /// this Device's own id beyond its own counter is forged and refused
-  /// too.
+  /// too. An entry of a later structure ([Entry.applies]) is kept and
+  /// passed on, but not applied nor returned.
   List<Entry> applyEntries(
     List<Entry> entries, {
     Iterable<KeyRecord> keys = const [],
@@ -129,7 +130,8 @@ extension Sync on Store {
         report?.refuse(e.author, e.device);
         continue;
       }
-      if (insert(e)) applied.add(e);
+      // One of a later structure is kept and passed on, not applied.
+      if (insert(e) && e.applies) applied.add(e);
     }
     return applied;
   });
@@ -144,6 +146,7 @@ extension Sync on Store {
     author: e.author,
     recordedIso: e.recorded.toUtc().toIso8601String(),
     ctx: e.ctx,
+    extra: e.extra,
   );
 
   /// The blobs the log refers to whose bytes are not here, as
@@ -176,6 +179,55 @@ extension Sync on Store {
     ('photo', NoteKeys.photoPrefix),
     ('audio', NoteKeys.audioPrefix),
   ];
+}
+
+/// Which Device needs a newer version of the app before two Devices can
+/// sync (ADR 0019): this one, or the other one.
+enum UpdateNeeded { here, there }
+
+/// Syncs that need an update, kept so each is announced once and not at
+/// every automatic try (ADR 0019): by the Device synced with, or
+/// [folderSource] for the shared folder. Local settings, never synced.
+extension UpdateNotices on Store {
+  static const _prefix = 'update:';
+  static const _seen = ' seen';
+
+  /// The source of the shared folder's notice.
+  static const folderSource = 'folder';
+
+  /// Keeps that syncing with [source] needs an update [where], to be
+  /// announced ([takeUpdateNotices]) unless that was known already.
+  void noteUpdateNeeded(String source, UpdateNeeded where) {
+    final held = localSetting('$_prefix$source');
+    if (held == where.name || held == '${where.name}$_seen') return;
+    setLocalSetting('$_prefix$source', where.name);
+  }
+
+  /// A sync with [source] went through: what it needed is forgotten.
+  void updateNoLongerNeeded(String source) {
+    if (localSetting('$_prefix$source') != null) {
+      removeLocalSetting('$_prefix$source');
+    }
+  }
+
+  /// Keeps whether the shared folder holds data of a newer format than
+  /// this version reads.
+  void noteFolderNewer({required bool newer}) => newer
+      ? noteUpdateNeeded(folderSource, UpdateNeeded.here)
+      : updateNoLongerNeeded(folderSource);
+
+  /// The notices not announced yet, by source; taking them marks them
+  /// announced.
+  List<(String source, UpdateNeeded where)> takeUpdateNotices() {
+    final out = <(String, UpdateNeeded)>[];
+    for (final (key, value) in localSettingsWithPrefix(_prefix)) {
+      final where = UpdateNeeded.values.where((w) => w.name == value);
+      if (where.isEmpty) continue;
+      out.add((key.substring(_prefix.length), where.first));
+      setLocalSetting(key, '$value$_seen');
+    }
+    return out;
+  }
 }
 
 /// The kind and hash of a blob reference `photo/<hash>`.

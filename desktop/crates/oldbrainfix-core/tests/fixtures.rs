@@ -2466,3 +2466,70 @@ fn profiles_come_out_as_the_dart_core_has_them() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
+    use oldbrainfix_core::signing::{ImportReport, KeyRecord};
+    let dir = fixtures().join("versions");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let record = KeyRecord::from_json(&read_json(&dir.join("key.json"))?).ok_or("a key record")?;
+    let parse = |name: &str| -> Result<Vec<WireEntry>, Box<dyn std::error::Error>> {
+        lines_of(&dir.join(name))?
+            .iter()
+            .map(|l| WireEntry::parse(l).ok_or_else(|| format!("an entry: {l}").into()))
+            .collect()
+    };
+    let now = parse_time("2026-01-02T10:00:00.000Z")?;
+    let mut seed = [0u8; 32];
+    for (i, b) in seed.iter_mut().enumerate() {
+        *b = i as u8 + 33;
+    }
+    let reader = Store::in_memory(Box::new(move || now), move || {
+        Ok(SigningKey::from_seed(seed))
+    })?;
+
+    // A key changed, the version raised or a key added on the way: refused.
+    let mut report = ImportReport::default();
+    let refused = reader.apply_entries(
+        &parse("tampered.jsonl")?,
+        std::slice::from_ref(&record),
+        None,
+        &mut report,
+    )?;
+    assert!(refused.is_empty());
+    assert_eq!(json!(report.refused_count()), expected["refused"]);
+
+    let incoming = parse("incoming.jsonl")?;
+    let applied = reader.apply_entries(&incoming, &[record], None, &mut ImportReport::default())?;
+    let ids: Vec<String> = applied
+        .iter()
+        .map(|e| format!("{}:{}", e.device, e.dseq))
+        .collect();
+    assert_eq!(json!(ids), expected["applied"]);
+    assert_eq!(json!(reader.version_vector()?), expected["vector"]);
+    let note = incoming
+        .last()
+        .map(|e| e.entity.clone())
+        .ok_or("an entry")?;
+    assert_eq!(
+        Notes::new(&reader).by_id(&note)?.map(|n| json!(n.text)),
+        Some(expected["text"].clone())
+    );
+
+    // Passed on as they came, the one of version 2 among them.
+    let forwarded: Vec<String> = reader
+        .entries_since(&std::collections::HashMap::new())?
+        .iter()
+        .map(|e| e.wire().line())
+        .collect::<Result<_, _>>()?;
+    assert_eq!(forwarded, lines_of(&dir.join("forwarded.jsonl"))?);
+    assert_eq!(forwarded, lines_of(&dir.join("incoming.jsonl"))?);
+    // Over the LAN an entry travels as a JSON object and arrives in the
+    // same canonical form.
+    for line in &forwarded {
+        let value: Value = serde_json::from_str(line)?;
+        let entry = WireEntry::from_value(&value).ok_or("an entry")?;
+        assert_eq!(&entry.line()?, line);
+    }
+    Ok(())
+}

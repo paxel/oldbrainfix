@@ -9,7 +9,9 @@ CREATE TABLE entries (
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
         sig      TEXT,
-        ctx      TEXT
+        ctx      TEXT,
+        raw      TEXT,
+        v        INTEGER
       );
 CREATE UNIQUE INDEX idx_entries_device_dseq
         ON entries (device, dseq);

@@ -514,6 +514,24 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 }
 
+/// What a sync that needs an update ([UpdateNotices]) says at the top:
+/// which Device needs it, by the name it is paired under where known.
+String updateNoticeText(
+  AppLocalizations t,
+  Store store,
+  String source,
+  UpdateNeeded where,
+) {
+  if (source == UpdateNotices.folderSource) return t.folderNeedsUpdate;
+  final name = store.pairedDevice(source)?.name ?? '';
+  return switch (where) {
+    UpdateNeeded.here when name.isNotEmpty => t.syncUpdateHereWith(name),
+    UpdateNeeded.there when name.isNotEmpty => t.syncUpdateThereWith(name),
+    UpdateNeeded.here => t.syncFailUpdateHere,
+    UpdateNeeded.there => t.syncFailUpdateThere,
+  };
+}
+
 /// Why a sync did not happen, in words.
 String syncFailureText(AppLocalizations t, SyncFailure failure) =>
     switch (failure) {
@@ -524,6 +542,7 @@ String syncFailureText(AppLocalizations t, SyncFailure failure) =>
       SyncFailure.locked => t.syncFailLocked,
       SyncFailure.declined => t.syncFailDeclined,
       SyncFailure.cancelled => t.shareCancelled,
-      SyncFailure.format => t.syncFailFormat,
+      SyncFailure.updateHere => t.syncFailUpdateHere,
+      SyncFailure.updateThere => t.syncFailUpdateThere,
       SyncFailure.failed => t.syncFailFailed,
     };

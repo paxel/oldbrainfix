@@ -361,6 +361,23 @@ void main() {
       expect(find.text('Edited at the desk'), findsOneWidget);
     });
 
+    testWidgets('a computer that needs an update is announced at the top '
+        'once, not at every try (ADR 0019)', (tester) async {
+      pairDesk();
+      failure = SyncFailure.updateThere;
+      await start(tester);
+      expect(joined, hasLength(1));
+      const needed =
+          'Old Brain Fix on Desk needs an update to sync with this Device.';
+      expect(announcements.visible, needed);
+      announcements.dismiss();
+      // The periodic work asks again.
+      sync.want();
+      await tester.pumpAndSettle();
+      expect(joined, hasLength(2), reason: 'tried again');
+      expect(announcements.visible, isNull);
+    });
+
     testWidgets('Conflicts a background sync brought are announced when the '
         'app opens', (tester) async {
       editApart();

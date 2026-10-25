@@ -9,7 +9,9 @@ use std::thread::JoinHandle;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
-use oldbrainfix_core::lan::{DEVICE_HEADER, PIN_HEADER, apply_answer, sync_request};
+use oldbrainfix_core::lan::{
+    DEVICE_HEADER, FORMAT_HEADER, OWN_FORMATS, PIN_HEADER, apply_answer, sync_request,
+};
 use oldbrainfix_core::{Notes, SigningKey, Store};
 use oldbrainfix_gui::{App, Selection};
 
@@ -49,6 +51,7 @@ fn join(
         let mut res = agent
             .get(format!("{base}/vector"))
             .header(PIN_HEADER, &pin)
+            .header(FORMAT_HEADER, OWN_FORMATS.encode())
             .call()
             .map_err(|e| fail(&e))?;
         let host_device = res
@@ -685,5 +688,43 @@ fn a_bundle_dropped_onto_the_window_is_imported_and_strangers_told_to_pair() -> 
         .click_accesskit();
     harness.run();
     assert_eq!(harness.state().notice(), None);
+    Ok(())
+}
+
+#[test]
+fn a_device_that_needs_an_update_is_announced_until_clicked_away() -> TestResult {
+    use oldbrainfix_core::sync::UpdateNeeded;
+    let desk = store(1)?;
+    desk.remember_device(&oldbrainfix_core::PairedDevice {
+        id: "phone".into(),
+        name: "Pixel".into(),
+        fingerprint: String::new(),
+        host: None,
+        port: None,
+        last_sync: chrono::Utc::now(),
+        shared: false,
+    })?;
+    // A phone of an older version was refused while nobody looked.
+    desk.note_update_needed("phone", UpdateNeeded::There)?;
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            App::new(desk, "en"),
+        );
+    harness.step();
+    let text = "Old Brain Fix on Pixel needs an update to sync with this Device.";
+    assert!(shows(&harness, text));
+    assert!(
+        harness.state().store().take_update_notices()?.is_empty(),
+        "taken once"
+    );
+    harness.get_by_label(text).click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(!shows(&harness, text));
     Ok(())
 }

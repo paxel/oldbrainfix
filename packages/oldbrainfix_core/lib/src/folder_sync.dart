@@ -136,6 +136,10 @@ class FolderSyncResult {
   /// Segments of other Devices sealed with a key this Device does not
   /// hold: it was not paired with them, or their keys are on the way.
   final int unreadable;
+
+  /// Devices whose manifest is of a newer format than this version
+  /// reads: nothing of theirs was read, this app needs an update.
+  final int newer;
   final Moment? moment;
   final ImportReport report;
   final List<Conflict> conflicts;
@@ -150,6 +154,7 @@ class FolderSyncResult {
     required this.blobsIn,
     required this.blobsOut,
     required this.unreadable,
+    this.newer = 0,
     required this.moment,
     required this.report,
     required this.conflicts,
@@ -165,7 +170,9 @@ class FolderSyncResult {
 /// which segments exist; it is not sealed.
 const segmentCap = 64 * 1024;
 
-/// The manifest's format; a reader skips a higher one.
+/// The manifest's format, `format` in it: 1 when missing, and 1 is never
+/// written (ADR 0019). A reader reads no data of a higher one and says
+/// so: the Device that wrote it runs a newer version.
 const manifestFormat = 1;
 
 String manifestName(String device) => '$device.manifest';
@@ -203,10 +210,11 @@ class FolderManifest {
     required this.segments,
   });
 
-  /// Its bytes, the same from both cores: keys sorted, no spaces.
+  /// Its bytes, the same from both cores: keys sorted, no spaces; the
+  /// format only above 1.
   Uint8List encode() => utf8.encode(
     jsonEncode({
-      'format': format,
+      if (format != 1) 'format': format,
       'generation': generation,
       'segments': [
         for (final s in segments)
@@ -216,12 +224,14 @@ class FolderManifest {
     }),
   );
 
+  /// The manifest [bytes] hold; null when they hold none this version
+  /// reads: half-written, damaged, or of a newer format ([isNewer]).
   static FolderManifest? parse(List<int>? bytes) {
     if (bytes == null) return null;
     try {
       final m = jsonDecode(utf8.decode(bytes));
       if (m is! Map) return null;
-      final format = m['format'];
+      final format = m.containsKey('format') ? m['format'] : 1;
       final generation = m['generation'];
       final vector = m['vector'];
       final segments = m['segments'];
@@ -248,6 +258,18 @@ class FolderManifest {
       );
     } on FormatException {
       return null;
+    }
+  }
+
+  /// Whether [bytes] hold a manifest of a format newer than this version
+  /// reads: its writer runs a newer version of the app.
+  static bool isNewer(List<int>? bytes) {
+    if (bytes == null) return false;
+    try {
+      final m = jsonDecode(utf8.decode(bytes));
+      return m is Map && m['format'] is int && m['format'] > manifestFormat;
+    } on FormatException {
+      return false;
     }
   }
 }
@@ -280,7 +302,11 @@ Future<FolderSyncResult> folderSync(
   final report = ImportReport();
   final profileChanged = await _learnKeys(store, folder, report);
   final before = store.currentSeq();
-  final (applied, unreadable) = await _readForeign(store, folder, report);
+  final (applied, unreadable, newer) = await _readForeign(
+    store,
+    folder,
+    report,
+  );
   final moment = store.momentFor(
     before: before,
     changed: applied.isNotEmpty,
@@ -300,6 +326,7 @@ Future<FolderSyncResult> folderSync(
     blobsIn: blobsIn,
     blobsOut: blobsOut,
     unreadable: unreadable,
+    newer: newer,
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
@@ -321,7 +348,7 @@ Future<FolderSyncResult> readSealed(
   final report = ImportReport();
   final profileChanged = await _learnKeys(store, folder, report);
   final before = store.currentSeq();
-  final (applied, unreadable) = await _readForeign(
+  final (applied, unreadable, newer) = await _readForeign(
     store,
     folder,
     report,
@@ -342,6 +369,7 @@ Future<FolderSyncResult> readSealed(
     blobsIn: blobsIn,
     blobsOut: 0,
     unreadable: unreadable,
+    newer: newer,
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
@@ -536,8 +564,9 @@ String _readStateKey(String device) => 'folderRead:$device';
 /// segment of a key not held is counted as unreadable and left unread,
 /// to be read once the key is here. Entries are never filtered by the
 /// version vector: a segment of a key learned late fills a gap below it,
-/// and only the store knows what it holds.
-Future<(List<Entry>, int)> _readForeign(
+/// and only the store knows what it holds. A manifest of a newer format
+/// is counted, and nothing of its writer read.
+Future<(List<Entry>, int, int)> _readForeign(
   Store store,
   SyncFolder folder,
   ImportReport report, {
@@ -547,17 +576,23 @@ Future<(List<Entry>, int)> _readForeign(
   final fresh = <Entry>[];
   final states = <String, Map<String, Object>>{};
   var unreadable = 0;
+  var newer = 0;
   for (final name in await folder.list('')) {
     if (!name.endsWith('.manifest')) continue;
     final device = name.substring(0, name.length - '.manifest'.length);
     if (device == self || device.isEmpty) continue;
     final FolderManifest? manifest;
+    final List<int>? bytes;
     try {
-      manifest = FolderManifest.parse(await folder.read('', name));
+      bytes = await folder.read('', name);
+      manifest = FolderManifest.parse(bytes);
     } on FileSystemException {
       continue;
     }
-    if (manifest == null) continue; // half-written, or a newer format
+    if (manifest == null) {
+      if (FolderManifest.isNewer(bytes)) newer++;
+      continue; // half-written, or a newer format
+    }
     var state = remember
         ? _readState(store, device)
         : (generation: -1, lines: const <String, int>{});
@@ -595,7 +630,7 @@ Future<(List<Entry>, int)> _readForeign(
       store.setLocalSetting(_readStateKey(key), jsonEncode(value));
     }
   }
-  return (applied, unreadable);
+  return (applied, unreadable, newer);
 }
 
 /// The entries of [segment] from line [have] on, or null when it is not
@@ -615,9 +650,10 @@ Future<List<Entry>?> _segmentEntries(
     for (final line in lines.sublist(have, segment.lines)) {
       final plain = unseal(key, base64.decode(line), aad: SealedAs.entry);
       if (plain == null) return null;
-      final json = jsonDecode(utf8.decode(plain));
+      final text = utf8.decode(plain);
+      final json = jsonDecode(text);
       if (json is! Map) return null;
-      entries.add(Entry.fromJson(json.cast<String, dynamic>()));
+      entries.add(Entry.fromJson(json.cast<String, dynamic>(), text: text));
     }
     return entries;
   } on FormatException {
@@ -777,7 +813,7 @@ Future<int> _writeSegments(
     keys[key.id] = key;
     final sealed = seal(
       key.key,
-      utf8.encode(jsonEncode(e.toJson())),
+      utf8.encode(e.wire),
       aad: SealedAs.entry,
       nonce: nonce(),
     );
@@ -943,11 +979,16 @@ class FolderStatus {
   /// The folder could not be read or written.
   final bool failed;
 
+  /// Devices writing a newer format into the folder: this app needs an
+  /// update to read what they write.
+  final int newer;
+
   const FolderStatus({
     required this.at,
     required this.entriesIn,
     required this.unreadable,
     required this.failed,
+    this.newer = 0,
   });
 
   Map<String, Object?> toJson() => {
@@ -955,6 +996,7 @@ class FolderStatus {
     'entriesIn': entriesIn,
     'unreadable': unreadable,
     'failed': failed,
+    if (newer > 0) 'newer': newer,
   };
 
   static FolderStatus? fromJson(Object? json) {
@@ -971,6 +1013,10 @@ class FolderStatus {
         entriesIn: entriesIn,
         unreadable: unreadable,
         failed: failed,
+        newer: switch (json) {
+          {'newer': final int n} => n,
+          _ => 0,
+        },
       );
     }
     return null;
@@ -1035,8 +1081,10 @@ Future<FolderSyncResult?> folderRound(
         entriesIn: result.applied.length,
         unreadable: result.unreadable,
         failed: false,
+        newer: result.newer,
       ),
     );
+    store.noteFolderNewer(newer: result.newer > 0);
     return result;
   } on FileSystemException {
     store._setFolderStatus(

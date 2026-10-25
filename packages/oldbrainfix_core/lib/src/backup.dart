@@ -36,7 +36,14 @@ const backupExtension = 'obfbackup';
 /// What the header line says a Backup is.
 const backupType = 'oldbrainfix-backup';
 
+/// The format a Backup says it is in, in its header and its first
+/// record: `format`, 1 when missing, and 1 is never written (ADR 0019).
 const backupFormat = 1;
+
+/// Whether [json] is in the format this version reads.
+bool _inFormat(Object? json) =>
+    json is Map &&
+    (json.containsKey('format') ? json['format'] : 1) == backupFormat;
 
 /// How many payload bytes each sealed chunk holds.
 const backupChunkBytes = 65536;
@@ -235,7 +242,6 @@ class BackupHeader {
     jsonEncode({
       'chunk': chunk,
       'created': created.toUtc().toIso8601String(),
-      'format': backupFormat,
       'kdf': pass.kdfJson(),
       'key': base64.encode(sealedKey),
       'pass': base64.encode(pass.sealed),
@@ -251,13 +257,12 @@ class BackupHeader {
           case {
             'chunk': final int chunk,
             'created': final String created,
-            'format': backupFormat,
             'kdf': final Object kdf,
             'key': final String key,
             'pass': final String sealed,
             'type': backupType,
           }
-          when chunk >= 1024 && chunk <= (1 << 20)) {
+          when chunk >= 1024 && chunk <= (1 << 20) && _inFormat(json)) {
         final pass = BackupPass.read(kdf, sealed);
         final at = DateTime.tryParse(created);
         if (pass == null || at == null) return null;
@@ -597,11 +602,7 @@ Future<BackupCounts> writeBackup(Store store, String path) async {
     await out.add(
       _line(
         jsonEncode({
-          'about': {
-            'device': store.deviceId,
-            'format': backupFormat,
-            'seed': store.signingKey.seedHex,
-          },
+          'about': {'device': store.deviceId, 'seed': store.signingKey.seedHex},
         }),
       ),
     );
@@ -617,7 +618,7 @@ Future<BackupCounts> writeBackup(Store store, String path) async {
     }
     final entries = store.allEntries();
     for (final e in entries) {
-      await out.add(_line('{"entry":${jsonEncode(e.toJson())}}'));
+      await out.add(_line('{"entry":${e.wire}}'));
     }
     final seqs = [for (final e in entries) e.seq];
     final moments = store.momentRows().reversed.toList();
@@ -859,7 +860,7 @@ Future<RestoreResult> restoreBackup(
       switch (json) {
         case {'entry': final Map<String, dynamic> e}:
           try {
-            entries.add(Entry.fromJson(e));
+            entries.add(Entry.fromJson(e, text: _entryText(text)));
           } on Object {
             throw damaged;
           }
@@ -945,16 +946,20 @@ Future<RestoreResult> restoreBackup(
   );
 }
 
+/// The entry in a record `{"entry":…}` as it was written, so it is kept
+/// byte for byte (ADR 0019); null for a record written otherwise.
+String? _entryText(String record) {
+  const head = '{"entry":';
+  return record.startsWith(head) && record.endsWith('}')
+      ? record.substring(head.length, record.length - 1)
+      : null;
+}
+
 /// The old Device's signing key in the `about` record, or null when it
 /// is none or not the Device's own.
 SigningKey? _about(Object? about) {
-  if (about
-      case {
-        'device': final String device,
-        'format': backupFormat,
-        'seed': final String seed,
-      }
-      when seed.length == 64) {
+  if (about case {'device': final String device, 'seed': final String seed}
+      when seed.length == 64 && _inFormat(about)) {
     try {
       final key = SigningKey.fromSeed(fromHex(seed));
       return deviceIdFromKey(key.publicKey) == device ? key : null;

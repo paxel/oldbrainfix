@@ -10,7 +10,9 @@ use std::collections::{BTreeSet, HashMap};
 use crate::Result;
 use crate::entry::{Entry, WireEntry};
 use crate::notes::keys as note_keys;
-use crate::signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, entry_bytes, verify_signature};
+use crate::signing::{
+    ImportReport, KeyRecord, KeyTrust, PinnedKey, entry_bytes_with, verify_signature,
+};
 use crate::store::Store;
 
 const KEY_PREFIX: &str = "key:";
@@ -145,7 +147,8 @@ impl Store {
     /// returns the ones that were new here, as the Dart core's
     /// `applyEntries`: keys first, then every entry not held checked
     /// against its Device's key; what does not verify is refused and
-    /// counted, never recorded.
+    /// counted, never recorded. An entry of a later structure is kept and
+    /// passed on, but not applied nor returned.
     pub fn apply_entries(
         &self,
         entries: &[WireEntry],
@@ -176,7 +179,7 @@ impl Store {
                         }
                     }
                 };
-                let bytes = entry_bytes(
+                let bytes = entry_bytes_with(
                     &e.device,
                     e.dseq,
                     &e.entity,
@@ -186,13 +189,16 @@ impl Store {
                     &e.author,
                     &e.recorded,
                     e.ctx.as_deref(),
+                    &e.extra,
                 );
                 let signed = key.is_some_and(|k| verify_signature(&k, &bytes, e.sig.as_deref()));
                 if !signed {
                     report.refuse(&e.author, &e.device);
                     continue;
                 }
-                if self.insert(e)? {
+                // One of a later structure is kept and passed on, not
+                // applied.
+                if self.insert(e)? && e.applies() {
                     applied.push(e.clone());
                 }
             }
@@ -258,6 +264,89 @@ impl Store {
         }
         let id = self.add_moment(before, cause, label)?;
         Ok(self.moments()?.into_iter().find(|m| m.id == id))
+    }
+}
+
+/// Which Device needs a newer version of the app before two Devices can
+/// sync (ADR 0019), as the Dart core's `UpdateNeeded`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateNeeded {
+    /// This one.
+    Here,
+    /// The other one.
+    There,
+}
+
+impl UpdateNeeded {
+    pub fn name(self) -> &'static str {
+        match self {
+            UpdateNeeded::Here => "here",
+            UpdateNeeded::There => "there",
+        }
+    }
+
+    fn from_name(name: &str) -> Option<UpdateNeeded> {
+        match name {
+            "here" => Some(UpdateNeeded::Here),
+            "there" => Some(UpdateNeeded::There),
+            _ => None,
+        }
+    }
+}
+
+const UPDATE_PREFIX: &str = "update:";
+const UPDATE_SEEN: &str = " seen";
+
+/// The source of the shared folder's update notice.
+pub const FOLDER_SOURCE: &str = "folder";
+
+/// Syncs that need an update, kept so each is announced once and not at
+/// every automatic try, as the Dart core's `UpdateNotices`: by the Device
+/// synced with, or [`FOLDER_SOURCE`]. Local settings, never synced.
+impl Store {
+    /// Keeps that syncing with `source` needs an update `where_`, to be
+    /// announced ([`Store::take_update_notices`]) unless known already.
+    pub fn note_update_needed(&self, source: &str, where_: UpdateNeeded) -> Result<()> {
+        let key = format!("{UPDATE_PREFIX}{source}");
+        let held = self.local_setting(&key)?;
+        let seen = format!("{}{UPDATE_SEEN}", where_.name());
+        if held.as_deref() == Some(where_.name()) || held.as_deref() == Some(seen.as_str()) {
+            return Ok(());
+        }
+        self.set_local_setting(&key, where_.name())
+    }
+
+    /// A sync with `source` went through: what it needed is forgotten.
+    pub fn update_no_longer_needed(&self, source: &str) -> Result<()> {
+        let key = format!("{UPDATE_PREFIX}{source}");
+        if self.local_setting(&key)?.is_some() {
+            self.remove_local_setting(&key)?;
+        }
+        Ok(())
+    }
+
+    /// Keeps whether the shared folder holds data of a newer format than
+    /// this version reads.
+    pub fn note_folder_newer(&self, newer: bool) -> Result<()> {
+        if newer {
+            self.note_update_needed(FOLDER_SOURCE, UpdateNeeded::Here)
+        } else {
+            self.update_no_longer_needed(FOLDER_SOURCE)
+        }
+    }
+
+    /// The notices not announced yet, by source; taking them marks them
+    /// announced.
+    pub fn take_update_notices(&self) -> Result<Vec<(String, UpdateNeeded)>> {
+        let mut out = Vec::new();
+        for (key, value) in self.local_settings_with_prefix(UPDATE_PREFIX)? {
+            let Some(where_) = UpdateNeeded::from_name(&value) else {
+                continue;
+            };
+            out.push((key[UPDATE_PREFIX.len()..].to_string(), where_));
+            self.set_local_setting(&key, &format!("{value}{UPDATE_SEEN}"))?;
+        }
+        Ok(out)
     }
 }
 

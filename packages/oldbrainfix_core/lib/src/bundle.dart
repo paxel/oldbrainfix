@@ -46,6 +46,16 @@ class NotABundle implements Exception {
   String toString() => 'NotABundle';
 }
 
+/// A bundle written by a newer version of the app: it holds only
+/// manifests of a format this version does not read (ADR 0019). This
+/// app needs an update to read it.
+class BundleNeedsUpdate implements Exception {
+  const BundleNeedsUpdate();
+
+  @override
+  String toString() => 'BundleNeedsUpdate';
+}
+
 /// What a bundle import did.
 class BundleResult {
   /// The entries that were new here.
@@ -140,7 +150,8 @@ Future<({int entries, int blobs})?> writeBundle(
 
 /// Imports the bundle at [path]: takes in what is new in it and the
 /// blobs the log lacks, as a folder sync does, and keeps what the
-/// writer said it holds. Throws [NotABundle] for a file that is none.
+/// writer said it holds. Throws [NotABundle] for a file that is none,
+/// and [BundleNeedsUpdate] for one holding only newer formats.
 Future<BundleResult> importBundle(Store store, String path) async {
   final InputFileStream input;
   try {
@@ -158,13 +169,19 @@ Future<BundleResult> importBundle(Store store, String path) async {
     }
     final folder = _ZipReadFolder(archive);
     final writers = <String, FolderManifest>{};
+    var newer = false;
     for (final name in await folder.list('')) {
       if (!name.endsWith('.manifest')) continue;
-      final manifest = FolderManifest.parse(await folder.read('', name));
+      final bytes = await folder.read('', name);
+      final manifest = FolderManifest.parse(bytes);
       final device = name.substring(0, name.length - '.manifest'.length);
-      if (manifest != null && device.isNotEmpty) writers[device] = manifest;
+      if (device.isEmpty) continue;
+      if (manifest != null) writers[device] = manifest;
+      newer |= FolderManifest.isNewer(bytes);
     }
-    if (writers.isEmpty) throw const NotABundle();
+    if (writers.isEmpty) {
+      throw newer ? const BundleNeedsUpdate() : const NotABundle();
+    }
     final from = writers.keys.firstWhere(
       (d) => d != store.deviceId,
       orElse: () => writers.keys.first,

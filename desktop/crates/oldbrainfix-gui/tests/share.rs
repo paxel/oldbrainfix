@@ -15,8 +15,8 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::lan::{
-    DEVICE_HEADER, Joining, PIN_HEADER, answer_sync, answer_sync_inviting, apply_answer_as,
-    sync_request, sync_request_as,
+    DEVICE_HEADER, FORMAT_HEADER, Joining, OWN_FORMATS, PIN_HEADER, answer_sync,
+    answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
 };
 use oldbrainfix_core::{
     AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store,
@@ -156,6 +156,7 @@ fn invited_phone(port: u16, pin: String) -> JoinHandle<Joined> {
         let mut res = agent
             .get(format!("{base}/vector"))
             .header(PIN_HEADER, &pin)
+            .header(FORMAT_HEADER, OWN_FORMATS.encode())
             .call()
             .map_err(|e| fail(&e))?;
         let host_device = res

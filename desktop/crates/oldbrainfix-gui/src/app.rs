@@ -73,7 +73,7 @@ use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
 use crate::speech::{SpeechModel, Status as SpeechStatus};
-use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text};
+use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -533,6 +533,9 @@ pub struct App {
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
+    /// Syncs that need an update of the app here or on another Device,
+    /// each announced once until clicked away (ADR 0019).
+    updates: std::collections::VecDeque<String>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
     /// The picture of the other Profile "Which one is you?" shows.
@@ -654,6 +657,7 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             handed: None,
             notice: None,
+            updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             question_view: ProfileView::default(),
             person_square: None,
@@ -1159,6 +1163,11 @@ impl App {
         }
         self.read_at = self.store.now();
         self.arrived = self.conflicts_arrived();
+        // What the hosts and the folder found that needs an update.
+        for (source, update) in self.store.take_update_notices().unwrap_or_default() {
+            let text = update_notice_text(&self.t, &self.store, &source, update);
+            self.updates.push_back(text);
+        }
         // "Which one is you?" opens once it comes up, and goes once it was
         // answered here or on another Device.
         match (&self.view.profile_question, &self.dialog) {
@@ -2120,6 +2129,18 @@ impl App {
                         .sense(egui::Sense::click());
                     if ui.add(label).on_hover_text(self.t.close()).clicked() {
                         self.notice = None;
+                    }
+                });
+        } else if let Some(update) = self.updates.front().cloned() {
+            // A sync that needs an update, until clicked away.
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(update).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).on_hover_text(self.t.close()).clicked() {
+                        self.updates.pop_front();
                     }
                 });
         } else if self.arrived > 0 && self.selection != Selection::Sync {

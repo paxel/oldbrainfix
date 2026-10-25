@@ -44,6 +44,60 @@ void main() {
 
     tearDown(() => host.stop());
 
+    test('Devices sharing no wire format name the one to update, and '
+        'an automatic sync keeps it to be announced once (ADR 0019)', () async {
+      final device = await pair();
+      Future<void> join() => pairedSync(
+        phone,
+        device,
+        host: '127.0.0.1',
+        port: host.port,
+        name: 'Phone',
+      );
+      // A host of a later version that no longer speaks this one's.
+      host.formats = (
+        oldest: newestSyncFormat + 1,
+        newest: newestSyncFormat + 2,
+      );
+      await expectLater(join(), failsWith(SyncFailure.updateHere));
+      await expectLater(join(), failsWith(SyncFailure.updateHere));
+      expect(phone.takeUpdateNotices(), [(desk.deviceId, UpdateNeeded.here)]);
+      expect(phone.takeUpdateNotices(), isEmpty, reason: 'announced once');
+      await expectLater(join(), failsWith(SyncFailure.updateHere));
+      expect(phone.takeUpdateNotices(), isEmpty);
+      // An older host: the desk needs the update, which is news.
+      host.formats = (oldest: 1, newest: oldestSyncFormat - 1);
+      await expectLater(join(), failsWith(SyncFailure.updateThere));
+      expect(phone.takeUpdateNotices(), [(desk.deviceId, UpdateNeeded.there)]);
+      // A host speaking this format among others syncs in it, and the
+      // notice is forgotten.
+      host.formats = (oldest: 1, newest: newestSyncFormat + 3);
+      Notes(desk).capture('Synced again');
+      await join();
+      expect(host.bodies.last['format'], newestSyncFormat);
+      expect(Notes(phone).all().map((n) => n.text), contains('Synced again'));
+      phone.noteUpdateNeeded(desk.deviceId, UpdateNeeded.there);
+      host.formats = ownFormats;
+      await join();
+      expect(phone.takeUpdateNotices(), isEmpty);
+    });
+
+    test('format ranges meet in the newest both speak', () {
+      expect(encodeFormats(ownFormats), '4-4');
+      expect(parseFormats('3-6'), (oldest: 3, newest: 6));
+      expect(parseFormats('5'), (oldest: 5, newest: 5));
+      for (final text in [null, '', 'x', '6-3', '0-2']) {
+        expect(parseFormats(text), (oldest: 1, newest: 1), reason: '$text');
+      }
+      expect(commonFormat((oldest: 3, newest: 6), (oldest: 2, newest: 5)), 5);
+      expect(commonFormat((oldest: 1, newest: 3)), isNull);
+      expect(updateNeeded((oldest: 1, newest: 3)), SyncFailure.updateThere);
+      expect(updateNeeded((oldest: 5, newest: 6)), SyncFailure.updateHere);
+      expect(formatOf({}), 1, reason: 'a missing format is 1');
+      expect(formatOf({'format': '4'}), 0);
+      expect(speaksFormat(1), isFalse);
+    });
+
     test('the proof covers the host and the nonce, as the desktop reads '
         'it', () {
       expect(

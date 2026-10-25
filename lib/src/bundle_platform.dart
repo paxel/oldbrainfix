@@ -157,6 +157,8 @@ Future<int> importBundleFile(
     result = await importBundle(store, path);
   } on NotABundle {
     failure = t.bundleNotABundle;
+  } on BundleNeedsUpdate {
+    failure = t.bundleNeedsUpdate;
   } on Object {
     // Whatever else broke on the way: nothing half-taken stays.
     failure = t.bundleFailed;

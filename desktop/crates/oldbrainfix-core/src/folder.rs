@@ -32,7 +32,9 @@ pub const ROOT: &str = "oldbrainfix-sync";
 /// A segment is closed once it passes this many bytes.
 pub const SEGMENT_CAP: usize = 64 * 1024;
 
-/// The manifest's format; a reader skips a higher one.
+/// The manifest's format, `format` in it: 1 when missing, and 1 is never
+/// written (ADR 0019). A reader reads no data of a higher one and says
+/// so: the Device that wrote it runs a newer version.
 pub const MANIFEST_FORMAT: i64 = 1;
 
 /// The shared folder as the sync sees it: the root (`""`), `keys` and
@@ -216,26 +218,36 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    /// Its bytes, as the Dart core writes them: keys sorted, no spaces.
+    /// Its bytes, as the Dart core writes them: keys sorted, no spaces;
+    /// the format only above 1.
     pub fn encode(&self) -> Vec<u8> {
         let segments: Vec<Value> = self
             .segments
             .iter()
             .map(|s| json!({"key": s.key, "lines": s.lines, "name": s.name}))
             .collect();
-        json!({
-            "format": self.format,
+        let mut manifest = json!({
             "generation": self.generation,
             "segments": segments,
             "vector": self.vector,
-        })
-        .to_string()
-        .into_bytes()
+        });
+        if self.format != 1
+            && let Some(map) = manifest.as_object_mut()
+        {
+            map.insert("format".to_string(), json!(self.format));
+        }
+        manifest.to_string().into_bytes()
     }
 
+    /// The manifest `bytes` hold; none when they hold none this version
+    /// reads: half-written, damaged, or of a newer format
+    /// ([`Manifest::is_newer`]).
     pub fn parse(bytes: Option<&[u8]>) -> Option<Manifest> {
         let m: Value = serde_json::from_slice(bytes?).ok()?;
-        let format = m.get("format")?.as_i64()?;
+        let format = match m.get("format") {
+            None => 1,
+            Some(format) => format.as_i64()?,
+        };
         if format > MANIFEST_FORMAT {
             return None;
         }
@@ -264,6 +276,15 @@ impl Manifest {
             segments,
         })
     }
+
+    /// Whether `bytes` hold a manifest of a format newer than this
+    /// version reads: its writer runs a newer version of the app.
+    pub fn is_newer(bytes: Option<&[u8]>) -> bool {
+        bytes
+            .and_then(|b| serde_json::from_slice::<Value>(b).ok())
+            .and_then(|m| m.get("format").and_then(Value::as_i64))
+            .is_some_and(|format| format > MANIFEST_FORMAT)
+    }
 }
 
 /// What one folder sync did.
@@ -275,6 +296,9 @@ pub struct FolderSyncResult {
     pub blobs_out: usize,
     /// Segments of other Devices sealed with a key not held here.
     pub unreadable: usize,
+    /// Devices whose manifest is of a newer format than this version
+    /// reads: nothing of theirs was read, this app needs an update.
+    pub newer: usize,
     pub moment: Option<Moment>,
     pub report: ImportReport,
     pub conflicts: Vec<Conflict>,
@@ -311,7 +335,7 @@ pub fn folder_sync(
     let mut report = ImportReport::default();
     let profile_changed = learn_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
-    let (applied, unreadable) = read_foreign(store, folder, &mut report, true)?;
+    let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
     let people = learn_profiles(store, folder)?;
     store.ensure_area_keys()?;
@@ -328,6 +352,7 @@ pub fn folder_sync(
         blobs_in,
         blobs_out,
         unreadable,
+        newer,
         moment,
         report,
         conflicts,
@@ -350,7 +375,7 @@ pub fn read_sealed(
     let mut report = ImportReport::default();
     let profile_changed = learn_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
-    let (applied, unreadable) = read_foreign(store, folder, &mut report, false)?;
+    let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, false)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
     let people = learn_profiles(store, folder)?;
     let names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
@@ -362,6 +387,7 @@ pub fn read_sealed(
         blobs_in,
         blobs_out: 0,
         unreadable,
+        newer,
         moment,
         report,
         conflicts,
@@ -543,23 +569,25 @@ fn segment_entries(
         .map(|line| {
             let sealed = BASE64.decode(line).ok()?;
             let plain = unseal(&key.key, &sealed, sealed_as::ENTRY)?;
-            serde_json::from_slice(&plain).ok()
+            WireEntry::parse(std::str::from_utf8(&plain).ok()?)
         })
         .collect()
 }
 
 /// Reads every other Device's segments sealed with a key held here, as
-/// the Dart core does; never filtered by the version vector.
+/// the Dart core does; never filtered by the version vector. A manifest
+/// of a newer format is counted, and nothing of its writer read.
 fn read_foreign(
     store: &Store,
     folder: &dyn SyncFolder,
     report: &mut ImportReport,
     remember: bool,
-) -> Result<(Vec<WireEntry>, usize)> {
+) -> Result<(Vec<WireEntry>, usize, usize)> {
     let own = store.device_id()?;
     let mut fresh = Vec::new();
     let mut states = Vec::new();
     let mut unreadable = 0;
+    let mut newer = 0;
     for name in folder.list("")? {
         let Some(device) = name.strip_suffix(".manifest") else {
             continue;
@@ -571,6 +599,9 @@ fn read_foreign(
             continue;
         };
         let Some(manifest) = Manifest::parse(bytes.as_deref()) else {
+            if Manifest::is_newer(bytes.as_deref()) {
+                newer += 1;
+            }
             continue;
         };
         let (mut generation, mut lines) = if remember {
@@ -613,7 +644,7 @@ fn read_foreign(
     }
     let applied = store.apply_entries(&fresh, &[], None, report)?;
     if !remember {
-        return Ok((applied, unreadable));
+        return Ok((applied, unreadable, newer));
     }
     for (device, generation, lines) in states {
         store.set_local_setting(
@@ -621,7 +652,7 @@ fn read_foreign(
             &json!({"generation": generation, "lines": lines}).to_string(),
         )?;
     }
-    Ok((applied, unreadable))
+    Ok((applied, unreadable, newer))
 }
 
 fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<()> {
@@ -777,7 +808,7 @@ fn write_segments(
         let Some(key) = key else {
             continue;
         };
-        let plain = serde_json::to_vec(&e.wire()).map_err(|e| Error::Invalid(e.to_string()))?;
+        let plain = e.wire().line()?.into_bytes();
         let sealed = seal(&key.key, &plain, sealed_as::ENTRY, &nonce()?)?;
         lines
             .entry(key.id())
@@ -929,16 +960,24 @@ pub struct FolderStatus {
     pub entries_in: usize,
     pub unreadable: usize,
     pub failed: bool,
+    /// Devices writing a newer format into the folder.
+    pub newer: usize,
 }
 
 impl FolderStatus {
     pub fn to_json(&self) -> Value {
-        json!({
+        let mut json = json!({
             "at": crate::dart_iso(self.at),
             "entriesIn": self.entries_in,
             "unreadable": self.unreadable,
             "failed": self.failed,
-        })
+        });
+        if self.newer > 0
+            && let Some(map) = json.as_object_mut()
+        {
+            map.insert("newer".to_string(), json!(self.newer));
+        }
+        json
     }
 
     pub fn from_json(json: &Value) -> Option<FolderStatus> {
@@ -947,6 +986,11 @@ impl FolderStatus {
             entries_in: usize::try_from(json.get("entriesIn")?.as_u64()?).ok()?,
             unreadable: usize::try_from(json.get("unreadable")?.as_u64()?).ok()?,
             failed: json.get("failed")?.as_bool()?,
+            newer: json
+                .get("newer")
+                .and_then(Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
+                .unwrap_or(0),
         })
     }
 }
@@ -1004,7 +1048,9 @@ pub fn folder_round(
                 entries_in: result.applied.len(),
                 unreadable: result.unreadable,
                 failed: false,
+                newer: result.newer,
             })?;
+            store.note_folder_newer(result.newer > 0)?;
             Ok(Some(result))
         }
         Err(Error::Io(_)) => {
@@ -1013,6 +1059,7 @@ pub fn folder_round(
                 entries_in: 0,
                 unreadable: 0,
                 failed: true,
+                newer: 0,
             })?;
             Ok(None)
         }
@@ -1026,6 +1073,7 @@ mod tests {
     use crate::lan::{answer_sync, apply_answer, sync_request};
     use crate::signing::SigningKey;
     use crate::store::tests::ticking;
+    use crate::sync::{FOLDER_SOURCE, UpdateNeeded};
     use crate::{Notes, Places};
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
@@ -1098,6 +1146,51 @@ mod tests {
                 }
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_newer_manifest_is_announced_and_its_data_not_read() -> TestResult {
+        let phone = device(1)?;
+        let desk = device(2)?;
+        meet(&phone, &desk)?;
+        Notes::new(&phone).capture("Written later", None, None)?;
+        let mut folder = MemoryFolder::default();
+        sync(&phone, &mut folder)?;
+        let name = manifest_name(&phone.device_id()?);
+        let bytes = folder.read("", &name)?.ok_or("a manifest")?;
+        // Format 1 is never written; a missing one reads as 1.
+        let mut manifest: Value = serde_json::from_slice(&bytes)?;
+        assert!(manifest.get("format").is_none());
+        assert!(Manifest::parse(Some(&bytes)).is_some());
+        // The same manifest from a newer version.
+        if let Some(map) = manifest.as_object_mut() {
+            map.insert("format".into(), json!(MANIFEST_FORMAT + 1));
+        }
+        folder.write("", &name, manifest.to_string().as_bytes())?;
+        let mut nonce = random_nonce;
+        let read = folder_round(&desk, &mut folder, &mut nonce)?.ok_or("a round")?;
+        assert_eq!(read.newer, 1);
+        assert!(read.applied.is_empty());
+        assert!(texts(&desk)?.is_empty());
+        assert_eq!(desk.folder_status()?.map(|s| s.newer), Some(1));
+        assert_eq!(
+            desk.take_update_notices()?,
+            vec![(FOLDER_SOURCE.to_string(), UpdateNeeded::Here)]
+        );
+        // Announced once, then forgotten once the folder reads again.
+        folder_round(&desk, &mut folder, &mut nonce)?;
+        assert!(desk.take_update_notices()?.is_empty());
+        folder.write("", &name, &bytes)?;
+        let again = folder_round(&desk, &mut folder, &mut nonce)?.ok_or("a round")?;
+        assert_eq!(again.newer, 0);
+        assert_eq!(texts(&desk)?, vec!["Written later"]);
+        desk.note_folder_newer(true)?;
+        assert_eq!(
+            desk.take_update_notices()?.len(),
+            1,
+            "news again after it was over"
+        );
         Ok(())
     }
 

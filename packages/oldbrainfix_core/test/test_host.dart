@@ -51,6 +51,10 @@ class TestHost {
   /// The invite this host hands out, as one inviting to a Shared Area.
   Invite? inviting;
 
+  /// The wire formats this host speaks: another build's, for the tests
+  /// of Devices that share none.
+  FormatRange formats = ownFormats;
+
   /// Every request that reached the host, and the nonces it handed out.
   var requests = 0;
   final nonces = <String>[];
@@ -112,7 +116,18 @@ class TestHost {
         return;
       }
       if (req.method == 'GET' && path == '/vector') {
-        res.headers.set(formatHeader, '$syncFormat');
+        res.headers.set(formatHeader, encodeFormats(formats));
+        final theirs = parseFormats(req.headers.value(formatHeader));
+        if (commonFormat(theirs, formats) == null) {
+          res.statusCode = HttpStatus.forbidden;
+          res.write(
+            jsonEncode({
+              'refusal': 'format',
+              'formats': encodeFormats(formats),
+            }),
+          );
+          return;
+        }
         res.headers.set(deviceHeader, store.deviceId);
         if (inviting != null) res.headers.set(inviteHeader, '1');
         res.headers.contentType = ContentType.json;
@@ -125,12 +140,24 @@ class TestHost {
             .cast<String, Object?>();
         bodies.add(sent);
         final done = answerSync(store, sent, name: name, inviting: inviting);
+        if (done == null && speaksFormat(formatOf(sent))) {
+          res.statusCode = HttpStatus.forbidden;
+          res.write('declined');
+          return;
+        }
         if (done == null) {
           res.statusCode = HttpStatus.forbidden;
-          res.write(jsonEncode({'refusal': 'format', 'format': syncFormat}));
+          res.headers.set(formatHeader, encodeFormats(formats));
+          res.write(
+            jsonEncode({
+              'refusal': 'format',
+              'formats': encodeFormats(formats),
+            }),
+          );
           return;
         }
         sessions.add(done.session);
+        res.headers.set(formatHeader, encodeFormats(formats));
         if (done.session.sharedArea != null) {
           store.rememberDevice(
             PairedDevice(

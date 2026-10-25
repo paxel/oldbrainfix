@@ -11,6 +11,11 @@ pub enum Error {
     /// A file that is no sync bundle this app can read.
     #[error("no sync bundle")]
     NotABundle,
+    /// A sync bundle holding only formats newer than this version reads,
+    /// as the Dart core's `BundleNeedsUpdate` (ADR 0019): this app needs
+    /// an update.
+    #[error("a sync bundle of a newer version")]
+    BundleNeedsUpdate,
     /// A Backup that could not be restored, and why.
     #[error("backup: {0:?}")]
     Backup(crate::backup::Problem),

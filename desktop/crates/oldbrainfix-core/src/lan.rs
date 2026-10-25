@@ -44,16 +44,97 @@ use crate::profile::{OwnProfile, ProfileChoice, ProfileTaken};
 use crate::shared::Invite;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
-use crate::sync::{Moment, cause, split_blob_ref, wire};
+use crate::sync::{Moment, UpdateNeeded, cause, split_blob_ref, wire};
 use crate::{Error, Result};
 
-/// The wire format this build speaks, the Dart core's `syncFormat`.
-/// Format 2 carries the entries' causal contexts, which format 1 would
-/// refuse as forged; format 3 the invites to Shared Areas, which format
-/// 2 would answer with everything it holds; format 4 the own Profile
-/// between one's own Devices (ADR 0017), which format 3 would leave
-/// behind.
-pub const SYNC_FORMAT: i64 = 4;
+/// The wire formats this build speaks, the oldest and the newest, as the
+/// Dart core's `oldestSyncFormat` and `newestSyncFormat` (ADR 0019).
+/// Both sides state theirs in [`FORMAT_HEADER`], `<oldest>-<newest>`,
+/// and sync in the newest both speak, which the `/sync` body names as
+/// its `format`; a Device stating none speaks format 1. Format 2 carries
+/// the entries' causal contexts, which format 1 would refuse as forged;
+/// format 3 the invites to Shared Areas, which format 2 would answer
+/// with everything it holds; format 4 the own Profile between one's own
+/// Devices (ADR 0017), which format 3 would leave behind.
+pub const OLDEST_SYNC_FORMAT: i64 = 4;
+pub const NEWEST_SYNC_FORMAT: i64 = 4;
+
+/// The wire formats a Device speaks, the oldest and the newest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormatRange {
+    pub oldest: i64,
+    pub newest: i64,
+}
+
+/// The wire formats this build speaks.
+pub const OWN_FORMATS: FormatRange = FormatRange {
+    oldest: OLDEST_SYNC_FORMAT,
+    newest: NEWEST_SYNC_FORMAT,
+};
+
+impl FormatRange {
+    /// The range as [`FORMAT_HEADER`] states it.
+    pub fn encode(self) -> String {
+        format!("{}-{}", self.oldest, self.newest)
+    }
+
+    /// The range a header states: `<oldest>-<newest>`, or one format
+    /// alone. A Device stating none, or nothing readable, speaks 1.
+    pub fn parse(text: Option<&str>) -> FormatRange {
+        let numbers: Vec<Option<i64>> = text
+            .unwrap_or_default()
+            .trim()
+            .split('-')
+            .map(|p| p.trim().parse().ok())
+            .collect();
+        match numbers.as_slice() {
+            [Some(one)] if *one >= 1 => FormatRange {
+                oldest: *one,
+                newest: *one,
+            },
+            [Some(oldest), Some(newest)] if *oldest >= 1 && oldest <= newest => FormatRange {
+                oldest: *oldest,
+                newest: *newest,
+            },
+            _ => FormatRange {
+                oldest: 1,
+                newest: 1,
+            },
+        }
+    }
+
+    /// The newest format both this range and `ours` speak; none when
+    /// they share none.
+    pub fn common(self, ours: FormatRange) -> Option<i64> {
+        let newest = self.newest.min(ours.newest);
+        (newest >= self.oldest.max(ours.oldest)).then_some(newest)
+    }
+
+    /// Which Device needs an update when this range, the other one's,
+    /// and `ours` share no format: the one whose newest is older than the
+    /// other's oldest.
+    pub fn update_needed(self, ours: FormatRange) -> UpdateNeeded {
+        if self.newest < ours.oldest {
+            UpdateNeeded::There
+        } else {
+            UpdateNeeded::Here
+        }
+    }
+}
+
+/// The wire format a body is written in: its `format`, 1 when missing, 0
+/// when it is no whole number.
+pub fn format_of(body: &Value) -> i64 {
+    match body.get("format") {
+        None => 1,
+        Some(format) => format.as_i64().unwrap_or(0),
+    }
+}
+
+/// Whether this build reads a body written in `format`.
+pub fn speaks_format(format: i64) -> bool {
+    (OLDEST_SYNC_FORMAT..=NEWEST_SYNC_FORMAT).contains(&format)
+}
 
 pub const PIN_FAILURES_PER_ADDRESS: u32 = 5;
 pub const PIN_FAILURES_TOTAL: u32 = 20;
@@ -86,6 +167,9 @@ pub const PROOF_HEADER: &str = "x-oldbrainfix-proof";
 /// once; the oldest goes first.
 pub const CHALLENGE_TTL: Duration = Duration::from_secs(120);
 pub const MAX_CHALLENGES: usize = 256;
+
+/// The source of the update notice of a joiner that did not name itself.
+pub const LAN_SOURCE: &str = "lan";
 
 /// The local setting holding the port the paired host had, taken again
 /// when it is free, so a phone finds it where it was.
@@ -942,14 +1026,11 @@ fn vector_of(value: Option<&Value>) -> HashMap<String, i64> {
         .unwrap_or_default()
 }
 
+/// The entries of a body, each in its canonical form (ADR 0019).
 fn entries_of(value: Option<&Value>) -> Vec<WireEntry> {
     value
         .and_then(|e| e.as_array())
-        .map(|list| {
-            list.iter()
-                .filter_map(|e| serde_json::from_value(e.clone()).ok())
-                .collect()
-        })
+        .map(|list| list.iter().filter_map(WireEntry::from_value).collect())
         .unwrap_or_default()
 }
 
@@ -1085,7 +1166,7 @@ pub fn sync_request_as(
         ),
     };
     let mut body = json!({
-        "format": SYNC_FORMAT,
+        "format": NEWEST_SYNC_FORMAT,
         "deviceId": store.device_id()?,
         "name": name,
         "proof": store.signing_key()?.sign(&pairing_proof_bytes(host_device, pin)),
@@ -1134,7 +1215,8 @@ fn missing_for(store: &Store, peer: &str) -> Result<Vec<String>> {
 }
 
 /// Takes in a joiner's `POST /sync` body and answers it, as the Dart
-/// core's `answerSync`; none when the joiner speaks another format.
+/// core's `answerSync`; none when the body is in a format this build
+/// does not speak. The answer is in the body's format.
 pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Value, Session)>> {
     answer_sync_inviting(store, body, name, None)
 }
@@ -1150,7 +1232,8 @@ pub fn answer_sync_inviting(
     name: &str,
     inviting: Option<&Invite>,
 ) -> Result<Option<(Value, Session)>> {
-    if body.get("format").and_then(|f| f.as_i64()) != Some(SYNC_FORMAT) {
+    let format = format_of(body);
+    if !speaks_format(format) {
         return Ok(None);
     }
     let peer = text_of(body, "deviceId");
@@ -1242,7 +1325,7 @@ pub fn answer_sync_inviting(
         )
     };
     let mut answer = json!({
-        "format": SYNC_FORMAT,
+        "format": format,
         "deviceId": store.device_id()?,
         "name": name,
         "entries": wire(&entries),
@@ -1396,7 +1479,20 @@ impl Store {
     ) -> Result<(Response, Option<Session>)> {
         let path = request.path.as_str();
         Ok(match (request.method.as_str(), path) {
-            ("GET", "/vector") => (self.serve_vector_inviting(inviting.is_some())?, None),
+            ("GET", "/vector") => {
+                // A joiner sharing no format with this build syncs nothing,
+                // and is told so (ADR 0019).
+                let theirs = FormatRange::parse(request.header(FORMAT_HEADER));
+                if theirs.common(OWN_FORMATS).is_none() {
+                    let joiner = request.header(DEVICE_HEADER);
+                    (
+                        self.refuse_format(joiner, theirs.update_needed(OWN_FORMATS))?,
+                        None,
+                    )
+                } else {
+                    (self.serve_vector_inviting(inviting.is_some())?, None)
+                }
+            }
             ("GET", "/profile") => (Response::json(200, &profile_answer(self)?), None),
             ("POST", "/sync") => self.serve_sync_inviting(&request.body, name, inviting)?,
             ("GET", p) if p.starts_with("/blob/") => {
@@ -1437,7 +1533,28 @@ impl Store {
         })
     }
 
-    /// `/vector`: the version vector, with the wire format and this
+    /// The refusal of a joiner, `joiner` when it named itself, that shares
+    /// no wire format with this build: this build's formats in the header
+    /// and the body. Which Device needs an update is kept as an update
+    /// notice, by the joiner's id, to be announced once; a joiner that did
+    /// not name itself, joining by pair code, is news every time.
+    fn refuse_format(&self, joiner: Option<&str>, update: UpdateNeeded) -> Result<Response> {
+        let source = joiner.filter(|j| !j.is_empty()).unwrap_or(LAN_SOURCE);
+        if source == LAN_SOURCE {
+            self.update_no_longer_needed(LAN_SOURCE)?;
+        }
+        self.note_update_needed(source, update)?;
+        let mut response = Response::json(
+            403,
+            &json!({"refusal": "format", "formats": OWN_FORMATS.encode()}),
+        );
+        response
+            .headers
+            .push((FORMAT_HEADER.to_string(), OWN_FORMATS.encode()));
+        Ok(response)
+    }
+
+    /// `/vector`: the version vector, with the wire formats and this
     /// Device's id in the headers.
     pub fn serve_vector(&self) -> Result<Response> {
         self.serve_vector_inviting(false)
@@ -1448,7 +1565,7 @@ impl Store {
         let mut response = Response::json(200, &json!(self.version_vector()?));
         response
             .headers
-            .push((FORMAT_HEADER.to_string(), SYNC_FORMAT.to_string()));
+            .push((FORMAT_HEADER.to_string(), OWN_FORMATS.encode()));
         response
             .headers
             .push((DEVICE_HEADER.to_string(), self.device_id()?));
@@ -1460,7 +1577,8 @@ impl Store {
         Ok(response)
     }
 
-    /// `/sync`: refuses another format with its reason, answers the rest.
+    /// `/sync`: refuses a format this build does not speak with its
+    /// reason, answers the rest.
     pub fn serve_sync(&self, body: &[u8], name: &str) -> Result<(Response, Option<Session>)> {
         self.serve_sync_inviting(body, name, None)
     }
@@ -1476,14 +1594,26 @@ impl Store {
     ) -> Result<(Response, Option<Session>)> {
         let body: Value =
             serde_json::from_slice(body).map_err(|e| Error::Invalid(format!("sync body: {e}")))?;
-        let speaks = body.get("format").and_then(|f| f.as_i64()) == Some(SYNC_FORMAT);
+        let format = format_of(&body);
         Ok(match answer_sync_inviting(self, &body, name, inviting)? {
-            Some((answer, session)) => (Response::json(200, &answer), Some(session)),
-            None if speaks => (Response::declined(), None),
-            None => (
-                Response::json(403, &json!({"refusal": "format", "format": SYNC_FORMAT})),
-                None,
-            ),
+            Some((answer, session)) => {
+                self.update_no_longer_needed(&session.peer)?;
+                let mut response = Response::json(200, &answer);
+                response
+                    .headers
+                    .push((FORMAT_HEADER.to_string(), OWN_FORMATS.encode()));
+                (response, Some(session))
+            }
+            None if speaks_format(format) => (Response::declined(), None),
+            None => {
+                let update = if format > NEWEST_SYNC_FORMAT {
+                    UpdateNeeded::Here
+                } else {
+                    UpdateNeeded::There
+                };
+                let joiner = body.get("deviceId").and_then(Value::as_str);
+                (self.refuse_format(joiner, update)?, None)
+            }
         })
     }
 
@@ -1619,6 +1749,7 @@ mod tests {
         let mut res = agent
             .get(format!("{base}/vector"))
             .header(PIN_HEADER, pin)
+            .header(FORMAT_HEADER, OWN_FORMATS.encode())
             .call()
             .map_err(|e| fail(&e))?;
         if res.status().as_u16() != 200 {
@@ -1840,12 +1971,122 @@ mod tests {
     #[test]
     fn another_format_is_refused_with_its_reason() -> TestResult {
         let store = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
-        let body = json!({"format": 1, "deviceId": "p", "entries": []}).to_string();
+        // No format written means format 1, which this build no longer
+        // speaks: the joiner needs an update.
+        let body = json!({"deviceId": "p", "entries": []}).to_string();
         let (response, session) = store.serve_sync(body.as_bytes(), "Desk")?;
         assert!(session.is_none());
         assert_eq!(response.status, 403);
         let refusal: Value = serde_json::from_slice(&response.body)?;
         assert_eq!(refusal["refusal"], "format");
+        assert_eq!(refusal["formats"], "4-4");
+        assert_eq!(
+            store.take_update_notices()?,
+            vec![("p".to_string(), UpdateNeeded::There)]
+        );
+        // A newer format: this Device needs the update.
+        let body = json!({"format": 9, "deviceId": "p", "entries": []}).to_string();
+        store.serve_sync(body.as_bytes(), "Desk")?;
+        assert_eq!(
+            store.take_update_notices()?,
+            vec![("p".to_string(), UpdateNeeded::Here)]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn format_ranges_meet_in_the_newest_both_speak() {
+        let range = |oldest, newest| FormatRange { oldest, newest };
+        assert_eq!(FormatRange::parse(Some("4-4")), range(4, 4));
+        assert_eq!(FormatRange::parse(Some("3-6")), range(3, 6));
+        assert_eq!(FormatRange::parse(Some("5")), range(5, 5));
+        // None stated, or nothing readable: format 1.
+        for text in [None, Some(""), Some("x"), Some("6-3"), Some("0-2")] {
+            assert_eq!(FormatRange::parse(text), range(1, 1), "{text:?}");
+        }
+        assert_eq!(OWN_FORMATS.encode(), "4-4");
+        assert_eq!(range(3, 6).common(range(2, 5)), Some(5));
+        assert_eq!(range(4, 4).common(range(4, 7)), Some(4));
+        assert_eq!(range(1, 3).common(range(4, 4)), None);
+        assert_eq!(range(1, 3).update_needed(range(4, 4)), UpdateNeeded::There);
+        assert_eq!(range(5, 6).update_needed(range(4, 4)), UpdateNeeded::Here);
+    }
+
+    #[test]
+    fn a_joiner_sharing_no_format_is_refused_at_the_vector_and_announced_once() -> TestResult {
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let vector = |formats: Option<&str>| -> Result<Response> {
+            let (reply, _) = channel();
+            let mut headers = vec![(DEVICE_HEADER.to_string(), "phone".to_string())];
+            if let Some(formats) = formats {
+                headers.push((FORMAT_HEADER.to_string(), formats.to_string()));
+            }
+            let request = Request {
+                method: "GET".into(),
+                path: "/vector".into(),
+                headers,
+                body: Vec::new(),
+                from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                challenged: false,
+                reply,
+            };
+            Ok(desk.serve(&request, "Desk")?.0)
+        };
+        let header = |r: &Response| {
+            r.headers
+                .iter()
+                .find(|(k, _)| k == FORMAT_HEADER)
+                .map(|(_, v)| v.clone())
+        };
+        let newer = vector(Some("5-7"))?;
+        assert_eq!(newer.status, 403);
+        assert_eq!(header(&newer).as_deref(), Some("4-4"));
+        assert_eq!(
+            desk.take_update_notices()?,
+            vec![("phone".to_string(), UpdateNeeded::Here)]
+        );
+        // Every automatic try after it is refused, but announced once.
+        assert_eq!(vector(Some("5-7"))?.status, 403);
+        assert!(desk.take_update_notices()?.is_empty());
+        // A joiner stating no formats speaks format 1.
+        assert_eq!(vector(None)?.status, 403);
+        assert_eq!(
+            desk.take_update_notices()?,
+            vec![("phone".to_string(), UpdateNeeded::There)]
+        );
+        // A joiner by pair code names no Device: every refusal is news.
+        let unnamed = |formats: &str| -> Result<Response> {
+            let (reply, _) = channel();
+            let request = Request {
+                method: "GET".into(),
+                path: "/vector".into(),
+                headers: vec![(FORMAT_HEADER.to_string(), formats.to_string())],
+                body: Vec::new(),
+                from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                challenged: false,
+                reply,
+            };
+            Ok(desk.serve(&request, "Desk")?.0)
+        };
+        for _ in 0..2 {
+            assert_eq!(unnamed("1-3")?.status, 403);
+            assert_eq!(
+                desk.take_update_notices()?,
+                vec![(LAN_SOURCE.to_string(), UpdateNeeded::There)]
+            );
+        }
+        let shared = vector(Some("2-4"))?;
+        assert_eq!(shared.status, 200);
+        assert_eq!(header(&shared).as_deref(), Some("4-4"));
+        // A sync that goes through forgets the notice.
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let body = sync_request(&phone, &desk.version_vector()?, "Phone", "", "")?;
+        let phone_id = phone.device_id()?;
+        desk.note_update_needed(&phone_id, UpdateNeeded::There)?;
+        let (response, _) = desk.serve_sync(body.to_string().as_bytes(), "Desk")?;
+        assert_eq!(response.status, 200);
+        assert_eq!(header(&response).as_deref(), Some("4-4"));
+        assert!(desk.take_update_notices()?.is_empty());
         Ok(())
     }
 
@@ -1962,6 +2203,7 @@ mod tests {
             (DEVICE_HEADER, device.to_string()),
             (NONCE_HEADER, nonce),
             (PROOF_HEADER, proof),
+            (FORMAT_HEADER, OWN_FORMATS.encode()),
         ];
         let mut get = agent.get(format!("{base}/vector"));
         for (k, v) in &headers {
@@ -2106,6 +2348,7 @@ mod tests {
                         (DEVICE_HEADER.into(), signer.device_id()?),
                         (NONCE_HEADER.into(), "n1".into()),
                         (PROOF_HEADER.into(), proof),
+                        (FORMAT_HEADER.into(), OWN_FORMATS.encode()),
                     ],
                     body,
                     from: IpAddr::V4(Ipv4Addr::LOCALHOST),

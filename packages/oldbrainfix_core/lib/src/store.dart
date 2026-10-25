@@ -116,7 +116,9 @@ class Store {
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
         sig      TEXT,
-        ctx      TEXT
+        ctx      TEXT,
+        raw      TEXT,
+        v        INTEGER
       );
       CREATE TABLE IF NOT EXISTS local_settings (
         key   TEXT PRIMARY KEY,
@@ -139,6 +141,12 @@ class Store {
     final columns = db.select('PRAGMA table_info(entries)');
     if (!columns.any((c) => c['name'] == 'ctx')) {
       db.execute('ALTER TABLE entries ADD COLUMN ctx TEXT');
+    }
+    // And the entries kept as they came, of a later structure among them
+    // (ADR 0019); none in a log from before.
+    if (!columns.any((c) => c['name'] == 'raw')) {
+      db.execute('ALTER TABLE entries ADD COLUMN raw TEXT');
+      db.execute('ALTER TABLE entries ADD COLUMN v INTEGER');
     }
     final store = Store._(db, clock, photos, audio);
     if (store.localSetting('device') == null) {
@@ -307,7 +315,8 @@ class Store {
     final fields = conflictUnitFields(unit);
     final writers = {
       for (final r in _db.select(
-        'SELECT DISTINCT device FROM entries WHERE entity = ? AND field IN '
+        'SELECT DISTINCT device FROM entries WHERE $_applied AND entity = ? '
+        'AND field IN '
         '(${List.filled(fields.length, '?').join(', ')})',
         [entity, ...fields],
       ))
@@ -322,11 +331,13 @@ class Store {
 
   /// Takes in an entry another Device wrote, as it is; one already held
   /// by (device, dseq) is skipped. Returns whether it was new. The caller
-  /// checks its signature first.
+  /// checks its signature first. What it came as is kept when this
+  /// version would write it otherwise ([Entry.raw]), and its version
+  /// when it is not 1.
   bool insert(Entry e) {
     _db.execute(
-      'INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx, raw, v) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         e.device,
         e.dseq,
@@ -338,6 +349,8 @@ class Store {
         e.recorded.toUtc().toIso8601String(),
         e.sig,
         e.ctx,
+        e.raw,
+        e.v == 1 ? null : e.v,
       ],
     );
     final added = _db.updatedRows > 0;
@@ -361,7 +374,8 @@ class Store {
   /// entity and field.
   List<(String, String)> fieldsWithPrefix(String prefix) => [
     for (final r in _db.select(
-      'SELECT DISTINCT entity, field FROM entries WHERE substr(field, 1, ?) = ? '
+      'SELECT DISTINCT entity, field FROM entries '
+      'WHERE $_applied AND substr(field, 1, ?) = ? '
       'ORDER BY entity, field',
       [prefix.length, prefix],
     ))
@@ -372,7 +386,8 @@ class Store {
   /// field, device), each once.
   List<(String, String, String)> writersOf(List<String> fields) => [
     for (final r in _db.select(
-      'SELECT DISTINCT entity, field, device FROM entries WHERE field IN '
+      'SELECT DISTINCT entity, field, device FROM entries '
+      'WHERE $_applied AND field IN '
       '(${List.filled(fields.length, '?').join(', ')})',
       fields,
     ))
@@ -381,7 +396,7 @@ class Store {
 
   /// Whether any entry ever wrote [field].
   bool mentions(String field) => _db.select(
-    'SELECT 1 FROM entries WHERE field = ? LIMIT 1',
+    'SELECT 1 FROM entries WHERE $_applied AND field = ? LIMIT 1',
     [field],
   ).isNotEmpty;
 
@@ -461,7 +476,7 @@ class Store {
   /// a Shared Area allows is left out ([judged]).
   List<Entry> history(String entity) {
     final all = _entries(
-      'SELECT * FROM entries WHERE entity = ? ORDER BY seq',
+      'SELECT * FROM entries WHERE $_applied AND entity = ? ORDER BY seq',
       [entity],
     );
     final ignored = judged.ignored;
@@ -490,13 +505,17 @@ class Store {
   JudgedLog get judged => _judged ??=
       _db
           .select(
-            "SELECT 1 FROM entries WHERE substr(field, 1, 5) = 'role:' LIMIT 1",
+            "SELECT 1 FROM entries WHERE $_applied "
+            "AND substr(field, 1, 5) = 'role:' LIMIT 1",
           )
           .isEmpty
       ? JudgedLog.none
-      : judgeLog(_entries('SELECT * FROM entries ORDER BY seq'));
+      : judgeLog(
+          _entries('SELECT * FROM entries WHERE $_applied ORDER BY seq'),
+        );
 
-  /// Every entry, in log order.
+  /// Every entry, in log order, those of a later structure too: what a
+  /// Backup carries.
   List<Entry> allEntries() => _entries('SELECT * FROM entries ORDER BY seq');
 
   /// The current value of [field] on [entity] — latest wins.
@@ -518,7 +537,8 @@ class Store {
   List<String> entitiesOfType(String type) {
     final ids = _db
         .select(
-          r"SELECT DISTINCT entity FROM entries WHERE field = '$type' AND value = ?",
+          'SELECT DISTINCT entity FROM entries WHERE $_applied '
+          r"AND field = '$type' AND value = ?",
           [type],
         )
         .map((r) => r['entity'] as String);
@@ -556,8 +576,13 @@ class Store {
         recorded: DateTime.parse(r['recorded'] as String),
         sig: r['sig'] as String?,
         ctx: r['ctx'] as String?,
-      ),
+      ).withRaw(r['raw'] as String?),
   ];
+
+  /// The entries this version applies (ADR 0019): those of a later
+  /// structure are only held and passed on, so they count for what is
+  /// held (`holds`, the version vector, the deltas) and nothing else.
+  static const _applied = '(v IS NULL OR v <= $entryVersion)';
 
   static final _random = Random.secure();
 

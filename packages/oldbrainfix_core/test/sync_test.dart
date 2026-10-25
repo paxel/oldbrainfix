@@ -43,7 +43,135 @@ void exchange(Store joiner, Store host) {
 List<String> texts(Store store) =>
     [for (final n in Notes(store).all()) n.text]..sort();
 
+/// The [n]th edit of [noteId]'s text by [writer] as a later version
+/// writes it (ADR 0019): with the keys of [extra], signed with them, in
+/// canonical form; signed without them when [signExtra] is false.
+String laterLine(
+  Store writer,
+  String noteId,
+  int n,
+  String text,
+  Map<String, Object?> extra, {
+  bool signExtra = true,
+}) {
+  final dseq = (writer.versionVector()[writer.deviceId] ?? 0) + n;
+  final date = writer.clock().toUtc().toIso8601String();
+  final value = StoredText.plain(text).encode();
+  final json = <String, Object?>{
+    'device': writer.deviceId,
+    'dseq': dseq,
+    'entity': noteId,
+    'field': 'text',
+    'value': value,
+    'date': date,
+    'author': 'Ada',
+    'recorded': date,
+    'sig': writer.signingKey.sign(
+      entryBytes(
+        device: writer.deviceId,
+        dseq: dseq,
+        entity: noteId,
+        field: 'text',
+        value: value,
+        dateIso: date,
+        author: 'Ada',
+        recordedIso: date,
+        extra: signExtra ? extra : const {},
+      ),
+    ),
+    ...extra,
+  };
+  return canonicalEntry(json);
+}
+
+Entry entryOf(String line) =>
+    Entry.fromJson(jsonDecode(line) as Map<String, dynamic>, text: line);
+
 void main() {
+  group('entries of a later version (ADR 0019)', () {
+    late Store writer;
+    late Store middle;
+    late String noteId;
+
+    setUp(() {
+      final clock = ticking();
+      writer = device(clock, 'Ada');
+      middle = device(clock, 'Ada');
+      noteId = Notes(writer).capture('First').id;
+      middle.applyEntries(
+        writer.entriesSince(const {}),
+        keys: [writer.ownKeyRecord],
+      );
+    });
+
+    test('are kept, applied up to the known version, and passed on byte '
+        'for byte, signatures holding', () {
+      final unknown = laterLine(writer, noteId, 1, 'Edited later', {
+        'later': {'b': 2, 'a': 'x'},
+      });
+      final v2 = laterLine(writer, noteId, 2, 'Version two', {
+        'more': 'kept',
+        'v': 2,
+      });
+      final applied = middle.applyEntries([entryOf(unknown), entryOf(v2)]);
+      // Only the entry of the known version counts; the other is held.
+      expect([for (final e in applied) e.raw], [unknown]);
+      expect(Notes(middle).byId(noteId)?.text, 'Edited later');
+      expect(middle.holds(writer.deviceId, entryOf(v2).dseq), isTrue);
+      final forwarded = [for (final e in middle.entriesSince(const {})) e.wire];
+      expect(forwarded.sublist(forwarded.length - 2), [unknown, v2]);
+      // Over the LAN to a Device of the later version's kind, which checks
+      // every signature again.
+      final third = device(ticking(), 'Ben');
+      exchange(third, middle);
+      final passed = [for (final e in third.entriesSince(const {})) e.wire];
+      expect(passed, containsAllInOrder([unknown, v2]));
+      expect(third.versionVector(), middle.versionVector());
+      expect(Notes(third).byId(noteId)?.text, 'Edited later');
+      // Its own entries and those of version 1 keep nothing extra.
+      expect([for (final e in third.allEntries()) e.raw].nonNulls, [
+        unknown,
+        v2,
+      ]);
+    });
+
+    test('with a key changed, added or unsigned on the way are '
+        'refused', () {
+      final line = laterLine(writer, noteId, 1, 'Edited later', {
+        'later': 'x',
+        'v': 2,
+      });
+      final json = jsonDecode(line) as Map<String, dynamic>;
+      final unsigned = laterLine(writer, noteId, 2, 'Unsigned', {
+        'later': 'x',
+      }, signExtra: false);
+      final report = ImportReport();
+      final applied = middle.applyEntries([
+        for (final changed in [
+          {...json, 'later': 'y'},
+          {...json, 'v': 3},
+          {...json, 'added': true},
+          {
+            for (final MapEntry(:key, :value) in json.entries)
+              if (key != 'later') key: value,
+          },
+        ])
+          entryOf(canonicalEntry(changed)),
+        entryOf(unsigned),
+      ], report: report);
+      expect(applied, isEmpty);
+      expect(report.refusedCount, 5);
+      expect(middle.holds(writer.deviceId, entryOf(line).dseq), isFalse);
+    });
+
+    test('a version that is no whole number from 1 is no entry', () {
+      for (final v in [0, '2', 1.5, null]) {
+        final line = laterLine(writer, noteId, 1, 'Odd', {'v': v});
+        expect(() => entryOf(line), throwsFormatException, reason: '$v');
+      }
+    });
+  });
+
   group('key records', () {
     test('a record is valid only for the device its key names', () {
       final key = SigningKey.generate();

@@ -1455,8 +1455,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get syncFailDeclined => 'Der Computer hat dieses Gerät abgelehnt.';
 
   @override
-  String get syncFailFormat =>
-      'Das andere Gerät hat eine andere Version von Old Brain Fix. Aktualisiere beide.';
+  String get syncFailUpdateHere =>
+      'Old Brain Fix auf diesem Gerät braucht ein Update, um mit dem anderen Gerät zu synchronisieren.';
+
+  @override
+  String get syncFailUpdateThere =>
+      'Old Brain Fix auf dem anderen Gerät braucht ein Update, um mit diesem zu synchronisieren.';
+
+  @override
+  String syncUpdateHereWith(String name) {
+    return 'Old Brain Fix auf diesem Gerät braucht ein Update, um mit $name zu synchronisieren.';
+  }
+
+  @override
+  String syncUpdateThereWith(String name) {
+    return 'Old Brain Fix auf $name braucht ein Update, um mit diesem Gerät zu synchronisieren.';
+  }
+
+  @override
+  String get folderNeedsUpdate =>
+      'Ein anderes Gerät schreibt ein neueres Format in den geteilten Ordner. Old Brain Fix auf diesem Gerät braucht ein Update, um es zu lesen.';
 
   @override
   String get syncFailFailed =>
@@ -1662,6 +1680,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get bundleNotABundle =>
       'Diese Datei ist kein Sync-Paket, das diese App lesen kann.';
+
+  @override
+  String get bundleNeedsUpdate =>
+      'Dieses Sync-Paket stammt von einem neueren Old Brain Fix. Old Brain Fix auf diesem Gerät braucht ein Update, um es zu lesen.';
 
   @override
   String get bundleFailed =>

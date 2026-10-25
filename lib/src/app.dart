@@ -42,6 +42,7 @@ import 'setup_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
+import 'sync_screen.dart';
 import 'voice_platform.dart';
 
 class OldBrainFixApp extends StatefulWidget {
@@ -445,6 +446,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_unsortedOpened);
     widget.lock.addListener(_lockChanged);
     widget.autoSync.addListener(_conflictsSynced);
+    widget.autoSync.addListener(_updatesNeeded);
     // Paired Devices sync while the app shows, from the first frame on:
     // what it brings is announced.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -490,6 +492,19 @@ class _HomeState extends State<_Home> {
     widget.autoSync.shown();
   }
 
+  /// An automatic sync, now or in the background, or the shared folder
+  /// needs an update of the app here or on another Device: announced at
+  /// the top, once (ADR 0019).
+  void _updatesNeeded() {
+    if (!mounted) return;
+    final announcements = AnnouncementsScope.of(context);
+    for (final (source, where) in widget.autoSync.takeUpdates()) {
+      announcements?.announce(
+        updateNoticeText(context.t, widget.store, source, where),
+      );
+    }
+  }
+
   /// An automatic sync, now or in the background, brought Conflicts:
   /// announced at the top, a tap away from the list.
   void _conflictsSynced() {
@@ -531,6 +546,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_unsortedOpened);
     widget.lock.removeListener(_lockChanged);
     widget.autoSync.removeListener(_conflictsSynced);
+    widget.autoSync.removeListener(_updatesNeeded);
     unawaited(_bundlesOpened.cancel());
     _lifecycle.dispose();
     super.dispose();

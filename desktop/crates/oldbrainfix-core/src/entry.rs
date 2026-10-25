@@ -1,7 +1,18 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use crate::{Error, Result};
+
+/// The version of the entries' structure this build applies, as the
+/// Dart core's `entryVersion` (ADR 0019): an entry with a higher `v` is
+/// kept and passed on, never applied.
+pub const ENTRY_VERSION: i64 = 1;
+
+/// The version of an entry with these `extra` keys: `v`, 1 when missing.
+fn version_of(extra: &Map<String, Value>) -> i64 {
+    extra.get("v").and_then(Value::as_i64).unwrap_or(1)
+}
 
 /// One immutable fact in the append-only log (ADR 0002), as the store
 /// holds it. The current value of a field is the entry with the highest
@@ -33,6 +44,12 @@ pub struct Entry {
     /// pairs by device, empty when only the writer had written the field;
     /// `None` for a first write, other fields and older entries.
     pub ctx: Option<String>,
+    /// The keys a later version added, `v` among them, as the Dart core's
+    /// `Entry.extra`: signed with the entry and passed on as they are.
+    pub extra: Map<String, Value>,
+    /// The entry's JSON as it came, kept when it is not what this version
+    /// writes for it, as the Dart core's `Entry.raw`.
+    pub raw: Option<String>,
     /// [`Entry::date`] read as an instant.
     pub date_at: DateTime<Utc>,
     /// [`Entry::recorded`] read as an instant.
@@ -43,6 +60,11 @@ impl Entry {
     /// Identity on the wire.
     pub fn id(&self) -> String {
         format!("{}:{}", self.device, self.dseq)
+    }
+
+    /// The version of the entry's structure: `v`, 1 when missing.
+    pub fn v(&self) -> i64 {
+        version_of(&self.extra)
     }
 
     /// The entry as it travels: what the Dart core's `Entry.toJson`
@@ -59,11 +81,15 @@ impl Entry {
             recorded: self.recorded.clone(),
             ctx: self.ctx.clone(),
             sig: self.sig.clone(),
+            extra: self.extra.clone(),
+            raw: self.raw.clone(),
         }
     }
 }
 
-/// An entry on the wire: `seq` is a local handle and stays out.
+/// An entry on the wire: `seq` is a local handle and stays out. It is
+/// written in the canonical form of ADR 0019: the keys of version 1 in
+/// their order, then the keys a later version added, sorted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WireEntry {
     pub device: String,
@@ -78,6 +104,65 @@ pub struct WireEntry {
     pub ctx: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sig: Option<String>,
+    /// The keys a later version added, `v` among them; sorted, as a
+    /// JSON object keeps them here.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+    /// The entry's JSON as it came, kept when it is not what this
+    /// version writes for it: passed on byte for byte.
+    #[serde(skip)]
+    pub raw: Option<String>,
+}
+
+impl WireEntry {
+    /// The entry `text` holds, as it came (a segment, a bundle, a
+    /// Backup); none when it is no entry, or its `v` is no whole number
+    /// from 1.
+    pub fn parse(text: &str) -> Option<WireEntry> {
+        let entry: WireEntry = serde_json::from_str(text).ok()?;
+        entry.came_as(text)
+    }
+
+    /// The entry `value` holds, in its canonical form: a LAN body keeps
+    /// no bytes of its own.
+    pub fn from_value(value: &Value) -> Option<WireEntry> {
+        let entry: WireEntry = serde_json::from_value(value.clone()).ok()?;
+        let text = serde_json::to_string(&entry).ok()?;
+        entry.came_as(&text)
+    }
+
+    /// This entry, kept as `text` when that is not what this version
+    /// writes for it.
+    fn came_as(mut self, text: &str) -> Option<WireEntry> {
+        if self.extra.contains_key("v") && !self.extra.get("v")?.as_i64().is_some_and(|v| v >= 1) {
+            return None;
+        }
+        self.raw = None;
+        if !self.extra.is_empty() || serde_json::to_string(&self).ok()? != text {
+            self.raw = Some(text.to_string());
+        }
+        Some(self)
+    }
+
+    /// The version of the entry's structure: `v`, 1 when missing.
+    pub fn v(&self) -> i64 {
+        version_of(&self.extra)
+    }
+
+    /// Whether this version applies the entry: one of a later structure
+    /// is only kept and passed on.
+    pub fn applies(&self) -> bool {
+        self.v() <= ENTRY_VERSION
+    }
+
+    /// The entry's JSON line in a segment, a bundle or a Backup: as it
+    /// came when kept.
+    pub fn line(&self) -> Result<String> {
+        match &self.raw {
+            Some(raw) => Ok(raw.clone()),
+            None => serde_json::to_string(self).map_err(|e| Error::Invalid(e.to_string())),
+        }
+    }
 }
 
 /// Reads a timestamp as the Dart core writes it (ISO 8601 with an

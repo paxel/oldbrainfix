@@ -49,14 +49,68 @@ const inviteHeader = 'x-oldbrainfix-invite';
 const nonceHeader = 'x-oldbrainfix-nonce';
 const proofHeader = 'x-oldbrainfix-proof';
 
-/// The wire format this build speaks; a peer speaking another one is
-/// refused with the reason, never half understood. Format 2 carries the
-/// entries' causal contexts, which format 1 would refuse as forged;
-/// format 3 the invites to Shared Areas, which format 2 would answer
-/// with everything it holds; format 4 the Profiles (ADR 0017), the own
-/// one between one's own Devices and those of the people of a Shared
-/// Area with its sync, which format 3 would leave behind.
-const syncFormat = 4;
+/// The wire formats this build speaks, the oldest and the newest (ADR
+/// 0019). Both sides state theirs in [formatHeader], `<oldest>-<newest>`,
+/// and sync in the newest both speak, which the `/sync` body names as
+/// its `format`; a Device stating none speaks format 1. Two Devices
+/// sharing none sync nothing, and the one whose newest is the older
+/// needs an update ([SyncFailure.updateHere], [SyncFailure.updateThere]).
+/// Format 2 carries the entries' causal contexts, which format 1 would
+/// refuse as forged; format 3 the invites to Shared Areas, which format
+/// 2 would answer with everything it holds; format 4 the Profiles (ADR
+/// 0017), the own one between one's own Devices and those of the people
+/// of a Shared Area with its sync, which format 3 would leave behind.
+const oldestSyncFormat = 4;
+const newestSyncFormat = 4;
+
+/// The wire formats a Device speaks.
+typedef FormatRange = ({int oldest, int newest});
+
+/// The wire formats this build speaks.
+const ownFormats = (oldest: oldestSyncFormat, newest: newestSyncFormat);
+
+/// [range] as [formatHeader] states it.
+String encodeFormats(FormatRange range) => '${range.oldest}-${range.newest}';
+
+/// The range [formatHeader] states: `<oldest>-<newest>`, or one format
+/// alone. A Device stating none, or nothing readable, speaks format 1.
+FormatRange parseFormats(String? text) {
+  final parts = (text ?? '').trim().split('-');
+  final numbers = [for (final p in parts) int.tryParse(p.trim())];
+  return switch (numbers) {
+    [final int one] when one >= 1 => (oldest: one, newest: one),
+    [final int oldest, final int newest] when oldest >= 1 && oldest <= newest =>
+      (oldest: oldest, newest: newest),
+    _ => (oldest: 1, newest: 1),
+  };
+}
+
+/// The newest wire format both [theirs] and [ours] speak; null when they
+/// share none.
+int? commonFormat(FormatRange theirs, [FormatRange ours = ownFormats]) {
+  final newest = theirs.newest < ours.newest ? theirs.newest : ours.newest;
+  final oldest = theirs.oldest > ours.oldest ? theirs.oldest : ours.oldest;
+  return newest >= oldest ? newest : null;
+}
+
+/// Which Device needs an update when [theirs] and [ours] share no
+/// format: the one whose newest is older than the other's oldest.
+SyncFailure updateNeeded(FormatRange theirs, [FormatRange ours = ownFormats]) =>
+    theirs.newest < ours.oldest
+    ? SyncFailure.updateThere
+    : SyncFailure.updateHere;
+
+/// The wire format a body is written in: its `format`, 1 when missing,
+/// 0 when it is no whole number.
+int formatOf(Map<String, Object?> body) => switch (body['format']) {
+  null when !body.containsKey('format') => 1,
+  final int format => format,
+  _ => 0,
+};
+
+/// Whether this build reads a body written in [format].
+bool speaksFormat(int format) =>
+    format >= oldestSyncFormat && format <= newestSyncFormat;
 
 const pinFailuresPerAddress = 5;
 const pinFailuresTotal = 20;
@@ -124,6 +178,8 @@ Map<String, int> _vector(Object? json) => {
       if (key is String && value is int) key: value,
 };
 
+/// The entries of a body; each is taken in its canonical form (ADR
+/// 0019).
 List<Entry> _entries(Object? json) => [
   if (json is List)
     for (final e in json)
@@ -186,10 +242,13 @@ bool trustsPairedJoiner(
 /// paired by invite before, what lies in the Areas it holds a role in.
 /// The Profiles of the people of those Areas go along (ADR 0017); to a
 /// Device of this one's own group every Profile kept here.
+///
+/// The body is written in [format], the newest both Devices speak.
 Map<String, Object?> syncRequest(
   Store store,
   Map<String, int> hostVector, {
   required String name,
+  int format = newestSyncFormat,
   String hostDevice = '',
   String pin = '',
   bool invited = false,
@@ -230,7 +289,7 @@ Map<String, Object?> syncRequest(
     own = true;
   }
   return {
-    'format': syncFormat,
+    'format': format,
     'deviceId': store.deviceId,
     'name': name,
     'proof': store.signingKey.sign(pairingProofBytes(hostDevice, pin)),
@@ -279,9 +338,10 @@ List<String> _missingFor(Store store, String peer) {
 /// a Moment before it when anything was new) and answers with what the
 /// joiner lacks, the blobs this Device wants, its keys, id and [name].
 /// The joiner's own key is pinned as verified: it came over a session
-/// the pair code authenticated. Null when the joiner speaks another
-/// format, ignores this host's [inviting], or invites it to an Area it
-/// holds as its own.
+/// the pair code authenticated. Null when the body is in a format this
+/// build does not speak ([speaksFormat]), the joiner ignores this
+/// host's [inviting], or invites it to an Area it holds as its own. The
+/// answer is in the body's format.
 ///
 /// Another person's Device (ADR 0013), [inviting] or inviting this one
 /// or paired by invite before ([isShared] says which), gets only what it
@@ -297,7 +357,8 @@ List<String> _missingFor(Store store, String peer) {
   Invite? inviting,
   bool Function(String peer)? isShared,
 }) {
-  if (body['format'] != syncFormat) return null;
+  final format = formatOf(body);
+  if (!speaksFormat(format)) return null;
   final peer = body['deviceId'] is String ? body['deviceId'] as String : '';
   final peerName = body['name'] is String ? body['name'] as String : '';
   final peerVector = _vector(body['vector']);
@@ -374,7 +435,7 @@ List<String> _missingFor(Store store, String peer) {
   store.noteHeldBy(peer, store.versionVector());
   return (
     answer: {
-      'format': syncFormat,
+      'format': format,
       'deviceId': store.deviceId,
       'name': name,
       'entries': [
@@ -509,8 +570,13 @@ enum SyncFailure {
   /// The user did not confirm the person an invite was for.
   cancelled,
 
-  /// The other side speaks another wire format.
-  format,
+  /// The two Devices share no wire format, and this one is the older:
+  /// this app needs an update (ADR 0019).
+  updateHere,
+
+  /// The two Devices share no wire format, and the other one is the
+  /// older: the app there needs an update.
+  updateThere,
 
   /// Anything else went wrong on the way.
   failed,
@@ -519,6 +585,10 @@ enum SyncFailure {
 class SyncException implements Exception {
   final SyncFailure failure;
   const SyncException(this.failure);
+
+  /// Whether one of the two Devices needs an update to sync.
+  bool get needsUpdate =>
+      failure == SyncFailure.updateHere || failure == SyncFailure.updateThere;
 
   @override
   String toString() => 'SyncException(${failure.name})';
@@ -594,7 +664,9 @@ Future<SyncResult> lanSync(
 /// nonce from the host in every request. Afterwards the Device is
 /// remembered at this address. Throws a [SyncException]: `wrongHost`
 /// for another certificate or a Device that never hosted, `declined`
-/// when the host does not sync automatically with this Device.
+/// when the host does not sync automatically with this Device. A Device
+/// that needs an update to sync is kept as an update notice
+/// ([UpdateNotices]) until a sync with it goes through.
 Future<SyncResult> pairedSync(
   Store store,
   PairedDevice device, {
@@ -610,15 +682,28 @@ Future<SyncResult> pairedSync(
   if (pinned.length != certificateFingerprintBytes) {
     throw const SyncException(SyncFailure.wrongHost);
   }
-  return _sync(
-    store,
-    host: host,
-    port: port,
-    fingerprint: pinned,
-    paired: device.id,
-    name: name,
-    timeout: timeout,
-  );
+  try {
+    return await _sync(
+      store,
+      host: host,
+      port: port,
+      fingerprint: pinned,
+      paired: device.id,
+      name: name,
+      timeout: timeout,
+    );
+  } on SyncException catch (e) {
+    // Kept to be announced once, not at every try (ADR 0019).
+    if (e.needsUpdate) {
+      store.noteUpdateNeeded(
+        device.id,
+        e.failure == SyncFailure.updateHere
+            ? UpdateNeeded.here
+            : UpdateNeeded.there,
+      );
+    }
+    rethrow;
+  }
 }
 
 /// The bytes of a whole certificate fingerprint, SHA-256.
@@ -648,8 +733,10 @@ Future<SyncResult> _sync(
       seen = actual;
       return true;
     };
-  // The PIN, or once the nonce is in, the paired Device's proof.
-  var auth = <String, String>{if (paired == null) pinHeader: pin};
+  // The PIN, or once the nonce is in, the paired Device's proof; and the
+  // formats this build speaks, on every request.
+  final formats = {formatHeader: encodeFormats(ownFormats)};
+  var auth = <String, String>{...formats, if (paired == null) pinHeader: pin};
   try {
     Future<(HttpHeaders, Uint8List)?> call(
       String method,
@@ -695,7 +782,9 @@ Future<SyncResult> _sync(
           throw const SyncException(SyncFailure.declined);
         }
         if (text.contains('refusal')) {
-          throw const SyncException(SyncFailure.format);
+          throw SyncException(
+            updateNeeded(parseFormats(res.headers.value(formatHeader))),
+          );
         }
         // No PIN to be wrong for a paired Device: the host said no.
         throw SyncException(
@@ -730,6 +819,7 @@ Future<SyncResult> _sync(
         throw const SyncException(SyncFailure.failed);
       }
       auth = {
+        ...formats,
         deviceHeader: store.deviceId,
         nonceHeader: nonce,
         proofHeader: store.signingKey.sign(pairedProofBytes(paired, nonce)),
@@ -738,9 +828,10 @@ Future<SyncResult> _sync(
     final vectorCall = await call('GET', '/vector');
     if (vectorCall == null) throw const SyncException(SyncFailure.failed);
     final (headers, vectorBytes) = vectorCall;
-    if (headers.value(formatHeader) != '$syncFormat') {
-      throw const SyncException(SyncFailure.format);
-    }
+    // The newest format both speak; sharing none, nothing is sent.
+    final hostFormats = parseFormats(headers.value(formatHeader));
+    final format = commonFormat(hostFormats);
+    if (format == null) throw SyncException(updateNeeded(hostFormats));
     final hostDevice = headers.value(deviceHeader) ?? '';
     // The certificate is the pinned one; a host naming another Device
     // all the same is not the one paired.
@@ -778,6 +869,7 @@ Future<SyncResult> _sync(
       store,
       hostVector,
       name: name,
+      format: format,
       hostDevice: hostDevice,
       pin: pin,
       invited: invited,
@@ -821,6 +913,7 @@ Future<SyncResult> _sync(
       // The host took in everything beyond its vector, as it answered.
       store.noteHeldBy(session.peer, hostVector);
       store.noteHeldBy(session.peer, _vector(request['vector']));
+      store.updateNoLongerNeeded(session.peer);
     }
 
     // The entries are in and the Moment recorded; whatever happens to the

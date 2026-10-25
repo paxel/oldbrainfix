@@ -3046,6 +3046,122 @@ Map<String, Object?> _signing() {
   };
 }
 
+/// A later version's entries (ADR 0019): one with a key this version
+/// does not know, which applies, and one of structure version 2 with a
+/// key more, which is kept and passed on but not applied; signed with
+/// those keys. A Device of this version takes them in and passes them on
+/// byte for byte; the same lines with a key changed or added on the way
+/// are refused.
+void _versionsFixture(Directory root) {
+  final out = Directory('${root.path}/versions');
+  final writer = _store();
+  final reader = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  );
+  try {
+    final note = Notes(writer).capture('Kept as it came');
+    final key = writer.signingKey;
+    final device = writer.deviceId;
+    var dseq = writer.versionVector()[device] ?? 0;
+    // Lines as a later version writes them: the keys of version 1 in
+    // their order, then its own, sorted.
+    Map<String, Object?> later(
+      String field,
+      String value,
+      Map<String, Object?> extra,
+    ) {
+      dseq++;
+      final date = _clock().toUtc().toIso8601String();
+      final sig = key.sign(
+        entryBytes(
+          device: device,
+          dseq: dseq,
+          entity: note.id,
+          field: field,
+          value: value,
+          dateIso: date,
+          author: 'Ada',
+          recordedIso: date,
+          extra: extra,
+        ),
+      );
+      return {
+        'device': device,
+        'dseq': dseq,
+        'entity': note.id,
+        'field': field,
+        'value': value,
+        'date': date,
+        'author': 'Ada',
+        'recorded': date,
+        'sig': sig,
+        ...extra,
+      };
+    }
+
+    final unknown = later(
+      'text',
+      const StoredText.plain('Edited by a later version').encode(),
+      {
+        'later': {'b': 2, 'a': 'x'},
+      },
+    );
+    final v2 = later(
+      'text',
+      const StoredText.plain('Not applied here').encode(),
+      {'more': 'kept', 'v': 2},
+    );
+    final lines = [
+      for (final e in writer.allEntries()) e.wire,
+      canonicalEntry(unknown),
+      canonicalEntry(v2),
+    ];
+    _write(File('${out.path}/incoming.jsonl'), '${lines.join('\n')}\n');
+    final record = writer.ownKeyRecord;
+    _write(File('${out.path}/key.json'), '${_json.convert(record.toJson())}\n');
+    final tampered = [
+      canonicalEntry({...unknown, 'later': 'changed'}),
+      canonicalEntry({...v2, 'v': 3}),
+      canonicalEntry({...v2, 'added': true}),
+    ];
+    _write(File('${out.path}/tampered.jsonl'), '${tampered.join('\n')}\n');
+
+    final report = ImportReport();
+    final refused = reader.applyEntries(
+      [
+        for (final line in tampered)
+          Entry.fromJson(jsonDecode(line) as Map<String, dynamic>, text: line),
+      ],
+      keys: [record],
+      report: report,
+    );
+    final applied = reader.applyEntries(
+      [
+        for (final line in lines)
+          Entry.fromJson(jsonDecode(line) as Map<String, dynamic>, text: line),
+      ],
+      keys: [record],
+    );
+    final forwarded = [for (final e in reader.entriesSince(const {})) e.wire];
+    _write(File('${out.path}/forwarded.jsonl'), '${forwarded.join('\n')}\n');
+    final text = Notes(reader).byId(note.id)?.text;
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'refused': report.refusedCount,
+        'refusedApplied': refused.length,
+        'applied': [for (final e in applied) e.id],
+        'vector': reader.versionVector(),
+        'text': text,
+      })}\n',
+    );
+  } finally {
+    writer.close();
+    reader.close();
+  }
+}
+
 /// The marks over a region around the origin, negative cells included.
 Map<String, Object?> _questionMarks() => {
   'shapes': [
@@ -3160,6 +3276,14 @@ Future<void> main(List<String> args) async {
     '(`remove.jsonl`) with the answer he gets then (`answer3.json`), and '
     'what both read, which entries the roles leave out and whose Profile '
     'marks each Note (`expected.json`).\n'
+    '- `versions/`: Ada\'s Device of a later version (ADR 0019): its log, '
+    'then an edit with a key this version does not know and one of '
+    'structure version 2 with a key more, both signed with those keys '
+    '(`incoming.jsonl`), her key record (`key.json`), the same two with a '
+    'key changed, the version raised and a key added on the way '
+    '(`tampered.jsonl`, all refused), what a Device of this version passes '
+    'on after taking them in, byte for byte (`forwarded.jsonl`), and what '
+    'it applied and reads (`expected.json`).\n'
     '- `sent/`: Ada sends a Note with a Section, a Routine and a Reminder '
     'to Ben: her log (`sender.jsonl`), her Profile\'s settings, which every '
     'file she sends carries (`settings.json`), what sending wrote (`sent.jsonl`, '
@@ -3228,6 +3352,7 @@ Future<void> main(List<String> args) async {
   _sentFixture(root);
   await _backupFixture(root);
   _profilesFixture(root);
+  _versionsFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

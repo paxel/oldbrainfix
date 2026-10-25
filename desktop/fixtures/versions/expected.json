@@ -1,0 +1,14 @@
+{
+  "refused": 3,
+  "refusedApplied": 0,
+  "applied": [
+    "65b60673d6ed884bf01c2c222d82ada0:1",
+    "65b60673d6ed884bf01c2c222d82ada0:2",
+    "65b60673d6ed884bf01c2c222d82ada0:3",
+    "65b60673d6ed884bf01c2c222d82ada0:4"
+  ],
+  "vector": {
+    "65b60673d6ed884bf01c2c222d82ada0": 5
+  },
+  "text": "Edited by a later version"
+}

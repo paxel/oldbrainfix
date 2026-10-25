@@ -33,8 +33,14 @@ const sentItemExtension = 'oldbrain';
 /// The type a Sent Item is shared as.
 const sentItemMimeType = 'application/vnd.oldbrainfix.item';
 
-/// The format a file says it is in.
+/// The format a file says it is in: `format`, 1 when missing, and 1 is
+/// never written (ADR 0019).
 const sentItemFormat = 1;
+
+/// Whether [json] is in the format this version reads.
+bool _inFormat(Object? json) =>
+    json is Map &&
+    (json.containsKey('format') ? json['format'] : 1) == sentItemFormat;
 
 /// A file larger than this is no Sent Item: it holds only texts.
 const maxSentItemBytes = 1 << 20;
@@ -422,11 +428,7 @@ Uint8List encodeSentItem(
   final bytesOf = random ?? secretBytes;
   final payload = item.encode();
   final signed = utf8.encode(
-    jsonEncode({
-      'format': sentItemFormat,
-      'item': payload,
-      'sig': key.sign(_signedBytes(payload)),
-    }),
+    jsonEncode({'item': payload, 'sig': key.sign(_signedBytes(payload))}),
   );
   if (to.isEmpty) return signed;
   final content = bytesOf(areaKeyBytes);
@@ -457,11 +459,7 @@ Uint8List encodeSentItem(
     });
   }
   return utf8.encode(
-    jsonEncode({
-      'format': sentItemFormat,
-      'sealed': base64.encode(sealed),
-      'to': stanzas,
-    }),
+    jsonEncode({'sealed': base64.encode(sealed), 'to': stanzas}),
   );
 }
 
@@ -621,21 +619,15 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
   final outer = _json(bytes);
   var encrypted = false;
   var signed = outer;
-  if (outer case {
-    'format': sentItemFormat,
-    'sealed': final String sealed,
-    'to': final List<Object?> to,
-  }) {
+  if (outer case {'sealed': final String sealed, 'to': final List<Object?> to}
+      when _inFormat(outer)) {
     final inner = _open(store, sealed, to);
     if (inner == null) throw const SentItemNotForUs();
     signed = _json(inner);
     encrypted = true;
   }
-  if (signed case {
-    'format': sentItemFormat,
-    'item': final String payload,
-    'sig': final String sig,
-  }) {
+  if (signed case {'item': final String payload, 'sig': final String sig}
+      when _inFormat(signed)) {
     final item = SentItem.parse(payload);
     if (item == null ||
         !item.from.valid ||

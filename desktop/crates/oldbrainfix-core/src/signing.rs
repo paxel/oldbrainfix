@@ -123,6 +123,36 @@ pub fn entry_bytes(
     recorded_iso: &str,
     ctx: Option<&str>,
 ) -> Vec<u8> {
+    entry_bytes_with(
+        device,
+        dseq,
+        entity,
+        field,
+        value,
+        date_iso,
+        author,
+        recorded_iso,
+        ctx,
+        &serde_json::Map::new(),
+    )
+}
+
+/// [`entry_bytes`] of an entry carrying keys a later version added
+/// (ADR 0019), as the Dart core's `entryBytes` with `extra`: they follow
+/// as one object, keys sorted, after the context or a null in its place.
+#[allow(clippy::too_many_arguments)]
+pub fn entry_bytes_with(
+    device: &str,
+    dseq: i64,
+    entity: &str,
+    field: &str,
+    value: Option<&str>,
+    date_iso: &str,
+    author: &str,
+    recorded_iso: &str,
+    ctx: Option<&str>,
+    extra: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<u8> {
     let mut list = vec![
         serde_json::json!(device),
         serde_json::json!(dseq),
@@ -133,7 +163,10 @@ pub fn entry_bytes(
         serde_json::json!(author),
         serde_json::json!(recorded_iso),
     ];
-    if let Some(ctx) = ctx {
+    if !extra.is_empty() {
+        list.push(serde_json::json!(ctx));
+        list.push(serde_json::Value::Object(extra.clone()));
+    } else if let Some(ctx) = ctx {
         list.push(serde_json::json!(ctx));
     }
     serde_json::Value::Array(list).to_string().into_bytes()

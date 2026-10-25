@@ -2384,11 +2384,35 @@ abstract class AppLocalizations {
   /// **'The computer said no to this Device.'**
   String get syncFailDeclined;
 
-  /// No description provided for @syncFailFormat.
+  /// No description provided for @syncFailUpdateHere.
   ///
   /// In en, this message translates to:
-  /// **'The other Device runs another version of Old Brain Fix. Update both.'**
-  String get syncFailFormat;
+  /// **'Old Brain Fix on this Device needs an update to sync with the other Device.'**
+  String get syncFailUpdateHere;
+
+  /// No description provided for @syncFailUpdateThere.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix on the other Device needs an update to sync with this one.'**
+  String get syncFailUpdateThere;
+
+  /// No description provided for @syncUpdateHereWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix on this Device needs an update to sync with {name}.'**
+  String syncUpdateHereWith(String name);
+
+  /// No description provided for @syncUpdateThereWith.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix on {name} needs an update to sync with this Device.'**
+  String syncUpdateThereWith(String name);
+
+  /// No description provided for @folderNeedsUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Another Device writes a newer format into the shared folder. Old Brain Fix on this Device needs an update to read it.'**
+  String get folderNeedsUpdate;
 
   /// No description provided for @syncFailFailed.
   ///
@@ -2665,6 +2689,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This file is no sync bundle this app can read.'**
   String get bundleNotABundle;
+
+  /// No description provided for @bundleNeedsUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'This bundle comes from a newer Old Brain Fix. Old Brain Fix on this Device needs an update to read it.'**
+  String get bundleNeedsUpdate;
 
   /// No description provided for @bundleFailed.
   ///
