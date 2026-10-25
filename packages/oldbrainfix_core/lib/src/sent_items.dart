@@ -356,6 +356,7 @@ List<Recipient> sentItemRecipients(Store store) {
 /// them; a Note this Device may not change goes out under a new id each
 /// time. With [cancel] it goes out as the cancellation of that id. It
 /// carries the own Profile, which the app makes at its first start.
+/// Only a link one of the user's own Devices wrote counts (ADR 0015).
 SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final notes = Notes(store);
   final note = notes.byId(noteId);
@@ -368,7 +369,7 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   var id = '';
   var version = 1;
   try {
-    if (jsonDecode(store.current(noteId, field) ?? '')
+    if (jsonDecode(store.currentByOwn(noteId, field) ?? '')
         case {'id': final String held, 'version': final int was}
         when held.isNotEmpty) {
       id = held;
@@ -479,9 +480,10 @@ Uint8List sendNote(
 );
 
 /// Whether this Device sent the Note [noteId] before, so sending it
-/// again sends an update, or a cancellation.
+/// again sends an update, or a cancellation. Only a link one of the
+/// user's own Devices wrote counts (ADR 0015).
 bool wasSent(Store store, String noteId) =>
-    store.current(noteId, SentKeys.sent(store.deviceId)) != null;
+    store.currentByOwn(noteId, SentKeys.sent(store.deviceId)) != null;
 
 /// Who a Sent Item opened here comes from, as far as this Device knows
 /// their Profile (ADR 0017, #51).

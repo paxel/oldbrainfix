@@ -355,6 +355,7 @@ impl Store {
     /// new id; records both on the Note when this Device may change it.
     /// With `cancel` it goes out as the cancellation of that id. It
     /// carries the own Profile, which the app makes at its first start.
+    /// Only a link one of the user's own Devices wrote counts (ADR 0015).
     pub fn sent_item_of(&self, note_id: &str, cancel: bool) -> Result<SentItem> {
         let notes = Notes::new(self);
         let note = notes
@@ -368,7 +369,7 @@ impl Store {
             .ok_or_else(|| Error::Invalid("no own Profile to send with".into()))?;
         let field = keys::sent(&self.device_id()?);
         let held = self
-            .current(note_id, &field)?
+            .own_current(note_id, &field, &mut HashMap::new())?
             .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
             .and_then(|json| {
                 let id = json.get("id")?.as_str()?.to_string();
@@ -416,10 +417,15 @@ impl Store {
     }
 
     /// Whether this Device sent the Note `note_id` before, so sending it
-    /// again sends an update, or a cancellation.
+    /// again sends an update, or a cancellation. Only a link one of the
+    /// user's own Devices wrote counts (ADR 0015).
     pub fn was_sent(&self, note_id: &str) -> Result<bool> {
         Ok(self
-            .current(note_id, &keys::sent(&self.device_id()?))?
+            .own_current(
+                note_id,
+                &keys::sent(&self.device_id()?),
+                &mut HashMap::new(),
+            )?
             .is_some())
     }
 

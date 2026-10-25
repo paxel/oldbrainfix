@@ -1549,6 +1549,125 @@ mod tests {
         Ok(())
     }
 
+    /// The link `ann` keeps on a Note it sent.
+    fn sent_field(ann: &Store) -> Boxed<String> {
+        Ok(crate::sent::keys::sent(&ann.device_id()?))
+    }
+
+    /// Ann's Note "Dentist" sent to Cid and accepted there: the Sent Item
+    /// and the Note Cid holds it as.
+    fn dentist_at(ann: &Store, cid: &Store) -> Boxed<(crate::sent::SentItem, String)> {
+        let dentist = Notes::new(ann).capture("Dentist", None, None)?.id;
+        let item = opened(cid, &ann.send_note(&dentist, None, false)?)?.item;
+        let held = cid.accept_sent_item(&item, false)?.ok_or("a Note")?;
+        Ok((item, held))
+    }
+
+    #[test]
+    fn a_sent_link_another_persons_device_wrote_sends_a_new_sent_item() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        let (dentist, held) = dentist_at(&ann, &cid)?;
+        let rent = Notes::new(&ann)
+            .capture("Pay the rent", Some(&area), None)?
+            .id;
+        sync(&ben, &ann)?;
+        let forged = json!({"id": dentist.id, "version": 1}).to_string();
+        let later = ann.now() + chrono::Duration::hours(1);
+        ben.append(&rent, &sent_field(&ann)?, Some(&forged), Some(later))?;
+        sync(&ben, &ann)?;
+        assert!(
+            ann.current(&rent, &sent_field(&ann)?)?.is_some(),
+            "it landed"
+        );
+        assert!(!ann.was_sent(&rent)?);
+
+        let cancel = opened(&cid, &ann.send_note(&rent, None, true)?)?;
+        assert_ne!(cancel.item.id, dentist.id);
+        assert_eq!(cancel.state, SentItemState::NothingToCancel);
+        assert_eq!(cid.accept_sent_item(&cancel.item, false)?, None);
+        assert!(!trashed(&cid, &held)?);
+
+        let again = opened(&cid, &ann.send_note(&rent, None, false)?)?;
+        assert_ne!(again.item.id, dentist.id);
+        assert_eq!(again.state, SentItemState::Fresh);
+        assert_ne!(
+            cid.accept_sent_item(&again.item, false)?,
+            Some(held.clone())
+        );
+        assert_eq!(text_of(&cid, &held)?, "Dentist");
+        Ok(())
+    }
+
+    #[test]
+    fn ones_own_sent_link_makes_the_second_send_an_update_through_the_desk() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([4; 32])))?;
+        let cid = device(3, "Cid")?;
+        remember(&ann, &desk, false)?;
+        remember(&desk, &ann, false)?;
+        let hi = Notes::new(&ann).capture("Hi", None, None)?.id;
+        let first = opened(&cid, &ann.send_note(&hi, None, false)?)?.item;
+        let held = cid.accept_sent_item(&first, false)?.ok_or("a Note")?;
+        own_sync(&desk, &ann)?;
+        Notes::new(&desk).edit(&hi, "Hi again")?;
+        own_sync(&desk, &ann)?;
+        assert!(ann.was_sent(&hi)?);
+
+        let update = opened(&cid, &ann.send_note(&hi, None, false)?)?;
+        assert_eq!(update.item.id, first.id);
+        assert_eq!(update.item.version, 2);
+        assert_eq!(update.state, SentItemState::Update);
+        assert_eq!(
+            cid.accept_sent_item(&update.item, false)?,
+            Some(held.clone())
+        );
+        assert_eq!(text_of(&cid, &held)?, "Hi again");
+        // Another Device of Ann's sends under an id of its own (ADR 0015).
+        assert!(!desk.was_sent(&hi)?);
+        assert_ne!(desk.sent_item_of(&hi, false)?.id, first.id);
+        Ok(())
+    }
+
+    #[test]
+    fn a_newer_sent_link_another_persons_device_wrote_hides_not_ones_own() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        let (dentist, dentist_held) = dentist_at(&ann, &cid)?;
+        let rent = Notes::new(&ann)
+            .capture("Pay the rent", Some(&area), None)?
+            .id;
+        let first = opened(&cid, &ann.send_note(&rent, None, false)?)?.item;
+        let held = cid.accept_sent_item(&first, false)?.ok_or("a Note")?;
+        sync(&ben, &ann)?;
+        let forged = json!({"id": dentist.id, "version": 99}).to_string();
+        let later = ann.now() + chrono::Duration::hours(1);
+        ben.append(&rent, &sent_field(&ann)?, Some(&forged), Some(later))?;
+        sync(&ben, &ann)?;
+        let landed: Value =
+            serde_json::from_str(&ann.current(&rent, &sent_field(&ann)?)?.ok_or("a link")?)?;
+        assert_eq!(landed["version"], json!(99), "it landed");
+
+        let update = opened(&cid, &ann.send_note(&rent, None, false)?)?;
+        assert_eq!(update.item.id, first.id);
+        assert_eq!(update.item.version, 2);
+        assert_eq!(update.state, SentItemState::Update);
+        assert_eq!(
+            cid.accept_sent_item(&update.item, false)?,
+            Some(held.clone())
+        );
+        assert_eq!(text_of(&cid, &dentist_held)?, "Dentist");
+        Ok(())
+    }
+
     #[test]
     fn a_sent_item_carrying_the_receivers_id_or_a_third_persons_shows_its_key() -> TestResult {
         let ben = device(2, "Ben")?;

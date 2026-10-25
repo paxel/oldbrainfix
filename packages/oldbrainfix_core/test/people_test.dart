@@ -769,6 +769,106 @@ void main() {
     });
   });
 
+  group('Sent Item links on the sending side', () {
+    /// The link Ann's phone keeps on a Note it sent.
+    String sentField() => SentKeys.sent(ann.deviceId);
+
+    /// Ann's Note "Dentist" sent to Cid and accepted there: the Sent Item
+    /// and the Note Cid holds it as.
+    ({SentItem item, String held}) dentistAtCid(Store cid) {
+      final item = openSentItem(
+        cid,
+        sendNote(ann, Notes(ann).capture('Dentist').id),
+      ).item;
+      return (item: item, held: acceptSentItem(cid, item)!);
+    }
+
+    test('a link another person\'s Device wrote on Ann\'s Note sends it as '
+        'a new Sent Item, no update or cancellation of hers', () {
+      final area = household();
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      final cid = device(clock, 'Cid');
+      final dentist = dentistAtCid(cid);
+      final rent = Notes(ann).capture('Pay the rent', place: area).id;
+      exchange(ben, ann);
+      ben.append(
+        rent,
+        sentField(),
+        jsonEncode({'id': dentist.item.id, 'version': 1}),
+      );
+      exchange(ben, ann);
+      expect(ann.current(rent, sentField()), isNotNull, reason: 'it landed');
+      expect(wasSent(ann, rent), isFalse);
+
+      final cancel = openSentItem(cid, sendNote(ann, rent, cancel: true));
+      expect(cancel.item.id, isNot(dentist.item.id));
+      expect(cancel.state, SentItemState.nothingToCancel);
+      expect(acceptSentItem(cid, cancel.item), isNull);
+      expect(Notes(cid).byId(dentist.held)!.isTrashed, isFalse);
+
+      final again = openSentItem(cid, sendNote(ann, rent));
+      expect(again.item.id, isNot(dentist.item.id));
+      expect(again.state, SentItemState.fresh);
+      expect(acceptSentItem(cid, again.item), isNot(dentist.held));
+      expect(Notes(cid).byId(dentist.held)!.text, 'Dentist');
+    });
+
+    test('Ann\'s own link makes the second send an update, also after it '
+        'went through her other own Device', () {
+      household();
+      final cid = device(clock, 'Cid');
+      final hi = Notes(ann).capture('Hi').id;
+      final first = openSentItem(cid, sendNote(ann, hi)).item;
+      final held = acceptSentItem(cid, first)!;
+      exchange(annDesk, ann);
+      Notes(annDesk).edit(hi, 'Hi again');
+      exchange(annDesk, ann);
+      expect(wasSent(ann, hi), isTrue);
+
+      final update = openSentItem(cid, sendNote(ann, hi));
+      expect(update.item.id, first.id);
+      expect(update.item.version, 2);
+      expect(update.state, SentItemState.update);
+      expect(acceptSentItem(cid, update.item), held);
+      expect(Notes(cid).byId(held)!.text, 'Hi again');
+      // Another Device of Ann's sends under an id of its own (ADR 0015).
+      expect(wasSent(annDesk, hi), isFalse);
+      expect(sentItemOf(annDesk, hi).id, isNot(first.id));
+    });
+
+    test('a newer link another person\'s Device wrote does not hide Ann\'s '
+        'own', () {
+      final area = household();
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      final cid = device(clock, 'Cid');
+      final dentist = dentistAtCid(cid);
+      final rent = Notes(ann).capture('Pay the rent', place: area).id;
+      final first = openSentItem(cid, sendNote(ann, rent)).item;
+      final held = acceptSentItem(cid, first)!;
+      exchange(ben, ann);
+      ben.append(
+        rent,
+        sentField(),
+        jsonEncode({'id': dentist.item.id, 'version': 99}),
+      );
+      exchange(ben, ann);
+      expect(
+        (jsonDecode(ann.current(rent, sentField())!) as Map)['version'],
+        99,
+        reason: 'it landed',
+      );
+
+      final update = openSentItem(cid, sendNote(ann, rent));
+      expect(update.item.id, first.id);
+      expect(update.item.version, 2);
+      expect(update.state, SentItemState.update);
+      expect(acceptSentItem(cid, update.item), held);
+      expect(Notes(cid).byId(dentist.held)!.text, 'Dentist');
+    });
+  });
+
   group('the shared folder and bundles', () {
     test('the people\'s Profiles go sealed under the Area\'s key', () async {
       final area = household();

@@ -23,7 +23,7 @@ Accepting makes a new Note of the receiver's, captured then and Unsorted, with t
 
 ## Updates and cancellations
 
-A later file with the same ID and a higher version is an update; a file carrying `"kind":"cancel"` is a cancellation (no `kind` means a normal item, any other kind is unreadable, so files from before stay byte-identical). Both are accepted only when signed by the same key as the item first accepted under that ID; a version at or below the one held writes nothing. Only a `received` link (and a Routine's sender id) that one of the user's own Devices wrote counts, the newest such one, as for the author shown (ADR 0017): in a Shared Area another person's Device can write any field of a Note, so a link it wrote reaches no Note.
+A later file with the same ID and a higher version is an update; a file carrying `"kind":"cancel"` is a cancellation (no `kind` means a normal item, any other kind is unreadable, so files from before stay byte-identical). Both are accepted only when signed by the same key as the item first accepted under that ID; a version at or below the one held writes nothing. Only a `received` link (and a Routine's sender id) that one of the user's own Devices wrote counts, the newest such one, as for the author shown (ADR 0017): in a Shared Area another person's Device can write any field of a Note, so a link it wrote reaches no Note. The same holds on the sending side for the `sent:<device>` link: only one that one of the user's own Devices wrote keeps a Sent Item's id, so a link another person's Device wrote makes the next send a new Sent Item, no update or cancellation of another.
 
 ## Profiles (ADR 0017)
 
