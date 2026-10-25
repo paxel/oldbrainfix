@@ -82,6 +82,8 @@ impl Profile {
     /// The record `text` holds, its name sanitised again; none when it is
     /// none.
     pub fn parse(text: &str) -> Option<Profile> {
+        #[cfg(test)]
+        tests::PARSED.with(|n| n.set(n.get() + 1));
         let json: Value = serde_json::from_str(text).ok()?;
         let map = json.as_object()?;
         let id = map.get("id")?.as_str().filter(|id| !id.is_empty())?;
@@ -567,14 +569,16 @@ pub(crate) struct Checked {
     pub(crate) shown: Option<Vec<u8>>,
 }
 
-/// `sent` checked: its binding from the first key, its signer bound, the
-/// signature over its record, the record, and its picture made again.
+/// `sent` checked: the signature over its record's bytes as sent before
+/// anything of the record is read, then the record, its binding from the
+/// first key, its signer bound, and its picture made again.
 pub(crate) fn check(sent: &SignedProfile) -> Option<Checked> {
+    if !verifies(&sent.signer, &record_bytes(&sent.record), &sent.sig) {
+        return None;
+    }
     let profile = Profile::parse(&sent.record)?;
     let (bound, keys) = chain(&profile.id, &sent.first, &[], &sent.keys);
-    if !bound.contains(&sent.signer)
-        || !verifies(&sent.signer, &record_bytes(&sent.record), &sent.sig)
-    {
+    if !bound.contains(&sent.signer) {
         return None;
     }
     let shown = match &profile.picture {
@@ -744,7 +748,9 @@ impl<'a> OwnProfile<'a> {
     /// The ids the own Profile replaced, the kept Profile showing for
     /// each.
     pub fn aliases(&self) -> Result<Vec<String>> {
-        Ok(self.held_aliases()?.into_iter().map(|a| a.alias).collect())
+        let mut ids: Vec<String> = self.held_aliases()?.into_iter().map(|a| a.alias).collect();
+        ids.dedup();
+        Ok(ids)
     }
 
     fn chosen(&self, key: &str) -> Result<bool> {
@@ -815,7 +821,7 @@ impl<'a> OwnProfile<'a> {
         if aliases.is_empty() {
             return self.store.remove_local_setting(ALIASES);
         }
-        aliases.sort_by(|a, b| a.alias.cmp(&b.alias));
+        aliases.sort_by(|a, b| a.alias.cmp(&b.alias).then_with(|| a.by.cmp(&b.by)));
         let json = Value::Array(aliases.iter().map(ProfileAlias::to_json).collect());
         self.store.set_local_setting(ALIASES, &json.to_string())
     }
@@ -1070,7 +1076,7 @@ impl<'a> OwnProfile<'a> {
         let mut aliases = self.held_aliases()?;
         let mut more = false;
         for a in &theirs.aliases {
-            if aliases.iter().any(|h| h.alias == a.alias) || a.alias == mine.id {
+            if aliases.iter().any(|h| h.alias == a.alias && h.by == a.by) || a.alias == mine.id {
                 continue;
             }
             if !bound.contains(&a.by) || !a.signed() {
@@ -1120,7 +1126,9 @@ impl<'a> OwnProfile<'a> {
     }
 
     /// Takes `theirs` over as the own Profile; the id of `mine`, when
-    /// there was one, becomes its alias, signed with this Device's key.
+    /// there was one, becomes its alias, signed with this Device's key,
+    /// which is bound to it: the entry other people count. The aliases it
+    /// came with count only when a key bound to it made them.
     fn adopt(
         &self,
         theirs: &SignedProfile,
@@ -1128,24 +1136,30 @@ impl<'a> OwnProfile<'a> {
         mine: Option<&Profile>,
     ) -> Result<()> {
         let id = &checked.profile.id;
+        let bound = chain(id, &theirs.first, &[], &theirs.keys).0;
         let mut aliases: Vec<ProfileAlias> = Vec::new();
-        for a in self
-            .held_aliases()?
-            .into_iter()
-            .chain(theirs.aliases.iter().cloned())
-        {
-            if a.alias != *id && a.signed() && !aliases.iter().any(|h| h.alias == a.alias) {
+        let received = theirs
+            .aliases
+            .iter()
+            .filter(|a| bound.contains(&a.by))
+            .cloned();
+        for a in self.held_aliases()?.into_iter().chain(received) {
+            if a.alias != *id
+                && a.signed()
+                && !aliases.iter().any(|h| h.alias == a.alias && h.by == a.by)
+            {
                 aliases.push(a);
             }
         }
+        let me = self.me()?;
         if let Some(mine) = mine
             && mine.id != *id
-            && !aliases.iter().any(|a| a.alias == mine.id)
+            && !aliases.iter().any(|a| a.alias == mine.id && a.by == me)
         {
             aliases.push(ProfileAlias {
                 alias: mine.id.clone(),
                 to: id.clone(),
-                by: self.me()?,
+                by: me,
                 sig: self.store.signing_key()?.sign(&alias_bytes(&mine.id, id)),
             });
         }
@@ -1197,7 +1211,7 @@ impl<'a> OwnProfile<'a> {
             theirs
                 .aliases
                 .iter()
-                .filter(|a| a.alias != id && a.signed())
+                .filter(|a| a.alias != id && bound.contains(&a.by) && a.signed())
                 .cloned()
                 .collect(),
         )?;
@@ -1262,12 +1276,17 @@ impl<'a> OwnProfile<'a> {
         if id == mine.id {
             return Ok(());
         }
+        // This Device's key is bound to the Profile given up only on the
+        // Devices that held it: the entry tells them which one is kept,
+        // and the Device that gave it up signs it again on taking the kept
+        // one over, for other people.
         let mut aliases = self.held_aliases()?;
-        if !aliases.iter().any(|a| a.alias == id) {
+        let me = self.me()?;
+        if !aliases.iter().any(|a| a.alias == id && a.by == me) {
             aliases.push(ProfileAlias {
                 alias: id.clone(),
                 to: mine.id.clone(),
-                by: self.me()?,
+                by: me,
                 sig: self.store.signing_key()?.sign(&alias_bytes(&id, &mine.id)),
             });
         }
@@ -1278,6 +1297,12 @@ impl<'a> OwnProfile<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    thread_local! {
+        /// How many records [`Profile::parse`] read on this thread: a
+        /// received record is not read before its signature holds.
+        pub(super) static PARSED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    }
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
 
@@ -1697,6 +1722,64 @@ mod tests {
         let good = signed_by(&desk_key, sent.keys.clone()).to_json();
         assert_eq!(own.take(Some(&good), &from)?, ProfileTaken::Updated);
         assert_eq!(own.get()?.ok_or("a Profile")?.name, "Mallory");
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_whose_signature_fails_is_refused_before_it_is_read() -> TestResult {
+        let key = SigningKey::from_seed([9; 32]);
+        let key_b64 = BASE64.encode(key.public_key());
+        let record = json!({
+            "id": "e".repeat(32),
+            "name": "Eve",
+            "picture": format!("*not base64*{}", "A".repeat(1000)),
+            "version": 1,
+        })
+        .to_string();
+        let sent = |sig: String| SignedProfile {
+            record: record.clone(),
+            signer: key_b64.clone(),
+            sig,
+            first: key_b64.clone(),
+            keys: Vec::new(),
+            aliases: Vec::new(),
+            fresh: false,
+        };
+        let before = PARSED.with(|n| n.get());
+        assert!(check(&sent(key.sign(&record_bytes("{}")))).is_none());
+        assert_eq!(PARSED.with(|n| n.get()), before, "nothing of it was read");
+        // Signed, the same record is read, and refused for its picture.
+        assert!(check(&sent(key.sign(&record_bytes(&record)))).is_none());
+        assert!(PARSED.with(|n| n.get()) > before);
+        Ok(())
+    }
+
+    #[test]
+    fn taking_over_or_restoring_keeps_only_aliases_a_bound_key_made() -> TestResult {
+        let desk = device(2, "Desk")?;
+        OwnProfile::new(&desk).rename("Ada")?;
+        let desk_id = id(&desk)?;
+        let stranger = SigningKey::from_seed([9; 32]);
+        let stranger_id = "a".repeat(32);
+        let forged = ProfileAlias {
+            alias: stranger_id.clone(),
+            to: desk_id.clone(),
+            by: BASE64.encode(stranger.public_key()),
+            sig: stranger.sign(&alias_bytes(&stranger_id, &desk_id)),
+        };
+        assert!(forged.signed());
+        desk.set_local_setting(ALIASES, &Value::Array(vec![forged.to_json()]).to_string())?;
+        // A Device with the defaults takes the computer's over.
+        let phone = device(1, "Pixel 7")?;
+        exchange(&phone, &desk)?;
+        assert_eq!(id(&phone)?, desk_id);
+        assert!(!OwnProfile::new(&phone).aliases()?.contains(&stranger_id));
+        // A Backup carrying it restores none either.
+        let pad = device(3, "Pad")?;
+        let sent = OwnProfile::new(&desk).signed()?.ok_or("signed")?.to_json();
+        assert!(OwnProfile::new(&pad).restore(Some(&sent), &desk.signing_key()?)?);
+        assert_eq!(id(&pad)?, desk_id);
+        assert!(OwnProfile::new(&pad).aliases()?.is_empty());
         Ok(())
     }
 

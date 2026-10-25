@@ -223,6 +223,35 @@ void main() {
       expect(ann.personShown(id).version, 2);
     });
 
+    test('a record whose signature fails is refused before it is read', () {
+      final key = SigningKey.generate();
+      final record = jsonEncode({
+        'id': 'e' * 32,
+        'name': 'Eve',
+        'picture': '*not base64*${'A' * 1000}',
+        'version': 1,
+      });
+      final bad = SignedProfile(
+        record: record,
+        signer: key.publicBase64,
+        sig: key.sign(profileRecordBytes('{}')),
+        first: key.publicBase64,
+      ).toJson();
+      expect(ann.isOwnPerson(''), isFalse, reason: 'the own Profile read');
+      final before = Profile.parsed;
+      expect(ann.takePerson(bad), PersonTaken.refused);
+      expect(Profile.parsed, before, reason: 'nothing of it was read');
+      // Signed, the same record is read, and refused for its picture.
+      final signed = SignedProfile(
+        record: record,
+        signer: key.publicBase64,
+        sig: key.sign(profileRecordBytes(record)),
+        first: key.publicBase64,
+      ).toJson();
+      expect(ann.takePerson(signed), PersonTaken.refused);
+      expect(Profile.parsed, greaterThan(before));
+    });
+
     test('a Profile shown before an invite must hold the key of the Device '
         'that sent it', () {
       expect(
@@ -487,6 +516,96 @@ void main() {
       final note = acceptSentItem(ben, openSentItem(ben, file).item)!;
       expect(ben.wroteBy(note, PersonFilter(people: {idOf(ann)})), isTrue);
       expect(ben.wroteBy(note, const PersonFilter(me: true)), isFalse);
+    });
+
+    test('a received link another person\'s Device wrote marks nothing', () {
+      final area = household();
+      final cid = device(clock, 'Cid');
+      final cids = acceptSentItem(
+        ann,
+        openSentItem(ann, sendNote(cid, Notes(cid).capture('Hi').id)).item,
+      )!;
+      final cidKey = base64.encode(cid.signingKey.publicKey);
+      expect(ann.authorOf(cids)!.id, idOf(cid));
+      // Ben's modified app marks his Notes as Ann's and as Cid's.
+      final asAnn = Notes(ben).capture('Eggs', place: area);
+      final asCid = Notes(ben).capture('Flour', place: area);
+      String link(String key, String person) =>
+          jsonEncode({'from': key, 'id': 'x', 'profile': person, 'version': 1});
+      ben.append(
+        asAnn.id,
+        'received',
+        link(base64.encode(ann.signingKey.publicKey), idOf(ann)),
+      );
+      ben.append(asCid.id, 'received', link(cidKey, idOf(cid)));
+      exchange(ben, ann);
+      expect(ann.authorOf(asAnn.id)!.id, idOf(ben));
+      expect(ann.wroteBy(asAnn.id, const PersonFilter(me: true)), isFalse);
+      expect(ann.authorOf(asCid.id)!.id, idOf(ben));
+    });
+
+    test('a newer received link another person\'s Device wrote does not '
+        'hide the one accepting wrote', () {
+      final area = household();
+      final cid = device(clock, 'Cid');
+      final cids = acceptSentItem(
+        ann,
+        openSentItem(ann, sendNote(cid, Notes(cid).capture('Hi').id)).item,
+      )!;
+      // A Manager can write on Ann's Note too.
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      Notes(ann).file(cids, area);
+      exchange(ben, ann);
+      final forged = jsonEncode({
+        'from': base64.encode(ann.signingKey.publicKey),
+        'id': 'x',
+        'profile': idOf(ann),
+        'version': 1,
+      });
+      ben.append(cids, 'received', forged);
+      exchange(ben, ann);
+      expect(ann.current(cids, 'received'), forged, reason: 'it landed');
+      expect(ann.authorOf(cids)!.id, idOf(cid));
+    });
+
+    test('a Sent Item carrying the receiver\'s Profile id, or a third '
+        'person\'s, shows its sender by the key', () {
+      final eve = device(clock, 'Eve');
+      final cid = device(clock, 'Cid');
+      for (final from in [eve, cid]) {
+        acceptSentItem(
+          ben,
+          openSentItem(ben, sendNote(from, Notes(from).capture('Hi').id)).item,
+        );
+      }
+      String forgedAs(String id, String name) {
+        final record = Profile(id: id, name: name, version: 9).encode();
+        final copy = SignedProfile(
+          record: record,
+          signer: eve.signingKey.publicBase64,
+          sig: eve.signingKey.sign(profileRecordBytes(record)),
+          first: eve.signingKey.publicBase64,
+        );
+        final file = encodeSentItem(
+          SentItem(
+            id: 'as-$name',
+            version: 1,
+            from: eve.ownKeyRecord,
+            profile: copy,
+            text: 'Hello from $name',
+          ),
+          eve.signingKey,
+        );
+        return acceptSentItem(ben, openSentItem(ben, file).item)!;
+      }
+
+      final asBen = forgedAs(idOf(ben), 'Ben');
+      expect(ben.authorOf(asBen)?.id, idOf(eve));
+      expect(ben.wroteBy(asBen, const PersonFilter(me: true)), isFalse);
+      final asCid = forgedAs(idOf(cid), 'Cid');
+      expect(ben.authorOf(asCid)?.id, idOf(eve));
+      expect(ben.wroteBy(asCid, PersonFilter(people: {idOf(cid)})), isFalse);
     });
   });
 

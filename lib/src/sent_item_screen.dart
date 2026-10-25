@@ -92,7 +92,7 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
                   key: ValueKey('send-to-${r.id}'),
                   contentPadding: EdgeInsets.zero,
                   value: i,
-                  title: Text(t.sendEncrypted(r.name)),
+                  title: Text(t.sendEncrypted(profileDisplayName(t, r.name))),
                   secondary: const Icon(Icons.lock_outline),
                 ),
               RadioListTile<int>(

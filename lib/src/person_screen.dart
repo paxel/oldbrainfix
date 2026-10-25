@@ -92,11 +92,38 @@ class _PersonScreenState extends State<PersonScreen> {
 
   PersonOverride? get _override => widget.store.personOverride(widget.id);
 
+  /// What the page shows of the person, read when it opens and when
+  /// their Profile or the Override changes rather than on every build, so
+  /// a picture keeps its bytes and is not decoded again.
+  late Profile _theirs;
+  late Profile _shown;
+  String? _code;
+  var _verified = false;
+
   @override
   void initState() {
     super.initState();
     _nameFocus.addListener(_focusChanged);
     widget.store.addProfileListener(_changed);
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(PersonScreen old) {
+    super.didUpdateWidget(old);
+    if (old.store != widget.store) {
+      old.store.removeProfileListener(_changed);
+      widget.store.addProfileListener(_changed);
+    }
+    if (old.store != widget.store || old.id != widget.id) _read();
+  }
+
+  void _read() {
+    final store = widget.store;
+    _theirs = store.personTheirs(widget.id);
+    _shown = store.personShown(widget.id);
+    _code = store.personCode(widget.id);
+    _verified = store.personVerified(widget.id);
   }
 
   @override
@@ -114,6 +141,7 @@ class _PersonScreenState extends State<PersonScreen> {
   void _changed() {
     if (!mounted) return;
     setState(() {
+      _read();
       if (_nameFocus.hasFocus) return;
       final kept = _override?.name ?? '';
       if (_name.text != kept) _name.text = kept;
@@ -159,7 +187,7 @@ class _PersonScreenState extends State<PersonScreen> {
       return;
     }
     widget.store.verifyPerson(widget.id, code);
-    setState(() {});
+    setState(_read);
   }
 
   /// Opens All Notes with only this person's Notes (#53).
@@ -202,7 +230,7 @@ class _PersonScreenState extends State<PersonScreen> {
     if (picked == null || !mounted) return;
     if (picked == 'theirs') {
       widget.store.setOverridePicture(widget.id, null);
-      setState(() {});
+      setState(_read);
       return;
     }
     final source = picked == 'pick'
@@ -216,17 +244,16 @@ class _PersonScreenState extends State<PersonScreen> {
     );
     if (made == null || !mounted) return;
     widget.store.setOverridePicture(widget.id, made);
-    setState(() {});
+    setState(_read);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final store = widget.store;
-    final theirs = store.personTheirs(widget.id);
-    final shown = store.personShown(widget.id);
-    final code = store.personCode(widget.id);
-    final verified = store.personVerified(widget.id);
+    final theirs = _theirs;
+    final shown = _shown;
+    final code = _code;
+    final verified = _verified;
     final theirName = profileDisplayName(t, theirs.name);
     final text = Theme.of(context).textTheme;
     return PopScope(
@@ -338,15 +365,52 @@ class _PersonScreenState extends State<PersonScreen> {
 
 /// The People of the Profile page (#52): every Profile kept here, as
 /// the user sees them, each opening its Profile.
-class PeopleSection extends StatelessWidget {
+class PeopleSection extends StatefulWidget {
   final Store store;
 
   const PeopleSection({super.key, required this.store});
 
   @override
+  State<PeopleSection> createState() => _PeopleSectionState();
+}
+
+class _PeopleSectionState extends State<PeopleSection> {
+  /// The people as they show, read when their Profiles change rather than
+  /// on every build, so a picture keeps its bytes and is not decoded
+  /// again.
+  late List<Profile> _people;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addProfileListener(_changed);
+    _people = widget.store.peopleShown;
+  }
+
+  @override
+  void didUpdateWidget(PeopleSection old) {
+    super.didUpdateWidget(old);
+    if (old.store == widget.store) return;
+    old.store.removeProfileListener(_changed);
+    widget.store.addProfileListener(_changed);
+    _people = widget.store.peopleShown;
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeProfileListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    setState(() => _people = widget.store.peopleShown);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = context.t;
-    final people = store.peopleShown;
+    final people = _people;
     return SettingsSection(
       children: [
         if (people.isEmpty)

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:characters/characters.dart';
 import 'package:crypto/crypto.dart';
 import 'package:image/image.dart' as img;
+import 'package:meta/meta.dart';
 
 import 'backup.dart';
 import 'entry.dart';
@@ -83,9 +84,15 @@ class Profile {
     'version': version,
   });
 
+  /// How many records [parse] read; only tests look at it, to see that a
+  /// received record is not read before its signature holds.
+  @visibleForTesting
+  static int parsed = 0;
+
   /// The record [text] holds, its name sanitised again; null when it is
   /// none.
   static Profile? parse(String text) {
+    parsed++;
     try {
       final json = jsonDecode(text);
       if (json is! Map<String, Object?>) return null;
@@ -585,14 +592,11 @@ class SignedProfile {
 /// joined to its binding, and its picture made again for the screen.
 typedef _Checked = ({Profile profile, List<ProfileKey> keys, Uint8List? shown});
 
-/// [sent] checked: its binding from the first key, its signer bound,
-/// the signature over its record, the record, and its picture made
-/// again; null when any of it fails.
+/// [sent] checked: the signature over its record's bytes as sent before
+/// anything of the record is read, then the record, its binding from the
+/// first key, its signer bound, and its picture made again; null when any
+/// of it fails.
 _Checked? _check(SignedProfile sent) {
-  final profile = Profile.parse(sent.record);
-  if (profile == null) return null;
-  final (bound, keys) = _chain(profile.id, sent.first, sent.keys);
-  if (!bound.contains(sent.signer)) return null;
   if (!verifySignature(
     base64.decode(sent.signer),
     profileRecordBytes(sent.record),
@@ -600,6 +604,10 @@ _Checked? _check(SignedProfile sent) {
   )) {
     return null;
   }
+  final profile = Profile.parse(sent.record);
+  if (profile == null) return null;
+  final (bound, keys) = _chain(profile.id, sent.first, sent.keys);
+  if (!bound.contains(sent.signer)) return null;
   Uint8List? shown;
   if (profile.picture case final picture?) {
     shown = receivedProfilePicture(picture);
@@ -615,6 +623,13 @@ int _compareUtf8(String a, String b) {
     if (x[i] != y[i]) return x[i] - y[i];
   }
   return x.length - y.length;
+}
+
+/// Aliases in the order they are kept and sent: by the id given up, then
+/// by the key that made the alias.
+int _compareAliases(ProfileAlias a, ProfileAlias b) {
+  final byAlias = _compareUtf8(a.alias, b.alias);
+  return byAlias != 0 ? byAlias : _compareUtf8(a.by, b.by);
 }
 
 /// Whether the record [a] replaces [b]: a higher version, or at the same
@@ -826,8 +841,7 @@ extension OwnProfile on Store {
       : setLocalSetting(_keys, jsonEncode([for (final k in keys) k.toJson()]));
 
   void _keepAliases(Iterable<ProfileAlias> aliases) {
-    final sorted = aliases.toList()
-      ..sort((a, b) => _compareUtf8(a.alias, b.alias));
+    final sorted = aliases.toList()..sort(_compareAliases);
     sorted.isEmpty
         ? removeLocalSetting(_aliases)
         : setLocalSetting(
@@ -1002,12 +1016,12 @@ extension OwnProfile on Store {
         jsonEncode([for (final k in held) k.toJson()])) {
       _keepKeys(keys);
     }
-    final aliases = {for (final a in _heldAliases) a.alias: a};
+    final aliases = {for (final a in _heldAliases) (a.alias, a.by): a};
     var more = false;
     for (final a in theirs.aliases) {
-      if (aliases.containsKey(a.alias) || a.alias == mine.id) continue;
+      if (aliases.containsKey((a.alias, a.by)) || a.alias == mine.id) continue;
       if (!bound.contains(a.by) || !a.signed) continue;
-      aliases[a.alias] = a;
+      aliases[(a.alias, a.by)] = a;
       more = true;
     }
     if (more) {
@@ -1015,8 +1029,8 @@ extension OwnProfile on Store {
       taken = ProfileTaken.updated;
     }
     final asked = SignedProfile.fromJson(_askedJson);
-    if (asked != null &&
-        aliases.containsKey(Profile.parse(asked.record)?.id ?? '')) {
+    final askedId = asked == null ? null : Profile.parse(asked.record)?.id;
+    if (askedId != null && aliases.values.any((a) => a.alias == askedId)) {
       removeLocalSetting(_asked);
       taken = ProfileTaken.updated;
     }
@@ -1051,19 +1065,31 @@ extension OwnProfile on Store {
   }
 
   /// Takes [theirs] over as the own Profile; the id of [mine], when there
-  /// was one, becomes its alias, signed with this Device's key.
+  /// was one, becomes its alias, signed with this Device's key, which is
+  /// bound to it: the entry other people count. The aliases it came with
+  /// count only when a key bound to it made them.
   void _adopt(SignedProfile theirs, _Checked checked, Profile? mine) {
     final id = checked.profile.id;
-    final aliases = <String, ProfileAlias>{};
-    for (final a in [..._heldAliases, ...theirs.aliases]) {
-      if (a.alias != id && a.signed) aliases.putIfAbsent(a.alias, () => a);
+    final bound = _chain(id, theirs.first, theirs.keys).$1;
+    final aliases = <(String, String), ProfileAlias>{};
+    for (final a in _heldAliases) {
+      if (a.alias != id && a.signed) aliases[(a.alias, a.by)] = a;
     }
-    if (mine != null && mine.id != id && !aliases.containsKey(mine.id)) {
-      aliases[mine.id] = ProfileAlias(
-        alias: mine.id,
-        to: id,
-        by: signingKey.publicBase64,
-        sig: signingKey.sign(profileAliasBytes(mine.id, id)),
+    for (final a in theirs.aliases) {
+      if (a.alias != id && bound.contains(a.by) && a.signed) {
+        aliases.putIfAbsent((a.alias, a.by), () => a);
+      }
+    }
+    final me = signingKey.publicBase64;
+    if (mine != null && mine.id != id) {
+      aliases.putIfAbsent(
+        (mine.id, me),
+        () => ProfileAlias(
+          alias: mine.id,
+          to: id,
+          by: me,
+          sig: signingKey.sign(profileAliasBytes(mine.id, id)),
+        ),
       );
     }
     _keepReceived(theirs, checked);
@@ -1113,7 +1139,7 @@ extension OwnProfile on Store {
     _keepKeys(keys);
     _keepAliases([
       for (final a in theirs.aliases)
-        if (a.alias != id && a.signed) a,
+        if (a.alias != id && bound.contains(a.by) && a.signed) a,
     ]);
     if (theirs.fresh) {
       removeLocalSetting(_nameChosen);
@@ -1169,9 +1195,13 @@ extension OwnProfile on Store {
       if (!keepMine) {
         _adopt(asked, checked, mine);
       } else if (id != mine.id) {
-        final aliases = {for (final a in _heldAliases) a.alias: a};
+        // This Device's key is bound to the Profile given up only on the
+        // Devices that held it: the entry tells them which one is kept,
+        // and the Device that gave it up signs it again on taking the
+        // kept one over, for other people.
+        final aliases = {for (final a in _heldAliases) (a.alias, a.by): a};
         aliases.putIfAbsent(
-          id,
+          (id, signingKey.publicBase64),
           () => ProfileAlias(
             alias: id,
             to: mine.id,

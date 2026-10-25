@@ -3794,7 +3794,7 @@ fn send_form(
         ui.radio_value(
             picked,
             Some(i),
-            RichText::new(t.send_encrypted(&r.name)).color(text),
+            RichText::new(t.send_encrypted(profile_view::display_name(t, &r.name))).color(text),
         );
     }
     ui.radio_value(picked, None, RichText::new(t.send_anyone()).color(text));

@@ -151,6 +151,17 @@ void main() {
       expect(openSentItem(ann, bytes).encrypted, isTrue);
     });
 
+    testWidgets('to a person without a name: "No name", encrypted', (
+      tester,
+    ) async {
+      meet(phone, ann, '');
+      final note = Notes(phone).capture('Surprise party');
+      await edit(tester, note);
+      await tester.tap(find.byTooltip('Send this Note'));
+      await tester.pumpAndSettle();
+      expect(find.text('No name, encrypted'), findsOneWidget);
+    });
+
     testWidgets('sent before: an update, or a cancellation instead', (
       tester,
     ) async {

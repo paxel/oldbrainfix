@@ -98,6 +98,22 @@ fn drop_file(harness: &mut Harness<'_, App>, path: &std::path::Path) {
 }
 
 #[test]
+fn a_person_without_a_name_shows_as_no_name() -> TestResult {
+    let desk = store(1, "Ada")?;
+    let ben = store(2, "Ben")?;
+    meet(&desk, &ben, "")?;
+    let note = Notes::new(&desk).capture("Dentist on Friday", None, None)?;
+    let mut app = App::new(desk, "en");
+    app.select(Selection::All);
+    app.select_note(&note.id);
+    let mut harness = window(app);
+    harness.get_by_label("Send…").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "No name, encrypted"));
+    Ok(())
+}
+
+#[test]
 fn a_note_is_saved_to_send_encrypted_to_a_person_met_or_signed_only() -> TestResult {
     let desk = store(1, "Ada")?;
     let ben = store(2, "Ben")?;

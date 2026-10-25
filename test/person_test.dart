@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/notes_screen.dart';
 import 'package:oldbrainfix/src/nudge_screen.dart';
@@ -302,6 +304,90 @@ void main() {
     final empty = find.byKey(const ValueKey('peopleEmpty'));
     await tester.ensureVisible(empty);
     expect(empty, findsOneWidget);
+  });
+
+  group('pictures read on change, not on every build', () {
+    /// The image the picture under [key] shows: the same as before when
+    /// its bytes are the same, so it is not decoded again.
+    ImageProvider imageUnder(WidgetTester tester, Key key) => tester
+        .widget<Image>(
+          find.descendant(of: find.byKey(key), matching: find.byType(Image)),
+        )
+        .image;
+
+    /// [child] under a parent that builds it again when [rebuild] is
+    /// called, with nothing changed.
+    late void Function() rebuild;
+    Widget again(Widget Function() child) => StatefulBuilder(
+      builder: (context, setState) {
+        rebuild = () => setState(() {});
+        return child();
+      },
+    );
+
+    Future<Uint8List> forMe() async {
+      final size = pictureSize(halvesPng)!;
+      return makeProfilePicture(
+        halvesPng,
+        left: 0,
+        top: 0,
+        size: size.height < size.width ? size.height : size.width,
+      )!;
+    }
+
+    testWidgets('on a person\'s Profile', (tester) async {
+      ann.setOverridePicture(benId, await forMe());
+      await page(tester, again(person));
+      const key = ValueKey('overridePicture');
+      final before = imageUnder(tester, key);
+      rebuild();
+      await tester.pump();
+      expect(imageUnder(tester, key), before);
+      // A change shows at once.
+      ann.setOverrideName(benId, 'Mum');
+      await tester.pump();
+      expect(find.text('Mum'), findsWidgets);
+    });
+
+    testWidgets('in the chips of the person filter', (tester) async {
+      ann.setOverridePicture(benId, await forMe());
+      await page(
+        tester,
+        again(
+          () => Scaffold(
+            body: PersonFilterChips(
+              store: ann,
+              filter: PersonFilter(people: {benId}),
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      );
+      final key = ValueKey('personChip-$benId');
+      final before = imageUnder(tester, key);
+      rebuild();
+      await tester.pump();
+      expect(imageUnder(tester, key), before);
+      ann.setOverrideName(benId, 'Mum');
+      await tester.pump();
+      expect(find.text('Mum'), findsOneWidget);
+    });
+
+    testWidgets('in People', (tester) async {
+      ann.setOverridePicture(benId, await forMe());
+      await page(
+        tester,
+        again(() => Scaffold(body: PeopleSection(store: ann))),
+      );
+      final key = ValueKey('people-$benId');
+      final before = imageUnder(tester, key);
+      rebuild();
+      await tester.pump();
+      expect(imageUnder(tester, key), before);
+      ann.setOverrideName(benId, 'Mum');
+      await tester.pump();
+      expect(find.text('Mum'), findsOneWidget);
+    });
   });
 
   testWidgets('fits a phone in German', (tester) async {

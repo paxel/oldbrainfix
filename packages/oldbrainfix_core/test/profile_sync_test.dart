@@ -151,6 +151,73 @@ void main() {
       expect(held(tablet), held(desk));
       expect(tablet.ownProfileAliases, contains(shared));
     });
+    test('"Keep mine" reaches the people who knew the Profile given up, '
+        'answered on the host or on the joiner', () {
+      for (final onHost in [true, false]) {
+        final clock = ticking();
+        final phone = device(clock, 'Pixel 7')..renameOwnProfile('Ada L.');
+        final desk = device(clock, 'Desk')..renameOwnProfile('Ada');
+        final cid = device(clock, 'Cid');
+        // Cid shares an Area with the phone and keeps its Profile.
+        final area = phone.share(Places(phone).addArea('Garden').id);
+        exchange(cid, phone, inviting: Invite(area, role: AreaRole.member));
+        final phoneId = phone.ownProfile!.id, deskId = desk.ownProfile!.id;
+        expect(cid.resolvePerson(phoneId), phoneId);
+        // The phone gives its Profile up for the computer's.
+        if (onHost) {
+          exchange(phone, desk);
+        } else {
+          exchange(desk, phone);
+        }
+        desk.answerProfileQuestion(keepMine: true);
+        for (var i = 0; i < 3; i++) {
+          exchange(phone, desk);
+        }
+        expect(phone.ownProfile!.id, deskId);
+        expect(
+          phone.localSetting('profile:aliases'),
+          desk.localSetting('profile:aliases'),
+        );
+        exchange(cid, phone);
+        expect(cid.resolvePerson(phoneId), deskId, reason: 'onHost: $onHost');
+        expect(cid.personShown(phoneId).name, 'Ada');
+      }
+    });
+  });
+
+  group('aliases', () {
+    test('taking a Profile over or restoring it keeps only the aliases a '
+        'key bound to it made', () {
+      final clock = ticking();
+      final desk = device(clock, 'Desk')..renameOwnProfile('Ada');
+      final deskId = desk.ownProfile!.id;
+      final stranger = SigningKey.generate();
+      final strangerId = 'a' * 32;
+      final forgedAlias = ProfileAlias(
+        alias: strangerId,
+        to: deskId,
+        by: stranger.publicBase64,
+        sig: stranger.sign(profileAliasBytes(strangerId, deskId)),
+      );
+      expect(forgedAlias.signed, isTrue);
+      desk.setLocalSetting(
+        'profile:aliases',
+        jsonEncode([forgedAlias.toJson()]),
+      );
+      // A Device with the defaults takes the computer's over.
+      final phone = device(clock, 'Pixel 7');
+      exchange(phone, desk);
+      expect(phone.ownProfile!.id, deskId);
+      expect(phone.ownProfileAliases, isNot(contains(strangerId)));
+      // A Backup carrying it restores none either.
+      final restored = device(clock, 'Pad');
+      expect(
+        restored.restoreOwnProfile(desk.ownProfileJson, old: desk.signingKey),
+        isTrue,
+      );
+      expect(restored.ownProfile!.id, deskId);
+      expect(restored.ownProfileAliases, isEmpty);
+    });
   });
 
   group('updates', () {

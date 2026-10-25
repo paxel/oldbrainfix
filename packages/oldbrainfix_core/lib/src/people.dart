@@ -331,10 +331,10 @@ extension People on Store {
       held: held.sent.keys,
     );
     if (!bound.contains(theirs.signer)) return PersonTaken.refused;
-    final aliases = {for (final a in held.sent.aliases) a.alias: a};
+    final aliases = {for (final a in held.sent.aliases) (a.alias, a.by): a};
     for (final a in theirs.aliases) {
-      if (a.alias == id || aliases.containsKey(a.alias)) continue;
-      if (bound.contains(a.by) && a.signed) aliases[a.alias] = a;
+      if (a.alias == id || aliases.containsKey((a.alias, a.by))) continue;
+      if (bound.contains(a.by) && a.signed) aliases[(a.alias, a.by)] = a;
     }
     final kept = Profile.parse(held.sent.record);
     final newer =
@@ -361,7 +361,7 @@ extension People on Store {
   }
 
   static List<ProfileAlias> _sortedAliases(Iterable<ProfileAlias> aliases) =>
-      aliases.toList()..sort((a, b) => _compareUtf8(a.alias, b.alias));
+      aliases.toList()..sort(_compareAliases);
 
   void _keepPerson(
     SignedProfile sent,
@@ -562,8 +562,15 @@ extension People on Store {
   /// as their Profile shows without the Override, or nobody known.
   _Writer _writerOf(String entity) {
     if (_receivedFrom(entity) case (:final key, :final person)) {
-      if (_own.bound.contains(key) || isOwnPerson(person)) return const _Own();
-      return _theirs(_shownFor(key, person));
+      if (_own.bound.contains(key)) return const _Own();
+      // The id counts only when a Profile kept under it binds the key:
+      // a Sent Item carrying one's own id, or a third person's, is shown
+      // by its key alone.
+      final target = resolvePerson(person);
+      final kept = _people.byId.values.any(
+        (h) => h.bound.contains(key) && resolvePerson(h.id) == target,
+      );
+      return _theirs(_shownFor(key, kept ? person : null));
     }
     String? device;
     for (final e in history(entity)) {
@@ -587,9 +594,16 @@ extension People on Store {
       author == null ? const _Unknown() : _Theirs(author);
 
   /// The sender's key and Profile id the Note [entity] keeps from the
-  /// Sent Item it was accepted from; null for any other.
+  /// Sent Item it was accepted from; null for any other. Only a link one
+  /// of the user's own Devices wrote counts: another person's Device in
+  /// a Shared Area could write any.
   ({String key, String person})? _receivedFrom(String entity) {
-    final raw = current(entity, 'received');
+    Entry? held;
+    for (final e in history(entity)) {
+      if (e.field != 'received' || !_writtenByOwn(e.device)) continue;
+      if (held == null || Store.latestWins(e, held) > 0) held = e;
+    }
+    final raw = held?.value;
     if (raw == null) return null;
     try {
       if (jsonDecode(raw) case {

@@ -21,6 +21,8 @@ dependencies:
   # in pure Dart, the same code for a picture chosen here and one
   # received. MIT.
   image: ^4.3.0
+  # @visibleForTesting on the counter a test reads. BSD-3-Clause.
+  meta: ^1.16.0
   qr: ^4.0.0
   sqlite3: ^3.0.0
 

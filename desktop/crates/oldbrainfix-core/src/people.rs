@@ -10,6 +10,7 @@
 //! user compared its short code in person (#51); it stays on this
 //! Device and is kept through every newer record.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Value, json};
 
 use crate::Result;
-use crate::entry::dart_iso;
+use crate::entry::{Entry, dart_iso};
 use crate::notes::Note;
 use crate::profile::{
     ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SentProfile,
@@ -404,18 +405,19 @@ impl Store {
         if !bound.contains(&theirs.signer) {
             return Ok(PersonTaken::Refused);
         }
-        let mut aliases: BTreeMap<String, ProfileAlias> = held
+        let mut aliases: BTreeMap<(String, String), ProfileAlias> = held
             .sent
             .aliases
             .iter()
-            .map(|a| (a.alias.clone(), a.clone()))
+            .map(|a| ((a.alias.clone(), a.by.clone()), a.clone()))
             .collect();
         for a in &theirs.aliases {
-            if a.alias == id || aliases.contains_key(&a.alias) {
+            let at = (a.alias.clone(), a.by.clone());
+            if a.alias == id || aliases.contains_key(&at) {
                 continue;
             }
             if bound.contains(&a.by) && a.signed() {
-                aliases.insert(a.alias.clone(), a.clone());
+                aliases.insert(at, a.clone());
             }
         }
         let newer = match Profile::parse(&held.sent.record) {
@@ -704,10 +706,22 @@ impl Store {
     /// as their Profile shows without the Override, or nobody known.
     fn writer_of(&self, entity: &str) -> Result<Writer> {
         if let Some((key, person)) = self.received_from(entity)? {
-            if self.own_keys()?.bound.contains(&key) || self.is_own_person(&person)? {
+            if self.own_keys()?.bound.contains(&key) {
                 return Ok(Writer::Own);
             }
-            return Ok(Writer::theirs(self.shown_for(Some(&key), Some(person))?));
+            // The id counts only when a Profile kept under it binds the
+            // key: a Sent Item carrying one's own id, or a third
+            // person's, is shown by its key alone.
+            let target = self.resolve_person(&person)?;
+            let mut kept = false;
+            for held in self.people_index()?.by_id.values() {
+                if held.bound.contains(&key) && self.resolve_person(&held.profile.id)? == target {
+                    kept = true;
+                    break;
+                }
+            }
+            let named = kept.then_some(person);
+            return Ok(Writer::theirs(self.shown_for(Some(&key), named)?));
         }
         let Some(device) = self
             .history(entity)?
@@ -743,9 +757,23 @@ impl Store {
     }
 
     /// The sender's key and Profile id the Note `entity` keeps from the
-    /// Sent Item it was accepted from; none for any other.
+    /// Sent Item it was accepted from; none for any other. Only a link
+    /// one of the user's own Devices wrote counts: another person's
+    /// Device in a Shared Area could write any.
     fn received_from(&self, entity: &str) -> Result<Option<(String, String)>> {
-        let Some(raw) = self.current(entity, "received")? else {
+        let mut held: Option<Entry> = None;
+        for e in self.history(entity)? {
+            if e.field != "received" || !self.written_by_own(&e.device)? {
+                continue;
+            }
+            if held
+                .as_ref()
+                .is_none_or(|h| Store::latest_wins(&e, h) == Ordering::Greater)
+            {
+                held = Some(e);
+            }
+        }
+        let Some(raw) = held.and_then(|e| e.value) else {
             return Ok(None);
         };
         let Ok(link) = serde_json::from_str::<Value>(&raw) else {
@@ -819,7 +847,7 @@ fn placeholder(id: String) -> Profile {
 }
 
 fn sorted_aliases(mut aliases: Vec<ProfileAlias>) -> Vec<ProfileAlias> {
-    aliases.sort_by(|a, b| a.alias.cmp(&b.alias));
+    aliases.sort_by(|a, b| a.alias.cmp(&b.alias).then_with(|| a.by.cmp(&b.by)));
     aliases
 }
 
@@ -1224,6 +1252,184 @@ mod tests {
         assert_eq!(ann.resolve_person(&ben_id)?, ben_id);
         assert_eq!(ann.person_shown(&ben_id)?.name, "Ben");
         assert_eq!(ann.author_of(&note)?.map(|p| p.name), Some("Ben".into()));
+        Ok(())
+    }
+
+    /// Ben's phone syncs with Ann's desk, as people sharing an Area.
+    fn sync(ben: &Store, ann: &Store) -> TestResult {
+        let request = sync_request(ben, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
+        let (answer, _) = answer_sync(ann, &request, "Desk")?.ok_or("an answer")?;
+        apply_answer_as(ben, &answer, true, None)?;
+        Ok(())
+    }
+
+    /// The Note `from` sends, accepted on `to`.
+    fn accepted(
+        to: &Store,
+        file: &[u8],
+    ) -> std::result::Result<String, Box<dyn std::error::Error>> {
+        let opened = to.open_sent_item(file)?.map_err(|_| "a Sent Item")?;
+        Ok(to.accept_sent_item(&opened.item, false)?.ok_or("a Note")?)
+    }
+
+    fn sent_from(from: &Store) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let note = Notes::new(from).capture("Hi", None, None)?;
+        Ok(from.send_note(&note.id, None, false)?)
+    }
+
+    /// A `received` link as accepting a Sent Item writes it.
+    fn link(key: &str, person: &str) -> String {
+        json!({"from": key, "id": "x", "profile": person, "version": 1}).to_string()
+    }
+
+    fn key_of(store: &Store) -> std::result::Result<String, Box<dyn std::error::Error>> {
+        Ok(BASE64.encode(store.signing_key()?.public_key()))
+    }
+
+    #[test]
+    fn a_received_link_another_persons_device_wrote_marks_nothing() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let cids = accepted(&ann, &sent_from(&cid)?)?;
+        let cid_id = own_id(&cid)?;
+        assert_eq!(ann.author_of(&cids)?.map(|p| p.id), Some(cid_id.clone()));
+        // Ben's modified app marks his Notes as Ann's and as Cid's.
+        let as_ann = Notes::new(&ben).capture("Eggs", Some(&area), None)?;
+        let as_cid = Notes::new(&ben).capture("Flour", Some(&area), None)?;
+        let ann_link = link(&key_of(&ann)?, &own_id(&ann)?);
+        ben.append(&as_ann.id, "received", Some(&ann_link), None)?;
+        ben.append(
+            &as_cid.id,
+            "received",
+            Some(&link(&key_of(&cid)?, &cid_id)),
+            None,
+        )?;
+        sync(&ben, &ann)?;
+        let ben_id = own_id(&ben)?;
+        assert_eq!(
+            ann.author_of(&as_ann.id)?.map(|p| p.id),
+            Some(ben_id.clone())
+        );
+        assert!(!ann.wrote_by(&as_ann.id, &me())?);
+        assert_eq!(ann.author_of(&as_cid.id)?.map(|p| p.id), Some(ben_id));
+        Ok(())
+    }
+
+    #[test]
+    fn a_newer_received_link_another_persons_device_wrote_hides_nothing() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let cids = accepted(&ann, &sent_from(&cid)?)?;
+        // A Manager can write on Ann's Note too.
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        Notes::new(&ann).file(&cids, &area)?;
+        sync(&ben, &ann)?;
+        let forged = link(&key_of(&ann)?, &own_id(&ann)?);
+        // Later than anything Ann wrote: each Device has a clock of its own.
+        let later = ann.now() + chrono::Duration::hours(1);
+        ben.append(&cids, "received", Some(&forged), Some(later))?;
+        sync(&ben, &ann)?;
+        assert_eq!(ann.current(&cids, "received")?, Some(forged), "it landed");
+        assert_eq!(ann.author_of(&cids)?.map(|p| p.id), Some(own_id(&cid)?));
+        Ok(())
+    }
+
+    #[test]
+    fn a_sent_item_carrying_the_receivers_id_or_a_third_persons_shows_its_key() -> TestResult {
+        let ben = device(2, "Ben")?;
+        let eve = device(5, "Eve")?;
+        let cid = device(3, "Cid")?;
+        accepted(&ben, &sent_from(&eve)?)?;
+        accepted(&ben, &sent_from(&cid)?)?;
+        let forged_as =
+            |id: &str, name: &str| -> std::result::Result<String, Box<dyn std::error::Error>> {
+                let key = eve.signing_key()?;
+                let record = Profile {
+                    id: id.into(),
+                    name: name.into(),
+                    picture: None,
+                    version: 9,
+                }
+                .encode();
+                let copy = SignedProfile {
+                    sig: key.sign(&record_bytes(&record)),
+                    record,
+                    signer: key_of(&eve)?,
+                    first: key_of(&eve)?,
+                    keys: Vec::new(),
+                    aliases: Vec::new(),
+                    fresh: false,
+                };
+                let item = crate::sent::SentItem {
+                    id: format!("as-{name}"),
+                    version: 1,
+                    cancel: false,
+                    from: eve.own_key_record()?,
+                    profile: copy,
+                    text: format!("Hello from {name}"),
+                    sections: Vec::new(),
+                    routines: Vec::new(),
+                };
+                accepted(
+                    &ben,
+                    &crate::sent::encode(&item, &key, &[], &mut |n| Ok(vec![0; n]))?,
+                )
+            };
+        let eve_id = own_id(&eve)?;
+        let as_ben = forged_as(&own_id(&ben)?, "Ben")?;
+        assert_eq!(ben.author_of(&as_ben)?.map(|p| p.id), Some(eve_id.clone()));
+        assert!(!ben.wrote_by(&as_ben, &me())?);
+        let cid_id = own_id(&cid)?;
+        let as_cid = forged_as(&cid_id, "Cid")?;
+        assert_eq!(ben.author_of(&as_cid)?.map(|p| p.id), Some(eve_id));
+        assert!(!ben.wrote_by(&as_cid, &PersonFilter::person(&cid_id))?);
+        Ok(())
+    }
+
+    /// One LAN session between two of one's own Devices: `joiner` joins
+    /// `host`.
+    fn own_sync(joiner: &Store, host: &Store) -> TestResult {
+        let request = sync_request(joiner, &host.version_vector()?, "Phone", "", "")?;
+        let (answer, _) = answer_sync(host, &request, "Desk")?.ok_or("an answer")?;
+        crate::lan::apply_answer(joiner, &answer)?;
+        Ok(())
+    }
+
+    #[test]
+    fn keep_mine_reaches_the_people_who_knew_the_profile_given_up() -> TestResult {
+        for on_host in [true, false] {
+            let phone = device(1, "Ada L.")?;
+            let desk = device(2, "Ada")?;
+            let cid = device(3, "Cid")?;
+            // Cid shares an Area with the phone and keeps its Profile.
+            household(&phone, &cid)?;
+            let (phone_id, desk_id) = (own_id(&phone)?, own_id(&desk)?);
+            assert_eq!(cid.resolve_person(&phone_id)?, phone_id);
+            // The phone gives its Profile up for the computer's.
+            if on_host {
+                own_sync(&phone, &desk)?;
+            } else {
+                own_sync(&desk, &phone)?;
+            }
+            OwnProfile::new(&desk).answer(true)?;
+            for _ in 0..3 {
+                own_sync(&phone, &desk)?;
+            }
+            assert_eq!(own_id(&phone)?, desk_id);
+            assert_eq!(phone.local_setting(ALIASES)?, desk.local_setting(ALIASES)?);
+            sync(&cid, &phone)?;
+            assert_eq!(
+                cid.resolve_person(&phone_id)?,
+                desk_id,
+                "on host: {on_host}"
+            );
+            assert_eq!(cid.person_shown(&phone_id)?.name, "Ada");
+        }
         Ok(())
     }
 

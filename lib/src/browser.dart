@@ -243,7 +243,7 @@ class PersonFilterButton extends StatelessWidget {
 /// Who the person filter keeps, as chips under the search field, each
 /// with ✕ to take that person out; nothing while it keeps everyone, so
 /// Notes never leave the list unseen.
-class PersonFilterChips extends StatelessWidget {
+class PersonFilterChips extends StatefulWidget {
   final Store store;
   final PersonFilter filter;
   final ValueChanged<PersonFilter> onChanged;
@@ -256,7 +256,52 @@ class PersonFilterChips extends StatelessWidget {
   });
 
   @override
+  State<PersonFilterChips> createState() => _PersonFilterChipsState();
+}
+
+class _PersonFilterChipsState extends State<PersonFilterChips> {
+  /// The people of the filter as they show, read when the filter or
+  /// their Profiles change rather than on every build, so a picture
+  /// keeps its bytes and is not decoded again.
+  Map<String, Profile> _shown = const {};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addProfileListener(_changed);
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(PersonFilterChips old) {
+    super.didUpdateWidget(old);
+    if (old.store != widget.store) {
+      old.store.removeProfileListener(_changed);
+      widget.store.addProfileListener(_changed);
+    }
+    if (old.store != widget.store || old.filter != widget.filter) _read();
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeProfileListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (!mounted) return;
+    setState(_read);
+  }
+
+  void _read() {
+    final store = widget.store;
+    _shown = {for (final id in widget.filter.people) id: store.personShown(id)};
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filter = widget.filter;
+    final onChanged = widget.onChanged;
     if (filter.isEveryone) return const SizedBox.shrink();
     final t = context.t;
     final people = filter.people.toList()..sort();
@@ -275,12 +320,13 @@ class PersonFilterChips extends StatelessWidget {
               onDeleted: () => onChanged(filter.toggledMe()),
             ),
           for (final id in people)
-            InputChip(
-              key: ValueKey('personChip-$id'),
-              avatar: ProfileAvatar(profile: store.personShown(id), size: 24),
-              label: Text(profileDisplayName(t, store.personShown(id).name)),
-              onDeleted: () => onChanged(filter.toggled(id)),
-            ),
+            if (_shown[id] case final person?)
+              InputChip(
+                key: ValueKey('personChip-$id'),
+                avatar: ProfileAvatar(profile: person, size: 24),
+                label: Text(profileDisplayName(t, person.name)),
+                onDeleted: () => onChanged(filter.toggled(id)),
+              ),
         ],
       ),
     );

@@ -133,7 +133,7 @@ impl Store {
     /// Whether the Device `device` is one of the user's own: this one,
     /// one paired as its own, or one whose key is bound to the own
     /// Profile.
-    fn written_by_own(&self, device: &str) -> Result<bool> {
+    pub(crate) fn written_by_own(&self, device: &str) -> Result<bool> {
         if device == self.device_id()? || self.is_own_device(device)? {
             return Ok(true);
         }
