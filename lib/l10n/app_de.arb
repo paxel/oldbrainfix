@@ -386,6 +386,8 @@
   "pairedLastSync": "Zuletzt synchronisiert {when}",
   "forgetDevice": "Vergessen",
   "syncSettingsStay": "Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.",
+  "syncAutomatically": "Automatisch synchronisieren",
+  "syncAutoIntro": "Gekoppelte Computer im selben WLAN synchronisieren sich von selbst: während die App offen ist und im Hintergrund jede Viertelstunde.",
   "conflictsTitle": "Konflikte",
   "conflictsEntry": "{count, plural, =0{Keine Konflikte} =1{1 Konflikt zu klären} other{{count} Konflikte zu klären}}",
   "conflictsIntro": "Zwei Geräte haben dasselbe geändert, bevor sie sich synchronisiert haben. Tippe auf die Fassung, die bleibt; bis dahin wird die neuere gezeigt.",

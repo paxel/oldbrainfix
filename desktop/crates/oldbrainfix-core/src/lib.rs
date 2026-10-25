@@ -13,6 +13,7 @@
 pub mod alarms;
 pub mod blobs;
 pub mod conflicts;
+pub mod discovery;
 pub mod entry;
 pub mod error;
 pub mod lan;

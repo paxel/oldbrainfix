@@ -2,8 +2,9 @@
 //! view shows, with the pair code as a QR and as text and its PIN. A
 //! phone that is not paired yet gets the user's question first; a
 //! paired one, proven by its key, syncs straight away. Every session's joiner is remembered
-//! as a paired Device, and the paired Devices can be forgotten here. The
-//! Conflicts are listed here too, each version a button that keeps it.
+//! as a paired Device, and the paired Devices can be forgotten here, or
+//! kept from syncing on their own. The Conflicts are listed here too,
+//! each version a button that keeps it.
 
 use std::net::IpAddr;
 
@@ -28,6 +29,8 @@ pub enum SyncAction {
     Trust(bool),
     /// Forget the paired Device with this id.
     Forget(String),
+    /// Let the paired Device with this id sync on its own, or not.
+    AutoSync(String, bool),
     /// Keep the version at `index` of the Conflict on `unit` of `entity`.
     Keep {
         entity: String,
@@ -330,6 +333,8 @@ impl SyncHost {
                     let devices = store.paired_devices().unwrap_or_default();
                     if devices.is_empty() {
                         ui.label(RichText::new(t.paired_none()).color(weak));
+                    } else {
+                        ui.label(RichText::new(t.sync_auto_intro()).small().color(weak));
                     }
                     for device in devices {
                         ui.horizontal(|ui| {
@@ -341,6 +346,16 @@ impl SyncHost {
                             ui.label(RichText::new(name).color(text));
                             let when = wall(device.last_sync).format("%Y-%m-%d %H:%M").to_string();
                             ui.label(RichText::new(t.paired_last_sync(&when)).small().color(weak));
+                            let mut on = store.auto_sync_on(&device.id).unwrap_or(true);
+                            if ui
+                                .checkbox(
+                                    &mut on,
+                                    RichText::new(t.sync_automatically()).color(text),
+                                )
+                                .changed()
+                            {
+                                action = Some(SyncAction::AutoSync(device.id.clone(), on));
+                            }
                             if ui
                                 .button(RichText::new(t.forget_device()).color(text))
                                 .clicked()

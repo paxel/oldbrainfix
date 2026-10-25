@@ -1474,6 +1474,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.';
 
   @override
+  String get syncAutomatically => 'Automatisch synchronisieren';
+
+  @override
+  String get syncAutoIntro =>
+      'Gekoppelte Computer im selben WLAN synchronisieren sich von selbst: während die App offen ist und im Hintergrund jede Viertelstunde.';
+
+  @override
   String get conflictsTitle => 'Konflikte';
 
   @override

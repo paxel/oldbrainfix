@@ -53,7 +53,7 @@
   "pastePhoto": "Bild einfügen",
   "pasteNoPicture": "In der Zwischenablage ist kein Bild.",
   "photosHint": "Ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz.",
-  "syncHostIntro": "Zeig das deinem Telefon: Öffne dort in den Einstellungen „Synchronisieren“ und scanne den Code oder tippe ihn ein. Die Synchronisierung bleibt offen, solange diese Seite zu sehen ist.",
+  "syncHostIntro": "Zeig das deinem Telefon: Öffne dort in den Einstellungen „Synchronisieren“ und scanne den Code oder tippe ihn ein. Das Koppeln bleibt offen, solange diese Seite zu sehen ist.",
   "syncPin": "PIN {pin}",
   "syncNoNetwork": "Kein Netz gefunden. Verbinde diesen Computer mit demselben WLAN wie dein Telefon.",
   "syncLockedOut": "Zu viele falsche PINs. Verlasse „Synchronisieren“ und öffne es neu, um einen neuen Code zu bekommen.",
@@ -62,5 +62,7 @@
   "syncRefuse": "Ablehnen",
   "syncCopyCode": "Code kopieren",
   "unnamedDevice": "Unbenanntes Gerät",
+  "syncAutoIntro": "Gekoppelte Geräte im selben Netz synchronisieren sich von selbst, solange diese App läuft, auch im Infobereich.",
+  "syncConflictsArrived": "{count, plural, =1{Eine Synchronisierung hat 1 Sache gefunden, die auf beiden Geräten geändert wurde. Klicke, um zu wählen, welche Fassung bleibt.} other{Eine Synchronisierung hat {count} Sachen gefunden, die auf beiden Geräten geändert wurden. Klicke, um zu wählen, welche Fassungen bleiben.}}",
   "syncConflictsBelow": "{count, plural, =1{1 Sache wurde auf beiden Geräten geändert. Wähle unten, welche Fassung bleibt.} other{{count} Sachen wurden auf beiden Geräten geändert. Wähle unten, welche Fassungen bleiben.}}"
 }

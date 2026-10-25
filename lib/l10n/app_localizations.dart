@@ -2414,6 +2414,18 @@ abstract class AppLocalizations {
   /// **'Settings stay on each Device and are never synced.'**
   String get syncSettingsStay;
 
+  /// The switch per paired Device: it syncs on its own on the same network.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync automatically'**
+  String get syncAutomatically;
+
+  /// No description provided for @syncAutoIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Paired computers on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.'**
+  String get syncAutoIntro;
+
   /// No description provided for @conflictsTitle.
   ///
   /// In en, this message translates to:

@@ -166,5 +166,8 @@ dependencies {
     // The pair code's QR read from a photo: zxing's pure-Java reader,
     // no Google service and no dependencies of its own.
     implementation("com.google.zxing:core:3.5.3")
+    // The background sync's periodic work. WorkManager alone: no
+    // Google Play services (not work-gcm).
+    implementation("androidx.work:work-runtime:2.10.1")
     testImplementation("junit:junit:4.13.2")
 }

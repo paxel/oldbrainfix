@@ -69,6 +69,7 @@ class PairedDevice {
 /// The paired Devices of this Device, never synced (ADR 0008).
 extension Pairing on Store {
   static const _prefix = 'paired:';
+  static const _autoPrefix = 'autosync:';
 
   /// Every paired Device, by name.
   List<PairedDevice> pairedDevices() =>
@@ -100,7 +101,19 @@ extension Pairing on Store {
 
   /// Forgets the paired Device [id]. Its key stays: the entries it wrote
   /// are still checked against it.
-  void forgetDevice(String id) => removeLocalSetting('$_prefix$id');
+  void forgetDevice(String id) {
+    removeLocalSetting('$_prefix$id');
+    removeLocalSetting('$_autoPrefix$id');
+  }
+
+  /// Whether this Device syncs with the paired Device [id] on its own;
+  /// on unless switched off. Kept apart from the [PairedDevice], which
+  /// every sync writes anew.
+  bool autoSyncOn(String id) => localSetting('$_autoPrefix$id') != 'off';
+
+  void setAutoSync(String id, bool on) => on
+      ? removeLocalSetting('$_autoPrefix$id')
+      : setLocalSetting('$_autoPrefix$id', 'off');
 
   static PairedDevice? _read(String raw) {
     try {

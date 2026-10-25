@@ -96,7 +96,7 @@
   "@pasteNoPicture": {"description": "Announced when Paste a picture finds none."},
   "photosHint": "A pasted picture becomes a photo Note, with what is typed.",
   "@photosHint": {"description": "Under the desktop's Paste a picture button."},
-  "syncHostIntro": "Show this to your phone: in its Settings, open Sync and scan the code, or type it in. Sync stays open while this page shows.",
+  "syncHostIntro": "Show this to your phone: in its Settings, open Sync and scan the code, or type it in. Pairing stays open while this page shows.",
   "@syncHostIntro": {"description": "The desktop's Sync view while it hosts."},
   "syncPin": "PIN {pin}",
   "@syncPin": {"placeholders": {"pin": {"type": "String"}}},
@@ -109,6 +109,10 @@
   "syncCopyCode": "Copy the code",
   "unnamedDevice": "Unnamed Device",
   "@unnamedDevice": {"description": "A paired Device that did not say its name."},
+  "syncAutoIntro": "Paired Devices on the same network sync on their own for as long as this app runs, also in the tray.",
+  "@syncAutoIntro": {"description": "The desktop's Sync view, over the paired Devices."},
+  "syncConflictsArrived": "{count, plural, =1{A sync found 1 thing changed on both Devices. Click to pick which version stays.} other{A sync found {count} things changed on both Devices. Click to pick which versions stay.}}",
+  "@syncConflictsArrived": {"description": "Announced at the top after an automatic sync found Conflicts; a click opens Sync.", "placeholders": {"count": {"type": "int"}}},
   "syncConflictsBelow": "{count, plural, =1{1 thing was changed on both Devices. Pick below which version stays.} other{{count} things were changed on both Devices. Pick below which versions stay.}}",
   "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}}
 }

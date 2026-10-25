@@ -9,6 +9,8 @@ use crate::entry::{dart_iso, parse_time};
 use crate::store::Store;
 
 const PREFIX: &str = "paired:";
+const AUTO_PREFIX: &str = "autosync:";
+const CONFLICTS_ARRIVED: &str = "sync:conflictsArrived";
 
 /// A paired Device.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,9 +93,53 @@ impl Store {
         )
     }
 
-    /// Forgets the paired Device `id`; its key stays.
+    /// Forgets the paired Device `id` and its switch; its key stays.
     pub fn forget_device(&self, id: &str) -> Result<()> {
-        self.remove_local_setting(&format!("{PREFIX}{id}"))
+        self.remove_local_setting(&format!("{PREFIX}{id}"))?;
+        self.remove_local_setting(&format!("{AUTO_PREFIX}{id}"))
+    }
+
+    /// Whether this Device syncs with the paired Device `id` on its own;
+    /// on unless switched off, as the Dart core's `autoSyncOn`. Kept apart
+    /// from the [`PairedDevice`], which every sync writes anew.
+    pub fn auto_sync_on(&self, id: &str) -> Result<bool> {
+        Ok(self
+            .local_setting(&format!("{AUTO_PREFIX}{id}"))?
+            .as_deref()
+            != Some("off"))
+    }
+
+    pub fn set_auto_sync(&self, id: &str, on: bool) -> Result<()> {
+        let key = format!("{AUTO_PREFIX}{id}");
+        if on {
+            self.remove_local_setting(&key)
+        } else {
+            self.set_local_setting(&key, "off")
+        }
+    }
+
+    /// Whether any paired Device syncs with this one on its own.
+    pub fn auto_sync_wanted(&self) -> Result<bool> {
+        for device in self.paired_devices()? {
+            if self.auto_sync_on(&device.id)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Whether a sync nobody watched brought Conflicts not announced yet,
+    /// as the Dart core's `conflictsArrived`.
+    pub fn conflicts_arrived(&self) -> Result<bool> {
+        Ok(self.local_setting(CONFLICTS_ARRIVED)?.is_some())
+    }
+
+    pub fn set_conflicts_arrived(&self, arrived: bool) -> Result<()> {
+        if arrived {
+            self.set_local_setting(CONFLICTS_ARRIVED, "1")
+        } else {
+            self.remove_local_setting(CONFLICTS_ARRIVED)
+        }
     }
 }
 
@@ -125,9 +171,26 @@ mod tests {
         let held = s.paired_device("desk")?;
         assert_eq!(held.as_ref().map(|d| d.port), Some(Some(4000)));
         assert_eq!(s.paired_devices()?.len(), 1);
+        assert!(s.auto_sync_on("desk")?);
+        assert!(s.auto_sync_wanted()?);
+        s.set_auto_sync("desk", false)?;
+        assert!(!s.auto_sync_on("desk")?);
+        assert!(!s.auto_sync_wanted()?);
         s.forget_device("desk")?;
         assert!(s.paired_devices()?.is_empty());
+        assert!(s.auto_sync_on("desk")?, "the switch goes with it");
         assert!(s.all_entries()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn conflicts_arrived_are_kept_until_announced() -> Result<()> {
+        let s = store();
+        assert!(!s.conflicts_arrived()?);
+        s.set_conflicts_arrived(true)?;
+        assert!(s.conflicts_arrived()?);
+        s.set_conflicts_arrived(false)?;
+        assert!(!s.conflicts_arrived()?);
         Ok(())
     }
 }

@@ -12,8 +12,6 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.TimeZone
 
 class MainActivity : FlutterActivity() {
@@ -50,6 +48,13 @@ class MainActivity : FlutterActivity() {
 
     /** ocrs and its bundled models for the Photo Texts of photos. */
     private val ocr by lazy { Ocr(this) }
+
+    private var syncChannel: MethodChannel? = null
+
+    /** Paired hosts on the network while the app shows, told to the app as they come. */
+    private val discovery by lazy {
+        Discovery(this) { found -> syncChannel?.invokeMethod("found", found.toMap()) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
@@ -209,6 +214,25 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        syncChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SYNC_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "start" -> {
+                        discovery.start()
+                        result.success(null)
+                    }
+                    "stop" -> {
+                        discovery.stop()
+                        result.success(null)
+                    }
+                    "background" -> {
+                        SyncWork.schedule(this@MainActivity, call.arguments == true)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -293,81 +317,19 @@ class MainActivity : FlutterActivity() {
         alarmChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ALARM_CHANNEL).apply {
             setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "arm" -> {
-                        val args = call.arguments as Map<*, *>
-                        Scheduler.replace(
-                            this@MainActivity,
-                            json(args["alarms"]) as JSONArray,
-                            json(args["labels"]) as JSONObject,
-                            json(args["done"]) as JSONArray,
-                            json(args["nudge"]) as JSONObject?,
-                        )
-                        result.success(null)
-                    }
-                    "pending" -> result.success(
-                        EventQueue.pending(this@MainActivity).map {
-                            mapOf(
-                                "seq" to it.seq,
-                                "kind" to it.kind,
-                                "routine" to it.routine,
-                                "occurrence" to it.occurrence,
-                                "at" to it.at,
-                                "until" to it.until,
-                            )
-                        },
-                    )
-                    "ack" -> {
-                        EventQueue.ack(this@MainActivity, (call.arguments as Number).toLong())
-                        Scheduler.arm(this@MainActivity)
-                        result.success(null)
-                    }
-                    "ringing" -> result.success(
-                        RingService.ringing?.let {
-                            mapOf(
-                                "routine" to it.routine,
-                                "occurrence" to it.occurrence,
-                                "title" to it.title,
-                                "body" to it.body,
-                            )
-                        },
-                    )
-                    "answerRing" -> {
-                        val args = call.arguments as Map<*, *>
-                        val alarm = Alarm(
-                            id = "",
-                            routine = args["routine"] as String,
-                            occurrence = args["occurrence"] as String,
-                            local = null,
-                            at = null,
-                            title = args["title"] as String,
-                            body = args["body"] as String,
-                        )
-                        val minutes = (args["snooze"] as Number?)?.toInt()
-                        if (minutes == null) {
-                            AlarmReceiver.done(this@MainActivity, alarm)
-                        } else {
-                            AlarmReceiver.snooze(this@MainActivity, alarm, minutes)
-                        }
-                        result.success(null)
-                    }
                     "nudgeOpened" -> {
                         result.success(nudgeOpened)
                         nudgeOpened = false
-                    }
-                    "agenda" -> {
-                        AgendaWidget.replace(this@MainActivity, json(call.arguments) as JSONObject)
-                        result.success(null)
                     }
                     "unsortedOpened" -> {
                         result.success(unsortedOpened)
                         unsortedOpened = false
                     }
-                    "permissions" -> result.success(Permissions.granted(this@MainActivity))
                     "request" -> {
                         Permissions.request(this@MainActivity, call.arguments as String)
                         result.success(null)
                     }
-                    else -> result.notImplemented()
+                    else -> if (!AlarmChannel.handle(this@MainActivity, call, result)) result.notImplemented()
                 }
             }
         }
@@ -378,6 +340,7 @@ class MainActivity : FlutterActivity() {
         voice.release()
         speech.release()
         ocr.release()
+        discovery.stop()
         super.onDestroy()
     }
 
@@ -539,15 +502,6 @@ class MainActivity : FlutterActivity() {
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
 
-    /** Channel arguments (maps, lists, numbers) as org.json values. */
-    private fun json(value: Any?): Any? = when (value) {
-        is Map<*, *> -> JSONObject().apply {
-            for ((k, v) in value) put(k.toString(), json(v))
-        }
-        is List<*> -> JSONArray().apply { for (v in value) put(json(v)) }
-        else -> value
-    }
-
     companion object {
         private const val LOCATION_CHANNEL = "io.github.paxel.oldbrainfix/location"
         private const val ALARM_CHANNEL = "io.github.paxel.oldbrainfix/alarms"
@@ -560,6 +514,7 @@ class MainActivity : FlutterActivity() {
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
+        const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3
@@ -599,6 +554,16 @@ class MainActivity : FlutterActivity() {
             val activity = active ?: return
             activity.runOnUiThread { activity.showOverLockScreen(false) }
             actionsArrived()
+        }
+
+        /**
+         * The periodic sync came due: a running app syncs itself, with
+         * its own store; true when there was one to tell.
+         */
+        fun syncInApp(): Boolean {
+            val activity = active ?: return false
+            activity.runOnUiThread { activity.syncChannel?.invokeMethod("wanted", null) }
+            return true
         }
 
         /**

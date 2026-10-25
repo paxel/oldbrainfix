@@ -842,6 +842,9 @@
   },
   "forgetDevice": "Forget",
   "syncSettingsStay": "Settings stay on each Device and are never synced.",
+  "syncAutomatically": "Sync automatically",
+  "@syncAutomatically": {"description": "The switch per paired Device: it syncs on its own on the same network."},
+  "syncAutoIntro": "Paired computers on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.",
   "conflictsTitle": "Conflicts",
   "conflictsEntry": "{count, plural, =0{No conflicts} =1{1 conflict to settle} other{{count} conflicts to settle}}",
   "@conflictsEntry": {

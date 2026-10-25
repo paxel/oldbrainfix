@@ -348,6 +348,9 @@ pub struct App {
     /// this computer goes by in it.
     sync: SyncHost,
     sync_name: String,
+    /// The Conflicts an automatic sync brought, to be announced at the
+    /// top until the Sync view shows them.
+    arrived: usize,
 }
 
 impl App {
@@ -395,6 +398,7 @@ impl App {
             query: String::new(),
             sync: SyncHost::default(),
             sync_name: device_name(),
+            arrived: 0,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -587,6 +591,11 @@ impl App {
             Err(e) => self.error = Some(e.to_string()),
         }
         self.read_at = self.store.now();
+        self.arrived = self.conflicts_arrived();
+        if self.selection == Selection::Sync {
+            // What an automatic sync brought meanwhile.
+            self.sync.reload_conflicts(&self.store);
+        }
         if let Ok(quiet) = DeviceSettings::new(&self.store).quiet_hours() {
             self.quiet_text = (quiet.start.to_string(), quiet.end.to_string());
         }
@@ -597,6 +606,29 @@ impl App {
             self.amend.clear();
         }
         self.kick();
+    }
+
+    /// How many Conflicts an automatic sync brought that are still open
+    /// and not announced; none once they are settled elsewhere.
+    fn conflicts_arrived(&self) -> usize {
+        if !self.store.conflicts_arrived().unwrap_or(false) {
+            return 0;
+        }
+        // The Sync view lists them: announced.
+        if self.selection == Selection::Sync {
+            drop(self.store.set_conflicts_arrived(false));
+            return 0;
+        }
+        let open = self.store.conflicts().map(|c| c.len()).unwrap_or(0);
+        if open == 0 {
+            drop(self.store.set_conflicts_arrived(false));
+        }
+        open
+    }
+
+    /// The Conflicts an automatic sync brought, as announced at the top.
+    pub fn arrived_conflicts(&self) -> usize {
+        self.arrived
     }
 
     fn read(&self) -> oldbrainfix_core::Result<View> {
@@ -703,6 +735,7 @@ impl App {
                 self.sync.start(&self.store);
             }
         }
+
         self.refresh();
         if let Err(e) = done {
             self.error = Some(e.to_string());
@@ -996,6 +1029,7 @@ impl App {
                 }
             }
             Action::Sync(SyncAction::Forget(id)) => self.store.forget_device(&id)?,
+            Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
             Action::Sync(SyncAction::Keep {
                 entity,
                 unit,
@@ -1280,6 +1314,20 @@ impl App {
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                });
+        } else if self.arrived > 0 && self.selection != Selection::Sync {
+            // One at a time: Conflicts from an automatic sync, a click
+            // away from the Sync view that lists them.
+            let text = self.t.sync_conflicts_arrived(self.arrived as i64);
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::Select(Selection::Sync));
+                    }
                 });
         }
         egui::Panel::left("places")

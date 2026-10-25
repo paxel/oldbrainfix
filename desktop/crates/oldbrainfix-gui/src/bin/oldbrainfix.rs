@@ -14,7 +14,9 @@
 //!
 //! Transcripts and Photo Texts are made on threads of their own for as
 //! long as the app runs, the Transcripts once the speech model in the
-//! data directory's `whisper` folder is checked.
+//! data directory's `whisper` folder is checked. So are the alerts, and
+//! the host paired Devices sync with on their own; after such a sync
+//! the alerts plan again and the window reads the log again.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use std::cell::{Cell, RefCell};
@@ -27,6 +29,7 @@ use std::sync::{Arc, Mutex};
 
 use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Notes, SigningKey, Store};
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
+use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::cli::{self, Launch};
 use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
@@ -36,6 +39,7 @@ use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{SpeechModel, Status};
+use oldbrainfix_gui::sync_view::device_name;
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
 
@@ -366,6 +370,23 @@ fn run() -> Result<i32, String> {
             );
         });
     }
+    // Paired Devices sync on their own while the app runs, in the tray
+    // too: the alerts plan again after it (a Done elsewhere closes the
+    // notification here), the window reads the log again.
+    let auto_stop = Arc::new(AtomicBool::new(false));
+    let auto_sync = {
+        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let (stop, wake_window) = (auto_stop.clone(), waker(&window));
+        std::thread::spawn(move || {
+            auto_sync::run(&store, &device_name(), &stop, |session| {
+                if !session.applied.is_empty() {
+                    changes.fetch_add(1, Ordering::SeqCst);
+                    let _ = events.send(Event::Wake);
+                }
+                wake_window();
+            });
+        })
+    };
     // Transcripts and Photo Texts, each kept one tells the window.
     let enriched = {
         let (changes, window) = (changes.clone(), window.clone());
@@ -504,6 +525,9 @@ fn run() -> Result<i32, String> {
         }
     }
     drop(tray);
+    // The mDNS record says goodbye before the app ends.
+    auto_stop.store(true, Ordering::SeqCst);
+    let _ = auto_sync.join();
     let _ = std::fs::remove_file(&socket);
     Ok(cli::OK)
 }

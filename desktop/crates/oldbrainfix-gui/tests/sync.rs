@@ -244,3 +244,128 @@ fn the_sync_view_lists_the_conflicts_and_keeps_the_version_clicked() -> TestResu
     assert!(phone.conflicts()?.is_empty());
     Ok(())
 }
+
+fn pair(desk: &Store, id: &str) -> TestResult {
+    desk.remember_device(&oldbrainfix_core::PairedDevice {
+        id: id.into(),
+        name: "Pixel".into(),
+        fingerprint: String::new(),
+        host: None,
+        port: None,
+        last_sync: desk.now(),
+    })?;
+    Ok(())
+}
+
+#[test]
+fn the_paired_host_runs_only_while_a_paired_device_syncs_on_its_own() -> TestResult {
+    use oldbrainfix_gui::auto_sync::PairedHosting;
+    let desk = store(1)?;
+    let mut hosting = PairedHosting::new(IpAddr::V4(Ipv4Addr::LOCALHOST), false);
+    hosting.check(&desk);
+    assert!(!hosting.hosting(), "nobody to sync with");
+
+    pair(&desk, "phone")?;
+    hosting.check(&desk);
+    let port = hosting.port().ok_or("hosting")?;
+    // It hands out nonces, and lets nobody in on a PIN.
+    let asked = std::thread::spawn(move || -> Result<(u16, u16), String> {
+        let config = ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .disable_verification(true)
+                    .build(),
+            )
+            .http_status_as_error(false)
+            .build();
+        let agent = ureq::Agent::new_with_config(config);
+        let base = format!("https://127.0.0.1:{port}");
+        let challenge = agent
+            .get(format!("{base}/challenge"))
+            .call()
+            .map_err(|e| e.to_string())?;
+        let vector = agent
+            .get(format!("{base}/vector"))
+            .header(PIN_HEADER, "123456")
+            .call()
+            .map_err(|e| e.to_string())?;
+        Ok((challenge.status().as_u16(), vector.status().as_u16()))
+    });
+    let sessions = hosting.step(&desk, "Desk", std::time::Duration::from_millis(50));
+    assert!(sessions.is_empty());
+    assert_eq!(asked.join().map_err(|_| "asker")??, (200, 403));
+
+    desk.set_auto_sync("phone", false)?;
+    hosting.check(&desk);
+    assert!(!hosting.hosting(), "switched off");
+    desk.set_auto_sync("phone", true)?;
+    hosting.check(&desk);
+    assert_eq!(hosting.port(), Some(port), "the port it had");
+    Ok(())
+}
+
+#[test]
+fn a_paired_device_can_be_kept_from_syncing_on_its_own() -> TestResult {
+    let desk = store(1)?;
+    pair(&desk, "phone")?;
+    let mut app = App::new(desk, "en");
+    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
+    app.select(Selection::Sync);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.step();
+    assert!(shows(&harness, "sync on their own"));
+    assert!(harness.state().store().auto_sync_on("phone")?);
+    harness.get_by_label("Sync automatically").click_accesskit();
+    harness.step();
+    assert!(!harness.state().store().auto_sync_on("phone")?);
+    harness.get_by_label("Sync automatically").click_accesskit();
+    harness.step();
+    assert!(harness.state().store().auto_sync_on("phone")?);
+    Ok(())
+}
+
+#[test]
+fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestResult {
+    let desk = store(1)?;
+    let phone = store(2)?;
+    let note = Notes::new(&desk).capture("nees mor sauce", None, None)?;
+    send(&desk, &phone)?;
+    Notes::new(&phone).edit(&note.id, "From the phone")?;
+    Notes::new(&desk).edit(&note.id, "Edited at the desk")?;
+    send(&phone, &desk)?;
+    desk.set_conflicts_arrived(true)?;
+
+    let mut app = App::new(desk, "en");
+    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.step();
+    assert_eq!(harness.state().arrived_conflicts(), 1);
+    harness
+        .query_all_by_label_contains("A sync found 1 thing changed on both Devices")
+        .next()
+        .ok_or("the announcement")?
+        .click_accesskit();
+    step_until(&mut harness, |app| app.sync_host().hosting())?;
+    harness.step();
+    assert_eq!(harness.state().selection(), &Selection::Sync);
+    assert!(shows(&harness, "Note text"));
+    assert!(!harness.state().store().conflicts_arrived()?);
+    assert_eq!(harness.state().arrived_conflicts(), 0);
+    Ok(())
+}

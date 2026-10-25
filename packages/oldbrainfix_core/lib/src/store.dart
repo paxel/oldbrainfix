@@ -79,7 +79,10 @@ class Store {
     Blobs photos,
     Blobs audio,
   ) {
+    // The background sync may hold the file a moment while the app opens:
+    // a write waits for it instead of failing.
     db.execute('''
+      PRAGMA busy_timeout = 5000;
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS entries (
         seq      INTEGER PRIMARY KEY AUTOINCREMENT,

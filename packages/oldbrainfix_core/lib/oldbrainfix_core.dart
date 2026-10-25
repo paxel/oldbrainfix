@@ -3,6 +3,7 @@
 library;
 
 export 'src/alarms.dart';
+export 'src/auto_sync.dart';
 export 'src/blobs.dart';
 export 'src/calendar_mirror.dart';
 export 'src/conflicts.dart';

@@ -22,6 +22,13 @@ import 'sync.dart';
 /// an address out after [pinFailuresPerAddress] wrong ones and stops
 /// answering anyone after [pinFailuresTotal].
 ///
+/// A Device paired before syncs on its own without the PIN
+/// ([pairedSync]): it checks the host's certificate against the whole
+/// fingerprint it pinned before anything is sent, fetches a fresh nonce
+/// from `GET /challenge`, and signs it with its own key in every request
+/// ([pairedProofBytes]); the host answers only a paired Device whose
+/// verified key made that signature ([trustsPairedJoiner]).
+///
 /// The host side here ([answerSync] and the blob answers) is what the
 /// fixtures and the tests serve with; the desktop core answers the
 /// same, byte for byte.
@@ -29,6 +36,10 @@ import 'sync.dart';
 const pinHeader = 'x-oldbrainfix-pin';
 const deviceHeader = 'x-oldbrainfix-device';
 const formatHeader = 'x-oldbrainfix-format';
+
+/// A paired Device's nonce from `/challenge` and its signature over it.
+const nonceHeader = 'x-oldbrainfix-nonce';
+const proofHeader = 'x-oldbrainfix-proof';
 
 /// The wire format this build speaks; a peer speaking another one is
 /// refused with the reason, never half understood. Format 2 carries the
@@ -87,6 +98,34 @@ List<KeyRecord> _keys(Object? json) => [
 /// host and this session only.
 Uint8List pairingProofBytes(String hostDevice, String pin) =>
     Uint8List.fromList(utf8.encode(jsonEncode(['pair', hostDevice, pin])));
+
+/// The bytes a paired Device signs in every request of an automatic
+/// sync: the host's device id and the nonce the host handed out, so the
+/// proof is good for this host and this nonce only.
+Uint8List pairedProofBytes(String hostDevice, String nonce) =>
+    Uint8List.fromList(utf8.encode(jsonEncode(['auto', hostDevice, nonce])));
+
+/// Whether a request naming [device], carrying a [nonce] this host
+/// handed out and [proof], comes from a paired Device that syncs
+/// automatically: one whose verified key signed [pairedProofBytes] for
+/// this host. A device id alone proves nothing.
+bool trustsPairedJoiner(
+  Store store, {
+  required String device,
+  required String nonce,
+  required String? proof,
+}) {
+  if (store.pairedDevice(device) == null || !store.autoSyncOn(device)) {
+    return false;
+  }
+  final key = store.pinnedKey(device);
+  if (key == null || key.trust != KeyTrust.verified) return false;
+  return verifySignature(
+    key.record.publicKey,
+    pairedProofBytes(store.deviceId, nonce),
+    proof,
+  );
+}
 
 /// The joiner's `POST /sync` body: what a host holding [hostVector]
 /// lacks, with this Device's vector, id, [name] and keys, and its proof
@@ -264,15 +303,77 @@ Future<SyncResult> lanSync(
   if (!isPrivateHost(info.host)) {
     throw const SyncException(SyncFailure.notPrivate);
   }
+  return _sync(
+    store,
+    host: info.host,
+    port: info.port,
+    fingerprint: info.fingerprint,
+    pin: info.pin,
+    name: name,
+    timeout: timeout,
+  );
+}
+
+/// Syncs with the paired [device] hosting at [host] and [port] without
+/// the PIN, as automatic sync does: only once the host's certificate is
+/// the very one pinned for it, and with this Device's proof over a fresh
+/// nonce from the host in every request. Afterwards the Device is
+/// remembered at this address. Throws a [SyncException]: `wrongHost`
+/// for another certificate or a Device that never hosted, `declined`
+/// when the host does not sync automatically with this Device.
+Future<SyncResult> pairedSync(
+  Store store,
+  PairedDevice device, {
+  required String host,
+  required int port,
+  required String name,
+  Duration timeout = const Duration(seconds: 20),
+}) async {
+  if (!isPrivateHost(host)) {
+    throw const SyncException(SyncFailure.notPrivate);
+  }
+  final pinned = fromHex(device.fingerprint);
+  if (pinned.length != certificateFingerprintBytes) {
+    throw const SyncException(SyncFailure.wrongHost);
+  }
+  return _sync(
+    store,
+    host: host,
+    port: port,
+    fingerprint: pinned,
+    paired: device.id,
+    name: name,
+    timeout: timeout,
+  );
+}
+
+/// The bytes of a whole certificate fingerprint, SHA-256.
+const certificateFingerprintBytes = 32;
+
+/// One session with the host at [host] and [port] whose certificate
+/// matches [fingerprint]: with the [pin] of a pair code, or as the
+/// [paired] Device's partner with a proof over the host's nonce.
+Future<SyncResult> _sync(
+  Store store, {
+  required String host,
+  required int port,
+  required List<int> fingerprint,
+  String pin = '',
+  String? paired,
+  required String name,
+  required Duration timeout,
+}) async {
   List<int>? seen;
   final client = HttpClient()
     ..connectionTimeout = timeout
     ..badCertificateCallback = (cert, _, _) {
       final actual = certificateFingerprint(cert.der);
-      if (!fingerprintMatches(actual, info.fingerprint)) return false;
+      if (!fingerprintMatches(actual, fingerprint)) return false;
       seen = actual;
       return true;
     };
+  // The PIN, or once the nonce is in, the paired Device's proof.
+  var auth = <String, String>{if (paired == null) pinHeader: pin};
   try {
     Future<(HttpHeaders, Uint8List)?> call(
       String method,
@@ -285,9 +386,9 @@ Future<SyncResult> lanSync(
       try {
         final req = await client.openUrl(
           method,
-          Uri(scheme: 'https', host: info.host, port: info.port, path: path),
+          Uri(scheme: 'https', host: host, port: port, path: path),
         );
-        req.headers.set(pinHeader, info.pin);
+        auth.forEach(req.headers.set);
         if (json) req.headers.contentType = ContentType.json;
         req.contentLength = body?.length ?? 0;
         if (body != null) req.add(body);
@@ -320,7 +421,10 @@ Future<SyncResult> lanSync(
         if (text.contains('refusal')) {
           throw const SyncException(SyncFailure.format);
         }
-        throw const SyncException(SyncFailure.wrongPin);
+        // No PIN to be wrong for a paired Device: the host said no.
+        throw SyncException(
+          paired == null ? SyncFailure.wrongPin : SyncFailure.declined,
+        );
       }
       // A blob the log mentions but nobody holds: skipped, never failed on.
       if (res.statusCode == HttpStatus.notFound && path.startsWith('/blob/')) {
@@ -342,19 +446,38 @@ Future<SyncResult> lanSync(
       throw const SyncException(SyncFailure.failed);
     }
 
+    if (paired != null) {
+      final challenge = await call('GET', '/challenge');
+      if (challenge == null) throw const SyncException(SyncFailure.failed);
+      final nonce = decode(challenge.$2)['nonce'];
+      if (nonce is! String || nonce.isEmpty) {
+        throw const SyncException(SyncFailure.failed);
+      }
+      auth = {
+        deviceHeader: store.deviceId,
+        nonceHeader: nonce,
+        proofHeader: store.signingKey.sign(pairedProofBytes(paired, nonce)),
+      };
+    }
     final vectorCall = await call('GET', '/vector');
     if (vectorCall == null) throw const SyncException(SyncFailure.failed);
     final (headers, vectorBytes) = vectorCall;
     if (headers.value(formatHeader) != '$syncFormat') {
       throw const SyncException(SyncFailure.format);
     }
+    final hostDevice = headers.value(deviceHeader) ?? '';
+    // The certificate is the pinned one; a host naming another Device
+    // all the same is not the one paired.
+    if (paired != null && hostDevice != paired) {
+      throw const SyncException(SyncFailure.wrongHost);
+    }
     final hostVector = _vector(decode(vectorBytes));
     final request = syncRequest(
       store,
       hostVector,
       name: name,
-      hostDevice: headers.value(deviceHeader) ?? '',
-      pin: info.pin,
+      hostDevice: hostDevice,
+      pin: pin,
     );
     final syncCall = await call(
       'POST',
@@ -376,9 +499,9 @@ Future<SyncResult> lanSync(
         PairedDevice(
           id: session.peer,
           name: session.name,
-          fingerprint: hex(seen ?? info.fingerprint),
-          host: info.host,
-          port: info.port,
+          fingerprint: hex(seen ?? fingerprint),
+          host: host,
+          port: port,
           lastSync: store.clock().toUtc(),
         ),
       );

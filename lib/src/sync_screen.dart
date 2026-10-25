@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
+import 'auto_sync.dart';
 import 'conflicts_screen.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
@@ -19,8 +20,9 @@ typedef Join = Future<SyncResult> Function(
 
 /// Sync, inside Settings (UI laws): joins the computer the pair code
 /// names, scanned from a photo of its screen or typed in, leads to the
-/// Conflicts, and lists the paired Devices, each of which can be
-/// forgotten. What a sync did, or why it did not, is announced at the
+/// Conflicts, and lists the paired Devices with when they last synced,
+/// each of which can be forgotten, and those that host kept from syncing
+/// on their own. What a sync did, or why it did not, is announced at the
 /// top; Conflicts it found are announced with a way to them.
 class SyncScreen extends StatefulWidget {
   final Store store;
@@ -133,6 +135,7 @@ class _SyncScreenState extends State<SyncScreen> {
           _paired = widget.store.pairedDevices();
           _countConflicts();
         });
+        AutoSyncScope.of(context)?.devicesChanged();
       }
     }
   }
@@ -140,6 +143,13 @@ class _SyncScreenState extends State<SyncScreen> {
   void _forget(PairedDevice device) {
     widget.store.forgetDevice(device.id);
     setState(() => _paired = widget.store.pairedDevices());
+    AutoSyncScope.of(context)?.devicesChanged();
+  }
+
+  void _setAuto(PairedDevice device, bool on) {
+    widget.store.setAutoSync(device.id, on);
+    setState(() {});
+    AutoSyncScope.of(context)?.devicesChanged();
   }
 
   static String _failure(AppLocalizations t, SyncFailure failure) =>
@@ -223,12 +233,11 @@ class _SyncScreenState extends State<SyncScreen> {
             t.pairedDevicesTitle,
             style: Theme.of(context).textTheme.titleSmall,
           ),
-          if (_paired.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(t.pairedNone),
-            ),
-          for (final device in _paired)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),
+          ),
+          for (final device in _paired) ...[
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.computer_outlined),
@@ -241,6 +250,16 @@ class _SyncScreenState extends State<SyncScreen> {
                 child: Text(t.forgetDevice),
               ),
             ),
+            // Only a Device that hosts can be found and synced with.
+            if (device.fingerprint.isNotEmpty)
+              SwitchListTile(
+                key: ValueKey('auto-${device.id}'),
+                contentPadding: const EdgeInsets.only(left: 56),
+                title: Text(t.syncAutomatically),
+                value: widget.store.autoSyncOn(device.id),
+                onChanged: (on) => _setAuto(device, on),
+              ),
+          ],
           const SizedBox(height: 16),
           Text(t.syncSettingsStay),
         ],

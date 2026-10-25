@@ -6,10 +6,12 @@
 //! notifications, the tray, the login start, the one-instance rule, the
 //! command line, the capture popup and its hotkey, voice recordings and
 //! photos, the Transcripts and Photo Texts made of them, and the LAN
-//! sync it hosts.
+//! sync it hosts, for pairing in the Sync view and for paired Devices
+//! on their own.
 
 pub mod alerts;
 pub mod app;
+pub mod auto_sync;
 pub mod autostart;
 pub mod background;
 pub mod cli;

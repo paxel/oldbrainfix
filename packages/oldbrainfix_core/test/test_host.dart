@@ -35,8 +35,9 @@ Uint8List get testCertDer => base64.decode(
       .replaceAll(RegExp(r'\s'), ''),
 );
 
-/// A host as the desktop runs one, for the joiner's tests: the PIN on
-/// every request, `/vector`, `/sync` and the blobs answered by the core.
+/// A host as the desktop runs one, for the joiner's tests: the PIN, or a
+/// paired Device's proof over a nonce from `/challenge`, on every
+/// request, `/vector`, `/sync` and the blobs answered by the core.
 class TestHost {
   final Store store;
   final String pin;
@@ -46,6 +47,10 @@ class TestHost {
   /// Every session a joiner completed, and the `/sync` bodies it sent.
   final sessions = <SyncSession>[];
   final bodies = <Map<String, Object?>>[];
+
+  /// Every request that reached the host, and the nonces it handed out.
+  var requests = 0;
+  final nonces = <String>[];
 
   TestHost(this.store, {this.pin = '246810', this.name = 'Desk'});
 
@@ -78,11 +83,31 @@ class TestHost {
     final res = req.response;
     try {
       final body = await req.fold<List<int>>([], (a, b) => a..addAll(b));
-      if (req.headers.value(pinHeader) != pin) {
+      requests++;
+      final path = req.uri.path;
+      if (req.method == 'GET' && path == '/challenge') {
+        final nonce = 'nonce${nonces.length}';
+        nonces.add(nonce);
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode({'nonce': nonce}));
+        return;
+      }
+      final nonce = req.headers.value(nonceHeader);
+      final joiner = req.headers.value(deviceHeader);
+      final paired =
+          nonce != null &&
+          joiner != null &&
+          nonces.contains(nonce) &&
+          trustsPairedJoiner(
+            store,
+            device: joiner,
+            nonce: nonce,
+            proof: req.headers.value(proofHeader),
+          );
+      if (!paired && req.headers.value(pinHeader) != pin) {
         res.statusCode = HttpStatus.forbidden;
         return;
       }
-      final path = req.uri.path;
       if (req.method == 'GET' && path == '/vector') {
         res.headers.set(formatHeader, '$syncFormat');
         res.headers.set(deviceHeader, store.deviceId);

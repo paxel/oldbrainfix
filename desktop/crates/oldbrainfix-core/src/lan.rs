@@ -8,11 +8,18 @@
 //! [`PIN_FAILURES_PER_ADDRESS`] wrong ones, everyone after
 //! [`PIN_FAILURES_TOTAL`].
 //!
+//! A Device paired before syncs on its own without the PIN, with the
+//! host [`Host::start_paired`] runs while the app does: the joiner checks
+//! the certificate against the fingerprint it pinned, takes a fresh
+//! nonce from `GET /challenge` and signs it with its own key in every
+//! request ([`paired_proof_bytes`]); [`Store::serve_paired`] answers only
+//! a paired Device whose verified key made that signature.
+//!
 //! The network runs on its own threads and never touches the store:
-//! every request that passed the PIN crosses a channel to whoever polls
-//! [`Host::next_request`], who answers it with [`Store::serve`] (or
-//! holds it while the user is asked whether to trust the Device) and
-//! hands the response back.
+//! every request that passed the PIN, or carries a nonce this host handed
+//! out, crosses a channel to whoever polls [`Host::next_request`], who
+//! answers it with [`Store::serve`] (or holds it while the user is asked
+//! whether to trust the Device) and hands the response back.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -21,7 +28,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -31,6 +38,7 @@ use sha2::{Digest, Sha256};
 
 use crate::conflicts::Conflict;
 use crate::entry::WireEntry;
+use crate::pairing::PairedDevice;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
 use crate::sync::{Moment, cause, split_blob_ref, wire};
@@ -60,6 +68,19 @@ pub const TLS_KEY_KEY: &str = "tls:key";
 pub const PIN_HEADER: &str = "x-oldbrainfix-pin";
 pub const DEVICE_HEADER: &str = "x-oldbrainfix-device";
 pub const FORMAT_HEADER: &str = "x-oldbrainfix-format";
+/// A paired Device's nonce from `/challenge` and its signature over it;
+/// its id goes in [`DEVICE_HEADER`].
+pub const NONCE_HEADER: &str = "x-oldbrainfix-nonce";
+pub const PROOF_HEADER: &str = "x-oldbrainfix-proof";
+
+/// How long a nonce from `/challenge` holds, and how many may be out at
+/// once; the oldest goes first.
+pub const CHALLENGE_TTL: Duration = Duration::from_secs(120);
+pub const MAX_CHALLENGES: usize = 256;
+
+/// The local setting holding the port the paired host had, taken again
+/// when it is free, so a phone finds it where it was.
+pub const PAIRED_PORT_KEY: &str = "lan:port";
 
 // ---------------------------------------------------------------- pair code
 
@@ -256,6 +277,9 @@ pub struct Request {
     headers: Vec<(String, String)>,
     pub body: Vec<u8>,
     pub from: IpAddr,
+    /// Whether it carries a nonce this host handed out and that still
+    /// holds; whose proof it is, [`Store::paired_joiner`] checks.
+    challenged: bool,
     reply: Sender<Response>,
 }
 
@@ -308,6 +332,13 @@ pub fn pairing_proof_bytes(host_device: &str, pin: &str) -> Vec<u8> {
     json!(["pair", host_device, pin]).to_string().into_bytes()
 }
 
+/// The bytes a paired Device signs in every request of an automatic
+/// sync, as the Dart core's `pairedProofBytes`: this host's id and the
+/// nonce it handed out.
+pub fn paired_proof_bytes(host_device: &str, nonce: &str) -> Vec<u8> {
+    json!(["auto", host_device, nonce]).to_string().into_bytes()
+}
+
 impl Store {
     /// Whether `ask` comes from a paired Device: one paired before whose
     /// pinned key signed the proof for this host and `pin`. A device id
@@ -325,6 +356,49 @@ impl Store {
             &bytes,
             ask.proof.as_deref(),
         ))
+    }
+
+    /// Whether `device`, signing `proof` over `nonce`, is a paired Device
+    /// this one syncs with on its own: its verified key signed
+    /// [`paired_proof_bytes`] for this host, as the Dart core's
+    /// `trustsPairedJoiner`.
+    pub fn trusts_paired_joiner(
+        &self,
+        device: &str,
+        nonce: &str,
+        proof: Option<&str>,
+    ) -> Result<bool> {
+        if self.paired_device(device)?.is_none() || !self.auto_sync_on(device)? {
+            return Ok(false);
+        }
+        let Some(key) = self.pinned_key(device)? else {
+            return Ok(false);
+        };
+        if key.trust != crate::KeyTrust::Verified {
+            return Ok(false);
+        }
+        let bytes = paired_proof_bytes(&self.device_id()?, nonce);
+        Ok(crate::signing::verify_signature(
+            &key.record.public_key,
+            &bytes,
+            proof,
+        ))
+    }
+
+    /// The paired Device `request` comes from, when it carries a nonce
+    /// this host handed out and that Device's proof over it.
+    pub fn paired_joiner(&self, request: &Request) -> Result<Option<String>> {
+        let (Some(device), Some(nonce)) =
+            (request.header(DEVICE_HEADER), request.header(NONCE_HEADER))
+        else {
+            return Ok(None);
+        };
+        if !request.challenged {
+            return Ok(None);
+        }
+        Ok(self
+            .trusts_paired_joiner(device, nonce, request.header(PROOF_HEADER))?
+            .then(|| device.to_string()))
     }
 }
 
@@ -453,17 +527,39 @@ impl Host {
         let address = bind
             .or_else(|| lan_address().map(IpAddr::V4))
             .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST));
-        let config = server_config(identity)?;
         let bind_error = |e: std::io::Error| Error::Invalid(format!("bind: {e}"));
         let listener = TcpListener::bind(SocketAddr::new(address, 0)).map_err(bind_error)?;
+        Host::serve(identity, Some(pin), address, listener)
+    }
+
+    /// The host paired Devices sync with on their own, without a PIN:
+    /// on `bind` (every address of this machine, so it outlives a change
+    /// of network), on `port` while that is free, else on a free one.
+    pub fn start_paired(identity: &Identity, bind: IpAddr, port: u16) -> Result<Host> {
+        let bind_error = |e: std::io::Error| Error::Invalid(format!("bind: {e}"));
+        let listener = TcpListener::bind(SocketAddr::new(bind, port))
+            .or_else(|_| TcpListener::bind(SocketAddr::new(bind, 0)))
+            .map_err(bind_error)?;
+        Host::serve(identity, None, bind, listener)
+    }
+
+    fn serve(
+        identity: &Identity,
+        pin: Option<&str>,
+        address: IpAddr,
+        listener: TcpListener,
+    ) -> Result<Host> {
+        let config = server_config(identity)?;
+        let bind_error = |e: std::io::Error| Error::Invalid(format!("bind: {e}"));
         listener.set_nonblocking(true).map_err(bind_error)?;
         let port = listener.local_addr().map_err(bind_error)?.port();
         let (tx, rx) = channel();
         let stop = Arc::new(AtomicBool::new(false));
         let locked = Arc::new(AtomicBool::new(false));
         let gate = Arc::new(Gate {
-            pin: pin.to_string(),
+            pin: pin.map(str::to_string),
             failures: Mutex::new(Failures::default()),
+            challenges: Mutex::new(Vec::new()),
             locked: locked.clone(),
         });
         let thread = {
@@ -473,7 +569,7 @@ impl Host {
         Ok(Host {
             address,
             port,
-            pin: pin.to_string(),
+            pin: pin.unwrap_or_default().to_string(),
             fingerprint: identity.fingerprint.clone(),
             requests: rx,
             stop,
@@ -490,6 +586,7 @@ impl Host {
         self.port
     }
 
+    /// The PIN; empty for the paired host, which takes none.
     pub fn pin(&self) -> &str {
         &self.pin
     }
@@ -519,6 +616,11 @@ impl Host {
         self.requests.try_recv().ok()
     }
 
+    /// The next request, waiting up to `wait` for one.
+    pub fn wait_request(&self, wait: Duration) -> Option<Request> {
+        self.requests.recv_timeout(wait).ok()
+    }
+
     /// Stops accepting; connections in flight finish on their own.
     pub fn stop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
@@ -534,24 +636,55 @@ impl Drop for Host {
     }
 }
 
-/// The PIN and the wrong guesses counted against it.
+/// The PIN and the wrong guesses counted against it, and the nonces
+/// handed out with when.
 struct Gate {
-    pin: String,
+    /// None for the paired host: only nonces let a request in.
+    pin: Option<String>,
     failures: Mutex<Failures>,
+    challenges: Mutex<Vec<(String, Instant)>>,
     locked: Arc<AtomicBool>,
 }
 
 impl Gate {
+    /// A fresh nonce, kept for [`CHALLENGE_TTL`].
+    fn challenge(&self) -> String {
+        let mut random = [0u8; 32];
+        getrandom::fill(&mut random).ok();
+        let nonce = hex::encode(random);
+        let mut held = self.challenges.lock().unwrap_or_else(|e| e.into_inner());
+        held.retain(|(_, at)| at.elapsed() < CHALLENGE_TTL);
+        if held.len() >= MAX_CHALLENGES {
+            held.remove(0);
+        }
+        held.push((nonce.clone(), Instant::now()));
+        nonce
+    }
+
+    /// Whether `nonce` was handed out here and still holds.
+    fn knows(&self, nonce: Option<&str>) -> bool {
+        let Some(nonce) = nonce else {
+            return false;
+        };
+        let held = self.challenges.lock().unwrap_or_else(|e| e.into_inner());
+        held.iter()
+            .any(|(n, at)| n == nonce && at.elapsed() < CHALLENGE_TTL)
+    }
+
     /// Whether this request may pass: `Ok` when it did, else the answer
     /// to send instead.
     fn check(&self, from: IpAddr, pin: Option<&str>) -> std::result::Result<(), Response> {
+        let Some(own) = self.pin.as_deref() else {
+            // No PIN to guess here.
+            return Err(Response::status(403));
+        };
         let mut failures = self.failures.lock().unwrap_or_else(|e| e.into_inner());
         let locked = failures.total >= PIN_FAILURES_TOTAL
             || failures.per_address.get(&from).copied().unwrap_or(0) >= PIN_FAILURES_PER_ADDRESS;
         if locked {
             return Err(Response::text(403, "locked"));
         }
-        if pin != Some(self.pin.as_str()) {
+        if pin != Some(own) {
             *failures.per_address.entry(from).or_insert(0) += 1;
             failures.total += 1;
             if failures.total >= PIN_FAILURES_TOTAL {
@@ -617,21 +750,39 @@ fn serve_connection(
         rustls::ServerConnection::new(config).map_err(|e| std::io::Error::other(e.to_string()))?;
     let mut reader = BufReader::new(rustls::StreamOwned::new(conn, stream));
     let response = match read_request(&mut reader, peer.ip()) {
-        Ok(Some(partial)) => match gate.check(partial.from, partial.header(PIN_HEADER)) {
-            Err(refusal) => refusal,
-            Ok(()) => {
-                let (reply_tx, reply_rx) = channel();
-                let request = Request {
-                    reply: reply_tx,
-                    ..partial
-                };
-                if tx.send(request).is_err() {
-                    Response::status(503)
-                } else {
-                    reply_rx.recv().unwrap_or_else(|_| Response::status(503))
+        // Nonces only on the paired host: on a PIN host they would let
+        // anyone past the PIN. Asking there costs no PIN try.
+        Ok(Some(partial)) if partial.method == "GET" && partial.path == "/challenge" => {
+            if gate.pin.is_none() {
+                Response::json(200, &json!({"nonce": gate.challenge()}))
+            } else {
+                Response::status(404)
+            }
+        }
+        Ok(Some(partial)) => {
+            let challenged = gate.pin.is_none() && gate.knows(partial.header(NONCE_HEADER));
+            let passed = if challenged {
+                Ok(())
+            } else {
+                gate.check(partial.from, partial.header(PIN_HEADER))
+            };
+            match passed {
+                Err(refusal) => refusal,
+                Ok(()) => {
+                    let (reply_tx, reply_rx) = channel();
+                    let request = Request {
+                        reply: reply_tx,
+                        challenged,
+                        ..partial
+                    };
+                    if tx.send(request).is_err() {
+                        Response::status(503)
+                    } else {
+                        reply_rx.recv().unwrap_or_else(|_| Response::status(503))
+                    }
                 }
             }
-        },
+        }
         Ok(None) => Response::status(413),
         Err(_) => Response::status(500),
     };
@@ -705,6 +856,7 @@ fn read_request<R: BufRead>(reader: &mut R, from: IpAddr) -> std::io::Result<Opt
         headers,
         body,
         from,
+        challenged: false,
         reply,
     }))
 }
@@ -937,6 +1089,51 @@ impl Store {
                 None,
             ),
         })
+    }
+
+    /// Answers one request on the paired host, going by `name`: only a
+    /// paired Device that syncs on its own, proven by its key, and its
+    /// `/sync` only in its own name. The Device is remembered as synced
+    /// after a completed `/sync`.
+    pub fn serve_paired(
+        &self,
+        request: &Request,
+        name: &str,
+    ) -> Result<(Response, Option<Session>)> {
+        let Some(device) = self.paired_joiner(request)? else {
+            return Ok((Response::declined(), None));
+        };
+        if let Some(ask) = request.join_ask()
+            && ask.device != device
+        {
+            return Ok((Response::declined(), None));
+        }
+        let (response, session) = self.serve(request, name)?;
+        if let Some(session) = &session {
+            self.remember_device(&PairedDevice {
+                id: device,
+                name: session.name.clone(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: self.now(),
+            })?;
+        }
+        Ok((response, session))
+    }
+
+    /// Starts the paired host with this Device's certificate on `bind`,
+    /// on the port it had before while that is free, and keeps the port.
+    pub fn start_paired_host(&self, bind: IpAddr) -> Result<Host> {
+        let port = self
+            .local_setting(PAIRED_PORT_KEY)?
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0);
+        let host = Host::start_paired(&self.tls_identity()?, bind, port)?;
+        if host.port() != port {
+            self.set_local_setting(PAIRED_PORT_KEY, &host.port().to_string())?;
+        }
+        Ok(host)
     }
 }
 
@@ -1205,6 +1402,45 @@ mod tests {
     }
 
     #[test]
+    fn a_pin_host_hands_out_no_nonces_and_counts_no_tries_for_asking() -> TestResult {
+        let identity = generate_identity()?;
+        let host = Host::start(&identity, "111111", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
+        let agent = agent();
+        let base = format!("https://127.0.0.1:{}", host.port());
+        for _ in 0..=PIN_FAILURES_PER_ADDRESS {
+            let res = agent.get(format!("{base}/challenge")).call()?;
+            assert_eq!(res.status().as_u16(), 404);
+        }
+        let res = agent
+            .get(format!("{base}/vector"))
+            .header(DEVICE_HEADER, "phone")
+            .header(NONCE_HEADER, "anything")
+            .header(PROOF_HEADER, "x")
+            .call()?;
+        assert_eq!(res.status().as_u16(), 403, "no PIN, no entry");
+        // The right PIN still gets in: asking was no wrong try.
+        let stop = Arc::new(AtomicBool::new(false));
+        let served = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                while !stop.load(Ordering::Relaxed) {
+                    if let Some(request) = host.wait_request(Duration::from_millis(5)) {
+                        request.reply(Response::status(200));
+                    }
+                }
+            })
+        };
+        let res = agent
+            .get(format!("{base}/vector"))
+            .header(PIN_HEADER, "111111")
+            .call()?;
+        assert_eq!(res.status().as_u16(), 200);
+        stop.store(true, Ordering::Relaxed);
+        served.join().map_err(|_| "host thread")?;
+        Ok(())
+    }
+
+    #[test]
     fn another_format_is_refused_with_its_reason() -> TestResult {
         let store = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
         let body = json!({"format": 1, "deviceId": "p", "entries": []}).to_string();
@@ -1264,6 +1500,246 @@ mod tests {
     }
 
     #[test]
+    fn the_paired_proof_matches_the_dart_core() {
+        assert_eq!(
+            String::from_utf8(paired_proof_bytes("desk", "n0nce"))
+                .ok()
+                .as_deref(),
+            Some(r#"["auto","desk","n0nce"]"#)
+        );
+    }
+
+    /// The paired host's side as the desktop runs it in the background.
+    fn serve_paired_until(
+        path: PathBuf,
+        host: Host,
+        stop: Arc<AtomicBool>,
+    ) -> JoinHandle<Result<Vec<Session>>> {
+        std::thread::spawn(move || {
+            let store = open(&path, 1)?;
+            let mut sessions = Vec::new();
+            while !stop.load(Ordering::Relaxed) {
+                let Some(request) = host.wait_request(Duration::from_millis(5)) else {
+                    continue;
+                };
+                let (response, session) = store.serve_paired(&request, "Desk")?;
+                sessions.extend(session);
+                request.reply(response);
+            }
+            drop(host);
+            Ok(sessions)
+        })
+    }
+
+    /// A nonce from the paired host.
+    fn challenge(agent: &ureq::Agent, base: &str) -> std::result::Result<String, String> {
+        let mut res = agent
+            .get(format!("{base}/challenge"))
+            .call()
+            .map_err(|e| e.to_string())?;
+        let body: Value =
+            serde_json::from_str(&res.body_mut().read_to_string().map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+        Ok(body["nonce"].as_str().unwrap_or_default().to_string())
+    }
+
+    /// Syncs as the Dart core's `pairedSync` does, as `device` signing
+    /// with `signer`'s key and sending `body_store`'s entries; a refusal
+    /// comes back as its status and text.
+    fn join_paired(
+        signer: &Store,
+        device: &str,
+        port: u16,
+        host_device: &str,
+    ) -> std::result::Result<Session, String> {
+        let fail = |e: &dyn std::fmt::Display| e.to_string();
+        let agent = agent();
+        let base = format!("https://127.0.0.1:{port}");
+        let nonce = challenge(&agent, &base)?;
+        let proof = signer
+            .signing_key()
+            .map_err(|e| fail(&e))?
+            .sign(&paired_proof_bytes(host_device, &nonce));
+        let headers = [
+            (DEVICE_HEADER, device.to_string()),
+            (NONCE_HEADER, nonce),
+            (PROOF_HEADER, proof),
+        ];
+        let mut get = agent.get(format!("{base}/vector"));
+        for (k, v) in &headers {
+            get = get.header(*k, v);
+        }
+        let mut res = get.call().map_err(|e| fail(&e))?;
+        let text = res.body_mut().read_to_string().unwrap_or_default();
+        if res.status().as_u16() != 200 {
+            return Err(format!("{} {text}", res.status().as_u16()));
+        }
+        let host_vector: HashMap<String, i64> =
+            serde_json::from_str(&text).map_err(|e| fail(&e))?;
+        let body =
+            sync_request(signer, &host_vector, "Phone", host_device, "").map_err(|e| fail(&e))?;
+        let mut post = agent
+            .post(format!("{base}/sync"))
+            .content_type("application/json");
+        for (k, v) in &headers {
+            post = post.header(*k, v);
+        }
+        let mut res = post
+            .send(body.to_string().as_bytes())
+            .map_err(|e| fail(&e))?;
+        let text = res.body_mut().read_to_string().unwrap_or_default();
+        if res.status().as_u16() != 200 {
+            return Err(format!("{} {text}", res.status().as_u16()));
+        }
+        let answer: Value = serde_json::from_str(&text).map_err(|e| fail(&e))?;
+        apply_answer(signer, &answer).map_err(|e| fail(&e))
+    }
+
+    #[test]
+    fn a_paired_device_syncs_without_the_pin() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let host_path = dir.path().join("desk.db");
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let phone_id = phone.device_id()?;
+        let (desk_id, port) = {
+            let desk = open(&host_path, 1)?;
+            // Paired once by code: the phone's key verified, the phone
+            // remembered.
+            let first = sync_request(&phone, &HashMap::new(), "Phone", "", "")?;
+            desk.serve_sync(first.to_string().as_bytes(), "Desk")?;
+            desk.remember_device(&PairedDevice {
+                id: phone_id.clone(),
+                name: "Phone".into(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: desk.now(),
+            })?;
+            Notes::new(&desk).capture("Done on the desk", None, None)?;
+            let host = desk.start_paired_host(IpAddr::V4(Ipv4Addr::LOCALHOST))?;
+            assert_eq!(
+                desk.local_setting(PAIRED_PORT_KEY)?,
+                Some(host.port().to_string())
+            );
+            let port = host.port();
+            drop(host);
+            (desk.device_id()?, port)
+        };
+        let host = open(&host_path, 1)?.start_paired_host(IpAddr::V4(Ipv4Addr::LOCALHOST))?;
+        assert_eq!(host.port(), port, "the port it had");
+        assert_eq!(host.pin(), "");
+        let stop = Arc::new(AtomicBool::new(false));
+        let served = serve_paired_until(host_path.clone(), host, stop.clone());
+
+        let agent = agent();
+        let base = format!("https://127.0.0.1:{port}");
+        // Neither a PIN nor a nonce from here lets anyone in.
+        let res = agent
+            .get(format!("{base}/vector"))
+            .header(PIN_HEADER, "000000")
+            .call()?;
+        assert_eq!(res.status().as_u16(), 403);
+        let res = agent
+            .get(format!("{base}/vector"))
+            .header(DEVICE_HEADER, &phone_id)
+            .header(NONCE_HEADER, "made-up")
+            .header(PROOF_HEADER, "x")
+            .call()?;
+        assert_eq!(res.status().as_u16(), 403);
+        // Another key claiming the phone's id is declined.
+        let impostor = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([3; 32])))?;
+        assert_eq!(
+            join_paired(&impostor, &phone_id, port, &desk_id)
+                .err()
+                .as_deref(),
+            Some("403 declined")
+        );
+
+        let session = join_paired(&phone, &phone_id, port, &desk_id)?;
+        assert!(!session.applied.is_empty());
+        assert_eq!(session.name, "Desk");
+        assert!(
+            join_paired(&phone, &phone_id, port, &desk_id)?
+                .applied
+                .is_empty()
+        );
+
+        stop.store(true, Ordering::Relaxed);
+        let sessions = served.join().map_err(|_| "host thread")??;
+        assert_eq!(sessions.len(), 2);
+        let desk = open(&host_path, 1)?;
+        assert_eq!(
+            desk.paired_device(&phone_id)?.map(|d| d.name),
+            Some("Phone".to_string())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_switched_off_or_forgotten_device_and_a_borrowed_name_are_declined() -> TestResult {
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let other = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([3; 32])))?;
+        for joiner in [&phone, &other] {
+            let first = sync_request(joiner, &HashMap::new(), "Phone", "", "")?;
+            desk.serve_sync(first.to_string().as_bytes(), "Desk")?;
+            desk.remember_device(&PairedDevice {
+                id: joiner.device_id()?,
+                name: "Phone".into(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: desk.now(),
+            })?;
+        }
+        let desk_id = desk.device_id()?;
+        let request =
+            |signer: &Store, path: &str, body: Vec<u8>, challenged: bool| -> Result<Request> {
+                let proof = signer
+                    .signing_key()?
+                    .sign(&paired_proof_bytes(&desk_id, "n1"));
+                let (reply, _) = channel();
+                Ok(Request {
+                    method: if body.is_empty() { "GET" } else { "POST" }.into(),
+                    path: path.into(),
+                    headers: vec![
+                        (DEVICE_HEADER.into(), signer.device_id()?),
+                        (NONCE_HEADER.into(), "n1".into()),
+                        (PROOF_HEADER.into(), proof),
+                    ],
+                    body,
+                    from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+                    challenged,
+                    reply,
+                })
+            };
+        let status = |r: &Request| -> Result<u16> { Ok(desk.serve_paired(r, "Desk")?.0.status) };
+        assert_eq!(status(&request(&phone, "/vector", Vec::new(), true)?)?, 200);
+        assert_eq!(
+            status(&request(&phone, "/vector", Vec::new(), false)?)?,
+            403,
+            "a nonce this host never handed out"
+        );
+        // The phone's proof with the other Device's entries.
+        let borrowed = sync_request(&other, &HashMap::new(), "Other", &desk_id, "")?;
+        assert_eq!(
+            status(&request(
+                &phone,
+                "/sync",
+                borrowed.to_string().into_bytes(),
+                true
+            )?)?,
+            403
+        );
+        desk.set_auto_sync(&phone.device_id()?, false)?;
+        assert_eq!(status(&request(&phone, "/vector", Vec::new(), true)?)?, 403);
+        desk.set_auto_sync(&phone.device_id()?, true)?;
+        desk.forget_device(&phone.device_id()?)?;
+        assert_eq!(status(&request(&phone, "/vector", Vec::new(), true)?)?, 403);
+        Ok(())
+    }
+
+    #[test]
     fn a_join_ask_names_the_device() {
         let (reply, _) = channel();
         let request = Request {
@@ -1272,6 +1748,7 @@ mod tests {
             headers: Vec::new(),
             body: br#"{"deviceId":"abc","name":"Pixel","proof":"x"}"#.to_vec(),
             from: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            challenged: false,
             reply,
         };
         assert_eq!(

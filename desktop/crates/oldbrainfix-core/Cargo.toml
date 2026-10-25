@@ -26,6 +26,9 @@ parking_lot = "0.12"
 # certificate, as Catlog's desk does.
 rcgen = "0.13"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+# Paired Devices find the desktop's host on the network (mDNS/DNS-SD);
+# no async runtime, no logging.
+mdns-sd = { version = "0.21", default-features = false }
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

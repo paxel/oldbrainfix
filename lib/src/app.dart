@@ -9,7 +9,9 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
+import 'auto_sync.dart';
 import 'browser.dart';
+import 'conflicts_screen.dart';
 import 'calendar_mirror.dart';
 import 'calendar_platform.dart';
 import 'capture_requests.dart';
@@ -31,6 +33,7 @@ import 'routine_editor_screen.dart';
 import 'setup_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
+import 'sync_platform.dart';
 import 'voice_platform.dart';
 
 class OldBrainFixApp extends StatefulWidget {
@@ -89,6 +92,13 @@ class OldBrainFixApp extends StatefulWidget {
   /// Reads the pair code in a photo for Sync; typing it always works.
   final PairingPlatform pairing;
 
+  /// Finds paired Devices on the network and syncs in the background;
+  /// none when not given, and paired Devices are tried where they were.
+  final SyncPlatform sync;
+
+  /// How an automatic sync is run; tests hand in a fake.
+  final PairedJoin autoJoin;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -107,6 +117,8 @@ class OldBrainFixApp extends StatefulWidget {
     this.mirrorDelay = CalendarMirror.defaultDelay,
     this.lock = const NoBiometrics(),
     this.pairing = const NoPairing(),
+    this.sync = const NoSync(),
+    this.autoJoin = quickPairedSync,
   });
 
   @override
@@ -136,6 +148,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _speechModel = SpeechModel(widget.speech);
   late final _lock = AppLock(store: widget.store, platform: widget.lock);
   final _routes = RouteStack();
+  late final _autoSync = AutoSync(
+    store: widget.store,
+    platform: widget.sync,
+    deviceName: widget.pairing.deviceName,
+    join: widget.autoJoin,
+  );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
 
@@ -164,6 +182,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   @override
   void dispose() {
     _alarms.dispose();
+    _autoSync.dispose();
     _mirror.dispose();
     _playback.dispose();
     _transcriber.dispose();
@@ -215,7 +234,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                               lock: _lock,
                               child: PairingScope(
                                 pairing: widget.pairing,
-                                child: child ?? const SizedBox.shrink(),
+                                child: AutoSyncScope(
+                                  sync: _autoSync,
+                                  child: child ?? const SizedBox.shrink(),
+                                ),
                               ),
                             ),
                           ),
@@ -236,6 +258,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       places: _places,
       trail: _trail,
       alarms: _alarms,
+      autoSync: _autoSync,
       mirror: _mirror,
       lock: _lock,
       routes: _routes,
@@ -298,6 +321,7 @@ class _Home extends StatefulWidget {
   final Places places;
   final BrowserTrail trail;
   final AlarmSync alarms;
+  final AutoSync autoSync;
   final CalendarMirror mirror;
   final AppLock lock;
   final RouteStack routes;
@@ -310,6 +334,7 @@ class _Home extends StatefulWidget {
     required this.places,
     required this.trail,
     required this.alarms,
+    required this.autoSync,
     required this.mirror,
     required this.lock,
     required this.routes,
@@ -336,9 +361,11 @@ class _HomeState extends State<_Home> {
   /// Whether the app is locked, as shown.
   late bool _locked = widget.lock.locked;
 
-  /// The Nudge screen and the Unsorted list, asked for while locked.
+  /// The Nudge screen and the Unsorted list, asked for while locked, and
+  /// Conflicts a sync brought meanwhile.
   var _nudgeWaiting = false;
   var _unsortedWaiting = false;
+  var _conflictsWaiting = false;
 
   @override
   void initState() {
@@ -347,6 +374,12 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.lock.addListener(_lockChanged);
+    widget.autoSync.addListener(_conflictsSynced);
+    // Paired Devices sync while the app shows, from the first frame on:
+    // what it brings is announced.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.autoSync.shown();
+    });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
     // way out as well, so a changed Device setting is armed even when the
@@ -371,13 +404,50 @@ class _HomeState extends State<_Home> {
   void _hidden() {
     widget.lock.hidden();
     unawaited(widget.alarms.refresh());
+    widget.autoSync.hidden();
   }
 
-  /// Back from the background: the alarms as above, and the calendar
-  /// mirror in step with what other Devices synced meanwhile.
+  /// Back from the background: the alarms as above, the calendar mirror
+  /// in step with what other Devices synced meanwhile, and a sync with
+  /// the paired Devices.
   void _resumed() {
     unawaited(widget.alarms.refresh());
     unawaited(widget.mirror.sync());
+    widget.autoSync.shown();
+  }
+
+  /// An automatic sync, now or in the background, brought Conflicts:
+  /// announced at the top, a tap away from the list.
+  void _conflictsSynced() {
+    if (!mounted || widget.autoSync.takeConflicts() == 0) return;
+    // Not past the App Lock: announced once it is unlocked.
+    if (widget.lock.locked) {
+      _conflictsWaiting = true;
+      return;
+    }
+    _announceConflicts();
+  }
+
+  void _announceConflicts() {
+    _conflictsWaiting = false;
+    final store = widget.store;
+    final count = visibleConflicts(
+      store,
+      widget.lock,
+      store.conflicts(),
+    ).length;
+    if (count == 0) return;
+    final navigator = Navigator.of(context);
+    AnnouncementsScope.of(context)?.announce(
+      context.t.syncConflicts(count),
+      onTap: () => unawaited(
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => ConflictsScreen(store: store),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -386,6 +456,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.lock.removeListener(_lockChanged);
+    widget.autoSync.removeListener(_conflictsSynced);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -423,6 +494,7 @@ class _HomeState extends State<_Home> {
       return;
     }
     if (_nudgeWaiting) _openNudge();
+    if (_conflictsWaiting) _announceConflicts();
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));
