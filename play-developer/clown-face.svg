@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0" stop-color="#3a8f86"/>
+      <stop offset="1" stop-color="#1d4f4a"/>
+    </radialGradient>
+    <radialGradient id="skin" cx="45%" cy="38%" r="65%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e6e1d8"/>
+    </radialGradient>
+    <radialGradient id="nose" cx="38%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#ff6b6b"/>
+      <stop offset="1" stop-color="#c0141c"/>
+    </radialGradient>
+  </defs>
+  <g id="clownface">
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- hair tufts -->
+  <g fill="#ff7a1a">
+    <circle cx="112" cy="200" r="58"/><circle cx="86" cy="262" r="54"/><circle cx="110" cy="320" r="48"/>
+    <circle cx="400" cy="200" r="58"/><circle cx="426" cy="262" r="54"/><circle cx="402" cy="320" r="48"/>
+  </g>
+  <g fill="#ff9b3d">
+    <circle cx="124" cy="214" r="34"/><circle cx="100" cy="270" r="30"/>
+    <circle cx="388" cy="214" r="34"/><circle cx="412" cy="270" r="30"/>
+  </g>
+  <!-- face -->
+  <ellipse cx="256" cy="268" rx="150" ry="168" fill="url(#skin)"/>
+  <!-- small hat -->
+  <path d="M206 120 L256 28 L306 120 Z" fill="#2f6fdc"/>
+  <circle cx="232" cy="96" r="7" fill="#ffd23f"/><circle cx="262" cy="72" r="7" fill="#ffd23f"/><circle cx="280" cy="104" r="7" fill="#ffd23f"/>
+  <circle cx="256" cy="28" r="16" fill="#ffd23f"/>
+  <rect x="196" y="112" width="120" height="16" rx="8" fill="#1e4fa8"/>
+  <!-- eyebrows -->
+  <path d="M170 196 Q200 168 230 190" fill="none" stroke="#2b2b2b" stroke-width="9" stroke-linecap="round"/>
+  <path d="M282 190 Q312 168 342 196" fill="none" stroke="#2b2b2b" stroke-width="9" stroke-linecap="round"/>
+  <!-- eye diamonds -->
+  <path d="M200 206 L224 240 L200 274 L176 240 Z" fill="#3f8fe0"/>
+  <path d="M312 206 L336 240 L312 274 L288 240 Z" fill="#3f8fe0"/>
+  <ellipse cx="200" cy="240" rx="11" ry="14" fill="#1b1b1b"/>
+  <ellipse cx="312" cy="240" rx="11" ry="14" fill="#1b1b1b"/>
+  <circle cx="204" cy="235" r="4" fill="#fff"/><circle cx="316" cy="235" r="4" fill="#fff"/>
+  <!-- cheeks -->
+  <circle cx="160" cy="318" r="24" fill="#ff8a8a" opacity="0.55"/>
+  <circle cx="352" cy="318" r="24" fill="#ff8a8a" opacity="0.55"/>
+  <!-- mouth -->
+  <path d="M168 330 Q256 430 344 330 Q256 372 168 330 Z" fill="#d8222a"/>
+  <path d="M196 344 Q256 404 316 344 Q256 368 196 344 Z" fill="#7a0d12"/>
+  <path d="M226 376 Q256 392 286 376 Q256 400 226 376 Z" fill="#ff7a8a"/>
+  <!-- nose -->
+  <circle cx="256" cy="296" r="36" fill="url(#nose)"/>
+  <ellipse cx="244" cy="284" rx="10" ry="7" fill="#fff" opacity="0.6"/>
+  <!-- collar -->
+  <g fill="#ffd23f" stroke="#e0a800" stroke-width="3">
+    <path d="M96 470 Q128 420 160 452 Q184 404 216 440 Q236 396 256 434 Q276 396 296 440 Q328 404 352 452 Q384 420 416 470 L430 512 L82 512 Z"/>
+  </g>
+  </g>
+</svg>
