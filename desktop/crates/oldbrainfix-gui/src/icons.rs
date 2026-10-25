@@ -35,6 +35,7 @@ pub const PLAY: char = '\u{e4cb}';
 pub const PASTE: char = '\u{e192}';
 pub const SEARCH: char = '\u{e567}';
 pub const PHOTO: char = '\u{e4b4}';
+pub const PERSON: char = '\u{e491}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

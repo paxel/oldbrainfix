@@ -42,3 +42,7 @@ On Android the app's backup agent (`AutoBackup.kt`) takes part in Auto Backup (`
 - A Device that set Backups up again shows the newest key only; the older Backups of the other Device, still in its folder, need the older Recovery Sheet.
 - Google's copy is at most a week old, and only the newest one: Android keeps no history of it.
 - A Backup larger than 25 MiB, photos and recordings counting, never reaches Google.
+
+## Profiles (ADR 0017)
+
+Amended by ADR 0017: the backup key belongs to the Profile, one passphrase and one Recovery Sheet for all of a person's Devices; a Device paired as one's own receives it, the per-Device keys and their hand-over above go, and a Backup carries the Profile, which restoring brings back (#49). Until then the Profile is a local setting and stays behind like the others.

@@ -25,3 +25,7 @@ A Shared Area reuses whatever shared folder both people reach, with no folder of
 - A Device of the other person joins through Pairing with them, or a Device of its own that already has a role; a Device that meets them only through the folder needs one LAN sync first to learn the signing keys.
 - A Note moved out of a Shared Area stays as it was for the others.
 - Phones only join, so two people with only phones cannot share yet.
+
+## Profiles (ADR 0017)
+
+Amended by ADR 0017: the name a Manager types for the invited person goes; the invite shows the other person's Profile to confirm, and the person of a Note is its Profile, found through the signing Device's binding and the aliases. Profiles of the people of a Shared Area travel with its sync and bundles (#50).

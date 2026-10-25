@@ -20,6 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:image/image.dart' as img;
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:sqlite3/sqlite3.dart';
 
@@ -2291,6 +2292,151 @@ Map<String, Object?> _keys() {
   };
 }
 
+/// Profiles (ADR 0017): names as typed and as kept, initials, colours,
+/// short codes, records and their bytes, the own Profile as this Device
+/// keeps it, and a picture made here for the desktop to take in.
+void _profilesFixture(Directory root) {
+  final dir = Directory('${root.path}/profiles');
+  final writer = SigningKey.fromSeed(_seed).publicKey;
+  final joiner = SigningKey.fromSeed(_joinerSeed).publicKey;
+  const england =
+      '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
+  final names = [
+    '  Ada  ',
+    'Jürgen Müller',
+    '李小龍',
+    'مريم',
+    'Mum 👩\u200D👧 ❤\uFE0F',
+    'A\u0000d\u0007a\n\tB\u007F\u0085',
+    '\u202EAda\u202C \u2066Bo\u2069\u200E\u200F\u061C',
+    '\u200B Ada\u2060\uFEFF\u00AD ',
+    'A\u200Bd\u3164a',
+    '\u200DAda\u200D',
+    'A\u200D d',
+    'A\u200D\u200Dd',
+    'می\u200Cخواهم',
+    '\uFE0FAda',
+    '❤\uFE0F\uFE0F',
+    'Ada $england',
+    'Ada\u{E0041}\u{E0042}',
+    '\u{E0001}Ada',
+    'x' * 50,
+    '😀' * 45,
+    '${'a' * 39} bc',
+    '${'a' * 39}👩\u200D👧',
+    '${'a' * 36}$england',
+    '',
+    ' \u200B\u202E\n ',
+  ];
+  final picture = makeProfilePicture(
+    _gradient(320, 240),
+    left: 40,
+    top: 0,
+    size: 240,
+  )!;
+  _writeBytes(File('${dir.path}/picture.jpg'), picture);
+  final records = [
+    const Profile(id: 'p1', name: 'Ada', version: 1),
+    Profile(
+      id: '00000000000000000000000000000abc',
+      name: 'Jürgen "Jo" Müller 👩\u200D👧',
+      picture: Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]),
+      version: 7,
+    ),
+    const Profile(id: 'p2', name: '', version: 2),
+  ];
+  var ids = 0;
+  Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+  final store = Store.inMemory(newKey: () => SigningKey.fromSeed(_seed));
+  final own = <Map<String, Object?>>[];
+  void step(String what) => own.add({
+    'step': what,
+    'settings': {
+      for (final (key, value) in store.localSettingsWithPrefix('profile'))
+        key: value,
+    },
+    'code': store.ownProfileCode,
+  });
+  try {
+    store.applyProfileDefaults(name: ' Ada’s desk ');
+    step('defaults');
+    store.applyProfileDefaults(name: 'desk', picture: picture);
+    step('new defaults');
+    store.renameOwnProfile('\u202EAda\u200B');
+    step('renamed');
+    store.applyProfileDefaults(name: 'other');
+    step('defaults after the rename');
+    store.setOwnProfilePicture(null);
+    step('placeholder chosen');
+  } finally {
+    store.close();
+  }
+  final fixture = {
+    'names': [
+      for (final raw in names) {'raw': raw, 'kept': sanitizeProfileName(raw)},
+    ],
+    'initials': [
+      for (final name in [
+        'ada lovelace',
+        'Ada King Lovelace',
+        'Ada',
+        '',
+        'Élodie',
+        '李小龍',
+      ])
+        {'name': name, 'initials': profileInitials(name)},
+    ],
+    'colours': [
+      for (final id in ['p1', 'p2', '00000000000000000000000000000abc', 'é'])
+        {'id': id, 'colour': profileColor(id)},
+    ],
+    'codes': [
+      for (final (id, key) in [
+        ('p1', writer),
+        ('p1', joiner),
+        ('00000000000000000000000000000001', writer),
+      ])
+        {
+          'id': id,
+          'key': base64.encode(key),
+          'code': profileShortCode(id, key),
+        },
+    ],
+    'records': [
+      for (final r in records) {'payload': r.encode()},
+    ],
+    'refused': [
+      'nope',
+      '{"id":"","name":"A","version":1}',
+      '{"id":"p","name":"A","version":0}',
+      '{"id":"p","name":"A","picture":"%%","version":1}',
+      '{"id":"p","name":"A","picture":"AQ-_","version":1}',
+      '{"id":"p","name":"A","picture":"AQJ=","version":1}',
+      '{"id":"p","name":"\\ud800A","version":1}',
+    ],
+    'own': own,
+  };
+  _write(File('${dir.path}/profiles.json'), '${_json.convert(fixture)}\n');
+}
+
+/// A [width] × [height] PNG shading from red to blue, made the same way
+/// every time.
+Uint8List _gradient(int width, int height) {
+  final image = img.Image(width: width, height: height);
+  for (final p in image) {
+    p
+      ..r = 255 * (width - p.x) ~/ width
+      ..g = 255 * p.y ~/ height
+      ..b = 255 * p.x ~/ width;
+  }
+  return img.encodePng(image);
+}
+
+void _writeBytes(File file, List<int> bytes) {
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+}
+
 const _json = JsonEncoder.withIndent('  ');
 
 void _write(File file, String text) {
@@ -2531,7 +2677,12 @@ Future<void> main(List<String> args) async {
     'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
     'at a held clock), and a new Device restoring it with the passphrase '
     'a day later: its log (`restored.jsonl`), the settings it keeps and '
-    'what it reads (`expected.json`).\n',
+    'what it reads (`expected.json`).\n'
+    '- `profiles/`: Profile names as typed and as kept, initials, '
+    'placeholder colours, short codes from an id and a first key, records '
+    'as they are written and records refused, the own Profile\'s local '
+    'settings after each step (ids counted from 1), and a Profile picture '
+    'made here (`picture.jpg`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -2561,6 +2712,7 @@ Future<void> main(List<String> args) async {
   _sharedFixture(root);
   _sentFixture(root);
   await _backupFixture(root);
+  _profilesFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

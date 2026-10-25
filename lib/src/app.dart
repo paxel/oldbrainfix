@@ -30,6 +30,8 @@ import 'nudge_screen.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
+import 'profile.dart';
+import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
 import 'ring_screen.dart';
@@ -110,6 +112,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// Sharing and importing bundle files; none when not given.
   final BundlePlatform bundles;
 
+  /// The phone's name for the own Profile and its picture picker; none
+  /// when not given.
+  final ProfilePlatform profile;
+
   /// Where a Backup is written before it goes into its folder; while
   /// none is given, no Backup is written on its own while the app shows.
   final String? workDir;
@@ -136,6 +142,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.autoJoin = quickPairedSync,
     this.folders = const NoFolders(),
     this.bundles = const NoBundles(),
+    this.profile = const NoProfilePlatform(),
     this.workDir,
   });
 
@@ -176,6 +183,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
+  late final _profile = OwnProfileModel(
+    store: widget.store,
+    platform: widget.profile,
+  );
 
   @override
   void initState() {
@@ -197,6 +208,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     unawaited(_speechModel.check());
     // Photo Texts come in the background too, never holding Capture up.
     _photoReader = PhotoReader(notes: _notes, platform: widget.ocr);
+    // The own Profile from the phone's name, asking nothing.
+    unawaited(_profile.applyDefaults());
   }
 
   @override
@@ -209,6 +222,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     _speechModel.dispose();
     _photoReader.dispose();
     _lock.dispose();
+    _profile.dispose();
     _scroll.dispose();
     if (widget.announcements == null) _announcements.dispose();
     super.dispose();
@@ -290,6 +304,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       routes: _routes,
       requests: widget.requests,
       bundles: widget.bundles,
+      profile: _profile,
       onThemeChanged: _themeChanged,
     ),
   );
@@ -355,6 +370,7 @@ class _Home extends StatefulWidget {
   final RouteStack routes;
   final CaptureRequests requests;
   final BundlePlatform bundles;
+  final OwnProfileModel profile;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -369,6 +385,7 @@ class _Home extends StatefulWidget {
     required this.routes,
     required this.requests,
     required this.bundles,
+    required this.profile,
     required this.onThemeChanged,
   });
 
@@ -718,6 +735,7 @@ class _HomeState extends State<_Home> {
               trail: widget.trail,
               alarms: widget.alarms,
               requests: widget.requests,
+              profile: widget.profile,
               onThemeChanged: widget.onThemeChanged,
             ),
           ),

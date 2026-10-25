@@ -10,11 +10,17 @@ dependencies:
   # The bundle file (ADR 0003): a zip, stored, read and written as a
   # stream. MIT.
   archive: ^4.3.0
+  # Profile initials by what people see as one character. BSD-3-Clause.
+  characters: ^1.4.0
   crypto: ^3.0.6
   # End-to-end encryption of what leaves a Device (ADR 0003, 0012):
   # XChaCha20-Poly1305, pure Dart.
   cryptography: ^2.9.0
   ed25519_edwards: ^0.3.2
+  # Profile pictures (ADR 0017): decoded, cropped and re-encoded as JPEG
+  # in pure Dart, the same code for a picture chosen here and one
+  # received. MIT.
+  image: ^4.3.0
   qr: ^4.0.0
   sqlite3: ^3.0.0
 

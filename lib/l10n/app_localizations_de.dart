@@ -2207,4 +2207,57 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get restoreFoundSkip => 'Ohne sie anfangen';
+
+  @override
+  String get profileTitle => 'Profil';
+
+  @override
+  String get profileNoName => 'Ohne Namen';
+
+  @override
+  String get profileName => 'Name';
+
+  @override
+  String get profileCode => 'Dein Code';
+
+  @override
+  String get profilePictureChange => 'Bild ändern';
+
+  @override
+  String get profilePictureChoose => 'Bild auswählen';
+
+  @override
+  String get profilePictureTake => 'Foto aufnehmen';
+
+  @override
+  String get profilePictureInitials => 'Stattdessen Initialen zeigen';
+
+  @override
+  String get profilePictureUnreadable => 'Dieses Bild lässt sich nicht lesen.';
+
+  @override
+  String get profileCropTitle => 'Ausschnitt wählen';
+
+  @override
+  String get profileCropHint =>
+      'Ziehe das Quadrat, um es zu verschieben. Der Regler bestimmt seine Größe.';
+
+  @override
+  String get profileCropSize => 'Größe des Quadrats';
+
+  @override
+  String get profileCropUse => 'Diesen Ausschnitt nehmen';
+
+  @override
+  String get profileBackups => 'Sicherungen und Wiederherstellung';
+
+  @override
+  String get profileDevices => 'Deine Geräte';
+
+  @override
+  String get profileDeviceSettings => 'Einstellungen dieses Geräts';
+
+  @override
+  String get profileDeviceSettingsDetail =>
+      'Sie gelten nur für dieses Gerät und werden nie synchronisiert.';
 }

@@ -91,7 +91,7 @@ fn backups_are_set_up_the_sheet_saved_and_a_folder_gets_one_at_once() -> TestRes
         assert_eq!(title, "Choose the folder for Backups");
         Some(picked.clone())
     }));
-    app.select(Selection::Settings);
+    app.select(Selection::Profile);
     let mut harness = window(app);
     assert!(shows(&harness, "Set up Backups"));
 
@@ -151,7 +151,7 @@ fn the_recovery_key_of_a_paired_phone_shows_once_asked_for() -> TestResult {
         shared: false,
     })?;
     let mut app = App::new(desk, "en");
-    app.select(Selection::Settings);
+    app.select(Selection::Profile);
     let mut harness = window(app);
     assert!(shows(&harness, "Recovery keys of your other Devices"));
     assert!(shows(&harness, "Pixel"));

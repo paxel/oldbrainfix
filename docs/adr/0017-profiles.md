@@ -1,0 +1,52 @@
+# Profiles: one per person, a signed record bound to its Devices' keys, kept beside the log
+
+Every person has one Profile: an id, a name, a picture and a version. The first Device makes it with a random id (a new entity id, 32 hex digits) and its own signing key as the Profile's first key; a Device paired as one's own takes it over (#48). When two Devices that each have a Profile are paired as one's own, Pairing asks once "Which one is you?", showing both; the other id becomes an alias of the kept one, and Notes marked with it show the kept Profile without being written again (#48). Nothing about the Profile is asked at first start, at Capture or while sharing: the phone starts with its own name (`Settings.Global.DEVICE_NAME`, else its model), the computer with the login's full name and account picture, else its own name; the defaults follow the system until the user changes the name or the picture (#47).
+
+## The record (#47)
+
+The record is one JSON object, keys sorted and no spaces, the same bytes from both cores: `{"id":…,"name":…,"picture":…,"version":n}`. `picture` is a JPEG of 256 × 256 pixels in base64 and is left out for the placeholder; `version` starts at 1 and counts up with every change of name or picture. The name is sanitised when it is typed, when a record is read, and when one is received: control characters, bidi controls and invisible characters (zero-width space, word joiner, soft hyphen, the Hangul fillers and the like, from a fixed list in both cores) are removed; a zero-width joiner or non-joiner stays only between two visible characters, a variation selector only right after one, and tag characters only inside a flag after U+1F3F4, so emoji and every script stay whole; then the name is trimmed, cut to 40 code points (no joiner or half a flag left at the end) and trimmed again. A name with nothing left is empty in the record, and every screen shows it as "No name" in its own language. Code points are counted, not graphemes, because the two cores' Unicode tables differ by version and must cut at the same place.
+
+A picture is the square the user picks of a picture, re-encoded as a JPEG of 256 × 256 pixels (quality 85, transparent parts on white) with every metadata segment removed. A picture received is decoded and made again the same way, from its middle square, and refused when it is larger than 256 KB, declares an edge above 1024 pixels, or is no JPEG, PNG or WebP; a picture chosen on the Device may have edges up to 8192 pixels. Both limits are checked before anything is decoded. Both cores do this (`profiles.dart`, `profile.rs`); their JPEG encoders differ, so the same picture gives other bytes on the phone and on the desktop, and the fixtures carry pictures as data.
+
+The placeholder shows the initials (the first character of the first and of the last word, upper case) in white on a circle whose colour is one of 12 fixed colours: the first byte of SHA-256 over `oldbrainfix:profile-colour:<id>`, modulo 12. The short code people compare in person is the first 40 bits of SHA-256 over `oldbrainfix:profile-code:<id>:` followed by the first key's 32 public bytes, in upper-case Crockford base32 as 4 + 4 characters (`4F2K-9QX7`): a copied id with another key gives another code.
+
+## Where it lives (#47)
+
+The own Profile is kept as local settings, not in the log: `profile` holds the record, `profile:first` the first key (base64), and `profile:nameChosen` and `profile:pictureChosen` say the user replaced a default. The log goes to one's own Devices and, Area by Area, to other people under Area keys (ADR 0012, 0013), but the Profile has to reach the people of every Shared Area and every Sent Item whatever their keys, as one signed unit that a newer version replaces whole; an append-only log would also keep every picture ever chosen. Like the key records (ADR 0015), the record travels inside what is sent, never as an entry. Nothing about it leaves the Device in #47.
+
+## Signing and binding (#48, #50, #51)
+
+A record is signed by a Device key bound to its Profile, over `oldbrainfix:profile:` followed by the record's bytes as sent; the receiver checks the signature before it reads anything else, keeps the record as received so it can pass it on unchanged, and shows the name sanitised and the picture made again. A Profile's binding starts at its first key; one's own new Devices join it through Pairing, each added by a key already bound, and the binding carries the first key, so every Device that holds the Profile computes the same short code. On first sight an id is bound to the keys that came with it; later, a record of a known id counts only when signed by one of its bound keys, and a newer version replaces the stored one, every view showing the new name and picture at once. Profiles travel with Shared Area sync, bundles and the shared folder (#48 between one's own Devices, #50 to the people of a Shared Area) and with Sent Items (#51); the sync format is raised then.
+
+## Overrides and People (#52, #53)
+
+An Override is a name and picture one person gives another's Profile for themselves alone ("Mum"), sanitised like a Profile. Overrides sync between one's own Devices and never leave them: they are kept in the log outside every Area, under the personal key (ADR 0012), which no other person holds. A person's picture opens their Profile, and the Profile page lists every stored Profile under People (#52); "Their Notes" there opens the browser filtered to that person (#53).
+
+## Backup key per Profile (#49)
+
+One backup key per Profile instead of one per Device: one passphrase and one Recovery Sheet for all of a person's Devices. A Device paired as one's own receives the key over the encrypted paths ADR 0016 uses for a Device's own key; each Device keeps writing Backup files of its own, all opened with the same key, and restoring one restores the Profile.
+
+## The Profile page (#47)
+
+The settings gear in the Agenda's corner is replaced by the own Profile's picture, on the phone and on the desktop. It opens the Profile page: the picture, the name and the short code; Backups and recovery; Your Devices (pairing and the paired Devices, as the Sync page shows them); People (#52); and the settings of this Device, which stay unsynced (ADR 0008).
+
+## Changes to earlier decisions
+
+- ADR 0013: the name a Manager types for an invited person is replaced by the person's Profile, and Notes are marked by Profile through the signing Device's binding and the aliases (#50).
+- ADR 0015: a Sent Item carries the sender's signed Profile, stored and bound only when the item is accepted; "verified" moves from the Sent Item's key to the Profile, by comparing short codes in person (#51).
+- ADR 0016: the backup key belongs to the Profile, not to the Device; the per-Device keys and their hand-over between Devices of #40 and #41 go, and a Backup carries the Profile (#49).
+
+## Considered Options
+
+- Profile fields as log entries (rejected: they would reach other people only inside an Area's history, under its key, and every past picture would stay in the log for good).
+- The first key inside the record (rejected: the record holds what a person changes; the key belongs to the binding, which says who may change it).
+- An id derived from the first key, as device ids are (rejected: a Device that takes the Profile over would show another person; the id stays when keys join and go).
+- Storing "No name" in the record (rejected: one language's words would travel to readers of another).
+- Counting the 40 characters as graphemes (rejected: the cores' Unicode versions could cut the same name at different places).
+
+## Consequences
+
+- Until #48 every Device has a Profile of its own; pairing two of them is where "Which one is you?" comes in.
+- Until #49 a Backup does not carry the Profile: a restored Device starts with the defaults again.
+- The account picture is read where the system keeps it on Linux (AccountsService's icon or `~/.face`); inside the Flatpak, on Windows and on macOS the initials show until the user picks a picture. The name comes from the user database there too (passwd's full name, Windows' display name).
+- A name cut at 40 code points may lose the end of a long emoji sequence, never the characters before it.

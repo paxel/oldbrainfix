@@ -2150,3 +2150,73 @@ fn the_backup_the_dart_core_wrote_is_restored_here_and_written_the_same() -> Tes
     );
     Ok(())
 }
+
+#[test]
+fn profiles_come_out_as_the_dart_core_has_them() -> TestResult {
+    use oldbrainfix_core::profile::{self, OwnProfile, Profile};
+    let dir = fixtures().join("profiles");
+    let fixture = read_json(&dir.join("profiles.json"))?;
+    for case in fixture["names"].as_array().ok_or("names")? {
+        let raw = case["raw"].as_str().ok_or("raw")?;
+        assert_eq!(profile::sanitize_name(raw), case["kept"], "{raw:?}");
+    }
+    for case in fixture["initials"].as_array().ok_or("initials")? {
+        let name = case["name"].as_str().ok_or("name")?;
+        assert_eq!(profile::initials(name), case["initials"], "{name}");
+    }
+    for case in fixture["colours"].as_array().ok_or("colours")? {
+        let id = case["id"].as_str().ok_or("id")?;
+        assert_eq!(json!(profile::color(id)), case["colour"], "{id}");
+    }
+    for case in fixture["codes"].as_array().ok_or("codes")? {
+        let key = BASE64.decode(case["key"].as_str().ok_or("key")?)?;
+        let id = case["id"].as_str().ok_or("id")?;
+        assert_eq!(profile::short_code(id, &key), case["code"], "{id}");
+    }
+    for case in fixture["records"].as_array().ok_or("records")? {
+        let payload = case["payload"].as_str().ok_or("payload")?;
+        let parsed = Profile::parse(payload).ok_or("a record")?;
+        assert_eq!(parsed.encode(), payload);
+    }
+    for bad in fixture["refused"].as_array().ok_or("refused")? {
+        assert_eq!(
+            Profile::parse(bad.as_str().ok_or("refused")?),
+            None,
+            "{bad}"
+        );
+    }
+
+    // The picture the Dart core made is taken in here as one received.
+    let picture = std::fs::read(dir.join("picture.jpg"))?;
+    assert_eq!(profile::picture_size(&picture), Some((256, 256)));
+    assert!(profile::received_picture(&picture).is_some());
+
+    // The own Profile goes through the same steps to the same settings.
+    let store = writer_store()?;
+    let own = OwnProfile::new(&store);
+    let steps = fixture["own"].as_array().ok_or("own")?;
+    for (i, step) in steps.iter().enumerate() {
+        match i {
+            0 => own.apply_defaults(" Ada\u{2019}s desk ", None)?,
+            1 => own.apply_defaults("desk", Some(picture.clone()))?,
+            2 => own.rename("\u{202E}Ada\u{200B}")?,
+            3 => own.apply_defaults("other", None)?,
+            4 => own.set_picture(None)?,
+            _ => return Err(format!("a step more than here: {step}").into()),
+        };
+        let settings: serde_json::Map<String, Value> = store
+            .local_settings_with_prefix("profile")?
+            .into_iter()
+            .map(|(k, v)| (k, json!(v)))
+            .collect();
+        assert_eq!(
+            Value::Object(settings),
+            step["settings"],
+            "{}",
+            step["step"]
+        );
+        assert_eq!(json!(own.code()?), step["code"], "{}", step["step"]);
+    }
+    assert_eq!(steps.len(), 5);
+    Ok(())
+}

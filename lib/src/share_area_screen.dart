@@ -46,8 +46,12 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
   /// The name this Device's person last shared under.
   static const _ownNameKey = 'shareName';
 
+  // The own Profile's name until a name was shared under once.
   late final _own = TextEditingController(
-    text: widget.store.localSetting(_ownNameKey) ?? '',
+    text:
+        widget.store.localSetting(_ownNameKey) ??
+        widget.store.ownProfile?.name ??
+        '',
   );
   final _their = TextEditingController();
   final _code = TextEditingController();

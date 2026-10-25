@@ -220,6 +220,7 @@ void main() {
       );
     }
 
+    ben.applyProfileDefaults(name: 'Ben Bauer');
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
@@ -240,6 +241,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    // The own name starts as the own Profile's.
+    expect(find.text('Ben Bauer'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('invite')));
     await tester.pumpAndSettle();
     expect(announcements.visible, 'Fill in both names first.');

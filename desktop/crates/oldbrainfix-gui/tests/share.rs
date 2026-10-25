@@ -153,6 +153,19 @@ fn sharing_an_area_hosts_its_invite() -> TestResult {
 }
 
 #[test]
+fn the_own_name_starts_as_the_own_profiles() -> TestResult {
+    let ann = device(1)?;
+    oldbrainfix_core::OwnProfile::new(&ann).apply_defaults("Ann Smith", None)?;
+    Places::new(&ann).add_area("Household")?;
+    let mut harness = harness(ann, Selection::All);
+    open_menu(&mut harness, "Household");
+    harness.get_by_label("Share…").click();
+    harness.run();
+    assert!(harness.query_all_by_value("Ann Smith").next().is_some());
+    Ok(())
+}
+
+#[test]
 fn a_manager_changes_roles_and_removes_people() -> TestResult {
     let (ann, _ben, area) = shared(AreaRole::Member)?;
     let mut harness = harness(ann, Selection::All);

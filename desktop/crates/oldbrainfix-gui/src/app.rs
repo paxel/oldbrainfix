@@ -47,8 +47,8 @@ use oldbrainfix_core::backup;
 use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, SentItemState};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
-    Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, Person, Places,
-    QuietHours, Routine, Routines, Search, Section, Store, Topic, bundle,
+    Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
+    Places, Profile, QuietHours, Routine, Routines, Search, Section, Store, Topic, bundle,
 };
 
 use crate::about_view;
@@ -65,6 +65,7 @@ use crate::l10n::L10n;
 use crate::media::{Clipboard, Player, Recorder, photo_from_file};
 use crate::media_view::{self, PhotoCache, Speech, Voice};
 use crate::names::{area_name, topic_name};
+use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
 use crate::speech::{SpeechModel, Status as SpeechStatus};
@@ -77,10 +78,14 @@ pub enum Selection {
     /// Today's and tomorrow's Occurrences, the Missed Summary and the
     /// Unsorted count.
     Agenda,
-    /// This Device's settings, reached from the Agenda's gear.
+    /// The user's own Profile with Backups, the user's Devices and the
+    /// way to this Device's settings, reached from the Profile picture in
+    /// the Agenda's corner, where the settings gear was.
+    Profile,
+    /// This Device's settings, reached from the Profile page.
     Settings,
     /// The LAN sync this Device hosts while it shows, reached from the
-    /// Settings.
+    /// Profile page.
     Sync,
     /// The version and the source, reached from the Settings.
     About,
@@ -164,6 +169,9 @@ struct View {
     /// The Routines and Reminders in the trash on their own, with their
     /// Notes, while the trash shows.
     trashed_routines: Vec<(Routine, Option<Note>)>,
+    /// The user's own Profile and its short code.
+    profile: Option<Profile>,
+    profile_code: Option<String>,
 }
 
 impl View {
@@ -361,8 +369,10 @@ enum Action {
     },
     /// Takes the person asked about out of the Area.
     RemovePerson,
-    /// Something asked of the Backups card in the Settings.
+    /// Something asked of the Backups card on the Profile page.
     Backup(BackupAction),
+    /// Something asked of the own Profile on the Profile page.
+    Profile(ProfileAction),
     /// Something asked of the first start's view.
     Welcome(WelcomeAction),
 }
@@ -472,6 +482,10 @@ pub struct App {
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
+    /// The own Profile's picture, name field and new picture's square.
+    profile_view: ProfileView,
+    /// Asks the system's dialog for a picture file, titled as given.
+    picture_picker: FolderPicker,
     /// The passphrase being typed into the Backups card.
     backup_form: Passphrase,
     /// The other Devices whose recovery key the Backups card shows.
@@ -496,6 +510,13 @@ fn bundle_dialog(title: &str) -> rfd::FileDialog {
         oldbrainfix_core::APP_NAME,
         &[bundle::EXTENSION, sent::EXTENSION],
     )
+}
+
+/// The open dialog's filter for a Profile picture.
+fn picture_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(title, &["jpg", "jpeg", "png", "webp"])
 }
 
 /// The save dialog's filter for the Recovery Sheet.
@@ -574,6 +595,8 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             handed: None,
             notice: None,
+            profile_view: ProfileView::default(),
+            picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
             backup_form: Passphrase::default(),
             recovery_shown: Default::default(),
             welcome: None,
@@ -600,6 +623,12 @@ impl App {
     pub fn set_sync_host(&mut self, bind: Option<std::net::IpAddr>, name: &str) {
         self.sync.bind = bind;
         self.sync_name = name.to_string();
+    }
+
+    /// Asks `picker` for a Profile picture file instead of the system's
+    /// dialog; tests hand one in.
+    pub fn set_picture_picker(&mut self, picker: FolderPicker) {
+        self.picture_picker = picker;
     }
 
     /// Asks `picker` for the shared folder instead of the system's
@@ -1120,6 +1149,7 @@ impl App {
         let search = Search::new(&self.store);
         let shown = match &self.selection {
             Selection::Agenda
+            | Selection::Profile
             | Selection::Settings
             | Selection::Sync
             | Selection::About
@@ -1216,6 +1246,8 @@ impl App {
             routines: note_routines,
             agenda,
             trashed_routines,
+            profile: OwnProfile::new(&self.store).get()?,
+            profile_code: OwnProfile::new(&self.store).code()?,
         })
     }
 
@@ -1565,6 +1597,7 @@ impl App {
             }
             Action::OpenFile(path) => self.open_file(&path),
             Action::Backup(asked) => self.backup(asked)?,
+            Action::Profile(asked) => self.profile_action(asked)?,
             Action::Welcome(asked) => self.welcome_action(asked)?,
             Action::StartSend => {
                 self.save_text()?;
@@ -1603,7 +1636,15 @@ impl App {
             Action::Share(area) => {
                 self.dialog = Some(Dialog::Share {
                     area,
-                    own: self.store.local_setting(SHARE_NAME)?.unwrap_or_default(),
+                    // The own Profile's name until a name was shared
+                    // under once.
+                    own: match self.store.local_setting(SHARE_NAME)? {
+                        Some(name) => name,
+                        None => OwnProfile::new(&self.store)
+                            .get()?
+                            .map(|p| p.name)
+                            .unwrap_or_default(),
+                    },
                     their: String::new(),
                     role: AreaRole::Member,
                 });
@@ -1778,8 +1819,9 @@ impl App {
     fn back(&self) -> Option<Selection> {
         match &self.selection {
             Selection::All | Selection::Agenda => None,
-            Selection::Settings => Some(Selection::Agenda),
-            Selection::Sync | Selection::About => Some(Selection::Settings),
+            Selection::Profile => Some(Selection::Agenda),
+            Selection::Settings | Selection::Sync => Some(Selection::Profile),
+            Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
                 Some(topic) => Selection::Place(topic.area_id.clone()),
@@ -2140,6 +2182,7 @@ impl App {
     fn title(&self) -> String {
         match &self.selection {
             Selection::Agenda => self.t.agenda_title().to_string(),
+            Selection::Profile => self.t.profile_title().to_string(),
             Selection::Settings => self.t.settings_title().to_string(),
             Selection::Sync => self.t.sync_title().to_string(),
             Selection::About => self.t.about_title().to_string(),
@@ -2241,6 +2284,7 @@ impl App {
     fn notes_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         match self.selection {
             Selection::Agenda => return self.agenda_pane(ui, tones, actions),
+            Selection::Profile => return self.profile_pane(ui, tones, actions),
             Selection::Settings => return self.settings_pane(ui, tones, actions),
             Selection::About => {
                 if about_view::about(ui, &self.t, tones) {
@@ -2719,8 +2763,8 @@ impl App {
     /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
     /// Summary until "Seen", the "x Unsorted" banner, today's
     /// Occurrences, a gap, and tomorrow's dimmed; each checkable on its
-    /// own, a click on one opens its Routine. The gear in the corner
-    /// leads to the Settings.
+    /// own, a click on one opens its Routine. The Profile picture in the
+    /// corner, where the settings gear was, leads to the Profile page.
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -2733,8 +2777,11 @@ impl App {
                     reminder: false,
                 });
             }
-            if icon_button(ui, icons::SETTINGS, t.settings_title(), text).clicked() {
-                actions.push(Action::Select(Selection::Settings));
+            let profile = self.view.profile.as_ref();
+            if profile_view::avatar(ui, &mut self.profile_view, profile, 28.0, t.profile_title())
+                .clicked()
+            {
+                actions.push(Action::Select(Selection::Profile));
             }
         });
         ui.add_space(8.0);
@@ -2820,6 +2867,135 @@ impl App {
         }
     }
 
+    /// The Profile page (ADR 0017): the own Profile's picture, name and
+    /// short code; Backups and recovery; the user's Devices; and the way
+    /// to this Device's settings. While a new picture's square is picked,
+    /// that alone.
+    fn profile_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let mut asked = Vec::new();
+        if let Some(square) = self.profile_view.square.as_mut() {
+            embossed(ui, tones, false, None, |ui| {
+                profile_view::square_page(ui, &t, square, &mut asked);
+            });
+            actions.extend(asked.into_iter().map(Action::Profile));
+            return;
+        }
+        let (store, wall, backup_form, recovery_shown, view) = (
+            &self.store,
+            &self.wall,
+            &mut self.backup_form,
+            &mut self.recovery_shown,
+            &mut self.profile_view,
+        );
+        let profile = self.view.profile.as_ref();
+        let code = self.view.profile_code.as_deref();
+        ui.heading(RichText::new(t.profile_title()).color(text));
+        ui.add_space(8.0);
+        egui::ScrollArea::vertical()
+            .id_salt("profile")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 16.0;
+                ui.add_space(4.0);
+                embossed(ui, tones, false, None, |ui| {
+                    profile_view::header(ui, &t, view, profile, code, &mut asked);
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.profile_backups()).strong().color(text));
+                    let mut backup = Vec::new();
+                    backup_view::card(
+                        ui,
+                        &t,
+                        store,
+                        wall,
+                        backup_form,
+                        recovery_shown,
+                        &mut backup,
+                    );
+                    actions.extend(backup.into_iter().map(Action::Backup));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.profile_devices()).strong().color(text));
+                    if ui
+                        .button(RichText::new(t.sync_settings_entry()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::Select(Selection::Sync));
+                    }
+                    ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(
+                        RichText::new(t.profile_device_settings())
+                            .strong()
+                            .color(text),
+                    );
+                    if ui
+                        .button(RichText::new(t.settings_title()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::Select(Selection::Settings));
+                    }
+                    ui.label(
+                        RichText::new(t.profile_device_settings_detail())
+                            .small()
+                            .color(weak),
+                    );
+                });
+            });
+        actions.extend(asked.into_iter().map(Action::Profile));
+    }
+
+    /// Does what was asked of the own Profile on the Profile page.
+    fn profile_action(&mut self, asked: ProfileAction) -> oldbrainfix_core::Result<()> {
+        let own = OwnProfile::new(&self.store);
+        match asked {
+            ProfileAction::Rename(name) => {
+                if own.get()?.is_some() {
+                    own.rename(&name)?;
+                    // The field shows the name as kept.
+                    self.profile_view.name_of = None;
+                }
+            }
+            ProfileAction::Initials => {
+                if own.get()?.is_some() {
+                    own.set_picture(None)?;
+                }
+            }
+            ProfileAction::PickPicture => {
+                let Some(path) = (self.picture_picker)(self.t.profile_picture_choose()) else {
+                    return Ok(());
+                };
+                // Upright and without metadata, as a pasted photo is kept.
+                let square = std::fs::read(&path)
+                    .ok()
+                    .and_then(|bytes| photo_from_file(&bytes))
+                    .and_then(Square::new);
+                match square {
+                    Some(square) => self.profile_view.square = Some(square),
+                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                }
+            }
+            ProfileAction::UseSquare => {
+                let Some(square) = self.profile_view.square.take() else {
+                    return Ok(());
+                };
+                match square.make() {
+                    Some(picture) if own.get()?.is_some() => {
+                        own.set_picture(Some(picture))?;
+                    }
+                    Some(_) => {}
+                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                }
+            }
+            ProfileAction::CancelSquare => self.profile_view.square = None,
+        }
+        Ok(())
+    }
+
     /// This Device's settings (ADR 0008): its notifications and login
     /// start, its Re-nag interval, and the Nudges' repeat and Quiet
     /// Hours.
@@ -2852,12 +3028,6 @@ impl App {
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
-        let (store, wall, backup_form, recovery_shown) = (
-            &self.store,
-            &self.wall,
-            &mut self.backup_form,
-            &mut self.recovery_shown,
-        );
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -2882,21 +3052,6 @@ impl App {
                         actions.push(Action::Setting(Setting::Autostart(on)));
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    ui.label(RichText::new(t.sync_title()).strong().color(text));
-                    if ui
-                        .button(RichText::new(t.sync_settings_entry()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::Select(Selection::Sync));
-                    }
-                    ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
-                });
-                embossed(ui, tones, false, None, |ui| {
-                    let mut asked = Vec::new();
-                    backup_view::card(ui, &t, store, wall, backup_form, recovery_shown, &mut asked);
-                    actions.extend(asked.into_iter().map(Action::Backup));
                 });
                 embossed(ui, tones, false, None, |ui| {
                     if ui

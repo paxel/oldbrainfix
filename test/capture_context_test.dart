@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_location.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -201,7 +202,7 @@ void main() {
   group('Named Places', () {
     Future<void> openPage(WidgetTester tester) async {
       await start(tester);
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       await tester.ensureVisible(find.text('Named Places'));
       await tap(tester, find.text('Named Places'));
     }
@@ -253,7 +254,9 @@ void main() {
       expect(named.all(), isEmpty);
       expect(notes.byId(note.id)?.context.location, home);
 
-      // Back on the Agenda, through Settings, and into the browser.
+      // Back on the Agenda, through Settings and the Profile page, and
+      // into the browser.
+      await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byType(BackButton));
       await tap(tester, find.byIcon(Icons.search));

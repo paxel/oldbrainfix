@@ -7,7 +7,6 @@ import 'about_screen.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
-import 'backup_screen.dart';
 import 'calendar_mirror.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
@@ -20,30 +19,14 @@ import 'schedule_text.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
-import 'sync_screen.dart';
 
-/// Opens Settings; returns once the user left them.
-Future<void> openSettings(
-  BuildContext context,
-  Store store,
-  AlarmSync alarms, {
-  VoidCallback? onThemeChanged,
-}) => Navigator.of(context).push(
-  MaterialPageRoute<void>(
-    builder: (_) => SettingsScreen(
-      store: store,
-      alarms: alarms,
-      onThemeChanged: onThemeChanged,
-    ),
-  ),
-);
-
-/// This Device's settings (ADR 0008), reached only through the Agenda's
-/// gear: the theme; the alarm setup and the default Re-nag interval; the
+/// This Device's settings (ADR 0008), reached only through the Profile
+/// page: the theme; the alarm setup and the default Re-nag interval; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; the calendar mirror; the App Lock and
-/// the Area Locks; whether Streaks show; Sync; Backups; and About. Each is a local setting, never synced, and applies at
-/// once; the alarms are armed again after each change.
+/// the Area Locks; whether Streaks show; and About. Each is a local
+/// setting, never synced, and applies at once; the alarms are armed
+/// again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
   final AlarmSync alarms;
@@ -109,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
               child: Text(t.settingsIntro),
             ),
-            _Heading(t.settingsLook),
+            SettingsHeading(t.settingsLook),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SegmentedButton<ThemeChoice>(
@@ -136,8 +119,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onSelectionChanged: (picked) => _setTheme(picked.single),
               ),
             ),
-            _Heading(t.settingsAlarms),
-            _Section(
+            SettingsHeading(t.settingsAlarms),
+            SettingsSection(
               children: [
                 if (widget.alarms.platform.available)
                   ListTile(
@@ -176,10 +159,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            _Heading(t.settingsNudges),
+            SettingsHeading(t.settingsNudges),
             _NudgeSettings(store: widget.store, alarms: widget.alarms),
-            _Heading(t.settingsCapture),
-            _Section(
+            SettingsHeading(t.settingsCapture),
+            SettingsSection(
               children: [
                 ListTile(
                   leading: const Icon(Icons.place_outlined),
@@ -207,19 +190,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             if (mirror != null && mirror.platform.available) ...[
-              _Heading(t.settingsCalendar),
+              SettingsHeading(t.settingsCalendar),
               MirrorSwitch(mirror: mirror),
             ],
             if (LockScope.of(context) case final lock?) ...[
-              _Heading(t.settingsPrivacy),
+              SettingsHeading(t.settingsPrivacy),
               LockSettingsSection(
                 lock: lock,
                 alarms: widget.alarms,
                 places: Places(widget.store),
               ),
             ],
-            _Heading(t.settingsHistory),
-            _Section(
+            SettingsHeading(t.settingsHistory),
+            SettingsSection(
               children: [
                 SwitchListTile(
                   key: const ValueKey('streaks'),
@@ -231,32 +214,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            _Heading(t.syncTitle),
-            _Section(
-              children: [
-                ListTile(
-                  key: const ValueKey('sync'),
-                  leading: const Icon(Icons.sync),
-                  title: Text(t.syncSettingsEntry),
-                  subtitle: Text(t.syncSettingsDetail),
-                  onTap: () => _push(SyncScreen(store: widget.store)),
-                ),
-              ],
-            ),
-            _Heading(t.backupsTitle),
-            _Section(
-              children: [
-                ListTile(
-                  key: const ValueKey('backups'),
-                  leading: const Icon(Icons.backup_outlined),
-                  title: Text(t.backupsSettingsEntry),
-                  subtitle: Text(t.backupsSettingsDetail),
-                  onTap: () => _push(BackupScreen(store: widget.store)),
-                ),
-              ],
-            ),
             const SizedBox(height: 16),
-            _Section(
+            SettingsSection(
               children: [
                 ListTile(
                   leading: const Icon(Icons.info_outline),
@@ -272,11 +231,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-/// A section title of Settings.
-class _Heading extends StatelessWidget {
+/// A section title of Settings and the Profile page.
+class SettingsHeading extends StatelessWidget {
   final String text;
 
-  const _Heading(this.text);
+  const SettingsHeading(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -286,10 +245,10 @@ class _Heading extends StatelessWidget {
 }
 
 /// The tiles of one section on an embossed card.
-class _Section extends StatelessWidget {
+class SettingsSection extends StatelessWidget {
   final List<Widget> children;
 
-  const _Section({required this.children});
+  const SettingsSection({super.key, required this.children});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -357,7 +316,7 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
     String time(ClockTime c) => clockText(locale, c);
     final repeat = _repeat.inMinutes;
     final choices = {..._NudgeSettings.repeatChoices, repeat}.toList()..sort();
-    return _Section(
+    return SettingsSection(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

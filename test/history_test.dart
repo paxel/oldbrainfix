@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/routine_history_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -184,9 +185,11 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       await tap(tester, find.text('Show Streaks on this phone'));
       expect(store.streaksOn, isFalse);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tap(tester, find.text('pills').first);

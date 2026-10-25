@@ -15,6 +15,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
+import 'open_settings.dart';
 
 /// Reads the QR the test says is in the photo.
 class FakePairing implements PairingPlatform {
@@ -340,11 +341,10 @@ void main() {
     expect(find.text('Blood test on Tuesday'), findsOneWidget);
   });
 
-  testWidgets('Sync opens from Settings', (tester) async {
+  testWidgets('Sync opens from the Profile page', (tester) async {
     await tester.pumpWidget(OldBrainFixApp(store: phone, alarms: FakeAlarms()));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pumpAndSettle();
+    await openProfilePage(tester);
     final entry = find.byKey(const ValueKey('sync'));
     await tester.scrollUntilVisible(
       entry,

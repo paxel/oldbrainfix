@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -215,7 +216,7 @@ void main() {
       routines.create('pills', daily([at(20)]));
       await start(tester);
       expect(alarms.armed.first.alarm.renag, const Duration(minutes: 10));
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       await tap(tester, find.byKey(const ValueKey('renagDevice')));
       await tap(tester, find.text('15 min').last);
       expect(store.renagInterval, const Duration(minutes: 15));

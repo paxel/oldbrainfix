@@ -15,6 +15,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_speech.dart';
 import 'fake_voice.dart';
+import 'open_settings.dart';
 
 /// Stand-ins for two recordings, told apart by their last byte.
 final first = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
@@ -62,7 +63,7 @@ void main() {
 
   /// Opens the speech model page from Settings.
   Future<void> openModel(WidgetTester tester) async {
-    await tap(tester, find.byTooltip('Settings'));
+    await openDeviceSettings(tester);
     await tester.ensureVisible(modelButton);
     await tap(tester, modelButton);
     expect(find.byType(SpeechModelScreen), findsOneWidget);
@@ -77,7 +78,7 @@ void main() {
   group('the speech model page', () {
     testWidgets('is in Settings where there is a speech layer', (tester) async {
       await start(tester, platform: const NoSpeech());
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       expect(modelButton, findsNothing);
     });
 

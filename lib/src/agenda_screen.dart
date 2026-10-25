@@ -22,10 +22,11 @@ import 'note_editor_screen.dart';
 import 'place_names.dart';
 import 'nudge_screen.dart';
 import 'photo_platform.dart';
+import 'profile.dart';
+import 'profile_screen.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
-import 'settings_screen.dart';
 import 'setup_screen.dart';
 
 /// An Agenda row with where its Note is filed and whether it shows
@@ -67,6 +68,9 @@ class AgendaScreen extends StatefulWidget {
   /// The quick entry points asking for a capture screen.
   final CaptureRequests requests;
 
+  /// The user's own Profile, whose picture opens the Profile page.
+  final OwnProfileModel profile;
+
   /// Called after the theme was changed in Settings.
   final VoidCallback? onThemeChanged;
 
@@ -76,6 +80,7 @@ class AgendaScreen extends StatefulWidget {
     required this.places,
     required this.trail,
     required this.alarms,
+    required this.profile,
     this.requests = const NoCaptureRequests(),
     this.onThemeChanged,
   });
@@ -313,11 +318,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  Future<void> _settings() async {
-    await openSettings(
+  Future<void> _openProfile() async {
+    await openProfile(
       context,
       widget.notes.store,
       widget.alarms,
+      widget.profile,
       onThemeChanged: widget.onThemeChanged,
     );
     if (!mounted) return;
@@ -452,10 +458,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
             onPressed: _newRoutine,
             icon: const Icon(Icons.add_alarm),
           ),
+          // The Profile picture, where the settings gear was: Settings,
+          // Sync and Backups are reached through the Profile page.
           IconButton(
-            tooltip: t.settingsTitle,
-            onPressed: _settings,
-            icon: const Icon(Icons.settings_outlined),
+            key: const ValueKey('profile'),
+            tooltip: t.profileTitle,
+            onPressed: _openProfile,
+            icon: OwnProfileAvatar(model: widget.profile),
           ),
         ],
       ),

@@ -12,6 +12,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'fake_alarms.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -44,16 +45,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  final gear = find.byTooltip('Settings');
-
-  group('the gear', () {
-    testWidgets('sits in the Agenda\'s top bar and opens Settings; no '
-        'drawer and no ⋮ menu', (tester) async {
+  group('the Profile picture', () {
+    testWidgets('sits in the Agenda\'s top bar where the gear was and leads '
+        'to Settings through the Profile page; no drawer, no ⋮ menu', (
+      tester,
+    ) async {
       await start(tester);
       expect(
-        find.descendant(of: find.byType(AppBar), matching: gear),
+        find.descendant(of: find.byType(AppBar), matching: profileButton),
         findsOneWidget,
       );
+      expect(find.byTooltip('Profile'), findsOneWidget);
+      expect(find.byIcon(Icons.settings_outlined), findsNothing);
       final agenda = find.descendant(
         of: find.byType(AgendaScreen),
         matching: find.byType(Scaffold),
@@ -62,7 +65,7 @@ void main() {
       expect(find.byIcon(Icons.more_vert), findsNothing);
       expect(find.byWidgetPredicate((w) => w is PopupMenuButton), findsNothing);
 
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       expect(find.byType(SettingsScreen), findsOneWidget);
       expect(
         find.text('These settings belong to this phone and are never synced.'),
@@ -84,7 +87,7 @@ void main() {
             .whereType<String>(),
         ['Back', 'All Notes', 'Trash'],
       );
-      expect(gear, findsNothing);
+      expect(profileButton, findsNothing);
     });
   });
 
@@ -93,7 +96,7 @@ void main() {
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await start(tester);
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       Brightness shown() =>
           Theme.of(tester.element(find.byType(SettingsScreen))).brightness;
       expect(shown(), Brightness.light);
@@ -109,7 +112,7 @@ void main() {
 
     testWidgets('are kept on this Device and never logged', (tester) async {
       await start(tester);
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       await tap(tester, find.text('Light'));
       await tap(tester, find.byKey(const ValueKey('renagDevice')));
       await tap(tester, find.text('30 min').last);
@@ -130,7 +133,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       await tap(tester, find.text('Set up alarms'));
       expect(find.byType(SetupScreen), findsOneWidget);
       for (var step = 0; step < 2; step++) {
@@ -145,7 +148,7 @@ void main() {
     ) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       expect(find.text('Set up alarms'), findsNothing);
       expect(find.byKey(const ValueKey('renagDevice')), findsOneWidget);
     });
@@ -157,7 +160,7 @@ void main() {
       tester.platformDispatcher.localesTestValue = const [Locale('de')];
       addTearDown(tester.platformDispatcher.clearLocalesTestValue);
       await start(tester);
-      await tap(tester, find.byTooltip('Einstellungen'));
+      await openDeviceSettings(tester);
       expect(find.text('Wie das System'), findsOneWidget);
       await tester.ensureVisible(find.text('Über Old Brain Fix'));
       await tap(tester, find.text('Über Old Brain Fix'));
@@ -167,7 +170,7 @@ void main() {
 
     testWidgets('lead to About', (tester) async {
       await start(tester);
-      await tap(tester, gear);
+      await openDeviceSettings(tester);
       await tap(tester, find.text('About Old Brain Fix'));
       expect(find.byType(AboutScreen), findsOneWidget);
     });

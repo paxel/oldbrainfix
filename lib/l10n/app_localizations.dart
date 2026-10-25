@@ -3535,6 +3535,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Start without it'**
   String get restoreFoundSkip;
+
+  /// No description provided for @profileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileTitle;
+
+  /// No description provided for @profileNoName.
+  ///
+  /// In en, this message translates to:
+  /// **'No name'**
+  String get profileNoName;
+
+  /// No description provided for @profileName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get profileName;
+
+  /// No description provided for @profileCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Your code'**
+  String get profileCode;
+
+  /// No description provided for @profilePictureChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the picture'**
+  String get profilePictureChange;
+
+  /// No description provided for @profilePictureChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a picture'**
+  String get profilePictureChoose;
+
+  /// No description provided for @profilePictureTake.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get profilePictureTake;
+
+  /// No description provided for @profilePictureInitials.
+  ///
+  /// In en, this message translates to:
+  /// **'Show initials instead'**
+  String get profilePictureInitials;
+
+  /// No description provided for @profilePictureUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'This picture cannot be read.'**
+  String get profilePictureUnreadable;
+
+  /// No description provided for @profileCropTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the square'**
+  String get profileCropTitle;
+
+  /// No description provided for @profileCropHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the square to move it. The slider sets its size.'**
+  String get profileCropHint;
+
+  /// No description provided for @profileCropSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size of the square'**
+  String get profileCropSize;
+
+  /// No description provided for @profileCropUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this part'**
+  String get profileCropUse;
+
+  /// No description provided for @profileBackups.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups and recovery'**
+  String get profileBackups;
+
+  /// No description provided for @profileDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Devices'**
+  String get profileDevices;
+
+  /// No description provided for @profileDeviceSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings of this Device'**
+  String get profileDeviceSettings;
+
+  /// No description provided for @profileDeviceSettingsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'They belong to this Device and are never synced.'**
+  String get profileDeviceSettingsDetail;
 }
 
 class _AppLocalizationsDelegate

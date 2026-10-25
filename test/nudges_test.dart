@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -313,7 +314,7 @@ void main() {
         QuietHours(ClockTime(22, 0), ClockTime(8, 0)),
       );
 
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       expect(find.text('22:00'), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
       await tap(tester, find.byKey(const ValueKey('nudgeRepeat')));

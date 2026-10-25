@@ -11,9 +11,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   causes wrong taps.
 - The Agenda carries two floating buttons: **"+"** captures a Note and
   **the magnifier** opens the notes browser. Nothing else floats.
-- Settings, with About and Sync inside, are reached only through the
-  **gear in the Agenda's top corner**. No hamburger menu, no ⋮ menu for
-  them.
+- Settings, Backups and Sync are reached only through the **Profile
+  picture in the Agenda's top corner**, where the settings gear was. It
+  opens the Profile page: picture, name and short code; Backups and
+  recovery; Your Devices; Settings of this Device, with About
+  inside. No hamburger menu, no ⋮ menu for them.
 - In the notes browser, **swipe right goes back** one level (Topic,
   Area, Agenda) and **swipe left goes forward** into the last selected
   Area or Topic, if there is one. The last selected Area and Topic are

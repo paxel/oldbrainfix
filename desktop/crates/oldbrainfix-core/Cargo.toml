@@ -47,6 +47,11 @@ zip = { version = "=8.6.0", default-features = false }
 argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 # The recovery key as a QR on the Recovery Sheet.
 qrcode = { version = "0.14", default-features = false }
+# Profile pictures (ADR 0017): decoded, cropped and re-encoded as JPEG,
+# the same code for a picture chosen here and one received.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+# Profile initials by what people see as one character.
+unicode-segmentation = "1.13"
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

@@ -104,7 +104,7 @@ fn the_sync_view_hosts_asks_pairs_and_forgets() -> TestResult {
     Notes::new(&desk).capture("From the desk", None, None)?;
     let mut app = App::new(desk, "en");
     app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
-    app.select(Selection::Settings);
+    app.select(Selection::Profile);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 900.0))
         .build_ui_state(

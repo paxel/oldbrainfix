@@ -1227,5 +1227,22 @@
   "backupAutoTooBig": "The newest Backup is larger than the 25 MB Android sends to Google, so Google keeps none. A folder still takes it.",
   "restoreFoundTitle": "A Backup came back",
   "restoreFound": "This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.",
-  "restoreFoundSkip": "Start without it"
+  "restoreFoundSkip": "Start without it",
+  "profileTitle": "Profile",
+  "profileNoName": "No name",
+  "profileName": "Name",
+  "profileCode": "Your code",
+  "profilePictureChange": "Change the picture",
+  "profilePictureChoose": "Choose a picture",
+  "profilePictureTake": "Take a photo",
+  "profilePictureInitials": "Show initials instead",
+  "profilePictureUnreadable": "This picture cannot be read.",
+  "profileCropTitle": "Choose the square",
+  "profileCropHint": "Drag the square to move it. The slider sets its size.",
+  "profileCropSize": "Size of the square",
+  "profileCropUse": "Use this part",
+  "profileBackups": "Backups and recovery",
+  "profileDevices": "Your Devices",
+  "profileDeviceSettings": "Settings of this Device",
+  "profileDeviceSettingsDetail": "They belong to this Device and are never synced."
 }

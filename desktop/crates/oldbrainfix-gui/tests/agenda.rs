@@ -386,6 +386,11 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     };
     start.set(true)?;
     harness.state_mut().set_autostart(Some(start.clone()));
+    // The Profile picture sits where the gear was; the settings are on
+    // the Profile page.
+    harness.get_by_label("Profile").click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Profile);
     harness.get_by_label("Settings").click();
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Settings);
@@ -417,7 +422,10 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     harness.run();
     let renag = DeviceSettings::new(harness.state().store()).renag_interval()?;
     assert_eq!(renag, chrono::Duration::minutes(15));
-    // Back to the Agenda.
+    // Back to the Profile page, and to the Agenda.
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Profile);
     harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Agenda);

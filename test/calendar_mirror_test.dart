@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_calendar.dart';
 import 'fake_mirror.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -58,7 +59,7 @@ void main() {
   }
 
   Future<void> openSettings(WidgetTester tester) async {
-    await tap(tester, find.byTooltip('Settings'));
+    await openDeviceSettings(tester);
     expect(find.byType(SettingsScreen), findsOneWidget);
   }
 

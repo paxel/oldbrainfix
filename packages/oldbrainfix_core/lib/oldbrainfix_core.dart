@@ -25,6 +25,7 @@ export 'src/pair_code.dart';
 export 'src/pairing.dart';
 export 'src/photos.dart';
 export 'src/places.dart';
+export 'src/profiles.dart';
 export 'src/question_marks.dart';
 export 'src/recovery_sheet.dart';
 export 'src/routines.dart';

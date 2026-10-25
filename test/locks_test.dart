@@ -30,6 +30,7 @@ import 'fake_capture_requests.dart';
 import 'fake_lock.dart';
 import 'fake_mirror.dart';
 import 'fake_photos.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -624,7 +625,7 @@ void main() {
 
   group('Settings', () {
     Future<void> openSettings(WidgetTester tester) async {
-      await tap(tester, find.byTooltip(en.settingsTitle));
+      await openDeviceSettings(tester);
     }
 
     testWidgets('turn the App Lock on with a new PIN, and off only with '

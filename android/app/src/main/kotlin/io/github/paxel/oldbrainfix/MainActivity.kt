@@ -28,6 +28,9 @@ class MainActivity : FlutterActivity() {
     /** The answer to "take", until the camera app comes back. */
     private var photoAnswer: MethodChannel.Result? = null
 
+    /** The answer to the Profile's "pick", until the picture picker comes back. */
+    private var pictureAnswer: MethodChannel.Result? = null
+
     private var voiceChannel: MethodChannel? = null
 
     private var captureChannel: MethodChannel? = null
@@ -214,6 +217,14 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PROFILE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "deviceName" -> result.success(Profiles.defaultName(this))
+                    "pick" -> pickPicture(result)
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PAIRING_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -431,6 +442,25 @@ class MainActivity : FlutterActivity() {
         modelAnswer = result
     }
 
+    /**
+     * Opens the system's picture picker for the Profile picture, which
+     * needs no storage permission; the picture comes back as photos are
+     * kept, upright and without metadata, in [onActivityResult].
+     */
+    private fun pickPicture(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_GET_CONTENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("image/*")
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_PICTURE)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(null)
+        }
+        pictureAnswer?.success(null)
+        pictureAnswer = result
+    }
+
     /** Opens the system's file picker for a bundle to import; the answer comes in [onActivityResult]. */
     private fun pickBundle(result: MethodChannel.Result) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -491,6 +521,13 @@ class MainActivity : FlutterActivity() {
             val uri = data?.data
             if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
             return inBackground(answer) { Bundles.copy(this, uri) }
+        }
+        if (requestCode == REQUEST_PICTURE) {
+            val answer = pictureAnswer ?: return
+            pictureAnswer = null
+            val uri = data?.data
+            if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
+            return inBackground(answer) { Photos.normalize { contentResolver.openInputStream(uri) } }
         }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
@@ -622,12 +659,14 @@ class MainActivity : FlutterActivity() {
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
         private const val BUNDLE_CHANNEL = "io.github.paxel.oldbrainfix/bundle"
+        private const val PROFILE_CHANNEL = "io.github.paxel.oldbrainfix/profile"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3
         private const val REQUEST_MODEL = 4
         private const val REQUEST_FOLDER = 5
         private const val REQUEST_BUNDLE = 6
+        private const val REQUEST_PICTURE = 7
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12

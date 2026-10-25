@@ -572,5 +572,22 @@
   "backupAutoTooBig": "Die neueste Sicherung ist größer als die 25 MB, die Android an Google schickt, deshalb bewahrt Google keine auf. Ein Ordner nimmt sie weiter.",
   "restoreFoundTitle": "Eine Sicherung ist zurück",
   "restoreFound": "Dieses Handy hat eine Sicherung aus deinem Google-Konto zurückgebracht. Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt oder von einem deiner anderen Geräte.",
-  "restoreFoundSkip": "Ohne sie anfangen"
+  "restoreFoundSkip": "Ohne sie anfangen",
+  "profileTitle": "Profil",
+  "profileNoName": "Ohne Namen",
+  "profileName": "Name",
+  "profileCode": "Dein Code",
+  "profilePictureChange": "Bild ändern",
+  "profilePictureChoose": "Bild auswählen",
+  "profilePictureTake": "Foto aufnehmen",
+  "profilePictureInitials": "Stattdessen Initialen zeigen",
+  "profilePictureUnreadable": "Dieses Bild lässt sich nicht lesen.",
+  "profileCropTitle": "Ausschnitt wählen",
+  "profileCropHint": "Ziehe das Quadrat, um es zu verschieben. Der Regler bestimmt seine Größe.",
+  "profileCropSize": "Größe des Quadrats",
+  "profileCropUse": "Diesen Ausschnitt nehmen",
+  "profileBackups": "Sicherungen und Wiederherstellung",
+  "profileDevices": "Deine Geräte",
+  "profileDeviceSettings": "Einstellungen dieses Geräts",
+  "profileDeviceSettingsDetail": "Sie gelten nur für dieses Gerät und werden nie synchronisiert."
 }

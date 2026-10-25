@@ -6,7 +6,7 @@
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
-//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, and the encrypted Backups with their Recovery Sheet. The Dart core
+//! paired Devices, the Area keys and the shared folder and bundle files they seal, the Sent Items one person sends another, the encrypted Backups with their Recovery Sheet, and the user's own Profile. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
@@ -27,6 +27,7 @@ pub mod nudges;
 pub mod pairing;
 pub mod photos;
 pub mod places;
+pub mod profile;
 pub mod question_marks;
 pub mod recovery;
 pub mod routines;
@@ -47,6 +48,7 @@ pub use notes::{Blob, Importance, Note, Notes, Section};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use pairing::PairedDevice;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
+pub use profile::{OwnProfile, Profile};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
 pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,

@@ -2187,4 +2187,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get restoreFoundSkip => 'Start without it';
+
+  @override
+  String get profileTitle => 'Profile';
+
+  @override
+  String get profileNoName => 'No name';
+
+  @override
+  String get profileName => 'Name';
+
+  @override
+  String get profileCode => 'Your code';
+
+  @override
+  String get profilePictureChange => 'Change the picture';
+
+  @override
+  String get profilePictureChoose => 'Choose a picture';
+
+  @override
+  String get profilePictureTake => 'Take a photo';
+
+  @override
+  String get profilePictureInitials => 'Show initials instead';
+
+  @override
+  String get profilePictureUnreadable => 'This picture cannot be read.';
+
+  @override
+  String get profileCropTitle => 'Choose the square';
+
+  @override
+  String get profileCropHint =>
+      'Drag the square to move it. The slider sets its size.';
+
+  @override
+  String get profileCropSize => 'Size of the square';
+
+  @override
+  String get profileCropUse => 'Use this part';
+
+  @override
+  String get profileBackups => 'Backups and recovery';
+
+  @override
+  String get profileDevices => 'Your Devices';
+
+  @override
+  String get profileDeviceSettings => 'Settings of this Device';
+
+  @override
+  String get profileDeviceSettingsDetail =>
+      'They belong to this Device and are never synced.';
 }

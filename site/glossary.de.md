@@ -134,6 +134,18 @@ _Avoid_: Gast, Betrachter
 Eine einzelne Notiz mit ihren Routinen oder Erinnerungen, als Datei an einen anderen Menschen mit Old Brain Fix geschickt, außerhalb jedes geteilten Bereichs. Wer sie bekommt, sieht sie vorher an und nimmt sie an; wer sie geschickt hat, kann später eine Aktualisierung oder eine Absage nachschicken.
 _Avoid_: Einladung, Teilen, Paket (ein Paket ist ein Weg zum Abgleichen)
 
+**Profil** [Profile]:
+Ein Mensch, wie die App ihn zeigt: ein Name und ein Bild, unter einer eigenen Kennung. Jeder Mensch hat ein Profil für alle seine Geräte.
+_Avoid_: Konto, Benutzer, Avatar (das Bild ist nur ein Teil davon)
+
+**Eigene Anzeige** [Override]:
+Ein Name oder Bild, das du dem Profil eines anderen Menschen nur für dich gibst, etwa "Mama". Es bleibt auf deinen eigenen Geräten.
+_Avoid_: Spitzname, Kontaktname
+
+**Menschen** [People]:
+Alle Profile, die deine Geräte kennen, aufgelistet auf der Profilseite.
+_Avoid_: Kontakte, Freunde
+
 **Konflikt** [Conflict]:
 Zwei Fassungen desselben von Hand bearbeiteten Feldes, auf verschiedenen Geräten geschrieben, ohne dass eines das andere gesehen hatte. Bis dahin zeigt sich die neueste; du wählst, welche bleibt.
 _Avoid_: Zusammenstoß, Merge-Konflikt

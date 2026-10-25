@@ -40,6 +40,7 @@ use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
 use oldbrainfix_gui::folder_sync;
 use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
+use oldbrainfix_gui::login;
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
@@ -377,6 +378,11 @@ fn run() -> Result<i32, String> {
     #[cfg(target_os = "linux")]
     std::thread::spawn(oldbrainfix_gui::launcher::register);
     let store = Arc::new(open_store(&dir)?);
+    // The own Profile from the login's full name and account picture,
+    // asking nothing; the window opens without it if that fails.
+    if let Err(e) = login::apply_system_defaults(&store) {
+        eprintln!("oldbrainfix: {e}");
+    }
 
     // On by default: set up unless switched off, so a moved program is
     // found again.

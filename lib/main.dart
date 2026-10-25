@@ -23,6 +23,7 @@ import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
 import 'src/pairing_platform.dart';
 import 'src/photo_platform.dart';
+import 'src/profile_platform.dart';
 import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
 import 'src/sync_platform.dart';
@@ -53,6 +54,7 @@ Future<void> main() async {
       sync: AndroidSync(),
       folders: const AndroidFolders(),
       bundles: AndroidBundles(),
+      profile: const AndroidProfile(),
       workDir: work.path,
     ),
   );

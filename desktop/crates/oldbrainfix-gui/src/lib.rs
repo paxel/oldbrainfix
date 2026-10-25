@@ -28,11 +28,13 @@ pub mod instance;
 pub mod l10n;
 #[cfg(target_os = "linux")]
 pub mod launcher;
+pub mod login;
 pub mod media;
 pub mod media_view;
 pub mod names;
 pub mod notify;
 pub mod popup;
+pub mod profile_view;
 pub mod routine_editor;
 pub mod schedule_text;
 pub mod speech;

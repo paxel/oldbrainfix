@@ -24,3 +24,7 @@ Accepting makes a new Note of the receiver's, captured then and Unsorted, with t
 ## Updates and cancellations
 
 A later file with the same ID and a higher version is an update; a file carrying `"kind":"cancel"` is a cancellation (no `kind` means a normal item, any other kind is unreadable, so files from before stay byte-identical). Both are accepted only when signed by the same key as the item first accepted under that ID; a version at or below the one held writes nothing.
+
+## Profiles (ADR 0017)
+
+Amended by ADR 0017: a Sent Item carries the sender's signed Profile instead of a name of its own; the preview shows it, and it is stored and bound to the sender's key only when the item is accepted. "Verified" moves from the sender's key to the Profile, set by comparing the Profile's short code in person (#51).

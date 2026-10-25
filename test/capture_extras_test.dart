@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_context.dart';
 import 'fake_location.dart';
 import 'fake_photos.dart';
+import 'open_settings.dart';
 
 void main() {
   late Store store;
@@ -229,7 +230,7 @@ void main() {
 
     Future<void> openPage(WidgetTester tester) async {
       await start(tester);
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       await tester.ensureVisible(find.text('Capture Context'));
       await tap(tester, find.text('Capture Context'));
     }
@@ -304,7 +305,7 @@ void main() {
     testWidgets('are not offered without a source', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tap(tester, find.byTooltip('Settings'));
+      await openDeviceSettings(tester);
       expect(find.text('Capture Context'), findsNothing);
     });
   });
