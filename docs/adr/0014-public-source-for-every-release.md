@@ -1,0 +1,3 @@
+# Every released build stays open source; macOS builds accept objc2's caveat
+
+The Linux desktop links KDE's Plasma Wayland protocol code (LGPL-2.1, via winit) statically into one binary. The LGPL is met by keeping the complete source of every released build public under its `v*` tag, with `Cargo.lock` pinning every crate, so anyone can rebuild the app with a modified copy. Therefore no closed-source or source-less build of Old Brain Fix is ever published, on any channel. macOS builds use the objc2 crates although their authors say it is unclear whether Apple's SDK licence allows redistributing them; the project accepts this, as practically every Rust GUI app on macOS does.
