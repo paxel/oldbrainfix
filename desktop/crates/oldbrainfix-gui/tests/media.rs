@@ -460,6 +460,14 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     );
     let mut app = App::new(store.clone(), "en");
     app.set_enrichers(Some(transcripts), None, Some(speech.clone()));
+    // The system's dialog hands back the file of the user's own.
+    let file = tmp.path().join("ggml-base.bin");
+    std::fs::write(&file, b"not whisper")?;
+    let picked = file.clone();
+    app.set_model_picker(Box::new(move |title| {
+        assert_eq!(title, "Use a file of my own");
+        Some(picked.clone())
+    }));
     app.select(Selection::Settings);
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 1400.0))
@@ -488,14 +496,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         "That is not the expected speech model, so it was not kept."
     ));
     // A file of the user's own that is not the model is refused alike.
-    let file = tmp.path().join("ggml-base.bin");
-    std::fs::write(&file, b"not whisper")?;
-    type_into(
-        &mut harness,
-        "Path to ggml-base.bin",
-        &file.display().to_string(),
-    );
-    harness.get_by_label("Use this file").click();
+    harness.get_by_label("Use a file of my own").click();
     harness.run();
     assert!(eventually(|| speech.status() == Status::Missing));
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2);

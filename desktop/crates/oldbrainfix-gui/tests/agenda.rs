@@ -382,6 +382,7 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
         file: dir
             .path()
             .join("autostart/io.github.paxel.oldbrainfix.desktop"),
+        through_portal: false,
     };
     start.set(true)?;
     harness.state_mut().set_autostart(Some(start.clone()));

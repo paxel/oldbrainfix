@@ -1,0 +1,6 @@
+{
+  "io.github.paxel.oldbrainfix": {
+    "appstream-missing-screenshots": "CI builds before the Release whose assets the screenshots are; Flathub's build fetches them",
+    "appstream-screenshots-not-mirrored-in-ostree": "Flathub's build mirrors the screenshots; CI builds before they exist"
+  }
+}

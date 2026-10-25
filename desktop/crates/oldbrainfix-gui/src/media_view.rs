@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use egui::{ColorImage, RichText, TextEdit, TextureHandle, TextureOptions, Ui};
+use egui::{ColorImage, RichText, TextureHandle, TextureOptions, Ui};
 use oldbrainfix_core::Store;
 use oldbrainfix_whisper::model::{MEGABYTES, Outcome};
 
@@ -207,18 +207,14 @@ pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Optio
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Speech {
     Download,
-    TakeFile(String),
+    /// A file of the user's own, chosen in the system's dialog.
+    PickFile,
     Cancel,
 }
 
 /// The speech model's card in the Settings: what it is, where it comes
 /// from, how it stands, and the buttons to fetch it.
-pub fn speech_card(
-    ui: &mut Ui,
-    t: &L10n,
-    model: &SpeechModel,
-    path: &mut String,
-) -> Option<Speech> {
+pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
@@ -272,27 +268,17 @@ pub fn speech_card(
             {
                 asked = Some(Speech::Download);
             }
-            ui.label(RichText::new(t.speech_model_pick()).color(text));
+            if ui
+                .button(RichText::new(t.speech_model_pick()).color(text))
+                .clicked()
+            {
+                asked = Some(Speech::PickFile);
+            }
             ui.label(
                 RichText::new(t.speech_model_pick_detail())
                     .small()
                     .color(weak),
             );
-            ui.horizontal(|ui| {
-                ui.add(
-                    TextEdit::singleline(path)
-                        .id(egui::Id::new("speech model path"))
-                        .hint_text(t.speech_model_path_hint())
-                        .text_color(text)
-                        .desired_width(260.0),
-                );
-                let typed = !path.trim().is_empty();
-                let use_it =
-                    egui::Button::new(RichText::new(t.speech_model_use_file()).color(text));
-                if ui.add_enabled(typed, use_it).clicked() {
-                    asked = Some(Speech::TakeFile(path.trim().to_string()));
-                }
-            });
         }
     }
     asked

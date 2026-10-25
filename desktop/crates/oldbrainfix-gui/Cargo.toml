@@ -43,15 +43,18 @@ ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
 rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
 # The pair code as a QR in the Sync view.
 qrcode = { version = "0.14", default-features = false }
-# The shared folder picked in the Sync view with the system's own
-# dialog, as Catlog's desktop picks it: the desktop portal on Linux.
+# The shared folder, the Backup folder and every file picked with the
+# system's own dialog, as Catlog's desktop picks them: the file chooser
+# portal on Linux, which inside the Flatpak hands back a document portal
+# path that stays valid across restarts.
 rfd = "0.17"
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
-# The capture hotkey on Wayland, through the GlobalShortcuts portal.
-ashpd = { version = "0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+# The capture hotkey on Wayland, through the GlobalShortcuts portal, and
+# the login start inside the Flatpak, through the Background portal.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "background", "global_shortcuts"] }
 async-io = "2"
 futures-lite = "2"
 
@@ -63,7 +66,8 @@ zbus = { version = "5", default-features = false, features = ["async-io", "block
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.1.0" }
 
 [dev-dependencies]
-egui_kittest = "0.35"
+# wgpu draws the Flathub screenshots (tests/flathub_screenshots.rs).
+egui_kittest = { version = "0.35", features = ["wgpu"] }
 # A phone joining the Sync view in the tests.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 chrono-tz = "0.10"

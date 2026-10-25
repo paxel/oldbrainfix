@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The template of the desktop app's AppStream metainfo (#45).
+     desktop/packaging/flatpak/metainfo.py fills in the version and the
+     releases from CHANGELOG.md; render.sh puts the result next to the
+     Flatpak manifest. -->
+<component type="desktop-application">
+  <id>io.github.paxel.oldbrainfix</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+
+  <name>Old Brain Fix</name>
+  <summary>Notes, reminders and routines</summary>
+  <developer id="io.github.paxel">
+    <name>paxel</name>
+  </developer>
+
+  <description>
+    <p>
+      Old Brain Fix is a note and reminder app. This is its desktop app; an
+      Android app uses the same data. There is no account and no server: all
+      data is stored on the user's own devices.
+    </p>
+    <ul>
+      <li>Text, photo and voice Notes, captured in the window, in a small popup opened by a global hotkey or the tray, or by the oldbrainfix capture command.</li>
+      <li>Notes are filed into Areas and Topics, two levels deep, each Area with a colour and an icon.</li>
+      <li>Routines and Reminders made from any Note show notifications with Done and Snooze and repeat until they are marked Done.</li>
+      <li>The Agenda lists today's and tomorrow's Routines and Reminders and the Unsorted Notes.</li>
+      <li>Voice Notes are transcribed on the computer with Whisper, in English or German, after a one-time download of the speech model.</li>
+      <li>Text in photos is recognised on the computer with ocrs.</li>
+      <li>Search covers Note text, Transcripts and recognised text.</li>
+      <li>Phone and desktop sync over the local network or through a shared folder, such as one kept by Syncthing or Nextcloud.</li>
+      <li>Encrypted Backups go into a folder of the user's choice.</li>
+    </ul>
+    <p>
+      The Flatpak keeps its data apart from other installs of the desktop app.
+      Data moves between them through a Backup and its restore.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.paxel.oldbrainfix.desktop</launchable>
+  <provides>
+    <binary>oldbrainfix</binary>
+  </provides>
+
+  <url type="homepage">https://paxel.github.io/oldbrainfix/</url>
+  <url type="bugtracker">https://github.com/paxel/oldbrainfix/issues</url>
+  <url type="vcs-browser">https://github.com/paxel/oldbrainfix</url>
+  <url type="donation">https://ko-fi.com/paxel7</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#cde8e4</color>
+    <color type="primary" scheme_preference="dark">#26292c</color>
+  </branding>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>The Agenda with today's and tomorrow's Routines and Reminders</caption>
+      <image>https://github.com/paxel/oldbrainfix/releases/download/v@VERSION@/screenshot-agenda.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The Notes of an Area, with the selected Note on the right</caption>
+      <image>https://github.com/paxel/oldbrainfix/releases/download/v@VERSION@/screenshot-notes.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The Settings of this computer</caption>
+      <image>https://github.com/paxel/oldbrainfix/releases/download/v@VERSION@/screenshot-settings.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <!-- @RELEASES@ -->
+  </releases>
+</component>

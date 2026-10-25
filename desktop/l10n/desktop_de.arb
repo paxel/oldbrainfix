@@ -48,8 +48,6 @@
   "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}",
   "speechModelIntro": "Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Computer, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.",
   "speechModelReady": "Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Computer transkribiert.",
-  "speechModelPathHint": "Pfad zu ggml-base.bin",
-  "speechModelUseFile": "Diese Datei verwenden",
   "pastePhoto": "Bild einfügen",
   "pasteNoPicture": "In der Zwischenablage ist kein Bild.",
   "photosHint": "Ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz.",

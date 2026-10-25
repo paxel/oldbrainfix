@@ -444,7 +444,8 @@ pub struct App {
     speech: Option<SpeechModel>,
     speech_ready: bool,
     /// A speech model file as typed into the Settings.
-    model_path: String,
+    /// Asks for a speech model file of the user's own.
+    model_picker: FolderPicker,
     photos: PhotoCache,
     /// What the Notes shown are searched for.
     query: String,
@@ -558,7 +559,7 @@ impl App {
             reader: None,
             speech: None,
             speech_ready: false,
-            model_path: String::new(),
+            model_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
             photos: PhotoCache::default(),
             query: String::new(),
             sync: SyncHost::default(),
@@ -605,6 +606,12 @@ impl App {
     /// dialog; tests hand in a path.
     pub fn set_folder_picker(&mut self, picker: FolderPicker) {
         self.folder_picker = picker;
+    }
+
+    /// Asks `picker` for a speech model file instead of the system's
+    /// dialog; tests hand in a path.
+    pub fn set_model_picker(&mut self, picker: FolderPicker) {
+        self.model_picker = picker;
     }
 
     /// Hands in the dialogs asking where to save a bundle and which one
@@ -1323,7 +1330,11 @@ impl App {
                 if let Some(speech) = &self.speech {
                     match asked {
                         Speech::Download => speech.download(),
-                        Speech::TakeFile(path) => speech.take_file(std::path::Path::new(&path)),
+                        Speech::PickFile => {
+                            if let Some(path) = (self.model_picker)(self.t.speech_model_pick()) {
+                                speech.take_file(&path);
+                            }
+                        }
                         Speech::Cancel => speech.cancel(),
                     }
                 }
@@ -2841,7 +2852,6 @@ impl App {
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
-        let model_path = &mut self.model_path;
         let (store, wall, backup_form, recovery_shown) = (
             &self.store,
             &self.wall,
@@ -2902,7 +2912,7 @@ impl App {
                 });
                 if let Some(speech) = speech {
                     embossed(ui, tones, false, None, |ui| {
-                        if let Some(asked) = media_view::speech_card(ui, &t, speech, model_path) {
+                        if let Some(asked) = media_view::speech_card(ui, &t, speech) {
                             actions.push(Action::Speech(asked));
                         }
                     });

@@ -8,7 +8,11 @@
 #                    the Kotlin unit tests,
 #                    refused when signed with the debug key; the bundle
 #                    goes to Google Play's internal track
-#   build-linux    — Rust desktop: tar.gz, .deb, AppImage and Flatpak per arch
+#   build-linux    — Rust desktop: tar.gz, .deb and AppImage per arch
+#   build-flatpak  — the Flatpak per arch, from source with the manifest
+#                    Flathub builds
+#   screenshots    — the Flathub listing's screenshots, drawn by kittest
+#                    from demo data
 #   build-windows  — Rust desktop: zip with oldbrainfix.exe
 #   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
 #   render-channels — Homebrew cask + formula and Scoop manifest rendered from
@@ -17,6 +21,9 @@
 #   release        — GitHub Release, notes = the CHANGELOG section for the tag
 #   channels       — the rendered files pushed to the tap and the bucket, after
 #                    the Release, when publishing
+#   flathub        — the update pull request to flathub/io.github.paxel.oldbrainfix,
+#                    after the Release (the metainfo's screenshots are its
+#                    assets); skipped while that repository does not exist
 #
 # The Whisper model is not part of any of this: the app downloads it from
 # the separate `whisper-model-v1` release, which no tag here touches.
@@ -33,6 +40,9 @@
 #                 and paxel/scoop-bucket
 #   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
 #                 the same one cat(a)log and Chaos Alert use
+#   FLATHUB_TOKEN — classic token (public_repo) of a maintainer of
+#                 flathub/io.github.paxel.oldbrainfix, once Flathub accepted
+#                 the app
 name: Release
 
 on:
@@ -105,7 +115,7 @@ jobs:
           cargo test --workspace --locked
       - name: What's-new tool — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new
+        run: python3 -m unittest test_whats_new test_metainfo
 
   build-android:
     name: Android APKs and bundle
@@ -221,7 +231,7 @@ jobs:
       - name: Build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ curl file flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ curl file
       - name: Build
         working-directory: desktop
         run: cargo build --release --locked --bin oldbrainfix
@@ -229,17 +239,70 @@ jobs:
         run: |
           v="${RELEASE_TAG#v}"
           desktop/packaging/linux/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
-      - name: Pack the Flatpak
+      - uses: actions/upload-artifact@v6
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+
+  # The same manifest, rendered the same way, as Flathub builds: from
+  # source, the network off during the build.
+  build-flatpak:
+    name: Flatpak (${{ matrix.arch }})
+    needs: gate
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Older releases in the metainfo are dated by their tags.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: flatpak and flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+      - name: Build the bundle from source
         run: |
           # flatpak-builder sandboxes through bwrap, which Ubuntu's
           # AppArmor default refuses user namespaces to.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           v="${RELEASE_TAG#v}"
-          desktop/packaging/flatpak/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
+          RELEASE_DATE=$(git log -1 --format=%cs) \
+            desktop/packaging/flatpak/pack.sh "$v" "${{ matrix.arch }}" dist
       - uses: actions/upload-artifact@v6
         with:
-          name: linux-${{ matrix.arch }}
+          name: flatpak-${{ matrix.arch }}
           path: dist/*
+
+  # The metainfo points at these files on the Release.
+  screenshots:
+    name: Flathub screenshots
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Build dependencies and a software Vulkan (lavapipe) to draw with
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ mesa-vulkan-drivers libvulkan1
+      - name: Render the screenshots from demo data
+        working-directory: desktop
+        env:
+          SCREENSHOTS_DIR: ${{ github.workspace }}/screenshots
+        run: cargo test -p oldbrainfix-gui --test flathub_screenshots --locked -- --ignored
+      - uses: actions/upload-artifact@v6
+        with:
+          name: screenshots
+          path: screenshots/*.png
 
   build-windows:
     name: Windows desktop
@@ -394,7 +457,7 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-android, build-linux, build-windows, build-macos]
+    needs: [build-android, build-linux, build-flatpak, screenshots, build-windows, build-macos]
     if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -405,7 +468,7 @@ jobs:
       # uploading meanwhile.
       - uses: actions/download-artifact@v7
         with:
-          pattern: "{android,linux-*,windows,macos-*}"
+          pattern: "{android,linux-*,flatpak-*,screenshots,windows,macos-*}"
           path: dist
           merge-multiple: true
       - name: Release notes from the CHANGELOG section
@@ -469,3 +532,68 @@ jobs:
           git -C bucket add bucket/oldbrainfix.json
           git -C bucket diff --cached --quiet || git -C bucket commit -m "oldbrainfix $ver"
           git -C bucket push
+
+  # After the Release: Flathub fetches the metainfo's screenshots from its
+  # assets. The maintainer merges the pull request.
+  flathub:
+    name: Flathub update pull request
+    needs: release
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    env:
+      FLATHUB_REPO: flathub/io.github.paxel.oldbrainfix
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Is the app on Flathub yet
+        id: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/$FLATHUB_REPO" --silent 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::$FLATHUB_REPO does not exist yet, so no update pull request"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Render the manifest for the tag, cargo-sources.json and the metainfo
+        if: steps.app.outputs.exists == 'true'
+        run: |
+          # A dispatched release made its tag only in the release job.
+          git fetch --tags --force
+          commit=$(git rev-list -n 1 "$RELEASE_TAG")
+          desktop/packaging/flatpak/render.sh flathub "${RELEASE_TAG#v}" \
+            "$(git log -1 --format=%cs "$RELEASE_TAG")" "$RELEASE_TAG" "$commit"
+      # With the network: the screenshots and the site are there now.
+      - name: flatpak-builder-lint on the metainfo
+        if: steps.app.outputs.exists == 'true'
+        run: |
+          docker run --rm -v "$PWD/flathub:/work" -w /work \
+            ghcr.io/flathub-infra/flatpak-builder-lint@sha256:6057d350c1f67cfd72b87891ea779a9de2567ff70e33b480d20eebcffef08fa0 \
+            appstream io.github.paxel.oldbrainfix.metainfo.xml
+      - name: Open the pull request
+        if: steps.app.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.FLATHUB_TOKEN }}
+        run: |
+          git config --global user.name "oldbrainfix-release-bot"
+          git config --global user.email "taum@tuta.io"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/$FLATHUB_REPO.git" app
+          base=$(git -C app rev-parse --abbrev-ref HEAD)
+          branch="update-$RELEASE_TAG"
+          git -C app checkout -B "$branch"
+          cp flathub/io.github.paxel.oldbrainfix.yml flathub/cargo-sources.json \
+            flathub/io.github.paxel.oldbrainfix.metainfo.xml app/
+          git -C app add io.github.paxel.oldbrainfix.yml cargo-sources.json io.github.paxel.oldbrainfix.metainfo.xml
+          if git -C app diff --cached --quiet; then
+            echo "Flathub already builds $RELEASE_TAG"
+            exit 0
+          fi
+          git -C app commit -m "Update to $RELEASE_TAG"
+          git -C app push --force origin "$branch"
+          if ! gh pr view "$branch" --repo "$FLATHUB_REPO" >/dev/null 2>&1; then
+            gh pr create --repo "$FLATHUB_REPO" --base "$base" --head "$branch" \
+              --title "Update to $RELEASE_TAG" \
+              --body "Old Brain Fix $RELEASE_TAG: the manifest at the new tag, cargo-sources.json and the metainfo with its release notes, rendered by the release workflow of paxel/oldbrainfix."
+          fi

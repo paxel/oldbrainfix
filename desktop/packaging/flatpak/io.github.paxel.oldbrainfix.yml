@@ -1,11 +1,18 @@
-# The Flatpak of the desktop app, wrapped around the binary the release
-# builds (as the tarball, .deb and AppImage are), not built from source
-# in the sandbox. packaging/flatpak/pack.sh puts the files named below
-# next to a copy of this manifest and runs flatpak-builder.
-app-id: io.github.paxel.oldbrainfix
+# The Flatpak of the desktop app, built from source without network
+# access (#45): the Rust crates come from cargo-sources.json, whisper.cpp,
+# the ocrs models and the translations from the repository itself.
+#
+# One manifest for Flathub and the .flatpak file on each GitHub Release.
+# packaging/flatpak/render.sh writes it next to cargo-sources.json and the
+# metainfo it renders: with a tag and its commit, the app's source below
+# becomes that tag in git (what the Flathub repository holds); without,
+# it stays this checkout.
+id: io.github.paxel.oldbrainfix
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
 command: oldbrainfix
 # Flatpak exports only icons named after the app id; this renames the
 # icon and the entry's Icon= line to match.
@@ -20,33 +27,47 @@ finish-args:
   - --socket=pulseaudio
   # Sync with the phone on the home network, the speech model download.
   - --share=network
-  # The shared folder (Syncthing, Nextcloud, a USB stick) is a path the
-  # app keeps and syncs through in the background, wherever it lives.
-  - --filesystem=home
-  - --filesystem=/media
-  - --filesystem=/run/media
   # Notifications with Done and Snooze, and the tray icon.
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.kde.StatusNotifierWatcher
   # ksni registers org.kde.StatusNotifierItem-<pid>-<n>; flatpak only
   # accepts a wildcard as a whole last segment.
   - --own-name=org.kde.*
+  # No filesystem access: folders and files are chosen through the file
+  # chooser portal, which keeps them reachable through the document
+  # portal across restarts.
 modules:
   - name: oldbrainfix
     buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/oldbrainfix/cargo
+        CARGO_NET_OFFLINE: 'true'
     build-commands:
-      - install -Dm755 oldbrainfix /app/bin/oldbrainfix
-      - install -Dm644 io.github.paxel.oldbrainfix.desktop /app/share/applications/io.github.paxel.oldbrainfix.desktop
-      - install -Dm644 icon_256.png /app/share/icons/hicolor/256x256/apps/oldbrainfix.png
-      - install -Dm644 -t /app/share/licenses/io.github.paxel.oldbrainfix LICENSE-APACHE LICENSE-MIT
+      - cargo --offline build --release --locked --manifest-path desktop/Cargo.toml --bin oldbrainfix
+      - install -Dm755 desktop/target/release/oldbrainfix /app/bin/oldbrainfix
+      # Without the marker: inside the sandbox the app never rewrites it.
+      - grep -v '^X-Oldbrainfix-Managed=' desktop/packaging/linux/io.github.paxel.oldbrainfix.desktop > io.github.paxel.oldbrainfix.desktop
+      - install -Dm644 -t /app/share/applications io.github.paxel.oldbrainfix.desktop
+      - install -Dm644 desktop/packaging/icon/icon_256.png /app/share/icons/hicolor/256x256/apps/oldbrainfix.png
+      - install -Dm644 -t /app/share/metainfo io.github.paxel.oldbrainfix.metainfo.xml
+      - install -Dm644 -t /app/share/licenses/io.github.paxel.oldbrainfix LICENSE-APACHE LICENSE-MIT THIRD-PARTY-NOTICES.md
     sources:
+      # app-source: render.sh replaces this entry with the tag, or points
+      # it at the checkout; skipped is what local builds leave in it.
+      - type: dir
+        path: ../../..
+        skip:
+          - .git
+          - .dart_tool
+          - .idea
+          - build
+          - desktop/target
+          - android/.gradle
+          - android/app/.cxx
+          - android/app/build
+          - packages/oldbrainfix_core/.dart_tool
+      - cargo-sources.json
       - type: file
-        path: oldbrainfix
-      - type: file
-        path: io.github.paxel.oldbrainfix.desktop
-      - type: file
-        path: icon_256.png
-      - type: file
-        path: LICENSE-APACHE
-      - type: file
-        path: LICENSE-MIT
+        path: io.github.paxel.oldbrainfix.metainfo.xml
