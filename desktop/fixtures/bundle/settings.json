@@ -1,0 +1,38 @@
+{
+  "host": [
+    [
+      "key:c945cbf2a5602002141e2fb9d17054d6",
+      "{\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:2b038b02f23b2ce7",
+      "{\"key\":\"MjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFE=\",\"scope\":\"area:00000000000000000000000000000001\"}"
+    ],
+    [
+      "areakey:abc3e0721a89824d",
+      "{\"key\":\"DQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKyw=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:c30206e6d1ff486a",
+      "{\"key\":\"V1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=\",\"scope\":\"area:00000000000000000000000000000004\"}"
+    ],
+    [
+      "held:c945cbf2a5602002141e2fb9d17054d6",
+      "{\"65b60673d6ed884bf01c2c222d82ada0\":6,\"c945cbf2a5602002141e2fb9d17054d6\":3}"
+    ]
+  ],
+  "joiner": [
+    [
+      "key:65b60673d6ed884bf01c2c222d82ada0",
+      "{\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:2b038b02f23b2ce7",
+      "{\"key\":\"MjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFE=\",\"scope\":\"area:00000000000000000000000000000001\"}"
+    ],
+    [
+      "areakey:abc3e0721a89824d",
+      "{\"key\":\"DQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKyw=\",\"scope\":\"personal\"}"
+    ]
+  ]
+}

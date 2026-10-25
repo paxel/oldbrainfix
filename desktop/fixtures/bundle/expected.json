@@ -1,0 +1,174 @@
+{
+  "entries": 15,
+  "blobs": 2,
+  "applied": 15,
+  "blobsIn": 2,
+  "held": "{\"65b60673d6ed884bf01c2c222d82ada0\":21,\"c945cbf2a5602002141e2fb9d17054d6\":3}",
+  "read": {
+    "now": "2026-01-02T10:00:31.000Z",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000004",
+        "name": "Doctor",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      },
+      {
+        "id": "area:00000000000000000000000000000001",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Buy milk",
+        "captured": "2026-01-01T10:00:03.000Z",
+        "place": "area:00000000000000000000000000000001",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000003",
+        "text": "Call mum",
+        "captured": "2026-01-01T10:00:08.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000005",
+        "text": "Blood test on Friday",
+        "captured": "2026-01-01T10:00:16.000Z",
+        "place": "area:00000000000000000000000000000004",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [
+          "c40c7db61b1eb6c0e7415902a7574a8e7315f8633c5125e60084addd3c2d21fc"
+        ],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000006",
+        "text": "Hum this",
+        "captured": "2026-01-01T10:00:22.000Z",
+        "place": "area:00000000000000000000000000000001",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [
+          "52f0f855e3f6ef7cfd85ef214bcf3b80db8af56da1f0cc1811655661c1aeb442"
+        ],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000007",
+        "text": "Unsorted thought",
+        "captured": "2026-01-01T10:00:28.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000007"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000004": [
+        "note:00000000000000000000000000000005"
+      ],
+      "area:00000000000000000000000000000001": [
+        "note:00000000000000000000000000000006",
+        "note:00000000000000000000000000000002"
+      ]
+    },
+    "sections": {
+      "note:00000000000000000000000000000007": [],
+      "note:00000000000000000000000000000006": [],
+      "note:00000000000000000000000000000005": [],
+      "note:00000000000000000000000000000003": [],
+      "note:00000000000000000000000000000002": []
+    },
+    "untranscribed": [
+      {
+        "noteId": "note:00000000000000000000000000000006",
+        "hash": "52f0f855e3f6ef7cfd85ef214bcf3b80db8af56da1f0cc1811655661c1aeb442"
+      }
+    ],
+    "unreadPhotos": [
+      {
+        "noteId": "note:00000000000000000000000000000005",
+        "hash": "c40c7db61b1eb6c0e7415902a7574a8e7315f8633c5125e60084addd3c2d21fc"
+      }
+    ],
+    "search": {
+      "": [
+        "note:00000000000000000000000000000007",
+        "note:00000000000000000000000000000006",
+        "note:00000000000000000000000000000005",
+        "note:00000000000000000000000000000003",
+        "note:00000000000000000000000000000002"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000002"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000007",
+        "note:00000000000000000000000000000005"
+      ]
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000004": [
+        "note:00000000000000000000000000000005"
+      ],
+      "area:00000000000000000000000000000001": []
+    },
+    "conflicts": []
+  }
+}

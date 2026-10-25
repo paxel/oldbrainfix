@@ -292,6 +292,79 @@ Future<FolderSyncResult> folderSync(
   );
 }
 
+/// Reads the sealed layout of [folder] as a folder sync reads the shared
+/// folder, for a bundle (bundle.dart): learns the keys, takes in every
+/// other Device's segments of a key held here from their first line,
+/// remembering nothing of how far it read, with a Moment of [cause]
+/// before what was new, and the blobs the log lacks. Writes nothing.
+Future<FolderSyncResult> readSealed(
+  Store store,
+  SyncFolder folder, {
+  required String cause,
+  String? label,
+}) async {
+  final report = ImportReport();
+  await _learnKeys(store, folder, report);
+  final before = store.currentSeq();
+  final (applied, unreadable) = await _readForeign(
+    store,
+    folder,
+    report,
+    remember: false,
+  );
+  final moment = store.momentFor(
+    before: before,
+    changed: applied.isNotEmpty,
+    cause: cause,
+    label: label,
+  );
+  final names = (await folder.list('blobs')).toSet();
+  final blobsIn = await _fetchBlobs(store, folder, names);
+  return FolderSyncResult(
+    applied: applied,
+    entriesOut: 0,
+    blobsIn: blobsIn,
+    blobsOut: 0,
+    unreadable: unreadable,
+    moment: moment,
+    report: report,
+    conflicts: store.conflictsAmong(applied),
+  );
+}
+
+/// Writes [entries] into the empty [folder] as a folder sync writes this
+/// Device's part of the shared folder, for a bundle (bundle.dart): the
+/// keys files, the segments under generation 1 with the manifest, and
+/// the blobs of [blobs], each sealed as there and with nonces from
+/// [nonce] in the same order. Returns how many entries and blobs went
+/// out.
+Future<({int entries, int blobs})> writeSealed(
+  Store store,
+  SyncFolder folder,
+  List<Entry> entries, {
+  required Set<String> blobs,
+  required Uint8List Function() nonce,
+}) async {
+  store.ensureAreaKeys();
+  await _publishKeys(store, folder, nonce);
+  final out = await _writeSegments(
+    store,
+    folder,
+    nonce,
+    entries,
+    segments: [],
+    generation: 1,
+  );
+  final blobsOut = await _publishBlobs(
+    store,
+    folder,
+    <String>{},
+    nonce,
+    only: blobs,
+  );
+  return (entries: out, blobs: blobsOut);
+}
+
 /// The (device, key id) a file name `<device>.<key id>.<rest>` names.
 (String, String)? _deviceAndKey(String name) {
   final parts = name.split('.');
@@ -395,8 +468,9 @@ String _readStateKey(String device) => 'folderRead:$device';
 Future<(List<Entry>, int)> _readForeign(
   Store store,
   SyncFolder folder,
-  ImportReport report,
-) async {
+  ImportReport report, {
+  bool remember = true,
+}) async {
   final self = store.deviceId;
   final fresh = <Entry>[];
   final states = <String, Map<String, Object>>{};
@@ -412,7 +486,9 @@ Future<(List<Entry>, int)> _readForeign(
       continue;
     }
     if (manifest == null) continue; // half-written, or a newer format
-    var state = _readState(store, device);
+    var state = remember
+        ? _readState(store, device)
+        : (generation: -1, lines: const <String, int>{});
     if (state.generation != manifest.generation) {
       state = (generation: manifest.generation, lines: const {});
     }
@@ -442,8 +518,10 @@ Future<(List<Entry>, int)> _readForeign(
   // Remembered after: a round cut short reads the lines again, and the
   // store skips what it holds.
   final applied = store.applyEntries(fresh, report: report);
-  for (final MapEntry(:key, :value) in states.entries) {
-    store.setLocalSetting(_readStateKey(key), jsonEncode(value));
+  if (remember) {
+    for (final MapEntry(:key, :value) in states.entries) {
+      store.setLocalSetting(_readStateKey(key), jsonEncode(value));
+    }
   }
   return (applied, unreadable);
 }
@@ -547,6 +625,36 @@ Future<int> _publishEntries(
   final entries = store.entriesSince(afresh ? const {} : previous.vector);
   if (!afresh && entries.isEmpty) return 0;
 
+  if (afresh) {
+    for (final name in present) {
+      if (name.startsWith('$self.') && name.endsWith('.seg')) {
+        await folder.delete('', name);
+      }
+    }
+  }
+  return _writeSegments(
+    store,
+    folder,
+    nonce,
+    entries,
+    segments: afresh ? [] : [...previous.segments],
+    generation: afresh ? (previous?.generation ?? 0) + 1 : previous.generation,
+  );
+}
+
+/// Seals [entries] in log order, each with the key of its Area as it is
+/// now, appends them to the last of [segments] of that key, or a fresh
+/// one once the last passed [segmentCap], and writes the manifest of
+/// [generation] after. Returns how many entries went out.
+Future<int> _writeSegments(
+  Store store,
+  SyncFolder folder,
+  Uint8List Function() nonce,
+  List<Entry> entries, {
+  required List<Segment> segments,
+  required int generation,
+}) async {
+  final self = store.deviceId;
   // Sealed in log order, kept by key.
   final keyOf = <String, AreaKey?>{};
   final lines = <String, List<String>>{};
@@ -566,16 +674,6 @@ Future<int> _publishEntries(
     out++;
   }
 
-  final segments = <Segment>[];
-  if (afresh) {
-    for (final name in present) {
-      if (name.startsWith('$self.') && name.endsWith('.seg')) {
-        await folder.delete('', name);
-      }
-    }
-  } else {
-    segments.addAll(previous.segments);
-  }
   for (final id in lines.keys.toList()..sort()) {
     final fresh = lines[id]!;
     final run = [
@@ -619,9 +717,7 @@ Future<int> _publishEntries(
     '',
     manifestName(self),
     FolderManifest(
-      generation: afresh
-          ? (previous?.generation ?? 0) + 1
-          : previous.generation,
+      generation: generation,
       vector: store.versionVector(),
       segments: segments,
     ).encode(),
@@ -677,20 +773,23 @@ Future<int> _fetchBlobs(
 
 /// Publishes every blob held here that the folder lacks, sealed with the
 /// key of the Note it is on (once per key when two Notes in different
-/// Areas hold it). Returns how many went out.
+/// Areas hold it), or only those of [only]. Returns how many went out.
 Future<int> _publishBlobs(
   Store store,
   SyncFolder folder,
   Set<String> names,
-  Uint8List Function() nonce,
-) async {
+  Uint8List Function() nonce, {
+  Set<String>? only,
+}) async {
   final wanted = <(String, String), AreaKey>{};
   for (final (kind, prefix) in Sync.blobKinds) {
     for (final (entity, field) in store.fieldsWithPrefix(prefix)) {
+      final ref = '$kind/${field.substring(prefix.length)}';
+      if (only != null && !only.contains(ref)) continue;
       if (store.current(entity, field) == null) continue;
       final key = store.sealingKey(entity);
       if (key == null) continue;
-      wanted[('$kind/${field.substring(prefix.length)}', key.id)] = key;
+      wanted[(ref, key.id)] = key;
     }
   }
   final order = wanted.keys.toList()

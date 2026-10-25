@@ -413,5 +413,17 @@
   "folderNotYet": "Noch nicht synchronisiert",
   "folderSynced": "Zuletzt synchronisiert {when}: {count, plural, =0{nichts Neues} =1{1 Änderung angekommen} other{{count} Änderungen angekommen}}",
   "folderUnreachable": "Der Ordner war nicht erreichbar ({when}). Es wird später wieder versucht.",
-  "folderUnreadable": "{count, plural, =1{1 Datei stammt von einem Gerät, das nicht mit diesem gekoppelt ist. Kopple sie zuerst.} other{{count} Dateien stammen von Geräten, die nicht mit diesem gekoppelt sind. Kopple sie zuerst.}}"
+  "folderUnreadable": "{count, plural, =1{1 Datei stammt von einem Gerät, das nicht mit diesem gekoppelt ist. Kopple sie zuerst.} other{{count} Dateien stammen von Geräten, die nicht mit diesem gekoppelt sind. Kopple sie zuerst.}}",
+  "bundleTitle": "Sync-Paket",
+  "bundleIntro": "Schickt das Neue als eine Datei über einen beliebigen Messenger oder per Mail, und das andere Gerät importiert sie. Alles darin ist verschlüsselt: Nur Geräte, die mit diesem gekoppelt sind, können es lesen.",
+  "bundleFor": "Für",
+  "bundleEverything": "Alles",
+  "bundleSend": "Paket senden",
+  "bundleImport": "Paket importieren",
+  "bundleNothingNew": "Nichts Neues für {name}.",
+  "bundleCameIn": "{count, plural, =0{Mit dem Paket kam nichts Neues an.} =1{Mit dem Paket kam 1 Änderung an.} other{Mit dem Paket kamen {count} Änderungen an.}}",
+  "bundlePairFirst": "Dieses Paket stammt von einem Gerät, das nicht mit diesem gekoppelt ist, darum lässt sich nichts darin lesen. Kopple sie zuerst und importiere es dann noch einmal.",
+  "bundleNotABundle": "Diese Datei ist kein Sync-Paket, das diese App lesen kann.",
+  "bundleFailed": "Das Paket hat nicht geklappt. Nichts ging verloren; versuch es noch einmal.",
+  "bundleNoApp": "Keine App hier kann das Paket annehmen."
 }

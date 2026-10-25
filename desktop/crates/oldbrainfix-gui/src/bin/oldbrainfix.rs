@@ -9,7 +9,8 @@
 //! The hotkey, the tray's Capture and `oldbrainfix capture` open the
 //! capture popup: over the window while it is open, else on its own.
 //! `oldbrainfix capture TEXT` keeps TEXT without any window, through the
-//! running app when there is one. On Windows it is built without a
+//! running app when there is one, and `oldbrainfix import FILE` imports
+//! the sync bundle FILE the same way. On Windows it is built without a
 //! console window.
 //!
 //! Transcripts and Photo Texts are made on threads of their own for as
@@ -41,7 +42,7 @@ use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{SpeechModel, Status};
-use oldbrainfix_gui::sync_view::device_name;
+use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
 
@@ -295,6 +296,28 @@ fn capture_text(dir: &Path, socket: &Path, t: &L10n, text: &str) -> i32 {
     }
 }
 
+/// `oldbrainfix import FILE`: imports the bundle through the running
+/// app, or on its own when none runs, and prints what came in; the exit
+/// code.
+fn import_file(dir: &Path, socket: &Path, t: &L10n, file: &str) -> i32 {
+    // The running app has a working directory of its own.
+    let path = std::path::absolute(file).unwrap_or_else(|_| file.into());
+    let done = instance::hand_over_import(socket, &path).unwrap_or_else(|| {
+        let store = open_store(dir)?;
+        import_bundle_text(t, &store, &path)
+    });
+    match done {
+        Ok(said) => {
+            println!("{said}");
+            cli::OK
+        }
+        Err(e) => {
+            eprintln!("oldbrainfix: {e}");
+            cli::FAILED
+        }
+    }
+}
+
 fn run() -> Result<i32, String> {
     let locale = locale_for_system(sys_locale::get_locale().as_deref());
     let t = L10n::new(locale);
@@ -320,6 +343,7 @@ fn run() -> Result<i32, String> {
             }
             return Ok(capture_text(&dir, &socket, &t, &text));
         }
+        Launch::Import(file) => return Ok(import_file(&dir, &socket, &t, &file)),
         Launch::Window | Launch::Help => Some(Command::Open),
         Launch::Popup => Some(Command::Capture),
         // A login start adds nothing to a running app.
@@ -473,7 +497,15 @@ fn run() -> Result<i32, String> {
             Ok(())
         })
     };
-    if let Err(e) = instance::listen(&socket, command_tx.clone(), waker(&window), capture) {
+    let import: instance::Import = {
+        let (store, saved) = (store.clone(), saved.clone());
+        Box::new(move |path| {
+            let said = import_bundle_text(&t, &store, path);
+            saved();
+            said
+        })
+    };
+    if let Err(e) = instance::listen(&socket, command_tx.clone(), waker(&window), capture, import) {
         eprintln!("oldbrainfix: {e}");
     }
     let labels = tray::Labels {

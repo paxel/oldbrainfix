@@ -2,12 +2,15 @@
 //! window, open the capture popup, or nothing for a login start) to the
 //! running one over a local socket and ends, so reminders never come
 //! twice. `oldbrainfix capture <text>` hands its text over the same way,
-//! so only the running app writes to the log. On systems without Unix
-//! sockets every start runs on its own.
+//! and `oldbrainfix import <file>` the bundle's path, so only the running
+//! app writes to the log. On systems without Unix sockets every start
+//! runs on its own.
 //!
 //! The protocol: one line with a word (`open`, `capture`, `quit`,
 //! `none`), and nothing back; or the line `text`, then the text to the
-//! end of the stream, answered by `ok` or by `error` and what went wrong.
+//! end of the stream, answered by `ok` or by `error` and what went wrong;
+//! or the line `import`, then the path to the end of the stream,
+//! answered by `ok` and what came in, or by `error` and what went wrong.
 
 use std::path::Path;
 use std::sync::mpsc::Sender;
@@ -16,11 +19,17 @@ use crate::tray::Command;
 
 /// The word before a text to capture.
 const TEXT: &str = "text";
+/// The word before the path of a bundle to import.
+const IMPORT: &str = "import";
 const OK: &str = "ok";
 const ERROR: &str = "error";
 
 /// Captures a text handed over; what went wrong, if anything.
 pub type Capture = Box<dyn Fn(&str) -> Result<(), String> + Send>;
+
+/// Imports the bundle at a path handed over; what came in, or what went
+/// wrong.
+pub type Import = Box<dyn Fn(&Path) -> Result<String, String> + Send>;
 
 /// What a second start says.
 fn word(command: Option<Command>) -> &'static str {
@@ -64,26 +73,42 @@ pub fn hand_over(_socket: &Path, _wish: Option<Command>) -> bool {
 /// none runs, else whether it kept the text.
 #[cfg(unix)]
 pub fn hand_over_text(socket: &Path, text: &str) -> Option<Result<(), String>> {
+    ask(socket, TEXT, text).map(|answer| answer.map(drop))
+}
+
+/// Hands the bundle at `path` to the app running at `socket` to import;
+/// `None` when none runs, else what came in or what went wrong.
+#[cfg(unix)]
+pub fn hand_over_import(socket: &Path, path: &Path) -> Option<Result<String, String>> {
+    ask(socket, IMPORT, &path.to_string_lossy())
+}
+
+/// Sends `word` and `payload` to the app running at `socket` and reads
+/// its answer: what follows `ok`, or what follows `error`.
+#[cfg(unix)]
+fn ask(socket: &Path, word: &str, payload: &str) -> Option<Result<String, String>> {
     use std::io::{Read, Write};
     let mut stream = std::os::unix::net::UnixStream::connect(socket).ok()?;
     let answer = (|| -> std::io::Result<String> {
         // A store busy for longer than this is a failure, not a hang.
         stream.set_read_timeout(Some(std::time::Duration::from_secs(20)))?;
-        write!(stream, "{TEXT}\n{text}")?;
+        write!(stream, "{word}\n{payload}")?;
         stream.shutdown(std::net::Shutdown::Write)?;
         let mut answer = String::new();
         stream.read_to_string(&mut answer)?;
         Ok(answer)
     })();
     Some(match answer {
-        Ok(answer) if answer.trim() == OK => Ok(()),
-        Ok(answer) => Err(answer
-            .trim()
-            .strip_prefix(ERROR)
-            .map(str::trim)
-            .filter(|e| !e.is_empty())
-            .unwrap_or("no answer from the running app")
-            .to_string()),
+        Ok(answer) => match answer.trim().strip_prefix(OK) {
+            Some(said) => Ok(said.trim().to_string()),
+            None => Err(answer
+                .trim()
+                .strip_prefix(ERROR)
+                .map(str::trim)
+                .filter(|e| !e.is_empty())
+                .unwrap_or("no answer from the running app")
+                .to_string()),
+        },
         Err(e) => Err(e.to_string()),
     })
 }
@@ -93,14 +118,21 @@ pub fn hand_over_text(_socket: &Path, _text: &str) -> Option<Result<(), String>>
     None
 }
 
+#[cfg(not(unix))]
+pub fn hand_over_import(_socket: &Path, _path: &Path) -> Option<Result<String, String>> {
+    None
+}
+
 /// Listens at `socket` for later starts and passes their wishes to
-/// `commands`, calling `wake` after each; texts go to `capture`.
+/// `commands`, calling `wake` after each; texts go to `capture`, the
+/// paths of bundles to `import`.
 #[cfg(unix)]
 pub fn listen(
     socket: &Path,
     commands: Sender<Command>,
     wake: Box<dyn Fn() + Send>,
     capture: Capture,
+    import: Import,
 ) -> std::io::Result<()> {
     use std::io::{BufRead, Read, Write};
     // One left behind by a crash answers nobody.
@@ -115,14 +147,17 @@ pub fn listen(
             if reader.read_line(&mut line).is_err() {
                 continue;
             }
-            if line.trim() == TEXT {
+            let word = line.trim();
+            if word == TEXT || word == IMPORT {
                 let mut text = String::new();
                 let answer = match reader.read_to_string(&mut text) {
-                    Ok(_) => capture(&text),
+                    Ok(_) if word == TEXT => capture(&text).map(|()| String::new()),
+                    Ok(_) => import(Path::new(&text)),
                     Err(e) => Err(e.to_string()),
                 };
                 let answer = match answer {
-                    Ok(()) => OK.to_string(),
+                    Ok(said) if said.is_empty() => OK.to_string(),
+                    Ok(said) => format!("{OK} {said}"),
                     Err(e) => format!("{ERROR} {e}"),
                 };
                 drop(writeln!(reader.get_mut(), "{answer}"));
@@ -141,6 +176,7 @@ pub fn listen(
     _commands: Sender<Command>,
     _wake: Box<dyn Fn() + Send>,
     _capture: Capture,
+    _import: Import,
 ) -> std::io::Result<()> {
     Ok(())
 }
@@ -157,7 +193,13 @@ mod tests {
         let socket = dir.path().join("instance.sock");
         assert!(!hand_over(&socket, Some(Command::Open)));
         let (tx, rx) = std::sync::mpsc::channel();
-        listen(&socket, tx, Box::new(|| {}), Box::new(|_| Ok(())))?;
+        listen(
+            &socket,
+            tx,
+            Box::new(|| {}),
+            Box::new(|_| Ok(())),
+            Box::new(|_| Ok(String::new())),
+        )?;
         assert!(hand_over(&socket, Some(Command::Open)));
         assert!(hand_over(&socket, None));
         assert!(hand_over(&socket, Some(Command::Capture)));
@@ -182,7 +224,13 @@ mod tests {
             into.lock().map_err(|e| e.to_string())?.push(text.into());
             Ok(())
         });
-        listen(&socket, tx, Box::new(|| {}), capture)?;
+        listen(
+            &socket,
+            tx,
+            Box::new(|| {}),
+            capture,
+            Box::new(|_| Ok(String::new())),
+        )?;
         assert_eq!(hand_over_text(&socket, "buy milk"), Some(Ok(())));
         // Lines and blanks come through as given; a word is no command.
         assert_eq!(hand_over_text(&socket, "open\nthe window\n"), Some(Ok(())));
@@ -193,6 +241,32 @@ mod tests {
         let kept = kept.lock().map(|k| k.clone()).unwrap_or_default();
         assert_eq!(kept, ["buy milk", "open\nthe window\n"]);
         assert!(rx.try_recv().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_bundle_is_imported_by_the_running_app_and_answered() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        let file = dir.path().join("a b.obfsync");
+        assert_eq!(hand_over_import(&socket, &file), None);
+        let (tx, _rx) = std::sync::mpsc::channel();
+        let import: Import = Box::new(|path| {
+            if path.ends_with("a b.obfsync") {
+                Ok("3 changes came in.\nAnd more.".into())
+            } else {
+                Err("no sync bundle".into())
+            }
+        });
+        listen(&socket, tx, Box::new(|| {}), Box::new(|_| Ok(())), import)?;
+        assert_eq!(
+            hand_over_import(&socket, &file),
+            Some(Ok("3 changes came in.\nAnd more.".into()))
+        );
+        assert_eq!(
+            hand_over_import(&socket, &dir.path().join("other")),
+            Some(Err("no sync bundle".into()))
+        );
         Ok(())
     }
 }

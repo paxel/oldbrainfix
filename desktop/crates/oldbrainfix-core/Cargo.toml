@@ -34,6 +34,9 @@ mdns-sd = { version = "0.21", default-features = false }
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 # Blob names in the shared folder.
 hmac = "0.12"
+# The bundle file (ADR 0003): a zip of stored files only, as the Dart
+# core's `archive` writes it; no compression, no encryption of its own.
+zip = { version = "=8.6.0", default-features = false }
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

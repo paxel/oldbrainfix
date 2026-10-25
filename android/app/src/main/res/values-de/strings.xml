@@ -11,4 +11,5 @@
     <string name="agenda_widget">Agenda</string>
     <string name="agenda_widget_description">Die Routinen und Erinnerungen von heute zum Abhaken und was unsortiert ist.</string>
     <string name="agenda_widget_open_app">Öffne Old Brain Fix, um zu sehen, was heute ansteht.</string>
+    <string name="bundle_import">In Old Brain Fix importieren</string>
 </resources>

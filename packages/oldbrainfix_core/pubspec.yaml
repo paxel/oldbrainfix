@@ -7,6 +7,9 @@ environment:
   sdk: ^3.13.4
 
 dependencies:
+  # The bundle file (ADR 0003): a zip, stored, read and written as a
+  # stream. MIT.
+  archive: ^4.3.0
   crypto: ^3.0.6
   # End-to-end encryption of what leaves a Device (ADR 0003, 0012):
   # XChaCha20-Poly1305, pure Dart.

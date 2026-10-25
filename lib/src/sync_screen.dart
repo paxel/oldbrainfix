@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
+import 'bundle_platform.dart';
 import 'conflicts_screen.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
@@ -26,9 +27,10 @@ typedef Join = Future<SyncResult> Function(
 /// Conflicts, and lists the paired Devices with when they last synced,
 /// each of which can be forgotten, and those that host kept from syncing
 /// on their own. The shared folder is picked and forgotten here too,
-/// with how its last sync went. What a sync did, or why it did not, is
-/// announced at the top; Conflicts it found are announced with a way to
-/// them.
+/// with how its last sync went, and a bundle file is sent, for a paired
+/// Device or of everything, and one imported. What a sync did, or why it
+/// did not, is announced at the top; Conflicts it found are announced
+/// with a way to them.
 class SyncScreen extends StatefulWidget {
   final Store store;
   final Join join;
@@ -49,6 +51,10 @@ class _SyncScreenState extends State<SyncScreen> {
   String? _folderName;
   var _folderBusy = false;
   var _named = false;
+
+  /// The paired Device the next bundle is for; everything when null.
+  String? _bundleFor;
+  var _bundleBusy = false;
 
   @override
   void didChangeDependencies() {
@@ -257,6 +263,119 @@ class _SyncScreenState extends State<SyncScreen> {
     ];
   }
 
+  /// Writes a bundle for the chosen Device, or of everything, and offers
+  /// it to the app the user picks; nothing is written when there is
+  /// nothing new for that Device.
+  Future<void> _sendBundle() async {
+    final t = context.t;
+    final bundles = BundleScope.of(context);
+    final store = widget.store;
+    final device = _bundleFor;
+    final since = device == null ? const <String, int>{} : store.heldBy(device);
+    if (store.entriesSince(since).isEmpty) {
+      final name = device == null ? null : store.pairedDevice(device)?.name;
+      _announce(t.bundleNothingNew(name ?? t.bundleEverything));
+      return;
+    }
+    setState(() => _bundleBusy = true);
+    try {
+      final path = await bundles.exportPath(
+        bundleFileName(store.clock().toLocal()),
+      );
+      if (!mounted) return;
+      if (path == null) {
+        _announce(t.bundleFailed);
+        return;
+      }
+      await writeBundle(store, path, forDevice: device);
+      final shared = await bundles.share(path);
+      if (!mounted) return;
+      if (!shared) _announce(t.bundleNoApp);
+    } on Object {
+      if (!mounted) return;
+      _announce(t.bundleFailed);
+    } finally {
+      if (mounted) setState(() => _bundleBusy = false);
+    }
+  }
+
+  /// Imports a bundle the user picks.
+  Future<void> _importBundle() async {
+    final path = await BundleScope.of(context).pick();
+    if (!mounted || path == null) return;
+    setState(() => _bundleBusy = true);
+    final conflicts = await importBundleFile(context, widget.store, path);
+    if (!mounted) return;
+    if (conflicts > 0) {
+      // The root navigator outlives this screen: the announcement may be
+      // tapped after leaving it.
+      final navigator = Navigator.of(context, rootNavigator: true);
+      _announce(
+        context.t.syncConflicts(conflicts),
+        onTap: () => _openConflicts(navigator),
+      );
+    }
+    setState(() {
+      _bundleBusy = false;
+      _countConflicts();
+    });
+  }
+
+  /// The bundle file: for which paired Device, or everything, and the
+  /// ways to send one and to import one.
+  List<Widget> _bundle(AppLocalizations t) {
+    // A Device forgotten meanwhile is no choice any more.
+    final chosen = _paired.any((d) => d.id == _bundleFor) ? _bundleFor : null;
+    return [
+      const SizedBox(height: 16),
+      Text(t.bundleTitle, style: Theme.of(context).textTheme.titleSmall),
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(t.bundleIntro),
+      ),
+      Row(
+        children: [
+          Text(t.bundleFor),
+          const SizedBox(width: 16),
+          Expanded(
+            child: DropdownButton<String?>(
+              key: const ValueKey('bundle-for'),
+              isExpanded: true,
+              value: chosen,
+              items: [
+                for (final device in _paired)
+                  DropdownMenuItem(value: device.id, child: Text(device.name)),
+                DropdownMenuItem(child: Text(t.bundleEverything)),
+              ],
+              onChanged: _bundleBusy
+                  ? null
+                  : (id) => setState(() => _bundleFor = id),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          FilledButton.tonalIcon(
+            key: const ValueKey('send-bundle'),
+            onPressed: _bundleBusy ? null : _sendBundle,
+            icon: const Icon(Icons.send_outlined),
+            label: Text(t.bundleSend),
+          ),
+          FilledButton.tonalIcon(
+            key: const ValueKey('import-bundle'),
+            onPressed: _bundleBusy ? null : _importBundle,
+            icon: const Icon(Icons.file_open_outlined),
+            label: Text(t.bundleImport),
+          ),
+        ],
+      ),
+    ];
+  }
+
   static String _failure(AppLocalizations t, SyncFailure failure) =>
       switch (failure) {
         SyncFailure.notPrivate => t.syncFailNotPrivate,
@@ -366,6 +485,7 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
           ],
           if (FolderScope.of(context).available) ..._folder(t, when),
+          if (BundleScope.of(context).available) ..._bundle(t),
           const SizedBox(height: 16),
           Text(t.syncSettingsStay),
         ],

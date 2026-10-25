@@ -1,15 +1,18 @@
 //! The Devices this one has synced with in person, as the Dart core's
 //! `Pairing` keeps them: one local setting each, never synced (ADR 0008).
 
+use std::collections::{BTreeMap, HashMap};
+
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 
-use crate::Result;
 use crate::entry::{dart_iso, parse_time};
 use crate::store::Store;
+use crate::{Error, Result};
 
 const PREFIX: &str = "paired:";
 const AUTO_PREFIX: &str = "autosync:";
+const HELD_PREFIX: &str = "held:";
 const CONFLICTS_ARRIVED: &str = "sync:conflictsArrived";
 
 /// A paired Device.
@@ -96,7 +99,42 @@ impl Store {
     /// Forgets the paired Device `id` and its switch; its key stays.
     pub fn forget_device(&self, id: &str) -> Result<()> {
         self.remove_local_setting(&format!("{PREFIX}{id}"))?;
-        self.remove_local_setting(&format!("{AUTO_PREFIX}{id}"))
+        self.remove_local_setting(&format!("{AUTO_PREFIX}{id}"))?;
+        self.remove_local_setting(&format!("{HELD_PREFIX}{id}"))
+    }
+
+    /// The version vector the Device `id` last said it holds, in a LAN
+    /// session or a bundle it wrote, as the Dart core's `heldBy`; empty
+    /// when it never said.
+    pub fn held_by(&self, id: &str) -> Result<HashMap<String, i64>> {
+        Ok(self
+            .local_setting(&format!("{HELD_PREFIX}{id}"))?
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+            .and_then(|json| {
+                json.as_object().map(|m| {
+                    m.iter()
+                        .filter_map(|(k, v)| v.as_i64().map(|n| (k.clone(), n)))
+                        .collect()
+                })
+            })
+            .unwrap_or_default())
+    }
+
+    /// The Device `id` said it holds `vector`: kept, each counter only
+    /// ever growing.
+    pub fn note_held_by(&self, id: &str, vector: &HashMap<String, i64>) -> Result<()> {
+        if id.is_empty() || id == self.device_id()? {
+            return Ok(());
+        }
+        let mut held: BTreeMap<String, i64> = self.held_by(id)?.into_iter().collect();
+        for (device, n) in vector {
+            let at = held.entry(device.clone()).or_insert(0);
+            if *n > *at {
+                *at = *n;
+            }
+        }
+        let json = serde_json::to_string(&held).map_err(|e| Error::Invalid(e.to_string()))?;
+        self.set_local_setting(&format!("{HELD_PREFIX}{id}"), &json)
     }
 
     /// Whether this Device syncs with the paired Device `id` on its own;

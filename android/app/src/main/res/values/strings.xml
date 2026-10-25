@@ -14,4 +14,6 @@
     <string name="agenda_widget">Agenda</string>
     <string name="agenda_widget_description">Today\'s Routines and Reminders to check off, and what is Unsorted.</string>
     <string name="agenda_widget_open_app">Open Old Brain Fix to see what\'s due today.</string>
+    <!-- The "open with" and share choice for sync bundles. -->
+    <string name="bundle_import">Import into Old Brain Fix</string>
 </resources>

@@ -48,10 +48,16 @@ mod tests {
             (en.popup_keys_hint(), de.popup_keys_hint()),
             (en.hotkey_unavailable(), de.hotkey_unavailable()),
             (en.cli_usage(), de.cli_usage()),
+            (en.bundle_save(), de.bundle_save()),
+            (en.bundle_open(), de.bundle_open()),
+            (en.bundle_drop(), de.bundle_drop()),
+            (en.bundle_pair_first(), de.bundle_pair_first()),
         ] {
             assert_ne!(en, de);
         }
         assert_ne!(en.sync_conflicts_below(2), de.sync_conflicts_below(2));
+        assert_ne!(en.bundle_saved(2), de.bundle_saved(2));
+        assert!(en.cli_usage().contains("oldbrainfix import FILE"));
         assert_eq!(de.close(), "Schließen");
     }
 }

@@ -31,6 +31,8 @@ pub mod cause {
     pub const SYNC: &str = "sync";
     /// A folder sync brought it.
     pub const FOLDER: &str = "folder";
+    /// A bundle file brought it.
+    pub const BUNDLE: &str = "bundle";
 }
 
 /// A state of the log a Device can be returned to: the log's high-water

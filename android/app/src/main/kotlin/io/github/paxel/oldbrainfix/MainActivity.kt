@@ -54,6 +54,11 @@ class MainActivity : FlutterActivity() {
     /** The answer to the shared folder's "pickTree", until the picker comes back. */
     private var folderAnswer: MethodChannel.Result? = null
 
+    private var bundleChannel: MethodChannel? = null
+
+    /** The answer to the bundle's "pick", until the file picker comes back. */
+    private var bundleAnswer: MethodChannel.Result? = null
+
     /** Paired hosts on the network while the app shows, told to the app as they come. */
     private val discovery by lazy {
         Discovery(this) { found -> syncChannel?.invokeMethod("found", found.toMap()) }
@@ -87,6 +92,10 @@ class MainActivity : FlutterActivity() {
         // Something was shared in while the app runs: it takes it now.
         if (intent.getBooleanExtra(EXTRA_SHARED, false)) {
             photoChannel?.invokeMethod("shared", null)
+        }
+        // A bundle was opened with the running app: it imports it now.
+        if (intent.getBooleanExtra(EXTRA_BUNDLE, false)) {
+            bundleChannel?.invokeMethod("opened", null)
         }
         // A shortcut, tile or widget asked for Capture while the app runs.
         CaptureModes.of(intent.action, intent.flags)?.let {
@@ -245,6 +254,26 @@ class MainActivity : FlutterActivity() {
                     !FolderChannel.handle(this, call, result) -> result.notImplemented()
                 }
             }
+        bundleChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BUNDLE_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
+                val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                when (call.method) {
+                    "exportPath" -> result.success(
+                        Bundles.exportPath(this@MainActivity, args["name"] as? String ?: ""),
+                    )
+                    "share" -> result.success(
+                        Bundles.share(
+                            this@MainActivity,
+                            args["path"] as? String ?: "",
+                            args["type"] as? String ?: "application/octet-stream",
+                        ),
+                    )
+                    "pick" -> pickBundle(result)
+                    "take" -> result.success(Bundles.take())
+                    else -> result.notImplemented()
+                }
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -395,6 +424,21 @@ class MainActivity : FlutterActivity() {
         modelAnswer = result
     }
 
+    /** Opens the system's file picker for a bundle to import; the answer comes in [onActivityResult]. */
+    private fun pickBundle(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_BUNDLE)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(null)
+        }
+        bundleAnswer?.success(null)
+        bundleAnswer = result
+    }
+
     /** Opens the system's folder picker for the shared folder; the answer comes in [onActivityResult]. */
     private fun pickFolder(result: MethodChannel.Result) {
         folderAnswer?.success(null)
@@ -433,6 +477,13 @@ class MainActivity : FlutterActivity() {
                 }
             }
             return answer.success(uri?.toString())
+        }
+        if (requestCode == REQUEST_BUNDLE) {
+            val answer = bundleAnswer ?: return
+            bundleAnswer = null
+            val uri = data?.data
+            if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
+            return inBackground(answer) { Bundles.copy(this, uri) }
         }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
@@ -563,11 +614,13 @@ class MainActivity : FlutterActivity() {
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
+        private const val BUNDLE_CHANNEL = "io.github.paxel.oldbrainfix/bundle"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3
         private const val REQUEST_MODEL = 4
         private const val REQUEST_FOLDER = 5
+        private const val REQUEST_BUNDLE = 6
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
@@ -585,6 +638,9 @@ class MainActivity : FlutterActivity() {
 
         /** Marks the launch by a share from another app ([ShareActivity]). */
         const val EXTRA_SHARED = "oldbrainfix.shared"
+
+        /** Marks the launch by a bundle another app opened with this one ([BundleActivity]). */
+        const val EXTRA_BUNDLE = "oldbrainfix.bundle"
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false

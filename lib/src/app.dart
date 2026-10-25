@@ -11,6 +11,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
+import 'bundle_platform.dart';
 import 'conflicts_screen.dart';
 import 'calendar_mirror.dart';
 import 'calendar_platform.dart';
@@ -103,6 +104,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// The shared folder to sync through; none when not given.
   final FolderPlatform folders;
 
+  /// Sharing and importing bundle files; none when not given.
+  final BundlePlatform bundles;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -124,6 +128,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
     this.folders = const NoFolders(),
+    this.bundles = const NoBundles(),
   });
 
   @override
@@ -244,7 +249,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                   sync: _autoSync,
                                   child: FolderScope(
                                     folders: widget.folders,
-                                    child: child ?? const SizedBox.shrink(),
+                                    child: BundleScope(
+                                      bundles: widget.bundles,
+                                      child: child ?? const SizedBox.shrink(),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -272,6 +280,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       lock: _lock,
       routes: _routes,
       requests: widget.requests,
+      bundles: widget.bundles,
       onThemeChanged: _themeChanged,
     ),
   );
@@ -319,7 +328,8 @@ class RouteStack extends NavigatorObserver {
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, and the Unsorted list when the Agenda widget's Unsorted
-/// count was. While the App Lock is locked, the lock screen stands in
+/// count was, and imports the bundles other apps opened with this one.
+/// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
 /// again, while Capture and the full-screen alarm stay, and the Nudge
@@ -335,6 +345,7 @@ class _Home extends StatefulWidget {
   final AppLock lock;
   final RouteStack routes;
   final CaptureRequests requests;
+  final BundlePlatform bundles;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -348,6 +359,7 @@ class _Home extends StatefulWidget {
     required this.lock,
     required this.routes,
     required this.requests,
+    required this.bundles,
     required this.onThemeChanged,
   });
 
@@ -376,9 +388,14 @@ class _HomeState extends State<_Home> {
   var _unsortedWaiting = false;
   var _conflictsWaiting = false;
 
+  late final StreamSubscription<void> _bundlesOpened;
+
   @override
   void initState() {
     super.initState();
+    _bundlesOpened = widget.bundles.opened.listen(
+      (_) => unawaited(_importOpened()),
+    );
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_unsortedOpened);
@@ -387,7 +404,10 @@ class _HomeState extends State<_Home> {
     // Paired Devices sync while the app shows, from the first frame on:
     // what it brings is announced.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.autoSync.shown();
+      if (!mounted) return;
+      widget.autoSync.shown();
+      // A bundle that opened the app.
+      unawaited(_importOpened());
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -466,8 +486,27 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_unsortedOpened);
     widget.lock.removeListener(_lockChanged);
     widget.autoSync.removeListener(_conflictsSynced);
+    unawaited(_bundlesOpened.cancel());
     _lifecycle.dispose();
     super.dispose();
+  }
+
+  /// Imports the bundles other apps opened with this one, announcing
+  /// what each brought; Conflicts as an automatic sync's, not past the
+  /// App Lock.
+  Future<void> _importOpened() async {
+    final paths = await widget.bundles.takeOpened();
+    var conflicts = 0;
+    for (final path in paths) {
+      if (!mounted) return;
+      conflicts += await importBundleFile(context, widget.store, path);
+    }
+    if (!mounted || conflicts == 0) return;
+    if (widget.lock.locked) {
+      _conflictsWaiting = true;
+      return;
+    }
+    _announceConflicts();
   }
 
   /// Opens the full-screen alarm when one starts ringing, and closes it

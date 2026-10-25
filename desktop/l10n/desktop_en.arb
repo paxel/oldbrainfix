@@ -76,7 +76,7 @@
   "@hotkeyUnavailable": {"description": "Under the hotkey field where neither the app nor the desktop can provide one."},
   "captureCommand": "Launchers, key-binding tools and macro pads can run “oldbrainfix capture” to open the popup, or “oldbrainfix capture buy milk” to keep a text at once.",
   "@captureCommand": {"description": "In the desktop settings' quick capture card."},
-  "cliUsage": "Usage:\n  oldbrainfix               open the window\n  oldbrainfix capture       open the capture popup\n  oldbrainfix capture TEXT  capture TEXT as a Note with a Nudge in 1 h\n  oldbrainfix capture -     capture what comes in on stdin\n\nExit codes: 0 kept, 1 could not be kept, 2 wrong arguments or nothing to capture.",
+  "cliUsage": "Usage:\n  oldbrainfix               open the window\n  oldbrainfix capture       open the capture popup\n  oldbrainfix capture TEXT  capture TEXT as a Note with a Nudge in 1 h\n  oldbrainfix capture -     capture what comes in on stdin\n  oldbrainfix import FILE   import the sync bundle FILE\n\nExit codes: 0 done, 1 could not be kept or imported, 2 wrong arguments or nothing to capture.",
   "@cliUsage": {"description": "The desktop's command-line help."},
   "cliNothing": "Nothing to capture.",
   "@cliNothing": {"description": "Printed when `oldbrainfix capture` gets a blank text."},
@@ -117,5 +117,13 @@
   "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}},
   "folderSyncNow": "Sync now",
   "@folderSyncNow": {"description": "Syncs through the shared folder at once instead of within half a minute."},
-  "folderPickTitle": "Choose the shared folder"
+  "folderPickTitle": "Choose the shared folder",
+  "bundleSave": "Save bundle…",
+  "@bundleSave": {"description": "Opens the save dialog for a sync bundle."},
+  "bundleOpen": "Import bundle…",
+  "bundleSaveTitle": "Save the sync bundle",
+  "bundleOpenTitle": "Import a sync bundle",
+  "bundleSaved": "{count, plural, =1{Bundle saved with 1 change. Send it to the other Device and import it there.} other{Bundle saved with {count} changes. Send it to the other Device and import it there.}}",
+  "@bundleSaved": {"placeholders": {"count": {"type": "int"}}},
+  "bundleDrop": "Or drop a bundle file onto the window."
 }

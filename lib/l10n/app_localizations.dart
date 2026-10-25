@@ -2581,6 +2581,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 file is from a Device this one is not paired with. Pair them first.} other{{count} files are from Devices this one is not paired with. Pair them first.}}'**
   String folderUnreadable(int count);
+
+  /// No description provided for @bundleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync bundle'**
+  String get bundleTitle;
+
+  /// No description provided for @bundleIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Sends what is new as one file through any messenger or mail, and the other Device imports it. Everything in it is encrypted: only Devices paired with this one can read it.'**
+  String get bundleIntro;
+
+  /// Label of the choice which paired Device a bundle is written for.
+  ///
+  /// In en, this message translates to:
+  /// **'For'**
+  String get bundleFor;
+
+  /// The bundle carries the whole log, for a Device that holds nothing yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything'**
+  String get bundleEverything;
+
+  /// No description provided for @bundleSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send bundle'**
+  String get bundleSend;
+
+  /// No description provided for @bundleImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import bundle'**
+  String get bundleImport;
+
+  /// No description provided for @bundleNothingNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing new to send to {name}.'**
+  String bundleNothingNew(String name);
+
+  /// No description provided for @bundleCameIn.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Nothing new came in with the bundle.} =1{1 change came in with the bundle.} other{{count} changes came in with the bundle.}}'**
+  String bundleCameIn(int count);
+
+  /// No description provided for @bundlePairFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'This bundle is from a Device this one is not paired with, so nothing in it can be read. Pair them first, then import it again.'**
+  String get bundlePairFirst;
+
+  /// No description provided for @bundleNotABundle.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is no sync bundle this app can read.'**
+  String get bundleNotABundle;
+
+  /// No description provided for @bundleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle did not work out. Nothing was lost; try again.'**
+  String get bundleFailed;
+
+  /// No description provided for @bundleNoApp.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the bundle.'**
+  String get bundleNoApp;
 }
 
 class _AppLocalizationsDelegate

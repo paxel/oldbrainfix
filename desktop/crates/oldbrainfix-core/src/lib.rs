@@ -6,12 +6,13 @@
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
-//! paired Devices, the Area keys and the shared folder they seal. The Dart core
+//! paired Devices, the Area keys and the shared folder and bundle files they seal. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
 pub mod alarms;
 pub mod blobs;
+pub mod bundle;
 pub mod conflicts;
 pub mod discovery;
 pub mod entry;

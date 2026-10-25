@@ -23,7 +23,8 @@
 //! at once and one big stop button ends it and keeps the Note, as do the
 //! Nudge times (UI laws, "Capture"). A picture pasted from the clipboard
 //! or dropped onto the window (where the system hands drops over: not on
-//! Wayland) becomes a photo Note, with what is typed.
+//! Wayland) becomes a photo Note, with what is typed; a sync bundle
+//! dropped there is imported, what came in announced at the top.
 //! The editor shows a Note's photos and plays its recordings, with their
 //! Transcripts. Transcripts and Photo Texts are made in the background
 //! and found by the search over All Notes, an Area or a Topic.
@@ -42,7 +43,7 @@ use egui::{
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, ClockTime, Day, DeviceSettings, Importance, MissedSummary,
     Note, Notes, NotesGo, Occurrence, Places, QuietHours, Routine, Routines, Search, Section,
-    Store, Topic,
+    Store, Topic, bundle,
 };
 
 use crate::alerts::Event;
@@ -59,7 +60,7 @@ use crate::names::{area_name, topic_name};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
 use crate::speech::{SpeechModel, Status as SpeechStatus};
-use crate::sync_view::{SyncAction, SyncHost, device_name};
+use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -262,6 +263,8 @@ enum Action {
     RestoreRoutine(String),
     Setting(Setting),
     Sync(SyncAction),
+    /// Imports the bundle file dropped onto the window.
+    ImportBundle(std::path::PathBuf),
 }
 
 /// A change in the Settings.
@@ -357,10 +360,28 @@ pub struct App {
     /// Tells the folder thread to sync now; without one, the window
     /// syncs itself.
     folder_wanted: Option<Arc<AtomicBool>>,
+    /// Ask the system's dialogs where to save a bundle and which one to
+    /// import.
+    bundle_saver: FileSaver,
+    bundle_opener: FolderPicker,
+    /// What a bundle saved or imported did, announced at the top until
+    /// clicked away.
+    notice: Option<String>,
 }
 
-/// Asks for a folder, with the dialog's title.
+/// Asks for a folder, or a file to open, with the dialog's title.
 pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
+
+/// Asks where to save a file, with the dialog's title and the name it
+/// proposes.
+pub type FileSaver = Box<dyn Fn(&str, &str) -> Option<std::path::PathBuf>>;
+
+/// The dialogs' filter for bundle files.
+fn bundle_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(oldbrainfix_core::APP_NAME, &[bundle::EXTENSION])
+}
 
 impl App {
     /// The window over `store`, speaking `locale`, showing the Agenda on
@@ -410,6 +431,11 @@ impl App {
             arrived: 0,
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
+            bundle_saver: Box::new(|title, name| {
+                bundle_dialog(title).set_file_name(name).save_file()
+            }),
+            bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
+            notice: None,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -435,6 +461,65 @@ impl App {
     /// dialog; tests hand in a path.
     pub fn set_folder_picker(&mut self, picker: FolderPicker) {
         self.folder_picker = picker;
+    }
+
+    /// Hands in the dialogs asking where to save a bundle and which one
+    /// to import.
+    pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
+        self.bundle_saver = saver;
+        self.bundle_opener = opener;
+    }
+
+    /// What a bundle saved or imported did, as announced.
+    pub fn notice(&self) -> Option<&str> {
+        self.notice.as_deref()
+    }
+
+    /// Saves a bundle for the paired Device `device`, or of everything,
+    /// where the user says; nothing asked when there is nothing new.
+    fn save_bundle(&mut self, device: Option<String>) -> oldbrainfix_core::Result<()> {
+        let since = match &device {
+            Some(id) => self.store.held_by(id)?,
+            None => Default::default(),
+        };
+        let name = device
+            .as_ref()
+            .and_then(|id| self.store.paired_device(id).ok().flatten())
+            .map(|d| d.name)
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| self.t.unnamed_device().to_string());
+        if self.store.entries_since(&since)?.is_empty() {
+            self.notice = Some(self.t.bundle_nothing_new(&name));
+            return Ok(());
+        }
+        let day = (self.wall)(self.store.now()).date();
+        let Some(mut path) =
+            (self.bundle_saver)(self.t.bundle_save_title(), &bundle::file_name(day))
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != bundle::EXTENSION) {
+            path.set_extension(bundle::EXTENSION);
+        }
+        self.notice = Some(
+            match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
+                Ok(Some((entries, _))) => self.t.bundle_saved(entries as i64),
+                Ok(None) => self.t.bundle_nothing_new(&name),
+                Err(e) => format!("{} ({e})", self.t.bundle_failed()),
+            },
+        );
+        Ok(())
+    }
+
+    /// Imports the bundle at `path` and announces what came in.
+    fn import_bundle(&mut self, path: &std::path::Path) {
+        let said = import_bundle_text(&self.t, &self.store, path);
+        self.notice = Some(said.unwrap_or_else(|e| e));
+        self.refresh();
+        // The alerts plan again: a Done in the bundle closes its alarm.
+        if let Some(wake) = &self.wake {
+            drop(wake.send(Event::Wake));
+        }
     }
 
     /// Leaves folder syncs to the thread that `wanted` wakes.
@@ -1071,6 +1156,13 @@ impl App {
             }
             Action::Sync(SyncAction::ForgetFolder) => self.store.forget_sync_folder()?,
             Action::Sync(SyncAction::FolderNow) => self.folder_now()?,
+            Action::Sync(SyncAction::SaveBundle(device)) => self.save_bundle(device)?,
+            Action::Sync(SyncAction::OpenBundle) => {
+                if let Some(path) = (self.bundle_opener)(self.t.bundle_open_title()) {
+                    self.import_bundle(&path);
+                }
+            }
+            Action::ImportBundle(path) => self.import_bundle(&path),
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
             Action::Sync(SyncAction::Keep {
                 entity,
@@ -1315,8 +1407,19 @@ impl App {
                 self.playing = None;
             }
         }
-        // Pictures dropped onto the window become a photo Note.
+        // Pictures dropped onto the window become a photo Note; a bundle
+        // file is imported.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
+        let (bundles, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
+            file.path
+                .as_ref()
+                .is_some_and(|p| p.extension().is_some_and(|e| e == bundle::EXTENSION))
+        });
+        for file in bundles {
+            if let Some(path) = file.path {
+                actions.push(Action::ImportBundle(path));
+            }
+        }
         let photos: Vec<Vec<u8>> = dropped
             .iter()
             .filter_map(|file| match (&file.bytes, &file.path) {
@@ -1356,6 +1459,18 @@ impl App {
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                });
+        } else if let Some(notice) = self.notice.clone() {
+            // What a bundle did, until clicked away.
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(notice).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).on_hover_text(self.t.close()).clicked() {
+                        self.notice = None;
+                    }
                 });
         } else if self.arrived > 0 && self.selection != Selection::Sync {
             // One at a time: Conflicts from an automatic sync, a click

@@ -8,6 +8,9 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Invalid(String),
+    /// A file that is no sync bundle this app can read.
+    #[error("no sync bundle")]
+    NotABundle,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -121,6 +121,9 @@ void main() {
       expect(paired.port, host.port);
       expect(phone.pinnedKey(desk.deviceId)?.trust, KeyTrust.verified);
       expect(desk.pinnedKey(phone.deviceId)?.trust, KeyTrust.verified);
+      // Each now knows the other holds all it holds, for bundles.
+      expect(phone.heldBy(desk.deviceId), phone.versionVector());
+      expect(desk.heldBy(phone.deviceId), desk.versionVector());
       expect(host.sessions.single.name, 'Phone');
       // The joiner proves it holds its key, for this host and PIN only.
       final proof = host.bodies.single['proof'] as String?;

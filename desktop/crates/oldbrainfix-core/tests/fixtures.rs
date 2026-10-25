@@ -1367,7 +1367,12 @@ fn tree(dir: &Path) -> Result<Vec<Named>, Box<dyn std::error::Error>> {
 
 /// The nonces the generator counted from 1001 on.
 fn counted_nonces() -> impl FnMut() -> oldbrainfix_core::Result<[u8; 24]> {
-    let mut n: u64 = 1000;
+    counted_nonces_after(1000)
+}
+
+/// The nonces the generator counted from `start` + 1 on.
+fn counted_nonces_after(start: u64) -> impl FnMut() -> oldbrainfix_core::Result<[u8; 24]> {
+    let mut n: u64 = start;
     move || {
         n += 1;
         Ok(std::array::from_fn(|i| ((n * 37 + i as u64) & 0xff) as u8))
@@ -1426,6 +1431,86 @@ fn the_folder_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
     );
     let theirs = tree(&dir.join(ROOT))?;
     let mine = tree(&ours.path().join(ROOT))?;
+    assert_eq!(
+        mine.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
+        theirs.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>()
+    );
+    for ((name, a), (_, b)) in mine.iter().zip(&theirs) {
+        assert!(a == b, "{name} differs");
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------------- Bundles
+
+/// The files inside the zip at `path` with their bytes, by name.
+fn zip_files(path: &Path) -> Result<Vec<Named>, Box<dyn std::error::Error>> {
+    use std::io::Read;
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
+    let mut out = Vec::new();
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        out.push((file.name().to_string(), bytes));
+    }
+    out.sort();
+    Ok(out)
+}
+
+/// The zip containers differ (each core's zip library writes its own
+/// headers); the files inside are compared byte for byte.
+#[test]
+fn the_bundle_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestResult {
+    use oldbrainfix_core::bundle::{import_bundle, write_bundle};
+    let dir = fixtures().join("bundle");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let mut read_back = expected["read"].clone();
+    let now = read_back["now"].as_str().ok_or("now")?.to_string();
+    let theirs = dir.join("host.obfsync");
+
+    let joiner = fixture_device("bundle", "joiner", joiner_key, &now)?;
+    let host = fixture_device("bundle", "host", writer_key, &now)?;
+    let got = import_bundle(&joiner, &theirs)?;
+    assert_eq!(
+        got.applied.len() as u64,
+        expected["applied"].as_u64().ok_or("applied")?
+    );
+    assert_eq!(
+        got.blobs_in as u64,
+        expected["blobsIn"].as_u64().ok_or("blobsIn")?
+    );
+    assert_eq!(got.unreadable, 0);
+    assert_eq!(got.report.refused_count(), 0);
+    assert_eq!(got.from, host.device_id()?);
+    assert_eq!(
+        joiner
+            .local_setting(&format!("held:{}", host.device_id()?))?
+            .as_deref(),
+        expected["held"].as_str()
+    );
+    let mut actual = read(&joiner)?;
+    if let Some(map) = actual.as_object_mut() {
+        map.remove("device");
+    }
+    if let Some(map) = read_back.as_object_mut() {
+        map.remove("device");
+    }
+    assert_eq!(actual, read_back);
+
+    // The host writes the very same files for the joiner, nonce for nonce.
+    let ours = tempfile::tempdir()?;
+    let path = ours.path().join("host.obfsync");
+    let mut nonces = counted_nonces_after(2000);
+    let (entries, blobs) =
+        write_bundle(&host, &path, Some(&joiner.device_id()?), &mut nonces)?.ok_or("a bundle")?;
+    assert_eq!(
+        entries as u64,
+        expected["entries"].as_u64().ok_or("entries")?
+    );
+    assert_eq!(blobs as u64, expected["blobs"].as_u64().ok_or("blobs")?);
+    let theirs = zip_files(&theirs)?;
+    let mine = zip_files(&path)?;
     assert_eq!(
         mine.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
         theirs.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>()

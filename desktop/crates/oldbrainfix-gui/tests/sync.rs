@@ -514,3 +514,125 @@ fn the_folder_thread_syncs_at_once_and_on_its_own() -> TestResult {
     thread.join().map_err(|_| "the thread")?;
     Ok(())
 }
+
+/// A phone that met `desk` once, as at a Pairing.
+fn paired_phone(desk: &Store) -> Result<Store, Box<dyn std::error::Error>> {
+    use oldbrainfix_core::lan::answer_sync;
+    let phone = store(2)?;
+    let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+    let (answer, _) = answer_sync(desk, &request, "Desk")?.ok_or("an answer")?;
+    apply_answer(&phone, &answer)?;
+    Ok(phone)
+}
+
+fn texts_of(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let mut texts: Vec<String> = Notes::new(store)
+        .all()?
+        .into_iter()
+        .map(|n| n.text)
+        .collect();
+    texts.sort();
+    Ok(texts)
+}
+
+#[test]
+fn a_bundle_is_imported_and_one_saved_in_the_sync_view() -> TestResult {
+    use oldbrainfix_core::bundle::{import_bundle, write_bundle_now};
+    let desk = store(1)?;
+    let phone = paired_phone(&desk)?;
+    Notes::new(&phone).capture("From the phone's bundle", None, None)?;
+    let dir = tempfile::tempdir()?;
+    let from_phone = dir.path().join("phone.obfsync");
+    write_bundle_now(&phone, &from_phone, None)?;
+    Notes::new(&desk).capture("From the desk", None, None)?;
+
+    let mut harness = sync_view(desk, dir.path())?;
+    let saved = dir.path().join("for-the-phone");
+    {
+        let app = harness.state_mut();
+        let (open, save) = (from_phone.clone(), saved.clone());
+        app.set_bundle_dialogs(
+            Box::new(move |title, name| {
+                assert_eq!(title, "Save the sync bundle");
+                assert!(name.starts_with("oldbrainfix-") && name.ends_with(".obfsync"));
+                Some(save.clone())
+            }),
+            Box::new(move |title| {
+                assert_eq!(title, "Import a sync bundle");
+                Some(open.clone())
+            }),
+        );
+    }
+    assert!(shows(&harness, "Sync bundle"));
+    harness.get_by_label("Import bundle…").click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(shows(&harness, "came in with the bundle"));
+    let desk = harness.state().store();
+    assert_eq!(
+        texts_of(desk)?,
+        vec!["From the desk", "From the phone's bundle"]
+    );
+
+    harness.get_by_label("Save bundle…").click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(shows(&harness, "Bundle saved with"));
+    let file = saved.with_extension("obfsync");
+    assert!(file.is_file(), "the extension is added");
+    import_bundle(&phone, &file)?;
+    assert_eq!(texts_of(&phone)?, texts_of(harness.state().store())?);
+    Ok(())
+}
+
+#[test]
+fn a_bundle_dropped_onto_the_window_is_imported_and_strangers_told_to_pair() -> TestResult {
+    use oldbrainfix_core::bundle::write_bundle_now;
+    let desk = store(1)?;
+    let phone = paired_phone(&desk)?;
+    Notes::new(&phone).capture("Dropped in", None, None)?;
+    let stranger = store(3)?;
+    Notes::new(&stranger).capture("Private", None, None)?;
+    let dir = tempfile::tempdir()?;
+    let paired = dir.path().join("paired.obfsync");
+    let foreign = dir.path().join("foreign.obfsync");
+    let junk = dir.path().join("junk.obfsync");
+    write_bundle_now(&phone, &paired, None)?;
+    write_bundle_now(&stranger, &foreign, None)?;
+    std::fs::write(&junk, b"no zip")?;
+
+    let mut app = App::new(desk, "en");
+    app.select(Selection::Agenda);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    let drop = |harness: &mut Harness<'_, App>, path: &std::path::Path| {
+        harness.input_mut().dropped_files = vec![egui::DroppedFile {
+            path: Some(path.to_path_buf()),
+            ..Default::default()
+        }];
+        harness.run();
+    };
+    drop(&mut harness, &paired);
+    assert!(shows(&harness, "came in with the bundle"));
+    assert_eq!(texts_of(harness.state().store())?, vec!["Dropped in"]);
+    drop(&mut harness, &foreign);
+    assert!(shows(&harness, "Pair them first"));
+    assert_eq!(texts_of(harness.state().store())?, vec!["Dropped in"]);
+    drop(&mut harness, &junk);
+    assert!(shows(&harness, "no sync bundle this app can read"));
+    // A click puts the announcement away.
+    harness
+        .get_by_label_contains("no sync bundle")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(harness.state().notice(), None);
+    Ok(())
+}

@@ -43,7 +43,7 @@
   "hotkeyTaken": "Ein anderes Programm nutzt dieses Kürzel schon. Wähle ein anderes.",
   "hotkeyUnavailable": "Auf dieser Arbeitsumgebung gibt es kein Tastenkürzel. Lege in ihren Tastatureinstellungen eine Taste auf den Befehl unten.",
   "captureCommand": "Starter, Tastenkürzel-Programme und Makro-Tastaturen können „oldbrainfix capture“ ausführen, um das Erfassen-Fenster zu öffnen, oder „oldbrainfix capture Milch kaufen“, um einen Text sofort zu behalten.",
-  "cliUsage": "Aufruf:\n  oldbrainfix               öffnet das Fenster\n  oldbrainfix capture       öffnet das Erfassen-Fenster\n  oldbrainfix capture TEXT  erfasst TEXT als Notiz, mit einem Stupser in 1 Std.\n  oldbrainfix capture -     erfasst, was über stdin kommt\n\nRückgabewerte: 0 behalten, 1 nicht behalten, 2 falsche Argumente oder nichts zu erfassen.",
+  "cliUsage": "Aufruf:\n  oldbrainfix               öffnet das Fenster\n  oldbrainfix capture       öffnet das Erfassen-Fenster\n  oldbrainfix capture TEXT  erfasst TEXT als Notiz, mit einem Stupser in 1 Std.\n  oldbrainfix capture -     erfasst, was über stdin kommt\n  oldbrainfix import DATEI  importiert das Sync-Paket DATEI\n\nRückgabewerte: 0 erledigt, 1 nicht behalten oder importiert, 2 falsche Argumente oder nichts zu erfassen.",
   "cliNothing": "Nichts zu erfassen.",
   "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}",
   "speechModelIntro": "Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Computer, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.",
@@ -66,5 +66,11 @@
   "syncConflictsArrived": "{count, plural, =1{Eine Synchronisierung hat 1 Sache gefunden, die auf beiden Geräten geändert wurde. Klicke, um zu wählen, welche Fassung bleibt.} other{Eine Synchronisierung hat {count} Sachen gefunden, die auf beiden Geräten geändert wurden. Klicke, um zu wählen, welche Fassungen bleiben.}}",
   "syncConflictsBelow": "{count, plural, =1{1 Sache wurde auf beiden Geräten geändert. Wähle unten, welche Fassung bleibt.} other{{count} Sachen wurden auf beiden Geräten geändert. Wähle unten, welche Fassungen bleiben.}}",
   "folderSyncNow": "Jetzt synchronisieren",
-  "folderPickTitle": "Geteilten Ordner wählen"
+  "folderPickTitle": "Geteilten Ordner wählen",
+  "bundleSave": "Paket speichern …",
+  "bundleOpen": "Paket importieren …",
+  "bundleSaveTitle": "Sync-Paket speichern",
+  "bundleOpenTitle": "Sync-Paket importieren",
+  "bundleSaved": "{count, plural, =1{Paket mit 1 Änderung gespeichert. Schick es an das andere Gerät und importiere es dort.} other{Paket mit {count} Änderungen gespeichert. Schick es an das andere Gerät und importiere es dort.}}",
+  "bundleDrop": "Oder zieh eine Paket-Datei auf das Fenster."
 }

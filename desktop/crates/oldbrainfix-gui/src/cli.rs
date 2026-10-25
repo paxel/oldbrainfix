@@ -4,23 +4,29 @@
 //! - `oldbrainfix --tray` is the login start, into the tray,
 //! - `oldbrainfix capture` opens the capture popup,
 //! - `oldbrainfix capture buy milk` captures "buy milk" without a window,
-//! - `oldbrainfix capture -` captures what comes in on stdin.
+//! - `oldbrainfix capture -` captures what comes in on stdin,
+//! - `oldbrainfix import FILE` imports the sync bundle FILE.
 //!
-//! A capture without a window prints nothing when it worked. The exit
-//! codes are [`OK`], [`FAILED`] and [`USAGE`].
+//! A capture without a window prints nothing when it worked; an import
+//! prints what came in. The exit codes are [`OK`], [`FAILED`] and
+//! [`USAGE`].
 
 use crate::autostart::TRAY_ARG;
 
 /// It worked.
 pub const OK: i32 = 0;
-/// The Note could not be kept: no data directory, the store or the
-/// running app failed.
+/// The Note could not be kept or the bundle imported: no data
+/// directory, the store or the running app failed, or the file is no
+/// bundle.
 pub const FAILED: i32 = 1;
 /// The arguments make no sense, or there was nothing to capture.
 pub const USAGE: i32 = 2;
 
 /// The subcommand that captures.
 pub const CAPTURE: &str = "capture";
+
+/// The subcommand that imports a bundle.
+pub const IMPORT: &str = "import";
 
 /// What a start asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +41,8 @@ pub enum Launch {
     Text(String),
     /// Captures what comes in on stdin, without a window.
     Stdin,
+    /// Imports the bundle at this path, without a window.
+    Import(String),
     /// Prints the usage.
     Help,
 }
@@ -59,6 +67,11 @@ pub fn parse(args: &[String]) -> Result<Launch, Usage> {
             [dashes, text @ ..] if dashes == "--" => words(text),
             [first, ..] if first.starts_with('-') => Err(Usage),
             text => words(text),
+        },
+        IMPORT => match rest {
+            [one] if one == "-h" || one == "--help" => Ok(Launch::Help),
+            [path] if !path.is_empty() => Ok(Launch::Import(path.clone())),
+            _ => Err(Usage),
         },
         _ => Err(Usage),
     }
@@ -116,6 +129,17 @@ mod tests {
         assert_eq!(parse_of(&["capture", "--"]), Err(Usage));
         assert_eq!(parse_of(&["capture", "-x", "milk"]), Err(Usage));
         assert_eq!(parse_of(&["capture", "-", "milk"]), Err(Usage));
+    }
+
+    #[test]
+    fn import_takes_one_file() {
+        assert_eq!(
+            parse_of(&["import", "a.obfsync"]),
+            Ok(Launch::Import("a.obfsync".into()))
+        );
+        assert_eq!(parse_of(&["import", "--help"]), Ok(Launch::Help));
+        assert_eq!(parse_of(&["import"]), Err(Usage));
+        assert_eq!(parse_of(&["import", "a", "b"]), Err(Usage));
     }
 
     #[test]

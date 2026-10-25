@@ -166,6 +166,9 @@ abstract final class MomentCause {
 
   /// A folder sync brought it.
   static const folder = 'folder';
+
+  /// A bundle file brought it.
+  static const bundle = 'bundle';
 }
 
 /// A state of the log a Device can be returned to (Catlog's ADR 0009):

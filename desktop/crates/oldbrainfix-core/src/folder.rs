@@ -15,7 +15,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Value, json};
 
 use crate::conflicts::Conflict;
-use crate::entry::WireEntry;
+use crate::entry::{Entry, WireEntry};
 use crate::keys::{
     AreaKey, PERSONAL_SCOPE, SEAL_NONCE_BYTES, area_keys_of, blob_name, random_bytes, seal,
     sealed_as, unseal,
@@ -301,14 +301,14 @@ pub fn folder_sync(
     let mut report = ImportReport::default();
     learn_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
-    let (applied, unreadable) = read_foreign(store, folder, &mut report)?;
+    let (applied, unreadable) = read_foreign(store, folder, &mut report, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
     store.ensure_area_keys()?;
     publish_keys(store, folder, nonce)?;
     let entries_out = publish_entries(store, folder, nonce)?;
     let mut names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
     let blobs_in = fetch_blobs(store, folder, &names)?;
-    let blobs_out = publish_blobs(store, folder, &mut names, nonce)?;
+    let blobs_out = publish_blobs(store, folder, &mut names, nonce, None)?;
     let conflicts = store.conflicts_among(&applied)?;
     Ok(FolderSyncResult {
         applied,
@@ -320,6 +320,57 @@ pub fn folder_sync(
         report,
         conflicts,
     })
+}
+
+/// Reads the sealed layout of `folder` as [`folder_sync`] reads the
+/// shared folder, for a bundle, as the Dart core's `readSealed`: learns
+/// the keys, takes in every other Device's segments of a key held here
+/// from their first line, remembering nothing of how far it read, with a
+/// Moment of `cause` before what was new, and the blobs the log lacks.
+/// Writes nothing.
+pub fn read_sealed(
+    store: &Store,
+    folder: &dyn SyncFolder,
+    cause: &str,
+    label: Option<&str>,
+) -> Result<FolderSyncResult> {
+    let mut report = ImportReport::default();
+    learn_keys(store, folder, &mut report)?;
+    let before = store.current_seq()?;
+    let (applied, unreadable) = read_foreign(store, folder, &mut report, false)?;
+    let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
+    let names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
+    let blobs_in = fetch_blobs(store, folder, &names)?;
+    let conflicts = store.conflicts_among(&applied)?;
+    Ok(FolderSyncResult {
+        applied,
+        entries_out: 0,
+        blobs_in,
+        blobs_out: 0,
+        unreadable,
+        moment,
+        report,
+        conflicts,
+    })
+}
+
+/// Writes `entries` into the empty `folder` as [`folder_sync`] writes
+/// this Device's part of the shared folder, for a bundle, as the Dart
+/// core's `writeSealed`: the keys files, the segments under generation 1
+/// with the manifest, and the blobs of `blobs`, with nonces in the same
+/// order. Returns how many entries and blobs went out.
+pub fn write_sealed(
+    store: &Store,
+    folder: &mut dyn SyncFolder,
+    entries: &[Entry],
+    blobs: &BTreeSet<String>,
+    nonce: Nonces<'_>,
+) -> Result<(usize, usize)> {
+    store.ensure_area_keys()?;
+    publish_keys(store, folder, nonce)?;
+    let out = write_segments(store, folder, nonce, entries, Vec::new(), 1)?;
+    let blobs_out = publish_blobs(store, folder, &mut BTreeSet::new(), nonce, Some(blobs))?;
+    Ok((out, blobs_out))
 }
 
 /// The (device, key id) a name `<device>.<key id>.<rest>` names.
@@ -434,6 +485,7 @@ fn read_foreign(
     store: &Store,
     folder: &dyn SyncFolder,
     report: &mut ImportReport,
+    remember: bool,
 ) -> Result<(Vec<WireEntry>, usize)> {
     let own = store.device_id()?;
     let mut fresh = Vec::new();
@@ -452,7 +504,11 @@ fn read_foreign(
         let Some(manifest) = Manifest::parse(bytes.as_deref()) else {
             continue;
         };
-        let (mut generation, mut lines) = read_state(store, device)?;
+        let (mut generation, mut lines) = if remember {
+            read_state(store, device)?
+        } else {
+            (-1, BTreeMap::new())
+        };
         if generation != manifest.generation {
             generation = manifest.generation;
             lines = BTreeMap::new();
@@ -487,6 +543,9 @@ fn read_foreign(
         states.push((device.to_string(), generation, taken));
     }
     let applied = store.apply_entries(&fresh, &[], None, report)?;
+    if !remember {
+        return Ok((applied, unreadable));
+    }
     for (device, generation, lines) in states {
         store.set_local_setting(
             &read_state_key(&device),
@@ -545,10 +604,44 @@ fn publish_entries(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>
         return Ok(0);
     }
 
+    if previous.is_none() {
+        for name in &present {
+            if name.starts_with(&format!("{own}.")) && name.ends_with(".seg") {
+                folder.delete("", name)?;
+            }
+        }
+    }
+    let generation = match &previous {
+        Some(p) => p.generation,
+        None => {
+            Manifest::parse(folder.read("", &manifest_name(&own))?.as_deref())
+                .map(|p| p.generation)
+                .unwrap_or(0)
+                + 1
+        }
+    };
+    let segments = previous.map(|p| p.segments).unwrap_or_default();
+    write_segments(store, folder, nonce, &entries, segments, generation)
+}
+
+/// Seals `entries` in log order, each with the key of its Area as it is
+/// now, appends them to the last of `segments` of that key or a fresh
+/// one past [`SEGMENT_CAP`], and writes the manifest of `generation`
+/// after, as the Dart core's `_writeSegments`. Returns how many entries
+/// went out.
+fn write_segments(
+    store: &Store,
+    folder: &mut dyn SyncFolder,
+    nonce: Nonces<'_>,
+    entries: &[Entry],
+    mut segments: Vec<Segment>,
+    generation: i64,
+) -> Result<usize> {
+    let own = store.device_id()?;
     let mut key_of: HashMap<String, Option<AreaKey>> = HashMap::new();
     let mut lines: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut out = 0;
-    for e in &entries {
+    for e in entries {
         let key = match key_of.get(&e.entity) {
             Some(key) => key.clone(),
             None => {
@@ -569,17 +662,6 @@ fn publish_entries(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>
         out += 1;
     }
 
-    let mut segments = Vec::new();
-    match &previous {
-        Some(previous) => segments.extend(previous.segments.iter().cloned()),
-        None => {
-            for name in &present {
-                if name.starts_with(&format!("{own}.")) && name.ends_with(".seg") {
-                    folder.delete("", name)?;
-                }
-            }
-        }
-    }
     for (id, fresh) in lines {
         let run: Vec<Segment> = segments.iter().filter(|s| s.key == id).cloned().collect();
         let mut n = run.len();
@@ -613,15 +695,6 @@ fn publish_entries(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>
             .cmp(&b.key)
             .then(number(&a.name).cmp(&number(&b.name)))
     });
-    let generation = match &previous {
-        Some(p) => p.generation,
-        None => {
-            Manifest::parse(folder.read("", &manifest_name(&own))?.as_deref())
-                .map(|p| p.generation)
-                .unwrap_or(0)
-                + 1
-        }
-    };
     let manifest = Manifest {
         format: MANIFEST_FORMAT,
         generation,
@@ -684,20 +757,22 @@ fn publish_blobs(
     folder: &mut dyn SyncFolder,
     names: &mut BTreeSet<String>,
     nonce: Nonces<'_>,
+    only: Option<&BTreeSet<String>>,
 ) -> Result<usize> {
     let mut wanted: BTreeMap<(String, String), AreaKey> = BTreeMap::new();
     for (kind, prefix) in BLOB_KINDS {
         for (entity, field) in store.fields_with_prefix(prefix)? {
+            let reference = format!("{kind}/{}", &field[prefix.len()..]);
+            if only.is_some_and(|only| !only.contains(&reference)) {
+                continue;
+            }
             if store.current(&entity, &field)?.is_none() {
                 continue;
             }
             let Some(key) = store.sealing_key(&entity)? else {
                 continue;
             };
-            wanted.insert(
-                (format!("{kind}/{}", &field[prefix.len()..]), key.id()),
-                key,
-            );
+            wanted.insert((reference, key.id()), key);
         }
     }
     let mut out = 0;

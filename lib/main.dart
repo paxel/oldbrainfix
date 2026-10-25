@@ -11,6 +11,7 @@ import 'src/alarm_platform.dart';
 import 'src/alarm_sync.dart';
 import 'src/app.dart';
 import 'src/auto_sync.dart';
+import 'src/bundle_platform.dart';
 import 'src/calendar_mirror.dart';
 import 'src/calendar_platform.dart';
 import 'src/capture_requests.dart';
@@ -50,6 +51,7 @@ Future<void> main() async {
       pairing: const AndroidPairing(),
       sync: AndroidSync(),
       folders: const AndroidFolders(),
+      bundles: AndroidBundles(),
     ),
   );
 }

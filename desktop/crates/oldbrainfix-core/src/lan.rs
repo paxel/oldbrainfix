@@ -1006,11 +1006,16 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
     )?;
     store.ensure_area_keys()?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&peer_name))?;
+    let peer_vector = vector_of(body.get("vector"));
+    // The answer carries everything beyond what the joiner holds: once it
+    // took it in, it holds what this Device holds now.
+    store.note_held_by(&peer, &peer_vector)?;
+    store.note_held_by(&peer, &store.version_vector()?)?;
     let answer = json!({
         "format": SYNC_FORMAT,
         "deviceId": store.device_id()?,
         "name": name,
-        "entries": wire(&store.entries_since(&vector_of(body.get("vector")))?),
+        "entries": wire(&store.entries_since(&peer_vector)?),
         "wantBlobs": store.missing_blobs()?,
         "keys": keys_json(store)?,
         "areaKeys": area_keys_json(store)?,

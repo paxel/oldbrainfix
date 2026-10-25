@@ -5,18 +5,22 @@
 //! as a paired Device, and the paired Devices can be forgotten here, or
 //! kept from syncing on their own. The Conflicts are listed here too,
 //! each version a button that keeps it, and the shared folder is chosen,
-//! synced and forgotten here, with how its last sync went.
+//! synced and forgotten here, with how its last sync went. A bundle file
+//! for a paired Device, or of everything, is saved and one imported here
+//! too.
 
 use std::net::IpAddr;
+use std::path::Path;
 
 use egui::{Color32, Rect, RichText, Ui, Vec2};
+use oldbrainfix_core::bundle::{BundleResult, import_bundle};
 use oldbrainfix_core::conflicts::{RADIUS, SCHEDULE_UNIT};
 use oldbrainfix_core::lan::{
     Host, JoinAsk, Request, Response, lan_address, new_pin, pair_code_lines,
 };
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
-use oldbrainfix_core::{Conflict, Entry, Fields, PairedDevice, Routines, Store};
+use oldbrainfix_core::{Conflict, Entry, Error, Fields, PairedDevice, Routines, Store};
 
 use crate::app::{Wall, embossed};
 use crate::l10n::L10n;
@@ -44,6 +48,11 @@ pub enum SyncAction {
     ForgetFolder,
     /// Sync through the shared folder now.
     FolderNow,
+    /// Save a bundle for the paired Device with this id, or of
+    /// everything, with the system's dialog.
+    SaveBundle(Option<String>),
+    /// Import a bundle chosen with the system's dialog.
+    OpenBundle,
 }
 
 /// The desktop's hosting state.
@@ -67,6 +76,8 @@ pub struct SyncHost {
     /// The address to bind instead of the LAN one; tests use the
     /// loopback.
     pub bind: Option<IpAddr>,
+    /// The paired Device the next bundle is for; everything when none.
+    pub bundle_for: Option<String>,
 }
 
 impl SyncHost {
@@ -338,6 +349,9 @@ impl SyncHost {
                 if let Some(asked) = folder_section(ui, t, tones, store, wall) {
                     action = Some(asked);
                 }
+                if let Some(asked) = bundle_section(ui, t, tones, store, &mut self.bundle_for) {
+                    action = Some(asked);
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
                     let devices = store.paired_devices().unwrap_or_default();
@@ -441,6 +455,108 @@ fn folder_section(
         }
     });
     action
+}
+
+/// The bundle file: for which paired Device, or everything, and the
+/// ways to save one and to import one.
+fn bundle_section(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    store: &Store,
+    bundle_for: &mut Option<String>,
+) -> Option<SyncAction> {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let mut action = None;
+    let devices = store.paired_devices().unwrap_or_default();
+    // A Device forgotten meanwhile is no choice any more.
+    if bundle_for
+        .as_ref()
+        .is_some_and(|id| !devices.iter().any(|d| &d.id == id))
+    {
+        *bundle_for = None;
+    }
+    let named = |device: &PairedDevice| {
+        if device.name.is_empty() {
+            t.unnamed_device().to_string()
+        } else {
+            device.name.clone()
+        }
+    };
+    embossed(ui, tones, false, None, |ui| {
+        ui.label(RichText::new(t.bundle_title()).strong().color(text));
+        ui.label(RichText::new(t.bundle_intro()).small().color(weak));
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(t.bundle_for()).color(text));
+            let shown = bundle_for
+                .as_ref()
+                .and_then(|id| devices.iter().find(|d| &d.id == id))
+                .map(named)
+                .unwrap_or_else(|| t.bundle_everything().to_string());
+            egui::ComboBox::from_id_salt("bundle-for")
+                .selected_text(RichText::new(shown).color(text))
+                .show_ui(ui, |ui| {
+                    for device in &devices {
+                        ui.selectable_value(
+                            bundle_for,
+                            Some(device.id.clone()),
+                            RichText::new(named(device)).color(text),
+                        );
+                    }
+                    ui.selectable_value(
+                        bundle_for,
+                        None,
+                        RichText::new(t.bundle_everything()).color(text),
+                    );
+                });
+        });
+        ui.horizontal(|ui| {
+            if ui
+                .button(RichText::new(t.bundle_save()).color(text))
+                .clicked()
+            {
+                action = Some(SyncAction::SaveBundle(bundle_for.clone()));
+            }
+            if ui
+                .button(RichText::new(t.bundle_open()).color(text))
+                .clicked()
+            {
+                action = Some(SyncAction::OpenBundle);
+            }
+        });
+        ui.label(RichText::new(t.bundle_drop()).small().color(weak));
+    });
+    action
+}
+
+/// Imports the bundle at `path` into `store` and says what came in, or
+/// what went wrong; Conflicts it brought are announced as an automatic
+/// sync's are.
+pub fn import_bundle_text(t: &L10n, store: &Store, path: &Path) -> Result<String, String> {
+    match import_bundle(store, path) {
+        Ok(result) => {
+            if !result.conflicts.is_empty() {
+                drop(store.set_conflicts_arrived(true));
+            }
+            Ok(bundle_result_text(t, &result))
+        }
+        Err(Error::NotABundle) => Err(t.bundle_not_a_bundle().to_string()),
+        Err(e) => Err(format!("{} ({e})", t.bundle_failed())),
+    }
+}
+
+/// What a bundle import did, in words.
+pub fn bundle_result_text(t: &L10n, result: &BundleResult) -> String {
+    if result.needs_pairing() {
+        return t.bundle_pair_first().to_string();
+    }
+    let mut lines = vec![t.bundle_came_in(result.applied.len() as i64)];
+    let refused = result.report.refused_count();
+    if refused > 0 {
+        lines.push(t.sync_refused(refused as i64));
+    }
+    lines.join("\n")
 }
 
 /// How the shared folder's last sync went, in words, each line with

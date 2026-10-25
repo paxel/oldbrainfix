@@ -70,6 +70,7 @@ class PairedDevice {
 extension Pairing on Store {
   static const _prefix = 'paired:';
   static const _autoPrefix = 'autosync:';
+  static const _heldPrefix = 'held:';
 
   /// Every paired Device, by name.
   List<PairedDevice> pairedDevices() =>
@@ -104,6 +105,37 @@ extension Pairing on Store {
   void forgetDevice(String id) {
     removeLocalSetting('$_prefix$id');
     removeLocalSetting('$_autoPrefix$id');
+    removeLocalSetting('$_heldPrefix$id');
+  }
+
+  /// The version vector the Device [id] last said it holds, in a LAN
+  /// session or a bundle it wrote; empty when it never said. What a
+  /// bundle for it carries is what lies beyond.
+  Map<String, int> heldBy(String id) {
+    final raw = localSetting('$_heldPrefix$id');
+    if (raw == null) return const {};
+    try {
+      final json = jsonDecode(raw);
+      return {
+        if (json is Map)
+          for (final MapEntry(:key, :value) in json.entries)
+            if (key is String && value is int) key: value,
+      };
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  /// The Device [id] said it holds [vector]: kept, each counter only
+  /// ever growing, so an older word never makes it seem to hold less.
+  void noteHeldBy(String id, Map<String, int> vector) {
+    if (id.isEmpty || id == deviceId) return;
+    final held = Map.of(heldBy(id));
+    for (final MapEntry(:key, :value) in vector.entries) {
+      if (value > (held[key] ?? 0)) held[key] = value;
+    }
+    final sorted = {for (final d in held.keys.toList()..sort()) d: held[d]};
+    setLocalSetting('$_heldPrefix$id', jsonEncode(sorted));
   }
 
   /// Whether this Device syncs with the paired Device [id] on its own;

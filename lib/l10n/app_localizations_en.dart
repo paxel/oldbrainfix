@@ -1592,4 +1592,55 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get bundleTitle => 'Sync bundle';
+
+  @override
+  String get bundleIntro =>
+      'Sends what is new as one file through any messenger or mail, and the other Device imports it. Everything in it is encrypted: only Devices paired with this one can read it.';
+
+  @override
+  String get bundleFor => 'For';
+
+  @override
+  String get bundleEverything => 'Everything';
+
+  @override
+  String get bundleSend => 'Send bundle';
+
+  @override
+  String get bundleImport => 'Import bundle';
+
+  @override
+  String bundleNothingNew(String name) {
+    return 'Nothing new to send to $name.';
+  }
+
+  @override
+  String bundleCameIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes came in with the bundle.',
+      one: '1 change came in with the bundle.',
+      zero: 'Nothing new came in with the bundle.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get bundlePairFirst =>
+      'This bundle is from a Device this one is not paired with, so nothing in it can be read. Pair them first, then import it again.';
+
+  @override
+  String get bundleNotABundle =>
+      'This file is no sync bundle this app can read.';
+
+  @override
+  String get bundleFailed =>
+      'The bundle did not work out. Nothing was lost; try again.';
+
+  @override
+  String get bundleNoApp => 'No app here can take the bundle.';
 }

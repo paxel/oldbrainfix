@@ -168,6 +168,7 @@ Map<String, Object?> syncRequest(
   if (body['format'] != syncFormat) return null;
   final peer = body['deviceId'] is String ? body['deviceId'] as String : '';
   final peerName = body['name'] is String ? body['name'] as String : '';
+  final peerVector = _vector(body['vector']);
   final report = ImportReport();
   final before = store.currentSeq();
   store.learnAreaKeys(areaKeysOf(body['areaKeys']));
@@ -184,14 +185,16 @@ Map<String, Object?> syncRequest(
     cause: MomentCause.sync,
     label: peerName,
   );
+  // The answer carries everything beyond what the joiner holds: once it
+  // took it in, it holds what this Device holds now.
+  store.noteHeldBy(peer, peerVector);
+  store.noteHeldBy(peer, store.versionVector());
   return (
     answer: {
       'format': syncFormat,
       'deviceId': store.deviceId,
       'name': name,
-      'entries': [
-        for (final e in store.entriesSince(_vector(body['vector']))) e.toJson(),
-      ],
+      'entries': [for (final e in store.entriesSince(peerVector)) e.toJson()],
       'wantBlobs': store.missingBlobs(),
       'keys': [for (final k in store.keyRecords()) k.toJson()],
       'areaKeys': [for (final k in store.areaKeys()) k.toJson()],
@@ -516,6 +519,9 @@ Future<SyncResult> _sync(
           lastSync: store.clock().toUtc(),
         ),
       );
+      // The host took in everything beyond its vector, as it answered.
+      store.noteHeldBy(session.peer, hostVector);
+      store.noteHeldBy(session.peer, _vector(request['vector']));
     }
 
     // The entries are in and the Moment recorded; whatever happens to the

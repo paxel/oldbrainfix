@@ -1603,4 +1603,55 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get bundleTitle => 'Sync-Paket';
+
+  @override
+  String get bundleIntro =>
+      'Schickt das Neue als eine Datei über einen beliebigen Messenger oder per Mail, und das andere Gerät importiert sie. Alles darin ist verschlüsselt: Nur Geräte, die mit diesem gekoppelt sind, können es lesen.';
+
+  @override
+  String get bundleFor => 'Für';
+
+  @override
+  String get bundleEverything => 'Alles';
+
+  @override
+  String get bundleSend => 'Paket senden';
+
+  @override
+  String get bundleImport => 'Paket importieren';
+
+  @override
+  String bundleNothingNew(String name) {
+    return 'Nichts Neues für $name.';
+  }
+
+  @override
+  String bundleCameIn(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mit dem Paket kamen $count Änderungen an.',
+      one: 'Mit dem Paket kam 1 Änderung an.',
+      zero: 'Mit dem Paket kam nichts Neues an.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get bundlePairFirst =>
+      'Dieses Paket stammt von einem Gerät, das nicht mit diesem gekoppelt ist, darum lässt sich nichts darin lesen. Kopple sie zuerst und importiere es dann noch einmal.';
+
+  @override
+  String get bundleNotABundle =>
+      'Diese Datei ist kein Sync-Paket, das diese App lesen kann.';
+
+  @override
+  String get bundleFailed =>
+      'Das Paket hat nicht geklappt. Nichts ging verloren; versuch es noch einmal.';
+
+  @override
+  String get bundleNoApp => 'Keine App hier kann das Paket annehmen.';
 }

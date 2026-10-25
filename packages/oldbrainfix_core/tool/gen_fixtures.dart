@@ -1477,6 +1477,73 @@ Future<void> _folder(Directory root) async {
   }
 }
 
+/// Two Devices that met once over LAN; the host writes more, a new Area
+/// among it, and writes a bundle for the joiner with counted nonces: the
+/// logs, keys and what the host was told the joiner holds before, the
+/// bundle, and what the joiner reads from it.
+Future<void> _bundle(Directory root) async {
+  final out = Directory('${root.path}/bundle')..createSync(recursive: true);
+  final keep = secretBytes;
+  secretBytes = _counted(200);
+  final host = _store();
+  final joiner = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    final house = Places(host).addArea('Household');
+    Notes(host).capture('Buy milk', place: house.id);
+    Notes(joiner).capture('Call mum');
+    _meet(joiner, host);
+    // Since: what the bundle carries, and nothing from before.
+    final doctor = Places(host).addArea('Doctor');
+    Notes(
+      host,
+    ).capture('Blood test on Friday', place: doctor.id, photos: [_photo(11)]);
+    Notes(host)
+        .capture('Hum this', place: house.id, recordings: [_recording(5)]);
+    Notes(host).capture('Unsorted thought');
+    host.ensureAreaKeys();
+
+    _writeDevice(host, out, 'host');
+    _writeDevice(joiner, out, 'joiner');
+    List<List<String>> settings(Store store) => [
+      ..._keySettings(store),
+      for (final (key, value) in store.localSettingsWithPrefix('held:'))
+        [key, value],
+    ];
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'host': settings(host), 'joiner': settings(joiner)})}\n',
+    );
+    final nonces = _counted(2000);
+    final file = '${out.path}/host.$bundleExtension';
+    final wrote = await writeBundle(
+      host,
+      file,
+      forDevice: joiner.deviceId,
+      nonce: () => nonces(sealNonceBytes),
+    );
+    _held = _tick.add(const Duration(days: 1));
+    final read = await importBundle(joiner, file);
+    final expected = _expected(joiner)..remove('device');
+    final written = _expected(host)..remove('device');
+    if (wrote == null ||
+        jsonEncode(expected) != jsonEncode(written) ||
+        read.unreadable != 0) {
+      throw StateError('the joiner of the bundle fixture did not read it all');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({'entries': wrote.entries, 'blobs': wrote.blobs, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'held': joiner.localSetting('held:${host.deviceId}'), 'read': expected})}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    host.close();
+    joiner.close();
+  }
+}
+
 /// Sealed messages, key ids and blob names the desktop core must make
 /// the same.
 Map<String, Object?> _crypto() {
@@ -1748,7 +1815,14 @@ Future<void> main(List<String> args) async {
     'synced through the shared folder: both logs with their blobs and the '
     'keys each holds (`settings.json`), the folder the host wrote '
     '(`$syncFolderRoot/`, nonces counted from 1001 on), and what the '
-    'joiner reads from it (`expected.json`).\n',
+    'joiner reads from it (`expected.json`).\n'
+    '- `bundle/`: two Devices that met once; the host wrote more since, a '
+    'new Area among it, and a bundle for the joiner: both logs with their '
+    'blobs, the keys each holds and what each was told the other holds '
+    '(`settings.json`), the bundle (`host.$bundleExtension`, nonces counted '
+    'from 2001 on), and what the joiner reads from it (`expected.json`). '
+    'The desktop core compares the files inside the zip byte for byte, not '
+    'the zip itself, whose headers its zip library writes its own way.\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -1774,6 +1848,7 @@ Future<void> main(List<String> args) async {
   _sync(root);
   _conflictsFixture(root);
   await _folder(root);
+  await _bundle(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {
