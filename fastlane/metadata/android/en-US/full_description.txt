@@ -1,29 +1,37 @@
-<b>Old Brain Fix is a memory aid for anyone who forgets things.</b> Capturing a thought takes one tap. The app then keeps asking until every Note is sorted into an Area and Topic, or turned into a Routine or Reminder that rings until it is done.
+Old Brain Fix is a note and reminder app for Android. A desktop app for Linux, Windows and macOS uses the same data. There is no account and no server; all data is stored on the user's own devices.
 
-It is built for brains that drop things: the idea in the shower, the pills at eight, the form that is due on Friday, the thing you meant to tell somebody. Nothing has to be sorted at the moment you think of it, and nothing gets lost because you didn't.
+<b>Capture</b>
+• Text, photo and voice Notes, opened from the + button, home-screen widgets, Quick Settings tiles, app shortcuts, or a hardware button where the phone allows assigning one.
+• Content shared from other apps is saved as a Note.
+• Each Note records the time of capture. Optional: the location (shown as a Named Place such as "Home" when one matches), the current calendar event and the connected Bluetooth device.
+• Voice Notes are transcribed on the device with Whisper (English and German). The speech model (148 MB) is downloaded once, on request.
+• Text in photos and screenshots is recognised on the device with ocrs. Recognition covers unaccented Latin letters only.
+• Transcripts and recognised text are included in search.
 
-<b>CAPTURE</b>
-• <b>One tap.</b> Text, a photo or a voice Note, from the + button, a widget, a Quick Settings tile, an app shortcut or a hardware button. Things shared from other apps land as a Note too.
-• <b>Context that makes sense later.</b> Every Note keeps when and where it was captured ("Home" or "Work" instead of coordinates), the calendar event at the time and the Bluetooth device connected, so "buy more sauce" still means something days later.
-• <b>Voice and photos become searchable.</b> Voice Notes are transcribed on the phone by Whisper, in English or German, and text in photos and screenshots is read on the phone by ocrs. Nothing is sent anywhere for it.
+<b>Organising</b>
+• New Notes are kept in Unsorted. A notification (Nudge) reports Unsorted Notes at a set interval; Quiet Hours suppress it at night.
+• Notes are filed into Areas and Topics (two levels), each with a colour and an icon. A starter set of Areas is offered at first start.
+• Notes can be edited, amended and merged. Deleted items stay in the trash for 30 days.
 
-<b>SORTED OR DONE</b>
-• <b>Unsorted until you deal with it.</b> A new Note waits in Unsorted, and Nudges keep reminding you until none are left. Quiet Hours hold them back at night.
-• <b>Areas and Topics of your own,</b> two levels deep, with a colour and icon, and a starter set to pick from.
-• <b>Routines and Reminders made from any Note:</b> from once to any repeat rule, several times a day, with alarms on the minute, even from the lock screen and after a restart.
-• <b>Re-nag:</b> an ignored alarm rings again until it is Done, snoozed or Missed; if you like, it turns into a full-screen alarm with sound.
-• <b>The Agenda</b> as home screen: today's Routines and Reminders, what was Missed, and how many Notes are still Unsorted — also as a home-screen widget to tick off.
-• A history per Routine with its Streak and Adherence, and your Routines in your calendar app if you want them there.
+<b>Routines and Reminders</b>
+• Any Note can have Reminders (one time) and Routines (repeating by a recurrence rule, several times a day if needed).
+• Alarms ring at the exact minute, also on the lock screen, and are restored after a restart. This requires the "Alarms & reminders" permission.
+• An alarm that is neither marked Done nor snoozed rings again at a set interval (Re-nag, default 10 minutes). Optionally, after a set number of repeats it is shown as a full-screen alarm with sound.
+• The Agenda lists today's Routines and Reminders, missed ones and the number of Unsorted Notes. It is also available as a home-screen widget.
+• Each Routine has a history with streak and adherence.
+• Routines and Reminders can be written to a device calendar or exported as an ICS file.
 
-<b>YOURS, AND PRIVATE</b>
-• <b>No account, no server, no tracking, no ads.</b> Everything stays on your devices.
-• <b>Phone and desktop sync directly,</b> end-to-end encrypted, over the home network, through a folder you already share (Syncthing, Nextcloud, a USB stick) or as a file through any messenger.
-• <b>Share a single Area</b> with another person; every other Area stays private. Send one Note with its Reminders to someone else, who decides whether to accept it.
-• An optional App Lock and Area Locks that hide single Areas, while capturing and alarms keep working.
-• Encrypted Backups with a printable Recovery Sheet.
+<b>Sync and sharing</b>
+• Phone and desktop sync directly over the local network (TLS, paired by QR code or typed code), through a shared folder such as Syncthing or Nextcloud (end-to-end encrypted), or through an encrypted file sent with any app.
+• A single Area can be shared with another person. Other Areas are not shared.
+• A Note can be sent to another person as a file, together with its Routines and Reminders. The receiver can accept or decline it.
 
-<b>ALSO</b>
-• A trash that keeps deleted things for 30 days.
-• English and German. Light and dark themes.
-• A desktop app in the same look.
-• Free and open source (Apache-2.0 / MIT).
+<b>Privacy and security</b>
+• No account, no server, no analytics, no advertising.
+• The app uses the network only for sync and for the speech model download.
+• Optional App Lock (PIN, fingerprint) and Area Locks. Capture and alarms keep working while locked.
+• Encrypted Backups (Argon2id, XChaCha20-Poly1305) into a chosen folder, optionally weekly, with a printable Recovery Sheet. Optionally, Android's backup to Google stores the encrypted Backup file and nothing else.
+
+<b>Other</b>
+• English and German. Light and dark theme.
+• Free and open source, licensed under Apache-2.0 or MIT.
