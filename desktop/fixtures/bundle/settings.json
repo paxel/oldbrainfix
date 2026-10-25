@@ -17,6 +17,22 @@
       "{\"key\":\"V1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=\",\"scope\":\"area:00000000000000000000000000000004\"}"
     ],
     [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ada\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"gNTDMeC6djjX/4YNDN+yv8wQFBv1Xev3ukFgikI/Yv7hOEZ0dwQbqKA6JwiDHaB4rheXx7+xrwm+UquK2aOgCw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+    ],
+    [
       "held:c945cbf2a5602002141e2fb9d17054d6",
       "{\"65b60673d6ed884bf01c2c222d82ada0\":6,\"c945cbf2a5602002141e2fb9d17054d6\":3}"
     ]
@@ -33,6 +49,22 @@
     [
       "areakey:abc3e0721a89824d",
       "{\"key\":\"DQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKyw=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000009\",\"name\":\"Ada L.\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"0uVhiBVV0XRo46kgfPKwWpb7i7sPJsMwA3W/7APVPxReUzMztWUdRsNhPGy0cjCIl2uxV8Yuql34hiImh9pWDg==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"}"
     ]
   ]
 }

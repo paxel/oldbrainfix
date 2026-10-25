@@ -1244,5 +1244,12 @@
   "profileBackups": "Backups and recovery",
   "profileDevices": "Your Devices",
   "profileDeviceSettings": "Settings of this Device",
-  "profileDeviceSettingsDetail": "They belong to this Device and are never synced."
+  "profileDeviceSettingsDetail": "They belong to this Device and are never synced.",
+  "profileWhichTitle": "Which one is you?",
+  "profileWhichText": "Both Devices had a Profile of their own. The one you pick is kept on all of your Devices.",
+  "profileWhichThisDevice": "On this Device",
+  "profileWhichOtherDevice": "On the other Device",
+  "profileWhichPick": "This is me",
+  "profileWhichLater": "Later",
+  "profileWhichWaiting": "Your Devices have two Profiles. Pick yours."
 }

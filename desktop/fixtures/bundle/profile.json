@@ -1,0 +1,10 @@
+{
+  "joiner": {
+    "profile": "{\"id\":\"00000000000000000000000000000009\",\"name\":\"Ada L.\",\"version\":2}",
+    "profile:asked": "{\"aliases\":[],\"first\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"keys\":[],\"record\":\"{\\\"id\\\":\\\"00000000000000000000000000000008\\\",\\\"name\\\":\\\"Ada\\\",\\\"version\\\":2}\",\"sig\":\"gNTDMeC6djjX/4YNDN+yv8wQFBv1Xev3ukFgikI/Yv7hOEZ0dwQbqKA6JwiDHaB4rheXx7+xrwm+UquK2aOgCw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}",
+    "profile:first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+    "profile:keys": "[{\"by\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"BbOzy/Ixr5tiireTqFSj86T4W74ndTexyydScfRlg6dNQSSJ32L5JQ7A35bCMM8Nln/TnbChWNImpqaeMbdWAg==\"}]",
+    "profile:nameChosen": "true",
+    "profile:signed": "{\"sig\":\"0uVhiBVV0XRo46kgfPKwWpb7i7sPJsMwA3W/7APVPxReUzMztWUdRsNhPGy0cjCIl2uxV8Yuql34hiImh9pWDg==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"}"
+  }
+}

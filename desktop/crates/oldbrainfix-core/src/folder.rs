@@ -20,6 +20,7 @@ use crate::keys::{
     AreaKey, PERSONAL_SCOPE, SEAL_NONCE_BYTES, area_keys_of, blob_name, random_bytes, seal,
     sealed_as, unseal,
 };
+use crate::profile::OwnProfile;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
 use crate::sync::{BLOB_KINDS, Moment, cause, split_blob_ref};
@@ -271,6 +272,9 @@ pub struct FolderSyncResult {
     pub moment: Option<Moment>,
     pub report: ImportReport,
     pub conflicts: Vec<Conflict>,
+    /// Whether the own Profile changed, or "Which one is you?" came up,
+    /// from what another of the user's Devices published (ADR 0017).
+    pub profile_changed: bool,
 }
 
 /// Where the nonces come from: random, or counted in the fixture tests.
@@ -299,7 +303,7 @@ pub fn folder_sync(
         folder.write("", ".nomedia", &[])?;
     }
     let mut report = ImportReport::default();
-    learn_keys(store, folder, &mut report)?;
+    let profile_changed = learn_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
     let (applied, unreadable) = read_foreign(store, folder, &mut report, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
@@ -319,6 +323,7 @@ pub fn folder_sync(
         moment,
         report,
         conflicts,
+        profile_changed,
     })
 }
 
@@ -335,7 +340,7 @@ pub fn read_sealed(
     label: Option<&str>,
 ) -> Result<FolderSyncResult> {
     let mut report = ImportReport::default();
-    learn_keys(store, folder, &mut report)?;
+    let profile_changed = learn_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
     let (applied, unreadable) = read_foreign(store, folder, &mut report, false)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
@@ -351,6 +356,7 @@ pub fn read_sealed(
         moment,
         report,
         conflicts,
+        profile_changed,
     })
 }
 
@@ -382,7 +388,13 @@ fn device_and_key(name: &str) -> Option<(&str, &str)> {
     Some((device, key))
 }
 
-fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport) -> Result<()> {
+/// Opens every other Device's keys file sealed with a personal key held
+/// here and takes in what it carries, until nothing new comes. The own
+/// Profile a writer published is taken in, its writer's key bound to it
+/// (ADR 0017): the personal key shows the writer is one of the user's
+/// own Devices. Returns whether the own Profile changed or a question
+/// came up.
+fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport) -> Result<bool> {
     let own = store.device_id()?;
     let files: Vec<(String, String, String)> = folder
         .list("keys")?
@@ -394,6 +406,7 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
         })
         .collect();
     let mut opened = BTreeSet::new();
+    let mut profile_changed = false;
     let mut learned = true;
     while learned {
         learned = false;
@@ -422,12 +435,17 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
             store.learn_keys(&signing, None, report)?;
             // Only the writer's own: the file is sealed and bound to it.
             store.learn_backup_key(device, json.get("backupKey"))?;
+            if let Some(pinned) = store.pinned_key(device)? {
+                let taken =
+                    OwnProfile::new(store).take(json.get("profile"), &pinned.record.public_key)?;
+                profile_changed |= taken.changed();
+            }
             if store.learn_area_keys(&area_keys_of(json.get("areaKeys")))? > 0 {
                 learned = true;
             }
         }
     }
-    Ok(())
+    Ok(profile_changed)
 }
 
 fn read_state_key(device: &str) -> String {
@@ -569,6 +587,9 @@ fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -
     );
     if let Some(key) = store.backup_key_to_send()? {
         map.insert("backupKey".into(), Value::String(key));
+    }
+    if let Some(profile) = OwnProfile::new(store).to_send()? {
+        map.insert("profile".into(), profile);
     }
     map.insert(
         "signing".into(),

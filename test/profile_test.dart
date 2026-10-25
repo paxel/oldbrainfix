@@ -202,6 +202,76 @@ void main() {
     });
   });
 
+  group('another of the own Devices', () {
+    late Store desk;
+
+    setUp(() {
+      desk = Store.inMemory();
+    });
+    tearDown(() => desk.close());
+
+    /// One LAN session with [desk] as the phone runs it.
+    void sync() {
+      final done = answerSync(
+        desk,
+        syncRequest(store, desk.versionVector(), name: 'Pixel'),
+        name: 'Desk',
+      )!;
+      applyAnswer(store, done.answer);
+    }
+
+    testWidgets('changes the name and picture, and every view shows it at '
+        'once', (tester) async {
+      desk
+        ..applyProfileDefaults(name: 'Desk')
+        ..renameOwnProfile('Ada');
+      await start(tester);
+      sync();
+      await tester.pumpAndSettle();
+      expect(inAgendaBar(find.text('A')), findsOneWidget);
+      await openProfilePage(tester);
+      expect(find.text('Ada'), findsOneWidget);
+
+      desk.renameOwnProfile('Ada Lovelace');
+      desk.setOwnProfilePicture(squareProfilePicture(halvesPng));
+      sync();
+      await tester.pumpAndSettle();
+      expect(find.text('Ada Lovelace'), findsOneWidget);
+      expect(store.ownProfile!.picture, isNotNull);
+      expect(find.byKey(const ValueKey('profilePlaceholder')), findsNothing);
+    });
+
+    testWidgets('with a Profile of its own leaves "Which one is you?" on the '
+        'Profile page until it is answered', (tester) async {
+      desk
+        ..applyProfileDefaults(name: 'Desk')
+        ..renameOwnProfile('Ada');
+      await start(tester);
+      store.renameOwnProfile('Ada L.');
+      sync();
+      await tester.pumpAndSettle();
+      await openProfilePage(tester);
+      await tap(tester, find.byKey(const ValueKey('profileQuestion')));
+      expect(find.byType(ProfileQuestionDialog), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('whichLater')));
+      expect(store.profileQuestion, isNotNull);
+      expect(find.byKey(const ValueKey('profileQuestion')), findsOneWidget);
+
+      await tap(tester, find.byKey(const ValueKey('profileQuestion')));
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('whichMine')),
+          matching: find.text('This is me'),
+        ),
+      );
+      expect(store.profileQuestion, isNull);
+      expect(find.byKey(const ValueKey('profileQuestion')), findsNothing);
+      expect(store.ownProfile!.name, 'Ada L.');
+      expect(store.ownProfileAliases, {desk.ownProfile!.id});
+    });
+  });
+
   group('the Profile picture', () {
     late OwnProfileModel model;
     late AlarmSync alarms;

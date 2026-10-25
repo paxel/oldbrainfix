@@ -10,6 +10,7 @@ import 'conflicts.dart';
 import 'entry.dart';
 import 'pair_code.dart';
 import 'pairing.dart';
+import 'profiles.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
@@ -52,8 +53,9 @@ const proofHeader = 'x-oldbrainfix-proof';
 /// refused with the reason, never half understood. Format 2 carries the
 /// entries' causal contexts, which format 1 would refuse as forged;
 /// format 3 the invites to Shared Areas, which format 2 would answer
-/// with everything it holds.
-const syncFormat = 3;
+/// with everything it holds; format 4 the own Profile between one's own
+/// Devices (ADR 0017), which format 3 would leave behind.
+const syncFormat = 4;
 
 const pinFailuresPerAddress = 5;
 const pinFailuresTotal = 20;
@@ -78,6 +80,9 @@ class SyncSession {
   /// The Shared Area this session invited one side to, if it did.
   final String? sharedArea;
 
+  /// What became of the own Profile the other Device sent (ADR 0017).
+  final ProfileTaken profile;
+
   const SyncSession({
     required this.peer,
     required this.name,
@@ -86,6 +91,7 @@ class SyncSession {
     required this.report,
     this.conflicts = const [],
     this.sharedArea,
+    this.profile = ProfileTaken.unchanged,
   });
 }
 
@@ -156,7 +162,8 @@ bool trustsPairedJoiner(
 /// paired with it before lets it in without asking only then. The
 /// Area keys travel along (ADR 0012): only over this session, which the
 /// pair code or the pinned certificate authenticated; to a Device of
-/// this one's own group this Device's backup key as well (ADR 0016).
+/// this one's own group this Device's backup key (ADR 0016) and the own
+/// Profile, signed, with its binding (ADR 0017) as well.
 ///
 /// To another person's Device (ADR 0013) only what it shares goes: when
 /// the host invites this Device ([invited]), nothing at all; when this
@@ -212,6 +219,7 @@ Map<String, Object?> syncRequest(
     'keys': [for (final k in store.keyRecords()) k.toJson()],
     'areaKeys': [for (final k in areaKeys) k.toJson()],
     if (own) 'backupKey': ?store.backupKeyToSend,
+    if (own) 'profile': ?store.ownProfileJson,
     if (invited) 'invited': true,
     if (invite != null) 'invite': {'area': invite.areaId},
   };
@@ -247,7 +255,9 @@ List<String> _missingFor(Store store, String peer) {
 /// or paired by invite before ([isShared] says which), gets only what it
 /// shares, and only the keys of those Areas are taken from it. A Device
 /// of this one's own group gets this one's roles in the Shared Areas it
-/// has none in ([SharedAreas.extendRolesTo]) before the answer is made.
+/// has none in ([SharedAreas.extendRolesTo]) before the answer is made,
+/// and its key is bound to the own Profile, whose version it sent is
+/// taken in ([OwnProfile.takeOwnProfile]).
 ({Map<String, Object?> answer, SyncSession session})? answerSync(
   Store store,
   Map<String, Object?> body, {
@@ -297,6 +307,7 @@ List<String> _missingFor(Store store, String peer) {
     ]);
   }
   store.ensureAreaKeys();
+  var profile = ProfileTaken.unchanged;
   if (inviting != null) {
     store.invite(
       inviting.areaId,
@@ -306,6 +317,7 @@ List<String> _missingFor(Store store, String peer) {
     );
   } else if (!shared) {
     store.extendRolesTo(peer);
+    profile = _takeProfile(store, peer, body['profile']);
   }
   final moment = store.momentFor(
     before: before,
@@ -336,6 +348,7 @@ List<String> _missingFor(Store store, String peer) {
           k.toJson(),
       ],
       if (!shared) 'backupKey': ?store.backupKeyToSend,
+      if (!shared) 'profile': ?store.ownProfileJson,
       if (inviting != null) 'invite': {'area': inviting.areaId},
     },
     session: SyncSession(
@@ -346,8 +359,17 @@ List<String> _missingFor(Store store, String peer) {
       report: report,
       conflicts: store.conflictsAmong(applied),
       sharedArea: sharedArea,
+      profile: profile,
     ),
   );
+}
+
+/// Takes in the own Profile [sent] by [peer], a Device of this one's own
+/// group whose key the session verified; nothing without that key.
+ProfileTaken _takeProfile(Store store, String peer, Object? sent) {
+  final key = store.pinnedKey(peer)?.record.publicKey;
+  if (key == null || peer.isEmpty) return ProfileTaken.unchanged;
+  return store.takeOwnProfile(sent, from: key);
 }
 
 /// The joiner takes in the host's `/sync` [answer]; the host's own key
@@ -356,7 +378,8 @@ List<String> _missingFor(Store store, String peer) {
 /// Areas it shares are taken, and an invite to an Area this Device holds
 /// as its own is refused before anything is taken, as `declined`. A Device
 /// of this one's own group gets this one's roles in the Shared Areas it
-/// has none in, to go out with the next sync.
+/// has none in, to go out with the next sync, and its own Profile is
+/// taken in.
 SyncSession applyAnswer(
   Store store,
   Map<String, Object?> answer, {
@@ -381,6 +404,7 @@ SyncSession applyAnswer(
     verifiedDevice: host.isEmpty ? null : host,
     report: report,
   );
+  var profile = ProfileTaken.unchanged;
   if (shared) {
     final areas = {...store.areasSharedWith(host), ?invitedTo};
     store.learnAreaKeys([
@@ -389,6 +413,7 @@ SyncSession applyAnswer(
     ]);
   } else {
     store.extendRolesTo(host);
+    profile = _takeProfile(store, host, answer['profile']);
   }
   return SyncSession(
     peer: host,
@@ -403,6 +428,7 @@ SyncSession applyAnswer(
     report: report,
     conflicts: store.conflictsAmong(applied),
     sharedArea: invitedTo ?? invitedBy,
+    profile: profile,
   );
 }
 

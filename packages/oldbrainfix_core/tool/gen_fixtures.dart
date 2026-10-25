@@ -1182,9 +1182,9 @@ Store _store() {
 final _joinerSeed = Uint8List.fromList(List<int>.generate(32, (i) => 33 + i));
 
 /// The settings of [store] that a sync reads: the keys it holds, its
-/// Devices' and its Areas'.
+/// Devices' and its Areas', and its own Profile (ADR 0017).
 List<List<String>> _keySettings(Store store) => [
-  for (final prefix in ['key:', 'areakey:'])
+  for (final prefix in ['key:', 'areakey:', 'profile'])
     for (final (key, value) in store.localSettingsWithPrefix(prefix))
       [key, value],
 ];
@@ -1373,6 +1373,12 @@ void _sync(Directory root) {
       'backup:key',
       base64.encode(List<int>.generate(32, (i) => 73 + i)),
     );
+    // Each made a Profile meanwhile, the host's named by the user, the
+    // joiner's still the defaults: the joiner takes the host's over.
+    host
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ada');
+    joiner.applyProfileDefaults(name: 'Pixel 7');
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
@@ -1397,6 +1403,13 @@ void _sync(Directory root) {
       File('${out.path}/backup_keys.json'),
       '${_json.convert({'host': _heldBackupKey(host, joiner), 'joiner': _heldBackupKey(joiner, host)})}\n',
     );
+    if (host.ownProfileCode != joiner.ownProfileCode) {
+      throw StateError('the joiner of the sync fixture kept its Profile');
+    }
+    _write(
+      File('${out.path}/profile.json'),
+      '${_json.convert({'host': _profileSettings(host), 'joiner': _profileSettings(joiner)})}\n',
+    );
     _held = _tick.add(const Duration(days: 1));
     final expected = _expected(host)..remove('device');
     final joined = _expected(joiner)..remove('device');
@@ -1409,6 +1422,12 @@ void _sync(Directory root) {
     joiner.close();
   }
 }
+
+/// The own Profile's settings of [store], as a map.
+Map<String, String> _profileSettings(Store store) => {
+  for (final (key, value) in store.localSettingsWithPrefix('profile'))
+    key: value,
+};
 
 /// Counted bytes for keys and nonces, so the folder comes out the same
 /// on every run: the [n]th call gives `n, n+1, …` from a start of its
@@ -1452,7 +1471,13 @@ Future<void> _folder(Directory root) async {
     final kitchen = Places(host).addTopic(house.id, 'Kitchen');
     Notes(host).capture('Buy milk', place: kitchen.id);
     Notes(joiner).capture('Call mum');
+    // One Profile since they met, renamed on the host since.
+    host
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ada');
+    joiner.applyProfileDefaults(name: 'Pixel 7');
     _meet(joiner, host);
+    host.renameOwnProfile('Ada Lovelace');
     // Since: a new Area whose key goes only through the folder, Notes
     // in and out of Areas, a photo and a recording, a Note moved, an
     // Amend, a Routine and a Named Place.
@@ -1495,9 +1520,15 @@ Future<void> _folder(Directory root) async {
     final read = await folderSync(joiner, folder);
     final expected = _expected(joiner)..remove('device');
     final written = _expected(host)..remove('device');
-    if (jsonEncode(expected) != jsonEncode(written) || read.unreadable != 0) {
+    if (jsonEncode(expected) != jsonEncode(written) ||
+        read.unreadable != 0 ||
+        joiner.ownProfile?.name != 'Ada Lovelace') {
       throw StateError('the joiner of the folder fixture did not read it all');
     }
+    _write(
+      File('${out.path}/profile.json'),
+      '${_json.convert({'joiner': _profileSettings(joiner)})}\n',
+    );
     _write(
       File('${out.path}/expected.json'),
       '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'backupKey': _heldBackupKey(joiner, host), 'read': expected})}\n',
@@ -1536,6 +1567,14 @@ Future<void> _bundle(Directory root) async {
         .capture('Hum this', place: house.id, recordings: [_recording(5)]);
     Notes(host).capture('Unsorted thought');
     host.ensureAreaKeys();
+    // Each made a Profile since and named it: "Which one is you?" waits
+    // on the joiner.
+    host
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ada');
+    joiner
+      ..applyProfileDefaults(name: 'Pixel 7')
+      ..renameOwnProfile('Ada L.');
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
@@ -1562,9 +1601,14 @@ Future<void> _bundle(Directory root) async {
     final written = _expected(host)..remove('device');
     if (wrote == null ||
         jsonEncode(expected) != jsonEncode(written) ||
-        read.unreadable != 0) {
+        read.unreadable != 0 ||
+        joiner.profileQuestion?.profile.name != 'Ada') {
       throw StateError('the joiner of the bundle fixture did not read it all');
     }
+    _write(
+      File('${out.path}/profile.json'),
+      '${_json.convert({'joiner': _profileSettings(joiner)})}\n',
+    );
     _write(
       File('${out.path}/expected.json'),
       '${_json.convert({'entries': wrote.entries, 'blobs': wrote.blobs, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'held': joiner.localSetting('held:${host.deviceId}'), 'read': expected})}\n',
@@ -2371,6 +2415,7 @@ void _profilesFixture(Directory root) {
   } finally {
     store.close();
   }
+  final takes = _profileTakes();
   final fixture = {
     'names': [
       for (final raw in names) {'raw': raw, 'kept': sanitizeProfileName(raw)},
@@ -2415,8 +2460,144 @@ void _profilesFixture(Directory root) {
       '{"id":"p","name":"\\ud800A","version":1}',
     ],
     'own': own,
+    'takes': takes,
   };
   _write(File('${dir.path}/profiles.json'), '${_json.convert(fixture)}\n');
+}
+
+/// Profiles another of the writer's own Devices (the joiner) sends
+/// (#48), each taken by the writer's store as it was before: a Profile
+/// named Ada with the joiner's key bound. What became of each, and the
+/// own Profile's settings after.
+Map<String, Object?> _profileTakes() {
+  final writer = SigningKey.fromSeed(_seed);
+  final joiner = SigningKey.fromSeed(_joinerSeed);
+  final stranger = SigningKey.fromSeed(
+    Uint8List.fromList(List<int>.filled(32, 9)),
+  );
+  var ids = 100;
+  Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+  Store open() => Store.inMemory(newKey: () => SigningKey.fromSeed(_seed));
+  final base = open();
+  final Map<String, String> before;
+  final Profile mine;
+  final SignedProfile sent;
+  try {
+    base
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ada')
+      ..takeOwnProfile(null, from: joiner.publicKey);
+    before = _profileSettings(base);
+    mine = base.ownProfile!;
+    sent = base.ownSignedProfile!;
+  } finally {
+    base.close();
+  }
+  String record(String id, String name, int version) =>
+      Profile(id: id, name: name, version: version).encode();
+  Map<String, Object?> signed(
+    SigningKey by,
+    String record, {
+    String? first,
+    List<ProfileKey>? keys,
+    List<ProfileAlias> aliases = const [],
+    bool fresh = false,
+  }) => SignedProfile(
+    record: record,
+    signer: by.publicBase64,
+    sig: by.sign(profileRecordBytes(record)),
+    first: first ?? by.publicBase64,
+    keys: keys ?? const [],
+    aliases: aliases,
+    fresh: fresh,
+  ).toJson();
+  const other = '000000000000000000000000000000f1';
+  final cases = <String, Object?>{
+    'newer, from a bound key': signed(
+      joiner,
+      record(mine.id, 'Ada Lovelace', mine.version + 1),
+      first: sent.first,
+      keys: sent.keys,
+    ),
+    'older': signed(
+      joiner,
+      record(mine.id, 'Ada at first', 1),
+      first: sent.first,
+      keys: sent.keys,
+    ),
+    'signed by a key not bound': signed(
+      stranger,
+      record(mine.id, 'Mallory', mine.version + 5),
+      first: sent.first,
+      keys: sent.keys,
+    ),
+    'a key bound by itself': signed(
+      stranger,
+      record(mine.id, 'Mallory', mine.version + 5),
+      first: sent.first,
+      keys: [
+        ...sent.keys,
+        ProfileKey(
+          key: stranger.publicBase64,
+          by: stranger.publicBase64,
+          sig: stranger.sign(profileKeyBytes(mine.id, stranger.publicBase64)),
+        ),
+      ],
+    ),
+    'a copied id': signed(stranger, record(mine.id, 'Mallory', 9)),
+    'the record changed after signing': {
+      ...signed(
+        joiner,
+        record(mine.id, 'Ada', mine.version + 1),
+        first: sent.first,
+        keys: sent.keys,
+      ),
+      'record': record(mine.id, 'Mallory', mine.version + 1),
+    },
+    'another, named by the user': signed(joiner, record(other, 'Ada L.', 3)),
+    'another, with the defaults': signed(
+      joiner,
+      record(other, 'Pixel 7', 1),
+      fresh: true,
+    ),
+    'another, naming this one its alias': signed(
+      joiner,
+      record(other, 'Ada L.', 3),
+      aliases: [
+        ProfileAlias(
+          alias: mine.id,
+          to: other,
+          by: joiner.publicBase64,
+          sig: joiner.sign(profileAliasBytes(mine.id, other)),
+        ),
+      ],
+    ),
+  };
+  final out = <Map<String, Object?>>[];
+  for (final MapEntry(key: what, value: profile) in cases.entries) {
+    final store = open();
+    try {
+      before.forEach(store.setLocalSetting);
+      final taken = store.takeOwnProfile(profile, from: joiner.publicKey);
+      out.add({
+        'case': what,
+        'profile': profile,
+        'taken': taken.name,
+        'settings': _profileSettings(store),
+      });
+    } finally {
+      store.close();
+    }
+  }
+  if (out.map((c) => c['taken']).toSet().length != ProfileTaken.values.length) {
+    throw StateError('the profile takes do not cover every outcome');
+  }
+  return {
+    'writer': writer.publicBase64,
+    'from': joiner.publicBase64,
+    'before': before,
+    'cases': out,
+  };
 }
 
 /// A [width] × [height] PNG shading from red to blue, made the same way
@@ -2619,8 +2800,11 @@ Future<void> main(List<String> args) async {
     'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
     'request (with its proof for the PIN 246810) and the host\'s answer, '
     'both with the Area keys and the backup key they hand over, the '
-    'backup key each then holds of the other (`backup_keys.json`), and '
-    'what both read after the joiner took it in (`expected.json`).\n'
+    'backup key each then holds of the other (`backup_keys.json`), the '
+    'own Profiles both hold after it, the host\'s named by the user and '
+    'taken over by the joiner, whose own still had the defaults '
+    '(`profile.json`), and what both read after the joiner took it in '
+    '(`expected.json`).\n'
     '- `conflicts/`: two Devices that met once, then edited the same Note '
     'text, Area name and Routine schedule apart, wrote the same value on '
     'both sides and renamed a Topic on one side only: their logs, the '
@@ -2635,13 +2819,16 @@ Future<void> main(List<String> args) async {
     'synced through the shared folder: both logs with their blobs and the '
     'keys each holds (`settings.json`), the folder the host wrote '
     '(`$syncFolderRoot/`, nonces counted from 1001 on; its keys file '
-    'carries the host\'s backup key), and what the joiner reads from it '
-    '(`expected.json`).\n'
+    'carries the host\'s backup key and its own Profile, renamed since they '
+    'met), what the joiner reads from it (`expected.json`) and its own '
+    'Profile after (`profile.json`).\n'
     '- `bundle/`: two Devices that met once; the host wrote more since, a '
     'new Area among it, and a bundle for the joiner: both logs with their '
     'blobs, the keys each holds and what each was told the other holds '
     '(`settings.json`), the bundle (`host.$bundleExtension`, nonces counted '
-    'from 2001 on), and what the joiner reads from it (`expected.json`). '
+    'from 2001 on), what the joiner reads from it (`expected.json`) and its '
+    'own Profile after, both Profiles named by the user since, so "Which '
+    'one is you?" waits (`profile.json`). '
     'The desktop core compares the files inside the zip byte for byte, not '
     'the zip itself, whose headers its zip library writes its own way.\n'
     '- `shared/`: Ann shares a Starter Set Area with Ben as a Member: her '
@@ -2681,8 +2868,10 @@ Future<void> main(List<String> args) async {
     '- `profiles/`: Profile names as typed and as kept, initials, '
     'placeholder colours, short codes from an id and a first key, records '
     'as they are written and records refused, the own Profile\'s local '
-    'settings after each step (ids counted from 1), and a Profile picture '
-    'made here (`picture.jpg`).\n',
+    'settings after each step (ids counted from 1), signed Profiles another '
+    'of the own Devices sends with what became of each and the settings '
+    'after (`takes`, ids counted from 0x65), and a Profile picture made '
+    'here (`picture.jpg`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {

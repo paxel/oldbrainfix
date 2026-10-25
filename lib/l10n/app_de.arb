@@ -589,5 +589,12 @@
   "profileBackups": "Sicherungen und Wiederherstellung",
   "profileDevices": "Deine Geräte",
   "profileDeviceSettings": "Einstellungen dieses Geräts",
-  "profileDeviceSettingsDetail": "Sie gelten nur für dieses Gerät und werden nie synchronisiert."
+  "profileDeviceSettingsDetail": "Sie gelten nur für dieses Gerät und werden nie synchronisiert.",
+  "profileWhichTitle": "Welches Profil bist du?",
+  "profileWhichText": "Beide Geräte hatten ein eigenes Profil. Das gewählte gilt auf allen deinen Geräten.",
+  "profileWhichThisDevice": "Auf diesem Gerät",
+  "profileWhichOtherDevice": "Auf dem anderen Gerät",
+  "profileWhichPick": "Das bin ich",
+  "profileWhichLater": "Später",
+  "profileWhichWaiting": "Deine Geräte haben zwei Profile. Wähle deines."
 }

@@ -64,6 +64,10 @@ class BundleResult {
   final String from;
   final String fromName;
 
+  /// Whether the own Profile changed, or "Which one is you?" came up
+  /// (ADR 0017).
+  final bool profileChanged;
+
   const BundleResult({
     required this.applied,
     required this.blobsIn,
@@ -73,6 +77,7 @@ class BundleResult {
     required this.conflicts,
     required this.from,
     required this.fromName,
+    this.profileChanged = false,
   });
 
   /// Nothing could be read for want of keys: the Devices have to be
@@ -188,6 +193,7 @@ Future<BundleResult> importBundle(Store store, String path) async {
       conflicts: read.conflicts,
       from: from,
       fromName: name,
+      profileChanged: read.profileChanged,
     );
   } finally {
     input.closeSync();

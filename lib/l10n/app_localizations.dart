@@ -3637,6 +3637,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'They belong to this Device and are never synced.'**
   String get profileDeviceSettingsDetail;
+
+  /// No description provided for @profileWhichTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one is you?'**
+  String get profileWhichTitle;
+
+  /// No description provided for @profileWhichText.
+  ///
+  /// In en, this message translates to:
+  /// **'Both Devices had a Profile of their own. The one you pick is kept on all of your Devices.'**
+  String get profileWhichText;
+
+  /// No description provided for @profileWhichThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On this Device'**
+  String get profileWhichThisDevice;
+
+  /// No description provided for @profileWhichOtherDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On the other Device'**
+  String get profileWhichOtherDevice;
+
+  /// No description provided for @profileWhichPick.
+  ///
+  /// In en, this message translates to:
+  /// **'This is me'**
+  String get profileWhichPick;
+
+  /// No description provided for @profileWhichLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get profileWhichLater;
+
+  /// No description provided for @profileWhichWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Devices have two Profiles. Pick yours.'**
+  String get profileWhichWaiting;
 }
 
 class _AppLocalizationsDelegate

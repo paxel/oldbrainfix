@@ -17,6 +17,22 @@
       "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
     ],
     [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000005\",\"name\":\"Ada\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"eRvh6d/RUlGKtIheFiJAg8iake9470s303eRxc6HJcivrrt7D7OlWS+EKSajqPlJH/C3Hql0wShuInjsu1cSAg==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+    ],
+    [
       "backup:key",
       "KSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0g="
     ]
@@ -37,6 +53,18 @@
     [
       "areakey:540f38ddbc8623e5",
       "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000006\",\"name\":\"Pixel 7\",\"version\":1}"
+    ],
+    [
+      "profile:first",
+      "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"YCSPwSgN/tixFMtiN9c9OYST1qhm80bQT9fKSoGVLh0LXPB73FZOQ2z0GL6ERgNSqwgIm4OKPkLAobZ/i+wQCg==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"}"
     ],
     [
       "backup:key",

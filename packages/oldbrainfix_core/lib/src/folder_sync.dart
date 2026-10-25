@@ -6,6 +6,7 @@ import 'area_keys.dart';
 import 'backup.dart';
 import 'conflicts.dart';
 import 'entry.dart';
+import 'profiles.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
@@ -139,6 +140,10 @@ class FolderSyncResult {
   final ImportReport report;
   final List<Conflict> conflicts;
 
+  /// Whether the own Profile changed, or "Which one is you?" came up,
+  /// from what another of the user's Devices published (ADR 0017).
+  final bool profileChanged;
+
   const FolderSyncResult({
     required this.applied,
     required this.entriesOut,
@@ -148,6 +153,7 @@ class FolderSyncResult {
     required this.moment,
     required this.report,
     required this.conflicts,
+    this.profileChanged = false,
   });
 }
 
@@ -268,7 +274,7 @@ Future<FolderSyncResult> folderSync(
     await folder.write('', '.nomedia', const []);
   }
   final report = ImportReport();
-  await _learnKeys(store, folder, report);
+  final profileChanged = await _learnKeys(store, folder, report);
   final before = store.currentSeq();
   final (applied, unreadable) = await _readForeign(store, folder, report);
   final moment = store.momentFor(
@@ -291,6 +297,7 @@ Future<FolderSyncResult> folderSync(
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
+    profileChanged: profileChanged,
   );
 }
 
@@ -306,7 +313,7 @@ Future<FolderSyncResult> readSealed(
   String? label,
 }) async {
   final report = ImportReport();
-  await _learnKeys(store, folder, report);
+  final profileChanged = await _learnKeys(store, folder, report);
   final before = store.currentSeq();
   final (applied, unreadable) = await _readForeign(
     store,
@@ -331,6 +338,7 @@ Future<FolderSyncResult> readSealed(
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
+    profileChanged: profileChanged,
   );
 }
 
@@ -376,8 +384,11 @@ Future<({int entries, int blobs})> writeSealed(
 
 /// Opens every other Device's keys file sealed with a personal key held
 /// here and takes in what it carries, until nothing new comes: a key
-/// learned from one file may open another.
-Future<void> _learnKeys(
+/// learned from one file may open another. The own Profile a writer
+/// published is taken in, its writer's key bound to it (ADR 0017): the
+/// personal key shows the writer is one of the user's own Devices.
+/// Returns whether the own Profile changed or a question came up.
+Future<bool> _learnKeys(
   Store store,
   SyncFolder folder,
   ImportReport report,
@@ -391,6 +402,7 @@ Future<void> _learnKeys(
           (name, device, key),
   ];
   final opened = <String>{};
+  var profileChanged = false;
   var learned = true;
   while (learned) {
     learned = false;
@@ -422,11 +434,18 @@ Future<void> _learnKeys(
       ], report: report);
       // Only the writer's own: the file is sealed and bound to it.
       store.learnBackupKey(device, json['backupKey']);
+      if (store.pinnedKey(device)?.record.publicKey case final key?) {
+        final taken = store.takeOwnProfile(json['profile'], from: key);
+        if (taken != ProfileTaken.unchanged && taken != ProfileTaken.refused) {
+          profileChanged = true;
+        }
+      }
       if (store.learnAreaKeys(areaKeysOf(json['areaKeys'])) > 0) {
         learned = true;
       }
     }
   }
+  return profileChanged;
 }
 
 /// What this Device remembers of a writer's segments: the generation it
@@ -563,9 +582,10 @@ Future<List<Entry>?> _segmentEntries(
 }
 
 /// Publishes the keys this Device holds, its own signing key and every
-/// one it pinned, and its own backup key (ADR 0016), sealed once with
-/// each personal key it holds, so a Device holding any of them learns
-/// the rest. A file that already says the same stays untouched.
+/// one it pinned, its own backup key (ADR 0016) and the own Profile,
+/// signed, with its binding (ADR 0017), sealed once with each personal
+/// key it holds, so a Device holding any of them learns the rest. A
+/// file that already says the same stays untouched.
 Future<void> _publishKeys(
   Store store,
   SyncFolder folder,
@@ -577,6 +597,7 @@ Future<void> _publishKeys(
     jsonEncode({
       'areaKeys': [for (final k in keys) k.toJson()],
       'backupKey': ?store.backupKeyToSend,
+      'profile': ?store.ownProfileJson,
       'signing': [for (final k in store.keyRecords()) k.toJson()],
     }),
   );

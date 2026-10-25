@@ -8,7 +8,7 @@ use egui::{
     Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit,
     TextureHandle, TextureOptions, Ui, WidgetInfo, WidgetType,
 };
-use oldbrainfix_core::profile::{self, Profile};
+use oldbrainfix_core::profile::{self, Profile, ProfileChoice};
 
 use crate::icons;
 use crate::l10n::L10n;
@@ -27,6 +27,12 @@ pub enum ProfileAction {
     UseSquare,
     /// Leave the picture as it was.
     CancelSquare,
+    /// Open "Which one is you?" again.
+    Ask,
+    /// "Which one is you?": this Device's Profile (true) or the other's.
+    Answer(bool),
+    /// "Which one is you?" waits on the Profile page.
+    Later,
 }
 
 /// A new picture while the user picks its square, in pixels of the
@@ -234,6 +240,70 @@ pub fn header(
             ui.label(RichText::new(t.profile_code()).color(weak));
             ui.label(RichText::new(code).monospace().size(16.0).color(text));
         });
+    }
+}
+
+/// "Which one is you?" (ADR 0017): this Device's Profile and the other
+/// one, each with its picture, name and short code and a button that
+/// keeps it, and "Later", which leaves the question on the Profile page.
+pub fn question_form(
+    ui: &mut Ui,
+    t: &L10n,
+    views: (&mut ProfileView, &mut ProfileView),
+    mine: (Option<&Profile>, Option<&str>),
+    other: &ProfileChoice,
+    actions: &mut Vec<ProfileAction>,
+) {
+    let text = ui.visuals().text_color();
+    ui.heading(RichText::new(t.profile_which_title()).color(text));
+    ui.label(RichText::new(t.profile_which_text()).color(text));
+    let (own_view, other_view) = views;
+    let choices = [
+        (
+            own_view,
+            mine.0,
+            mine.1.unwrap_or_default(),
+            t.profile_which_this_device(),
+            true,
+        ),
+        (
+            other_view,
+            Some(&other.profile),
+            other.code.as_str(),
+            t.profile_which_other_device(),
+            false,
+        ),
+    ];
+    for (view, profile, code, place, keep_mine) in choices {
+        ui.group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                let name = display_name(t, profile.map_or("", |p| p.name.as_str()));
+                avatar(ui, view, profile, 56.0, name);
+                ui.add_space(12.0);
+                ui.vertical(|ui| {
+                    ui.label(RichText::new(name).strong().color(text));
+                    ui.label(RichText::new(code).monospace().color(text));
+                    ui.label(
+                        RichText::new(place)
+                            .small()
+                            .color(ui.visuals().weak_text_color()),
+                    );
+                    if ui
+                        .button(RichText::new(t.profile_which_pick()).color(text))
+                        .clicked()
+                    {
+                        actions.push(ProfileAction::Answer(keep_mine));
+                    }
+                });
+            });
+        });
+    }
+    if ui
+        .button(RichText::new(t.profile_which_later()).color(text))
+        .clicked()
+    {
+        actions.push(ProfileAction::Later);
     }
 }
 

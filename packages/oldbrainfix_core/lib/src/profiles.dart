@@ -6,11 +6,13 @@ import 'package:crypto/crypto.dart';
 import 'package:image/image.dart' as img;
 
 import 'photos.dart';
+import 'signing.dart';
 import 'store.dart';
 
 /// Profiles (ADR 0017): every person has one, with an id, a name and a
-/// picture. This Device keeps the user's own as local settings; nothing
-/// about it leaves the Device yet (#48 syncs it, signed).
+/// picture. This Device keeps the user's own as local settings, signed
+/// and bound to the keys of the user's own Devices, and syncs it with
+/// them (#48).
 
 /// The most characters (Unicode code points) a Profile name keeps.
 const profileNameMax = 40;
@@ -64,8 +66,8 @@ class Profile {
     required this.version,
   });
 
-  /// The record as it is kept and, from #48 on, signed: keys sorted, no
-  /// spaces, the same bytes from both cores; no picture, no key.
+  /// The record as it is kept and signed: keys sorted, no spaces, the
+  /// same bytes from both cores; no picture, no key.
   String encode() => jsonEncode({
     'id': id,
     'name': name,
@@ -384,26 +386,297 @@ Uint8List _square(
   return stripJpegMetadata(img.encodeJpg(canvas, quality: _quality));
 }
 
+// ------------------------------------------------ signing and binding
+
+/// The bytes a Profile record's signature covers: the record as sent.
+Uint8List profileRecordBytes(String record) =>
+    utf8.encode('oldbrainfix:profile:$record');
+
+/// The bytes that bind the key [key] (base64) to the Profile [id].
+Uint8List profileKeyBytes(String id, String key) =>
+    utf8.encode('oldbrainfix:profile-key:$id:$key');
+
+/// The bytes that make the Profile id [alias] an alias of [to].
+Uint8List profileAliasBytes(String alias, String to) =>
+    utf8.encode('oldbrainfix:profile-alias:$alias:$to');
+
+/// Whether [text] is a public key in standard base64, as written.
+bool _isKey(String text) {
+  try {
+    final bytes = base64.decode(text);
+    return bytes.length == 32 && base64.encode(bytes) == text;
+  } on FormatException {
+    return false;
+  }
+}
+
+/// A key joined to a Profile's binding: [key], and [sig] over
+/// [profileKeyBytes] by [by], a key bound before it (both base64).
+class ProfileKey {
+  final String key;
+  final String by;
+  final String sig;
+
+  const ProfileKey({required this.key, required this.by, required this.sig});
+
+  Map<String, Object?> toJson() => {'by': by, 'key': key, 'sig': sig};
+
+  static ProfileKey? fromJson(Object? json) {
+    if (json
+        case {
+          'by': final String by,
+          'key': final String key,
+          'sig': final String sig,
+        }
+        when _isKey(by) && _isKey(key)) {
+      return ProfileKey(key: key, by: by, sig: sig);
+    }
+    return null;
+  }
+}
+
+/// The Profile id [alias] given up for [to]: [sig] over
+/// [profileAliasBytes] by [by], a key bound to the Profile given up.
+class ProfileAlias {
+  final String alias;
+  final String to;
+  final String by;
+  final String sig;
+
+  const ProfileAlias({
+    required this.alias,
+    required this.to,
+    required this.by,
+    required this.sig,
+  });
+
+  Map<String, Object?> toJson() => {
+    'alias': alias,
+    'by': by,
+    'sig': sig,
+    'to': to,
+  };
+
+  static ProfileAlias? fromJson(Object? json) {
+    if (json
+        case {
+          'alias': final String alias,
+          'by': final String by,
+          'sig': final String sig,
+          'to': final String to,
+        }
+        when alias.isNotEmpty && to.isNotEmpty && _isKey(by)) {
+      return ProfileAlias(alias: alias, to: to, by: by, sig: sig);
+    }
+    return null;
+  }
+
+  /// Whether [by] made [sig].
+  bool get signed =>
+      verifySignature(base64.decode(by), profileAliasBytes(alias, to), sig);
+}
+
+/// A Profile as it travels between Devices (ADR 0017): the [record]
+/// as its signer sent it, signed by [signer] ([sig]); its binding, the
+/// [first] key and the [keys] joined since; the ids it replaced
+/// ([aliases]); and, between one's own Devices only, whether it still
+/// has the defaults ([fresh]).
+class SignedProfile {
+  final String record;
+  final String signer;
+  final String sig;
+  final String first;
+  final List<ProfileKey> keys;
+  final List<ProfileAlias> aliases;
+  final bool fresh;
+
+  const SignedProfile({
+    required this.record,
+    required this.signer,
+    required this.sig,
+    required this.first,
+    this.keys = const [],
+    this.aliases = const [],
+    this.fresh = false,
+  });
+
+  /// Keys sorted, no spaces, the same bytes from both cores.
+  Map<String, Object?> toJson() => {
+    'aliases': [for (final a in aliases) a.toJson()],
+    'first': first,
+    if (fresh) 'fresh': true,
+    'keys': [for (final k in keys) k.toJson()],
+    'record': record,
+    'sig': sig,
+    'signer': signer,
+  };
+
+  /// The signed Profile [json] holds, or null when it is none. Keys and
+  /// aliases that are no such things are left out.
+  static SignedProfile? fromJson(Object? json) {
+    if (json
+        case {
+          'record': final String record,
+          'signer': final String signer,
+          'sig': final String sig,
+          'first': final String first,
+          'keys': final List keys,
+          'aliases': final List aliases,
+        }
+        when _isKey(signer) && _isKey(first)) {
+      final fresh = json['fresh'];
+      if (fresh != null && fresh is! bool) return null;
+      return SignedProfile(
+        record: record,
+        signer: signer,
+        sig: sig,
+        first: first,
+        keys: [for (final k in keys) ?ProfileKey.fromJson(k)],
+        aliases: [for (final a in aliases) ?ProfileAlias.fromJson(a)],
+        fresh: fresh == true,
+      );
+    }
+    return null;
+  }
+}
+
+/// The keys bound to the Profile [id] from [first] on: every key of
+/// [held], then of [offered], signed by one bound before it, until no
+/// more join; with the statements that bound them, sorted by key.
+(Set<String>, List<ProfileKey>) _chain(
+  String id,
+  String first,
+  Iterable<ProfileKey> offered, {
+  Iterable<ProfileKey> held = const [],
+}) {
+  final bound = {first};
+  final kept = <ProfileKey>[];
+  final pending = [...held, ...offered];
+  var grew = true;
+  while (grew) {
+    grew = false;
+    for (final k in pending) {
+      if (bound.contains(k.key) || !bound.contains(k.by)) continue;
+      if (!verifySignature(
+        base64.decode(k.by),
+        profileKeyBytes(id, k.key),
+        k.sig,
+      )) {
+        continue;
+      }
+      bound.add(k.key);
+      kept.add(k);
+      grew = true;
+    }
+  }
+  kept.sort((a, b) => a.key.compareTo(b.key));
+  return (bound, kept);
+}
+
+/// A received Profile whose signatures held: its record read, the keys
+/// joined to its binding, and its picture made again for the screen.
+typedef _Checked = ({Profile profile, List<ProfileKey> keys, Uint8List? shown});
+
+/// [sent] checked: its binding from the first key, its signer bound,
+/// the signature over its record, the record, and its picture made
+/// again; null when any of it fails.
+_Checked? _check(SignedProfile sent) {
+  final profile = Profile.parse(sent.record);
+  if (profile == null) return null;
+  final (bound, keys) = _chain(profile.id, sent.first, sent.keys);
+  if (!bound.contains(sent.signer)) return null;
+  if (!verifySignature(
+    base64.decode(sent.signer),
+    profileRecordBytes(sent.record),
+    sent.sig,
+  )) {
+    return null;
+  }
+  Uint8List? shown;
+  if (profile.picture case final picture?) {
+    shown = receivedProfilePicture(picture);
+    if (shown == null) return null;
+  }
+  return (profile: profile, keys: keys, shown: shown);
+}
+
+/// [a] against [b] by their UTF-8 bytes, as the desktop core compares.
+int _compareUtf8(String a, String b) {
+  final x = utf8.encode(a), y = utf8.encode(b);
+  for (var i = 0; i < x.length && i < y.length; i++) {
+    if (x[i] != y[i]) return x[i] - y[i];
+  }
+  return x.length - y.length;
+}
+
+/// Whether the record [a] replaces [b]: a higher version, or at the same
+/// version the larger bytes, so two Devices that changed it apart end up
+/// with the same one.
+bool _replaces(String a, Profile pa, String b, Profile pb) =>
+    pa.version != pb.version ? pa.version > pb.version : _compareUtf8(a, b) > 0;
+
+/// What became of a Profile another of the user's Devices sent.
+enum ProfileTaken {
+  /// Nothing new, or none sent.
+  unchanged,
+
+  /// Its signatures did not hold, or a copied id: nothing was kept.
+  refused,
+
+  /// A newer record, keys or aliases of the own Profile were kept.
+  updated,
+
+  /// This Device took the other Profile over.
+  adopted,
+
+  /// Both Profiles were changed by the user: "Which one is you?" waits.
+  asked,
+}
+
+/// The Profile "Which one is you?" asks about: its record with the
+/// picture made again, and its short code.
+typedef ProfileChoice = ({Profile profile, String code});
+
 // ------------------------------------------------------- own Profile
 
 /// The user's own Profile on this Device (ADR 0017), kept as local
 /// settings: `profile` holds the record, `profile:first` the public key
 /// of the Device that made it (base64), and `profile:nameChosen` and
-/// `profile:pictureChosen` say the user replaced a default.
+/// `profile:pictureChosen` say the user replaced a default. Since #48
+/// `profile:signed` holds the record's signature and signer,
+/// `profile:keys` the keys joined to the binding, `profile:aliases` the
+/// ids it replaced, `profile:shown` a received picture made again, and
+/// `profile:asked` the other Profile "Which one is you?" asks about.
 extension OwnProfile on Store {
   static const _record = 'profile';
   static const _first = 'profile:first';
   static const _nameChosen = 'profile:nameChosen';
   static const _pictureChosen = 'profile:pictureChosen';
+  static const _signed = 'profile:signed';
+  static const _keys = 'profile:keys';
+  static const _aliases = 'profile:aliases';
+  static const _shown = 'profile:shown';
+  static const _asked = 'profile:asked';
 
   /// The user's own Profile; null before [applyProfileDefaults] made it.
+  /// A picture taken from another Device shows as made again here.
   Profile? get ownProfile {
     final text = localSetting(_record);
-    return text == null ? null : Profile.parse(text);
+    final profile = text == null ? null : Profile.parse(text);
+    final shown = localSetting(_shown);
+    if (profile == null || shown == null || profile.picture == null) {
+      return profile;
+    }
+    return Profile(
+      id: profile.id,
+      name: profile.name,
+      picture: base64.decode(shown),
+      version: profile.version,
+    );
   }
 
-  /// The first key of the own Profile: this Device's signing key when it
-  /// made the Profile.
+  /// The first key of the own Profile: the signing key of the Device
+  /// that made it.
   Uint8List? get ownProfileFirstKey {
     final text = localSetting(_first);
     return text == null ? null : base64.decode(text);
@@ -418,11 +691,15 @@ extension OwnProfile on Store {
         : profileShortCode(profile.id, key);
   }
 
+  /// The ids the own Profile replaced, the kept Profile showing for each.
+  Set<String> get ownProfileAliases => {for (final a in _heldAliases) a.alias};
+
   /// Makes the own Profile the first time, with a new id, the default
   /// [name] and [picture] (already a Profile picture, or null for the
   /// placeholder) and this Device's key as its first key; later it takes
-  /// the defaults the user has not replaced. Asks nothing; counts the
-  /// version up only when something changed.
+  /// the defaults the user has not replaced, while no other Device holds
+  /// the Profile. Asks nothing; counts the version up only when something
+  /// changed.
   Profile applyProfileDefaults({required String name, Uint8List? picture}) {
     final clean = sanitizeProfileName(name);
     final current = ownProfile;
@@ -434,9 +711,12 @@ extension OwnProfile on Store {
         version: 1,
       );
       setLocalSetting(_first, base64.encode(signingKey.publicKey));
-      setLocalSetting(_record, made.encode());
+      _keep(made);
       return made;
     }
+    // A Profile held by several Devices keeps the name and picture it
+    // had: each Device's own defaults would replace each other's.
+    if (!_alone) return current;
     final takeName =
         localSetting(_nameChosen) != 'true' && clean != current.name;
     final takePicture =
@@ -447,7 +727,7 @@ extension OwnProfile on Store {
       name: takeName ? clean : null,
       picture: takePicture ? () => picture : null,
     );
-    setLocalSetting(_record, next.encode());
+    _keep(next);
     return next;
   }
 
@@ -458,7 +738,7 @@ extension OwnProfile on Store {
     final clean = sanitizeProfileName(name);
     if (clean == current.name) return current;
     final next = current._with(name: clean);
-    setLocalSetting(_record, next.encode());
+    _keep(next);
     return next;
   }
 
@@ -469,13 +749,377 @@ extension OwnProfile on Store {
     setLocalSetting(_pictureChosen, 'true');
     if (_same(picture, current.picture)) return current;
     final next = current._with(picture: () => picture);
-    setLocalSetting(_record, next.encode());
+    _keep(next);
     return next;
   }
 
   Profile get _own =>
       ownProfile ??
       (throw StateError('no own Profile yet: applyProfileDefaults first'));
+
+  /// Keeps [profile] as made here, signed with this Device's key.
+  void _keep(Profile profile) {
+    final text = profile.encode();
+    setLocalSetting(_record, text);
+    _sign(text);
+    removeLocalSetting(_shown);
+    profileChanged();
+  }
+
+  void _sign(String record) => setLocalSetting(
+    _signed,
+    jsonEncode({
+      'sig': signingKey.sign(profileRecordBytes(record)),
+      'signer': signingKey.publicBase64,
+    }),
+  );
+
+  bool _chosen(String key) => localSetting(key) == 'true';
+
+  bool get _fresh => !_chosen(_nameChosen) && !_chosen(_pictureChosen);
+
+  /// Whether only this Device holds the own Profile: it made it, and no
+  /// other key or id joined it.
+  bool get _alone =>
+      localSetting(_first) == signingKey.publicBase64 &&
+      _heldKeys.isEmpty &&
+      _heldAliases.isEmpty;
+
+  List<ProfileKey> get _heldKeys => _list(_keys, ProfileKey.fromJson);
+
+  List<ProfileAlias> get _heldAliases => _list(_aliases, ProfileAlias.fromJson);
+
+  List<T> _list<T>(String key, T? Function(Object?) read) {
+    final text = localSetting(key);
+    if (text == null) return const [];
+    try {
+      final json = jsonDecode(text);
+      return [
+        if (json is List)
+          for (final item in json) ?read(item),
+      ];
+    } on FormatException {
+      return const [];
+    }
+  }
+
+  void _keepKeys(List<ProfileKey> keys) => keys.isEmpty
+      ? removeLocalSetting(_keys)
+      : setLocalSetting(_keys, jsonEncode([for (final k in keys) k.toJson()]));
+
+  void _keepAliases(Iterable<ProfileAlias> aliases) {
+    final sorted = aliases.toList()
+      ..sort((a, b) => _compareUtf8(a.alias, b.alias));
+    sorted.isEmpty
+        ? removeLocalSetting(_aliases)
+        : setLocalSetting(
+            _aliases,
+            jsonEncode([for (final a in sorted) a.toJson()]),
+          );
+  }
+
+  /// The own Profile as it goes to the user's other Devices: the record
+  /// with its signature (made here when the record has none that holds),
+  /// its binding and aliases, and whether it still has the defaults; null
+  /// before it exists.
+  SignedProfile? get ownSignedProfile {
+    final record = localSetting(_record);
+    final first = localSetting(_first);
+    if (record == null || first == null || !_isKey(first)) return null;
+    var signed = _signature;
+    if (signed == null ||
+        !verifySignature(
+          base64.decode(signed.signer),
+          profileRecordBytes(record),
+          signed.sig,
+        )) {
+      _sign(record);
+      signed = _signature;
+    }
+    if (signed == null) return null;
+    return SignedProfile(
+      record: record,
+      signer: signed.signer,
+      sig: signed.sig,
+      first: first,
+      keys: _heldKeys,
+      aliases: _heldAliases,
+      fresh: _fresh,
+    );
+  }
+
+  /// [ownSignedProfile] as JSON, for the sync bodies and the keys file.
+  Map<String, Object?>? get ownProfileJson => ownSignedProfile?.toJson();
+
+  ({String sig, String signer})? get _signature {
+    final text = localSetting(_signed);
+    if (text == null) return null;
+    try {
+      if (jsonDecode(text)
+          case {'sig': final String sig, 'signer': final String signer}
+          when _isKey(signer)) {
+        return (sig: sig, signer: signer);
+      }
+    } on FormatException {
+      // Read as none: the record is signed again.
+    }
+    return null;
+  }
+
+  /// Binds [key] (base64), the key of another of the user's own Devices
+  /// met in a sync, to the own Profile, signed with this Device's key
+  /// when that is bound: the user's own Devices join the binding through
+  /// Pairing.
+  void _bind(String key) {
+    final record = localSetting(_record);
+    final first = localSetting(_first);
+    final profile = record == null ? null : Profile.parse(record);
+    final me = signingKey.publicBase64;
+    if (profile == null || first == null || key == me || !_isKey(key)) {
+      return;
+    }
+    final (bound, keys) = _chain(profile.id, first, _heldKeys);
+    if (!bound.contains(me) || bound.contains(key)) return;
+    _keepKeys(
+      [
+        ...keys,
+        ProfileKey(
+          key: key,
+          by: me,
+          sig: signingKey.sign(profileKeyBytes(profile.id, key)),
+        ),
+      ]..sort((a, b) => a.key.compareTo(b.key)),
+    );
+  }
+
+  /// Takes in the Profile [sent] by another of the user's own Devices,
+  /// whose signing key [from] the session or the keys file vouches for.
+  /// That Device's key is bound to the own Profile first. Then: the same
+  /// Profile, newer and validly signed, replaces the record kept; an
+  /// update signed by a key not bound to it is refused. Another Profile
+  /// is taken over when this Device's still has the defaults and the
+  /// other not, when both have them and the other's id is lower, or when
+  /// it names this one's id as its alias; when both were changed by the
+  /// user, "Which one is you?" waits ([profileQuestion]).
+  ProfileTaken takeOwnProfile(Object? sent, {required List<int> from}) {
+    _bind(base64.encode(from));
+    if (sent == null) return ProfileTaken.unchanged;
+    final theirs = SignedProfile.fromJson(sent);
+    final checked = theirs == null ? null : _check(theirs);
+    if (theirs == null || checked == null) return ProfileTaken.refused;
+    final taken = _take(theirs, checked);
+    if (taken != ProfileTaken.unchanged && taken != ProfileTaken.refused) {
+      profileChanged();
+    }
+    return taken;
+  }
+
+  ProfileTaken _take(SignedProfile theirs, _Checked checked) {
+    final record = localSetting(_record);
+    final first = localSetting(_first);
+    final mine = record == null ? null : Profile.parse(record);
+    if (record == null || first == null || mine == null) {
+      _adopt(theirs, checked, null);
+      return ProfileTaken.adopted;
+    }
+    final id = checked.profile.id;
+    if (id == mine.id) return _merge(theirs, checked, mine, record, first);
+    final myBound = _chain(mine.id, first, _heldKeys).$1;
+    final aliasesMe = theirs.aliases.any(
+      (a) =>
+          a.alias == mine.id &&
+          myBound.contains(a.by) &&
+          a.signed &&
+          _reaches(a.to, id, theirs.aliases),
+    );
+    if (ownProfileAliases.contains(id)) {
+      // Given up here, and this one given up there: answered apart, the
+      // lower id stays.
+      if (aliasesMe && _compareUtf8(id, mine.id) < 0) {
+        _adopt(theirs, checked, mine);
+        return ProfileTaken.adopted;
+      }
+      return ProfileTaken.unchanged;
+    }
+    final fresh = _fresh;
+    if (aliasesMe ||
+        (fresh && !theirs.fresh) ||
+        (fresh && theirs.fresh && _compareUtf8(id, mine.id) < 0)) {
+      _adopt(theirs, checked, mine);
+      return ProfileTaken.adopted;
+    }
+    if (fresh || theirs.fresh) return ProfileTaken.unchanged;
+    final text = jsonEncode(theirs.toJson());
+    if (localSetting(_asked) == text) return ProfileTaken.unchanged;
+    setLocalSetting(_asked, text);
+    return ProfileTaken.asked;
+  }
+
+  /// Whether the alias chain [aliases] leads from [to] to [id].
+  bool _reaches(String to, String id, List<ProfileAlias> aliases) {
+    var at = to;
+    for (var i = 0; i <= aliases.length; i++) {
+      if (at == id) return true;
+      final next = aliases.where((a) => a.alias == at).firstOrNull;
+      if (next == null) return false;
+      at = next.to;
+    }
+    return false;
+  }
+
+  ProfileTaken _merge(
+    SignedProfile theirs,
+    _Checked checked,
+    Profile mine,
+    String record,
+    String first,
+  ) {
+    // A copied id with another first key is another person's Profile.
+    if (theirs.first != first) return ProfileTaken.refused;
+    final held = _heldKeys;
+    final (bound, keys) = _chain(mine.id, first, theirs.keys, held: held);
+    if (!bound.contains(theirs.signer)) return ProfileTaken.refused;
+    var taken = ProfileTaken.unchanged;
+    if (jsonEncode([for (final k in keys) k.toJson()]) !=
+        jsonEncode([for (final k in held) k.toJson()])) {
+      _keepKeys(keys);
+    }
+    final aliases = {for (final a in _heldAliases) a.alias: a};
+    var more = false;
+    for (final a in theirs.aliases) {
+      if (aliases.containsKey(a.alias) || a.alias == mine.id) continue;
+      if (!bound.contains(a.by) || !a.signed) continue;
+      aliases[a.alias] = a;
+      more = true;
+    }
+    if (more) {
+      _keepAliases(aliases.values);
+      taken = ProfileTaken.updated;
+    }
+    final asked = SignedProfile.fromJson(_askedJson);
+    if (asked != null &&
+        aliases.containsKey(Profile.parse(asked.record)?.id ?? '')) {
+      removeLocalSetting(_asked);
+      taken = ProfileTaken.updated;
+    }
+    if (!_replaces(theirs.record, checked.profile, record, mine)) return taken;
+    // A change made on another Device was the user's: the defaults no
+    // longer apply to it here either.
+    if (!theirs.fresh) {
+      if (checked.profile.name != mine.name) {
+        setLocalSetting(_nameChosen, 'true');
+      }
+      if (!_same(checked.profile.picture, mine.picture)) {
+        setLocalSetting(_pictureChosen, 'true');
+      }
+    }
+    _keepReceived(theirs, checked);
+    return ProfileTaken.updated;
+  }
+
+  /// Keeps [theirs] record as received, with its signature and its
+  /// picture made again.
+  void _keepReceived(SignedProfile theirs, _Checked checked) {
+    setLocalSetting(_record, theirs.record);
+    setLocalSetting(
+      _signed,
+      jsonEncode({'sig': theirs.sig, 'signer': theirs.signer}),
+    );
+    if (checked.shown case final shown?) {
+      setLocalSetting(_shown, base64.encode(shown));
+    } else {
+      removeLocalSetting(_shown);
+    }
+  }
+
+  /// Takes [theirs] over as the own Profile; the id of [mine], when there
+  /// was one, becomes its alias, signed with this Device's key.
+  void _adopt(SignedProfile theirs, _Checked checked, Profile? mine) {
+    final id = checked.profile.id;
+    final aliases = <String, ProfileAlias>{};
+    for (final a in [..._heldAliases, ...theirs.aliases]) {
+      if (a.alias != id && a.signed) aliases.putIfAbsent(a.alias, () => a);
+    }
+    if (mine != null && mine.id != id && !aliases.containsKey(mine.id)) {
+      aliases[mine.id] = ProfileAlias(
+        alias: mine.id,
+        to: id,
+        by: signingKey.publicBase64,
+        sig: signingKey.sign(profileAliasBytes(mine.id, id)),
+      );
+    }
+    _keepReceived(theirs, checked);
+    setLocalSetting(_first, theirs.first);
+    _keepKeys(checked.keys);
+    _keepAliases(aliases.values);
+    if (theirs.fresh) {
+      removeLocalSetting(_nameChosen);
+      removeLocalSetting(_pictureChosen);
+    } else {
+      setLocalSetting(_nameChosen, 'true');
+      setLocalSetting(_pictureChosen, 'true');
+    }
+    removeLocalSetting(_asked);
+  }
+
+  Object? get _askedJson {
+    final text = localSetting(_asked);
+    if (text == null) return null;
+    try {
+      return jsonDecode(text);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  /// The other Profile "Which one is you?" asks about, or null when
+  /// nothing is asked.
+  ProfileChoice? get profileQuestion {
+    final asked = SignedProfile.fromJson(_askedJson);
+    final checked = asked == null ? null : _check(asked);
+    if (asked == null || checked == null) return null;
+    final p = checked.profile;
+    return (
+      profile: Profile(
+        id: p.id,
+        name: p.name,
+        picture: checked.shown,
+        version: p.version,
+      ),
+      code: profileShortCode(p.id, base64.decode(asked.first)),
+    );
+  }
+
+  /// Answers "Which one is you?": [keepMine] keeps this Device's Profile
+  /// and makes the other's id its alias, signed with this Device's key;
+  /// otherwise this Device takes the other over. The answer reaches the
+  /// other Devices with the next sync.
+  void answerProfileQuestion({required bool keepMine}) {
+    final asked = SignedProfile.fromJson(_askedJson);
+    final checked = asked == null ? null : _check(asked);
+    final record = localSetting(_record);
+    final mine = record == null ? null : Profile.parse(record);
+    removeLocalSetting(_asked);
+    if (asked != null && checked != null && mine != null) {
+      final id = checked.profile.id;
+      if (!keepMine) {
+        _adopt(asked, checked, mine);
+      } else if (id != mine.id) {
+        final aliases = {for (final a in _heldAliases) a.alias: a};
+        aliases.putIfAbsent(
+          id,
+          () => ProfileAlias(
+            alias: id,
+            to: mine.id,
+            by: signingKey.publicBase64,
+            sig: signingKey.sign(profileAliasBytes(id, mine.id)),
+          ),
+        );
+        _keepAliases(aliases.values);
+      }
+    }
+    profileChanged();
+  }
 }
 
 bool _same(Uint8List? a, Uint8List? b) {

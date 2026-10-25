@@ -2240,4 +2240,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profileDeviceSettingsDetail =>
       'They belong to this Device and are never synced.';
+
+  @override
+  String get profileWhichTitle => 'Which one is you?';
+
+  @override
+  String get profileWhichText =>
+      'Both Devices had a Profile of their own. The one you pick is kept on all of your Devices.';
+
+  @override
+  String get profileWhichThisDevice => 'On this Device';
+
+  @override
+  String get profileWhichOtherDevice => 'On the other Device';
+
+  @override
+  String get profileWhichPick => 'This is me';
+
+  @override
+  String get profileWhichLater => 'Later';
+
+  @override
+  String get profileWhichWaiting =>
+      'Your Devices have two Profiles. Pick yours.';
 }

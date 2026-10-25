@@ -150,6 +150,94 @@ void main() {
     expect(find.text('No paired Devices yet.'), findsOneWidget);
   });
 
+  group('"Which one is you?"', () {
+    Future<void> pair(WidgetTester tester) async {
+      await open(tester);
+      await tester.enterText(find.byKey(const ValueKey('code')), code);
+      await tester.tap(find.byKey(const ValueKey('join')));
+      await tester.pumpAndSettle();
+    }
+
+    Finder inChoice(String key, Finder finder) =>
+        find.descendant(of: find.byKey(ValueKey(key)), matching: finder);
+
+    testWidgets('pairing two Devices whose Profiles were both named asks '
+        'once, showing both, and keeps the one picked', (tester) async {
+      phone
+        ..applyProfileDefaults(name: 'Pixel')
+        ..renameOwnProfile('Ada L.');
+      desk
+        ..applyProfileDefaults(name: 'Desk')
+        ..renameOwnProfile('Ada');
+      final deskId = desk.ownProfile!.id;
+      final phoneId = phone.ownProfile!.id;
+      await pair(tester);
+      expect(find.text('Which one is you?'), findsOneWidget);
+      expect(inChoice('whichMine', find.text('Ada L.')), findsOneWidget);
+      expect(
+        inChoice('whichMine', find.text(phone.ownProfileCode!)),
+        findsOneWidget,
+      );
+      expect(
+        inChoice('whichMine', find.text('On this Device')),
+        findsOneWidget,
+      );
+      expect(inChoice('whichOther', find.text('Ada')), findsOneWidget);
+      expect(
+        inChoice('whichOther', find.text(desk.ownProfileCode!)),
+        findsOneWidget,
+      );
+      await tester.tap(inChoice('whichOther', find.text('This is me')));
+      await tester.pumpAndSettle();
+      expect(find.text('Which one is you?'), findsNothing);
+      expect(phone.ownProfile!.id, deskId);
+      expect(phone.ownProfileCode, desk.ownProfileCode);
+      expect(phone.profileQuestion, isNull);
+
+      // The next sync carries the answer: the computer asks no more, and
+      // neither does the phone.
+      await tester.enterText(find.byKey(const ValueKey('code')), code);
+      await tester.tap(find.byKey(const ValueKey('join')));
+      await tester.pumpAndSettle();
+      expect(find.text('Which one is you?'), findsNothing);
+      expect(desk.profileQuestion, isNull);
+      expect(desk.ownProfileAliases, {phoneId});
+    });
+
+    testWidgets('keeping this Device\'s Profile keeps it, and the computer '
+        'takes it over at the next sync', (tester) async {
+      phone
+        ..applyProfileDefaults(name: 'Pixel')
+        ..renameOwnProfile('Ada L.');
+      desk
+        ..applyProfileDefaults(name: 'Desk')
+        ..renameOwnProfile('Ada');
+      final phoneId = phone.ownProfile!.id;
+      await pair(tester);
+      await tester.tap(inChoice('whichMine', find.text('This is me')));
+      await tester.pumpAndSettle();
+      expect(phone.ownProfile!.id, phoneId);
+      await tester.enterText(find.byKey(const ValueKey('code')), code);
+      await tester.tap(find.byKey(const ValueKey('join')));
+      await tester.pumpAndSettle();
+      expect(desk.ownProfile!.id, phoneId);
+      expect(desk.ownProfile!.name, 'Ada L.');
+    });
+
+    testWidgets('a phone with the defaults takes the computer\'s Profile '
+        'over without a question', (tester) async {
+      phone.applyProfileDefaults(name: 'Pixel');
+      desk
+        ..applyProfileDefaults(name: 'Desk')
+        ..renameOwnProfile('Ada');
+      await pair(tester);
+      expect(find.text('Which one is you?'), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
+      expect(phone.ownProfile!.id, desk.ownProfile!.id);
+      expect(phone.ownProfile!.name, 'Ada');
+    });
+  });
+
   testWidgets('what is no code is said so and nothing is tried', (
     tester,
   ) async {

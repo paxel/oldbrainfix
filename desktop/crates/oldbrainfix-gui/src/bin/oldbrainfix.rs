@@ -436,7 +436,7 @@ fn run() -> Result<i32, String> {
         let (stop, wake_window) = (auto_stop.clone(), waker(&window));
         std::thread::spawn(move || {
             auto_sync::run(&store, &device_name(), &stop, |session| {
-                if !session.applied.is_empty() {
+                if !session.applied.is_empty() || session.profile.changed() {
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }
@@ -456,7 +456,7 @@ fn run() -> Result<i32, String> {
             folder_sync::run(&store, &stop, &wanted, |result| {
                 // Photos and recordings come on their own too, after
                 // the entries naming them.
-                if !result.applied.is_empty() || result.blobs_in > 0 {
+                if !result.applied.is_empty() || result.blobs_in > 0 || result.profile_changed {
                     changes.fetch_add(1, Ordering::SeqCst);
                     let _ = events.send(Event::Wake);
                 }

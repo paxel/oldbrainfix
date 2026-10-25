@@ -40,6 +40,25 @@ class Store {
 
   void removeListener(void Function() listener) => _listeners.remove(listener);
 
+  final _profileListeners = <void Function()>[];
+
+  /// Calls [listener] after the own Profile changed, or a question about
+  /// it came or went (ADR 0017): from the Profile page, or from another
+  /// of the user's Devices in a sync.
+  void addProfileListener(void Function() listener) =>
+      _profileListeners.add(listener);
+
+  void removeProfileListener(void Function() listener) =>
+      _profileListeners.remove(listener);
+
+  /// Tells the [addProfileListener] listeners that the own Profile
+  /// changed.
+  void profileChanged() {
+    for (final listener in List.of(_profileListeners)) {
+      listener();
+    }
+  }
+
   void _changed() {
     _judged = null;
     if (_inBatch) return;

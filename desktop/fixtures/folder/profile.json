@@ -1,0 +1,11 @@
+{
+  "joiner": {
+    "profile": "{\"id\":\"00000000000000000000000000000005\",\"name\":\"Ada Lovelace\",\"version\":3}",
+    "profile:aliases": "[{\"alias\":\"00000000000000000000000000000006\",\"by\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"y4r8pwv0LjQu4KUprK407mp9ade3OF6C68OaJrJPze/l5Dg6vyyE645wOJmTVuZpg/7sCU81UHHnC2t6FNaIAg==\",\"to\":\"00000000000000000000000000000005\"}]",
+    "profile:first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+    "profile:keys": "[{\"by\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"lTEholUdo0cHqWApFkTCQ96GUeMQ24Fy6U5ta14c8LdRBtwr8a5anvkNx7PeLYGgmNdKvx6zf3j2phSfUWAfAg==\"}]",
+    "profile:nameChosen": "true",
+    "profile:pictureChosen": "true",
+    "profile:signed": "{\"sig\":\"gO47xuonWE+zwwhTVQVlHmqC9B61RKzqozqs50FYL29eJAVqhKI0QmdaQWv5IzgBiyz61p7ag/j2E0CN6b7WCw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+  }
+}

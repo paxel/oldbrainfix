@@ -1,5 +1,5 @@
 {
-  "format": 3,
+  "format": 4,
   "deviceId": "c945cbf2a5602002141e2fb9d17054d6",
   "name": "Phone",
   "proof": "5j6AQVNKnP9PSJglUkHC60PclIm7BM755EuZncibvM5rQ4PBVOjrsW0mbmJzUSA2/VdSo5LeYrpH3Fr4IYGwAg==",
@@ -107,5 +107,14 @@
       "scope": "personal"
     }
   ],
-  "backupKey": "SUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2g="
+  "backupKey": "SUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2g=",
+  "profile": {
+    "aliases": [],
+    "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+    "fresh": true,
+    "keys": [],
+    "record": "{\"id\":\"00000000000000000000000000000006\",\"name\":\"Pixel 7\",\"version\":1}",
+    "sig": "YCSPwSgN/tixFMtiN9c9OYST1qhm80bQT9fKSoGVLh0LXPB73FZOQ2z0GL6ERgNSqwgIm4OKPkLAobZ/i+wQCg==",
+    "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+  }
 }

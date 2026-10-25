@@ -2260,4 +2260,27 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get profileDeviceSettingsDetail =>
       'Sie gelten nur für dieses Gerät und werden nie synchronisiert.';
+
+  @override
+  String get profileWhichTitle => 'Welches Profil bist du?';
+
+  @override
+  String get profileWhichText =>
+      'Beide Geräte hatten ein eigenes Profil. Das gewählte gilt auf allen deinen Geräten.';
+
+  @override
+  String get profileWhichThisDevice => 'Auf diesem Gerät';
+
+  @override
+  String get profileWhichOtherDevice => 'Auf dem anderen Gerät';
+
+  @override
+  String get profileWhichPick => 'Das bin ich';
+
+  @override
+  String get profileWhichLater => 'Später';
+
+  @override
+  String get profileWhichWaiting =>
+      'Deine Geräte haben zwei Profile. Wähle deines.';
 }

@@ -61,7 +61,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An About page with the version, documentation, source, a way to report problems or write to the developer, and a donation link; it and the desktop's About list every third-party component and its licence.
 - A documentation site in English and German with a glossary, what's new and a privacy policy, linked from About on the phone and the desktop.
 - A desktop app for Linux, Windows and macOS in the phone's look that captures, edits and sorts Notes, manages Areas, Topics, Routines and Reminders, shows the Agenda like the phone, records and plays voice Notes, keeps pasted pictures as photo Notes, writes Transcripts with Whisper and Photo Texts with ocrs, and finds Notes by their text, Transcripts and Photo Texts, with drag-and-drop filing, keys in place of swipes, notifications with Re-nag from a tray icon that starts at login unless switched off, and a small capture popup that a global hotkey, the tray or the `oldbrainfix capture` command opens, the command also keeping a given text as a Note without opening anything; it comes as .deb, AppImage and Flatpak, from Homebrew and Scoop, and sits in the application menu with its own icon.
-- A Profile with your name, picture and short code, taken from the phone's name or the computer login without asking; its page gathers Backups, your Devices and the settings.
+- A Profile with your name, picture and short code, taken from the phone's name or the computer login without asking and shared by all of your Devices, where pairing two Devices that each have a named Profile asks once which one is you; its page gathers Backups, your Devices and the settings.
 
 ---
 

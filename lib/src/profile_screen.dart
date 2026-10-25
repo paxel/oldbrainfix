@@ -102,15 +102,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _nameFocus.addListener(_focusChanged);
+    widget.model.addListener(_profileChanged);
   }
 
   @override
   void dispose() {
+    widget.model.removeListener(_profileChanged);
     _nameFocus
       ..removeListener(_focusChanged)
       ..dispose();
     _name.dispose();
     super.dispose();
+  }
+
+  /// A name that came from another Device shows at once, unless the user
+  /// is typing one.
+  void _profileChanged() {
+    if (_nameFocus.hasFocus) return;
+    final kept = widget.model.profile?.name ?? '';
+    if (_name.text != kept) _name.text = kept;
   }
 
   void _focusChanged() {
@@ -218,6 +228,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSubmitted: (_) => _saveName(),
                   ),
                 ),
+                if (model.question != null)
+                  ListTile(
+                    key: const ValueKey('profileQuestion'),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                    leading: const Icon(Icons.people_outline),
+                    title: Text(t.profileWhichTitle),
+                    subtitle: Text(t.profileWhichWaiting),
+                    onTap: () =>
+                        unawaited(askWhichProfile(context, widget.store)),
+                  ),
                 if (model.code case final code?)
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 24),

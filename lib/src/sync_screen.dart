@@ -16,6 +16,7 @@ import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
+import 'profile.dart';
 
 /// How a sync is run; the app passes the core's [lanSync], tests a fake.
 typedef Join = Future<SyncResult> Function(
@@ -220,6 +221,10 @@ class _SyncScreenState extends State<SyncScreen> {
         AutoSyncScope.of(context)?.devicesChanged();
       }
     }
+    // Two Profiles changed by the user met: asked once, right here.
+    if (mounted && widget.store.profileQuestion != null) {
+      await askWhichProfile(context, widget.store);
+    }
   }
 
   void _forget(PairedDevice device) {
@@ -317,6 +322,10 @@ class _SyncScreenState extends State<SyncScreen> {
     setState(() => _bundleBusy = true);
     final conflicts = await openReceivedFile(context, widget.store, path);
     if (!mounted) return;
+    if (widget.store.profileQuestion != null) {
+      await askWhichProfile(context, widget.store);
+      if (!mounted) return;
+    }
     if (conflicts > 0) {
       // The root navigator outlives this screen: the announcement may be
       // tapped after leaving it.

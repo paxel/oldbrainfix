@@ -235,3 +235,129 @@ fn the_profile_page_speaks_german() -> TestResult {
     }
     Ok(())
 }
+
+// ------------------------------------------- between one's own Devices
+
+/// A phone of the same user with a Profile of its own, named by the user.
+fn phone(name: &str) -> Result<Store, Box<dyn std::error::Error>> {
+    let store = Store::in_memory(Box::new(chrono::Utc::now), || {
+        Ok(SigningKey::from_seed([5; 32]))
+    })?;
+    let own = OwnProfile::new(&store);
+    own.apply_defaults("Pixel", None)?;
+    own.rename(name)?;
+    Ok(store)
+}
+
+/// The phone joins the desktop's host once, as Pairing does.
+fn pair(phone: &Store, desk: &Store) -> TestResult {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    let request = sync_request(phone, &desk.version_vector()?, "Phone", "", "")?;
+    let (answer, _) = answer_sync(desk, &request, "Desk")?.ok_or("an answer")?;
+    apply_answer(phone, &answer)?;
+    Ok(())
+}
+
+/// The desktop's Profile named Ada by the user, paired with a phone whose
+/// Profile is Ada L.: "Which one is you?" waits on both.
+fn met() -> Result<(Store, Store), Box<dyn std::error::Error>> {
+    let desk = store()?;
+    OwnProfile::new(&desk).rename("Ada")?;
+    let phone = phone("Ada L.")?;
+    pair(&phone, &desk)?;
+    Ok((desk, phone))
+}
+
+fn id(store: &Store) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(OwnProfile::new(store).get()?.ok_or("a Profile")?.id)
+}
+
+#[test]
+fn two_profiles_meeting_ask_which_one_is_you_showing_both() -> TestResult {
+    let (desk, phone) = met()?;
+    let phone_code = OwnProfile::new(&phone).code()?.ok_or("a code")?;
+    let desk_code = OwnProfile::new(&desk).code()?.ok_or("a code")?;
+    let mut harness = window(App::new(desk, "en"));
+    assert!(shows(&harness, "Which one is you?"));
+    for label in [
+        "Ada",
+        "Ada L.",
+        phone_code.as_str(),
+        desk_code.as_str(),
+        "On this Device",
+        "On the other Device",
+    ] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    // The phone's Profile is me: this Device takes it over.
+    harness
+        .get_all_by_label("This is me")
+        .nth(1)
+        .ok_or("two choices")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(!shows(&harness, "Which one is you?"));
+    let store = harness.state().store();
+    assert_eq!(id(store)?, id(&phone)?);
+    assert_eq!(OwnProfile::new(store).code()?, Some(phone_code));
+    Ok(())
+}
+
+#[test]
+fn later_leaves_the_question_on_the_profile_page() -> TestResult {
+    let (desk, phone) = met()?;
+    let mut harness = window(App::new(desk, "en"));
+    click(&mut harness, "Later");
+    assert!(!shows(&harness, "On the other Device"));
+    assert!(
+        OwnProfile::new(harness.state().store())
+            .question()?
+            .is_some()
+    );
+
+    click(&mut harness, "Profile");
+    assert!(shows(
+        &harness,
+        "Your Devices have two Profiles. Pick yours."
+    ));
+    click(&mut harness, "Which one is you?");
+    assert!(shows(&harness, "On the other Device"));
+    harness
+        .get_all_by_label("This is me")
+        .next()
+        .ok_or("two choices")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    let store = harness.state().store();
+    assert!(OwnProfile::new(store).question()?.is_none());
+    assert_eq!(OwnProfile::new(store).aliases()?, vec![id(&phone)?]);
+    assert!(!shows(
+        &harness,
+        "Your Devices have two Profiles. Pick yours."
+    ));
+    Ok(())
+}
+
+#[test]
+fn a_name_changed_on_the_phone_shows_here_at_once() -> TestResult {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    let desk = Arc::new(store()?);
+    let phone = phone("Ada")?;
+    pair(&phone, &desk)?;
+    let changes = Arc::new(AtomicU64::new(0));
+    let mut app = App::new(desk.clone(), "en");
+    app.watch_changes(changes.clone());
+    app.select(Selection::Profile);
+    let mut harness = window(app);
+    assert!(harness.query_all_by_value("Ada").next().is_some());
+
+    OwnProfile::new(&phone).rename("Ada Lovelace")?;
+    pair(&phone, &desk)?;
+    changes.fetch_add(1, Ordering::SeqCst);
+    harness.run();
+    assert!(harness.query_all_by_value("Ada Lovelace").next().is_some());
+    Ok(())
+}

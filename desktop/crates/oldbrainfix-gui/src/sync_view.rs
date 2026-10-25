@@ -242,7 +242,7 @@ impl SyncHost {
                 self.found = session.conflicts.len();
                 self.last = Some((session.name, session.applied.len()));
                 self.reload_conflicts(store);
-                !session.applied.is_empty()
+                !session.applied.is_empty() || session.profile.changed()
             }
             Err(e) => {
                 request.reply(Response::status(500));

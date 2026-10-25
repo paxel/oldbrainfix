@@ -44,6 +44,7 @@ use egui::{
     Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::backup;
+use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, SentItemState};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
@@ -172,6 +173,8 @@ struct View {
     /// The user's own Profile and its short code.
     profile: Option<Profile>,
     profile_code: Option<String>,
+    /// The other Profile "Which one is you?" asks about, if it does.
+    profile_question: Option<ProfileChoice>,
 }
 
 impl View {
@@ -258,6 +261,9 @@ enum Dialog {
         person: String,
         question: String,
     },
+    /// "Which one is you?" (ADR 0017): two Profiles of the user's own
+    /// Devices, both changed by the user, met.
+    WhichProfile,
 }
 
 /// The question before an Area or Topic is deleted.
@@ -484,6 +490,10 @@ pub struct App {
     notice: Option<String>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
+    /// The picture of the other Profile "Which one is you?" shows.
+    question_view: ProfileView,
+    /// "Which one is you?" was put off until the Profile page asks again.
+    question_later: bool,
     /// Asks the system's dialog for a picture file, titled as given.
     picture_picker: FolderPicker,
     /// The passphrase being typed into the Backups card.
@@ -596,6 +606,8 @@ impl App {
             handed: None,
             notice: None,
             profile_view: ProfileView::default(),
+            question_view: ProfileView::default(),
+            question_later: false,
             picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
             backup_form: Passphrase::default(),
             recovery_shown: Default::default(),
@@ -1088,6 +1100,16 @@ impl App {
         }
         self.read_at = self.store.now();
         self.arrived = self.conflicts_arrived();
+        // "Which one is you?" opens once it comes up, and goes once it was
+        // answered here or on another Device.
+        match (&self.view.profile_question, &self.dialog) {
+            (Some(_), None) if !self.question_later => self.dialog = Some(Dialog::WhichProfile),
+            (None, Some(Dialog::WhichProfile)) => self.dialog = None,
+            _ => {}
+        }
+        if self.view.profile_question.is_none() {
+            self.question_later = false;
+        }
         if self.selection == Selection::Sync {
             // What an automatic sync brought meanwhile.
             self.sync.reload_conflicts(&self.store);
@@ -1248,6 +1270,7 @@ impl App {
             trashed_routines,
             profile: OwnProfile::new(&self.store).get()?,
             profile_code: OwnProfile::new(&self.store).code()?,
+            profile_question: OwnProfile::new(&self.store).question()?,
         })
     }
 
@@ -2665,6 +2688,7 @@ impl App {
         };
         let t = self.t;
         let view = &self.view;
+        let (own_view, question_view) = (&mut self.profile_view, &mut self.question_view);
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -2753,10 +2777,28 @@ impl App {
                             }
                         });
                     }
+                    Dialog::WhichProfile => {
+                        if let Some(other) = &view.profile_question {
+                            let mut asked = Vec::new();
+                            profile_view::question_form(
+                                ui,
+                                &t,
+                                (own_view, question_view),
+                                (view.profile.as_ref(), view.profile_code.as_deref()),
+                                other,
+                                &mut asked,
+                            );
+                            actions.extend(asked.into_iter().map(Action::Profile));
+                        }
+                    }
                 }
             });
         if modal.should_close() {
-            actions.push(Action::CloseDialog);
+            // Put off, not lost: it waits on the Profile page.
+            actions.push(match dialog {
+                Dialog::WhichProfile => Action::Profile(ProfileAction::Later),
+                _ => Action::CloseDialog,
+            });
         }
     }
 
@@ -2892,6 +2934,7 @@ impl App {
         );
         let profile = self.view.profile.as_ref();
         let code = self.view.profile_code.as_deref();
+        let question = self.view.profile_question.is_some();
         ui.heading(RichText::new(t.profile_title()).color(text));
         ui.add_space(8.0);
         egui::ScrollArea::vertical()
@@ -2903,6 +2946,17 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     profile_view::header(ui, &t, view, profile, code, &mut asked);
                 });
+                if question {
+                    embossed(ui, tones, false, None, |ui| {
+                        ui.label(RichText::new(t.profile_which_waiting()).color(text));
+                        if ui
+                            .button(RichText::new(t.profile_which_title()).color(text))
+                            .clicked()
+                        {
+                            asked.push(ProfileAction::Ask);
+                        }
+                    });
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.profile_backups()).strong().color(text));
                     let mut backup = Vec::new();
@@ -2992,6 +3046,18 @@ impl App {
                 }
             }
             ProfileAction::CancelSquare => self.profile_view.square = None,
+            ProfileAction::Ask => {
+                self.question_later = false;
+                self.dialog = Some(Dialog::WhichProfile);
+            }
+            ProfileAction::Answer(keep_mine) => {
+                self.dialog = None;
+                own.answer(keep_mine)?;
+            }
+            ProfileAction::Later => {
+                self.dialog = None;
+                self.question_later = true;
+            }
         }
         Ok(())
     }

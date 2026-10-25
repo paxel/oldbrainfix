@@ -58,6 +58,9 @@ pub struct BundleResult {
     /// The Device that wrote it, and the name it goes by here.
     pub from: String,
     pub from_name: String,
+    /// Whether the own Profile changed, or "Which one is you?" came up
+    /// (ADR 0017).
+    pub profile_changed: bool,
 }
 
 impl BundleResult {
@@ -191,6 +194,7 @@ pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
         conflicts: read.conflicts,
         from,
         from_name,
+        profile_changed: read.profile_changed,
     })
 }
 

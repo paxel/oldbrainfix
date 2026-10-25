@@ -59,6 +59,17 @@ fn read_json(path: &Path) -> Result<Value, Box<dyn std::error::Error>> {
 }
 
 /// The writer's key: seed bytes 1 to 32.
+/// The own Profile's settings of `store`, as the generator writes them.
+fn profile_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(Value::Object(
+        store
+            .local_settings_with_prefix("profile")?
+            .into_iter()
+            .map(|(k, v)| (k, json!(v)))
+            .collect(),
+    ))
+}
+
 fn writer_key() -> SigningKey {
     let mut seed = [0u8; 32];
     for (i, b) in seed.iter_mut().enumerate() {
@@ -1216,6 +1227,11 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
 
     // Both end up reading the same, and each holds the other's backup key.
     let back = apply_answer(&joiner, &answer)?;
+    // The joiner, still with the defaults, took the host's Profile over.
+    let profiles = read_json(&dir.join("profile.json"))?;
+    assert_eq!(profile_settings(&host)?, profiles["host"]);
+    assert_eq!(profile_settings(&joiner)?, profiles["joiner"]);
+    assert_eq!(back.profile.name(), "adopted");
     assert_eq!(back.name, "Desk");
     let held = read_json(&dir.join("backup_keys.json"))?;
     for (side, store, other) in [("host", &host, &joiner), ("joiner", &joiner, &host)] {
@@ -1420,6 +1436,12 @@ fn the_folder_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
         .held_backup_key(&host_id)?
         .map(|(k, _)| BASE64.encode(k));
     assert_eq!(key.as_deref(), expected["backupKey"].as_str());
+    // So did the host's Profile, renamed since they met.
+    assert!(result.profile_changed);
+    assert_eq!(
+        profile_settings(&joiner)?,
+        read_json(&dir.join("profile.json"))?["joiner"]
+    );
     let mut actual = read(&joiner)?;
     if let Some(map) = actual.as_object_mut() {
         map.remove("device");
@@ -1496,6 +1518,12 @@ fn the_bundle_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
     assert_eq!(got.unreadable, 0);
     assert_eq!(got.report.refused_count(), 0);
     assert_eq!(got.from, host.device_id()?);
+    // Both Profiles named by the user: "Which one is you?" waits.
+    assert!(got.profile_changed);
+    assert_eq!(
+        profile_settings(&joiner)?,
+        read_json(&dir.join("profile.json"))?["joiner"]
+    );
     assert_eq!(
         joiner
             .local_setting(&format!("held:{}", host.device_id()?))?
@@ -2218,5 +2246,23 @@ fn profiles_come_out_as_the_dart_core_has_them() -> TestResult {
         assert_eq!(json!(own.code()?), step["code"], "{}", step["step"]);
     }
     assert_eq!(steps.len(), 5);
+
+    // Profiles another of the own Devices sends, each taken as there.
+    let takes = &fixture["takes"];
+    let from = BASE64.decode(takes["from"].as_str().ok_or("from")?)?;
+    for case in takes["cases"].as_array().ok_or("cases")? {
+        let store = writer_store()?;
+        for (key, value) in takes["before"].as_object().ok_or("before")? {
+            store.set_local_setting(key, value.as_str().ok_or("a value")?)?;
+        }
+        let taken = OwnProfile::new(&store).take(Some(&case["profile"]), &from)?;
+        assert_eq!(taken.name(), case["taken"], "{}", case["case"]);
+        assert_eq!(
+            profile_settings(&store)?,
+            case["settings"],
+            "{}",
+            case["case"]
+        );
+    }
     Ok(())
 }

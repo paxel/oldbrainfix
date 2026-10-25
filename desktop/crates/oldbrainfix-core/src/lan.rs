@@ -40,6 +40,7 @@ use crate::conflicts::Conflict;
 use crate::entry::WireEntry;
 use crate::keys::{AreaKey, area_keys_of};
 use crate::pairing::PairedDevice;
+use crate::profile::{OwnProfile, ProfileTaken};
 use crate::shared::Invite;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
@@ -49,8 +50,10 @@ use crate::{Error, Result};
 /// The wire format this build speaks, the Dart core's `syncFormat`.
 /// Format 2 carries the entries' causal contexts, which format 1 would
 /// refuse as forged; format 3 the invites to Shared Areas, which format
-/// 2 would answer with everything it holds.
-pub const SYNC_FORMAT: i64 = 3;
+/// 2 would answer with everything it holds; format 4 the own Profile
+/// between one's own Devices (ADR 0017), which format 3 would leave
+/// behind.
+pub const SYNC_FORMAT: i64 = 4;
 
 pub const PIN_FAILURES_PER_ADDRESS: u32 = 5;
 pub const PIN_FAILURES_TOTAL: u32 = 20;
@@ -913,6 +916,8 @@ pub struct Session {
     pub conflicts: Vec<Conflict>,
     /// The Shared Area this session invited one side to, if it did.
     pub shared_area: Option<String>,
+    /// What became of the own Profile the other Device sent (ADR 0017).
+    pub profile: ProfileTaken,
 }
 
 fn vector_of(value: Option<&Value>) -> HashMap<String, i64> {
@@ -1052,6 +1057,9 @@ pub fn sync_request_as(
         if own && let Some(key) = store.backup_key_to_send()? {
             map.insert("backupKey".to_string(), Value::String(key));
         }
+        if own && let Some(profile) = OwnProfile::new(store).to_send()? {
+            map.insert("profile".to_string(), profile);
+        }
     }
     Ok(body)
 }
@@ -1138,10 +1146,12 @@ pub fn answer_sync_inviting(
         store.learn_area_keys(&taken)?;
     }
     store.ensure_area_keys()?;
+    let mut profile = ProfileTaken::Unchanged;
     if let Some(invite) = inviting {
         store.invite(&invite.area, &peer, invite.role, &invite.name)?;
     } else if !shared {
         store.extend_roles_to(&peer)?;
+        profile = take_profile(store, &peer, body.get("profile"))?;
     }
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&peer_name))?;
     // The answer carries everything beyond what the joiner holds: once it
@@ -1181,6 +1191,12 @@ pub fn answer_sync_inviting(
     {
         map.insert("backupKey".to_string(), Value::String(key));
     }
+    if !shared
+        && let Some(own) = OwnProfile::new(store).to_send()?
+        && let Some(map) = answer.as_object_mut()
+    {
+        map.insert("profile".to_string(), own);
+    }
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Some((
         answer,
@@ -1192,8 +1208,20 @@ pub fn answer_sync_inviting(
             report,
             conflicts,
             shared_area,
+            profile,
         },
     )))
+}
+
+/// Takes in the own Profile `sent` by `peer`, a Device of this one's own
+/// group whose key the session verified; nothing without that key.
+fn take_profile(store: &Store, peer: &str, sent: Option<&Value>) -> Result<ProfileTaken> {
+    match store.pinned_key(peer)? {
+        Some(pinned) if !peer.is_empty() => {
+            OwnProfile::new(store).take(sent, &pinned.record.public_key)
+        }
+        _ => Ok(ProfileTaken::Unchanged),
+    }
 }
 
 /// The joiner takes in the host's `/sync` answer, as the Dart core's
@@ -1246,6 +1274,11 @@ pub fn apply_answer_as(
     } else {
         store.extend_roles_to(&host)?;
     }
+    let profile = if shared {
+        ProfileTaken::Unchanged
+    } else {
+        take_profile(store, &host, answer.get("profile"))?
+    };
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&name))?;
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Session {
@@ -1256,6 +1289,7 @@ pub fn apply_answer_as(
         report,
         conflicts,
         shared_area: invited.or_else(|| invited_by.map(str::to_string)),
+        profile,
     })
 }
 
