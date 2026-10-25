@@ -88,5 +88,6 @@
   "backupFolderPickTitle": "Ordner für Sicherungen wählen",
   "restoreOpenTitle": "Sicherungsdatei wählen",
   "welcomeTitle": "Willkommen bei Old Brain Fix",
-  "welcomeFresh": "Neu anfangen"
+  "welcomeFresh": "Neu anfangen",
+  "personOpen": "Profil von {name} öffnen"
 }

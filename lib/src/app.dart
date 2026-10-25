@@ -29,6 +29,7 @@ import 'look.dart';
 import 'nudge_screen.dart';
 import 'ocr_platform.dart';
 import 'pairing_platform.dart';
+import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'profile_platform.dart';
@@ -274,7 +275,11 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                     folders: widget.folders,
                                     child: BundleScope(
                                       bundles: widget.bundles,
-                                      child: child ?? const SizedBox.shrink(),
+                                      child: PersonScope(
+                                        store: widget.store,
+                                        platform: widget.profile,
+                                        child: child ?? const SizedBox.shrink(),
+                                      ),
                                     ),
                                   ),
                                 ),

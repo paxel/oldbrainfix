@@ -38,6 +38,12 @@
   ],
   "shareAt": "2026-02-01T09:00:00.000Z",
   "sessionAt": "2026-02-01T10:00:00.000Z",
+  "overrideAt": "2026-02-01T10:15:00.000Z",
+  "override": {
+    "person": "00000000000000000000000000000008",
+    "shown": "Benny",
+    "theirs": "Ben"
+  },
   "folderAt": "2026-02-01T10:30:00.000Z",
   "afterFolder": {
     "profilesFile": "65b60673d6ed884bf01c2c222d82ada0.433b042ce43517cc.profiles",
@@ -692,7 +698,7 @@
         },
         {
           "id": "00000000000000000000000000000008",
-          "name": "Ben",
+          "name": "Benny",
           "role": "member",
           "devices": [
             "c945cbf2a5602002141e2fb9d17054d6"
@@ -824,7 +830,7 @@
         },
         {
           "id": "00000000000000000000000000000008",
-          "name": "Ben",
+          "name": "Benny",
           "role": "manager",
           "devices": [
             "c945cbf2a5602002141e2fb9d17054d6"

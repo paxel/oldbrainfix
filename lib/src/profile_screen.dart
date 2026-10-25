@@ -10,6 +10,7 @@ import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'backup_screen.dart';
 import 'l10n.dart';
+import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'settings_screen.dart';
@@ -67,8 +68,8 @@ class PictureWork {
 }
 
 /// The Profile page (ADR 0017): the own Profile's picture, name and
-/// short code, then Backups and recovery, the user's Devices, and the
-/// settings of this Device. Reached through the Profile picture in the
+/// short code, then Backups and recovery, the user's Devices, People
+/// (#52), and the settings of this Device. Reached through the Profile picture in the
 /// Agenda's top corner, where the settings gear was.
 class ProfileScreen extends StatefulWidget {
   final Store store;
@@ -275,6 +276,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
+                SettingsHeading(t.peopleTitle),
+                PeopleSection(store: widget.store),
                 SettingsHeading(t.profileDeviceSettings),
                 SettingsSection(
                   children: [

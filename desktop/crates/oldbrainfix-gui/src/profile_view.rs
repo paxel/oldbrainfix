@@ -175,6 +175,37 @@ pub fn person_picture(
     response.on_hover_text(label)
 }
 
+/// Another person's picture in a circle `size` wide, or their
+/// placeholder, labelled `label`, that opens their Profile when clicked
+/// (#52).
+pub fn person_button(
+    ui: &mut Ui,
+    pictures: &mut Pictures,
+    profile: &Profile,
+    size: f32,
+    label: &str,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), Sense::click());
+    response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    let texture = pictures.texture(ui, profile);
+    paint(ui, rect, texture, Some(profile));
+    hover_ring(ui, rect, &response);
+    response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label)
+}
+
+/// A ring around the circle in `rect` while `response` is hovered.
+fn hover_ring(ui: &Ui, rect: Rect, response: &egui::Response) {
+    if response.hovered() {
+        ui.painter_at(rect.expand(2.0)).circle_stroke(
+            rect.center(),
+            rect.width() / 2.0,
+            Stroke::new(2.0, ui.visuals().widgets.hovered.fg_stroke.color),
+        );
+    }
+}
+
 /// Paints `texture` in a circle filling `rect`; without one, the
 /// placeholder of `profile`, or a neutral circle without a Profile.
 fn paint(ui: &Ui, rect: egui::Rect, texture: Option<TextureHandle>, profile: Option<&Profile>) {
@@ -239,15 +270,7 @@ pub fn avatar(
     response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
     let texture = profile.and_then(|p| view.texture(ui, p));
     paint(ui, rect, texture, profile);
-    let painter = ui.painter_at(rect.expand(2.0));
-    let center = rect.center();
-    if response.hovered() {
-        painter.circle_stroke(
-            center,
-            size / 2.0,
-            Stroke::new(2.0, ui.visuals().widgets.hovered.fg_stroke.color),
-        );
-    }
+    hover_ring(ui, rect, &response);
     response.on_hover_text(label)
 }
 

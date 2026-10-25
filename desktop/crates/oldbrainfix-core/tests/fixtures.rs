@@ -1773,6 +1773,21 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(people_json(&ann)?, after_invite["hostPeople"]);
     assert_eq!(people_json(&ben)?, after_invite["joinerPeople"]);
 
+    // Ann gives Ben a name and picture for herself alone: the same
+    // entries, every view shows them, and they never reach Ben.
+    *clock.lock() = at("overrideAt")?;
+    let overridden = &expected["override"];
+    let ben_id = overridden["person"].as_str().ok_or("person")?;
+    let mark = ann.current_seq()?;
+    ann.set_override_name(ben_id, "Benny")?;
+    ann.set_override_picture(ben_id, Some(&std::fs::read(dir.join("override.jpg"))?))?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("override.jsonl"))?
+    );
+    assert_eq!(json!(ann.person_shown(ben_id)?.name), overridden["shown"]);
+    assert_eq!(json!(ann.person_theirs(ben_id)?.name), overridden["theirs"]);
+
     // Ann renames herself and syncs through a shared folder: the
     // Household's Profiles go sealed under its key, as the Dart core
     // sealed them, and Ben reads hers.
@@ -1805,6 +1820,12 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
     assert_eq!(answer, read_json(&dir.join("answer2.json"))?);
     apply_answer_as(&ben, &answer, true, None)?;
+    assert!(
+        ben.all_entries()?
+            .iter()
+            .all(|e| !e.entity.starts_with(oldbrainfix_core::overrides::PREFIX)),
+        "Ann's Override reached Ben"
+    );
     let after = &expected["after"];
     let ids: Vec<String> = after["hostRoles"]["mayChange"]
         .as_object()

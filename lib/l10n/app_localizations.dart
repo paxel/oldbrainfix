@@ -3673,6 +3673,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nothing was shared.'**
   String get shareCancelled;
+
+  /// No description provided for @personVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified: code compared in person.'**
+  String get personVerified;
+
+  /// No description provided for @personNotVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified: compare codes in person to be sure.'**
+  String get personNotVerified;
+
+  /// No description provided for @personCodesDiffered.
+  ///
+  /// In en, this message translates to:
+  /// **'The codes differ: this Profile may not be the person it names.'**
+  String get personCodesDiffered;
+
+  /// No description provided for @personForMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Name and picture for me'**
+  String get personForMe;
+
+  /// No description provided for @personForMeDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you see them, on your own Devices. Their own name and picture stay as they are.'**
+  String get personForMeDetail;
+
+  /// No description provided for @personForMeName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name for me'**
+  String get personForMeName;
+
+  /// No description provided for @personForMePicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the picture for me'**
+  String get personForMePicture;
+
+  /// No description provided for @personTheirPicture.
+  ///
+  /// In en, this message translates to:
+  /// **'Use their own picture'**
+  String get personTheirPicture;
+
+  /// No description provided for @profilePeopleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody yet. The people you share an Area with or accept Sent Items from show here.'**
+  String get profilePeopleEmpty;
 }
 
 class _AppLocalizationsDelegate

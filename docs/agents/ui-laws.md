@@ -14,7 +14,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**, where the settings gear was. It
   opens the Profile page: picture, name and short code; Backups and
-  recovery; Your Devices; Settings of this Device, with About
+  recovery; Your Devices; People; Settings of this Device, with About
   inside. No hamburger menu, no ⋮ menu for them.
 - In the notes browser, **swipe right goes back** one level (Topic,
   Area, Agenda) and **swipe left goes forward** into the last selected
@@ -66,7 +66,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   plus a Capture Context icon when there is more to see. Tapping the card
   opens the full editor, which shows everything about the Note.
 - Another person's Note shows their Profile picture, or its
-  placeholder, on its card; one's own Notes show none.
+  placeholder, on its card; one's own Notes show none. Tapping another
+  person's picture, anywhere it shows, opens their Profile.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.

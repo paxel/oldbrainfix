@@ -193,11 +193,28 @@ impl Store {
         Ok(at)
     }
 
+    /// Whether the key `key` (base64) is bound to the own Profile.
+    pub(crate) fn own_bound(&self, key: &str) -> Result<bool> {
+        Ok(self.own_keys()?.bound.contains(key))
+    }
+
     /// The person `id` as every screen shows them: the own Profile for
     /// one's own ids, a Profile kept here through its aliases with its
     /// picture made again, else the placeholder with no name, until their
-    /// Profile arrives.
+    /// Profile arrives; with the name and picture of the user's Override,
+    /// where they gave one (#52).
     pub fn person_shown(&self, id: &str) -> Result<Profile> {
+        let theirs = self.person_theirs(id)?;
+        if self.is_own_person(id)? {
+            return Ok(theirs);
+        }
+        self.with_override(theirs)
+    }
+
+    /// The person `id` with their own name and picture, as
+    /// [`Store::person_shown`] but without the user's Override: what
+    /// their Profile view shows them as.
+    pub fn person_theirs(&self, id: &str) -> Result<Profile> {
         if self.is_own_person(id)?
             && let Some(own) = OwnProfile::new(self).get()?
         {
@@ -483,13 +500,21 @@ impl Store {
                 .contains(&signer);
             verified = kept && held.verified;
         }
+        let shown = Profile {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            picture: checked.shown.clone(),
+            version: p.version,
+        };
+        // The user's Override shows only for the Profile kept here, bound
+        // to the key that signed: a copied id gets none.
+        let profile = if kept && !self.is_own_person(&p.id)? {
+            self.with_override(shown)?
+        } else {
+            shown
+        };
         Ok(Some(SentProfile {
-            profile: Profile {
-                id: p.id.clone(),
-                name: p.name.clone(),
-                picture: checked.shown.clone(),
-                version: p.version,
-            },
+            profile,
             code,
             kept,
             verified,
@@ -576,6 +601,13 @@ impl Store {
     /// is not known. A Note accepted from a Sent Item shows its sender,
     /// through the key and the Profile id it keeps (#51).
     pub fn author_of(&self, entity: &str) -> Result<Option<Profile>> {
+        match self.author_theirs(entity)? {
+            Some(author) => Ok(Some(self.with_override(author)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn author_theirs(&self, entity: &str) -> Result<Option<Profile>> {
         if let Some((key, person)) = self.received_from(entity)? {
             if self.own_keys()?.bound.contains(&key) || self.is_own_person(&person)? {
                 return Ok(None);

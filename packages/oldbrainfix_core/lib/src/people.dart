@@ -156,8 +156,17 @@ extension People on Store {
   /// The person [id] as every screen shows them: the own Profile for
   /// one's own ids, a Profile kept here through its aliases with its
   /// picture made again, else the placeholder with no name, until their
-  /// Profile arrives.
+  /// Profile arrives; with the name and picture of the user's Override,
+  /// where they gave one (#52).
   Profile personShown(String id) {
+    final theirs = personTheirs(id);
+    return isOwnPerson(id) ? theirs : _withOverride(theirs);
+  }
+
+  /// The person [id] with their own name and picture, as [personShown]
+  /// but without the user's Override: what their Profile view shows them
+  /// as.
+  Profile personTheirs(String id) {
     if (isOwnPerson(id)) {
       if (ownProfile case final own?) return own;
     }
@@ -367,13 +376,16 @@ extension People on Store {
       ).$1.contains(signer);
       verified = kept && held.verified;
     }
+    final shown = Profile(
+      id: p.id,
+      name: p.name,
+      picture: checked.shown,
+      version: p.version,
+    );
     return (
-      profile: Profile(
-        id: p.id,
-        name: p.name,
-        picture: checked.shown,
-        version: p.version,
-      ),
+      // The user's Override shows only for the Profile kept here, bound
+      // to the key that signed: a copied id gets none.
+      profile: kept && !isOwnPerson(p.id) ? _withOverride(shown) : shown,
       code: code,
       kept: kept,
       verified: verified,
@@ -459,6 +471,11 @@ extension People on Store {
   /// from a Sent Item shows its sender, through the key and the Profile
   /// id it keeps (#51).
   Profile? authorOf(String entity) {
+    final author = _authorOf(entity);
+    return author == null ? null : _withOverride(author);
+  }
+
+  Profile? _authorOf(String entity) {
     if (_receivedFrom(entity) case (:final key, :final person)) {
       if (_own.bound.contains(key) || isOwnPerson(person)) return null;
       return _shownFor(key, person);

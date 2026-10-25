@@ -1243,5 +1243,14 @@
       }
     }
   },
-  "shareCancelled": "Nothing was shared."
+  "shareCancelled": "Nothing was shared.",
+  "personVerified": "Verified: code compared in person.",
+  "personNotVerified": "Not verified: compare codes in person to be sure.",
+  "personCodesDiffered": "The codes differ: this Profile may not be the person it names.",
+  "personForMe": "Name and picture for me",
+  "personForMeDetail": "Only you see them, on your own Devices. Their own name and picture stay as they are.",
+  "personForMeName": "Name for me",
+  "personForMePicture": "Change the picture for me",
+  "personTheirPicture": "Use their own picture",
+  "profilePeopleEmpty": "Nobody yet. The people you share an Area with or accept Sent Items from show here."
 }

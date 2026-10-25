@@ -33,6 +33,7 @@ pub mod media;
 pub mod media_view;
 pub mod names;
 pub mod notify;
+pub mod person_view;
 pub mod popup;
 pub mod profile_view;
 pub mod routine_editor;

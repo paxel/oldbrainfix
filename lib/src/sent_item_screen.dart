@@ -8,6 +8,7 @@ import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'person_screen.dart';
 import 'profile.dart';
 import 'schedule_text.dart';
 
@@ -160,7 +161,11 @@ Future<int> openReceivedFile(
     final opened = openSentItem(store, bytes);
     await navigator.push(
       MaterialPageRoute<void>(
-        builder: (_) => SentItemScreen(store: store, opened: opened),
+        builder: (_) => SentItemScreen(
+          store: store,
+          opened: opened,
+          reopen: () => openSentItem(store, bytes),
+        ),
       ),
     );
   } on NotASentItem {
@@ -204,7 +209,16 @@ class SentItemScreen extends StatefulWidget {
   final Store store;
   final OpenedSentItem opened;
 
-  const SentItemScreen({super.key, required this.store, required this.opened});
+  /// Reads the item again, as it shows after the sender's Profile was
+  /// opened and an Override set there (#52).
+  final OpenedSentItem Function()? reopen;
+
+  const SentItemScreen({
+    super.key,
+    required this.store,
+    required this.opened,
+    this.reopen,
+  });
 
   @override
   State<SentItemScreen> createState() => _SentItemScreenState();
@@ -217,7 +231,18 @@ class _SentItemScreenState extends State<SentItemScreen> {
   var _compared = _Compared.not;
 
   Store get store => widget.store;
-  OpenedSentItem get opened => widget.opened;
+  late OpenedSentItem opened = widget.opened;
+
+  /// Shows the sender as the user sees them now.
+  void _reopen() {
+    final reopen = widget.reopen;
+    if (reopen == null) return;
+    try {
+      opened = reopen();
+    } on Exception {
+      // Read once already; what showed stays.
+    }
+  }
 
   Future<void> _compare(String name) async {
     final t = context.t;
@@ -309,10 +334,22 @@ class _SentItemScreenState extends State<SentItemScreen> {
               children: [
                 Row(
                   children: [
-                    ProfileAvatar(
-                      key: const ValueKey('sent-from-picture'),
-                      profile: opened.sender,
-                      size: 48,
+                    // A sender kept here opens their Profile (#52); one
+                    // not kept yet has nothing to open until accepted.
+                    GestureDetector(
+                      onTap:
+                          opened.trust == SenderTrust.unknown ||
+                              !canOpenPerson(context, opened.sender.id)
+                          ? null
+                          : () async {
+                              await openPerson(context, opened.sender.id);
+                              if (mounted) setState(_reopen);
+                            },
+                      child: ProfileAvatar(
+                        key: const ValueKey('sent-from-picture'),
+                        profile: opened.sender,
+                        size: 48,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

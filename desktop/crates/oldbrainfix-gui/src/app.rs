@@ -66,6 +66,7 @@ use crate::l10n::L10n;
 use crate::media::{Clipboard, Player, Recorder, photo_from_file};
 use crate::media_view::{self, PhotoCache, Speech, Voice};
 use crate::names::{area_name, topic_name};
+use crate::person_view::{self, Comparing, PersonAction, PersonView};
 use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
@@ -160,6 +161,12 @@ struct View {
     people: std::collections::HashMap<String, Vec<Person>>,
     /// The name each person's Profile shows, by Profile id.
     names: std::collections::HashMap<String, String>,
+    /// Each person's Profile as it shows, Override applied, by Profile id.
+    shown: std::collections::HashMap<String, Profile>,
+    /// People (#52): every Profile kept here, as the user sees them.
+    people_shown: Vec<Profile>,
+    /// The person whose Profile the dialog shows.
+    person: Option<PersonView>,
     /// The person this Device belongs to in each Shared Area.
     mine: std::collections::HashMap<String, String>,
     /// What this Device may do to the selected Note.
@@ -269,6 +276,13 @@ enum Dialog {
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
+    /// Another person's Profile (#52), with where comparing their code
+    /// stands and the name for the user being typed.
+    Person {
+        id: String,
+        comparing: Comparing,
+        name: String,
+    },
 }
 
 /// Where comparing the short code of a Sent Item's sender stands
@@ -398,6 +412,10 @@ enum Action {
     Backup(BackupAction),
     /// Something asked of the own Profile on the Profile page.
     Profile(ProfileAction),
+    /// Opens another person's Profile (#52).
+    OpenPerson(String),
+    /// Something asked of the person's Profile the dialog shows.
+    Person(PersonAction),
     /// Something asked of the first start's view.
     Welcome(WelcomeAction),
 }
@@ -513,6 +531,10 @@ pub struct App {
     profile_view: ProfileView,
     /// The picture of the other Profile "Which one is you?" shows.
     question_view: ProfileView,
+    /// The square of a new picture for the person the dialog shows.
+    person_square: Option<Square>,
+    /// The dialog a person's Profile opened over, shown again after it.
+    dialog_behind: Option<Dialog>,
     /// "Which one is you?" was put off until the Profile page asks again.
     question_later: bool,
     /// Asks the system's dialog for a picture file, titled as given.
@@ -627,6 +649,8 @@ impl App {
             notice: None,
             profile_view: ProfileView::default(),
             question_view: ProfileView::default(),
+            person_square: None,
+            dialog_behind: None,
             question_later: false,
             picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
             backup_form: Passphrase::default(),
@@ -1179,6 +1203,7 @@ impl App {
         let mut access = std::collections::HashMap::new();
         let mut people = std::collections::HashMap::new();
         let mut names = std::collections::HashMap::new();
+        let mut shown_people = std::collections::HashMap::new();
         let mut mine = std::collections::HashMap::new();
         for area in places.areas()? {
             let topics = places.topics(&area.id)?;
@@ -1186,7 +1211,9 @@ impl App {
             if let Some(grants) = self.store.grants_of(&area.id)? {
                 let shared = self.store.people(&area.id)?;
                 for person in &shared {
-                    names.insert(person.id.clone(), self.store.person_shown(&person.id)?.name);
+                    let shown = self.store.person_shown(&person.id)?;
+                    names.insert(person.id.clone(), shown.name.clone());
+                    shown_people.insert(person.id.clone(), shown);
                 }
                 people.insert(area.id.clone(), shared);
                 if let Some(person) = grants.person_of(&self.store.device_id()?) {
@@ -1294,6 +1321,12 @@ impl App {
             access,
             people,
             names,
+            shown: shown_people,
+            people_shown: self.store.people_shown()?,
+            person: match &self.dialog {
+                Some(Dialog::Person { id, .. }) => Some(PersonView::read(&self.store, id)?),
+                _ => None,
+            },
             mine,
             may,
             notes: placed,
@@ -1509,7 +1542,7 @@ impl App {
                     }
                 }
             }
-            Action::CloseDialog => self.dialog = None,
+            Action::CloseDialog => self.close_dialog()?,
             Action::AddPlace => {
                 if let Some(Dialog::NewPlace { area, name }) = &self.dialog {
                     match area {
@@ -1654,6 +1687,8 @@ impl App {
             Action::OpenFile(path) => self.open_file(&path),
             Action::Backup(asked) => self.backup(asked)?,
             Action::Profile(asked) => self.profile_action(asked)?,
+            Action::OpenPerson(id) => self.open_person(id)?,
+            Action::Person(asked) => self.person_action(asked)?,
             Action::Welcome(asked) => self.welcome_action(asked)?,
             Action::StartSend => {
                 self.save_text()?;
@@ -2431,8 +2466,13 @@ impl App {
                         store: &self.store,
                         transcribing: transcribing.as_deref(),
                     };
-                    let card = note_card(ui, &self.t, tones, placed, selected, draggable, media);
-                    if card.clicked() {
+                    let (card, author) =
+                        note_card(ui, &self.t, tones, placed, selected, draggable, media);
+                    if let (Some(author), Some(profile)) = (author, &placed.author)
+                        && author.clicked()
+                    {
+                        actions.push(Action::OpenPerson(profile.id.clone()));
+                    } else if card.clicked() {
                         actions.push(Action::SelectNote(placed.note.id.clone()));
                     }
                 }
@@ -2716,6 +2756,7 @@ impl App {
         let view = &self.view;
         let (own_view, question_view) = (&mut self.profile_view, &mut self.question_view);
         let pictures = &mut self.pictures;
+        let person_square = &mut self.person_square;
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -2789,7 +2830,8 @@ impl App {
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
                         let mine = view.mine.get(area).map(String::as_str);
                         let names = &view.names;
-                        people_form(ui, &t, area, (people, names, mine), manages, actions);
+                        let shown = (&view.shown, &mut *pictures);
+                        people_form(ui, &t, area, (people, names, mine), shown, manages, actions);
                     }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
@@ -2801,6 +2843,36 @@ impl App {
                                 actions.push(Action::RemovePerson);
                             }
                         });
+                    }
+                    Dialog::Person {
+                        comparing, name, ..
+                    } => {
+                        let mut asked = Vec::new();
+                        if let Some(square) = person_square.as_mut() {
+                            let mut picked = Vec::new();
+                            profile_view::square_page(ui, &t, square, &mut picked);
+                            asked.extend(picked.into_iter().filter_map(|a| match a {
+                                ProfileAction::UseSquare => Some(PersonAction::UseSquare),
+                                ProfileAction::CancelSquare => Some(PersonAction::CancelSquare),
+                                _ => None,
+                            }));
+                        } else if let Some(person) = &view.person {
+                            person_view::form(
+                                ui,
+                                &t,
+                                pictures,
+                                person,
+                                (*comparing, name),
+                                &mut asked,
+                            );
+                            if ui
+                                .button(RichText::new(t.close()).color(ui.visuals().text_color()))
+                                .clicked()
+                            {
+                                actions.push(Action::CloseDialog);
+                            }
+                        }
+                        actions.extend(asked.into_iter().map(Action::Person));
                     }
                     Dialog::WhichProfile => {
                         if let Some(other) = &view.profile_question {
@@ -2956,6 +3028,8 @@ impl App {
             &mut self.backup_form,
             &mut self.profile_view,
         );
+        let (people, pictures) = (&self.view.people_shown, &mut self.pictures);
+        let mut people_asked = Vec::new();
         let profile = self.view.profile.as_ref();
         let code = self.view.profile_code.as_deref();
         let question = self.view.profile_question.is_some();
@@ -2997,6 +3071,27 @@ impl App {
                     }
                     ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
                 });
+                // People (#52): every Profile kept here, each opening it.
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.people_title()).strong().color(text));
+                    if people.is_empty() {
+                        ui.label(RichText::new(t.profile_people_empty()).small().color(weak));
+                    }
+                    for person in people {
+                        let name = profile_view::display_name(&t, &person.name).to_string();
+                        ui.horizontal(|ui| {
+                            let open = t.person_open(&name);
+                            let picture =
+                                profile_view::person_button(ui, pictures, person, 32.0, &open);
+                            let line = ui.add(
+                                egui::Button::new(RichText::new(&name).color(text)).frame(false),
+                            );
+                            if picture.clicked() || line.clicked() {
+                                people_asked.push(person.id.clone());
+                            }
+                        });
+                    }
+                });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(
                         RichText::new(t.profile_device_settings())
@@ -3017,6 +3112,120 @@ impl App {
                 });
             });
         actions.extend(asked.into_iter().map(Action::Profile));
+        actions.extend(people_asked.into_iter().map(Action::OpenPerson));
+    }
+
+    /// Opens the Profile of the person `id` (#52) over the window; over
+    /// a dialog, that one shows again once it closes. Nothing for the
+    /// user's own.
+    fn open_person(&mut self, id: String) -> oldbrainfix_core::Result<()> {
+        if self.store.is_own_person(&id)? {
+            return Ok(());
+        }
+        let name = self
+            .store
+            .person_override(&id)?
+            .and_then(|o| o.name)
+            .unwrap_or_default();
+        let behind = self.dialog.take();
+        if !matches!(behind, Some(Dialog::Person { .. })) {
+            self.dialog_behind = behind;
+        }
+        self.person_square = None;
+        self.dialog = Some(Dialog::Person {
+            id,
+            comparing: Comparing::Not,
+            name,
+        });
+        Ok(())
+    }
+
+    /// Closes the dialog. A person's Profile keeps the name typed last
+    /// and shows the dialog it opened over again, a Sent Item's sender as
+    /// the user sees them now.
+    fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
+        let behind = self.dialog_behind.take();
+        if let Some(Dialog::Person { id, name, .. }) = self.dialog.take() {
+            self.store.set_override_name(&id, &name)?;
+            self.person_square = None;
+            self.dialog = behind;
+            if let Some(Dialog::SentItem { opened, .. }) = &mut self.dialog
+                && opened.trust != SenderTrust::Unknown
+            {
+                opened.sender = self.store.person_shown(&opened.sender.id)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Does what was asked of the person's Profile the dialog shows.
+    fn person_action(&mut self, asked: PersonAction) -> oldbrainfix_core::Result<()> {
+        match asked {
+            PersonAction::UseSquare => return self.person_square_done(true),
+            PersonAction::CancelSquare => return self.person_square_done(false),
+            _ => {}
+        }
+        let Some(Dialog::Person {
+            id,
+            comparing,
+            name,
+        }) = &mut self.dialog
+        else {
+            return Ok(());
+        };
+        match asked {
+            PersonAction::Rename(typed) => {
+                self.store.set_override_name(id, &typed)?;
+                *name = self
+                    .store
+                    .person_override(id)?
+                    .and_then(|o| o.name)
+                    .unwrap_or_default();
+            }
+            PersonAction::TheirPicture => self.store.set_override_picture(id, None)?,
+            PersonAction::PickPicture => {
+                let Some(path) = (self.picture_picker)(self.t.profile_picture_choose()) else {
+                    return Ok(());
+                };
+                let square = std::fs::read(&path)
+                    .ok()
+                    .and_then(|bytes| photo_from_file(&bytes))
+                    .and_then(Square::new);
+                match square {
+                    Some(square) => self.person_square = Some(square),
+                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                }
+            }
+            PersonAction::UseSquare | PersonAction::CancelSquare => {}
+            PersonAction::CompareCodes => *comparing = Comparing::Asking,
+            PersonAction::CodesCompared(false) => *comparing = Comparing::Differ,
+            PersonAction::CodesCompared(true) => {
+                *comparing = Comparing::Not;
+                if let Some(code) = self.store.person_code(id)? {
+                    self.store.verify_person(id, &code)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Takes the square picked as the picture for the person the dialog
+    /// shows, or leaves it.
+    fn person_square_done(&mut self, take: bool) -> oldbrainfix_core::Result<()> {
+        let Some(square) = self.person_square.take() else {
+            return Ok(());
+        };
+        let Some(Dialog::Person { id, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        if !take {
+            return Ok(());
+        }
+        match square.make() {
+            Some(picture) => self.store.set_override_picture(id, Some(&picture))?,
+            None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+        }
+        Ok(())
     }
 
     /// Does what was asked of the own Profile on the Profile page.
@@ -3504,7 +3713,21 @@ fn sent_item_form(
     let item = &opened.item;
     let name = profile_view::display_name(t, &opened.sender.name).to_string();
     ui.horizontal(|ui| {
-        profile_view::person_picture(ui, pictures, &opened.sender, 40.0, &name);
+        // A sender kept here opens their Profile (#52); one not kept has
+        // nothing to open until the item is accepted.
+        if opened.trust == SenderTrust::Unknown {
+            profile_view::person_picture(ui, pictures, &opened.sender, 40.0, &name);
+        } else if profile_view::person_button(
+            ui,
+            pictures,
+            &opened.sender,
+            40.0,
+            &t.person_open(&name),
+        )
+        .clicked()
+        {
+            actions.push(Action::OpenPerson(opened.sender.id.clone()));
+        }
         ui.add_space(8.0);
         title(ui, &t.sent_item_from(&name));
     });
@@ -3678,6 +3901,10 @@ fn people_form(
         &std::collections::HashMap<String, String>,
         Option<&str>,
     ),
+    (shown, pictures): (
+        &std::collections::HashMap<String, Profile>,
+        &mut profile_view::Pictures,
+    ),
     manages: bool,
     actions: &mut Vec<Action>,
 ) {
@@ -3694,7 +3921,23 @@ fn people_form(
             AreaRole::Member => t.role_member(),
         };
         ui.horizontal(|ui| {
-            ui.label(RichText::new(name).color(text));
+            // Another person's picture opens their Profile (#52).
+            if let Some(profile) = shown.get(&person.id) {
+                if own {
+                    profile_view::person_picture(ui, pictures, profile, 32.0, &name);
+                } else if profile_view::person_button(
+                    ui,
+                    pictures,
+                    profile,
+                    32.0,
+                    &t.person_open(&name),
+                )
+                .clicked()
+                {
+                    actions.push(Action::OpenPerson(person.id.clone()));
+                }
+            }
+            ui.label(RichText::new(&name).color(text));
             ui.label(RichText::new(role).small().color(weak));
             if !manages || own {
                 return;
@@ -4312,13 +4555,14 @@ fn note_card(
     selected: bool,
     draggable: bool,
     media: CardMedia,
-) -> egui::Response {
+) -> (egui::Response, Option<egui::Response>) {
     let note = &placed.note;
     let important = note.importance == Importance::Important;
     let colour = placed
         .area
         .as_ref()
         .and_then(|a| area_colour(a.colour.as_deref()));
+    let mut author_rect = None;
     let inner = ui.scope(|ui| {
         if note.importance == Importance::Unimportant {
             ui.multiply_opacity(theme::UNIMPORTANT_OPACITY);
@@ -4351,13 +4595,14 @@ fn note_card(
             ui.horizontal(|ui| {
                 if let Some(author) = &placed.author {
                     let name = profile_view::display_name(t, &author.name);
-                    profile_view::person_picture(
+                    let picture = profile_view::person_picture(
                         ui,
                         media.pictures,
                         author,
                         20.0,
                         &t.author_picture(name),
                     );
+                    author_rect = Some(picture.rect);
                 }
                 ui.label(RichText::new(when(t, note.captured)).small().color(weak));
             });
@@ -4410,7 +4655,19 @@ fn note_card(
     if draggable {
         resp.dnd_set_drag_payload(DraggedNote(note.id.clone()));
     }
-    resp.on_hover_cursor(egui::CursorIcon::PointingHand)
+    // The author's picture lies over the card and opens their Profile
+    // (#52): registered after the card, so it takes the click.
+    let author = author_rect
+        .zip(placed.author.as_ref())
+        .map(|(rect, author)| {
+            let label = t.person_open(profile_view::display_name(t, &author.name));
+            let picture = ui.interact(rect, Id::new(("author", &note.id)), Sense::click());
+            picture.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+            picture
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text(label)
+        });
+    (resp.on_hover_cursor(egui::CursorIcon::PointingHand), author)
 }
 
 #[cfg(test)]

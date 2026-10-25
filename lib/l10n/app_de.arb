@@ -595,5 +595,14 @@
   "inviteConfirmShare": "Teilen",
   "profileTheirCode": "Ihr Code",
   "authorPicture": "Geschrieben von {name}",
-  "shareCancelled": "Es wurde nichts geteilt."
+  "shareCancelled": "Es wurde nichts geteilt.",
+  "personVerified": "Bestätigt: Code persönlich verglichen.",
+  "personNotVerified": "Nicht bestätigt: Vergleiche die Codes persönlich, um sicherzugehen.",
+  "personCodesDiffered": "Die Codes unterscheiden sich: Dieses Profil gehört vielleicht nicht der Person, die es nennt.",
+  "personForMe": "Name und Bild für mich",
+  "personForMeDetail": "Nur du siehst sie, auf deinen eigenen Geräten. Name und Bild der Person bleiben, wie sie sind.",
+  "personForMeName": "Name für mich",
+  "personForMePicture": "Bild für mich ändern",
+  "personTheirPicture": "Ihr eigenes Bild verwenden",
+  "profilePeopleEmpty": "Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst."
 }

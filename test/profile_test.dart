@@ -92,8 +92,8 @@ void main() {
   });
 
   group('the Profile page', () {
-    testWidgets('shows picture, name and code, then Backups, Devices and '
-        'Settings, in that order', (tester) async {
+    testWidgets('shows picture, name and code, then Backups, Devices, '
+        'People and Settings, in that order', (tester) async {
       tester.view.physicalSize = const Size(1080, 2600);
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
@@ -109,6 +109,7 @@ void main() {
         find.text(code),
         find.text('Backups and recovery'),
         find.text('Your Devices'),
+        find.text('People'),
         find.text('Settings of this Device'),
       ];
       final tops = [for (final f in order) tester.getTopLeft(f).dy];

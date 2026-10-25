@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'entry.dart';
 import 'notes.dart';
+import 'profiles.dart' show OverrideKeys;
 import 'signing.dart';
 import 'store.dart';
 
@@ -89,6 +90,26 @@ extension Sync on Store {
     Iterable<KeyRecord> keys = const [],
     String? verifiedDevice,
     ImportReport? report,
+  }) {
+    final applied = _applyEntries(
+      entries,
+      keys: keys,
+      verifiedDevice: verifiedDevice,
+      report: report,
+    );
+    // An Override from another of the user's Devices shows at once
+    // wherever a person shows (#52).
+    if (applied.any((e) => e.entity.startsWith(OverrideKeys.prefix))) {
+      profileChanged();
+    }
+    return applied;
+  }
+
+  List<Entry> _applyEntries(
+    List<Entry> entries, {
+    required Iterable<KeyRecord> keys,
+    required String? verifiedDevice,
+    required ImportReport? report,
   }) => batch(() {
     learnKeys(keys, verifiedDevice: verifiedDevice, report: report);
     final self = deviceId;

@@ -2261,4 +2261,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareCancelled => 'Nothing was shared.';
+
+  @override
+  String get personVerified => 'Verified: code compared in person.';
+
+  @override
+  String get personNotVerified =>
+      'Not verified: compare codes in person to be sure.';
+
+  @override
+  String get personCodesDiffered =>
+      'The codes differ: this Profile may not be the person it names.';
+
+  @override
+  String get personForMe => 'Name and picture for me';
+
+  @override
+  String get personForMeDetail =>
+      'Only you see them, on your own Devices. Their own name and picture stay as they are.';
+
+  @override
+  String get personForMeName => 'Name for me';
+
+  @override
+  String get personForMePicture => 'Change the picture for me';
+
+  @override
+  String get personTheirPicture => 'Use their own picture';
+
+  @override
+  String get profilePeopleEmpty =>
+      'Nobody yet. The people you share an Area with or accept Sent Items from show here.';
 }

@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'person_screen.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -232,18 +233,7 @@ class NoteCard extends StatelessWidget {
                             spacing: 4,
                             children: [
                               if (author case final author?)
-                                Semantics(
-                                  label: t.authorPicture(
-                                    profileDisplayName(t, author.name),
-                                  ),
-                                  image: true,
-                                  excludeSemantics: true,
-                                  child: ProfileAvatar(
-                                    key: const ValueKey('author'),
-                                    profile: author,
-                                    size: 20,
-                                  ),
-                                ),
+                                _AuthorPicture(noteId: note.id, author: author),
                               Text(
                                 when.format(note.captured.toLocal()),
                                 style: text.bodySmall,
@@ -335,5 +325,82 @@ class NoteCard extends StatelessWidget {
     return note.importance == Importance.unimportant
         ? Opacity(opacity: unimportantOpacity, child: card)
         : card;
+  }
+}
+
+/// Another person's picture on a card, opening their Profile (#52): a
+/// small picture with room around it for a finger. It follows their
+/// Profile and the user's Override as they change, as the writer of the
+/// Note [noteId] is shown ([People.authorOf]).
+class _AuthorPicture extends StatefulWidget {
+  final String noteId;
+
+  /// The writer as the card was read.
+  final Profile author;
+
+  const _AuthorPicture({required this.noteId, required this.author});
+
+  @override
+  State<_AuthorPicture> createState() => _AuthorPictureState();
+}
+
+class _AuthorPictureState extends State<_AuthorPicture> {
+  Store? _store;
+  late Profile? _author = widget.author;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final store = PersonScope.of(context)?.store;
+    if (store == _store) return;
+    _store?.removeProfileListener(_changed);
+    _store = store?..addProfileListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(_AuthorPicture old) {
+    super.didUpdateWidget(old);
+    _author = widget.author;
+  }
+
+  @override
+  void dispose() {
+    _store?.removeProfileListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    final store = _store;
+    if (!mounted || store == null) return;
+    setState(() => _author = store.authorOf(widget.noteId));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final author = _author;
+    if (author == null) return const SizedBox.shrink();
+    final t = context.t;
+    final id = author.id;
+    final opens = canOpenPerson(context, id);
+    final picture = ProfileAvatar(
+      key: const ValueKey('author'),
+      profile: author,
+      size: 20,
+    );
+    return Semantics(
+      label: t.authorPicture(profileDisplayName(t, author.name)),
+      image: !opens,
+      button: opens,
+      excludeSemantics: true,
+      onTap: opens ? () => openPerson(context, id) : null,
+      child: !opens
+          ? picture
+          : GestureDetector(
+              key: const ValueKey('author-open'),
+              behavior: HitTestBehavior.opaque,
+              onTap: () => openPerson(context, id),
+              child: Padding(padding: const EdgeInsets.all(6), child: picture),
+            ),
+    );
   }
 }

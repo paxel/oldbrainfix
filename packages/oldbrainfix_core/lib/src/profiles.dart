@@ -6,12 +6,14 @@ import 'package:crypto/crypto.dart';
 import 'package:image/image.dart' as img;
 
 import 'backup.dart';
+import 'entry.dart';
 import 'photos.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
 
+part 'overrides.dart';
 part 'people.dart';
 
 /// Profiles (ADR 0017): every person has one, with an id, a name and a

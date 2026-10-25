@@ -2176,6 +2176,24 @@ Future<void> _sharedFixture(Directory root) async {
       'joinerPeople': _people(ben),
     };
 
+    // Ann gives Ben a name and picture for herself alone (#52): kept in
+    // her log under the personal key, never sent to Ben.
+    final overrideAt = DateTime.utc(2026, 2, 1, 10, 15);
+    _held = overrideAt;
+    final benId = ben.ownProfile!.id;
+    final overridePicture = squareProfilePicture(_gradient(40, 30))!;
+    _writeBytes(File('${out.path}/override.jpg'), overridePicture);
+    mark = ann.currentSeq();
+    ann
+      ..setOverrideName(benId, 'Benny')
+      ..setOverridePicture(benId, overridePicture);
+    _writeAfter(ann, mark, File('${out.path}/override.jsonl'));
+    final overridden = {
+      'person': benId,
+      'shown': ann.personShown(benId).name,
+      'theirs': ann.personTheirs(benId).name,
+    };
+
     // Ann renames herself and syncs through a shared folder: her Profile
     // and Ben's go sealed under the Household's key, and Ben reads hers.
     final folderAt = DateTime.utc(2026, 2, 1, 10, 30);
@@ -2265,6 +2283,9 @@ Future<void> _sharedFixture(Directory root) async {
     };
     // What no role allows of the Topic and the Routine Ben made up lies
     // nowhere for him, so it never even went to Ann.
+    if (ben.allEntries().any((e) => e.entity.startsWith(OverrideKeys.prefix))) {
+      throw StateError('Ann\'s Override reached Ben');
+    }
     if (Notes(ben).byId(blood.id) != null ||
         Notes(ben).byId(loose.id)?.text != 'Fix the tap' ||
         Notes(ann).byId(milk.id)?.text != 'Buy milk') {
@@ -2274,7 +2295,7 @@ Future<void> _sharedFixture(Directory root) async {
     // Ann makes Ben a Manager, then removes him.
     final person = ann
         .people(area)
-        .firstWhere((p) => ann.personShown(p.id).name == 'Ben')
+        .firstWhere((p) => ann.personTheirs(p.id).name == 'Ben')
         .id;
     final roleAt = DateTime.utc(2026, 2, 1, 13);
     _held = roleAt;
@@ -2343,7 +2364,7 @@ Future<void> _sharedFixture(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'overrideAt': overrideAt.toIso8601String(), 'override': overridden, 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -3072,7 +3093,9 @@ Future<void> main(List<String> args) async {
     'log before (`before.jsonl`), what sharing wrote (`share.jsonl`, ids '
     'counted from 0x101, at a held clock), Ben\'s log (`joiner.jsonl`), the '
     'invite session (`request.json`, `answer.json`) with the Profiles '
-    'each then keeps, Ann renamed and publishing the Area\'s Profiles '
+    'each then keeps, Ann giving Ben a name and picture for herself alone '
+    '(`override.jsonl` with `override.jpg`, an Override that never reaches '
+    'him), Ann renamed and publishing the Area\'s Profiles '
     'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
     'from 2000) and what Ben keeps after reading it, what Ben wrote, '
     'allowed and not (`member.jsonl`), Ann filing a Note in '

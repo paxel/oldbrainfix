@@ -6,6 +6,7 @@ import 'announcements.dart';
 import 'auto_sync.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
+import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
 import 'profile.dart';
@@ -391,6 +392,13 @@ class _PeopleScreenState extends State<PeopleScreen> {
               subtitle: Text(
                 person.role == AreaRole.manager ? t.roleManager : t.roleMember,
               ),
+              // Another person's Profile opens from their line (#52).
+              onTap: person.id == _mine || !canOpenPerson(context, person.id)
+                  ? null
+                  : () async {
+                      await openPerson(context, person.id);
+                      if (mounted) setState(_load);
+                    },
               trailing: !_manages || person.id == _mine
                   ? null
                   : PopupMenuButton<_PersonAction>(

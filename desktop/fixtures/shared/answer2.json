@@ -82,14 +82,14 @@
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 45,
+      "dseq": 47,
       "entity": "note:00000000000000000000000000000004",
       "field": "place",
       "value": "area:00000000000000000000000000000101",
       "date": "2026-02-01T11:30:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:30:00.000Z",
-      "sig": "vWasG9MpAL0CekXWaYdycEnLYgnUo+HF6ASIbA5hRn4FYxnMlCn3LV3Pro+aGSe3pbxduJQ71CEWujufWFauDQ=="
+      "sig": "3GhkULI5E+GG6/WEJLYC73hbkLsIbUrYjWKAl5724T8y79Q48W7DkuwV1LcAan6CQ+xi2VNdKA/tbxQuhcTQBw=="
     }
   ],
   "wantBlobs": [],

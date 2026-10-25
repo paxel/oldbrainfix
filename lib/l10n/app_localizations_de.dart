@@ -2281,4 +2281,35 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shareCancelled => 'Es wurde nichts geteilt.';
+
+  @override
+  String get personVerified => 'Bestätigt: Code persönlich verglichen.';
+
+  @override
+  String get personNotVerified =>
+      'Nicht bestätigt: Vergleiche die Codes persönlich, um sicherzugehen.';
+
+  @override
+  String get personCodesDiffered =>
+      'Die Codes unterscheiden sich: Dieses Profil gehört vielleicht nicht der Person, die es nennt.';
+
+  @override
+  String get personForMe => 'Name und Bild für mich';
+
+  @override
+  String get personForMeDetail =>
+      'Nur du siehst sie, auf deinen eigenen Geräten. Name und Bild der Person bleiben, wie sie sind.';
+
+  @override
+  String get personForMeName => 'Name für mich';
+
+  @override
+  String get personForMePicture => 'Bild für mich ändern';
+
+  @override
+  String get personTheirPicture => 'Ihr eigenes Bild verwenden';
+
+  @override
+  String get profilePeopleEmpty =>
+      'Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
 }

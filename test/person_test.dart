@@ -1,0 +1,315 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
+import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/person_screen.dart';
+import 'package:oldbrainfix/src/profile_screen.dart';
+import 'package:oldbrainfix/src/sent_item_screen.dart';
+import 'package:oldbrainfix/src/share_area_screen.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+import 'fake_alarms.dart';
+import 'fake_profile.dart';
+import 'open_settings.dart';
+
+Map<String, Object?> wire(Map<String, Object?> json) =>
+    jsonDecode(jsonEncode(json)) as Map<String, Object?>;
+
+/// Reads and makes pictures right here, as the tests run on one isolate.
+final inline = PictureWork(
+  size: (bytes) async => pictureSize(bytes),
+  make: (bytes, left, top, size) async =>
+      makeProfilePicture(bytes, left: left, top: top, size: size),
+);
+
+void main() {
+  late Store ann;
+  late Store ben;
+  late String area;
+  late String benId;
+  late FakeProfilePlatform platform;
+
+  setUp(() {
+    ann = Store.inMemory()
+      ..starterSetOffered = true
+      ..alarmSetupDone = true
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ann');
+    ben = Store.inMemory()
+      ..starterSetOffered = true
+      ..alarmSetupDone = true
+      ..applyProfileDefaults(name: 'Pixel')
+      ..renameOwnProfile('Ben');
+    benId = ben.ownProfile!.id;
+    platform = FakeProfilePlatform(name: 'Desk', picked: halvesPng);
+    area = ann.share(Places(ann).addArea('Household').id);
+    // Ann's computer invites Ben's phone, as a LAN session would.
+    final done = answerSync(
+      ann,
+      wire(
+        syncRequest(
+          ben,
+          ann.versionVector(),
+          name: 'Phone',
+          hostDevice: ann.deviceId,
+          invited: true,
+        ),
+      ),
+      name: 'Desk',
+      inviting: Invite(area, role: AreaRole.member),
+    )!;
+    applyAnswer(ben, wire(done.answer), shared: true);
+    for (final (store, peer) in [(ann, ben), (ben, ann)]) {
+      store.rememberDevice(
+        PairedDevice(
+          id: peer.deviceId,
+          name: '',
+          fingerprint: '',
+          host: null,
+          port: null,
+          lastSync: DateTime.utc(2026, 3, 1),
+          shared: true,
+        ),
+      );
+    }
+  });
+  tearDown(() {
+    ann.close();
+    ben.close();
+  });
+
+  /// Ben's phone and Ann's computer sync once more, as paired.
+  void sync() {
+    final done = answerSync(
+      ann,
+      wire(
+        syncRequest(
+          ben,
+          ann.versionVector(),
+          name: 'Phone',
+          hostDevice: ann.deviceId,
+        ),
+      ),
+      name: 'Desk',
+    )!;
+    applyAnswer(ben, wire(done.answer), shared: true);
+  }
+
+  Future<void> tap(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+    await tester.tap(finder);
+    await tester.pumpAndSettle();
+  }
+
+  /// [home] inside the app's localizations and a [PersonScope] of Ann's.
+  Future<void> page(
+    WidgetTester tester,
+    Widget home, {
+    Locale locale = const Locale('en'),
+  }) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => PersonScope(
+          store: ann,
+          platform: platform,
+          work: inline,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: home,
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  PersonScreen person() =>
+      PersonScreen(store: ann, platform: platform, work: inline, id: benId);
+
+  testWidgets('a picture on a card opens the person\'s Profile, and the '
+      'name for me shows on the card', (tester) async {
+    final semantics = tester.ensureSemantics();
+    Notes(ben).capture('Ben buys bread', place: area);
+    sync();
+    await tester.pumpWidget(
+      OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
+    );
+    await tester.pumpAndSettle();
+    await tap(tester, find.byIcon(Icons.search));
+    await tap(tester, find.text('Household'));
+    await tap(tester, find.byKey(const ValueKey('author-open')));
+    expect(find.byType(PersonScreen), findsOneWidget);
+    expect(find.byType(NoteCard), findsNothing);
+    expect(find.text('Ben'), findsWidgets);
+    expect(find.text(ann.personCode(benId)!), findsOneWidget);
+    expect(find.textContaining('Not verified'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('overrideName')), 'Mum');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(ann.personShown(benId).name, 'Mum');
+    // Their own name stays on their Profile.
+    expect(find.byKey(const ValueKey('personName')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('personName'))).data,
+      'Ben',
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(NoteCard), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Written by Mum')), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('codes compared there mark the Profile verified', (tester) async {
+    await page(tester, person());
+    await tap(tester, find.byKey(const ValueKey('compare-codes')));
+    expect(find.textContaining(ann.personCode(benId)!), findsWidgets);
+    await tap(tester, find.byKey(const ValueKey('codes-match')));
+    expect(ann.personVerified(benId), isTrue);
+    expect(find.textContaining('Verified'), findsOneWidget);
+    expect(find.byKey(const ValueKey('compare-codes')), findsNothing);
+  });
+
+  testWidgets('codes that differ verify nobody', (tester) async {
+    await page(tester, person());
+    await tap(tester, find.byKey(const ValueKey('compare-codes')));
+    await tap(tester, find.byKey(const ValueKey('codes-differ')));
+    expect(ann.personVerified(benId), isFalse);
+  });
+
+  testWidgets('the picture for me is a square the user picks; their own '
+      'comes back', (tester) async {
+    await page(tester, person());
+    await tap(tester, find.byKey(const ValueKey('overridePicture')));
+    await tap(tester, find.text('Choose a picture'));
+    expect(find.byType(ProfileCropScreen), findsOneWidget);
+    await tap(tester, find.byKey(const ValueKey('cropUse')));
+    expect(find.byType(PersonScreen), findsOneWidget);
+    final picture = ann.personOverride(benId)!.picture!;
+    expect(pictureSize(picture), (width: 256, height: 256));
+    expect(ann.personShown(benId).picture, picture);
+    // Their own picture, the placeholder, still leads their Profile.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('personPicture')),
+        matching: find.byKey(const ValueKey('profilePlaceholder')),
+      ),
+      findsOneWidget,
+    );
+    await tap(tester, find.byKey(const ValueKey('overridePicture')));
+    await tap(tester, find.text('Use their own picture'));
+    expect(ann.personOverride(benId), isNull);
+  });
+
+  testWidgets('the name for me is kept when the page is left', (tester) async {
+    await page(tester, const SizedBox.shrink());
+    final context = tester.element(find.byType(SizedBox));
+    final opened = openPerson(context, benId);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('overrideName')), 'Mum');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await opened;
+    expect(ann.personShown(benId).name, 'Mum');
+  });
+
+  testWidgets('the people of a Shared Area open their Profile, the own '
+      'line not', (tester) async {
+    ann.setOverrideName(benId, 'Mum');
+    await page(tester, PeopleScreen(store: ann, areaId: area));
+    expect(find.text('Mum'), findsOneWidget);
+    await tap(tester, find.text('Ann (you)'));
+    expect(find.byType(PersonScreen), findsNothing);
+    await tap(tester, find.text('Mum'));
+    expect(find.byType(PersonScreen), findsOneWidget);
+  });
+
+  testWidgets('a Sent Item\'s sender opens their Profile once kept', (
+    tester,
+  ) async {
+    final file = sendNote(ben, Notes(ben).capture('Dentist').id);
+    final cid = Store.inMemory()..applyProfileDefaults(name: 'Cid');
+    addTearDown(cid.close);
+    // Cid never met Ben: nothing to open before accepting.
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => PersonScope(
+          store: cid,
+          platform: platform,
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: SentItemScreen(store: cid, opened: openSentItem(cid, file)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tap(tester, find.byKey(const ValueKey('sent-from-picture')));
+    expect(find.byType(PersonScreen), findsNothing);
+    // Ann keeps Ben's Profile: it opens, and the name for me set there
+    // shows in the preview after.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await page(
+      tester,
+      SentItemScreen(
+        store: ann,
+        opened: openSentItem(ann, file),
+        reopen: () => openSentItem(ann, file),
+      ),
+    );
+    await tap(tester, find.byKey(const ValueKey('sent-from-picture')));
+    expect(find.byType(PersonScreen), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('overrideName')), 'Mum');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('From Mum'), findsOneWidget);
+  });
+
+  testWidgets('People on the Profile page lists every stored Profile, the '
+      'name for me among them', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2600);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    ann.setOverrideName(benId, 'Mum');
+    await tester.pumpWidget(
+      OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
+    );
+    await tester.pumpAndSettle();
+    await openProfilePage(tester);
+    expect(find.byType(ProfileScreen), findsOneWidget);
+    await tap(tester, find.byKey(ValueKey('people-$benId')));
+    expect(find.byType(PersonScreen), findsOneWidget);
+    expect(find.text('Mum'), findsWidgets);
+  });
+
+  testWidgets('People says so while nobody is kept', (tester) async {
+    final alone = Store.inMemory()
+      ..starterSetOffered = true
+      ..alarmSetupDone = true;
+    addTearDown(alone.close);
+    await tester.pumpWidget(
+      OldBrainFixApp(store: alone, alarms: FakeAlarms(), profile: platform),
+    );
+    await tester.pumpAndSettle();
+    await openProfilePage(tester);
+    final empty = find.byKey(const ValueKey('peopleEmpty'));
+    await tester.ensureVisible(empty);
+    expect(empty, findsOneWidget);
+  });
+
+  testWidgets('fits a phone in German', (tester) async {
+    tester.view.physicalSize = const Size(720, 1280);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    ann.setOverrideName(benId, 'Mama');
+    await page(tester, person(), locale: const Locale('de'));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Name und Bild für mich'), findsOneWidget);
+    expect(find.text('Codes vergleichen'), findsOneWidget);
+  });
+}
