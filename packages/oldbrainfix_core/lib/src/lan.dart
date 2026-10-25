@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'conflicts.dart';
 import 'entry.dart';
 import 'pair_code.dart';
 import 'pairing.dart';
@@ -30,8 +31,9 @@ const deviceHeader = 'x-oldbrainfix-device';
 const formatHeader = 'x-oldbrainfix-format';
 
 /// The wire format this build speaks; a peer speaking another one is
-/// refused with the reason, never half understood.
-const syncFormat = 1;
+/// refused with the reason, never half understood. Format 2 carries the
+/// entries' causal contexts, which format 1 would refuse as forged.
+const syncFormat = 2;
 
 const pinFailuresPerAddress = 5;
 const pinFailuresTotal = 20;
@@ -42,7 +44,8 @@ const maxEntriesBytes = 64 << 20;
 const maxBlobBytes = 64 << 20;
 
 /// What one side of a session brought in: from whom, what was new here,
-/// the Moment before it, and what the signatures said.
+/// the Moment before it, what the signatures said, and the Conflicts
+/// what came in is part of.
 class SyncSession {
   /// The other Device's id and the name it goes by.
   final String peer;
@@ -50,6 +53,7 @@ class SyncSession {
   final List<Entry> applied;
   final Moment? moment;
   final ImportReport report;
+  final List<Conflict> conflicts;
 
   const SyncSession({
     required this.peer,
@@ -57,6 +61,7 @@ class SyncSession {
     required this.applied,
     required this.moment,
     required this.report,
+    this.conflicts = const [],
   });
 }
 
@@ -148,6 +153,7 @@ Map<String, Object?> syncRequest(
       applied: applied,
       moment: moment,
       report: report,
+      conflicts: store.conflictsAmong(applied),
     ),
   );
 }
@@ -176,6 +182,7 @@ SyncSession applyAnswer(Store store, Map<String, Object?> answer) {
       label: name,
     ),
     report: report,
+    conflicts: store.conflictsAmong(applied),
   );
 }
 

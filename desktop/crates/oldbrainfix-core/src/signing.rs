@@ -103,7 +103,8 @@ pub fn verify_signature(public_key: &[u8], message: &[u8], signature: Option<&st
 
 /// The bytes an entry's signature covers: a fixed-order JSON list, so a
 /// null value and an empty one differ. Dates go in as the store writes
-/// them.
+/// them. The causal context goes last, and only when there is one:
+/// entries without it keep the bytes they were signed with.
 #[allow(clippy::too_many_arguments)]
 pub fn entry_bytes(
     device: &str,
@@ -114,19 +115,22 @@ pub fn entry_bytes(
     date_iso: &str,
     author: &str,
     recorded_iso: &str,
+    ctx: Option<&str>,
 ) -> Vec<u8> {
-    serde_json::json!([
-        device,
-        dseq,
-        entity,
-        field,
-        value,
-        date_iso,
-        author,
-        recorded_iso
-    ])
-    .to_string()
-    .into_bytes()
+    let mut list = vec![
+        serde_json::json!(device),
+        serde_json::json!(dseq),
+        serde_json::json!(entity),
+        serde_json::json!(field),
+        serde_json::json!(value),
+        serde_json::json!(date_iso),
+        serde_json::json!(author),
+        serde_json::json!(recorded_iso),
+    ];
+    if let Some(ctx) = ctx {
+        list.push(serde_json::json!(ctx));
+    }
+    serde_json::Value::Array(list).to_string().into_bytes()
 }
 
 /// How far a pinned key is trusted: met in a payload some other Device
@@ -267,7 +271,7 @@ mod tests {
     fn a_signature_verifies_only_for_its_bytes_and_key() {
         let key = SigningKey::from_seed([7; 32]);
         let other = SigningKey::from_seed([8; 32]);
-        let bytes = entry_bytes("d", 1, "note:a", "text", Some("hi"), "x", "", "y");
+        let bytes = entry_bytes("d", 1, "note:a", "text", Some("hi"), "x", "", "y", None);
         let sig = key.sign(&bytes);
         assert!(verify_signature(&key.public_key(), &bytes, Some(&sig)));
         assert!(!verify_signature(&other.public_key(), &bytes, Some(&sig)));
@@ -288,8 +292,8 @@ mod tests {
 
     #[test]
     fn a_null_value_and_an_empty_one_sign_differently() {
-        let null = entry_bytes("d", 1, "e", "f", None, "x", "", "y");
-        let empty = entry_bytes("d", 1, "e", "f", Some(""), "x", "", "y");
+        let null = entry_bytes("d", 1, "e", "f", None, "x", "", "y", None);
+        let empty = entry_bytes("d", 1, "e", "f", Some(""), "x", "", "y", None);
         assert_eq!(
             String::from_utf8_lossy(&null),
             r#"["d",1,"e","f",null,"x","","y"]"#

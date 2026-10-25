@@ -18,9 +18,9 @@ use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, ClockTime, Day, Importance, Note, Notes, NotesGo, Occurrence, Places,
-    Recurrence, Routine, Routines, STARTER_SET, Schedule, Search, Section, SigningKey,
-    SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Importance, Note, Notes, NotesGo,
+    Occurrence, Places, Recurrence, Routine, Routines, STARTER_SET, Schedule, Search, Section,
+    SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
@@ -205,7 +205,28 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "unreadPhotos": blobs_json(&notes.unread_photos()?),
         "search": searched,
         "searchWithin": within,
+        "conflicts": conflicts_json(&store.conflicts()?),
     }))
+}
+
+/// Conflicts in the shape of the generator's `_conflicts`.
+fn conflicts_json(conflicts: &[Conflict]) -> Value {
+    json!(
+        conflicts
+            .iter()
+            .map(|c| json!({
+                "entity": c.entity,
+                "unit": c.unit,
+                "type": c.entity_type,
+                "versions": c.versions.iter().map(|v| json!({
+                    "entry": v.entry.id(),
+                    "device": v.entry.device,
+                    "recorded": dart_iso(v.entry.recorded_at),
+                    "values": v.values.iter().map(|(k, val)| (k.clone(), json!(val))).collect::<serde_json::Map<String, Value>>(),
+                })).collect::<Vec<_>>(),
+            }))
+            .collect::<Vec<_>>()
+    )
 }
 
 #[test]
@@ -234,6 +255,7 @@ fn every_logged_entry_verifies_and_signs_the_same_here() -> TestResult {
                 &e.date,
                 &e.author,
                 &e.recorded,
+                e.ctx.as_deref(),
             );
             assert!(
                 verify_signature(&key.public_key(), &bytes, e.sig.as_deref()),
@@ -261,7 +283,7 @@ fn awkward_text_signs_to_the_same_bytes_and_signature() -> TestResult {
     );
     assert_eq!(key.code(), fixture["code"].as_str().ok_or("code")?);
     let entries = fixture["entries"].as_array().ok_or("entries")?;
-    assert_eq!(entries.len(), 2);
+    assert_eq!(entries.len(), 4);
     for e in entries {
         let s = |k: &str| e[k].as_str().ok_or(format!("{k} is text"));
         let bytes = entry_bytes(
@@ -273,6 +295,7 @@ fn awkward_text_signs_to_the_same_bytes_and_signature() -> TestResult {
             s("date")?,
             s("author")?,
             s("recorded")?,
+            e["ctx"].as_str(),
         );
         assert_eq!(BASE64.encode(&bytes), s("bytes")?);
         assert_eq!(key.sign(&bytes), s("sig")?);
@@ -1131,7 +1154,17 @@ fn sync_device(
     key: fn() -> SigningKey,
     now: &str,
 ) -> Result<Store, Box<dyn std::error::Error>> {
-    let dir = fixtures().join("sync");
+    fixture_device("sync", name, key, now)
+}
+
+/// One Device of a two-Device fixture under `scenario`.
+fn fixture_device(
+    scenario: &str,
+    name: &str,
+    key: fn() -> SigningKey,
+    now: &str,
+) -> Result<Store, Box<dyn std::error::Error>> {
+    let dir = fixtures().join(scenario);
     let now = parse_time(now)?;
     let store = Store::in_memory(Box::new(move || now), move || Ok(key()))?;
     store.set_local_setting("author", "Ada")?;
@@ -1194,6 +1227,68 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
             map.remove("device");
         }
         assert_eq!(actual, expected, "{side}");
+    }
+    Ok(())
+}
+
+#[test]
+fn conflicts_are_found_and_picked_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    let dir = fixtures().join("conflicts");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let now = expected["now"].as_str().ok_or("now")?.to_string();
+    let host = fixture_device("conflicts", "host", writer_key, &now)?;
+    let joiner = fixture_device("conflicts", "joiner", joiner_key, &now)?;
+    let vector: std::collections::HashMap<String, i64> =
+        serde_json::from_value(read_json(&dir.join("vector.json"))?)?;
+    let request = read_json(&dir.join("request.json"))?;
+    assert_eq!(sync_request(&joiner, &vector, "Phone", "", "")?, request);
+
+    // Both sides find the same Conflicts at import, and nothing is
+    // written for them.
+    let (answer, session) = answer_sync(&host, &request, "Desk")?.ok_or("an answer")?;
+    assert_eq!(answer, read_json(&dir.join("answer.json"))?);
+    let back = apply_answer(&joiner, &answer)?;
+    let found = &expected["conflicts"];
+    assert_eq!(&conflicts_json(&session.conflicts), found);
+    assert_eq!(&conflicts_json(&back.conflicts), found);
+    assert_eq!(&conflicts_json(&host.conflicts()?), found);
+    assert_eq!(&conflicts_json(&joiner.conflicts()?), found);
+
+    // The host picks as the Dart core picked, to the same entries.
+    let mark = host.current_seq()?;
+    for pick in expected["picks"].as_array().ok_or("picks")? {
+        let entity = pick[0].as_str().ok_or("entity")?;
+        let unit = pick[1].as_str().ok_or("unit")?;
+        let index = pick[2].as_u64().ok_or("index")? as usize;
+        let conflict = host.conflict_on(entity, unit)?.ok_or("a conflict")?;
+        host.resolve_conflict(&conflict, &conflict.versions[index])?;
+    }
+    let ours: Vec<String> = host
+        .entries_after(mark)?
+        .iter()
+        .map(|e| serde_json::to_string(&e.wire()))
+        .collect::<Result<_, _>>()?;
+    let text = std::fs::read_to_string(dir.join("picks.jsonl"))?;
+    let theirs: Vec<&str> = text.lines().filter(|l| !l.is_empty()).collect();
+    assert_eq!(ours, theirs);
+    assert!(host.conflicts()?.is_empty());
+
+    // A second session carries the picks over: nothing open on either.
+    let request = sync_request(&joiner, &host.version_vector()?, "Phone", "", "")?;
+    let (answer, _) = answer_sync(&host, &request, "Desk")?.ok_or("an answer")?;
+    let back = apply_answer(&joiner, &answer)?;
+    assert!(back.conflicts.is_empty());
+    let mut after = expected["after"].clone();
+    if let Some(map) = after.as_object_mut() {
+        map.remove("device");
+    }
+    for (side, store) in [("host", &host), ("joiner", &joiner)] {
+        let mut actual = read(store)?;
+        if let Some(map) = actual.as_object_mut() {
+            map.remove("device");
+        }
+        assert_eq!(actual, after, "{side}");
     }
     Ok(())
 }

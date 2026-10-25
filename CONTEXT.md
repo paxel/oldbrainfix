@@ -136,6 +136,10 @@ _Avoid_: guest, viewer
 A single Note with its Routines or Reminders, sent as a file to another Old Brain Fix user outside any Shared Area. The receiver previews and accepts it; the sender may later send an update or a cancellation for it.
 _Avoid_: invite, share, bundle (a bundle is a sync transport)
 
+**Conflict**:
+Two versions of the same user-edited field written on different Devices without either having seen the other. The newest shows meanwhile; the user picks which one stays.
+_Avoid_: clash, merge conflict
+
 ### Privacy
 
 **App Lock**:

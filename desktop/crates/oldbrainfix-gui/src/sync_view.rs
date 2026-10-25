@@ -2,18 +2,23 @@
 //! view shows, with the pair code as a QR and as text and its PIN. A
 //! phone that is not paired yet gets the user's question first; a
 //! paired one, proven by its key, syncs straight away. Every session's joiner is remembered
-//! as a paired Device, and the paired Devices can be forgotten here.
+//! as a paired Device, and the paired Devices can be forgotten here. The
+//! Conflicts are listed here too, each version a button that keeps it.
 
 use std::net::IpAddr;
 
 use egui::{Color32, Rect, RichText, Ui, Vec2};
+use oldbrainfix_core::conflicts::{RADIUS, SCHEDULE_UNIT};
 use oldbrainfix_core::lan::{
     Host, JoinAsk, Request, Response, lan_address, new_pin, pair_code_lines,
 };
-use oldbrainfix_core::{PairedDevice, Store};
+use oldbrainfix_core::notes::keys as note_keys;
+use oldbrainfix_core::places::keys as place_keys;
+use oldbrainfix_core::{Conflict, Entry, Fields, PairedDevice, Routines, Store};
 
 use crate::app::{Wall, embossed};
 use crate::l10n::L10n;
+use crate::schedule_text::schedule_text;
 use crate::theme::Tones;
 
 /// What the user asked for in the view this frame.
@@ -23,6 +28,12 @@ pub enum SyncAction {
     Trust(bool),
     /// Forget the paired Device with this id.
     Forget(String),
+    /// Keep the version at `index` of the Conflict on `unit` of `entity`.
+    Keep {
+        entity: String,
+        unit: String,
+        index: usize,
+    },
 }
 
 /// The desktop's hosting state.
@@ -39,6 +50,10 @@ pub struct SyncHost {
     last: Option<(String, usize)>,
     /// Entries refused for their signatures in the last session.
     refused: usize,
+    /// Conflicts the last session's entries are part of.
+    found: usize,
+    /// The open Conflicts, read again whenever the log may have changed.
+    conflicts: Vec<Conflict>,
     /// The address to bind instead of the LAN one; tests use the
     /// loopback.
     pub bind: Option<IpAddr>,
@@ -51,6 +66,8 @@ impl SyncHost {
         self.error = None;
         self.last = None;
         self.refused = 0;
+        self.found = 0;
+        self.reload_conflicts(store);
         self.no_network = self.bind.is_none() && lan_address().is_none();
         match store
             .tls_identity()
@@ -77,6 +94,19 @@ impl SyncHost {
 
     pub fn host(&self) -> Option<&Host> {
         self.host.as_ref()
+    }
+
+    /// Reads the open Conflicts again.
+    pub fn reload_conflicts(&mut self, store: &Store) {
+        match store.conflicts() {
+            Ok(conflicts) => self.conflicts = conflicts,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// The open Conflicts as last read.
+    pub fn conflicts(&self) -> &[Conflict] {
+        &self.conflicts
     }
 
     /// The Device waiting for the user's answer.
@@ -146,7 +176,9 @@ impl SyncHost {
                     }
                 }
                 self.refused = session.report.refused_count();
+                self.found = session.conflicts.len();
                 self.last = Some((session.name, session.applied.len()));
+                self.reload_conflicts(store);
                 !session.applied.is_empty()
             }
             Err(e) => {
@@ -249,7 +281,50 @@ impl SyncHost {
                     if self.refused > 0 {
                         ui.label(RichText::new(t.sync_refused(self.refused as i64)).color(error));
                     }
+                    if self.found > 0 {
+                        ui.label(
+                            RichText::new(t.sync_conflicts_below(self.found as i64))
+                                .strong()
+                                .color(text),
+                        );
+                    }
                 }
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.conflicts_title()).strong().color(text));
+                    if self.conflicts.is_empty() {
+                        ui.label(RichText::new(t.conflicts_none()).color(weak));
+                    } else {
+                        ui.label(RichText::new(t.conflicts_intro()).color(weak));
+                    }
+                    for conflict in &self.conflicts {
+                        ui.add_space(4.0);
+                        ui.label(
+                            RichText::new(conflict_label(t, conflict))
+                                .strong()
+                                .color(text),
+                        );
+                        if let Some(note) = routine_note(store, conflict) {
+                            ui.label(RichText::new(note).color(text));
+                        }
+                        for (index, version) in conflict.versions.iter().enumerate() {
+                            let value = conflict_value(t, conflict, &version.values);
+                            let when = wall(version.entry.recorded_at)
+                                .format("%Y-%m-%d %H:%M")
+                                .to_string();
+                            let origin = conflict_origin(t, store, &version.entry, &when);
+                            let button = egui::Button::new(
+                                RichText::new(format!("{value}\n{origin}")).color(text),
+                            );
+                            if ui.add(button).on_hover_text(t.conflict_keep()).clicked() {
+                                action = Some(SyncAction::Keep {
+                                    entity: conflict.entity.clone(),
+                                    unit: conflict.unit.clone(),
+                                    index,
+                                });
+                            }
+                        }
+                    }
+                });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
                     let devices = store.paired_devices().unwrap_or_default();
@@ -285,6 +360,81 @@ impl Drop for SyncHost {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// What `conflict` is about: which field of which kind of thing.
+pub fn conflict_label(t: &L10n, conflict: &Conflict) -> &'static str {
+    match (conflict.entity_type.as_str(), conflict.unit.as_str()) {
+        (note_keys::TYPE_NOTE, note_keys::TEXT) => t.conflict_note_text(),
+        (note_keys::TYPE_SECTION, note_keys::TEXT) => t.conflict_section_text(),
+        (place_keys::TYPE_AREA, place_keys::NAME) => t.conflict_area_name(),
+        (place_keys::TYPE_TOPIC, place_keys::NAME) => t.conflict_topic_name(),
+        (NAMED_PLACE, place_keys::NAME) => t.conflict_place_name(),
+        (NAMED_PLACE, RADIUS) => t.conflict_place_radius(),
+        ("routine", SCHEDULE_UNIT) => t.conflict_schedule(),
+        _ => t.conflict_other(),
+    }
+}
+
+/// A Named Place's `$type`, the Dart core's `NamedPlaceKeys.typeNamedPlace`.
+const NAMED_PLACE: &str = "namedPlace";
+
+/// The text of the Note a schedule Conflict's Routine comes from.
+fn routine_note(store: &Store, conflict: &Conflict) -> Option<String> {
+    if conflict.unit != SCHEDULE_UNIT {
+        return None;
+    }
+    let routines = Routines::new(store);
+    let routine = routines.by_id(&conflict.entity).ok().flatten()?;
+    routines.note(&routine).ok().flatten().map(|n| n.text)
+}
+
+/// What a version holding `values` says, in words.
+pub fn conflict_value(
+    t: &L10n,
+    conflict: &Conflict,
+    values: &[(String, Option<String>)],
+) -> String {
+    if conflict.unit == SCHEDULE_UNIT {
+        return match Routines::schedule_of(&Fields::new(values.to_vec())) {
+            Some(schedule) => schedule_text(t, &schedule),
+            None => t.conflict_empty().to_string(),
+        };
+    }
+    let value = values
+        .first()
+        .and_then(|(_, v)| v.as_deref())
+        .unwrap_or_default();
+    if value.is_empty() {
+        return t.conflict_empty().to_string();
+    }
+    if conflict.unit == RADIUS
+        && let Ok(metres) = value.parse::<f64>()
+    {
+        return t.radius_metres(metres.round() as i64);
+    }
+    value.to_string()
+}
+
+/// Where and when `entry` was written: this Device, a paired Device by
+/// the name it goes by, or the author name it carries.
+pub fn conflict_origin(t: &L10n, store: &Store, entry: &Entry, when: &str) -> String {
+    if store.device_id().ok().as_deref() == Some(entry.device.as_str()) {
+        return t.conflict_on_this_device(when);
+    }
+    let paired = store
+        .paired_device(&entry.device)
+        .ok()
+        .flatten()
+        .map(|d| d.name)
+        .unwrap_or_default();
+    if !paired.is_empty() {
+        return t.conflict_on_device(&paired, when);
+    }
+    if !entry.author.is_empty() {
+        return t.conflict_on_device(&entry.author, when);
+    }
+    t.conflict_on_unnamed(when)
 }
 
 /// `value` as a QR code, `size` points wide, black on white.

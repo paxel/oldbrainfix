@@ -12,6 +12,7 @@
 
 pub mod alarms;
 pub mod blobs;
+pub mod conflicts;
 pub mod entry;
 pub mod error;
 pub mod lan;
@@ -30,6 +31,7 @@ pub mod store;
 pub mod sync;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
+pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
 pub use notes::{Blob, Importance, Note, Notes, Section};

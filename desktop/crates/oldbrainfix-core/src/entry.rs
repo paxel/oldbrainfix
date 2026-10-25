@@ -28,6 +28,11 @@ pub struct Entry {
     pub recorded: String,
     /// The writing Device's signature over the row (base64).
     pub sig: Option<String>,
+    /// The causal context of an edit to a field concurrent edits are a
+    /// Conflict on, as the Dart core's `Entry.ctx`: `<device>:<dseq>`
+    /// pairs by device, empty when only the writer had written the field;
+    /// `None` for a first write, other fields and older entries.
+    pub ctx: Option<String>,
     /// [`Entry::date`] read as an instant.
     pub date_at: DateTime<Utc>,
     /// [`Entry::recorded`] read as an instant.
@@ -52,6 +57,7 @@ impl Entry {
             date: self.date.clone(),
             author: self.author.clone(),
             recorded: self.recorded.clone(),
+            ctx: self.ctx.clone(),
             sig: self.sig.clone(),
         }
     }
@@ -68,6 +74,8 @@ pub struct WireEntry {
     pub date: String,
     pub author: String,
     pub recorded: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ctx: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sig: Option<String>,
 }

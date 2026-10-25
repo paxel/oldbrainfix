@@ -27,6 +27,32 @@
       "recorded": "2026-01-01T10:00:00.123456Z",
       "bytes": "WyI2NWI2MDY3M2Q2ZWQ4ODRiZjAxYzJjMjIyZDgyYWRhMCIsOCwibm90ZTowMDAxIiwidHJhc2hlZCIsbnVsbCwiMjAyNi0wMS0wMVQxMDowMDowMC4wMDBaIiwiIiwiMjAyNi0wMS0wMVQxMDowMDowMC4xMjM0NTZaIl0=",
       "sig": "Nbj6FjQTxAK/vsAfV4Fo8fshq40wwiukMt1U5uVyDnF+NoIpxhMTUkHUwMeW/wttI72m7r3ACi+VrfJFTL13AA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 9,
+      "entity": "note:0001",
+      "field": "text",
+      "value": "Edited",
+      "date": "2026-01-01T10:00:00.000Z",
+      "author": "",
+      "recorded": "2026-01-01T10:00:00.123456Z",
+      "ctx": "",
+      "bytes": "WyI2NWI2MDY3M2Q2ZWQ4ODRiZjAxYzJjMjIyZDgyYWRhMCIsOSwibm90ZTowMDAxIiwidGV4dCIsIkVkaXRlZCIsIjIwMjYtMDEtMDFUMTA6MDA6MDAuMDAwWiIsIiIsIjIwMjYtMDEtMDFUMTA6MDA6MDAuMTIzNDU2WiIsIiJd",
+      "sig": "b0hJwMmHUGOGkcIoPjQCZCafrtEl4/0+DPCoMSMQMyZFkCwFoUWduDq0XobzRqjHUzn/AaNW5f5VMq7VB//9CA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 9,
+      "entity": "note:0001",
+      "field": "text",
+      "value": "Edited",
+      "date": "2026-01-01T10:00:00.000Z",
+      "author": "",
+      "recorded": "2026-01-01T10:00:00.123456Z",
+      "ctx": "a1b2:3 c4d5:12",
+      "bytes": "WyI2NWI2MDY3M2Q2ZWQ4ODRiZjAxYzJjMjIyZDgyYWRhMCIsOSwibm90ZTowMDAxIiwidGV4dCIsIkVkaXRlZCIsIjIwMjYtMDEtMDFUMTA6MDA6MDAuMDAwWiIsIiIsIjIwMjYtMDEtMDFUMTA6MDA6MDAuMTIzNDU2WiIsImExYjI6MyBjNGQ1OjEyIl0=",
+      "sig": "IHELEIsbmD1mqEQaK1s6ZQVZgfQKMm38yONNgzv5ARdn02o61tYCa4V/bPNFks2OeSAIHnt3MM/1fkaLIK1CDQ=="
     }
   ]
 }

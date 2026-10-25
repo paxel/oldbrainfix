@@ -996,6 +996,19 @@ impl App {
                 }
             }
             Action::Sync(SyncAction::Forget(id)) => self.store.forget_device(&id)?,
+            Action::Sync(SyncAction::Keep {
+                entity,
+                unit,
+                index,
+            }) => {
+                if let Some(conflict) = self.store.conflict_on(&entity, &unit)?
+                    && let Some(version) = conflict.versions.get(index)
+                {
+                    self.store.resolve_conflict(&conflict, version)?;
+                }
+                self.sync.reload_conflicts(&self.store);
+                self.refresh();
+            }
         }
         Ok(())
     }

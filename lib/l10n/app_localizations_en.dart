@@ -1461,4 +1461,83 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get syncSettingsStay =>
       'Settings stay on each Device and are never synced.';
+
+  @override
+  String get conflictsTitle => 'Conflicts';
+
+  @override
+  String conflictsEntry(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count conflicts to settle',
+      one: '1 conflict to settle',
+      zero: 'No conflicts',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get conflictsIntro =>
+      'Two Devices changed the same thing before they synced. Tap the version that stays; until then the newer one shows.';
+
+  @override
+  String get conflictsNone => 'No conflicts. Every Device agrees.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count things were changed on both Devices. Tap to pick which versions stay.',
+      one: '1 thing was changed on both Devices. Tap to pick which version stays.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get conflictNoteText => 'Note text';
+
+  @override
+  String get conflictSectionText => 'Text added to a Note';
+
+  @override
+  String get conflictAreaName => 'Area name';
+
+  @override
+  String get conflictTopicName => 'Topic name';
+
+  @override
+  String get conflictPlaceName => 'Named Place name';
+
+  @override
+  String get conflictPlaceRadius => 'Named Place radius';
+
+  @override
+  String get conflictSchedule => 'Routine schedule';
+
+  @override
+  String get conflictOther => 'Change';
+
+  @override
+  String get conflictEmpty => '(empty)';
+
+  @override
+  String conflictOnThisDevice(String when) {
+    return 'On this Device, $when';
+  }
+
+  @override
+  String conflictOnDevice(String device, String when) {
+    return 'On $device, $when';
+  }
+
+  @override
+  String conflictOnUnnamed(String when) {
+    return 'On a Device without a name, $when';
+  }
+
+  @override
+  String get conflictKeep => 'Keep this version';
 }

@@ -1,0 +1,68 @@
+{
+  "format": 2,
+  "deviceId": "65b60673d6ed884bf01c2c222d82ada0",
+  "name": "Desk",
+  "entries": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 18,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "text",
+      "value": "Buy milk and eggs",
+      "date": "2026-01-01T10:00:28.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:28.000Z",
+      "ctx": "",
+      "sig": "YzZOpNy9ezgJ37+sHcZbkpZ90Bf+kUz1/SiwIRG+2f3scBhyYVVx9cHLTQGnK7ZC3kxabAgeqXj5jQyNh7hPCA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 19,
+      "entity": "area:00000000000000000000000000000003",
+      "field": "name",
+      "value": "House",
+      "date": "2026-01-01T10:00:29.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:29.000Z",
+      "ctx": "",
+      "sig": "LmWS4sJU8zsbQnACbM44ByIKXwXzOjiqTEcisA2sm5HD1TS5mfj0UexjsXtR9W/LUuCAgeunlaWq7jH6ptlgCA=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 20,
+      "entity": "routine:00000000000000000000000000000006",
+      "field": "times",
+      "value": "09:00",
+      "date": "2026-01-01T10:00:31.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:31.000Z",
+      "ctx": "",
+      "sig": "usEcoQCL9Z6pdxOQ9OcaLCSXtQZjsis0hjUQUHlBLZN6cyOQEa4dXtmaoIY2qLFqVUj7i8Z9MCRCtTIKCSBRCw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 21,
+      "entity": "note:00000000000000000000000000000002",
+      "field": "text",
+      "value": "Call mum tonight",
+      "date": "2026-01-01T10:00:33.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:33.000Z",
+      "ctx": "c945cbf2a5602002141e2fb9d17054d6:3",
+      "sig": "SqZJR4PHWPEcqPPiNNENeayOl3mlTFn+iWHOY2U2nwUe5nKRbbib8PoQkx4Z105kf8JSY3lnKST/w4SqVDY+Bg=="
+    }
+  ],
+  "wantBlobs": [],
+  "keys": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "key": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "sig": "A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ]
+}

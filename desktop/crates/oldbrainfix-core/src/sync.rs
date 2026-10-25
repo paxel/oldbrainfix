@@ -168,6 +168,7 @@ impl Store {
                     &e.date,
                     &e.author,
                     &e.recorded,
+                    e.ctx.as_deref(),
                 );
                 let signed = key.is_some_and(|k| verify_signature(&k, &bytes, e.sig.as_deref()));
                 if !signed {

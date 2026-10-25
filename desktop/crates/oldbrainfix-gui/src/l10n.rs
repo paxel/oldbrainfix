@@ -51,6 +51,7 @@ mod tests {
         ] {
             assert_ne!(en, de);
         }
+        assert_ne!(en.sync_conflicts_below(2), de.sync_conflicts_below(2));
         assert_eq!(de.close(), "Schließen");
     }
 }

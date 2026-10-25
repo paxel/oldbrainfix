@@ -108,5 +108,7 @@
   "syncRefuse": "Refuse",
   "syncCopyCode": "Copy the code",
   "unnamedDevice": "Unnamed Device",
-  "@unnamedDevice": {"description": "A paired Device that did not say its name."}
+  "@unnamedDevice": {"description": "A paired Device that did not say its name."},
+  "syncConflictsBelow": "{count, plural, =1{1 thing was changed on both Devices. Pick below which version stays.} other{{count} things were changed on both Devices. Pick below which versions stay.}}",
+  "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}}
 }

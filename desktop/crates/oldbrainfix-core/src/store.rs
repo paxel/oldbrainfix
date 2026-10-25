@@ -22,6 +22,7 @@ use rusqlite::{Connection, OptionalExtension, Row, params};
 use sha2::{Digest, Sha256};
 
 use crate::blobs::{Blobs, FileBlobs, MemoryBlobs};
+use crate::conflicts::{conflict_unit, conflict_unit_fields, encode_context};
 use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
 use crate::photos::strip_jpeg_metadata;
 use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
@@ -46,7 +47,8 @@ const SCHEMA: &str = "
         date     TEXT NOT NULL,
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
-        sig      TEXT
+        sig      TEXT,
+        ctx      TEXT
       );
       CREATE TABLE IF NOT EXISTS local_settings (
         key   TEXT PRIMARY KEY,
@@ -71,6 +73,11 @@ const SCHEMA: &str = "
 pub struct Fields(Vec<(String, Option<String>)>);
 
 impl Fields {
+    /// Fields holding `values`, in their order.
+    pub fn new(values: Vec<(String, Option<String>)>) -> Fields {
+        Fields(values)
+    }
+
     /// The current value of `field`; `None` when absent or cleared.
     pub fn get(&self, field: &str) -> Option<&str> {
         self.0
@@ -136,6 +143,19 @@ impl Store {
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
         db.execute_batch(SCHEMA)?;
+        // A log from before causal contexts were kept gains the column;
+        // its entries keep none.
+        let has_ctx = {
+            let mut stmt = db.prepare("PRAGMA table_info(entries)")?;
+            let names = stmt.query_map([], |r| r.get::<_, String>("name"))?;
+            names
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .iter()
+                .any(|n| n == "ctx")
+        };
+        if !has_ctx {
+            db.execute_batch("ALTER TABLE entries ADD COLUMN ctx TEXT")?;
+        }
         let store = Store {
             db: ReentrantMutex::new(db),
             clock,
@@ -298,7 +318,8 @@ impl Store {
     // --------------------------------------------------------------- log
 
     /// Appends one fact under this Device, signed as the Dart core signs.
-    /// `date` defaults to now.
+    /// `date` defaults to now. An edit to a field concurrent edits are a
+    /// Conflict on carries its causal context ([`Entry::ctx`]).
     pub fn append(
         &self,
         entity: &str,
@@ -309,7 +330,12 @@ impl Store {
         let db = self.db.lock();
         let now = self.now();
         let device = self.device_id()?;
-        let dseq = self.version_vector()?.get(&device).copied().unwrap_or(0) + 1;
+        let vector = self.version_vector()?;
+        let dseq = vector.get(&device).copied().unwrap_or(0) + 1;
+        let ctx = match conflict_unit(field) {
+            Some(unit) => self.context(entity, unit, &device, &vector)?,
+            None => None,
+        };
         let date_iso = dart_iso(date.unwrap_or(now));
         let recorded_iso = dart_iso(now);
         let author = self.author()?;
@@ -322,10 +348,11 @@ impl Store {
             &date_iso,
             &author,
             &recorded_iso,
+            ctx.as_deref(),
         ));
         db.execute(
-            "INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 device,
                 dseq,
@@ -335,7 +362,8 @@ impl Store {
                 date_iso,
                 author,
                 recorded_iso,
-                sig
+                sig,
+                ctx
             ],
         )?;
         self.entries(
@@ -346,12 +374,62 @@ impl Store {
         .ok_or_else(|| Error::Invalid("the appended entry is gone".into()))
     }
 
+    /// The causal context of a write to `unit` on `entity` by `device`
+    /// holding `vector`: how far it has seen every other Device that
+    /// wrote the unit here; `None` when nobody wrote it yet.
+    fn context(
+        &self,
+        entity: &str,
+        unit: &str,
+        device: &str,
+        vector: &HashMap<String, i64>,
+    ) -> Result<Option<String>> {
+        let fields = conflict_unit_fields(unit);
+        let writers: Vec<String> = {
+            let db = self.db.lock();
+            let marks = vec!["?"; fields.len()].join(", ");
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT device FROM entries WHERE entity = ? AND field IN ({marks})"
+            ))?;
+            let mut args: Vec<&str> = vec![entity];
+            args.extend(fields.iter().copied());
+            let rows = stmt.query_map(rusqlite::params_from_iter(args), |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        if writers.is_empty() {
+            return Ok(None);
+        }
+        let seen: Vec<(String, i64)> = writers
+            .into_iter()
+            .filter(|d| d != device)
+            .map(|d| {
+                let n = vector.get(&d).copied().unwrap_or(0);
+                (d, n)
+            })
+            .collect();
+        Ok(Some(encode_context(&seen)))
+    }
+
+    /// Which Device wrote which of `fields` on which entity, as (entity,
+    /// field, device), each once.
+    pub fn writers_of(&self, fields: &[&str]) -> Result<Vec<(String, String, String)>> {
+        let db = self.db.lock();
+        let marks = vec!["?"; fields.len()].join(", ");
+        let mut stmt = db.prepare(&format!(
+            "SELECT DISTINCT entity, field, device FROM entries WHERE field IN ({marks})"
+        ))?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(fields.iter()), |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Takes in an entry another Device wrote, as it is; one already held
     /// is skipped. Returns whether it was new.
     pub fn insert(&self, entry: &WireEntry) -> Result<bool> {
         let changed = self.db.lock().execute(
-            "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 entry.device,
                 entry.dseq,
@@ -361,7 +439,8 @@ impl Store {
                 entry.date,
                 entry.author,
                 entry.recorded,
-                entry.sig
+                entry.sig,
+                entry.ctx
             ],
         )?;
         Ok(changed > 0)
@@ -560,6 +639,7 @@ impl Store {
                 author: wire.author,
                 recorded: wire.recorded,
                 sig: wire.sig,
+                ctx: wire.ctx,
             });
         }
         Ok(out)
@@ -578,6 +658,7 @@ fn raw_row(r: &Row) -> rusqlite::Result<(i64, WireEntry)> {
             date: r.get("date")?,
             author: r.get("author")?,
             recorded: r.get("recorded")?,
+            ctx: r.get("ctx")?,
             sig: r.get("sig")?,
         },
     ))
@@ -636,6 +717,7 @@ pub(crate) mod tests {
             &e.date,
             &e.author,
             &e.recorded,
+            e.ctx.as_deref(),
         );
         let key = store.signing_key()?;
         assert!(verify_signature(
@@ -690,6 +772,44 @@ pub(crate) mod tests {
         })?;
         assert_eq!(again.device_id()?, device);
         assert_eq!(again.current("note:a", "text")?.as_deref(), Some("kept"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_store_from_before_contexts_gains_the_column() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("oldbrainfix.db");
+        drop(Store::open(&path, ticking(), || {
+            Ok(SigningKey::from_seed([1; 32]))
+        })?);
+        {
+            let db = Connection::open(&path)?;
+            db.execute_batch(
+                "DROP TABLE entries;
+                 CREATE TABLE entries (
+                   seq      INTEGER PRIMARY KEY AUTOINCREMENT,
+                   device   TEXT NOT NULL,
+                   dseq     INTEGER NOT NULL,
+                   entity   TEXT NOT NULL,
+                   field    TEXT NOT NULL,
+                   value    TEXT,
+                   date     TEXT NOT NULL,
+                   author   TEXT NOT NULL,
+                   recorded TEXT NOT NULL,
+                   sig      TEXT
+                 );
+                 INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded)
+                 VALUES ('d', 1, 'note:a', 'text', 'kept', '2026-01-01T00:00:00.000Z', '',
+                         '2026-01-01T00:00:00.000Z');",
+            )?;
+        }
+        let store = Store::open(&path, ticking(), || {
+            Err(Error::Invalid("no new key on reopen".into()))
+        })?;
+        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("kept"));
+        assert_eq!(store.history("note:a")?[0].ctx, None);
+        let edit = store.append("note:a", "text", Some("edited"), None)?;
+        assert_eq!(edit.ctx.as_deref(), Some("d:1"));
         Ok(())
     }
 

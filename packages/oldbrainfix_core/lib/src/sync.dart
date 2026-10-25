@@ -118,6 +118,7 @@ extension Sync on Store {
     dateIso: e.date.toUtc().toIso8601String(),
     author: e.author,
     recordedIso: e.recorded.toUtc().toIso8601String(),
+    ctx: e.ctx,
   );
 
   /// The blobs the log refers to whose bytes are not here, as

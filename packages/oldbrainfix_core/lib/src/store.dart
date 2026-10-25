@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'blobs.dart';
+import 'conflicts.dart';
 import 'entry.dart';
 import 'photos.dart';
 import 'signing.dart';
@@ -90,7 +91,8 @@ class Store {
         date     TEXT NOT NULL,
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
-        sig      TEXT
+        sig      TEXT,
+        ctx      TEXT
       );
       CREATE TABLE IF NOT EXISTS local_settings (
         key   TEXT PRIMARY KEY,
@@ -108,6 +110,12 @@ class Store {
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
     ''');
+    // A log from before causal contexts were kept gains the column; its
+    // entries keep none.
+    final columns = db.select('PRAGMA table_info(entries)');
+    if (!columns.any((c) => c['name'] == 'ctx')) {
+      db.execute('ALTER TABLE entries ADD COLUMN ctx TEXT');
+    }
     final store = Store._(db, clock, photos, audio);
     if (store.localSetting('device') == null) {
       final key = newKey();
@@ -216,10 +224,15 @@ class Store {
   // ----------------------------------------------------------------- log
 
   /// Appends one fact under this Device, signed. [date] defaults to now.
+  /// An edit to a field concurrent edits are a Conflict on carries its
+  /// causal context ([Entry.ctx]).
   Entry append(String entity, String field, String? value, {DateTime? date}) {
     final now = clock().toUtc();
     final device = deviceId;
-    final dseq = (versionVector()[device] ?? 0) + 1;
+    final vector = versionVector();
+    final dseq = (vector[device] ?? 0) + 1;
+    final unit = conflictUnit(field);
+    final ctx = unit == null ? null : _context(entity, unit, device, vector);
     final dateIso = (date ?? now).toUtc().toIso8601String();
     final recordedIso = now.toIso8601String();
     final sig = signingKey.sign(
@@ -232,12 +245,24 @@ class Store {
         dateIso: dateIso,
         author: author,
         recordedIso: recordedIso,
+        ctx: ctx,
       ),
     );
     _db.execute(
-      'INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [device, dseq, entity, field, value, dateIso, author, recordedIso, sig],
+      'INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        device,
+        dseq,
+        entity,
+        field,
+        value,
+        dateIso,
+        author,
+        recordedIso,
+        sig,
+        ctx,
+      ],
     );
     _changed();
     return _entries('SELECT * FROM entries WHERE device = ? AND dseq = ?', [
@@ -246,13 +271,38 @@ class Store {
     ]).single;
   }
 
+  /// The causal context of a write to [unit] on [entity] by [device]
+  /// holding [vector]: how far it has seen every other Device that wrote
+  /// the unit here; null when nobody wrote it yet.
+  String? _context(
+    String entity,
+    String unit,
+    String device,
+    Map<String, int> vector,
+  ) {
+    final fields = conflictUnitFields(unit);
+    final writers = {
+      for (final r in _db.select(
+        'SELECT DISTINCT device FROM entries WHERE entity = ? AND field IN '
+        '(${List.filled(fields.length, '?').join(', ')})',
+        [entity, ...fields],
+      ))
+        r['device'] as String,
+    };
+    if (writers.isEmpty) return null;
+    return encodeContext({
+      for (final d in writers)
+        if (d != device) d: vector[d] ?? 0,
+    });
+  }
+
   /// Takes in an entry another Device wrote, as it is; one already held
   /// by (device, dseq) is skipped. Returns whether it was new. The caller
   /// checks its signature first.
   bool insert(Entry e) {
     _db.execute(
-      'INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig, ctx) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         e.device,
         e.dseq,
@@ -263,6 +313,7 @@ class Store {
         e.author,
         e.recorded.toUtc().toIso8601String(),
         e.sig,
+        e.ctx,
       ],
     );
     final added = _db.updatedRows > 0;
@@ -291,6 +342,17 @@ class Store {
       [prefix.length, prefix],
     ))
       (r['entity'] as String, r['field'] as String),
+  ];
+
+  /// Which Device wrote which of [fields] on which entity, as (entity,
+  /// field, device), each once.
+  List<(String, String, String)> writersOf(List<String> fields) => [
+    for (final r in _db.select(
+      'SELECT DISTINCT entity, field, device FROM entries WHERE field IN '
+      '(${List.filled(fields.length, '?').join(', ')})',
+      fields,
+    ))
+      (r['entity'] as String, r['field'] as String, r['device'] as String),
   ];
 
   /// Whether any entry ever wrote [field].
@@ -427,6 +489,7 @@ class Store {
         author: r['author'] as String,
         recorded: DateTime.parse(r['recorded'] as String),
         sig: r['sig'] as String?,
+        ctx: r['ctx'] as String?,
       ),
   ];
 

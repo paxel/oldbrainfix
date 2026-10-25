@@ -185,3 +185,62 @@ fn the_sync_view_hosts_asks_pairs_and_forgets() -> TestResult {
     assert!(!harness.state().sync_host().hosting());
     Ok(())
 }
+
+/// Everything `from` holds that `to` lacks, taken in as a session would.
+fn send(from: &Store, to: &Store) -> TestResult {
+    to.apply_entries(
+        &oldbrainfix_core::sync::wire(&from.entries_since(&to.version_vector()?)?),
+        &from.key_records()?,
+        None,
+        &mut oldbrainfix_core::ImportReport::default(),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn the_sync_view_lists_the_conflicts_and_keeps_the_version_clicked() -> TestResult {
+    let desk = store(1)?;
+    let phone = store(2)?;
+    let note = Notes::new(&desk).capture("nees mor sauce", None, None)?;
+    send(&desk, &phone)?;
+    Notes::new(&phone).edit(&note.id, "From the phone")?;
+    Notes::new(&desk).edit(&note.id, "Edited at the desk")?;
+    send(&phone, &desk)?;
+    assert_eq!(desk.conflicts()?.len(), 1);
+
+    let mut app = App::new(desk, "en");
+    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
+    app.select(Selection::Sync);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    step_until(&mut harness, |app| app.sync_host().hosting())?;
+    harness.step();
+    assert!(shows(&harness, "Note text"));
+    assert!(shows(&harness, "On this Device, "));
+    assert!(shows(&harness, "On a Device without a name, "));
+    harness
+        .query_all_by_label_contains("From the phone")
+        .next()
+        .ok_or("the phone's version")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(shows(&harness, "No conflicts. Every Device agrees."));
+    let desk = harness.state().store();
+    assert!(desk.conflicts()?.is_empty());
+    assert_eq!(
+        Notes::new(desk).by_id(&note.id)?.map(|n| n.text).as_deref(),
+        Some("From the phone")
+    );
+    // The pick reaches the phone: nothing is open there either.
+    send(desk, &phone)?;
+    assert!(phone.conflicts()?.is_empty());
+    Ok(())
+}

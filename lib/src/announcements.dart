@@ -5,14 +5,18 @@ import 'l10n.dart';
 /// Everything the app has to say, oldest first. Only the first one is
 /// shown; the rest wait behind it (UI laws, "Announcements").
 class Announcements extends ChangeNotifier {
-  final _waiting = <String>[];
+  final _waiting = <(String, VoidCallback?)>[];
 
   /// The announcement on screen, if any.
-  String? get visible => _waiting.firstOrNull;
+  String? get visible => _waiting.firstOrNull?.$1;
 
-  /// Queues [text], already in the reader's language.
-  void announce(String text) {
-    _waiting.add(text);
+  /// What tapping the visible announcement opens, if anything.
+  VoidCallback? get visibleAction => _waiting.firstOrNull?.$2;
+
+  /// Queues [text], already in the reader's language. Tapping it
+  /// dismisses it and then runs [onTap], when there is one.
+  void announce(String text, {VoidCallback? onTap}) {
+    _waiting.add((text, onTap));
     notifyListeners();
   }
 
@@ -47,8 +51,8 @@ class AnnouncementsScope extends InheritedWidget {
 
 /// Shows the visible announcement at the top of the screen, under the
 /// status bar, and pushes [child] down below it. Tapping it dismisses
-/// it. Nothing ever comes from the bottom (adapted from Catlog's
-/// note strip).
+/// it and opens what it is about, if anything. Nothing ever comes from
+/// the bottom (adapted from Catlog's note strip).
 class AnnouncementStrip extends StatelessWidget {
   final Announcements announcements;
   final Widget child;
@@ -74,7 +78,14 @@ class AnnouncementStrip extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: text == null
                 ? const SizedBox(width: double.infinity)
-                : _Line(text: text, onTap: announcements.dismiss),
+                : _Line(
+                    text: text,
+                    onTap: () {
+                      final action = announcements.visibleAction;
+                      announcements.dismiss();
+                      action?.call();
+                    },
+                  ),
           ),
           Expanded(
             // The strip took the status bar's height; the page must not

@@ -167,5 +167,30 @@
     "topic:starter-meetings": [
       "note:00000000000000000000000000000002"
     ]
-  }
+  },
+  "conflicts": [
+    {
+      "entity": "note:00000000000000000000000000000001",
+      "unit": "text",
+      "type": "note",
+      "versions": [
+        {
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:13",
+          "device": "65b60673d6ed884bf01c2c222d82ada0",
+          "recorded": "2026-01-01T10:00:32.000Z",
+          "values": {
+            "text": "Buy milk and eggs"
+          }
+        },
+        {
+          "entry": "c945cbf2a5602002141e2fb9d17054d6:15",
+          "device": "c945cbf2a5602002141e2fb9d17054d6",
+          "recorded": "2026-01-01T10:00:31.000Z",
+          "values": {
+            "text": "Buy oat milk"
+          }
+        }
+      ]
+    }
+  ]
 }

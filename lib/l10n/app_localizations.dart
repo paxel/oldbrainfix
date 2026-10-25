@@ -2413,6 +2413,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings stay on each Device and are never synced.'**
   String get syncSettingsStay;
+
+  /// No description provided for @conflictsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflicts'**
+  String get conflictsTitle;
+
+  /// No description provided for @conflictsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No conflicts} =1{1 conflict to settle} other{{count} conflicts to settle}}'**
+  String conflictsEntry(int count);
+
+  /// No description provided for @conflictsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Two Devices changed the same thing before they synced. Tap the version that stays; until then the newer one shows.'**
+  String get conflictsIntro;
+
+  /// No description provided for @conflictsNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No conflicts. Every Device agrees.'**
+  String get conflictsNone;
+
+  /// No description provided for @syncConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 thing was changed on both Devices. Tap to pick which version stays.} other{{count} things were changed on both Devices. Tap to pick which versions stay.}}'**
+  String syncConflicts(int count);
+
+  /// No description provided for @conflictNoteText.
+  ///
+  /// In en, this message translates to:
+  /// **'Note text'**
+  String get conflictNoteText;
+
+  /// No description provided for @conflictSectionText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text added to a Note'**
+  String get conflictSectionText;
+
+  /// No description provided for @conflictAreaName.
+  ///
+  /// In en, this message translates to:
+  /// **'Area name'**
+  String get conflictAreaName;
+
+  /// No description provided for @conflictTopicName.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic name'**
+  String get conflictTopicName;
+
+  /// No description provided for @conflictPlaceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Named Place name'**
+  String get conflictPlaceName;
+
+  /// No description provided for @conflictPlaceRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Named Place radius'**
+  String get conflictPlaceRadius;
+
+  /// No description provided for @conflictSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine schedule'**
+  String get conflictSchedule;
+
+  /// No description provided for @conflictOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get conflictOther;
+
+  /// No description provided for @conflictEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'(empty)'**
+  String get conflictEmpty;
+
+  /// No description provided for @conflictOnThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On this Device, {when}'**
+  String conflictOnThisDevice(String when);
+
+  /// No description provided for @conflictOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On {device}, {when}'**
+  String conflictOnDevice(String device, String when);
+
+  /// No description provided for @conflictOnUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'On a Device without a name, {when}'**
+  String conflictOnUnnamed(String when);
+
+  /// No description provided for @conflictKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this version'**
+  String get conflictKeep;
 }
 
 class _AppLocalizationsDelegate

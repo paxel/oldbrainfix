@@ -583,8 +583,29 @@ Map<String, Object?> _expected(Store store) {
       for (final id in placeIds)
         id: [for (final n in Search(store).notes('e', within: id)) n.id],
     },
+    'conflicts': _conflicts(store.conflicts()),
   };
 }
+
+/// [conflicts] as the fixtures hold them: the raw values of every
+/// version, never formatted.
+List<Map<String, Object?>> _conflicts(List<Conflict> conflicts) => [
+  for (final c in conflicts)
+    {
+      'entity': c.entity,
+      'unit': c.unit,
+      'type': c.type,
+      'versions': [
+        for (final v in c.versions)
+          {
+            'entry': v.entry.id,
+            'device': v.entry.device,
+            'recorded': v.entry.recorded.toUtc().toIso8601String(),
+            'values': v.values,
+          },
+      ],
+    },
+];
 
 /// Writes the photos and voice recordings [store] holds as it keeps
 /// them, one file per blob named by its hash, under [out].
@@ -1175,6 +1196,129 @@ void _writeDevice(Store store, Directory dir, String name) {
   _writeBlobs(store, Directory('${dir.path}/$name'));
 }
 
+/// The joiner [a] and the host [b] sync, blobs included.
+void _meet(Store a, Store b) {
+  final done = answerSync(
+    b,
+    syncRequest(a, b.versionVector(), name: 'Phone'),
+    name: 'Desk',
+  )!;
+  applyAnswer(a, done.answer);
+  for (final ref in a.missingBlobs()) {
+    final (kind, hash) = splitBlobRef(ref);
+    if (b.blob(kind, hash) case final bytes?) a.putBlob(kind, hash, bytes);
+  }
+  for (final ref in (done.answer['wantBlobs'] as List).cast<String>()) {
+    final (kind, hash) = splitBlobRef(ref);
+    if (a.blob(kind, hash) case final bytes?) b.putBlob(kind, hash, bytes);
+  }
+}
+
+/// Two Devices that met once and edited the same things offline since,
+/// then a LAN session between them that finds the Conflicts, the host
+/// picking a version of each, and a second session that carries the
+/// picks over. Everything after the meeting is written at a held clock,
+/// so the desktop core writes the same picks.
+void _conflictsFixture(Directory root) {
+  final out = Directory('${root.path}/conflicts');
+  final host = _store();
+  final joiner = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    final milk = Notes(host).capture('Buy milk');
+    final mum = Notes(joiner).capture('Call mum');
+    final house = Places(host).addArea('Household');
+    final kitchen = Places(host).addTopic(house.id, 'Kitchen');
+    final pills = Routines(host).create(
+      'Pills',
+      Schedule(
+        start: Day(2026, 1, 5),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    _meet(joiner, host);
+    // Offline on both: the same text, the same Area name and the same
+    // schedule changed apart; the same value written on both; a Topic
+    // renamed on one side only.
+    Notes(joiner).edit(milk.id, 'Buy oat milk');
+    Notes(host).edit(milk.id, 'Buy milk and eggs');
+    Places(host).rename(house.id, 'House');
+    Places(joiner).rename(house.id, 'Home');
+    Routines(host).reschedule(
+      pills.id,
+      Schedule(
+        start: Day(2026, 1, 5),
+        times: [ClockTime(9, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Routines(joiner).reschedule(
+      pills.id,
+      Schedule(
+        start: Day(2026, 1, 5),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,TH'),
+      ),
+    );
+    Notes(host).edit(mum.id, 'Call mum tonight');
+    Notes(joiner).edit(mum.id, 'Call mum tonight');
+    Places(joiner).rename(kitchen.id, 'Cooking');
+
+    _writeDevice(host, out, 'host');
+    _writeDevice(joiner, out, 'joiner');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'host': _keySettings(host), 'joiner': _keySettings(joiner)})}\n',
+    );
+    _held = _tick.add(const Duration(days: 1));
+    final hostVector = host.versionVector();
+    final request = syncRequest(joiner, hostVector, name: 'Phone');
+    final done = answerSync(host, request, name: 'Desk')!;
+    _write(File('${out.path}/vector.json'), '${_json.convert(hostVector)}\n');
+    _write(File('${out.path}/request.json'), '${_json.convert(request)}\n');
+    _write(File('${out.path}/answer.json'), '${_json.convert(done.answer)}\n');
+    final back = applyAnswer(joiner, done.answer);
+    final found = _conflicts(host.conflicts());
+    if (jsonEncode(found) != jsonEncode(_conflicts(joiner.conflicts())) ||
+        jsonEncode(found) != jsonEncode(_conflicts(done.session.conflicts)) ||
+        jsonEncode(found) != jsonEncode(_conflicts(back.conflicts))) {
+      throw StateError('the two Devices of the conflicts fixture disagree');
+    }
+    // The host keeps the older version of each.
+    final mark = host.currentSeq();
+    final picks = [
+      for (final c in host.conflicts())
+        [c.entity, c.unit, c.versions.length - 1],
+    ];
+    for (final [entity, unit, index] in picks) {
+      final c = host.conflictOn(entity as String, unit as String)!;
+      host.resolveConflict(c, c.versions[index as int]);
+    }
+    final picked = StringBuffer();
+    for (final e in host.entriesAfter(mark)) {
+      picked.writeln(jsonEncode(e.toJson()));
+    }
+    _write(File('${out.path}/picks.jsonl'), picked.toString());
+    _meet(joiner, host);
+    final expected = _expected(host)..remove('device');
+    final joined = _expected(joiner)..remove('device');
+    if (jsonEncode(expected) != jsonEncode(joined) ||
+        host.conflicts().isNotEmpty) {
+      throw StateError('the picks of the conflicts fixture did not land');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({'now': _held?.toIso8601String(), 'conflicts': found, 'picks': picks, 'after': expected})}\n',
+    );
+  } finally {
+    host.close();
+    joiner.close();
+  }
+}
+
 /// Two Devices that met once and wrote more since, then one more LAN
 /// session between them: the logs and keys before it, the joiner's
 /// request, the host's answer, and what both read after it.
@@ -1196,24 +1340,7 @@ void _sync(Directory root) {
       photos: [_photo(5)],
       place: Places.starterId(PlaceKeys.typeTopic, 'meetings'),
     );
-    void meet(Store a, Store b) {
-      final done = answerSync(
-        b,
-        syncRequest(a, b.versionVector(), name: 'Phone'),
-        name: 'Desk',
-      )!;
-      applyAnswer(a, done.answer);
-      for (final ref in a.missingBlobs()) {
-        final (kind, hash) = splitBlobRef(ref);
-        if (b.blob(kind, hash) case final bytes?) a.putBlob(kind, hash, bytes);
-      }
-      for (final ref in (done.answer['wantBlobs'] as List).cast<String>()) {
-        final (kind, hash) = splitBlobRef(ref);
-        if (a.blob(kind, hash) case final bytes?) b.putBlob(kind, hash, bytes);
-      }
-    }
-
-    meet(joiner, host);
+    _meet(joiner, host);
     // Since then: edits on both sides, one of them on the same field.
     Notes(joiner).edit(milk.id, 'Buy oat milk');
     Notes(host).edit(milk.id, 'Buy milk and eggs');
@@ -1319,8 +1446,9 @@ String _schema(Directory work) {
   }
 }
 
-/// One entry with awkward text, signed by the writer's key, with the
-/// exact bytes the signature covers.
+/// Entries signed by the writer's key, with the exact bytes the
+/// signature covers: awkward text, a null value, and edits with an empty
+/// and a two-Device causal context.
 Map<String, Object?> _signing() {
   final key = SigningKey.fromSeed(_seed);
   const date = '2026-01-01T10:00:00.000Z';
@@ -1346,6 +1474,23 @@ Map<String, Object?> _signing() {
     author: '',
     recordedIso: recorded,
   );
+  final ctxBytes = [
+    for (final ctx in ['', 'a1b2:3 c4d5:12'])
+      (
+        ctx,
+        entryBytes(
+          device: device,
+          dseq: 9,
+          entity: 'note:0001',
+          field: 'text',
+          value: 'Edited',
+          dateIso: date,
+          author: '',
+          recordedIso: recorded,
+          ctx: ctx,
+        ),
+      ),
+  ];
   return {
     'seed': key.seedHex,
     'publicKey': key.publicBase64,
@@ -1376,6 +1521,20 @@ Map<String, Object?> _signing() {
         'bytes': base64.encode(nullBytes),
         'sig': key.sign(nullBytes),
       },
+      for (final (ctx, bytes) in ctxBytes)
+        {
+          'device': device,
+          'dseq': 9,
+          'entity': 'note:0001',
+          'field': 'text',
+          'value': 'Edited',
+          'date': date,
+          'author': '',
+          'recorded': recorded,
+          'ctx': ctx,
+          'bytes': base64.encode(bytes),
+          'sig': key.sign(bytes),
+        },
     ],
   };
 }
@@ -1444,7 +1603,13 @@ void main(List<String> args) {
     '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
     'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
     'request (with its proof for the PIN 246810), the host\'s answer, and what both read after the joiner took '
-    'it in (`expected.json`).\n',
+    'it in (`expected.json`).\n'
+    '- `conflicts/`: two Devices that met once, then edited the same Note '
+    'text, Area name and Routine schedule apart, wrote the same value on '
+    'both sides and renamed a Topic on one side only: their logs, the '
+    'session between them, the Conflicts both find (`expected.json`), the '
+    'host keeping the older version of each (`picks.jsonl`, at the '
+    'held clock), and what both read after a second session.\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -1467,6 +1632,7 @@ void main(List<String> args) {
   );
   _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
   _sync(root);
+  _conflictsFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
+import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
@@ -207,6 +209,135 @@ void main() {
     await tester.pumpAndSettle();
     expect(joined, isEmpty);
     expect(announcements.visible, startsWith('No code found in the photo.'));
+  });
+
+  Future<void> syncNow(WidgetTester tester) async {
+    await tester.enterText(find.byKey(const ValueKey('code')), code);
+    await tester.tap(find.byKey(const ValueKey('join')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a sync that finds Conflicts leads to them from the top', (
+    tester,
+  ) async {
+    await open(tester);
+    await syncNow(tester);
+    final note = Notes(phone).all().single;
+    Notes(phone).edit(note.id, 'From the phone');
+    Notes(desk).edit(note.id, 'Edited at the desk');
+    announcements.dismiss();
+    await syncNow(tester);
+    expect(announcements.visible, startsWith('Synced with Desk: '));
+    announcements.dismiss();
+    await tester.pumpAndSettle();
+    const found =
+        '1 thing was changed on both Devices. Tap to pick which version stays.';
+    expect(announcements.visible, found);
+    expect(find.text('1 conflict to settle'), findsOneWidget);
+
+    await tester.tap(find.text(found));
+    await tester.pumpAndSettle();
+    expect(find.byType(ConflictsScreen), findsOneWidget);
+    expect(announcements.visible, isNull);
+    expect(find.text('Note text'), findsOneWidget);
+    expect(find.text('Edited at the desk'), findsOneWidget);
+    expect(find.text('From the phone'), findsOneWidget);
+    expect(find.textContaining('On Desk, '), findsOneWidget);
+    expect(find.textContaining('On this Device, '), findsOneWidget);
+    // Meanwhile the newer one shows.
+    expect(Notes(phone).byId(note.id)?.text, 'Edited at the desk');
+
+    await tester.tap(find.text('From the phone'));
+    await tester.pumpAndSettle();
+    expect(find.text('No conflicts. Every Device agrees.'), findsOneWidget);
+    expect(Notes(phone).byId(note.id)?.text, 'From the phone');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('No conflicts'), findsOneWidget);
+
+    // The next sync carries the pick to the desk; nothing is open there.
+    await syncNow(tester);
+    expect(desk.conflicts(), isEmpty);
+    expect(Notes(desk).byId(note.id)?.text, 'From the phone');
+  });
+
+  testWidgets('the Conflicts show every kind of thing in words', (
+    tester,
+  ) async {
+    final routine = Routines(desk).create(
+      'Pills',
+      Schedule(
+        start: Day(2026, 3, 2),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    final home = NamedPlaces(desk)
+        .add('Home', Coordinates(52.5, 13.4), radius: 100);
+    await open(tester);
+    await syncNow(tester);
+    Routines(phone).reschedule(
+      routine.id,
+      Schedule(
+        start: Day(2026, 3, 2),
+        times: [ClockTime(9, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    Routines(desk).reschedule(
+      routine.id,
+      Schedule(start: Day(2026, 3, 2), times: [ClockTime(8, 0)]),
+    );
+    NamedPlaces(phone).setRadius(home.id, 250);
+    NamedPlaces(desk).setRadius(home.id, 50);
+    await syncNow(tester);
+    await tester.tap(find.byKey(const ValueKey('conflicts')));
+    await tester.pumpAndSettle();
+    expect(find.text('Routine schedule'), findsOneWidget);
+    expect(find.text('Pills'), findsOneWidget);
+    expect(find.textContaining('09:00'), findsOneWidget);
+    expect(find.text('Named Place radius'), findsOneWidget);
+    expect(find.text('250 m'), findsOneWidget);
+    expect(find.text('50 m'), findsOneWidget);
+  });
+
+  testWidgets('a Conflict about a closed locked Area stays out', (
+    tester,
+  ) async {
+    final area = Places(phone).addArea('Doctor');
+    final note = Notes(phone).capture('Blood test', place: area.id);
+    desk.applyEntries(phone.entriesSince(const {}), keys: [phone.ownKeyRecord]);
+    Notes(phone).edit(note.id, 'Blood test on Monday');
+    Notes(desk).edit(note.id, 'Blood test on Tuesday');
+    phone.applyEntries(desk.entriesSince(const {}), keys: [desk.ownKeyRecord]);
+    expect(phone.conflicts(), hasLength(1));
+    phone.setPin('1234', iterations: 1);
+    phone.setAreaLocked(area.id, true);
+    final lock = AppLock(store: phone);
+    addTearDown(lock.dispose);
+
+    Future<void> show(Key key) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: LockScope(
+            lock: lock,
+            child: ConflictsScreen(key: key, store: phone),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await show(const ValueKey('closed'));
+    expect(find.text('Note text'), findsNothing);
+    expect(find.text('No conflicts. Every Device agrees.'), findsOneWidget);
+    lock.openArea(area.id);
+    await show(const ValueKey('open'));
+    expect(find.text('Note text'), findsOneWidget);
+    expect(find.text('Blood test on Tuesday'), findsOneWidget);
   });
 
   testWidgets('Sync opens from Settings', (tester) async {

@@ -1,0 +1,84 @@
+{
+  "format": 2,
+  "deviceId": "c945cbf2a5602002141e2fb9d17054d6",
+  "name": "Phone",
+  "proof": "tPxvoggZf07YxagdYRBXetMGr8vvwj8fAfnjOIatD0PyMmRY9Ahvyevf8GGdm/IybcBkpyNvJa2cnFpDgXwpBw==",
+  "vector": {
+    "65b60673d6ed884bf01c2c222d82ada0": 17,
+    "c945cbf2a5602002141e2fb9d17054d6": 8
+  },
+  "entries": [
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 4,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "text",
+      "value": "Buy oat milk",
+      "date": "2026-01-01T10:00:27.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:27.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:17",
+      "sig": "Dudae8KQvKvTwExQlh5nXbshQeuCOOCM5MoweAB1RTUn//yT19OZUk0VuAaelqNHvx0pXaKRiE97WOt7bdEaAA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 5,
+      "entity": "area:00000000000000000000000000000003",
+      "field": "name",
+      "value": "Home",
+      "date": "2026-01-01T10:00:30.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:30.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:17",
+      "sig": "IjwAtZC9BQVkXqwZb5h45TnU4zSGXK1EaT8G3owwC4IYbcep+Yox7OPzWqWGnJiw5PbN0E2xai0tQr+z413KBw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 6,
+      "entity": "routine:00000000000000000000000000000006",
+      "field": "rule",
+      "value": "FREQ=WEEKLY;BYDAY=MO,TH",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:32.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:17",
+      "sig": "eap1NwSfHzHgJ3NamKXaY2/WamIghM3PI2vNw/RIAjAO77fQ/OiOBFZC525iwoTemsmbuMh5MoJpnnKtlL8aAw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 7,
+      "entity": "note:00000000000000000000000000000002",
+      "field": "text",
+      "value": "Call mum tonight",
+      "date": "2026-01-01T10:00:34.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:34.000Z",
+      "ctx": "",
+      "sig": "H/zrMgNVhOuOJpemwJQnT90o5Uxwjikr72L8q1jupeN5B73ZV1NBnWBWhfvWcIbNfyVlA6ZDqRFxwggDJ3n+DA=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 8,
+      "entity": "topic:00000000000000000000000000000004",
+      "field": "name",
+      "value": "Cooking",
+      "date": "2026-01-01T10:00:35.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:35.000Z",
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:17",
+      "sig": "EqxZ31o/6LP84vb91ktuJGuxGywVG7BK6RaPjJaM9ItGwbumVQL6MIBLrmVKHWqcpMFCBWCXoH9C+/MEkHvxCw=="
+    }
+  ],
+  "keys": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "key": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "sig": "A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ]
+}

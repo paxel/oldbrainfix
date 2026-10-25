@@ -61,5 +61,6 @@
   "syncTrust": "Vertrauen",
   "syncRefuse": "Ablehnen",
   "syncCopyCode": "Code kopieren",
-  "unnamedDevice": "Unbenanntes Gerät"
+  "unnamedDevice": "Unbenanntes Gerät",
+  "syncConflictsBelow": "{count, plural, =1{1 Sache wurde auf beiden Geräten geändert. Wähle unten, welche Fassung bleibt.} other{{count} Sachen wurden auf beiden Geräten geändert. Wähle unten, welche Fassungen bleiben.}}"
 }

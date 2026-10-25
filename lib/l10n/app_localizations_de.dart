@@ -1472,4 +1472,83 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get syncSettingsStay =>
       'Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.';
+
+  @override
+  String get conflictsTitle => 'Konflikte';
+
+  @override
+  String conflictsEntry(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Konflikte zu klären',
+      one: '1 Konflikt zu klären',
+      zero: 'Keine Konflikte',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get conflictsIntro =>
+      'Zwei Geräte haben dasselbe geändert, bevor sie sich synchronisiert haben. Tippe auf die Fassung, die bleibt; bis dahin wird die neuere gezeigt.';
+
+  @override
+  String get conflictsNone => 'Keine Konflikte. Alle Geräte sind sich einig.';
+
+  @override
+  String syncConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Sachen wurden auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassungen bleiben.',
+      one: '1 Sache wurde auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassung bleibt.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get conflictNoteText => 'Text einer Notiz';
+
+  @override
+  String get conflictSectionText => 'Zur Notiz hinzugefügter Text';
+
+  @override
+  String get conflictAreaName => 'Name eines Bereichs';
+
+  @override
+  String get conflictTopicName => 'Name eines Themas';
+
+  @override
+  String get conflictPlaceName => 'Name eines benannten Orts';
+
+  @override
+  String get conflictPlaceRadius => 'Umkreis eines benannten Orts';
+
+  @override
+  String get conflictSchedule => 'Plan einer Routine';
+
+  @override
+  String get conflictOther => 'Änderung';
+
+  @override
+  String get conflictEmpty => '(leer)';
+
+  @override
+  String conflictOnThisDevice(String when) {
+    return 'Auf diesem Gerät, $when';
+  }
+
+  @override
+  String conflictOnDevice(String device, String when) {
+    return 'Auf $device, $when';
+  }
+
+  @override
+  String conflictOnUnnamed(String when) {
+    return 'Auf einem Gerät ohne Namen, $when';
+  }
+
+  @override
+  String get conflictKeep => 'Diese Fassung behalten';
 }

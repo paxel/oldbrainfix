@@ -36,6 +36,14 @@ class Entry {
   /// The writing Device's signature over the row (base64).
   final String? sig;
 
+  /// The causal context of an edit to a field concurrent edits are a
+  /// Conflict on ([conflictUnit]): how far the writer had seen each other
+  /// Device that wrote the field, as `<device>:<dseq>` pairs by device,
+  /// space-separated; empty when only the writer itself had. Null for the
+  /// first write of such a field, for every other field, and for entries
+  /// written before contexts were kept.
+  final String? ctx;
+
   /// Identity on the wire.
   String get id => '$device:$dseq';
 
@@ -50,6 +58,7 @@ class Entry {
     required this.author,
     required this.recorded,
     this.sig,
+    this.ctx,
   });
 
   @override
@@ -67,6 +76,7 @@ class Entry {
     'date': date.toIso8601String(),
     'author': author,
     'recorded': recorded.toIso8601String(),
+    if (ctx != null) 'ctx': ctx,
     if (sig != null) 'sig': sig,
   };
 
@@ -81,5 +91,6 @@ class Entry {
     author: json['author'] as String,
     recorded: DateTime.parse(json['recorded'] as String),
     sig: json['sig'] as String?,
+    ctx: json['ctx'] as String?,
   );
 }

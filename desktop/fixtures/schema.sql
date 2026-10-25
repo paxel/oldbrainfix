@@ -8,7 +8,8 @@ CREATE TABLE entries (
         date     TEXT NOT NULL,
         author   TEXT NOT NULL,
         recorded TEXT NOT NULL,
-        sig      TEXT
+        sig      TEXT,
+        ctx      TEXT
       );
 CREATE UNIQUE INDEX idx_entries_device_dseq
         ON entries (device, dseq);

@@ -86,7 +86,9 @@ bool verifySignature(
 
 /// The bytes an entry's signature covers: a fixed-order JSON list, so
 /// a null value and an empty one differ and free text needs no escaping
-/// rules of its own. Dates go in as the store writes them.
+/// rules of its own. Dates go in as the store writes them. The causal
+/// context [ctx] goes last, and only when there is one: entries without
+/// it keep the bytes they were signed with.
 Uint8List entryBytes({
   required String device,
   required int dseq,
@@ -96,6 +98,7 @@ Uint8List entryBytes({
   required String dateIso,
   required String author,
   required String recordedIso,
+  String? ctx,
 }) => Uint8List.fromList(
   utf8.encode(
     jsonEncode([
@@ -107,6 +110,7 @@ Uint8List entryBytes({
       dateIso,
       author,
       recordedIso,
+      ?ctx,
     ]),
   ),
 );

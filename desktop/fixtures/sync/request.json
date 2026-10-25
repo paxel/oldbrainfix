@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "deviceId": "c945cbf2a5602002141e2fb9d17054d6",
   "name": "Phone",
   "proof": "5j6AQVNKnP9PSJglUkHC60PclIm7BM755EuZncibvM5rQ4PBVOjrsW0mbmJzUSA2/VdSo5LeYrpH3Fr4IYGwAg==",
@@ -17,7 +17,8 @@
       "date": "2026-01-01T10:00:31.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:31.000Z",
-      "sig": "QbSGIbTFSlT40Aitl6sf6PGubDpg4J3XgffGZ8sQKb/X/1q99WA9XjgWe9gLpDeBdEEQs/tQy3uIUbW94ZunAg=="
+      "ctx": "",
+      "sig": "FoGrEUzbur00uvvbEjLd3qoneZglwgqDNjrHQoICqr7QsNWy7vo1sadudyF0LkkzKImTs0OO+57dHasKkMt+Dw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -28,7 +29,8 @@
       "date": "2026-01-01T10:00:33.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:33.000Z",
-      "sig": "IScjpXcZJtHJ9FwLRSxZbnfthBD8a84iXFHVbUxtkgQ/yBw8kQUKFC2Oj9WIx8wtVX3MMqYZyE80NzqPSe0ZBA=="
+      "ctx": "65b60673d6ed884bf01c2c222d82ada0:12",
+      "sig": "ffaGTh4pZk0SGXxkIZ4dBTCRk043OBaTFRqbYQgcjurf//uciK7+nB+2ga13utbc0h9eeOs2P5qGp87yXrHkBw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",

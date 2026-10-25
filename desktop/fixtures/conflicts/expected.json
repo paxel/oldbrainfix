@@ -1,0 +1,203 @@
+{
+  "now": "2026-01-02T10:00:35.000Z",
+  "conflicts": [
+    {
+      "entity": "area:00000000000000000000000000000003",
+      "unit": "name",
+      "type": "area",
+      "versions": [
+        {
+          "entry": "c945cbf2a5602002141e2fb9d17054d6:5",
+          "device": "c945cbf2a5602002141e2fb9d17054d6",
+          "recorded": "2026-01-01T10:00:30.000Z",
+          "values": {
+            "name": "Home"
+          }
+        },
+        {
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:19",
+          "device": "65b60673d6ed884bf01c2c222d82ada0",
+          "recorded": "2026-01-01T10:00:29.000Z",
+          "values": {
+            "name": "House"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "note:00000000000000000000000000000001",
+      "unit": "text",
+      "type": "note",
+      "versions": [
+        {
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:18",
+          "device": "65b60673d6ed884bf01c2c222d82ada0",
+          "recorded": "2026-01-01T10:00:28.000Z",
+          "values": {
+            "text": "Buy milk and eggs"
+          }
+        },
+        {
+          "entry": "c945cbf2a5602002141e2fb9d17054d6:4",
+          "device": "c945cbf2a5602002141e2fb9d17054d6",
+          "recorded": "2026-01-01T10:00:27.000Z",
+          "values": {
+            "text": "Buy oat milk"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "routine:00000000000000000000000000000006",
+      "unit": "schedule",
+      "type": "routine",
+      "versions": [
+        {
+          "entry": "c945cbf2a5602002141e2fb9d17054d6:6",
+          "device": "c945cbf2a5602002141e2fb9d17054d6",
+          "recorded": "2026-01-01T10:00:32.000Z",
+          "values": {
+            "start": "2026-01-05",
+            "times": "08:00",
+            "rule": "FREQ=WEEKLY;BYDAY=MO,TH"
+          }
+        },
+        {
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:20",
+          "device": "65b60673d6ed884bf01c2c222d82ada0",
+          "recorded": "2026-01-01T10:00:31.000Z",
+          "values": {
+            "start": "2026-01-05",
+            "times": "09:00",
+            "rule": "FREQ=DAILY"
+          }
+        }
+      ]
+    }
+  ],
+  "picks": [
+    [
+      "area:00000000000000000000000000000003",
+      "name",
+      1
+    ],
+    [
+      "note:00000000000000000000000000000001",
+      "text",
+      1
+    ],
+    [
+      "routine:00000000000000000000000000000006",
+      "schedule",
+      1
+    ]
+  ],
+  "after": {
+    "now": "2026-01-02T10:00:35.000Z",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000003",
+        "name": "House",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": [
+          {
+            "id": "topic:00000000000000000000000000000004",
+            "areaId": "area:00000000000000000000000000000003",
+            "name": "Cooking",
+            "starter": null
+          }
+        ]
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000001",
+        "text": "Buy oat milk",
+        "captured": "2026-01-01T10:00:01.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Call mum tonight",
+        "captured": "2026-01-01T10:00:05.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000005",
+        "text": "Pills",
+        "captured": "2026-01-01T10:00:14.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000001",
+      "note:00000000000000000000000000000002"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000003": [],
+      "topic:00000000000000000000000000000004": []
+    },
+    "sections": {
+      "note:00000000000000000000000000000005": [],
+      "note:00000000000000000000000000000002": [],
+      "note:00000000000000000000000000000001": []
+    },
+    "untranscribed": [],
+    "unreadPhotos": [],
+    "search": {
+      "": [
+        "note:00000000000000000000000000000005",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000001"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": []
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000003": [],
+      "topic:00000000000000000000000000000004": []
+    },
+    "conflicts": []
+  }
+}

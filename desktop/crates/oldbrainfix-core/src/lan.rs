@@ -29,6 +29,7 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::conflicts::Conflict;
 use crate::entry::WireEntry;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
@@ -36,7 +37,9 @@ use crate::sync::{Moment, cause, split_blob_ref, wire};
 use crate::{Error, Result};
 
 /// The wire format this build speaks, the Dart core's `syncFormat`.
-pub const SYNC_FORMAT: i64 = 1;
+/// Format 2 carries the entries' causal contexts, which format 1 would
+/// refuse as forged.
+pub const SYNC_FORMAT: i64 = 2;
 
 pub const PIN_FAILURES_PER_ADDRESS: u32 = 5;
 pub const PIN_FAILURES_TOTAL: u32 = 20;
@@ -740,7 +743,7 @@ fn read_chunked<R: BufRead>(reader: &mut R, limit: usize) -> std::io::Result<Opt
 // ------------------------------------------------------------- store side
 
 /// What one side of a session brought in, as the Dart core's
-/// `SyncSession`.
+/// `SyncSession`, with the Conflicts what came in is part of.
 #[derive(Debug, Clone)]
 pub struct Session {
     /// The other Device's id and the name it goes by.
@@ -749,6 +752,7 @@ pub struct Session {
     pub applied: Vec<WireEntry>,
     pub moment: Option<Moment>,
     pub report: ImportReport,
+    pub conflicts: Vec<Conflict>,
 }
 
 fn vector_of(value: Option<&Value>) -> HashMap<String, i64> {
@@ -842,6 +846,7 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
         "wantBlobs": store.missing_blobs()?,
         "keys": keys_json(store)?,
     });
+    let conflicts = store.conflicts_among(&applied)?;
     Ok(Some((
         answer,
         Session {
@@ -850,6 +855,7 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
             applied,
             moment,
             report,
+            conflicts,
         },
     )))
 }
@@ -868,12 +874,14 @@ pub fn apply_answer(store: &Store, answer: &Value) -> Result<Session> {
         &mut report,
     )?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&name))?;
+    let conflicts = store.conflicts_among(&applied)?;
     Ok(Session {
         peer: host,
         name,
         applied,
         moment,
         report,
+        conflicts,
     })
 }
 
@@ -1199,7 +1207,7 @@ mod tests {
     #[test]
     fn another_format_is_refused_with_its_reason() -> TestResult {
         let store = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
-        let body = json!({"format": 2, "deviceId": "p", "entries": []}).to_string();
+        let body = json!({"format": 1, "deviceId": "p", "entries": []}).to_string();
         let (response, session) = store.serve_sync(body.as_bytes(), "Desk")?;
         assert!(session.is_none());
         assert_eq!(response.status, 403);
