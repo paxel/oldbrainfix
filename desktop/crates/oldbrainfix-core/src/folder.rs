@@ -433,12 +433,12 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
                 .map(|list| list.iter().filter_map(KeyRecord::from_json).collect())
                 .unwrap_or_default();
             store.learn_keys(&signing, None, report)?;
-            // Only the writer's own: the file is sealed and bound to it.
-            store.learn_backup_key(device, json.get("backupKey"))?;
             if let Some(pinned) = store.pinned_key(device)? {
                 let taken =
                     OwnProfile::new(store).take(json.get("profile"), &pinned.record.public_key)?;
                 profile_changed |= taken.changed();
+                // The Profile's backup key, once its Profile was taken in.
+                store.take_backup_key(json.get("backupKey"))?;
             }
             if store.learn_area_keys(&area_keys_of(json.get("areaKeys")))? > 0 {
                 learned = true;
@@ -586,7 +586,7 @@ fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -
         json!(keys.iter().map(AreaKey::to_json).collect::<Vec<_>>()),
     );
     if let Some(key) = store.backup_key_to_send()? {
-        map.insert("backupKey".into(), Value::String(key));
+        map.insert("backupKey".into(), key);
     }
     if let Some(profile) = OwnProfile::new(store).to_send()? {
         map.insert("profile".into(), profile);

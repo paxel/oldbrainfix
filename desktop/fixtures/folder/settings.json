@@ -39,6 +39,14 @@
     [
       "backup:key",
       "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4A="
+    ],
+    [
+      "backup:pass",
+      "{\"m\":64,\"p\":1,\"salt\":\"xcbHyMnKy8zNzs/Q0dLT1A==\",\"sealed\":\"k5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna\",\"t\":1}"
+    ],
+    [
+      "backup:version",
+      "1"
     ]
   ],
   "joiner": [

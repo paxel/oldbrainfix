@@ -38,7 +38,11 @@ An Override is a name and picture one person gives another's Profile for themsel
 
 ## Backup key per Profile (#49)
 
-One backup key per Profile instead of one per Device: one passphrase and one Recovery Sheet for all of a person's Devices. A Device paired as one's own receives the key over the encrypted paths ADR 0016 uses for a Device's own key; each Device keeps writing Backup files of its own, all opened with the same key, and restoring one restores the Profile.
+One backup key per Profile instead of one per Device: one passphrase and one Recovery Sheet for all of a person's Devices. A Device paired as one's own receives the key, with its copy sealed by the passphrase, wherever it receives the own Profile, and takes it after the Profile, only for its own Profile and only when newer; each Device keeps writing Backup files of its own, all opened with the same key (ADR 0016).
+
+When two Devices that each set up Backups are paired, the kept Profile's key wins: the Device that takes the other Profile over lets its own key give way, and keeps it only while the kept Profile has none. Its older Backup files still open with its former Recovery Sheet.
+
+A Backup carries the own Profile with its binding. Restoring one restores the Profile on the new Device, replacing one made there at first start; the new Device gets a new device identity (ADR 0016), and its key joins the binding signed by the old Device's key, which the Backup holds, so the short code stays and its changes to the Profile count on the user's other Devices.
 
 ## The Profile page (#47)
 
@@ -64,6 +68,6 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 - A forgotten Device stays bound to the Profile; unbinding a key is left out, as key rotation is (ADR 0012).
 - Answered on both Devices before they meet again, and differently, "Which one is you?" ends with the lower id on both.
 - A change of name or picture alone makes no bundle: a bundle is written only when there are entries to send, and carries the Profile with them.
-- Until #49 a Backup does not carry the Profile: a restored Device starts with the defaults again.
+- A restored Device is not the Device that made the Profile, so the Profile no longer follows any Device's defaults after a restore.
 - The account picture is read where the system keeps it on Linux (AccountsService's icon or `~/.face`); inside the Flatpak, on Windows and on macOS the initials show until the user picks a picture. The name comes from the user database there too (passwd's full name, Windows' display name).
 - A name cut at 40 code points may lose the end of a long emoji sequence, never the characters before it.

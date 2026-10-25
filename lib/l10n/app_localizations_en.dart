@@ -1936,7 +1936,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out.';
+      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -1961,11 +1961,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupSettingUp => 'Setting up… this takes a few seconds.';
 
   @override
+  String get backupSetUpElsewhere =>
+      'Set up already on another of your Devices? Sync with it, and this Device takes the same passphrase and recovery key.';
+
+  @override
   String get backupSheetTitle => 'Recovery Sheet';
 
   @override
   String get backupSheetIntro =>
-      'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens your Backups when the passphrase is forgotten.';
+      'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens the Backups of all your Devices when the passphrase is forgotten.';
 
   @override
   String get backupSheetPrint => 'Print or save';
@@ -2109,13 +2113,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String recoverySheetDevice(String name) {
-    return 'Device: $name';
+  String recoverySheetProfile(String name) {
+    return 'Profile: $name';
   }
 
   @override
   String get recoverySheetPdfIntro =>
-      'This recovery key opens the Backups of this Device, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.';
+      'This recovery key opens the Backups of all your Devices, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.';
 
   @override
   String get recoverySheetKey => 'Recovery key';
@@ -2127,41 +2131,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoverySheetStepSettings =>
       'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.';
-
-  @override
-  String get backupOthersTitle => 'Recovery keys of your other Devices';
-
-  @override
-  String get backupOthersIntro =>
-      'Lost one of your other Devices? Its recovery key opens its Backups on a new one. Whoever holds it can read them: show it only to type it in.';
-
-  @override
-  String backupOthersDetail(String id, String when) {
-    return 'Its Backup files end in $id. Received $when.';
-  }
-
-  @override
-  String get backupOthersShow => 'Show recovery key';
-
-  @override
-  String get backupOthersHide => 'Hide';
-
-  @override
-  String backupOthersUnlock(String name) {
-    return 'Show the recovery key of $name';
-  }
-
-  @override
-  String backupOthersKeyTitle(String name) {
-    return 'Recovery key of $name';
-  }
-
-  @override
-  String get backupOthersKeyHint =>
-      'On the new Device, choose its Backup file and type this key where it asks for the passphrase or the recovery key.';
-
-  @override
-  String get backupOthersClose => 'Close';
 
   @override
   String get backupAutoTitle => 'Google backup';
@@ -2183,7 +2152,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get restoreFound =>
-      'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.';
+      'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet.';
 
   @override
   String get restoreFoundSkip => 'Start without it';

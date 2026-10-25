@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
-import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -17,7 +16,6 @@ import 'package:oldbrainfix/src/restore_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
-import 'fake_lock.dart';
 import 'fake_photos.dart';
 
 /// A stand-in for Argon2id, quick in a widget test: the real one is the
@@ -102,7 +100,9 @@ void main() {
 
   /// A Backup of a Device with a Note in an Area, and its recovery key.
   Future<(String, String)> backup() async {
-    final old = Store.inMemory(clock: () => now);
+    final old = Store.inMemory(clock: () => now)
+      ..applyProfileDefaults(name: 'Pixel')
+      ..renameOwnProfile('Ada');
     addTearDown(old.close);
     final area = Places(old).addArea('Doctor');
     Notes(old).capture('Pills at eight', place: area.id);
@@ -125,7 +125,6 @@ void main() {
     FolderPlatform folders = const NoFolders(),
     PhotoPlatform? photos,
     PairingPlatform? pairing,
-    AppLock? lock,
   }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -146,12 +145,7 @@ void main() {
                 folders: folders,
                 child: BundleScope(
                   bundles: bundles,
-                  child: lock == null
-                      ? child ?? const SizedBox.shrink()
-                      : LockScope(
-                          lock: lock,
-                          child: child ?? const SizedBox.shrink(),
-                        ),
+                  child: child ?? const SizedBox.shrink(),
                 ),
               ),
             ),
@@ -166,9 +160,18 @@ void main() {
   group('the Backups page', () {
     testWidgets('sets Backups up with a passphrase typed twice and offers '
         'the Recovery Sheet at once', (tester) async {
-      final store = Store.inMemory(clock: () => now);
+      final store = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Pixel')
+        ..renameOwnProfile('Ada');
       addTearDown(store.close);
       await page(tester, BackupScreen(store: store, derive: quickKey));
+      expect(
+        find.text(
+          'Set up already on another of your Devices? Sync with it, and this '
+          'Device takes the same passphrase and recovery key.',
+        ),
+        findsOneWidget,
+      );
 
       await tester.enterText(find.byKey(const ValueKey('passphrase')), 'short');
       await tester.tap(find.byKey(const ValueKey('set-up')));
@@ -203,7 +206,7 @@ void main() {
       expect(sheet, startsWith('%PDF-1.4'));
       final groups = store.recoveryCode!.split('-');
       expect(sheet, contains('(${groups.take(7).join('-')}) Tj'));
-      expect(sheet, contains('Device: Pixel'));
+      expect(sheet, contains('Profile: Ada'));
 
       await tester.tap(find.byKey(const ValueKey('sheet-share')));
       await tester.pumpAndSettle();
@@ -303,81 +306,39 @@ void main() {
     });
   });
 
-  group('another Device\'s recovery key', () {
-    /// This Device, paired with the Phone, which sent its backup key.
-    Future<(Store, String)> paired() async {
-      final phone = Store.inMemory(clock: () => now);
+  group('one backup key per Profile', () {
+    testWidgets('a Device paired as one\'s own shows the Backups set up '
+        'elsewhere, with the same Recovery Sheet', (tester) async {
+      final phone = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Pixel')
+        ..renameOwnProfile('Ada');
+      final desk = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Desk');
       addTearDown(phone.close);
+      addTearDown(desk.close);
+      void meet() {
+        final done = answerSync(
+          desk,
+          syncRequest(phone, desk.versionVector(), name: 'Pixel'),
+          name: 'Desk',
+        )!;
+        applyAnswer(phone, done.answer);
+      }
+
+      meet();
       final code = await setUpBackups(phone, 'correct horse', derive: quickKey);
-      final store = Store.inMemory(clock: () => now);
-      addTearDown(store.close);
-      store
-        ..learnBackupKey(phone.deviceId, phone.backupKeyToSend)
-        ..rememberDevice(
-          PairedDevice(
-            id: phone.deviceId,
-            name: 'Phone',
-            fingerprint: '',
-            host: null,
-            port: null,
-            lastSync: now,
-          ),
-        );
-      return (store, code);
-    }
+      meet();
+      expect(desk.recoveryCode, code);
 
-    testWidgets('shows after the App Lock\'s PIN, also before Backups are '
-        'set up here', (tester) async {
-      final (store, code) = await paired();
-      store.setPin('1234', iterations: 1);
-      final lock = AppLock(store: store, platform: FakeBiometrics(can: false));
-      addTearDown(lock.dispose);
-      await page(
-        tester,
-        BackupScreen(store: store, derive: quickKey),
-        lock: lock,
-      );
-      expect(find.text('Recovery keys of your other Devices'), findsOneWidget);
-      expect(find.text('Phone'), findsOneWidget);
-      expect(find.text(code), findsNothing);
-
-      await tester.tap(find.text('Phone'));
+      await page(tester, BackupScreen(store: desk, derive: quickKey));
+      expect(find.byKey(const ValueKey('passphrase')), findsNothing);
+      expect(find.text('Recovery Sheet'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('sheet-print')));
       await tester.pumpAndSettle();
-      expect(find.text('Show the recovery key of Phone'), findsOneWidget);
-      await tester.enterText(find.byKey(const ValueKey('pinField')), '9999');
-      await tester.tap(find.text('Unlock'));
-      await tester.pumpAndSettle();
-      expect(find.text(code), findsNothing);
-      await tester.enterText(find.byKey(const ValueKey('pinField')), '1234');
-      await tester.tap(find.text('Unlock'));
-      await tester.pumpAndSettle();
-      expect(find.text('Recovery key of Phone'), findsOneWidget);
-      expect(find.text(code), findsOneWidget);
-      await tester.tap(find.text('Close'));
-      await tester.pumpAndSettle();
-      expect(find.text(code), findsNothing);
-    });
-
-    testWidgets('without an App Lock, shows after the phone\'s own screen '
-        'lock', (tester) async {
-      final (store, code) = await paired();
-      final biometrics = FakeBiometrics(answer: false);
-      final lock = AppLock(store: store, platform: biometrics);
-      addTearDown(lock.dispose);
-      await page(
-        tester,
-        BackupScreen(store: store, derive: quickKey),
-        lock: lock,
-      );
-      await tester.tap(find.text('Phone'));
-      await tester.pumpAndSettle();
-      expect(biometrics.asked, ['Show the recovery key of Phone']);
-      expect(find.text(code), findsNothing);
-
-      biometrics.answer = true;
-      await tester.tap(find.text('Phone'));
-      await tester.pumpAndSettle();
-      expect(find.text(code), findsOneWidget);
+      final sheet = File(bundles.printed.single).readAsStringSync();
+      final groups = code.split('-');
+      expect(sheet, contains('(${groups.take(7).join('-')}) Tj'));
+      expect(sheet, contains('Profile: Ada'));
     });
   });
 
@@ -442,6 +403,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(popped?.entries, greaterThan(0));
       expect(Notes(store).all().single.text, 'Pills at eight');
+      // The Profile came back with it.
+      expect(store.ownProfile?.name, 'Ada');
     });
 
     testWidgets('on first start, before the Starter Set, with the recovery '

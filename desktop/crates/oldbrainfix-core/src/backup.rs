@@ -6,8 +6,10 @@
 //!
 //! Setting Backups up makes a random backup key, which the Recovery
 //! Sheet shows, and seals it once with a key the passphrase derives
-//! (Argon2id). The Device keeps both, never the passphrase. Every file
-//! is sealed in chunks with a content key of its own, sealed with the
+//! (Argon2id). The Device keeps both, never the passphrase. The key
+//! belongs to the own Profile: the user's other Devices receive it with
+//! the sealed copy and write their own Backups with it. Every file is
+//! sealed in chunks with a content key of its own, sealed with the
 //! backup key. The bytes are the Dart core's, byte for byte.
 
 use std::collections::BTreeSet;
@@ -23,7 +25,7 @@ use sha2::{Digest, Sha256};
 
 use crate::entry::{WireEntry, dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, SEAL_TAG_BYTES, seal, unseal};
-use crate::pairing::PairedDevice;
+use crate::profile::OwnProfile;
 use crate::recovery;
 use crate::shared::{ROLE_PREFIX, role_field};
 use crate::signing::{
@@ -299,25 +301,7 @@ const FOLDER: &str = "backup:folder";
 const WEEKLY: &str = "backup:weekly";
 const LAST: &str = "backup:last";
 const FAILED: &str = "backup:failed";
-const HELD_PREFIX: &str = "backupkey:";
-
-/// The recovery key of another Device of this one's group (ADR 0016), as
-/// the Dart core's `OtherRecoveryKey`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OtherRecoveryKey {
-    pub device: PairedDevice,
-    /// As the Recovery Sheet of that Device shows it.
-    pub code: String,
-    /// When it came here.
-    pub learned: DateTime<Utc>,
-}
-
-impl OtherRecoveryKey {
-    /// The first 8 digits of its device id, as its Backup files are named.
-    pub fn short_id(&self) -> String {
-        self.device.id.chars().take(8).collect()
-    }
-}
+const VERSION: &str = "backup:version";
 
 impl Store {
     /// The backup key, once Backups are set up.
@@ -345,10 +329,12 @@ impl Store {
         Ok(self.backup_key()?.map(|k| recovery::encode_code(&k)))
     }
 
-    /// Keeps the backup `key` and `pass`, what a scheduled Backup needs.
-    pub fn keep_backup_keys(&self, key: &[u8; KEY_BYTES], pass: &Pass) -> Result<()> {
+    /// Keeps the backup `key` and `pass`, what a scheduled Backup needs,
+    /// with the key's `version`.
+    pub fn keep_backup_keys(&self, key: &[u8; KEY_BYTES], pass: &Pass, version: i64) -> Result<()> {
         self.set_local_setting(KEY, &BASE64.encode(key))?;
-        self.set_local_setting(PASS, &pass.to_json().to_string())
+        self.set_local_setting(PASS, &pass.to_json().to_string())?;
+        self.set_local_setting(VERSION, &version.to_string())
     }
 
     /// The folder Backups go into.
@@ -395,89 +381,85 @@ impl Store {
             .and_then(|raw| parse_time(&raw).ok()))
     }
 
-    /// This Device's backup key as it travels to the Devices of its own
-    /// group (ADR 0016): base64, or none before Backups are set up.
-    pub fn backup_key_to_send(&self) -> Result<Option<String>> {
-        Ok(self.backup_key()?.map(|k| BASE64.encode(k)))
+    /// The backup key's version, as the Dart core's `backupKeyVersion`:
+    /// 1 when Backups were first set up, one more each time they are set
+    /// up again, 0 once the Profile it was made for was given up.
+    pub fn backup_key_version(&self) -> Result<i64> {
+        Ok(self
+            .local_setting(VERSION)?
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1))
     }
 
-    /// The backup key `device` sent of its own, over a LAN session with
-    /// it or in its keys file in the shared folder, as the Dart core's
-    /// `learnBackupKey`: the newest replaces what was held. Whether
-    /// anything changed.
-    pub fn learn_backup_key(&self, device: &str, sent: Option<&Value>) -> Result<bool> {
-        let Some(sent) = sent.and_then(Value::as_str) else {
+    /// The backup key as it travels to the user's other Devices (ADR
+    /// 0016): the key, its sealed copy, the own Profile it belongs to and
+    /// its version; none before Backups are set up or before the own
+    /// Profile exists.
+    pub fn backup_key_to_send(&self) -> Result<Option<Value>> {
+        let (Some(key), Some(pass), Some(profile)) = (
+            self.backup_key()?,
+            self.backup_pass()?,
+            OwnProfile::new(self).get()?,
+        ) else {
+            return Ok(None);
+        };
+        Ok(Some(json!({
+            "key": BASE64.encode(key),
+            "pass": pass.to_json(),
+            "profile": profile.id,
+            "version": self.backup_key_version()?,
+        })))
+    }
+
+    /// Takes the backup key `sent` by another of the user's own Devices,
+    /// after its Profile was taken in, as the Dart core's
+    /// `takeBackupKey`: only one made for the own Profile, and only when
+    /// it is newer than the one held (a higher version, or at the same
+    /// version the larger key). Whether it was kept.
+    pub fn take_backup_key(&self, sent: Option<&Value>) -> Result<bool> {
+        let Some(sent) = sent else {
             return Ok(false);
         };
-        if device.is_empty() || device == self.device_id()? {
+        let (Some(key), Some(pass), Some(profile), Some(version)) = (
+            sent.get("key").and_then(Value::as_str),
+            sent.get("pass").and_then(Pass::from_json),
+            sent.get("profile").and_then(Value::as_str),
+            sent.get("version").and_then(Value::as_i64),
+        ) else {
+            return Ok(false);
+        };
+        if version < 0
+            || OwnProfile::new(self)
+                .get()?
+                .is_none_or(|own| own.id != profile)
+        {
             return Ok(false);
         }
-        let Some(key) = BASE64
-            .decode(sent)
+        let Some(bytes) = BASE64
+            .decode(key)
             .ok()
             .and_then(|k| <[u8; KEY_BYTES]>::try_from(k).ok())
         else {
             return Ok(false);
         };
-        if self
-            .held_backup_key(device)?
-            .is_some_and(|(held, _)| held == key)
-        {
-            return Ok(false);
+        if let (Some(held), Some(_)) = (self.backup_key()?, self.backup_pass()?) {
+            let mine = self.backup_key_version()?;
+            let ours = BASE64.encode(held);
+            if version < mine || (version == mine && key <= ours.as_str()) {
+                return Ok(false);
+            }
         }
-        self.set_local_setting(
-            &format!("{HELD_PREFIX}{device}"),
-            &json!({"key": sent, "learned": dart_iso(self.now())}).to_string(),
-        )?;
+        self.keep_backup_keys(&bytes, &pass, version)?;
         Ok(true)
     }
 
-    /// The backup key the Device `device` sent, and when it came.
-    pub fn held_backup_key(
-        &self,
-        device: &str,
-    ) -> Result<Option<([u8; KEY_BYTES], DateTime<Utc>)>> {
-        let Some(raw) = self.local_setting(&format!("{HELD_PREFIX}{device}"))? else {
-            return Ok(None);
-        };
-        let Ok(json) = serde_json::from_str::<Value>(&raw) else {
-            return Ok(None);
-        };
-        let key = json
-            .get("key")
-            .and_then(Value::as_str)
-            .and_then(|k| BASE64.decode(k).ok())
-            .and_then(|k| <[u8; KEY_BYTES]>::try_from(k).ok());
-        let learned = json
-            .get("learned")
-            .and_then(Value::as_str)
-            .and_then(|at| parse_time(at).ok());
-        Ok(key.zip(learned))
-    }
-
-    /// Drops the backup key of `device`, as forgetting it does.
-    pub fn forget_backup_key(&self, device: &str) -> Result<()> {
-        self.remove_local_setting(&format!("{HELD_PREFIX}{device}"))
-    }
-
-    /// The recovery keys of the Devices still paired with this one and of
-    /// its own group (never one paired by invite), by name: what this
-    /// Device shows again for one that was lost.
-    pub fn other_recovery_keys(&self) -> Result<Vec<OtherRecoveryKey>> {
-        let mut out = Vec::new();
-        for device in self.paired_devices()? {
-            if device.shared {
-                continue;
-            }
-            if let Some((key, learned)) = self.held_backup_key(&device.id)? {
-                out.push(OtherRecoveryKey {
-                    code: recovery::encode_code(&key),
-                    device,
-                    learned,
-                });
-            }
+    /// Gives the backup key held up to whatever key the own Profile
+    /// brings: the Profile it was made for was given up for another.
+    pub fn yield_backup_key(&self) -> Result<()> {
+        if self.backup_key()?.is_some() {
+            self.set_local_setting(VERSION, "0")?;
         }
-        Ok(out)
+        Ok(())
     }
 
     /// Whether a scheduled Backup is due at `now`.
@@ -491,17 +473,23 @@ impl Store {
     }
 }
 
-/// Sets Backups up with `passphrase`: a new backup key, sealed with the
-/// key it derives. Returns the recovery key for the Recovery Sheet.
+/// Sets Backups up with `passphrase`: a new backup key for the own
+/// Profile, sealed with the key it derives, one version above the one
+/// held. Returns the recovery key for the Recovery Sheet.
 pub fn set_up(store: &Store, passphrase: &str, kdf: Kdf, random: Random) -> Result<String> {
     if passphrase.trim().chars().count() < MIN_PASSPHRASE {
         return Err(Error::Invalid("the passphrase is too short".into()));
     }
+    let version = if store.backups_set_up()? {
+        store.backup_key_version()? + 1
+    } else {
+        1
+    };
     let key = key_of(random(KEY_BYTES)?)?;
     let salt = random(SALT_BYTES)?;
     let derived = pass_key(passphrase, kdf, &salt)?;
     let sealed = seal(&derived, &key, sealed_as::PASS, &nonce(random)?)?;
-    store.keep_backup_keys(&key, &Pass { kdf, salt, sealed })?;
+    store.keep_backup_keys(&key, &Pass { kdf, salt, sealed }, version)?;
     Ok(recovery::encode_code(&key))
 }
 
@@ -570,9 +558,10 @@ pub fn held_blobs(store: &Store) -> Result<Vec<String>> {
     Ok(refs.into_iter().collect())
 }
 
-/// Writes a Backup of `store` to `path`: every entry, Moment, Area key,
-/// pinned key and blob, and this Device's identity; none of its
-/// settings. Backups must be set up.
+/// Writes a Backup of `store` to `path`: this Device's identity, the own
+/// Profile with its binding and the backup key's version, every entry,
+/// Moment, Area key, pinned key and blob; none of its settings. Backups
+/// must be set up.
 pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts> {
     let (Some(backup_key), Some(pass)) = (store.backup_key()?, store.backup_pass()?) else {
         return Err(Error::Invalid("Backups are not set up".into()));
@@ -600,6 +589,15 @@ pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts
         }})
         .to_string(),
     )?;
+    if let Some(profile) = OwnProfile::new(store).to_send()? {
+        out.line(
+            &json!({
+                "backupVersion": store.backup_key_version()?,
+                "profile": profile,
+            })
+            .to_string(),
+        )?;
+    }
     let entries = store.all_entries()?;
     for e in &entries {
         out.line(&format!(
@@ -787,8 +785,9 @@ struct MomentIn {
 /// Restores the Backup at `path`, opened with `backup_key`, into the
 /// empty log of `store`, as the Dart core's `restoreBackup`: this Device
 /// keeps its identity, takes in the entries, Moments, blobs, Area keys
-/// and pinned keys, pins the old Device's key as verified, keeps the
-/// backup key, and signs as the old Device its roles in the Shared
+/// and pinned keys, pins the old Device's key as verified, takes the own
+/// Profile back with its own key bound to it by the old Device's, keeps
+/// the backup key, and signs as the old Device its roles in the Shared
 /// Areas for itself. The log is written in one transaction, once the
 /// whole file proved sound.
 pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<Restored> {
@@ -818,6 +817,7 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
     let mut moments: Vec<MomentIn> = Vec::new();
     let mut keys: Vec<AreaKey> = Vec::new();
     let mut pinned: Vec<PinnedKey> = Vec::new();
+    let mut profile: Option<(Value, i64)> = None;
     let mut blobs = 0;
     while let Some(text) = payload.line()? {
         let json: Value = serde_json::from_str(&text).map_err(|_| damaged())?;
@@ -856,6 +856,9 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             keys.push(AreaKey::from_json(k).ok_or_else(damaged)?);
         } else if let Some(p) = json.get("pinned") {
             pinned.push(PinnedKey::from_json(p).ok_or_else(damaged)?);
+        } else if let (Some(v), Some(p)) = (json.get("backupVersion"), json.get("profile")) {
+            let v = v.as_i64().filter(|v| *v >= 0).ok_or_else(damaged)?;
+            profile = Some((p.clone(), v));
         } else if let Some(reference) = json.get("blob").and_then(Value::as_str) {
             let bytes = payload.bytes(size_of(&json)?)?;
             let (kind, hash) = split_blob_ref(reference);
@@ -900,7 +903,12 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             let verified = (p.trust == KeyTrust::Verified).then_some(p.record.device.as_str());
             store.learn_keys(std::slice::from_ref(&p.record), verified, &mut report)?;
         }
-        store.keep_backup_keys(backup_key, &header.pass)?;
+        OwnProfile::new(store).restore(profile.as_ref().map(|(p, _)| p), &old)?;
+        store.keep_backup_keys(
+            backup_key,
+            &header.pass,
+            profile.as_ref().map_or(1, |(_, v)| *v),
+        )?;
         hand_roles(store, &old)
     })?;
     Ok(Restored {
@@ -1179,7 +1187,7 @@ mod tests {
             })
             .collect();
         kept.sort();
-        assert_eq!(kept, vec!["backup:key", "backup:pass"]);
+        assert_eq!(kept, vec!["backup:key", "backup:pass", "backup:version"]);
         assert_eq!(store.recovery_code()?, Some(code));
         assert_eq!(store.backup_folder()?, None);
         assert_eq!(store.sync_folder()?, None);
@@ -1350,55 +1358,159 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn a_device_of_the_own_group_shows_the_others_recovery_key() -> Result<()> {
+    /// A Device of the user's own with a Profile, named by the user
+    /// unless `named` is none.
+    fn own(dir: &Path, name: &str, at: &Held, seed: u8, named: Option<&str>) -> Result<Store> {
+        let store = device(dir, name, at, seed)?;
+        let profile = OwnProfile::new(&store);
+        profile.apply_defaults(name, None)?;
+        if let Some(named) = named {
+            profile.rename(named)?;
+        }
+        Ok(store)
+    }
+
+    /// One LAN session, `joiner` asking `host`, both of the user's own.
+    fn exchange(joiner: &Store, host: &Store) -> Result<Value> {
         use crate::lan::{answer_sync, apply_answer, sync_request};
-        use crate::pairing::PairedDevice;
+        let request = sync_request(joiner, &host.version_vector()?, "Phone", "", "")?;
+        let (answer, _) =
+            answer_sync(host, &request, "Desk")?.ok_or(Error::Invalid("no answer".into()))?;
+        apply_answer(joiner, &answer)?;
+        Ok(request)
+    }
+
+    fn profile_id(store: &Store) -> Result<Option<String>> {
+        Ok(OwnProfile::new(store).get()?.map(|p| p.id))
+    }
+
+    #[test]
+    fn one_recovery_sheet_opens_the_backups_of_every_own_device() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let at = held(1);
-        let phone = device(dir.path(), "phone", &at, 1)?;
-        let desk = device(dir.path(), "desk", &at, 2)?;
+        let phone = own(dir.path(), "phone", &at, 1, None)?;
+        let desk = own(dir.path(), "desk", &at, 2, Some("Ada"))?;
+        exchange(&phone, &desk)?;
+        assert_eq!(profile_id(&phone)?, profile_id(&desk)?);
         let code = set_up(&phone, PASSPHRASE, CHEAP, &mut system_random)?;
-        let request = sync_request(&phone, &desk.version_vector()?, "Phone", "", "")?;
+        let request = exchange(&phone, &desk)?;
         assert_eq!(
-            request["backupKey"].as_str(),
-            phone.backup_key_to_send()?.as_deref()
+            request.get("backupKey"),
+            phone.backup_key_to_send()?.as_ref()
         );
-        let (answer, _) =
-            answer_sync(&desk, &request, "Desk")?.ok_or(Error::Invalid("no".into()))?;
-        assert!(answer.get("backupKey").is_none());
-        apply_answer(&phone, &answer)?;
-        // Held, but shown only once paired.
-        assert!(desk.held_backup_key(&phone.device_id()?)?.is_some());
-        assert!(desk.other_recovery_keys()?.is_empty());
-        desk.remember_device(&PairedDevice {
-            id: phone.device_id()?,
-            name: "Phone".into(),
-            fingerprint: String::new(),
-            host: None,
-            port: None,
-            last_sync: desk.now(),
-            shared: false,
-        })?;
-        let shown = desk.other_recovery_keys()?;
-        assert_eq!(shown.len(), 1);
-        assert_eq!(shown[0].code, code);
-        assert_eq!(shown[0].short_id(), phone.device_id()?[..8]);
+        assert_eq!(desk.recovery_code()?, Some(code.clone()));
+        assert_eq!(desk.backup_pass()?, phone.backup_pass()?);
+        // Each writes its own Backups; the one sheet and the one
+        // passphrase open both, and the Profile comes back with them.
+        for (i, store) in [&phone, &desk].into_iter().enumerate() {
+            let path = dir.path().join(format!("{i}.{EXTENSION}"));
+            write_backup(store, &path, &mut system_random)?;
+            let header = read_header(&path)?.ok_or(Error::Invalid("no header".into()))?;
+            let by_code = unlock(&header, None, Some(&code))?;
+            let by_pass = unlock(&header, Some(PASSPHRASE), None)?;
+            assert!(by_code.is_some() && by_code == by_pass);
+            let restored = device(dir.path(), &format!("new{i}"), &at, 10 + i as u8)?;
+            OwnProfile::new(&restored).apply_defaults("New phone", None)?;
+            restore(&restored, &path, &by_code.unwrap_or_default())?;
+            assert_eq!(profile_id(&restored)?, profile_id(&desk)?);
+            assert_eq!(
+                OwnProfile::new(&restored).code()?,
+                OwnProfile::new(&desk).code()?
+            );
+            assert_eq!(restored.recovery_code()?, Some(code.clone()));
+            // Its key is bound by the old Device's: a rename counts.
+            let me = BASE64.encode(restored.signing_key()?.public_key());
+            let by = BASE64.encode(store.signing_key()?.public_key());
+            let signed = OwnProfile::new(&restored)
+                .signed()?
+                .ok_or(Error::Invalid("no Profile".into()))?;
+            assert!(signed.keys.iter().any(|k| k.key == me && k.by == by));
+        }
 
-        // Nothing but a 32-byte key of the sender's own is taken.
-        let own = desk.device_id()?;
-        let key = json!(BASE64.encode([7u8; 32]));
-        assert!(!desk.learn_backup_key(&own, Some(&key))?);
-        assert!(!desk.learn_backup_key("", Some(&key))?);
-        assert!(!desk.learn_backup_key("x", Some(&json!("AAEC")))?);
-        assert!(!desk.learn_backup_key("x", Some(&json!(42)))?);
-        assert!(desk.learn_backup_key("x", Some(&key))?);
-        assert!(!desk.learn_backup_key("x", Some(&key))?);
+        // Set up again on the desk: the newer key reaches the phone.
+        let again = set_up(&desk, PASSPHRASE, CHEAP, &mut system_random)?;
+        assert_eq!(desk.backup_key_version()?, 2);
+        exchange(&phone, &desk)?;
+        assert_eq!(phone.recovery_code()?, Some(again));
+        Ok(())
+    }
 
-        // Forgotten: its key goes too.
-        desk.forget_device(&phone.device_id()?)?;
-        assert!(desk.held_backup_key(&phone.device_id()?)?.is_none());
-        assert!(desk.other_recovery_keys()?.is_empty());
+    #[test]
+    fn the_kept_profiles_key_wins_and_the_old_backups_keep_their_sheet() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let at = held(1);
+        let phone = own(dir.path(), "phone", &at, 1, Some("Ada"))?;
+        let desk = own(dir.path(), "desk", &at, 2, Some("Ada L."))?;
+        let phone_code = set_up(&phone, PASSPHRASE, CHEAP, &mut system_random)?;
+        let old = dir.path().join(format!("old.{EXTENSION}"));
+        write_backup(&phone, &old, &mut system_random)?;
+        let desk_code = set_up(&desk, "another passphrase", CHEAP, &mut system_random)?;
+        exchange(&phone, &desk)?;
+        assert!(OwnProfile::new(&phone).question()?.is_some());
+        assert_eq!(phone.recovery_code()?, Some(phone_code.clone()));
+        OwnProfile::new(&phone).answer(false)?;
+        assert_eq!(phone.backup_key_version()?, 0);
+        exchange(&phone, &desk)?;
+        assert_eq!(phone.recovery_code()?, Some(desk_code.clone()));
+        assert_eq!(desk.recovery_code()?, Some(desk_code));
+        let header = read_header(&old)?.ok_or(Error::Invalid("no header".into()))?;
+        assert!(unlock(&header, None, Some(&phone_code))?.is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn a_kept_profile_without_backups_takes_the_others_key() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let at = held(1);
+        let phone = own(dir.path(), "phone", &at, 1, None)?;
+        let desk = own(dir.path(), "desk", &at, 2, Some("Ada"))?;
+        let code = set_up(&phone, PASSPHRASE, CHEAP, &mut system_random)?;
+        exchange(&phone, &desk)?;
+        assert_eq!(profile_id(&phone)?, profile_id(&desk)?);
+        exchange(&phone, &desk)?;
+        assert_eq!(desk.recovery_code()?, Some(code));
+        assert_eq!(desk.backup_key_version()?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_key_is_taken_only_for_the_own_profile_whole_and_newer() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let at = held(1);
+        let store = own(dir.path(), "a", &at, 1, Some("Ada"))?;
+        let other = own(dir.path(), "b", &at, 2, Some("Ada"))?;
+        set_up(&other, PASSPHRASE, CHEAP, &mut system_random)?;
+        let sent = other
+            .backup_key_to_send()?
+            .ok_or(Error::Invalid("none".into()))?;
+        let id = profile_id(&store)?.unwrap_or_default();
+        let with = |changes: Value| {
+            let mut v = sent.clone();
+            v["profile"] = json!(id);
+            if let (Some(map), Some(more)) = (v.as_object_mut(), changes.as_object()) {
+                for (k, x) in more {
+                    map.insert(k.clone(), x.clone());
+                }
+            }
+            v
+        };
+        assert!(!store.take_backup_key(Some(&sent))?, "another Profile");
+        assert!(!store.take_backup_key(None)?);
+        assert!(!store.take_backup_key(Some(&with(json!({"key": "no base64!"}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"key": "AQID"}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"pass": "none"}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"version": -1}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"version": "2"}))))?);
+        assert!(!store.backups_set_up()?);
+        let low = BASE64.encode([1u8; 32]);
+        let high = BASE64.encode([2u8; 32]);
+        assert!(store.take_backup_key(Some(&with(json!({"key": high, "version": 2}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"key": high, "version": 2}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"key": low, "version": 2}))))?);
+        assert!(!store.take_backup_key(Some(&with(json!({"key": low, "version": 1}))))?);
+        assert!(store.take_backup_key(Some(&with(json!({"key": low, "version": 3}))))?);
+        assert_eq!(store.backup_key()?, Some([1u8; 32]));
+        assert_eq!(store.backup_key_version()?, 3);
         Ok(())
     }
 }

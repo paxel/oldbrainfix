@@ -1,15 +1,16 @@
-//! Backups on the desktop's screen (ADR 0010, 0016): the card in the
-//! Settings that sets them up with a passphrase, saves the Recovery
-//! Sheet, picks the folder, switches the weekly Backup, writes one now
-//! and shows the recovery keys of the other Devices of its group; and
-//! the first start's view that restores one into the empty log
-//! with the passphrase or the recovery key, or starts fresh.
+//! Backups on the desktop's screen (ADR 0010, 0016): the card on the
+//! Profile page that sets them up with a passphrase, or shows them set
+//! up on another of the user's Devices, the backup key belonging to the
+//! Profile; saves the Recovery Sheet, picks the folder, switches the
+//! weekly Backup and writes one now; and the first start's view that
+//! restores one into the empty log with the passphrase or the recovery
+//! key, or starts fresh.
 
-use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::backup::{self, Header, MIN_PASSPHRASE, Problem};
+use oldbrainfix_core::profile::OwnProfile;
 use oldbrainfix_core::recovery::{self, Sheet};
 use oldbrainfix_core::{Error, Store};
 
@@ -94,16 +95,13 @@ pub fn status(t: &L10n, store: &Store, wall: &Wall) -> (String, bool) {
     }
 }
 
-/// The Backups card's content: this Device's own Backups, then the
-/// recovery keys of the other Devices of its group, each shown in
-/// `shown` once asked for.
+/// The Backups card's content.
 pub fn card(
     ui: &mut Ui,
     t: &L10n,
     store: &Store,
     wall: &Wall,
     form: &mut Passphrase,
-    shown: &mut BTreeSet<String>,
     actions: &mut Vec<BackupAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -111,58 +109,10 @@ pub fn card(
     ui.label(RichText::new(t.backups_title()).strong().color(text));
     ui.label(RichText::new(t.backups_intro()).small().color(weak));
     own_backups(ui, t, store, wall, form, actions);
-    other_keys(ui, t, store, wall, shown);
 }
 
-/// The recovery keys of the other Devices of this one's group (ADR
-/// 0016): a lost one's Backups open with it on a new Device. Each shows
-/// only once asked for; the desktop has no App Lock, so its own unlock
-/// is the computer's login.
-fn other_keys(ui: &mut Ui, t: &L10n, store: &Store, wall: &Wall, shown: &mut BTreeSet<String>) {
-    let others = store.other_recovery_keys().unwrap_or_default();
-    if others.is_empty() {
-        return;
-    }
-    let text = ui.visuals().text_color();
-    let weak = ui.visuals().weak_text_color();
-    ui.add_space(8.0);
-    ui.label(RichText::new(t.backup_others_title()).strong().color(text));
-    ui.label(RichText::new(t.backup_others_intro()).small().color(weak));
-    for other in others {
-        let id = other.device.id.clone();
-        ui.label(RichText::new(&other.device.name).color(text));
-        let learned = wall(other.learned).format("%Y-%m-%d %H:%M").to_string();
-        ui.label(
-            RichText::new(t.backup_others_detail(&other.short_id(), &learned))
-                .small()
-                .color(weak),
-        );
-        if shown.contains(&id) {
-            let mut code = other.code.clone();
-            ui.add(
-                TextEdit::singleline(&mut code)
-                    .id(Id::new(("recovery key", &id)))
-                    .font(egui::TextStyle::Monospace)
-                    .text_color(text)
-                    .desired_width(f32::INFINITY),
-            );
-            if ui
-                .button(RichText::new(t.backup_others_hide()).color(text))
-                .clicked()
-            {
-                shown.remove(&id);
-            }
-        } else if ui
-            .button(RichText::new(t.backup_others_show()).color(text))
-            .clicked()
-        {
-            shown.insert(id);
-        }
-    }
-}
-
-/// This Device's own Backups: set up, the Recovery Sheet, the folder,
-/// the weekly switch and "Back up now".
+/// The Backups: set up, the Recovery Sheet, the folder, the weekly
+/// switch and "Back up now".
 fn own_backups(
     ui: &mut Ui,
     t: &L10n,
@@ -175,6 +125,7 @@ fn own_backups(
     let weak = ui.visuals().weak_text_color();
     let error = ui.visuals().error_fg_color;
     if !store.backups_set_up().unwrap_or(false) {
+        ui.label(RichText::new(t.backup_set_up_elsewhere()).color(text));
         secret(
             ui,
             "backup passphrase",
@@ -245,16 +196,23 @@ fn own_backups(
     }
 }
 
-/// The Recovery Sheet of `store` in the app's language, made now on the
-/// computer `device`; none before Backups are set up.
-pub fn sheet(t: &L10n, store: &Store, device: &str, wall: &Wall) -> Option<Vec<u8>> {
+/// The Recovery Sheet of `store` in the app's language, made now for the
+/// own Profile; none before Backups are set up.
+pub fn sheet(t: &L10n, store: &Store, wall: &Wall) -> Option<Vec<u8>> {
     let code = store.recovery_code().ok().flatten()?;
     let made = wall(store.now()).format("%Y-%m-%d %H:%M").to_string();
+    let name = OwnProfile::new(store)
+        .get()
+        .ok()
+        .flatten()
+        .map(|p| p.name)
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| t.profile_no_name().to_string());
     let sheet = Sheet {
         title: t.recovery_sheet_pdf_title().to_string(),
         about: vec![
             t.recovery_sheet_made(&made),
-            t.recovery_sheet_device(device),
+            t.recovery_sheet_profile(&name),
         ],
         intro: vec![t.recovery_sheet_pdf_intro().to_string()],
         code_label: t.recovery_sheet_key().to_string(),

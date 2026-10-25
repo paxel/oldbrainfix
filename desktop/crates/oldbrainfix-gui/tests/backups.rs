@@ -132,37 +132,44 @@ fn backups_are_set_up_the_sheet_saved_and_a_folder_gets_one_at_once() -> TestRes
 }
 
 #[test]
-fn the_recovery_key_of_a_paired_phone_shows_once_asked_for() -> TestResult {
+fn backups_set_up_on_a_paired_phone_show_with_the_same_recovery_sheet() -> TestResult {
     use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
-    use oldbrainfix_core::pairing::PairedDevice;
+    use oldbrainfix_core::profile::OwnProfile;
     let phone = store(2)?;
     let desk = store(1)?;
+    OwnProfile::new(&phone).apply_defaults("Pixel", None)?;
+    OwnProfile::new(&phone).rename("Ada")?;
+    OwnProfile::new(&desk).apply_defaults("Desk", None)?;
+    let meet = || -> TestResult {
+        let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+        let (answer, _) = answer_sync(&desk, &request, "Desk")?.ok_or("an answer")?;
+        apply_answer(&phone, &answer)?;
+        Ok(())
+    };
+    meet()?;
     let code = backup::set_up(&phone, "correct horse", CHEAP, &mut system_random)?;
-    let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
-    let (answer, _) = answer_sync(&desk, &request, "Desk")?.ok_or("an answer")?;
-    apply_answer(&phone, &answer)?;
-    desk.remember_device(&PairedDevice {
-        id: phone.device_id()?,
-        name: "Pixel".into(),
-        fingerprint: String::new(),
-        host: None,
-        port: None,
-        last_sync: desk.now(),
-        shared: false,
-    })?;
+    meet()?;
+    assert_eq!(desk.recovery_code()?, Some(code.clone()));
+
+    let dir = tempfile::tempdir()?;
+    let sheet = dir.path().join("sheet.pdf");
+    let saved = sheet.clone();
     let mut app = App::new(desk, "en");
+    app.set_backup_dialogs(
+        Box::new(move |_, _| Some(saved.clone())),
+        Box::new(|_| None),
+    );
     app.select(Selection::Profile);
     let mut harness = window(app);
-    assert!(shows(&harness, "Recovery keys of your other Devices"));
-    assert!(shows(&harness, "Pixel"));
-    let short: String = phone.device_id()?.chars().take(8).collect();
-    assert!(shows(&harness, &format!("end in {short}")));
-    assert!(harness.query_all_by_value(&code).next().is_none());
-
-    click(&mut harness, "Show recovery key");
-    assert!(harness.query_all_by_value(&code).next().is_some());
-    click(&mut harness, "Hide");
-    assert!(harness.query_all_by_value(&code).next().is_none());
+    // Set up already: no passphrase asked, the sheet offered.
+    assert!(!shows(&harness, "Set up Backups"));
+    assert!(shows(&harness, "Recovery Sheet"));
+    assert!(!shows(&harness, "Recovery keys of your other Devices"));
+    click(&mut harness, "Save the Recovery Sheet…");
+    let pdf = std::fs::read_to_string(&sheet)?;
+    let first: Vec<&str> = code.split('-').take(7).collect();
+    assert!(pdf.contains(&format!("({}) Tj", first.join("-"))));
+    assert!(pdf.contains("(Profile: Ada) Tj"));
     Ok(())
 }
 
@@ -171,6 +178,9 @@ fn old_backup(
     dir: &std::path::Path,
 ) -> Result<(std::path::PathBuf, String), Box<dyn std::error::Error>> {
     let old = store(7)?;
+    let profile = oldbrainfix_core::profile::OwnProfile::new(&old);
+    profile.apply_defaults("Desk", None)?;
+    profile.rename("Ada")?;
     let area = Places::new(&old).add_area("Doctor")?;
     Notes::new(&old).capture("Pills at eight", Some(&area.id), None)?;
     let code = backup::set_up(&old, "correct horse", CHEAP, &mut system_random)?;
@@ -200,6 +210,9 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
     let dir = tempfile::tempdir()?;
     let (path, _) = old_backup(dir.path())?;
     let mut harness = first_start(path)?;
+    // The computer made a Profile of its own at its first start.
+    oldbrainfix_core::profile::OwnProfile::new(harness.state().store())
+        .apply_defaults("Computer", None)?;
     assert!(shows(&harness, "Welcome to Old Brain Fix"));
     click(&mut harness, "Choose the Backup file");
     assert!(shows(&harness, "Backup of "));
@@ -220,6 +233,16 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
         .map(|n| n.text)
         .collect();
     assert_eq!(texts, vec!["Pills at eight"]);
+    // The Profile came back with it, and the Profile page shows it.
+    harness.state_mut().select(Selection::Profile);
+    harness.step();
+    harness.step();
+    assert!(harness.query_all_by_value("Ada").next().is_some());
+    assert!(harness.query_all_by_value("Computer").next().is_none());
+    harness.state_mut().select(Selection::All);
+    harness.step();
+    let own = oldbrainfix_core::profile::OwnProfile::new(harness.state().store()).get()?;
+    assert_eq!(own.map(|p| p.name).as_deref(), Some("Ada"));
     // Not offered again.
     harness.state_mut().offer_restore();
     assert!(!harness.state().welcoming());

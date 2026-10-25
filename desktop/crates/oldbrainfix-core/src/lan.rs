@@ -1016,7 +1016,7 @@ pub fn sync_request_as(
     joining: Joining,
 ) -> Result<Value> {
     store.ensure_area_keys()?;
-    // This Device's backup key goes to a Device of its own group only.
+    // The backup key goes to a Device of its own group only.
     let own = matches!(joining, Joining::Plain) && !store.is_shared_peer(host_device)?;
     let (entries, area_keys) = match joining {
         Joining::Invited => (Vec::new(), Vec::new()),
@@ -1055,7 +1055,7 @@ pub fn sync_request_as(
             Joining::Plain => {}
         }
         if own && let Some(key) = store.backup_key_to_send()? {
-            map.insert("backupKey".to_string(), Value::String(key));
+            map.insert("backupKey".to_string(), key);
         }
         if own && let Some(profile) = OwnProfile::new(store).to_send()? {
             map.insert("profile".to_string(), profile);
@@ -1123,7 +1123,6 @@ pub fn answer_sync_inviting(
     let offered = area_keys_of(body.get("areaKeys"));
     if !shared {
         store.learn_area_keys(&offered)?;
-        store.learn_backup_key(&peer, body.get("backupKey"))?;
     }
     let entries = if inviting.is_some() {
         Vec::new()
@@ -1151,7 +1150,7 @@ pub fn answer_sync_inviting(
         store.invite(&invite.area, &peer, invite.role, &invite.name)?;
     } else if !shared {
         store.extend_roles_to(&peer)?;
-        profile = take_profile(store, &peer, body.get("profile"))?;
+        profile = take_profile(store, &peer, body)?;
     }
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&peer_name))?;
     // The answer carries everything beyond what the joiner holds: once it
@@ -1189,7 +1188,7 @@ pub fn answer_sync_inviting(
         && let Some(key) = store.backup_key_to_send()?
         && let Some(map) = answer.as_object_mut()
     {
-        map.insert("backupKey".to_string(), Value::String(key));
+        map.insert("backupKey".to_string(), key);
     }
     if !shared
         && let Some(own) = OwnProfile::new(store).to_send()?
@@ -1215,10 +1214,13 @@ pub fn answer_sync_inviting(
 
 /// Takes in the own Profile `sent` by `peer`, a Device of this one's own
 /// group whose key the session verified; nothing without that key.
-fn take_profile(store: &Store, peer: &str, sent: Option<&Value>) -> Result<ProfileTaken> {
+fn take_profile(store: &Store, peer: &str, body: &Value) -> Result<ProfileTaken> {
     match store.pinned_key(peer)? {
         Some(pinned) if !peer.is_empty() => {
-            OwnProfile::new(store).take(sent, &pinned.record.public_key)
+            let taken =
+                OwnProfile::new(store).take(body.get("profile"), &pinned.record.public_key)?;
+            store.take_backup_key(body.get("backupKey"))?;
+            Ok(taken)
         }
         _ => Ok(ProfileTaken::Unchanged),
     }
@@ -1255,7 +1257,6 @@ pub fn apply_answer_as(
     let offered = area_keys_of(answer.get("areaKeys"));
     if !shared {
         store.learn_area_keys(&offered)?;
-        store.learn_backup_key(&host, answer.get("backupKey"))?;
     }
     let applied = store.apply_entries(
         &entries_of(answer.get("entries")),
@@ -1277,7 +1278,7 @@ pub fn apply_answer_as(
     let profile = if shared {
         ProfileTaken::Unchanged
     } else {
-        take_profile(store, &host, answer.get("profile"))?
+        take_profile(store, &host, answer)?
     };
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&name))?;
     let conflicts = store.conflicts_among(&applied)?;
@@ -2137,8 +2138,21 @@ mod tests {
         );
 
         // Backups set up on both: no backup key goes to another person.
-        for store in [&desk, &phone] {
-            store.set_local_setting("backup:key", &BASE64.encode([9u8; 32]))?;
+        let cheap = crate::backup::Kdf {
+            memory: 64,
+            iterations: 1,
+            parallelism: 1,
+        };
+        let mut codes = Vec::new();
+        for (store, name) in [(&desk, "Desk"), (&phone, "Pixel")] {
+            crate::profile::OwnProfile::new(store).apply_defaults(name, None)?;
+            codes.push(crate::backup::set_up(
+                store,
+                "a long passphrase",
+                cheap,
+                &mut crate::backup::system_random,
+            )?);
+            assert!(store.backup_key_to_send()?.is_some());
         }
         let body = sync_request_as(
             &phone,
@@ -2165,8 +2179,8 @@ mod tests {
         assert_eq!(scopes, vec![area.as_str()]);
         assert!(answer.get("backupKey").is_none());
         apply_answer_as(&phone, &answer, true, None)?;
-        assert!(phone.held_backup_key(&desk.device_id()?)?.is_none());
-        assert!(desk.held_backup_key(&phone.device_id()?)?.is_none());
+        assert_eq!(desk.recovery_code()?.as_ref(), Some(&codes[0]));
+        assert_eq!(phone.recovery_code()?.as_ref(), Some(&codes[1]));
         let texts: Vec<String> = Notes::new(&phone)
             .all()?
             .into_iter()

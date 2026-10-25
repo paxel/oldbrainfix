@@ -498,8 +498,6 @@ pub struct App {
     picture_picker: FolderPicker,
     /// The passphrase being typed into the Backups card.
     backup_form: Passphrase,
-    /// The other Devices whose recovery key the Backups card shows.
-    recovery_shown: std::collections::BTreeSet<String>,
     /// The first start's view, while it shows instead of the panes.
     welcome: Option<Welcome>,
     /// Ask where to save the Recovery Sheet and which Backup to restore.
@@ -610,7 +608,6 @@ impl App {
             question_later: false,
             picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
             backup_form: Passphrase::default(),
-            recovery_shown: Default::default(),
             welcome: None,
             sheet_saver: Box::new(|title, name| {
                 sheet_dialog(title).set_file_name(name).save_file()
@@ -700,8 +697,7 @@ impl App {
                 self.backup(BackupAction::SaveSheet)?;
             }
             BackupAction::SaveSheet => {
-                let Some(pdf) = backup_view::sheet(&t, &self.store, &self.sync_name, &self.wall)
-                else {
+                let Some(pdf) = backup_view::sheet(&t, &self.store, &self.wall) else {
                     return Ok(());
                 };
                 let Some(mut path) = (self.sheet_saver)(
@@ -2925,11 +2921,10 @@ impl App {
             actions.extend(asked.into_iter().map(Action::Profile));
             return;
         }
-        let (store, wall, backup_form, recovery_shown, view) = (
+        let (store, wall, backup_form, view) = (
             &self.store,
             &self.wall,
             &mut self.backup_form,
-            &mut self.recovery_shown,
             &mut self.profile_view,
         );
         let profile = self.view.profile.as_ref();
@@ -2960,15 +2955,7 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.profile_backups()).strong().color(text));
                     let mut backup = Vec::new();
-                    backup_view::card(
-                        ui,
-                        &t,
-                        store,
-                        wall,
-                        backup_form,
-                        recovery_shown,
-                        &mut backup,
-                    );
+                    backup_view::card(ui, &t, store, wall, backup_form, &mut backup);
                     actions.extend(backup.into_iter().map(Action::Backup));
                 });
                 embossed(ui, tones, false, None, |ui| {

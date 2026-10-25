@@ -165,4 +165,4 @@ Wie eine Fälligkeit aus einem gesperrten Bereich in Alarmen und in der Agenda e
 Eine verschlüsselte Datei mit allem, was auf einem Gerät ist, geöffnet mit einer Passphrase.
 
 **Wiederherstellungsblatt** [Recovery Sheet]:
-Eine druckbare Seite mit dem Wiederherstellungsschlüssel für Sicherungen, für eine Schublade oder einen Passwortmanager.
+Eine druckbare Seite mit dem Wiederherstellungsschlüssel für die Sicherungen all deiner Geräte, für eine Schublade oder einen Passwortmanager. Eine pro Profil.

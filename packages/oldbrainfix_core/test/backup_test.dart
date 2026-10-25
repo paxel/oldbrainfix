@@ -235,7 +235,7 @@ void main() {
             k != 'device' &&
             k != 'signseed',
       );
-      expect(keys.toSet(), {'backup:key', 'backup:pass'});
+      expect(keys.toSet(), {'backup:key', 'backup:pass', 'backup:version'});
       // The Recovery Sheet stays good.
       expect(store.recoveryCode, code);
       // What the new Device writes signs under its own key.
@@ -477,65 +477,138 @@ void main() {
     });
   });
 
-  group('recovery through a paired Device', () {
-    test('a Device of the own group holds the other\'s backup key after a '
-        'LAN session and shows it as its recovery key', () async {
-      final clock = ticking();
-      final phone = Store.inMemory(clock: clock);
-      final desk = Store.inMemory(clock: clock);
+  group('one backup key per Profile', () {
+    /// A Device of its own with a Profile: named by the user unless
+    /// [named] is null.
+    Store own(String? named, {String device = 'Device'}) {
+      final store = Store.inMemory(clock: ticking());
+      store.applyProfileDefaults(name: device);
+      if (named != null) store.renameOwnProfile(named);
+      return store;
+    }
+
+    /// Writes a Backup of [store] and restores it into a new Device, once
+    /// with the recovery key [code] and once with the passphrase; returns
+    /// the second.
+    Future<Store> restoredFrom(Store store, String code, String name) async {
+      final path = '${dir.path}/$name.$backupExtension';
+      await writeBackup(store, path);
+      final header = readBackupHeader(path)!;
+      final byCode = await unlockBackup(header, recoveryCode: code);
+      final byPass = await unlockBackup(header, passphrase: passphrase);
+      expect(byCode, isNotNull, reason: '$name opens with the recovery key');
+      expect(byPass, isNotNull, reason: '$name opens with the passphrase');
+      final first = fresh('$name-code');
+      addTearDown(first.close);
+      await restoreBackup(first, path, byCode!);
+      final second = fresh('$name-pass');
+      addTearDown(second.close);
+      await restoreBackup(second, path, byPass!);
+      return second;
+    }
+
+    test('a Device paired as one\'s own receives it with its sealed copy, '
+        'and one Recovery Sheet opens the Backups of both', () async {
+      final phone = own(null, device: 'Pixel');
+      final desk = own('Ada');
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      exchange(phone, desk);
+      expect(phone.ownProfile?.id, desk.ownProfile?.id);
+      final code = await setUpBackups(phone, passphrase, kdf: cheap);
+      final session = exchange(phone, desk);
+      expect(session.request['backupKey'], phone.backupKeyToSend);
+      expect(desk.backupsSetUp, isTrue);
+      expect(desk.recoveryCode, code);
+      expect(desk.backupPass?.toJson(), phone.backupPass?.toJson());
+      // Each writes its own Backups, all opened with the same key.
+      final fromPhone = await restoredFrom(phone, code, 'phone');
+      final fromDesk = await restoredFrom(desk, code, 'desk');
+      expect(fromPhone.recoveryCode, code);
+      expect(fromDesk.recoveryCode, code);
+
+      // Set up again on the desk: the newer key reaches the phone.
+      final again = await setUpBackups(desk, passphrase, kdf: cheap);
+      expect(desk.backupKeyVersion, 2);
+      exchange(phone, desk);
+      expect(phone.recoveryCode, again);
+      expect(phone.backupKeyVersion, 2);
+    });
+
+    test('two Devices that set it up apart end with the same key', () async {
+      final phone = own(null, device: 'Pixel');
+      final desk = own('Ada');
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      exchange(phone, desk);
+      await setUpBackups(phone, passphrase, kdf: cheap);
+      await setUpBackups(desk, passphrase, kdf: cheap);
+      final larger = [
+        phone.backupKeyToSend!['key']! as String,
+        desk.backupKeyToSend!['key']! as String,
+      ]..sort();
+      exchange(phone, desk);
+      exchange(phone, desk);
+      expect(phone.recoveryCode, desk.recoveryCode);
+      expect(base64.encode(phone.backupKey!), larger.last);
+    });
+
+    test('pairing two Devices with Backups of their own: the kept '
+        'Profile\'s key wins, the other\'s old Backups open with its old '
+        'Recovery Sheet', () async {
+      final phone = own('Ada', device: 'Pixel');
+      final desk = own('Ada L.');
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      final phoneCode = await setUpBackups(phone, passphrase, kdf: cheap);
+      final oldPath = '${dir.path}/phone-old.$backupExtension';
+      await writeBackup(phone, oldPath);
+      final deskCode = await setUpBackups(
+        desk,
+        'another passphrase',
+        kdf: cheap,
+      );
+      exchange(phone, desk);
+      // "Which one is you?" waits: no key changes Profile meanwhile.
+      expect(phone.profileQuestion, isNotNull);
+      expect(phone.recoveryCode, phoneCode);
+      expect(desk.recoveryCode, deskCode);
+      // The phone takes the desk's Profile over.
+      phone.answerProfileQuestion(keepMine: false);
+      expect(phone.backupKeyVersion, 0);
+      exchange(phone, desk);
+      expect(phone.recoveryCode, deskCode);
+      expect(desk.recoveryCode, deskCode);
+      expect(phone.backupPass?.toJson(), desk.backupPass?.toJson());
+      // What the phone wrote before still opens with its old sheet.
+      expect(
+        await unlockBackup(readBackupHeader(oldPath)!, recoveryCode: phoneCode),
+        isNotNull,
+      );
+    });
+
+    test('a kept Profile without Backups takes the other\'s key', () async {
+      final phone = own(null, device: 'Pixel');
+      final desk = own('Ada');
       addTearDown(phone.close);
       addTearDown(desk.close);
       final code = await setUpBackups(phone, passphrase, kdf: cheap);
-      final first = exchange(phone, desk);
-      expect(first.request['backupKey'], phone.backupKeyToSend);
-      expect(first.answer.containsKey('backupKey'), isFalse);
-
-      final shown = desk.otherRecoveryKeys().single;
-      expect(shown.device.id, phone.deviceId);
-      expect(shown.device.name, 'Phone');
-      expect(shown.code, code);
-      expect(shown.shortId, phone.deviceId.substring(0, 8));
-      expect(phone.otherRecoveryKeys(), isEmpty);
-
-      // The desk sets up as well; its key goes the other way.
-      final deskCode = await setUpBackups(desk, passphrase, kdf: cheap);
       exchange(phone, desk);
-      expect(phone.otherRecoveryKeys().single.code, deskCode);
-
-      // Set up again on the phone: the newest key is the one shown.
-      final again = await setUpBackups(phone, passphrase, kdf: cheap);
+      // The phone, still with the defaults, took the desk's Profile.
+      expect(phone.ownProfile?.id, desk.ownProfile?.id);
+      expect(phone.recoveryCode, code);
       exchange(phone, desk);
-      expect(desk.otherRecoveryKeys().single.code, again);
-
-      // The key opens the phone's Backups on a new Device.
-      final path = '${dir.path}/phone.$backupExtension';
-      await writeBackup(phone, path);
-      final header = readBackupHeader(path)!;
-      expect(
-        await unlockBackup(
-          header,
-          recoveryCode: desk.otherRecoveryKeys()[0].code,
-        ),
-        isNotNull,
-      );
-
-      // Forgotten: no longer paired, its key goes too.
-      desk.forgetDevice(phone.deviceId);
-      expect(desk.heldBackupKey(phone.deviceId), isNull);
-      expect(desk.otherRecoveryKeys(), isEmpty);
+      expect(desk.recoveryCode, code);
+      expect(desk.backupKeyVersion, 0);
     });
 
-    test('another person\'s Device neither gets nor gives a backup '
-        'key', () async {
-      final clock = ticking();
-      final ann = Store.inMemory(clock: clock)
-        ..setLocalSetting('author', 'Ann');
-      final ben = Store.inMemory(clock: clock)
-        ..setLocalSetting('author', 'Ben');
+    test('another person\'s Device neither gets nor gives one', () async {
+      final ann = own('Ann')..setLocalSetting('author', 'Ann');
+      final ben = own('Ben')..setLocalSetting('author', 'Ben');
       addTearDown(ann.close);
       addTearDown(ben.close);
-      await setUpBackups(ann, passphrase, kdf: cheap);
-      await setUpBackups(ben, passphrase, kdf: cheap);
+      final annCode = await setUpBackups(ann, passphrase, kdf: cheap);
+      final benCode = await setUpBackups(ben, passphrase, kdf: cheap);
       final house = Places(ann).addArea('Household');
       final area = ann.share(house.id, name: 'Ann');
       final invited = exchange(
@@ -557,43 +630,66 @@ void main() {
         expect(e.request.containsKey('backupKey'), isFalse);
         expect(e.answer.containsKey('backupKey'), isFalse);
       }
-      expect(ann.heldBackupKey(ben.deviceId), isNull);
-      expect(ben.heldBackupKey(ann.deviceId), isNull);
-      expect(ann.otherRecoveryKeys(), isEmpty);
-      expect(ben.otherRecoveryKeys(), isEmpty);
+      expect(ann.recoveryCode, annCode);
+      expect(ben.recoveryCode, benCode);
     });
 
-    test('a key is taken only as the sender\'s own, and only as one', () {
-      final store = Store.inMemory(clock: ticking());
+    test('a key is taken only for the own Profile, only whole and only '
+        'when newer', () async {
+      final store = own('Ada');
       addTearDown(store.close);
-      final key = base64.encode(List.filled(backupKeyBytes, 7));
-      expect(store.learnBackupKey(store.deviceId, key), isFalse);
-      expect(store.learnBackupKey('', key), isFalse);
-      expect(store.learnBackupKey('a' * 32, 'no base64!'), isFalse);
-      expect(store.learnBackupKey('a' * 32, base64.encode([1, 2, 3])), isFalse);
-      expect(store.learnBackupKey('a' * 32, 42), isFalse);
-      expect(store.learnBackupKey('a' * 32, key), isTrue);
-      expect(store.learnBackupKey('a' * 32, key), isFalse, reason: 'held');
-      // Not paired: held, but not shown.
-      expect(store.otherRecoveryKeys(), isEmpty);
+      final other = own('Ada');
+      addTearDown(other.close);
+      await setUpBackups(other, passphrase, kdf: cheap);
+      final sent = other.backupKeyToSend!;
+      final id = store.ownProfile!.id;
+      Map<String, Object?> as(Map<String, Object?> changes) => {
+        ...sent,
+        'profile': id,
+        ...changes,
+      };
+      expect(store.takeBackupKey(sent), isFalse, reason: 'another Profile');
+      expect(store.takeBackupKey(null), isFalse);
+      expect(store.takeBackupKey(as({'key': 'no base64!'})), isFalse);
+      expect(
+        store.takeBackupKey(
+          as({
+            'key': base64.encode([1, 2, 3]),
+          }),
+        ),
+        isFalse,
+      );
+      expect(store.takeBackupKey(as({'pass': 'none'})), isFalse);
+      expect(store.takeBackupKey(as({'version': -1})), isFalse);
+      expect(store.takeBackupKey(as({'version': '2'})), isFalse);
+      expect(store.backupsSetUp, isFalse);
+      final low = base64.encode(List.filled(backupKeyBytes, 1));
+      final high = base64.encode(List.filled(backupKeyBytes, 2));
+      expect(store.takeBackupKey(as({'key': high, 'version': 2})), isTrue);
+      expect(store.takeBackupKey(as({'key': high, 'version': 2})), isFalse);
+      expect(store.takeBackupKey(as({'key': low, 'version': 2})), isFalse);
+      expect(store.takeBackupKey(as({'key': low, 'version': 1})), isFalse);
+      expect(store.takeBackupKey(as({'key': low, 'version': 3})), isTrue);
+      expect(base64.encode(store.backupKey!), low);
+      expect(store.backupKeyVersion, 3);
+      expect(store.backupsSetUp, isTrue);
     });
 
     test('the shared folder carries it to a Device of the own group, in '
         'the keys file sealed with the personal key', () async {
-      final clock = ticking();
-      final phone = Store.inMemory(clock: clock);
-      final desk = Store.inMemory(clock: clock);
+      final phone = own(null, device: 'Pixel');
+      final desk = own('Ada');
       addTearDown(phone.close);
       addTearDown(desk.close);
       exchange(phone, desk);
       final code = await setUpBackups(phone, passphrase, kdf: cheap);
       final folder = MemorySyncFolder();
       await folderSync(phone, folder);
-      expect(desk.heldBackupKey(phone.deviceId), isNull);
+      expect(desk.backupsSetUp, isFalse);
       await folderSync(desk, folder);
-      expect(desk.otherRecoveryKeys().single.code, code);
+      expect(desk.recoveryCode, code);
       // Nothing of it in plain text.
-      final key = phone.backupKeyToSend!;
+      final key = phone.backupKeyToSend!['key']! as String;
       for (final files in folder.dirs.values) {
         for (final bytes in files.values) {
           expect(
@@ -605,9 +701,8 @@ void main() {
     });
 
     test('a bundle for a Device of the own group carries it too', () async {
-      final clock = ticking();
-      final phone = Store.inMemory(clock: clock);
-      final desk = Store.inMemory(clock: clock);
+      final phone = own(null, device: 'Pixel');
+      final desk = own('Ada');
       addTearDown(phone.close);
       addTearDown(desk.close);
       exchange(phone, desk);
@@ -619,7 +714,49 @@ void main() {
         isNotNull,
       );
       await importBundle(desk, path);
-      expect(desk.otherRecoveryKeys().single.code, code);
+      expect(desk.recoveryCode, code);
+    });
+
+    test('restoring a Backup restores the Profile, the new Device bound '
+        'to it by the old one', () async {
+      final phone = own('Ada', device: 'Pixel');
+      final desk = own(null);
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      exchange(desk, phone);
+      final code = await setUpBackups(phone, passphrase, kdf: cheap);
+      exchange(desk, phone);
+      final id = phone.ownProfile!.id;
+      final shortCode = phone.ownProfileCode;
+      final path = '${dir.path}/phone.$backupExtension';
+      await writeBackup(phone, path);
+
+      // The new phone made a Profile of its own at its first start.
+      final store = fresh('new');
+      addTearDown(store.close);
+      store.applyProfileDefaults(name: 'Pixel 9');
+      var told = 0;
+      store.addProfileListener(() => told++);
+      await restoreBackup(store, path, decodeRecoveryCode(code)!);
+      expect(told, greaterThan(0));
+      expect(store.ownProfile?.id, id);
+      expect(store.ownProfile?.name, 'Ada');
+      expect(store.ownProfileCode, shortCode);
+      expect(store.recoveryCode, code);
+      // Its defaults no longer replace the name.
+      store.applyProfileDefaults(name: 'Pixel 9');
+      expect(store.ownProfile?.name, 'Ada');
+      // Its key is bound to the Profile by the old phone's.
+      final bound = store.ownSignedProfile!.keys.singleWhere(
+        (k) => k.key == store.signingKey.publicBase64,
+      );
+      expect(bound.by, phone.signingKey.publicBase64);
+      // What it changes counts on the desk.
+      store.renameOwnProfile('Ada Lovelace');
+      exchange(store, desk);
+      expect(desk.ownProfile?.name, 'Ada Lovelace');
+      expect(desk.ownProfile?.id, id);
+      expect(desk.recoveryCode, code);
     });
   });
 

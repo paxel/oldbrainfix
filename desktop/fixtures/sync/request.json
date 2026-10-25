@@ -107,7 +107,18 @@
       "scope": "personal"
     }
   ],
-  "backupKey": "SUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2g=",
+  "backupKey": {
+    "key": "SUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2g=",
+    "pass": {
+      "m": 64,
+      "p": 1,
+      "salt": "ra6vsLGys7S1tre4ubq7vA==",
+      "sealed": "e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHC",
+      "t": 1
+    },
+    "profile": "00000000000000000000000000000006",
+    "version": 1
+  },
   "profile": {
     "aliases": [],
     "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",

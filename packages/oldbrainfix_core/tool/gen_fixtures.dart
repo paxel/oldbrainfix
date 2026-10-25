@@ -1322,18 +1322,30 @@ void _conflictsFixture(Directory root) {
   }
 }
 
-/// The keys [store] holds, its own backup key among them (ADR 0016).
+/// The keys [store] holds, the own Profile's backup key among them (ADR
+/// 0016).
 List<List<String>> _keysWithBackup(Store store) => [
   ..._keySettings(store),
-  if (store.localSetting('backup:key') case final key?) ['backup:key', key],
+  ..._backupSettings(store),
 ];
 
-/// The backup key [store] holds of [other], base64, or null.
-String? _heldBackupKey(Store store, Store other) =>
-    switch (store.heldBackupKey(other.deviceId)) {
-      final held? => base64.encode(held.key),
-      null => null,
-    };
+/// The backup key [store] holds, with its sealed copy and version.
+List<List<String>> _backupSettings(Store store) => [
+  for (final key in ['backup:key', 'backup:pass', 'backup:version'])
+    if (store.localSetting(key) case final value?) [key, value],
+];
+
+/// Gives [store] the backup key of bytes counted from [from], with a
+/// sealed copy that is only bytes as well: what travels, not what opens.
+void _plantBackupKey(Store store, int from) => store.keepBackupKeys(
+  Uint8List.fromList(List<int>.generate(32, (i) => from + i)),
+  BackupPass(
+    const BackupKdf(memory: 64, iterations: 1),
+    Uint8List.fromList(List<int>.generate(16, (i) => from + 100 + i)),
+    Uint8List.fromList(List<int>.generate(72, (i) => from + 50 + i)),
+  ),
+  version: 1,
+);
 
 /// Two Devices that met once and wrote more since, then one more LAN
 /// session between them: the logs and keys before it, the joiner's
@@ -1364,21 +1376,15 @@ void _sync(Directory root) {
         .rename(Places.starterId(PlaceKeys.typeArea, 'work'), 'Office');
     Notes(joiner).capture('Pills at eight', photos: [_photo(6)]);
     Notes(host).amend(dentist.id, 'Tuesday works');
-    // Both set Backups up meanwhile: each backup key goes to the other.
-    host.setLocalSetting(
-      'backup:key',
-      base64.encode(List<int>.generate(32, (i) => 41 + i)),
-    );
-    joiner.setLocalSetting(
-      'backup:key',
-      base64.encode(List<int>.generate(32, (i) => 73 + i)),
-    );
     // Each made a Profile meanwhile, the host's named by the user, the
-    // joiner's still the defaults: the joiner takes the host's over.
+    // joiner's still the defaults: the joiner takes the host's over, and
+    // with it the host's backup key in place of its own.
     host
       ..applyProfileDefaults(name: 'Desk')
       ..renameOwnProfile('Ada');
     joiner.applyProfileDefaults(name: 'Pixel 7');
+    _plantBackupKey(host, 41);
+    _plantBackupKey(joiner, 73);
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
@@ -1401,9 +1407,10 @@ void _sync(Directory root) {
     applyAnswer(joiner, done.answer);
     _write(
       File('${out.path}/backup_keys.json'),
-      '${_json.convert({'host': _heldBackupKey(host, joiner), 'joiner': _heldBackupKey(joiner, host)})}\n',
+      '${_json.convert({'host': _backupSettings(host), 'joiner': _backupSettings(joiner)})}\n',
     );
-    if (host.ownProfileCode != joiner.ownProfileCode) {
+    if (host.ownProfileCode != joiner.ownProfileCode ||
+        joiner.recoveryCode != host.recoveryCode) {
       throw StateError('the joiner of the sync fixture kept its Profile');
     }
     _write(
@@ -1496,11 +1503,8 @@ Future<void> _folder(Directory root) async {
     );
     NamedPlaces(host).add('Home', Coordinates(52.52, 13.405), radius: 150);
     host.ensureAreaKeys();
-    // Backups set up on the host: its keys file carries its backup key.
-    host.setLocalSetting(
-      'backup:key',
-      base64.encode(List<int>.generate(32, (i) => 97 + i)),
-    );
+    // Backups set up on the host: its keys file carries the backup key.
+    _plantBackupKey(host, 97);
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
@@ -1522,7 +1526,8 @@ Future<void> _folder(Directory root) async {
     final written = _expected(host)..remove('device');
     if (jsonEncode(expected) != jsonEncode(written) ||
         read.unreadable != 0 ||
-        joiner.ownProfile?.name != 'Ada Lovelace') {
+        joiner.ownProfile?.name != 'Ada Lovelace' ||
+        joiner.recoveryCode != host.recoveryCode) {
       throw StateError('the joiner of the folder fixture did not read it all');
     }
     _write(
@@ -1531,7 +1536,7 @@ Future<void> _folder(Directory root) async {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'backupKey': _heldBackupKey(joiner, host), 'read': expected})}\n',
+      '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'backupKey': _backupSettings(joiner), 'read': expected})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -1624,10 +1629,11 @@ Future<void> _bundle(Directory root) async {
 final _restoredSeed = Uint8List.fromList(List<int>.generate(32, (i) => 65 + i));
 
 /// Ada's Device with Areas, a Shared Area, Notes with a photo and a
-/// recording longer than a chunk, a Routine checked off, a Moment and
-/// another Device's key sets Backups up with the standard cost and
-/// writes a Backup with counted random bytes; a new Device restores it
-/// with the passphrase at a held clock.
+/// recording longer than a chunk, a Routine checked off, a Moment,
+/// another Device's key and her Profile sets Backups up with the
+/// standard cost and writes a Backup with counted random bytes; a new
+/// Device restores it with the passphrase at a held clock, her Profile
+/// with it.
 Future<void> _backupFixture(Directory root) async {
   final out = Directory('${root.path}/backup')..createSync(recursive: true);
   final keep = secretBytes;
@@ -1664,6 +1670,10 @@ Future<void> _backupFixture(Directory root) async {
     );
     ada.learnKeys([joiner.ownKeyRecord], verifiedDevice: joiner.deviceId);
     joiner.close();
+    // Her Profile, named by her, goes into the Backup and comes back.
+    ada
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ada');
     const passphrase = 'Grüße an die Katze';
     final code = await setUpBackups(ada, passphrase);
     final moment = ada.momentRows().single;
@@ -1707,7 +1717,8 @@ Future<void> _backupFixture(Directory root) async {
     final before = _expected(ada)..remove('device');
     before['now'] = expected['now'];
     if (result.roles != 1 ||
-        jsonEncode(expected['notes']) != jsonEncode(before['notes'])) {
+        jsonEncode(expected['notes']) != jsonEncode(before['notes']) ||
+        restored.ownProfileCode != ada.ownProfileCode) {
       throw StateError('the backup fixture did not restore it all');
     }
     _write(
@@ -2799,12 +2810,12 @@ Future<void> main(List<String> args) async {
     '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
     'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
     'request (with its proof for the PIN 246810) and the host\'s answer, '
-    'both with the Area keys and the backup key they hand over, the '
-    'backup key each then holds of the other (`backup_keys.json`), the '
-    'own Profiles both hold after it, the host\'s named by the user and '
-    'taken over by the joiner, whose own still had the defaults '
-    '(`profile.json`), and what both read after the joiner took it in '
-    '(`expected.json`).\n'
+    'both with the Area keys, the own Profile and its backup key, the '
+    'backup key each then holds, the host\'s on both '
+    '(`backup_keys.json`), the own Profiles both hold after it, the '
+    'host\'s named by the user and taken over by the joiner, whose own '
+    'still had the defaults (`profile.json`), and what both read after '
+    'the joiner took it in (`expected.json`).\n'
     '- `conflicts/`: two Devices that met once, then edited the same Note '
     'text, Area name and Routine schedule apart, wrote the same value on '
     'both sides and renamed a Topic on one side only: their logs, the '
@@ -2819,9 +2830,9 @@ Future<void> main(List<String> args) async {
     'synced through the shared folder: both logs with their blobs and the '
     'keys each holds (`settings.json`), the folder the host wrote '
     '(`$syncFolderRoot/`, nonces counted from 1001 on; its keys file '
-    'carries the host\'s backup key and its own Profile, renamed since they '
-    'met), what the joiner reads from it (`expected.json`) and its own '
-    'Profile after (`profile.json`).\n'
+    'carries the own Profile, renamed since they met, and its backup key), '
+    'what the joiner reads from it and the backup key it holds then '
+    '(`expected.json`) and its own Profile after (`profile.json`).\n'
     '- `bundle/`: two Devices that met once; the host wrote more since, a '
     'new Area among it, and a bundle for the joiner: both logs with their '
     'blobs, the keys each holds and what each was told the other holds '
@@ -2859,12 +2870,14 @@ Future<void> main(List<String> args) async {
     '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
     'recording longer than a chunk, a Routine checked off, a Moment and '
     'another Device\'s key: her log with its blobs (`device.jsonl`), the '
-    'keys and the backup key she holds (`settings.json`), her Moments '
+    'keys, her Profile and the backup key she holds (`settings.json`), '
+    'her Moments '
     '(`moments.json`), the Backup she wrote with the standard Argon2id '
     'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
     'at a held clock), and a new Device restoring it with the passphrase '
-    'a day later: its log (`restored.jsonl`), the settings it keeps and '
-    'what it reads (`expected.json`).\n'
+    'a day later: its log (`restored.jsonl`), the settings it keeps, her '
+    'Profile with the new Device\'s key bound to it by the old one\'s '
+    'among them, and what it reads (`expected.json`).\n'
     '- `profiles/`: Profile names as typed and as kept, initials, '
     'placeholder colours, short codes from an id and a first key, records '
     'as they are written and records refused, the own Profile\'s local '

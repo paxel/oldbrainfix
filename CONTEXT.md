@@ -167,4 +167,4 @@ How an Occurrence from a locked Area appears in alarms and on the Agenda when it
 An encrypted file holding everything on a Device, opened with a passphrase.
 
 **Recovery Sheet**:
-A printable page with the recovery key for Backups, for a drawer or a password manager.
+A printable page with the recovery key for the Backups of all of a person's Devices, for a drawer or a password manager. One per Profile.

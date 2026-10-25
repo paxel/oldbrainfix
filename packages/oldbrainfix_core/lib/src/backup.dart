@@ -10,7 +10,7 @@ import 'package:cryptography/dart.dart' show DartArgon2id;
 
 import 'area_keys.dart';
 import 'entry.dart';
-import 'pairing.dart';
+import 'profiles.dart';
 import 'recovery_sheet.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
@@ -25,8 +25,10 @@ import 'sync.dart';
 /// Setting Backups up makes a random backup key, which the Recovery
 /// Sheet shows, and seals it once with a key the passphrase derives
 /// (Argon2id). The Device keeps both, never the passphrase, so a
-/// scheduled Backup needs nobody to type anything. Every file is sealed
-/// with a content key of its own, sealed with the backup key.
+/// scheduled Backup needs nobody to type anything. The key belongs to
+/// the own Profile: the user's other Devices receive it with the sealed
+/// copy and write their own Backups with it. Every file is sealed with a
+/// content key of its own, sealed with the backup key.
 
 /// The file extension of a Backup.
 const backupExtension = 'obfbackup';
@@ -320,7 +322,7 @@ extension Backups on Store {
   static const _last = 'backup:last';
   static const _failed = 'backup:failed';
   static const _auto = 'backup:auto';
-  static const _heldPrefix = 'backupkey:';
+  static const _version = 'backup:version';
 
   /// The backup key, once Backups are set up.
   Uint8List? get backupKey {
@@ -353,10 +355,12 @@ extension Backups on Store {
     null => null,
   };
 
-  /// Keeps the backup [key] and [pass], what a scheduled Backup needs.
-  void keepBackupKeys(Uint8List key, BackupPass pass) {
+  /// Keeps the backup [key] and [pass], what a scheduled Backup needs,
+  /// with the key's [version].
+  void keepBackupKeys(Uint8List key, BackupPass pass, {required int version}) {
     setLocalSetting(_key, base64.encode(key));
     setLocalSetting(_pass, jsonEncode(pass.toJson()));
+    setLocalSetting(_version, '$version');
   }
 
   /// The folder Backups go into, as the platform keeps it.
@@ -408,93 +412,76 @@ extension Backups on Store {
   void _failedAt(DateTime at) =>
       setLocalSetting(_failed, at.toUtc().toIso8601String());
 
-  /// This Device's backup key as it travels to the Devices of its own
-  /// group (ADR 0016): base64, or null before Backups are set up.
-  String? get backupKeyToSend => switch (backupKey) {
-    final key? => base64.encode(key),
-    null => null,
-  };
+  /// The backup key's version: 1 when Backups were first set up, one
+  /// more each time they are set up again, 0 once the Profile it was
+  /// made for was given up for another (ADR 0016, 0017).
+  int get backupKeyVersion => int.tryParse(localSetting(_version) ?? '') ?? 1;
 
-  /// The backup key [device] sent of its own: over a LAN session with
-  /// it, or in its keys file in the shared folder, both of this Device's
-  /// own group only. Kept as it came, the newest one replacing what was
-  /// held, with when it was learned. Returns whether anything changed.
-  bool learnBackupKey(String device, Object? sent) {
-    if (device.isEmpty || device == deviceId || sent is! String) return false;
-    final Uint8List key;
-    try {
-      key = base64.decode(sent);
-    } on FormatException {
-      return false;
-    }
-    if (key.length != backupKeyBytes) return false;
-    if (heldBackupKey(device)?.key case final held?
-        when base64.encode(held) == sent) {
-      return false;
-    }
-    setLocalSetting(
-      '$_heldPrefix$device',
-      jsonEncode({'key': sent, 'learned': clock().toUtc().toIso8601String()}),
-    );
-    return true;
+  /// The backup key as it travels to the user's other Devices (ADR
+  /// 0016): the key, its sealed copy, the own Profile it belongs to and
+  /// its version, keys sorted; null before Backups are set up or before
+  /// the own Profile exists.
+  Map<String, Object?>? get backupKeyToSend {
+    final key = backupKey;
+    final pass = backupPass;
+    final profile = ownProfile;
+    if (key == null || pass == null || profile == null) return null;
+    return {
+      'key': base64.encode(key),
+      'pass': pass.toJson(),
+      'profile': profile.id,
+      'version': backupKeyVersion,
+    };
   }
 
-  /// The backup key the Device [device] sent, and when it came.
-  ({Uint8List key, DateTime learned})? heldBackupKey(String device) {
-    final raw = localSetting('$_heldPrefix$device');
-    if (raw == null) return null;
-    try {
-      if (jsonDecode(raw) case {
-        'key': final String key,
-        'learned': final String learned,
-      }) {
-        final bytes = base64.decode(key);
-        final at = DateTime.tryParse(learned);
-        if (bytes.length == backupKeyBytes && at != null) {
-          return (key: bytes, learned: at.toUtc());
+  /// Takes the backup key [sent] by another of the user's own Devices,
+  /// after its Profile was taken in: only one made for the own Profile,
+  /// and only when it is newer than the one held (a higher version, or
+  /// at the same version the larger key), so Devices that set Backups up
+  /// apart end with the same key. Returns whether it was kept.
+  bool takeBackupKey(Object? sent) {
+    if (sent
+        case {
+          'key': final String key,
+          'pass': final Object pass,
+          'profile': final String profile,
+          'version': final int version,
+        }
+        when version >= 0 && profile == ownProfile?.id) {
+      final sealed = BackupPass.fromJson(pass);
+      final Uint8List bytes;
+      try {
+        bytes = base64.decode(key);
+      } on FormatException {
+        return false;
+      }
+      if (sealed == null || bytes.length != backupKeyBytes) return false;
+      final held = backupKey;
+      if (held != null && backupPass != null) {
+        final mine = backupKeyVersion;
+        final ours = base64.encode(held);
+        if (version < mine || (version == mine && key.compareTo(ours) <= 0)) {
+          return false;
         }
       }
-    } on FormatException {
-      return null;
+      keepBackupKeys(bytes, sealed, version: version);
+      return true;
     }
-    return null;
+    return false;
   }
 
-  /// Drops the backup key of [device], as forgetting it does.
-  void forgetBackupKey(String device) =>
-      removeLocalSetting('$_heldPrefix$device');
-
-  /// The recovery keys of the Devices still paired with this one and of
-  /// its own group (never one paired by invite), by name: what this
-  /// Device shows again, after its own unlock, for one that was lost.
-  List<OtherRecoveryKey> otherRecoveryKeys() => [
-    for (final device in pairedDevices())
-      if (!device.shared)
-        if (heldBackupKey(device.id) case final held?)
-          OtherRecoveryKey(device, encodeRecoveryCode(held.key), held.learned),
-  ];
+  /// Gives the backup key held up to whatever key the own Profile
+  /// brings: the Profile it was made for was given up for another.
+  void yieldBackupKey() {
+    if (backupKey != null) setLocalSetting(_version, '0');
+  }
 }
 
-/// The recovery key of another Device of this one's group (ADR 0016).
-class OtherRecoveryKey {
-  final PairedDevice device;
-
-  /// As the Recovery Sheet of that Device shows it.
-  final String code;
-
-  /// When it came here.
-  final DateTime learned;
-
-  const OtherRecoveryKey(this.device, this.code, this.learned);
-
-  /// The first 8 digits of its device id, as its Backup files are named.
-  String get shortId => device.id.substring(0, min(8, device.id.length));
-}
-
-/// Sets Backups up with [passphrase]: a new backup key, sealed with the
-/// key [passphrase] derives. Returns the recovery key for the Recovery
-/// Sheet. Backups set up before keep opening with their own passphrase
-/// and recovery key.
+/// Sets Backups up with [passphrase]: a new backup key for the own
+/// Profile, sealed with the key [passphrase] derives, one version above
+/// the one held, so it reaches the user's other Devices. Returns the
+/// recovery key for the Recovery Sheet. Backups set up before keep
+/// opening with their own passphrase and recovery key.
 Future<String> setUpBackups(
   Store store,
   String passphrase, {
@@ -504,6 +491,7 @@ Future<String> setUpBackups(
   if (passphrase.trim().length < minPassphraseLength) {
     throw ArgumentError.value(passphrase, 'passphrase', 'too short');
   }
+  final version = store.backupsSetUp ? store.backupKeyVersion + 1 : 1;
   final key = secretBytes(backupKeyBytes);
   final salt = secretBytes(_saltBytes);
   final derived = await derive(passphrase, kdf, salt);
@@ -512,7 +500,7 @@ Future<String> setUpBackups(
     salt,
     seal(derived, key, aad: SealedAs.backupPass),
   );
-  store.keepBackupKeys(key, pass);
+  store.keepBackupKeys(key, pass, version: version);
   return encodeRecoveryCode(key);
 }
 
@@ -579,9 +567,9 @@ class _ChunkWriter {
 /// A record line: the JSON and its line break.
 List<int> _line(String json) => utf8.encode('$json\n');
 
-/// Writes a Backup of [store] to [path]: every entry, Moment, Area key,
-/// pinned key and blob, and this Device's identity; none of its
-/// settings. Backups must be set up. Keys and nonces come from
+/// Writes a Backup of [store] to [path]: this Device's identity, the
+/// own Profile with its binding and the backup key's version, every
+/// entry, Moment, Area key, pinned key and blob; none of its settings. Backups must be set up. Keys and nonces come from
 /// [secretBytes].
 Future<BackupCounts> writeBackup(Store store, String path) async {
   final backupKey = store.backupKey;
@@ -617,6 +605,16 @@ Future<BackupCounts> writeBackup(Store store, String path) async {
         }),
       ),
     );
+    if (store.ownProfileJson case final profile?) {
+      await out.add(
+        _line(
+          jsonEncode({
+            'backupVersion': store.backupKeyVersion,
+            'profile': profile,
+          }),
+        ),
+      );
+    }
     final entries = store.allEntries();
     for (final e in entries) {
       await out.add(_line('{"entry":${jsonEncode(e.toJson())}}'));
@@ -806,8 +804,9 @@ class _ChunkReader {
 /// Restores the Backup at [path], opened with [backupKey], into the
 /// empty log of [store]. This Device keeps its own identity: it takes in
 /// the entries, Moments, blobs, Area keys and pinned keys, pins the old
-/// Device's key as verified, and keeps the backup key, so the Recovery
-/// Sheet stays good. In every Shared Area where the old Device held a
+/// Device's key as verified, takes the own Profile back with its own key
+/// bound to it by the old Device's ([OwnProfile.restoreOwnProfile]),
+/// and keeps the backup key, so the Recovery Sheet stays good. In every Shared Area where the old Device held a
 /// role, it signs the same role for itself as the old Device. Nothing
 /// of the old Device's settings comes along. The log is written in one
 /// transaction, once the whole file proved sound.
@@ -836,6 +835,8 @@ Future<RestoreResult> restoreBackup(
   final moments = <({int seq, String cause, String? label, DateTime at})>[];
   final keys = <AreaKey>[];
   final pinned = <PinnedKey>[];
+  Object? profile;
+  int? version;
   var blobs = 0;
   try {
     raf.setPositionSync(header.line.length + 1);
@@ -877,6 +878,10 @@ Future<RestoreResult> restoreBackup(
           keys.add(AreaKey.fromJson(k) ?? (throw damaged));
         case {'pinned': final Object p}:
           pinned.add(PinnedKey.fromJson(p) ?? (throw damaged));
+        case {'backupVersion': final int v, 'profile': final Object p}:
+          if (v < 0) throw damaged;
+          profile = p;
+          version = v;
         case {'blob': final String ref, 'size': final int size}:
           if (size < 0 || size > _maxBlobBytes) throw damaged;
           final bytes = await payload.bytes(size);
@@ -923,9 +928,12 @@ Future<RestoreResult> restoreBackup(
         p.record,
       ], verifiedDevice: p.trust == KeyTrust.verified ? p.record.device : null);
     }
-    store.keepBackupKeys(backupKey, header.pass);
+    store
+      ..restoreOwnProfile(profile, old: from)
+      ..keepBackupKeys(backupKey, header.pass, version: version ?? 1);
     return _handRoles(store, from);
   });
+  store.profileChanged();
   return RestoreResult(
     from: deviceIdFromKey(from.publicKey),
     entries: entries.length,

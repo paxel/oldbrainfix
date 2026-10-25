@@ -70,6 +70,18 @@ fn profile_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> 
     ))
 }
 
+/// The backup key `store` holds, with its sealed copy and version, as
+/// the Dart core's fixtures list them.
+fn backup_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    for key in ["backup:key", "backup:pass", "backup:version"] {
+        if let Some(value) = store.local_setting(key)? {
+            out.push(json!([key, value]));
+        }
+    }
+    Ok(Value::Array(out))
+}
+
 fn writer_key() -> SigningKey {
     let mut seed = [0u8; 32];
     for (i, b) in seed.iter_mut().enumerate() {
@@ -1225,7 +1237,7 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
     assert!(session.moment.is_some());
     assert_eq!(session.report.refused_count(), 0);
 
-    // Both end up reading the same, and each holds the other's backup key.
+    // Both end up reading the same, with the kept Profile's backup key.
     let back = apply_answer(&joiner, &answer)?;
     // The joiner, still with the defaults, took the host's Profile over.
     let profiles = read_json(&dir.join("profile.json"))?;
@@ -1234,12 +1246,10 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(back.profile.name(), "adopted");
     assert_eq!(back.name, "Desk");
     let held = read_json(&dir.join("backup_keys.json"))?;
-    for (side, store, other) in [("host", &host, &joiner), ("joiner", &joiner, &host)] {
-        let key = store
-            .held_backup_key(&other.device_id()?)?
-            .map(|(k, _)| BASE64.encode(k));
-        assert_eq!(key.as_deref(), held[side].as_str(), "{side}");
+    for (side, store) in [("host", &host), ("joiner", &joiner)] {
+        assert_eq!(backup_settings(store)?, held[side], "{side}");
     }
+    assert_eq!(host.recovery_code()?, joiner.recovery_code()?);
     assert!(!back.applied.is_empty());
     if let Some(map) = expected.as_object_mut() {
         map.remove("device");
@@ -1430,12 +1440,8 @@ fn the_folder_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
     );
     assert_eq!(result.unreadable, 0);
     assert_eq!(result.report.refused_count(), 0);
-    // The host's backup key came in its keys file.
-    let host_id = oldbrainfix_core::signing::device_id_from_key(&writer_key().public_key());
-    let key = joiner
-        .held_backup_key(&host_id)?
-        .map(|(k, _)| BASE64.encode(k));
-    assert_eq!(key.as_deref(), expected["backupKey"].as_str());
+    // The backup key came in the host's keys file.
+    assert_eq!(backup_settings(&joiner)?, expected["backupKey"]);
     // So did the host's Profile, renamed since they met.
     assert!(result.profile_changed);
     assert_eq!(

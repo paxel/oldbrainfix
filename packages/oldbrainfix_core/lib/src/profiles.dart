@@ -5,6 +5,7 @@ import 'package:characters/characters.dart';
 import 'package:crypto/crypto.dart';
 import 'package:image/image.dart' as img;
 
+import 'backup.dart';
 import 'photos.dart';
 import 'signing.dart';
 import 'store.dart';
@@ -1060,6 +1061,52 @@ extension OwnProfile on Store {
       setLocalSetting(_pictureChosen, 'true');
     }
     removeLocalSetting(_asked);
+    // The kept Profile's backup key wins over the one made for the
+    // Profile given up; none held there, this one goes on (ADR 0016).
+    yieldBackupKey();
+  }
+
+  /// Takes the own Profile [sent] back from a Backup made on the Device
+  /// [old], replacing whatever Profile this Device made meanwhile: the
+  /// record with its signature, its binding and its aliases, and whether
+  /// the user chose its name and picture. This Device's key joins the
+  /// binding, signed by the old Device's key the Backup carries, so what
+  /// it changes later counts on the user's other Devices. Returns
+  /// whether a Profile was taken back.
+  bool restoreOwnProfile(Object? sent, {required SigningKey old}) {
+    final theirs = SignedProfile.fromJson(sent);
+    final checked = theirs == null ? null : _check(theirs);
+    if (theirs == null || checked == null) return false;
+    final id = checked.profile.id;
+    final (bound, keys) = _chain(id, theirs.first, checked.keys);
+    final me = signingKey.publicBase64;
+    if (bound.contains(old.publicBase64) && !bound.contains(me)) {
+      keys
+        ..add(
+          ProfileKey(
+            key: me,
+            by: old.publicBase64,
+            sig: old.sign(profileKeyBytes(id, me)),
+          ),
+        )
+        ..sort((a, b) => a.key.compareTo(b.key));
+    }
+    _keepReceived(theirs, checked);
+    setLocalSetting(_first, theirs.first);
+    _keepKeys(keys);
+    _keepAliases([
+      for (final a in theirs.aliases)
+        if (a.alias != id && a.signed) a,
+    ]);
+    if (theirs.fresh) {
+      removeLocalSetting(_nameChosen);
+      removeLocalSetting(_pictureChosen);
+    } else {
+      setLocalSetting(_nameChosen, 'true');
+      setLocalSetting(_pictureChosen, 'true');
+    }
+    removeLocalSetting(_asked);
+    return true;
   }
 
   Object? get _askedJson {

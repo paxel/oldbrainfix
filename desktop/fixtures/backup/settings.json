@@ -17,12 +17,32 @@
       "{\"key\":\"JygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUY=\",\"scope\":\"area:00000000000000000000000000000006\"}"
     ],
     [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ada\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"D3eb7Ocr6qL26/HQWEd+7+hn32qtMLmw/HpPR3tgRyv/12DFFLUWZ7LlkwGBOsaQ8oGNiEmD4J5SHWRQmshYAw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+    ],
+    [
       "backup:key",
       "TE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpams="
     ],
     [
       "backup:pass",
       "{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"sealed\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"t\":3}"
+    ],
+    [
+      "backup:version",
+      "1"
     ]
   ]
 }

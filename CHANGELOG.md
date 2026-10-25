@@ -55,7 +55,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Share a single Area with another person as Manager or Member; every other Area stays private.
 - Send a Note with its Routines and Reminders as a signed file to another Old Brain Fix user, encrypted when you know them, who previews it and accepts it into Unsorted with its alarms on; later updates or cancellations from the same sender change it or move it to the trash.
 - Encrypted Backups of all Areas, Notes, photos, voice recordings, Routines and their history, by hand or weekly into a folder you choose, restored on a new install with your passphrase or the recovery key on a printable Recovery Sheet.
-- A lost Device's recovery key shows again on your other paired Devices after their own unlock, and an opt-in Google backup keeps only the newest encrypted Backup, offered with the passphrase or recovery key on a new phone.
+- One passphrase and one Recovery Sheet open the Backups of all your Devices, a restored Backup brings your Profile back, and an opt-in Google backup keeps only the newest encrypted Backup, offered with the passphrase or recovery key on a new phone.
 - An optional App Lock with a PIN, fingerprint or screen lock that guards your Notes while capturing and alarms stay open.
 - Optional Area Locks that keep single Areas and their Notes hidden until unlocked, with their alarms, Agenda rows, widget and calendar entries shown as "Private Routine" or in full, still checkable.
 - An About page with the version, documentation, source, a way to report problems or write to the developer, and a donation link; it and the desktop's About list every third-party component and its licence.

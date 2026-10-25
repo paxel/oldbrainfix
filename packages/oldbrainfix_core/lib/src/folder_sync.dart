@@ -432,13 +432,13 @@ Future<bool> _learnKeys(
         for (final k in json['signing'] is List ? json['signing'] : const [])
           ?KeyRecord.fromJson(k),
       ], report: report);
-      // Only the writer's own: the file is sealed and bound to it.
-      store.learnBackupKey(device, json['backupKey']);
       if (store.pinnedKey(device)?.record.publicKey case final key?) {
         final taken = store.takeOwnProfile(json['profile'], from: key);
         if (taken != ProfileTaken.unchanged && taken != ProfileTaken.refused) {
           profileChanged = true;
         }
+        // The Profile's backup key, once its Profile was taken in.
+        store.takeBackupKey(json['backupKey']);
       }
       if (store.learnAreaKeys(areaKeysOf(json['areaKeys'])) > 0) {
         learned = true;
@@ -582,7 +582,7 @@ Future<List<Entry>?> _segmentEntries(
 }
 
 /// Publishes the keys this Device holds, its own signing key and every
-/// one it pinned, its own backup key (ADR 0016) and the own Profile,
+/// one it pinned, the own Profile's backup key (ADR 0016) and Profile,
 /// signed, with its binding (ADR 0017), sealed once with each personal
 /// key it holds, so a Device holding any of them learns the rest. A
 /// file that already says the same stays untouched.

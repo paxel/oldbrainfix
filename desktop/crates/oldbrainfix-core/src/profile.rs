@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::photos::strip_jpeg_metadata;
-use crate::signing::verify_signature;
+use crate::signing::{SigningKey, verify_signature};
 use crate::store::Store;
 use crate::{Error, Result};
 
@@ -1148,7 +1148,56 @@ impl<'a> OwnProfile<'a> {
             self.store.set_local_setting(NAME_CHOSEN, "true")?;
             self.store.set_local_setting(PICTURE_CHOSEN, "true")?;
         }
-        self.store.remove_local_setting(ASKED)
+        self.store.remove_local_setting(ASKED)?;
+        // The kept Profile's backup key wins over the one made for the
+        // Profile given up; none held there, this one goes on (ADR 0016).
+        self.store.yield_backup_key()
+    }
+
+    /// Takes the own Profile `sent` back from a Backup made on the Device
+    /// `old`, as the Dart core's `restoreOwnProfile`: it replaces whatever
+    /// Profile this Device made meanwhile, and this Device's key joins the
+    /// binding, signed by the old Device's key. Whether a Profile was
+    /// taken back.
+    pub fn restore(&self, sent: Option<&Value>, old: &SigningKey) -> Result<bool> {
+        let Some(theirs) = sent.and_then(SignedProfile::from_json) else {
+            return Ok(false);
+        };
+        let Some(checked) = check(&theirs) else {
+            return Ok(false);
+        };
+        let id = checked.profile.id.clone();
+        let (bound, mut keys) = chain(&id, &theirs.first, &[], &checked.keys);
+        let me = self.me()?;
+        let by = BASE64.encode(old.public_key());
+        if bound.contains(&by) && !bound.contains(&me) {
+            keys.push(ProfileKey {
+                sig: old.sign(&key_bytes(&id, &me)),
+                key: me,
+                by,
+            });
+            keys.sort_by(|a, b| a.key.cmp(&b.key));
+        }
+        self.keep_received(&theirs, &checked)?;
+        self.store.set_local_setting(FIRST, &theirs.first)?;
+        self.keep_keys(&keys)?;
+        self.keep_aliases(
+            theirs
+                .aliases
+                .iter()
+                .filter(|a| a.alias != id && a.signed())
+                .cloned()
+                .collect(),
+        )?;
+        if theirs.fresh {
+            self.store.remove_local_setting(NAME_CHOSEN)?;
+            self.store.remove_local_setting(PICTURE_CHOSEN)?;
+        } else {
+            self.store.set_local_setting(NAME_CHOSEN, "true")?;
+            self.store.set_local_setting(PICTURE_CHOSEN, "true")?;
+        }
+        self.store.remove_local_setting(ASKED)?;
+        Ok(true)
     }
 
     fn asked(&self) -> Result<Option<SignedProfile>> {

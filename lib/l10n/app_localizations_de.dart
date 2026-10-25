@@ -1951,7 +1951,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen.';
+      'Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.';
 
   @override
   String get backupPassphrase => 'Passphrase';
@@ -1977,11 +1977,15 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wird eingerichtet … das dauert ein paar Sekunden.';
 
   @override
+  String get backupSetUpElsewhere =>
+      'Schon auf einem deiner anderen Geräte eingerichtet? Synchronisiere mit ihm, dann übernimmt dieses Gerät dieselbe Passphrase und denselben Wiederherstellungsschlüssel.';
+
+  @override
   String get backupSheetTitle => 'Wiederherstellungsblatt';
 
   @override
   String get backupSheetIntro =>
-      'Drucke das Wiederherstellungsblatt aus oder bewahre es sicher auf. Sein Wiederherstellungsschlüssel öffnet deine Sicherungen, wenn die Passphrase vergessen ist.';
+      'Drucke das Wiederherstellungsblatt aus oder bewahre es sicher auf. Sein Wiederherstellungsschlüssel öffnet die Sicherungen all deiner Geräte, wenn die Passphrase vergessen ist.';
 
   @override
   String get backupSheetPrint => 'Drucken oder speichern';
@@ -2128,13 +2132,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String recoverySheetDevice(String name) {
-    return 'Gerät: $name';
+  String recoverySheetProfile(String name) {
+    return 'Profil: $name';
   }
 
   @override
   String get recoverySheetPdfIntro =>
-      'Dieser Wiederherstellungsschlüssel öffnet die Sicherungen dieses Geräts, auch wenn die Passphrase vergessen ist. Wer ihn hat, kann sie lesen: Bewahre dieses Blatt sicher auf, in einer Schublade oder einem Passwort-Manager, nie neben den Sicherungen.';
+      'Dieser Wiederherstellungsschlüssel öffnet die Sicherungen all deiner Geräte, auch wenn die Passphrase vergessen ist. Wer ihn hat, kann sie lesen: Bewahre dieses Blatt sicher auf, in einer Schublade oder einem Passwort-Manager, nie neben den Sicherungen.';
 
   @override
   String get recoverySheetKey => 'Wiederherstellungsschlüssel';
@@ -2146,42 +2150,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get recoverySheetStepSettings =>
       'Einstellungen wie Alarme, Ruhezeiten und Sperren sind nicht in einer Sicherung. Stell sie auf dem neuen Gerät neu ein und kopple es noch einmal mit deinen anderen Geräten.';
-
-  @override
-  String get backupOthersTitle =>
-      'Wiederherstellungsschlüssel deiner anderen Geräte';
-
-  @override
-  String get backupOthersIntro =>
-      'Eines deiner anderen Geräte ist verloren? Sein Wiederherstellungsschlüssel öffnet seine Sicherungen auf einem neuen. Wer ihn hat, kann sie lesen: Zeig ihn nur zum Eintippen.';
-
-  @override
-  String backupOthersDetail(String id, String when) {
-    return 'Seine Sicherungsdateien enden auf $id. Erhalten am $when.';
-  }
-
-  @override
-  String get backupOthersShow => 'Wiederherstellungsschlüssel zeigen';
-
-  @override
-  String get backupOthersHide => 'Verbergen';
-
-  @override
-  String backupOthersUnlock(String name) {
-    return 'Wiederherstellungsschlüssel von $name zeigen';
-  }
-
-  @override
-  String backupOthersKeyTitle(String name) {
-    return 'Wiederherstellungsschlüssel von $name';
-  }
-
-  @override
-  String get backupOthersKeyHint =>
-      'Wähle auf dem neuen Gerät seine Sicherungsdatei und tippe diesen Schlüssel dort ein, wo nach der Passphrase oder dem Wiederherstellungsschlüssel gefragt wird.';
-
-  @override
-  String get backupOthersClose => 'Schließen';
 
   @override
   String get backupAutoTitle => 'Google-Sicherung';
@@ -2203,7 +2171,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get restoreFound =>
-      'Dieses Handy hat eine Sicherung aus deinem Google-Konto zurückgebracht. Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt oder von einem deiner anderen Geräte.';
+      'Dieses Handy hat eine Sicherung aus deinem Google-Konto zurückgebracht. Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt.';
 
   @override
   String get restoreFoundSkip => 'Ohne sie anfangen';

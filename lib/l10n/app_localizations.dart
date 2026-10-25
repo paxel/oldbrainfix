@@ -3131,7 +3131,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupsIntro.
   ///
   /// In en, this message translates to:
-  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out.'**
+  /// **'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.'**
   String get backupsIntro;
 
   /// No description provided for @backupPassphrase.
@@ -3176,6 +3176,12 @@ abstract class AppLocalizations {
   /// **'Setting up… this takes a few seconds.'**
   String get backupSettingUp;
 
+  /// No description provided for @backupSetUpElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up already on another of your Devices? Sync with it, and this Device takes the same passphrase and recovery key.'**
+  String get backupSetUpElsewhere;
+
   /// No description provided for @backupSheetTitle.
   ///
   /// In en, this message translates to:
@@ -3185,7 +3191,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupSheetIntro.
   ///
   /// In en, this message translates to:
-  /// **'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens your Backups when the passphrase is forgotten.'**
+  /// **'Print the Recovery Sheet or save it somewhere safe. Its recovery key opens the Backups of all your Devices when the passphrase is forgotten.'**
   String get backupSheetIntro;
 
   /// No description provided for @backupSheetPrint.
@@ -3410,16 +3416,16 @@ abstract class AppLocalizations {
   /// **'Made on {date}'**
   String recoverySheetMade(String date);
 
-  /// No description provided for @recoverySheetDevice.
+  /// No description provided for @recoverySheetProfile.
   ///
   /// In en, this message translates to:
-  /// **'Device: {name}'**
-  String recoverySheetDevice(String name);
+  /// **'Profile: {name}'**
+  String recoverySheetProfile(String name);
 
   /// No description provided for @recoverySheetPdfIntro.
   ///
   /// In en, this message translates to:
-  /// **'This recovery key opens the Backups of this Device, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.'**
+  /// **'This recovery key opens the Backups of all your Devices, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.'**
   String get recoverySheetPdfIntro;
 
   /// No description provided for @recoverySheetKey.
@@ -3439,60 +3445,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.'**
   String get recoverySheetStepSettings;
-
-  /// No description provided for @backupOthersTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery keys of your other Devices'**
-  String get backupOthersTitle;
-
-  /// No description provided for @backupOthersIntro.
-  ///
-  /// In en, this message translates to:
-  /// **'Lost one of your other Devices? Its recovery key opens its Backups on a new one. Whoever holds it can read them: show it only to type it in.'**
-  String get backupOthersIntro;
-
-  /// No description provided for @backupOthersDetail.
-  ///
-  /// In en, this message translates to:
-  /// **'Its Backup files end in {id}. Received {when}.'**
-  String backupOthersDetail(String id, String when);
-
-  /// No description provided for @backupOthersShow.
-  ///
-  /// In en, this message translates to:
-  /// **'Show recovery key'**
-  String get backupOthersShow;
-
-  /// No description provided for @backupOthersHide.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide'**
-  String get backupOthersHide;
-
-  /// No description provided for @backupOthersUnlock.
-  ///
-  /// In en, this message translates to:
-  /// **'Show the recovery key of {name}'**
-  String backupOthersUnlock(String name);
-
-  /// No description provided for @backupOthersKeyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Recovery key of {name}'**
-  String backupOthersKeyTitle(String name);
-
-  /// No description provided for @backupOthersKeyHint.
-  ///
-  /// In en, this message translates to:
-  /// **'On the new Device, choose its Backup file and type this key where it asks for the passphrase or the recovery key.'**
-  String get backupOthersKeyHint;
-
-  /// No description provided for @backupOthersClose.
-  ///
-  /// In en, this message translates to:
-  /// **'Close'**
-  String get backupOthersClose;
 
   /// No description provided for @backupAutoTitle.
   ///
@@ -3527,7 +3479,7 @@ abstract class AppLocalizations {
   /// No description provided for @restoreFound.
   ///
   /// In en, this message translates to:
-  /// **'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.'**
+  /// **'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet.'**
   String get restoreFound;
 
   /// No description provided for @restoreFoundSkip.

@@ -162,8 +162,8 @@ bool trustsPairedJoiner(
 /// paired with it before lets it in without asking only then. The
 /// Area keys travel along (ADR 0012): only over this session, which the
 /// pair code or the pinned certificate authenticated; to a Device of
-/// this one's own group this Device's backup key (ADR 0016) and the own
-/// Profile, signed, with its binding (ADR 0017) as well.
+/// this one's own group the own Profile's backup key (ADR 0016) and the
+/// Profile itself, signed, with its binding (ADR 0017) as well.
 ///
 /// To another person's Device (ADR 0013) only what it shares goes: when
 /// the host invites this Device ([invited]), nothing at all; when this
@@ -182,7 +182,7 @@ Map<String, Object?> syncRequest(
   store.ensureAreaKeys();
   final List<Entry> entries;
   final List<AreaKey> areaKeys;
-  // This Device's backup key goes to a Device of its own group only.
+  // The backup key goes to a Device of its own group only.
   var own = false;
   if (invited) {
     entries = const [];
@@ -291,7 +291,6 @@ List<String> _missingFor(Store store, String peer) {
   final before = store.currentSeq();
   if (!shared) {
     store.learnAreaKeys(areaKeysOf(body['areaKeys']));
-    store.learnBackupKey(peer, body['backupKey']);
   }
   final applied = store.applyEntries(
     inviting != null ? const [] : _entries(body['entries']),
@@ -317,7 +316,7 @@ List<String> _missingFor(Store store, String peer) {
     );
   } else if (!shared) {
     store.extendRolesTo(peer);
-    profile = _takeProfile(store, peer, body['profile']);
+    profile = _takeProfile(store, peer, body);
   }
   final moment = store.momentFor(
     before: before,
@@ -364,12 +363,15 @@ List<String> _missingFor(Store store, String peer) {
   );
 }
 
-/// Takes in the own Profile [sent] by [peer], a Device of this one's own
-/// group whose key the session verified; nothing without that key.
-ProfileTaken _takeProfile(Store store, String peer, Object? sent) {
+/// Takes in the own Profile [peer] sent in [body], a Device of this
+/// one's own group whose key the session verified, then the backup key
+/// it sent for that Profile (ADR 0016); nothing without that key.
+ProfileTaken _takeProfile(Store store, String peer, Map<String, Object?> body) {
   final key = store.pinnedKey(peer)?.record.publicKey;
   if (key == null || peer.isEmpty) return ProfileTaken.unchanged;
-  return store.takeOwnProfile(sent, from: key);
+  final taken = store.takeOwnProfile(body['profile'], from: key);
+  store.takeBackupKey(body['backupKey']);
+  return taken;
 }
 
 /// The joiner takes in the host's `/sync` [answer]; the host's own key
@@ -396,7 +398,6 @@ SyncSession applyAnswer(
   final before = store.currentSeq();
   if (!shared) {
     store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
-    store.learnBackupKey(host, answer['backupKey']);
   }
   final applied = store.applyEntries(
     _entries(answer['entries']),
@@ -413,7 +414,7 @@ SyncSession applyAnswer(
     ]);
   } else {
     store.extendRolesTo(host);
-    profile = _takeProfile(store, host, answer['profile']);
+    profile = _takeProfile(store, host, answer);
   }
   return SyncSession(
     peer: host,

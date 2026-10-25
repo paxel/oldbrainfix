@@ -9,13 +9,11 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
-import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
-import 'pairing_platform.dart';
 
 /// [backupPassKey] in an isolate of its own, so the screen keeps
 /// moving while Argon2id works.
@@ -28,20 +26,20 @@ Future<Uint8List> isolatePassKey(
 /// The name the Recovery Sheet is shared and printed under.
 const recoverySheetName = 'oldbrainfix-recovery-sheet.pdf';
 
-/// The Recovery Sheet for [code] in the app's language, made [at] on
-/// the Device [device].
+/// The Recovery Sheet for [code] in the app's language, made [at] for
+/// the own Profile named [profile].
 Uint8List recoverySheetBytes(
   AppLocalizations t,
   String locale,
   String code, {
-  required String device,
+  required String profile,
   required DateTime at,
 }) => recoverySheetPdf(
   RecoverySheet(
     title: t.recoverySheetPdfTitle,
     about: [
       t.recoverySheetMade(DateFormat.yMMMMd(locale).add_Hm().format(at)),
-      t.recoverySheetDevice(device),
+      t.recoverySheetProfile(profile.isEmpty ? t.profileNoName : profile),
     ],
     intro: [t.recoverySheetPdfIntro],
     codeLabel: t.recoverySheetKey,
@@ -50,14 +48,14 @@ Uint8List recoverySheetBytes(
   code,
 );
 
-/// Backups, inside Settings (ADR 0010, 0016): set up once with a
+/// Backups, from the Profile page (ADR 0010, 0016): set up once with a
 /// passphrase, which makes the Recovery Sheet to print or share at once
-/// and again later; then the opt-in to keep the newest one in the user's
-/// Google account where the platform has one, the folder they go into,
-/// the weekly switch, "Back up now" and how the last one went; and the
-/// recovery keys of the other Devices of this one's group, each shown
-/// after this Device's own unlock. What happened, or why not, is
-/// announced at the top.
+/// and again later, or taken from another of the user's Devices in a
+/// sync, as the backup key belongs to the Profile; then the opt-in to
+/// keep the newest one in the user's Google account where the platform
+/// has one, the folder they go into, the weekly switch, "Back up now"
+/// and how the last one went. What happened, or why not, is announced
+/// at the top.
 class BackupScreen extends StatefulWidget {
   final Store store;
 
@@ -173,45 +171,6 @@ class _BackupScreenState extends State<BackupScreen> {
     if (mounted) setState(() => _autoTooBig = false);
   }
 
-  /// Shows the recovery key of [other] after this Device's own unlock.
-  Future<void> _showOther(OtherRecoveryKey other) async {
-    final t = context.t;
-    final lock = LockScope.of(context);
-    final ok = await confirmUnlock(
-      context,
-      lock,
-      title: t.backupOthersUnlock(other.device.name),
-    );
-    if (!ok || !mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.key_outlined),
-        title: Text(t.backupOthersKeyTitle(other.device.name)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SelectableText(
-              other.code,
-              key: const ValueKey('other-code'),
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontFamily: 'monospace'),
-            ),
-            const SizedBox(height: 12),
-            Text(t.backupOthersKeyHint),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.backupOthersClose),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _setUp() async {
     final t = context.t;
     final passphrase = _passphrase.text;
@@ -245,13 +204,11 @@ class _BackupScreenState extends State<BackupScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final bundles = BundleScope.of(context);
-    final pairing = PairingScope.of(context);
     final code = _store.recoveryCode;
     if (code == null) return;
     setState(() => _sheetBusy = true);
     try {
       final path = await bundles.exportPath(recoverySheetName);
-      final device = await pairing.deviceName();
       if (!mounted) return;
       if (path == null) {
         _announce(t.backupSheetFailed);
@@ -262,7 +219,7 @@ class _BackupScreenState extends State<BackupScreen> {
           t,
           locale,
           code,
-          device: device,
+          profile: _store.ownProfile?.name ?? '',
           at: _store.clock().toLocal(),
         ),
         flush: true,
@@ -338,6 +295,8 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   List<Widget> _setUpForm(AppLocalizations t) => [
+    Text(t.backupSetUpElsewhere),
+    const SizedBox(height: 12),
     TextField(
       key: const ValueKey('passphrase'),
       controller: _passphrase,
@@ -475,40 +434,6 @@ class _BackupScreenState extends State<BackupScreen> {
     ];
   }
 
-  /// The recovery keys of the other Devices of this one's group, each
-  /// a tap and this Device's unlock away.
-  List<Widget> _others(AppLocalizations t, DateFormat when) {
-    final others = _store.otherRecoveryKeys();
-    if (others.isEmpty) return const [];
-    return [
-      if (!_store.backupsSetUp) const SizedBox(height: 16),
-      _Card(
-        title: t.backupOthersTitle,
-        children: [
-          Text(t.backupOthersIntro),
-          for (final other in others)
-            ListTile(
-              key: ValueKey('other-${other.device.id}'),
-              contentPadding: EdgeInsets.zero,
-              title: Text(other.device.name),
-              subtitle: Text(
-                t.backupOthersDetail(
-                  other.shortId,
-                  when.format(other.learned.toLocal()),
-                ),
-              ),
-              trailing: IconButton(
-                tooltip: t.backupOthersShow,
-                icon: const Icon(Icons.key_outlined),
-                onPressed: () => unawaited(_showOther(other)),
-              ),
-              onTap: () => unawaited(_showOther(other)),
-            ),
-        ],
-      ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -522,7 +447,6 @@ class _BackupScreenState extends State<BackupScreen> {
           Text(t.backupsIntro),
           const SizedBox(height: 16),
           if (_store.backupsSetUp) ..._setUpDone(t, when) else ..._setUpForm(t),
-          ..._others(t, when),
         ],
       ),
     );
