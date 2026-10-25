@@ -40,6 +40,16 @@ const QUERIES: [&str; 12] = [
 /// `_future` stores it.
 const FUTURE: &str = r##"{"format":"x-future","text":"# Heading\n**bold** \u00fc","x":1}"##;
 
+/// Texts by the version of their structure, as the generator's
+/// `_versioned` stores them.
+const VERSIONED: [&str; 5] = [
+    r#"{"format":"plain","text":"Version one written out","v":1}"#,
+    r##"{"format":"x-future","text":"# Version one","v":1}"##,
+    r#"{"format":"plain","text":"Version two","v":2,"x":1}"#,
+    r#"{"format":"plain","v":2}"#,
+    r#"{"format":"plain","text":"Odd version","v":"1"}"#,
+];
+
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
@@ -119,6 +129,7 @@ fn note_json(note: &Note) -> Value {
         "id": note.id,
         "text": note.text,
         "textFormat": note.text_format,
+        "textVersion": note.text_version,
         "textEditable": note.text_editable,
         "captured": dart_iso(note.captured),
         "place": note.place,
@@ -139,6 +150,7 @@ fn section_json(section: &Section) -> Value {
         "noteId": section.note_id,
         "text": section.text,
         "textFormat": section.text_format,
+        "textVersion": section.text_version,
         "textEditable": section.text_editable,
         "captured": dart_iso(section.captured),
         "photos": section.photos,
@@ -551,6 +563,10 @@ fn write_formats(store: &Store) -> Built {
     notes.merge(&f.id, &host.id)?;
     let g = notes.capture("Formatted, standing alone", None, None)?;
     store.append(&g.id, note_keys::TEXT, Some(FUTURE), None)?;
+    for value in VERSIONED {
+        let note = notes.capture("Versioned", None, None)?;
+        store.append(&note.id, note_keys::TEXT, Some(value), None)?;
+    }
     Ok(())
 }
 

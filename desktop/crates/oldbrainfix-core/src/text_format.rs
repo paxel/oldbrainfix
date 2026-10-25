@@ -11,20 +11,28 @@ pub const PLAIN: &str = "plain";
 /// Every format this version reads and writes.
 pub const KNOWN: [&str; 1] = [PLAIN];
 
-/// A user text as stored: its format and its text, the source text for a
-/// format this version does not know.
+/// The newest structure of the stored value this version knows: `v` 1
+/// holds `format` and `text` and nothing else.
+pub const VERSION: i64 = 1;
+
+/// A user text as stored: its format, its text, the source text for a
+/// format this version does not know, and the version of the value's
+/// structure.
 ///
 /// It is stored as one value, `{"format":…,"text":…}`, keys sorted and no
 /// spaces, the same bytes from both cores, so text and format travel,
-/// conflict and win together in one entry. A value that is no such
-/// object was written before the format was recorded and reads as plain,
-/// whole.
+/// conflict and win together in one entry. `v` is written only when it
+/// is more than 1, its default; a value without it is version 1. A value that is no such object was written before the
+/// format was recorded and reads as plain, whole.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoredText {
     pub format: String,
     pub text: String,
-    /// Whether this version may change it: its format is known and the
-    /// value holds nothing else.
+    /// The version of the value's structure, `v`: which keys it has and
+    /// what they mean.
+    pub version: i64,
+    /// Whether this version may change it: its structure and its format
+    /// are known and the value holds nothing else.
     pub editable: bool,
 }
 
@@ -34,44 +42,80 @@ impl StoredText {
         StoredText {
             format: PLAIN.to_string(),
             text: text.to_string(),
+            version: VERSION,
             editable: true,
         }
     }
 
-    /// `text` in `format` as it arrived from elsewhere, such as a Sent
-    /// Item, to be stored as it is.
-    pub fn of(format: &str, text: &str) -> StoredText {
+    /// `text` in `format` with structure `version` as it arrived from
+    /// elsewhere, such as a Sent Item, to be stored as it is.
+    pub fn of(format: &str, text: &str, version: i64) -> StoredText {
         StoredText {
             format: format.to_string(),
             text: text.to_string(),
-            editable: KNOWN.contains(&format),
+            version,
+            editable: version <= VERSION && KNOWN.contains(&format),
         }
     }
 
     /// The text a stored `value` holds; `None` reads as empty plain text.
+    ///
+    /// Up to the version known here, a value needs a string `format` and a
+    /// string `text`. A later version may change or add keys: its value
+    /// shows `text` when it is a string, nothing otherwise, and is never
+    /// editable here.
     pub fn read(value: Option<&str>) -> StoredText {
         let Some(value) = value else {
             return StoredText::plain("");
         };
         if value.starts_with('{')
             && let Ok(Value::Object(json)) = serde_json::from_str::<Value>(value)
-            && let (Some(Value::String(format)), Some(Value::String(text))) =
-                (json.get("format"), json.get("text"))
+            && let Some(marked) = Self::marked(&json)
         {
-            return StoredText {
-                format: format.clone(),
-                text: text.clone(),
-                editable: KNOWN.contains(&format.as_str()) && json.len() == 2,
-            };
+            return marked;
         }
         StoredText::plain(value)
     }
 
-    /// The value it is stored as.
+    /// The text `json` holds when it is a marked value, `None` when not.
+    fn marked(json: &Map<String, Value>) -> Option<StoredText> {
+        let version = match json.get("v") {
+            None => VERSION,
+            Some(v) => v.as_i64().filter(|v| *v >= 1)?,
+        };
+        let string = |key: &str| match json.get(key) {
+            Some(Value::String(s)) => Some(s.clone()),
+            _ => None,
+        };
+        if version > VERSION {
+            return Some(StoredText {
+                format: string("format").unwrap_or_default(),
+                text: string("text").unwrap_or_default(),
+                version,
+                editable: false,
+            });
+        }
+        let (format, text) = (string("format")?, string("text")?);
+        let keys = if json.contains_key("v") { 3 } else { 2 };
+        let editable = KNOWN.contains(&format.as_str()) && json.len() == keys;
+        Some(StoredText {
+            format,
+            text,
+            version,
+            editable,
+        })
+    }
+
+    /// The value it is stored as, keys inserted in order so the bytes are
+    /// the same with or without serde_json's `preserve_order`; version 1,
+    /// the default, says no `v`.
     pub fn encode(&self) -> String {
         let mut map = Map::new();
         map.insert("format".into(), Value::String(self.format.clone()));
         map.insert("text".into(), Value::String(self.text.clone()));
+        if self.version != VERSION {
+            map.insert("v".into(), Value::from(self.version));
+        }
         Value::Object(map).to_string()
     }
 }
@@ -81,6 +125,7 @@ mod tests {
     use super::*;
 
     const FUTURE: &str = r##"{"format":"x-future","text":"# Heading\n**bold**"}"##;
+    const LATER: &str = r#"{"format":"plain","more":1,"text":"Later milk","v":2}"#;
 
     #[test]
     fn plain_text_is_written_with_its_format_keys_sorted() {
@@ -89,9 +134,23 @@ mod tests {
             r#"{"format":"plain","text":"Quote \" and \\ and \n"}"#
         );
         assert_eq!(
-            StoredText::read(Some(r#"{"format":"plain","text":"milk"}"#)),
+            StoredText::read(Some(r#"{"format":"plain","text":"milk","v":1}"#)),
             StoredText::plain("milk")
         );
+    }
+
+    #[test]
+    fn version_1_is_the_default_and_never_written() {
+        let unversioned = StoredText::read(Some(r#"{"format":"plain","text":"milk"}"#));
+        assert_eq!(unversioned, StoredText::plain("milk"));
+        // Written with its default, it is read the same and written without.
+        assert_eq!(
+            StoredText::read(Some(r#"{"format":"plain","text":"milk","v":1}"#)).encode(),
+            r#"{"format":"plain","text":"milk"}"#
+        );
+        let future = StoredText::read(Some(FUTURE));
+        assert_eq!(future.version, 1);
+        assert!(!future.editable);
     }
 
     #[test]
@@ -104,6 +163,14 @@ mod tests {
             r#"{"format":3,"text":"x"}"#,
             r#"["format","text"]"#,
             r#" {"format":"x-future","text":"x"}"#,
+            r#"{"format":"plain","text":"x","v":"1"}"#,
+            r#"{"format":"plain","text":"x","v":1.5}"#,
+            r#"{"format":"plain","text":"x","v":0}"#,
+            r#"{"format":"plain","text":"x","v":-1}"#,
+            r#"{"format":"plain","text":"x","v":true}"#,
+            r#"{"format":"plain","text":"x","v":null}"#,
+            r#"{"format":"plain","v":1}"#,
+            r#"{"text":"x","v":1}"#,
         ] {
             assert_eq!(StoredText::read(Some(value)), StoredText::plain(value));
         }
@@ -116,8 +183,48 @@ mod tests {
         assert_eq!(text.format, "x-future");
         assert_eq!(text.text, "# Heading\n**bold**");
         assert!(!text.editable);
-        let more = StoredText::read(Some(r#"{"format":"plain","more":1,"text":"x"}"#));
-        assert_eq!((more.format.as_str(), more.text.as_str()), (PLAIN, "x"));
-        assert!(!more.editable);
+        for value in [
+            r#"{"format":"plain","more":1,"text":"x"}"#,
+            r#"{"format":"plain","more":1,"text":"x","v":1}"#,
+        ] {
+            let more = StoredText::read(Some(value));
+            assert_eq!((more.format.as_str(), more.text.as_str()), (PLAIN, "x"));
+            assert!(!more.editable);
+        }
+        let unknown = StoredText::read(Some(r#"{"format":"x-future","text":"x","v":1}"#));
+        assert_eq!(unknown.format, "x-future");
+        assert!(!unknown.editable);
+    }
+
+    #[test]
+    fn a_later_structure_shows_its_text_never_editable() {
+        let later = StoredText::read(Some(LATER));
+        assert_eq!(
+            (later.format.as_str(), later.text.as_str(), later.version),
+            (PLAIN, "Later milk", 2)
+        );
+        assert!(!later.editable);
+        assert_ne!(later, StoredText::plain("Later milk"));
+        // Without text, or keys of another kind, it shows nothing.
+        for value in [
+            r#"{"format":"plain","v":2}"#,
+            r#"{"format":"plain","text":["x"],"v":2}"#,
+            r#"{"text":7,"v":3}"#,
+        ] {
+            let text = StoredText::read(Some(value));
+            assert_eq!(text.text, "", "{value}");
+            assert!(!text.editable, "{value}");
+        }
+        assert_eq!(StoredText::read(Some(r#"{"text":7,"v":3}"#)).format, "");
+    }
+
+    #[test]
+    fn a_text_from_elsewhere_keeps_its_version() {
+        let later = StoredText::of(PLAIN, "x", 2);
+        assert!(!later.editable);
+        assert_eq!(later.encode(), r#"{"format":"plain","text":"x","v":2}"#);
+        assert_eq!(StoredText::read(Some(&later.encode())), later);
+        assert!(StoredText::of(PLAIN, "x", VERSION).editable);
+        assert!(!StoredText::of("x-future", "x", 1).editable);
     }
 }

@@ -425,6 +425,47 @@ mod tests {
     }
 
     #[test]
+    fn a_text_with_version_1_written_out_is_the_same_as_without() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let note = Notes::new(&a).capture("Milk", None, None)?;
+        send(&a, &b)?;
+        Notes::new(&a).edit(&note.id, "Oat milk")?;
+        b.append(
+            &note.id,
+            note_keys::TEXT,
+            Some(r#"{"format":"plain","text":"Oat milk","v":1}"#),
+            None,
+        )?;
+        send(&b, &a)?;
+        assert!(a.conflicts()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_conflict_with_a_later_structure_is_not_resolved_here() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let note = Notes::new(&a).capture("Milk", None, None)?;
+        send(&a, &b)?;
+        Notes::new(&a).edit(&note.id, "Oat milk")?;
+        b.append(
+            &note.id,
+            note_keys::TEXT,
+            Some(r#"{"format":"plain","text":"Oat milk","v":2}"#),
+            None,
+        )?;
+        send(&b, &a)?;
+        let conflict = a.conflicts()?.remove(0);
+        assert!(!conflict.resolvable());
+        assert!(
+            a.resolve_conflict(&conflict, &conflict.versions[0])
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn a_sequential_edit_or_the_same_value_is_no_conflict() -> Result<()> {
         let a = device(1)?;
         let b = device(2)?;

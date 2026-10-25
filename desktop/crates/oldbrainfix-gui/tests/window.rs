@@ -40,8 +40,9 @@ fn harness(
     let mut app = App::new(store(scenario)?, locale);
     // These tests browse the Notes; the window opens on the Agenda.
     app.select(Selection::All);
+    // Tall enough for every Note of the `formats` scenario unscrolled.
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 800.0))
+        .with_size(egui::vec2(1280.0, 1400.0))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());
@@ -424,6 +425,47 @@ fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> Test
     // A plain Note says nothing of it.
     assert_ne!(harness.state().selected_note(), Some(id.as_str()));
     assert!(!shows(&harness, NEWER));
+    Ok(())
+}
+
+#[test]
+fn a_text_in_a_later_structure_shows_as_it_is_and_version_1_is_plain() -> TestResult {
+    const NEWER: &str =
+        "This text was written with a newer version of Old Brain Fix. Update the app to change it.";
+    let mut harness = harness("formats", "en")?;
+    // Version 2, a known format and a key more: its text, read-only.
+    card(&harness, "Version two").click();
+    harness.run();
+    let id = harness
+        .state()
+        .selected_note()
+        .ok_or("selected")?
+        .to_string();
+    let before = harness.state().store().current(&id, "text")?;
+    assert!(shows(&harness, NEWER));
+    assert!(
+        harness
+            .query_by(|n| n.role() == Role::MultilineTextInput
+                && n.value().is_some_and(|v| v.contains("Version two")))
+            .is_none(),
+        "no field to type into"
+    );
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    harness.run();
+    assert_eq!(harness.state().store().current(&id, "text")?, before);
+    // Version 1 in a format not known here: read-only too.
+    harness
+        .query_all_by_label_contains("# Version one")
+        .next()
+        .ok_or("the card")?
+        .click();
+    harness.run();
+    assert!(shows(&harness, NEWER));
+    // Version 1 written out, in a known format, is editable.
+    card(&harness, "Version one written out").click();
+    harness.run();
+    assert!(!shows(&harness, NEWER));
+    holding(&harness, "Version one written out");
     Ok(())
 }
 

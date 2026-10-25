@@ -9,6 +9,10 @@ import 'sync_test.dart' show ticking;
 /// would store it.
 const _future = '{"format":"x-future","text":"# Heading\\n**bold**"}';
 
+/// A plain text in a later structure with a key this version does not
+/// know.
+const _later = '{"format":"plain","more":1,"text":"Later milk","v":2}';
+
 void main() {
   group('the stored value', () {
     test('plain text is written with its format, keys sorted', () {
@@ -17,8 +21,23 @@ void main() {
         '{"format":"plain","text":"Quote \\" and \\\\ and \\n"}',
       );
       expect(
+        StoredText.read('{"format":"plain","text":"milk","v":1}'),
+        const StoredText.plain('milk'),
+      );
+    });
+
+    test('version 1 is the default and never written', () {
+      expect(
         StoredText.read('{"format":"plain","text":"milk"}'),
         const StoredText.plain('milk'),
+      );
+      final future = StoredText.read(_future);
+      expect(future.version, 1);
+      expect(future.editable, isFalse);
+      // Written with its default, it is read the same and written without.
+      expect(
+        StoredText.read('{"format":"plain","text":"milk","v":1}').encode(),
+        '{"format":"plain","text":"milk"}',
       );
     });
 
@@ -31,6 +50,14 @@ void main() {
         '{"format":3,"text":"x"}',
         '["format","text"]',
         ' {"format":"x-future","text":"x"}',
+        '{"format":"plain","text":"x","v":"1"}',
+        '{"format":"plain","text":"x","v":1.5}',
+        '{"format":"plain","text":"x","v":0}',
+        '{"format":"plain","text":"x","v":-1}',
+        '{"format":"plain","text":"x","v":true}',
+        '{"format":"plain","text":"x","v":null}',
+        '{"format":"plain","v":1}',
+        '{"text":"x","v":1}',
       ]) {
         final text = StoredText.read(value);
         expect(text.format, TextFormats.plain, reason: value);
@@ -50,6 +77,43 @@ void main() {
       expect(more.format, TextFormats.plain);
       expect(more.text, 'x');
       expect(more.editable, isFalse);
+      final versioned = StoredText.read(
+        '{"format":"plain","more":1,"text":"x","v":1}',
+      );
+      expect(versioned.text, 'x');
+      expect(versioned.editable, isFalse);
+      final unknown = StoredText.read('{"format":"x-future","text":"x","v":1}');
+      expect(unknown.format, 'x-future');
+      expect(unknown.editable, isFalse);
+    });
+
+    test('a later structure shows its text, never editable', () {
+      final later = StoredText.read(_later);
+      expect(later.format, TextFormats.plain);
+      expect(later.text, 'Later milk');
+      expect(later.version, 2);
+      expect(later.editable, isFalse);
+      expect(later, isNot(const StoredText.plain('Later milk')));
+      // Without text, or keys of another kind, it shows nothing.
+      for (final value in [
+        '{"format":"plain","v":2}',
+        '{"format":"plain","text":["x"],"v":2}',
+        '{"text":7,"v":3}',
+      ]) {
+        final text = StoredText.read(value);
+        expect(text.text, '', reason: value);
+        expect(text.editable, isFalse, reason: value);
+      }
+      expect(StoredText.read('{"text":7,"v":3}').format, '');
+    });
+
+    test('a text from elsewhere keeps its version', () {
+      final later = StoredText.of(TextFormats.plain, 'x', 2);
+      expect(later.editable, isFalse);
+      expect(later.encode(), '{"format":"plain","text":"x","v":2}');
+      expect(StoredText.read(later.encode()), later);
+      expect(StoredText.of(TextFormats.plain, 'x').editable, isTrue);
+      expect(StoredText.of('x-future', 'x', 1).editable, isFalse);
     });
   });
 
@@ -82,8 +146,25 @@ void main() {
       final read = notes.byId(note.id)!;
       expect(read.text, 'Needs more sauce');
       expect(read.textFormat, TextFormats.plain);
+      expect(read.textVersion, 1);
       expect(read.textEditable, isTrue);
       expect(notes.sections(note.id).single.textEditable, isTrue);
+    });
+
+    test('a text in a later structure is never overwritten here', () {
+      final note = notes.capture('x');
+      store.append(note.id, NoteKeys.text, _later);
+      final read = notes.byId(note.id)!;
+      expect(read.text, 'Later milk');
+      expect(read.textVersion, 2);
+      expect(read.textEditable, isFalse);
+      expect(() => notes.edit(note.id, 'Plain now'), throwsStateError);
+      final section = notes.amend(note.id, 'Amended');
+      store.append(section.id, SectionKeys.text, _later);
+      final shown = notes.sections(note.id).single;
+      expect(shown.textVersion, 2);
+      expect(shown.textEditable, isFalse);
+      expect(store.current(note.id, NoteKeys.text), _later);
     });
 
     test('a text written before the format was recorded reads as plain', () {
@@ -180,6 +261,33 @@ void main() {
       conflicts.exchange(phone, desk);
       expect(phone.conflicts(), isEmpty);
     });
+
+    test('a text with version 1 written out is the same as without', () {
+      final note = Notes(phone).capture('Milk');
+      conflicts.exchange(phone, desk);
+      Notes(phone).edit(note.id, 'Oat milk');
+      desk.append(
+        note.id,
+        NoteKeys.text,
+        '{"format":"plain","text":"Oat milk","v":1}',
+      );
+      conflicts.exchange(phone, desk);
+      expect(phone.conflicts(), isEmpty);
+    });
+
+    test('a Conflict with a later structure is not resolved here', () {
+      final note = Notes(phone).capture('Milk');
+      conflicts.exchange(phone, desk);
+      Notes(phone).edit(note.id, 'Oat milk');
+      desk.append(note.id, NoteKeys.text, _later);
+      conflicts.exchange(phone, desk);
+      final conflict = phone.conflicts().single;
+      expect(conflict.resolvable, isFalse);
+      expect(
+        () => phone.resolveConflict(conflict, conflict.versions.first),
+        throwsStateError,
+      );
+    });
   });
 
   group('Sent Items', () {
@@ -197,6 +305,8 @@ void main() {
       final payload = item.encode();
       expect(payload, contains('"note":{"format":"x-future","sections":['));
       expect(payload, contains(',"format":"plain","text":"Room 3"}'));
+      // Version 1, the default, is not written.
+      expect(payload, isNot(contains('"v":')));
 
       final got = acceptSentItem(ben, item)!;
       expect(ben.current(got, NoteKeys.text), _future);
@@ -220,7 +330,9 @@ void main() {
         ).encode().replaceAll('"format":"plain",', ''),
       )!;
       expect(item.textFormat, TextFormats.plain);
+      expect(item.textVersion, 1);
       expect(item.sections.single.format, TextFormats.plain);
+      expect(item.sections.single.version, 1);
       expect(
         SentItem.parse(
           SentItem(
@@ -233,6 +345,47 @@ void main() {
         ),
         isNull,
       );
+      final file = SentItem(
+        id: 'a',
+        version: 1,
+        from: ann.ownKeyRecord,
+        profile: SignedProfile.fromJson(ann.ownProfileForOthers)!,
+        text: 'Dentist',
+        sections: [SentSection('Room 3', DateTime.utc(2026))],
+      ).encode();
+      String section(String v) =>
+          file.replaceFirst('"text":"Room 3"}', '"text":"Room 3","v":$v}');
+      String note(String v) =>
+          file.replaceFirst('"text":"Dentist"}', '"text":"Dentist","v":$v}');
+      // Version 1 said all the same reads as the default.
+      expect(SentItem.parse(section('1'))?.sections.single.version, 1);
+      expect(SentItem.parse(note('1'))?.textVersion, 1);
+      expect(SentItem.parse(note('2'))?.textVersion, 2);
+      // A version that is no whole number from 1 makes it unreadable.
+      for (final v in ['"1"', '1.5', '0', 'null']) {
+        expect(SentItem.parse(section(v)), isNull, reason: 'section $v');
+        expect(SentItem.parse(note(v)), isNull, reason: 'note $v');
+      }
+    });
+
+    test('a text in a later structure goes out and arrives in it', () {
+      final clock = ticking();
+      final ann = sent.device(clock, 'Ann');
+      final ben = sent.device(clock, 'Ben');
+      final note = Notes(ann).capture('x');
+      ann.append(note.id, NoteKeys.text, _later);
+      final section = Notes(ann).amend(note.id, 'Room 3');
+      ann.append(section.id, SectionKeys.text, _later);
+      final item = openSentItem(ben, sendNote(ann, note.id)).item;
+      expect(item.textVersion, 2);
+      expect(item.sections.single.version, 2);
+      final got = acceptSentItem(ben, item)!;
+      const arrived = '{"format":"plain","text":"Later milk","v":2}';
+      expect(ben.current(got, NoteKeys.text), arrived);
+      expect(Notes(ben).byId(got)?.textEditable, isFalse);
+      final there = Notes(ben).sections(got).single;
+      expect(ben.current(there.id, SectionKeys.text), arrived);
+      expect(there.textEditable, isFalse);
     });
 
     test('an update never overwrites a text in an unknown format made '

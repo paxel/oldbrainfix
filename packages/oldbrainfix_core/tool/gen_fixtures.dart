@@ -132,7 +132,10 @@ final _scenarios = <Scenario>[
         'Texts written with their format, plain; texts written before '
         'their format was recorded, one looking like a marked text; a Note '
         'and a Section in a format this version does not know, amended '
-        'and merged into a plain Note.',
+        'and merged into a plain Note; texts by the version of their '
+        'structure, which only the last of these write out: 1 in plain, '
+        '1 in a format not known, 2 with a key more, 2 without text, and '
+        'one not a whole number.',
     build: (store) {
       final notes = Notes(store);
       final a = notes.capture('Plain milk');
@@ -147,6 +150,9 @@ final _scenarios = <Scenario>[
       notes.merge(f.id, notes.capture('Plain host').id);
       final g = notes.capture('Formatted, standing alone');
       store.append(g.id, NoteKeys.text, _future);
+      for (final value in _versioned) {
+        store.append(notes.capture('Versioned').id, NoteKeys.text, value);
+      }
     },
   ),
   (
@@ -520,6 +526,18 @@ const _queries = [
 const _future =
     '{"format":"x-future","text":"# Heading\\n**bold** \\u00fc","x":1}';
 
+/// Texts by the version of their structure, `v`: 1 written out though it
+/// is the default, 1 in a format not known, 2 in a known format with a
+/// key more, 2 without text, and one that is not a whole number. Every
+/// other text says none, version 1.
+const _versioned = [
+  '{"format":"plain","text":"Version one written out","v":1}',
+  '{"format":"x-future","text":"# Version one","v":1}',
+  '{"format":"plain","text":"Version two","v":2,"x":1}',
+  '{"format":"plain","v":2}',
+  '{"format":"plain","text":"Odd version","v":"1"}',
+];
+
 /// A value that tests how the signed bytes escape text.
 const _awkward =
     'Quote " backslash \\ slash / newline \n tab \t bell \u0001 '
@@ -529,6 +547,7 @@ Map<String, Object?> _note(Note note) => {
   'id': note.id,
   'text': note.text,
   'textFormat': note.textFormat,
+  'textVersion': note.textVersion,
   'textEditable': note.textEditable,
   'captured': note.captured.toUtc().toIso8601String(),
   'place': note.place,
@@ -547,6 +566,7 @@ Map<String, Object?> _section(Section section) => {
   'noteId': section.noteId,
   'text': section.text,
   'textFormat': section.textFormat,
+  'textVersion': section.textVersion,
   'textEditable': section.textEditable,
   'captured': section.context.captured.toUtc().toIso8601String(),
   'photos': section.photos,

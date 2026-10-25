@@ -80,6 +80,44 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
   });
 
+  testWidgets('a text in a later structure shows as its source, read-only, '
+      'and keeps its value', (tester) async {
+    const later = '{"format":"plain","more":1,"text":"Later milk","v":2}';
+    final note = notes.capture('x');
+    store.append(note.id, NoteKeys.text, later);
+    await openEditor(tester, 'Later milk');
+    expect(find.text(_newer), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.readOnly, isTrue);
+    expect(field.controller?.text, 'Later milk');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(store.current(note.id, NoteKeys.text), later);
+  });
+
+  testWidgets('a later structure without text shows nothing to change', (
+    tester,
+  ) async {
+    final note = notes.capture('Dentist');
+    final section = notes.amend(note.id, 'Room 3');
+    store.append(section.id, SectionKeys.text, '{"format":"plain","v":2}');
+    await openEditor(tester, 'Dentist');
+    expect(find.byKey(ValueKey('newer:${section.id}')), findsOneWidget);
+    expect(find.text('Room 3'), findsNothing);
+  });
+
+  testWidgets('version 1 written out stays editable', (tester) async {
+    final note = notes.capture('x');
+    store.append(
+      note.id,
+      NoteKeys.text,
+      '{"format":"plain","text":"Milk","v":1}',
+    );
+    await openEditor(tester, 'Milk');
+    expect(find.text(_newer), findsNothing);
+    expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isFalse);
+  });
+
   testWidgets('a Section in an unknown format says so', (tester) async {
     final note = notes.capture('Dentist');
     final section = notes.amend(note.id, 'Room 3');

@@ -209,6 +209,9 @@ class Note {
   /// The format [text] is in ([TextFormats]).
   final String textFormat;
 
+  /// The version of the structure [text] is stored in ([StoredText]).
+  final int textVersion;
+
   /// Whether this version may change [text]: never one in a format it
   /// does not know, which it shows as its source text (ADR 0018).
   final bool textEditable;
@@ -250,6 +253,7 @@ class Note {
     required this.text,
     required this.context,
     this.textFormat = TextFormats.plain,
+    this.textVersion = TextFormats.version,
     this.textEditable = true,
     this.place,
     this.importance = Importance.normal,
@@ -289,9 +293,11 @@ class Section {
   /// The text, the source text when its format is not known here.
   final String text;
 
-  /// The format [text] is in, and whether this version may change it,
-  /// as for [Note.textFormat] and [Note.textEditable].
+  /// The format [text] is in, the version of its structure and whether
+  /// this version may change it, as for [Note.textFormat],
+  /// [Note.textVersion] and [Note.textEditable].
   final String textFormat;
+  final int textVersion;
   final bool textEditable;
   final CaptureContext context;
 
@@ -316,6 +322,7 @@ class Section {
     required this.text,
     required this.context,
     this.textFormat = TextFormats.plain,
+    this.textVersion = TextFormats.version,
     this.textEditable = true,
     this.photos = const [],
     this.recordings = const [],
@@ -609,6 +616,7 @@ class Notes {
             noteId: noteId,
             text: note.text,
             textFormat: note.textFormat,
+            textVersion: note.textVersion,
             textEditable: note.textEditable,
             context: note.context,
             photos: note.photos,
@@ -740,6 +748,7 @@ class Notes {
       id: id,
       text: text.text,
       textFormat: text.format,
+      textVersion: text.version,
       textEditable: text.editable,
       context: _context(captured, fields),
       place: place != null && Places(store).isPlace(place) ? place : null,
@@ -844,6 +853,7 @@ class Notes {
       noteId: noteId ?? owner,
       text: text.text,
       textFormat: text.format,
+      textVersion: text.version,
       textEditable: text.editable,
       context: _context(captured, fields),
     );

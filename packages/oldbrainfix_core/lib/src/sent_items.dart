@@ -100,17 +100,19 @@ class SentItemNotForUs implements Exception {
   String toString() => 'SentItemNotForUs';
 }
 
-/// A Section of a Sent Item: its text, the format it is in (ADR 0018)
-/// and when it was captured.
+/// A Section of a Sent Item: its text, the format it is in and the
+/// version of its structure (ADR 0018), and when it was captured.
 class SentSection {
   final String text;
   final DateTime captured;
   final String format;
+  final int version;
 
   const SentSection(
     this.text,
     this.captured, {
     this.format = TextFormats.plain,
+    this.version = TextFormats.version,
   });
 }
 
@@ -143,8 +145,9 @@ class SentItem {
 
   final String text;
 
-  /// The format [text] is in (ADR 0018).
+  /// The format [text] is in and the version of its structure (ADR 0018).
   final String textFormat;
+  final int textVersion;
   final List<SentSection> sections;
   final List<SentRoutine> routines;
 
@@ -155,6 +158,7 @@ class SentItem {
     required this.profile,
     required this.text,
     this.textFormat = TextFormats.plain,
+    this.textVersion = TextFormats.version,
     this.sections = const [],
     this.routines = const [],
     this.cancel = false,
@@ -162,7 +166,8 @@ class SentItem {
 
   /// What is signed: keys sorted, no spaces, the same from both cores. A
   /// Reminder has no rule; only a cancellation says its kind. Every text
-  /// says its format; a file without one is read as plain.
+  /// says its format, and the version of its structure when it is more
+  /// than 1; a file without them is read as plain, version 1.
   String encode() => jsonEncode({
     'from': {'key': from.toJson(), 'profile': profile.toJson()},
     'id': id,
@@ -175,9 +180,11 @@ class SentItem {
             'captured': s.captured.toUtc().toIso8601String(),
             'format': s.format,
             'text': s.text,
+            if (s.version != TextFormats.version) 'v': s.version,
           },
       ],
       'text': text,
+      if (textVersion != TextFormats.version) 'v': textVersion,
     },
     'routines': [
       for (final r in routines)
@@ -213,14 +220,25 @@ class SentItem {
         final kind = json['kind'];
         if (kind != null && kind != _cancelKind) return null;
         final noteFormat = _format(json['note']);
-        if (noteFormat == null) return null;
+        final noteVersion = _version(json['note']);
+        if (noteFormat == null || noteVersion == null) return null;
         final parts = <SentSection>[];
         for (final s in sections) {
           if (s case {'captured': final String at, 'text': final String text}) {
             final captured = DateTime.tryParse(at);
             final format = _format(s);
-            if (captured == null || format == null) return null;
-            parts.add(SentSection(text, captured.toUtc(), format: format));
+            final version = _version(s);
+            if (captured == null || format == null || version == null) {
+              return null;
+            }
+            parts.add(
+              SentSection(
+                text,
+                captured.toUtc(),
+                format: format,
+                version: version,
+              ),
+            );
           } else {
             return null;
           }
@@ -253,6 +271,7 @@ class SentItem {
           profile: profile,
           text: body,
           textFormat: noteFormat,
+          textVersion: noteVersion,
           sections: parts,
           routines: scheduled,
           cancel: kind == _cancelKind,
@@ -270,6 +289,14 @@ class SentItem {
     {'format': final String format} => format,
     {'format': _} => null,
     _ => TextFormats.plain,
+  };
+
+  /// The version of the structure a text of [json] says it is stored in:
+  /// 1 when it says none, null when it is no whole number from 1.
+  static int? _version(Object? json) => switch (json) {
+    {'v': final int v} when v >= 1 => v,
+    {'v': _} => null,
+    _ => TextFormats.version,
   };
 }
 
@@ -364,10 +391,16 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
     profile: profile,
     text: note.text,
     textFormat: note.textFormat,
+    textVersion: note.textVersion,
     sections: [
       for (final s in notes.sections(noteId))
         if (s.text.trim().isNotEmpty)
-          SentSection(s.text, s.context.captured, format: s.textFormat),
+          SentSection(
+            s.text,
+            s.context.captured,
+            format: s.textFormat,
+            version: s.textVersion,
+          ),
     ],
     routines: [for (final r in routines) SentRoutine(r.id, r.schedule)],
   );
@@ -766,7 +799,7 @@ SentItemChanges _changes(
 ) {
   final notes = Notes(store);
   final text = StoredText.read(store.current(noteId, NoteKeys.text));
-  final incoming = StoredText.of(item.textFormat, item.text);
+  final incoming = StoredText.of(item.textFormat, item.text, item.textVersion);
   final sent = _lastSentText(store, noteId);
   final edited = sent == null || text != sent;
   // A text here in a format this version does not know, other than the
@@ -954,14 +987,14 @@ void _writeSection(Store store, String noteId, SentSection section) {
   store.append(
     id,
     SectionKeys.text,
-    StoredText.of(section.format, section.text).encode(),
+    StoredText.of(section.format, section.text, section.version).encode(),
   );
 }
 
 /// The Note text of [item] as it is stored: in the format it came in, so
 /// a text in a format this version does not know arrives whole.
 String _stored(SentItem item) =>
-    StoredText.of(item.textFormat, item.text).encode();
+    StoredText.of(item.textFormat, item.text, item.textVersion).encode();
 
 /// A Routine or Reminder of the Note [noteId] as [routine] is, knowing
 /// the sender's id for it; written, not spawned.

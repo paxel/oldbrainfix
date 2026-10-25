@@ -71,13 +71,14 @@ pub fn file_name(day: &str) -> String {
     format!("oldbrainfix-note-{day}.{EXTENSION}")
 }
 
-/// A Section of a Sent Item: its text, the format it is in (ADR 0018)
-/// and when it was captured.
+/// A Section of a Sent Item: its text, the format it is in and the
+/// version of its structure (ADR 0018), and when it was captured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SentSection {
     pub text: String,
     pub captured: DateTime<Utc>,
     pub format: String,
+    pub version: i64,
 }
 
 /// A Routine or Reminder of a Sent Item: the sender's id and its
@@ -101,8 +102,10 @@ pub struct SentItem {
     pub from: KeyRecord,
     pub profile: SignedProfile,
     pub text: String,
-    /// The format `text` is in (ADR 0018).
+    /// The format `text` is in and the version of its structure (ADR
+    /// 0018).
     pub text_format: String,
+    pub text_version: i64,
     pub sections: Vec<SentSection>,
     pub routines: Vec<SentRoutine>,
 }
@@ -119,18 +122,23 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
 
 impl SentItem {
     /// What is signed: keys sorted, no spaces, as the Dart core writes it;
-    /// only a cancellation says its kind. Every text says its format; a
-    /// file without one is read as plain.
+    /// only a cancellation says its kind. Every text says its format, and
+    /// the version of its structure when it is more than 1; a file
+    /// without them is read as plain, version 1.
     pub fn encode(&self) -> String {
         let sections: Vec<Value> = self
             .sections
             .iter()
             .map(|s| {
-                object(vec![
+                let mut pairs = vec![
                     ("captured", json!(dart_iso(s.captured))),
                     ("format", json!(s.format)),
                     ("text", json!(s.text)),
-                ])
+                ];
+                if s.version != text_format::VERSION {
+                    pairs.push(("v", json!(s.version)));
+                }
+                object(pairs)
             })
             .collect();
         let routines: Vec<Value> = self
@@ -146,6 +154,14 @@ impl SentItem {
                 object(pairs)
             })
             .collect();
+        let mut note = vec![
+            ("format", json!(self.text_format)),
+            ("sections", Value::Array(sections)),
+            ("text", json!(self.text)),
+        ];
+        if self.text_version != text_format::VERSION {
+            note.push(("v", json!(self.text_version)));
+        }
         let mut pairs = vec![
             (
                 "from",
@@ -160,14 +176,7 @@ impl SentItem {
             pairs.push(("kind", json!(CANCEL_KIND)));
         }
         pairs.extend([
-            (
-                "note",
-                object(vec![
-                    ("format", json!(self.text_format)),
-                    ("sections", Value::Array(sections)),
-                    ("text", json!(self.text)),
-                ]),
-            ),
+            ("note", object(note)),
             ("routines", Value::Array(routines)),
             ("version", json!(self.version)),
         ]);
@@ -195,6 +204,7 @@ impl SentItem {
                 text: s.get("text")?.as_str()?.to_string(),
                 captured: parse_time(s.get("captured")?.as_str()?).ok()?,
                 format: text_format_of(s)?,
+                version: text_version_of(s)?,
             });
         }
         let mut routines = Vec::new();
@@ -229,6 +239,7 @@ impl SentItem {
             profile: SignedProfile::from_json(from.get("profile")?)?,
             text: note.get("text")?.as_str()?.to_string(),
             text_format: text_format_of(note)?,
+            text_version: text_version_of(note)?,
             sections,
             routines,
         })
@@ -245,10 +256,19 @@ fn text_format_of(json: &Value) -> Option<String> {
     }
 }
 
+/// The version of the structure a text of `json` says it is stored in:
+/// 1 when it says none, `None` when it is no whole number from 1.
+fn text_version_of(json: &Value) -> Option<i64> {
+    match json.get("v") {
+        None => Some(text_format::VERSION),
+        Some(v) => v.as_i64().filter(|v| *v >= 1),
+    }
+}
+
 /// The Note text of `item` as it is stored: in the format it came in, so
 /// a text in a format this version does not know arrives whole.
 fn stored(item: &SentItem) -> String {
-    StoredText::of(&item.text_format, &item.text).encode()
+    StoredText::of(&item.text_format, &item.text, item.text_version).encode()
 }
 
 fn times(schedule: &Schedule) -> String {
@@ -373,6 +393,7 @@ impl Store {
             profile,
             text: note.text,
             text_format: note.text_format,
+            text_version: note.text_version,
             sections: notes
                 .sections(note_id)?
                 .into_iter()
@@ -381,6 +402,7 @@ impl Store {
                     text: s.text,
                     captured: s.captured,
                     format: s.text_format,
+                    version: s.text_version,
                 })
                 .collect(),
             routines: routines
@@ -562,7 +584,7 @@ impl Store {
     fn changes(&self, note_id: &str, item: &SentItem, restores: bool) -> Result<SentItemChanges> {
         let notes = Notes::new(self);
         let text = StoredText::read(self.current(note_id, note_keys::TEXT)?.as_deref());
-        let incoming = StoredText::of(&item.text_format, &item.text);
+        let incoming = StoredText::of(&item.text_format, &item.text, item.text_version);
         let sent = self.last_sent_text(note_id)?;
         let edited = sent.as_ref().is_none_or(|s| *s != text);
         // A text here in a format this version does not know, other than
@@ -771,7 +793,7 @@ impl Store {
             Some(&dart_iso(section.captured)),
             None,
         )?;
-        let text = StoredText::of(&section.format, &section.text).encode();
+        let text = StoredText::of(&section.format, &section.text, section.version).encode();
         self.append(&id, note_keys::TEXT, Some(&text), None)?;
         Ok(())
     }
@@ -1289,17 +1311,51 @@ mod tests {
         let payload = opened.item.encode();
         assert!(payload.contains(r#""note":{"format":"x-future","sections":["#));
         assert!(payload.contains(r#","format":"plain","text":"Room 3"}"#));
+        // Version 1, the default, is not written.
+        assert!(!payload.contains(r#""v":"#));
         let got = ben
             .accept_sent_item(&opened.item, false)?
             .ok_or("accepted")?;
         assert_eq!(ben.current(&got, note_keys::TEXT)?.as_deref(), Some(FUTURE));
-        // Without formats, a file reads as plain.
+        // Without formats, a file reads as plain, version 1.
         let bare =
             SentItem::parse(&payload.replace(r#""format":"x-future","#, "")).ok_or("bare")?;
         assert_eq!(bare.text_format, text_format::PLAIN);
+        assert_eq!(bare.text_version, 1);
+        assert_eq!(bare.sections[0].version, 1);
         assert!(
             SentItem::parse(&payload.replace(r#""format":"plain""#, r#""format":1"#)).is_none()
         );
+        let section = |v: &str| {
+            payload.replacen(
+                r#""text":"Room 3"}"#,
+                &format!(r#""text":"Room 3","v":{v}}}"#),
+                1,
+            )
+        };
+        let in_note = |v: &str| {
+            payload.replacen(
+                r##""text":"# Heading"}"##,
+                &format!(r##""text":"# Heading","v":{v}}}"##),
+                1,
+            )
+        };
+        // Version 1 said all the same reads as the default.
+        let said = SentItem::parse(&section("1")).ok_or("section 1")?;
+        assert_eq!(said.sections[0].version, 1);
+        assert_eq!(
+            SentItem::parse(&in_note("1")).ok_or("note 1")?.text_version,
+            1
+        );
+        assert_eq!(
+            SentItem::parse(&in_note("2")).ok_or("note 2")?.text_version,
+            2
+        );
+        // A version that is no whole number from 1 makes it unreadable.
+        for v in [r#""1""#, "1.5", "0", "null"] {
+            assert!(SentItem::parse(&section(v)).is_none(), "section {v}");
+            assert!(SentItem::parse(&in_note(v)).is_none(), "note {v}");
+        }
 
         // The sender's own formatted text follows her update.
         let moved = r##"{"format":"x-future","text":"# Moved"}"##;
@@ -1326,6 +1382,39 @@ mod tests {
         assert_eq!(next.changes.clone().ok_or("changes")?.text_before, None);
         ben.accept_sent_item(&next.item, false)?;
         assert_eq!(ben.current(&got, note_keys::TEXT)?.as_deref(), Some(FUTURE));
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_in_a_later_structure_goes_out_and_arrives_in_it() -> TestResult {
+        const LATER: &str = r#"{"format":"plain","more":1,"text":"Later milk","v":2}"#;
+        let ann = device(1);
+        let ben = device(2);
+        let note = Notes::new(&ann).capture("x", None, None)?;
+        ann.append(&note.id, note_keys::TEXT, Some(LATER), None)?;
+        let section = Notes::new(&ann).amend(&note.id, "Room 3")?;
+        ann.append(&section.id, note_keys::TEXT, Some(LATER), None)?;
+        let opened = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "opened")?;
+        assert_eq!(opened.item.text_version, 2);
+        assert_eq!(opened.item.sections[0].version, 2);
+        let got = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        let arrived = r#"{"format":"plain","text":"Later milk","v":2}"#;
+        assert_eq!(
+            ben.current(&got, note_keys::TEXT)?.as_deref(),
+            Some(arrived)
+        );
+        let notes = Notes::new(&ben);
+        assert!(!notes.by_id(&got)?.ok_or("note")?.text_editable);
+        let there = notes.sections(&got)?.remove(0);
+        assert_eq!(
+            ben.current(&there.id, note_keys::TEXT)?.as_deref(),
+            Some(arrived)
+        );
+        assert!(!there.text_editable);
         Ok(())
     }
 
@@ -1483,6 +1572,7 @@ mod tests {
             profile: profile_of(&ann)?,
             text: "Hello from Ann".into(),
             text_format: text_format::PLAIN.into(),
+            text_version: text_format::VERSION,
             sections: Vec::new(),
             routines: Vec::new(),
         };
@@ -1558,6 +1648,7 @@ mod tests {
             profile: copy,
             text: "Hello".into(),
             text_format: text_format::PLAIN.into(),
+            text_version: text_format::VERSION,
             sections: Vec::new(),
             routines: Vec::new(),
         };

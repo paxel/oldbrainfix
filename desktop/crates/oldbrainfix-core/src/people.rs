@@ -1535,7 +1535,7 @@ mod tests {
         sync(&ben, &ann)?;
         // Both at once, as accepting writes them.
         let later = Some(ann.now() + chrono::Duration::hours(1));
-        let text = crate::StoredText::of("plain", "Hi from Ben").encode();
+        let text = crate::StoredText::plain("Hi from Ben").encode();
         ben.append(&held, crate::notes::keys::TEXT, Some(&text), later)?;
         ben.append(&held, "received", Some(&relinked(&ann, &held, 1)?), later)?;
         sync(&ben, &ann)?;
@@ -1583,6 +1583,7 @@ mod tests {
                     profile: copy,
                     text: format!("Hello from {name}"),
                     text_format: crate::text_format::PLAIN.into(),
+                    text_version: crate::text_format::VERSION,
                     sections: Vec::new(),
                     routines: Vec::new(),
                 };

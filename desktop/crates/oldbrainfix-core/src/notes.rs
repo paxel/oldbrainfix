@@ -112,6 +112,9 @@ pub struct Note {
     pub text: String,
     /// The format `text` is in ([`crate::text_format`]).
     pub text_format: String,
+    /// The version of the structure `text` is stored in
+    /// ([`StoredText`]).
+    pub text_version: i64,
     /// Whether this version may change `text`: never one in a format it
     /// does not know, which it shows as its source text (ADR 0018).
     pub text_editable: bool,
@@ -171,9 +174,11 @@ pub struct Section {
     pub note_id: String,
     /// The text, the source text when its format is not known here.
     pub text: String,
-    /// The format `text` is in, and whether this version may change it,
-    /// as for [`Note::text_format`] and [`Note::text_editable`].
+    /// The format `text` is in, the version of its structure and whether
+    /// this version may change it, as for [`Note::text_format`],
+    /// [`Note::text_version`] and [`Note::text_editable`].
     pub text_format: String,
+    pub text_version: i64,
     pub text_editable: bool,
     pub captured: DateTime<Utc>,
     /// A merged Note's photos and recordings travel with it, with their
@@ -534,6 +539,7 @@ impl<'a> Notes<'a> {
             id: id.to_string(),
             text: text.text,
             text_format: text.format,
+            text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
             place,
@@ -631,6 +637,7 @@ impl<'a> Notes<'a> {
                     note_id: note_id.to_string(),
                     text: note.text,
                     text_format: note.text_format,
+                    text_version: note.text_version,
                     text_editable: note.text_editable,
                     captured: note.captured,
                     photos: note.photos,
@@ -668,6 +675,7 @@ impl<'a> Notes<'a> {
             note_id: note_id.to_string(),
             text: text.text,
             text_format: text.format,
+            text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
             photos: Vec::new(),
@@ -804,6 +812,28 @@ mod tests {
                 .iter()
                 .all(|s| !s.text_editable && s.text == "# Heading")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_in_a_later_structure_is_never_overwritten_here() -> Result<()> {
+        const LATER: &str = r#"{"format":"plain","more":1,"text":"Later milk","v":2}"#;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let a = notes.capture("x", None, None)?;
+        store.append(&a.id, keys::TEXT, Some(LATER), None)?;
+        let note = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
+        assert_eq!(note.text, "Later milk");
+        assert_eq!(note.text_version, 2);
+        assert!(!note.text_editable);
+        assert!(notes.edit(&a.id, "Plain now").is_err());
+        let section = notes.amend(&a.id, "Amended")?;
+        store.append(&section.id, keys::TEXT, Some(LATER), None)?;
+        let shown = notes.sections(&a.id)?;
+        assert_eq!(shown.len(), 1);
+        assert_eq!(shown[0].text_version, 2);
+        assert!(!shown[0].text_editable);
+        assert_eq!(store.current(&a.id, keys::TEXT)?.as_deref(), Some(LATER));
         Ok(())
     }
 

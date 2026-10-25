@@ -9,46 +9,59 @@ abstract final class TextFormats {
 
   /// Every format this version reads and writes.
   static const known = {plain};
+
+  /// The newest structure of the stored value this version knows: `v` 1
+  /// holds `format` and `text` and nothing else.
+  static const version = 1;
 }
 
-/// A user text as stored: its [format] and its [text], the source text
-/// for a format this version does not know.
+/// A user text as stored: its [format], its [text], the source text for a
+/// format this version does not know, and the [version] of the value's
+/// structure.
 ///
 /// It is stored as one value, `{"format":…,"text":…}`, keys sorted and no
 /// spaces, the same bytes from both cores, so text and format travel,
-/// conflict and win together in one entry. A value that is no such
-/// object was written before the format was recorded and reads as plain,
-/// whole.
+/// conflict and win together in one entry. `v` is written only when it
+/// is more than 1, its default; a value without it is version 1. A value that is no such object was written before the
+/// format was recorded and reads as plain, whole.
 class StoredText {
   final String format;
   final String text;
 
-  /// Whether this version may change it: its format is known and the
-  /// value holds nothing else.
+  /// The version of the value's structure, `v`: which keys it has and
+  /// what they mean.
+  final int version;
+
+  /// Whether this version may change it: its structure and its format are
+  /// known and the value holds nothing else.
   final bool editable;
 
-  const StoredText._(this.format, this.text, this.editable);
+  const StoredText._(this.format, this.text, this.version, this.editable);
 
   /// [text] as plain text, the only format this version writes.
   const StoredText.plain(this.text)
     : format = TextFormats.plain,
+      version = TextFormats.version,
       editable = true;
 
-  /// [text] in [format] as it arrived from elsewhere, such as a Sent
-  /// Item, to be stored as it is.
-  StoredText.of(this.format, this.text)
-    : editable = TextFormats.known.contains(format);
+  /// [text] in [format] with structure [version] as it arrived from
+  /// elsewhere, such as a Sent Item, to be stored as it is.
+  StoredText.of(this.format, this.text, [this.version = TextFormats.version])
+    : editable =
+          version <= TextFormats.version && TextFormats.known.contains(format);
 
   /// The text a stored [value] holds; null reads as empty plain text.
+  ///
+  /// Up to the version known here, a value needs a string `format` and a
+  /// string `text`. A later version may change or add keys: its value
+  /// shows `text` when it is a string, nothing otherwise, and is never
+  /// editable here.
   factory StoredText.read(String? value) {
     if (value == null) return const StoredText.plain('');
     if (value.startsWith('{')) {
       try {
-        if (jsonDecode(value)
-            case {'format': final String format, 'text': final String text} &&
-                final Map<Object?, Object?> json) {
-          final known = TextFormats.known.contains(format);
-          return StoredText._(format, text, known && json.length == 2);
+        if (jsonDecode(value) case final Map<String, Object?> json) {
+          if (_marked(json) case final marked?) return marked;
         }
       } on FormatException {
         // Plain text that happens to start with a brace.
@@ -57,16 +70,45 @@ class StoredText {
     return StoredText.plain(value);
   }
 
-  /// The value it is stored as.
-  String encode() => jsonEncode({'format': format, 'text': text});
+  /// The text [json] holds when it is a marked value, null when not.
+  static StoredText? _marked(Map<String, Object?> json) {
+    final version = switch (json['v']) {
+      null when !json.containsKey('v') => TextFormats.version,
+      final int v when v >= 1 => v,
+      _ => null,
+    };
+    if (version == null) return null;
+    final format = json['format'];
+    final text = json['text'];
+    if (version > TextFormats.version) {
+      return StoredText._(
+        format is String ? format : '',
+        text is String ? text : '',
+        version,
+        false,
+      );
+    }
+    if (format is! String || text is! String) return null;
+    final keys = json.containsKey('v') ? 3 : 2;
+    final known = TextFormats.known.contains(format);
+    return StoredText._(format, text, version, known && json.length == keys);
+  }
+
+  /// The value it is stored as; version 1, the default, says no `v`.
+  String encode() => jsonEncode({
+    'format': format,
+    'text': text,
+    if (version != TextFormats.version) 'v': version,
+  });
 
   @override
   bool operator ==(Object other) =>
       other is StoredText &&
       other.format == format &&
       other.text == text &&
+      other.version == version &&
       other.editable == editable;
 
   @override
-  int get hashCode => Object.hash(format, text, editable);
+  int get hashCode => Object.hash(format, text, version, editable);
 }
