@@ -475,6 +475,10 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2, "no model yet");
     assert!(shows(&harness, "Speech model"));
     assert!(shows(&harness, "No speech model yet"));
+    assert!(shows(
+        &harness,
+        "The speech model is the base model of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License."
+    ));
     harness.get_by_label("Download (148 MB)").click();
     harness.run();
     assert!(eventually(|| speech.outcome().is_some()));

@@ -5,6 +5,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+# Not published, which also keeps it out of the third-party licences.
+publish = false
 
 [lib]
 name = "oldbrainfix_core"

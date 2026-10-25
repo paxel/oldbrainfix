@@ -46,6 +46,7 @@ use oldbrainfix_core::{
     Store, Topic, bundle,
 };
 
+use crate::about_view;
 use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
@@ -74,6 +75,10 @@ pub enum Selection {
     /// The LAN sync this Device hosts while it shows, reached from the
     /// Settings.
     Sync,
+    /// The version and the source, reached from the Settings.
+    About,
+    /// Every third-party component and its licence, reached from About.
+    Licences,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -761,7 +766,11 @@ impl App {
         let routines = Routines::new(&self.store);
         let search = Search::new(&self.store);
         let shown = match &self.selection {
-            Selection::Agenda | Selection::Settings | Selection::Sync => Vec::new(),
+            Selection::Agenda
+            | Selection::Settings
+            | Selection::Sync
+            | Selection::About
+            | Selection::Licences => Vec::new(),
             Selection::All => search.notes(&self.query, None)?,
             Selection::Unsorted => notes.unsorted()?,
             Selection::Place(id) => search.notes(&self.query, Some(id))?,
@@ -1286,7 +1295,8 @@ impl App {
         match &self.selection {
             Selection::All | Selection::Agenda => None,
             Selection::Settings => Some(Selection::Agenda),
-            Selection::Sync => Some(Selection::Settings),
+            Selection::Sync | Selection::About => Some(Selection::Settings),
+            Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
                 Some(topic) => Selection::Place(topic.area_id.clone()),
                 None => Selection::All,
@@ -1587,6 +1597,8 @@ impl App {
             Selection::Agenda => self.t.agenda_title().to_string(),
             Selection::Settings => self.t.settings_title().to_string(),
             Selection::Sync => self.t.sync_title().to_string(),
+            Selection::About => self.t.about_title().to_string(),
+            Selection::Licences => self.t.open_source_licenses().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -1685,6 +1697,13 @@ impl App {
         match self.selection {
             Selection::Agenda => return self.agenda_pane(ui, tones, actions),
             Selection::Settings => return self.settings_pane(ui, tones, actions),
+            Selection::About => {
+                if about_view::about(ui, &self.t, tones) {
+                    actions.push(Action::Select(Selection::Licences));
+                }
+                return;
+            }
+            Selection::Licences => return about_view::licences_page(ui, &self.t),
             Selection::Sync => {
                 let wall = self.wall.clone();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
@@ -2260,6 +2279,15 @@ impl App {
                         actions.push(Action::Select(Selection::Sync));
                     }
                     ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    if ui
+                        .button(RichText::new(t.about_title()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::Select(Selection::About));
+                    }
+                    ui.label(RichText::new(t.about_settings_detail()).small().color(weak));
                 });
                 embossed(ui, tones, false, None, |ui| {
                     quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);

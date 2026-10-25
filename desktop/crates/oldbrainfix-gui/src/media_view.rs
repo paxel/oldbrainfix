@@ -225,6 +225,7 @@ pub fn speech_card(
     let mut asked = None;
     ui.label(RichText::new(t.speech_model_title()).strong().color(text));
     ui.label(RichText::new(t.speech_model_intro()).color(weak));
+    ui.label(RichText::new(t.speech_model_credit()).small().color(weak));
     match model.outcome() {
         Some(Outcome::Failed) => {
             ui.label(RichText::new(t.speech_model_failed()).color(error));

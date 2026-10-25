@@ -1,22 +1,23 @@
 ocrs models
 ===========
 
-text-detection.rten and text-recognition.rten are the pre-trained text
-detection and recognition models of the ocrs OCR engine by Robert Knight
-(https://github.com/robertknight/ocrs, models trained with
-https://github.com/robertknight/ocrs-models on the HierText dataset and
-synthetic data). They are bundled unchanged, as published at:
+Title:   Ocrs pre-trained models (text-detection.rten and
+         text-recognition.rten), the text detection and recognition
+         models of the ocrs OCR engine
+Author:  Robert Knight
+Source:  https://huggingface.co/robertknight/ocrs, as published at:
+           https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten
+             SHA-256 f15cfb56bd02c4bf478a20343986504a1f01e1665c2b3a0ad66340f054b1b5ca
+           https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten
+             SHA-256 e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e
+         trained with https://github.com/robertknight/ocrs-models on the
+         HierText dataset (also CC BY-SA 4.0) and synthetic data
+Licence: Creative Commons Attribution-ShareAlike 4.0 International
+         (CC BY-SA 4.0), https://creativecommons.org/licenses/by-sa/4.0/
 
-  https://ocrs-models.s3-accelerate.amazonaws.com/text-detection.rten
-    SHA-256 f15cfb56bd02c4bf478a20343986504a1f01e1665c2b3a0ad66340f054b1b5ca
-  https://ocrs-models.s3-accelerate.amazonaws.com/text-recognition.rten
-    SHA-256 e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e
+The models are bundled unmodified.
 
-The models are licensed under the Creative Commons Attribution-ShareAlike
-4.0 International License (CC BY-SA 4.0),
-https://creativecommons.org/licenses/by-sa/4.0/
-(see https://huggingface.co/robertknight/ocrs). The HierText dataset
-they were trained on is licensed under CC BY-SA 4.0 as well.
-
-The ocrs engine and its rten runtime are licensed under MIT OR
-Apache-2.0.
+The ocrs engine (https://github.com/robertknight/ocrs) and its rten
+runtime are licensed under MIT OR Apache-2.0. Every third-party
+component of Old Brain Fix and its licence is listed in the app's
+open-source licences and in THIRD-PARTY-NOTICES.md.

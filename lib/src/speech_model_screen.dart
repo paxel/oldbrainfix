@@ -40,6 +40,8 @@ class SpeechModelScreen extends StatelessWidget {
           Text(t.speechModelIntro),
           const SizedBox(height: 8),
           Text(t.speechModelSource(WhisperModel.megabytes)),
+          const SizedBox(height: 8),
+          Text(t.speechModelCredit),
           const SizedBox(height: 16),
           Embossed(
             child: Padding(

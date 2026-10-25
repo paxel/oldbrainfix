@@ -944,6 +944,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get speechModelCredit =>
+      'Das Sprachmodell ist das Basismodell von Whisper von OpenAI, Copyright (c) 2022 OpenAI, unter der MIT-Lizenz.';
+
+  @override
   String get speechModelChecking => 'Sprachmodell wird geprüft …';
 
   @override

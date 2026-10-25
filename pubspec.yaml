@@ -29,3 +29,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  # What ships inside the app but not as a Dart package, with its
+  # licence, for the open-source licences (see licenses/).
+  assets:
+    - licenses/common.txt
+    - licenses/android.txt
+    - licenses/android-crates.txt

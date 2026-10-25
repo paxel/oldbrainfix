@@ -1550,6 +1550,12 @@ abstract class AppLocalizations {
   /// **'The download is about {megabytes} MB, comes only from Old Brain Fix\'s own release on GitHub, and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.'**
   String speechModelSource(int megabytes);
 
+  /// Credit for the downloaded Whisper model on the speech model page.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model is the base model of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License.'**
+  String get speechModelCredit;
+
   /// No description provided for @speechModelChecking.
   ///
   /// In en, this message translates to:

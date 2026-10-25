@@ -18,5 +18,8 @@ decisions in [docs/adr](docs/adr), the plan in the GitHub issues.
 
 Dual-licensed under [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
 your option.
-The bundled ocrs text recognition models are CC BY-SA 4.0; see
-[their NOTICE](android/app/src/main/assets/ocrs/NOTICE).
+Every third-party component the apps ship or download, such as the ocrs text
+recognition models (CC BY-SA 4.0) and OpenAI's Whisper speech model (MIT),
+is listed with its licence in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md);
+the full texts are in [licenses/](licenses) and in each app's open-source
+licences.

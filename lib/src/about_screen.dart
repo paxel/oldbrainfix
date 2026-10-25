@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -132,33 +133,37 @@ class _AboutScreenState extends State<AboutScreen> {
 
 var _licensesRegistered = false;
 
-/// Adds what ships inside the app but not as a Dart package to the
-/// open-source licences: the ocrs models and whisper.cpp. Once only.
-void registerLicenses() {
+/// The lists of what ships inside the app but not as a Dart package, with
+/// its licence: the ocrs models, whisper.cpp, the Whisper model, Material
+/// Icons and Rust's standard library; the Android libraries; the Rust
+/// crates in the OCR library (written by tool/licenses.dart).
+const licenseLists = [
+  'licenses/common.txt',
+  'licenses/android.txt',
+  'licenses/android-crates.txt',
+];
+
+/// Adds [licenseLists] from [bundle] to the open-source licences, which
+/// list the Dart packages on their own. Once only.
+void registerLicenses([AssetBundle? bundle]) {
   if (_licensesRegistered) return;
   _licensesRegistered = true;
-  LicenseRegistry.addLicense(
-    () => Stream.fromIterable([
-      const LicenseEntryWithLineBreaks(['ocrs models'], _ocrsModels),
-      const LicenseEntryWithLineBreaks(['whisper.cpp'], _whisperCpp),
-    ]),
-  );
+  LicenseRegistry.addLicense(() async* {
+    for (final list in licenseLists) {
+      yield* Stream.fromIterable(
+        licenseEntries(await (bundle ?? rootBundle).loadString(list)),
+      );
+    }
+  });
 }
 
-/// From android/app/src/main/assets/ocrs/NOTICE.
-const _ocrsModels = '''text-detection.rten and text-recognition.rten are the pre-trained text detection and recognition models of the ocrs OCR engine by Robert Knight (https://github.com/robertknight/ocrs, models trained with https://github.com/robertknight/ocrs-models on the HierText dataset and synthetic data). They are bundled unchanged.
-
-The models are licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0), https://creativecommons.org/licenses/by-sa/4.0/ (see https://huggingface.co/robertknight/ocrs). The HierText dataset they were trained on is licensed under CC BY-SA 4.0 as well.
-
-The ocrs engine and its rten runtime are licensed under MIT OR Apache-2.0.''';
-
-/// From android/app/src/main/cpp/whisper/LICENSE.
-const _whisperCpp = '''MIT License
-
-Copyright (c) 2023-2026 The ggml authors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.''';
+/// The entries of a licence [list]: each is one or more names, one per
+/// line, a blank line and the licence text, closed by a line of 80 `=`.
+List<LicenseEntry> licenseEntries(String list) => [
+  for (final entry in list.split('\n${'=' * 80}\n'))
+    if (entry.trim().isNotEmpty)
+      LicenseEntryWithLineBreaks(
+        entry.substring(0, entry.indexOf('\n\n')).split('\n'),
+        entry.substring(entry.indexOf('\n\n') + 2),
+      ),
+];

@@ -265,21 +265,90 @@ void main() {
       expect(find.byType(LicensePage), findsOneWidget);
     });
 
-    test('the licences name the ocrs models and whisper.cpp', () async {
+    test('the licences name everything that is not a Dart package', () async {
       registerLicenses();
       registerLicenses();
       final entries = await LicenseRegistry.licenses.toList();
-      List<LicenseEntry> of(String package) => [
-        for (final e in entries)
-          if (e.packages.contains(package)) e,
-      ];
-      expect(of('ocrs models'), hasLength(1));
+      String of(String package) {
+        final found = [
+          for (final e in entries)
+            if (e.packages.contains(package))
+              e.paragraphs.map((p) => p.text).join('\n'),
+        ];
+        expect(found, hasLength(1), reason: package);
+        return found.single;
+      }
+
+      final models = of('ocrs models');
+      for (final tasl in [
+        'Ocrs pre-trained models',
+        'Robert Knight',
+        'https://huggingface.co/robertknight/ocrs',
+        'https://creativecommons.org/licenses/by-sa/4.0/',
+        'bundled unmodified',
+        'Attribution-ShareAlike 4.0 International',
+      ]) {
+        expect(models, contains(tasl));
+      }
+      expect(of('whisper.cpp'), contains('The ggml authors'));
       expect(
-        of('ocrs models').single.paragraphs.map((p) => p.text).join(' '),
-        contains('CC BY-SA 4.0'),
+        of('OpenAI Whisper base model'),
+        contains('Copyright (c) 2022 OpenAI'),
       );
-      expect(of('whisper.cpp'), hasLength(1));
-      expect(of('whisper.cpp').single.paragraphs.first.text, 'MIT License');
+      expect(of('Material Icons'), contains('Attribution 4.0 International'));
+      expect(of('Rust standard library'), contains('MIT'));
+      expect(of('androidx.work:work-runtime'), contains('Apache License'));
+      expect(of('org.jetbrains.kotlin:kotlin-stdlib'), contains('JetBrains'));
+      expect(of('com.google.zxing:core'), contains('ZXing authors'));
+      // A crate by its name, whatever its version.
+      String ofCrate(String name) => of(
+        entries
+            .expand((e) => e.packages)
+            .firstWhere((p) => RegExp('^$name [0-9]').hasMatch(p)),
+      );
+      expect(ofCrate('ocrs'), contains('Ocrs project contributors'));
+      expect(ofCrate('rten'), contains('RTen project contributors'));
+    });
+
+    testWidgets('the licence page lists them', (tester) async {
+      registerLicenses();
+      await about(tester);
+      await tester.scrollUntilVisible(
+        find.text('Open-source licenses'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text('Open-source licenses'));
+      // The page reads the lists from the asset bundle, off the clock.
+      for (
+        var i = 0;
+        i < 50 && find.text('androidx.activity:activity').evaluate().isEmpty;
+        i++
+      ) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 100)),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pumpAndSettle();
+      for (final name in [
+        'ocrs models',
+        'OpenAI Whisper base model',
+        'whisper.cpp',
+        'com.google.zxing:core',
+      ]) {
+        tester
+            .state<ScrollableState>(find.byType(Scrollable).last)
+            .position
+            .jumpTo(0);
+        await tester.pump();
+        await tester.scrollUntilVisible(
+          find.text(name),
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        expect(find.text(name), findsOneWidget);
+      }
     });
   });
 }

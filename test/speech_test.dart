@@ -81,7 +81,7 @@ void main() {
       expect(modelButton, findsNothing);
     });
 
-    testWidgets('tells the size and where the model comes from', (
+    testWidgets('tells the size, where the model comes from and whose it is', (
       tester,
     ) async {
       await start(tester);
@@ -89,6 +89,10 @@ void main() {
       expect(find.textContaining('about 148 MB'), findsOneWidget);
       expect(
         find.textContaining('only from Old Brain Fix\'s own release on GitHub'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Whisper by OpenAI, Copyright (c) 2022 OpenAI'),
         findsOneWidget,
       );
       expect(download, findsOneWidget);

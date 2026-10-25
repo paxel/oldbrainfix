@@ -525,6 +525,8 @@
       }
     }
   },
+  "speechModelCredit": "The speech model is the base model of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License.",
+  "@speechModelCredit": {"description": "Credit for the downloaded Whisper model on the speech model page."},
   "speechModelChecking": "Checking the speech model…",
   "speechModelUnsupported": "Transcripts are not available on this device. Voice recordings are kept as they are.",
   "speechModelReady": "The speech model is ready. Voice Notes are transcribed on this phone.",

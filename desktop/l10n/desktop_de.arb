@@ -72,5 +72,8 @@
   "bundleSaveTitle": "Sync-Paket speichern",
   "bundleOpenTitle": "Sync-Paket importieren",
   "bundleSaved": "{count, plural, =1{Paket mit 1 Änderung gespeichert. Schick es an das andere Gerät und importiere es dort.} other{Paket mit {count} Änderungen gespeichert. Schick es an das andere Gerät und importiere es dort.}}",
-  "bundleDrop": "Oder zieh eine Paket-Datei auf das Fenster."
+  "bundleDrop": "Oder zieh eine Paket-Datei auf das Fenster.",
+  "aboutSettingsDetail": "Die Version, der Quellcode und jede Fremdkomponente mit ihrer Lizenz.",
+  "aboutVersion": "Version {version}",
+  "licensesIntro": "Jede Fremdkomponente in dieser App mit ihrer Lizenz. Klick auf eine, um sie zu lesen."
 }
