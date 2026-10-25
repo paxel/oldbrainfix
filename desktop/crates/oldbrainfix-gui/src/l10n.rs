@@ -45,6 +45,9 @@ mod tests {
             (en.close(), de.close()),
             (en.capture_keys_hint(), de.capture_keys_hint()),
             (en.drag_to_file(), de.drag_to_file()),
+            (en.popup_keys_hint(), de.popup_keys_hint()),
+            (en.hotkey_unavailable(), de.hotkey_unavailable()),
+            (en.cli_usage(), de.cli_usage()),
         ] {
             assert_ne!(en, de);
         }

@@ -18,6 +18,11 @@ const NUDGE_REPEAT_MINUTES: &str = "nudgeRepeatMinutes";
 const ALERTS_OFF: &str = "alertsOff";
 const AUTOSTART_OFF: &str = "autostartOff";
 const LAST_FIRED: &str = "lastFired";
+const CAPTURE_HOTKEY: &str = "captureHotkey";
+
+/// The key chord that opens the desktop's capture popup when nothing
+/// else is set.
+pub const DEFAULT_CAPTURE_HOTKEY: &str = "Ctrl+Alt+N";
 
 /// The Re-nag interval when nothing else is set.
 pub fn default_renag() -> Duration {
@@ -158,6 +163,20 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_last_fired(&self, at: DateTime<Utc>) -> Result<()> {
         self.store.set_local_setting(LAST_FIRED, &dart_iso(at))
     }
+
+    /// The key chord that opens the desktop's capture popup, as typed,
+    /// such as "Ctrl+Alt+N".
+    pub fn capture_hotkey(&self) -> Result<String> {
+        Ok(self
+            .store
+            .local_setting(CAPTURE_HOTKEY)?
+            .filter(|chord| !chord.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_CAPTURE_HOTKEY.to_string()))
+    }
+
+    pub fn set_capture_hotkey(&self, chord: &str) -> Result<()> {
+        self.store.set_local_setting(CAPTURE_HOTKEY, chord)
+    }
 }
 
 #[cfg(test)]
@@ -174,6 +193,7 @@ mod tests {
         assert!(settings.quiet_hours_on()?);
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
+        assert_eq!(settings.capture_hotkey()?, DEFAULT_CAPTURE_HOTKEY);
         assert_eq!(settings.missed_seen()?, None);
         store.set_local_setting(RENAG_MINUTES, "0")?;
         assert_eq!(settings.renag_interval()?, Duration::minutes(10));
@@ -209,6 +229,8 @@ mod tests {
         assert!(!settings.quiet_hours_on()?);
         assert!(!settings.alerts_on()?);
         assert!(!settings.autostart_on()?);
+        settings.set_capture_hotkey("Super+Shift+K")?;
+        assert_eq!(settings.capture_hotkey()?, "Super+Shift+K");
         let now = store.now();
         settings.set_missed_seen(Some(now))?;
         assert_eq!(settings.missed_seen()?, Some(now));

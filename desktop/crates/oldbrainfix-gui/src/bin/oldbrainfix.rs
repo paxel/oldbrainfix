@@ -1,26 +1,46 @@
 //! The desktop launcher: opens the store, starts the alarm layer, the
-//! tray and the login start, and opens the native window, which hands
-//! every frame to `oldbrainfix_gui::App`. Closing the window leaves the
-//! app running in the tray, where Open brings the window back; without a
-//! tray, closing it quits. `--tray` (the login start) starts without the
-//! window. A second start hands its wish to the running app and ends. On
-//! Windows it is built without a console window.
+//! tray, the capture hotkey and the login start, and opens the native
+//! window, which hands every frame to `oldbrainfix_gui::App`. Closing the
+//! window leaves the app running in the tray, where Open brings the
+//! window back; without a tray, closing it quits. `--tray` (the login
+//! start) starts without the window. A second start hands its wish to the
+//! running app and ends.
+//!
+//! The hotkey, the tray's Capture and `oldbrainfix capture` open the
+//! capture popup: over the window while it is open, else on its own.
+//! `oldbrainfix capture TEXT` keeps TEXT without any window, through the
+//! running app when there is one. On Windows it is built without a
+//! console window.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+use std::cell::{Cell, RefCell};
+use std::io::Read;
+use std::path::Path;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
-use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, SigningKey, Store};
+use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Notes, SigningKey, Store};
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
-use oldbrainfix_gui::autostart::{Autostart, TRAY_ARG};
+use oldbrainfix_gui::autostart::Autostart;
+use oldbrainfix_gui::cli::{self, Launch};
+use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
 use oldbrainfix_gui::notify::DesktopNotifier;
+use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
 
 /// The window's context while it is open, to wake it from other threads.
 type Window = Arc<Mutex<Option<egui::Context>>>;
+
+/// Told after every Note kept outside the window: the window reads the
+/// log again, the alerts plan its Nudge.
+type Saved = Arc<dyn Fn() + Send + Sync>;
+
+/// Makes a fresh capture popup.
+type NewPopup = Rc<dyn Fn() -> CapturePopup>;
 
 fn wake(window: &Window) {
     if let Ok(held) = window.lock()
@@ -30,28 +50,40 @@ fn wake(window: &Window) {
     }
 }
 
+fn waiting(commands: &Mutex<Receiver<Command>>) -> Vec<Command> {
+    match commands.lock() {
+        Ok(rx) => rx.try_iter().collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
+/// The capture popup over the window.
+fn popup_id() -> egui::ViewportId {
+    egui::ViewportId::from_hash_of("capture popup")
+}
+
 struct Native {
     app: App,
     commands: Arc<Mutex<Receiver<Command>>>,
     quit: Arc<AtomicBool>,
     /// Whether closing the window leaves the app in the tray.
     tray: bool,
+    new_popup: NewPopup,
+    popup: Option<CapturePopup>,
 }
 
 impl eframe::App for Native {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         App::install(ui.ctx());
-        let waiting: Vec<Command> = match self.commands.lock() {
-            Ok(rx) => rx.try_iter().collect(),
-            Err(_) => Vec::new(),
-        };
-        for command in waiting {
+        for command in waiting(&self.commands) {
             match command {
                 Command::Open => focus(ui.ctx()),
-                Command::Capture => {
-                    focus(ui.ctx());
-                    self.app.focus_capture();
-                }
+                // The window stays where it is, so the keyboard goes back
+                // to whatever had it once the popup closes.
+                Command::Capture => match &mut self.popup {
+                    Some(popup) => popup.refocus(),
+                    None => self.popup = Some((self.new_popup)()),
+                },
                 Command::Quit => {
                     self.quit.store(true, Ordering::SeqCst);
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
@@ -62,10 +94,56 @@ impl eframe::App for Native {
             self.quit.store(true, Ordering::SeqCst);
         }
         self.app.show(ui);
+        if let Some(popup) = &mut self.popup {
+            let builder = popup.viewport();
+            let outcome = ui
+                .ctx()
+                .show_viewport_immediate(popup_id(), builder, |ui, _| popup.show(ui));
+            if outcome == Outcome::Closed {
+                self.popup = None;
+            }
+        }
     }
 
     fn on_exit(&mut self) {
+        if let Some(popup) = &mut self.popup {
+            popup.leave();
+        }
         self.app.flush();
+    }
+}
+
+/// The capture popup on its own, while the window is closed.
+struct PopupWindow {
+    popup: CapturePopup,
+    commands: Arc<Mutex<Receiver<Command>>>,
+    /// What the app does once the popup is gone: open the window, quit.
+    next: Rc<Cell<Option<Command>>>,
+}
+
+impl eframe::App for PopupWindow {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        App::install(ui.ctx());
+        let mut outcome = Outcome::Open;
+        for command in waiting(&self.commands) {
+            match command {
+                Command::Capture => self.popup.refocus(),
+                Command::Open | Command::Quit => {
+                    outcome = self.popup.leave();
+                    self.next.set(Some(command));
+                }
+            }
+        }
+        if outcome == Outcome::Open {
+            outcome = self.popup.show(ui);
+        }
+        if outcome == Outcome::Closed {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    fn on_exit(&mut self) {
+        self.popup.leave();
     }
 }
 
@@ -83,33 +161,19 @@ struct Shell {
     commands: Arc<Mutex<Receiver<Command>>>,
     window: Window,
     autostart: Option<Autostart>,
+    hotkey: Rc<RefCell<Hotkey>>,
+    new_popup: NewPopup,
 }
 
 impl Shell {
-    /// Opens the window and runs it until it closes; whether the app is
-    /// to quit.
-    fn window(&self, tray: bool, capture: bool) -> Result<bool, String> {
-        let mut app = App::new(self.store.clone(), self.locale);
-        app.watch_changes(self.changes.clone());
-        app.set_wake(self.events.clone());
-        app.set_autostart(self.autostart.clone());
-        if capture {
-            app.focus_capture();
-        }
-        let quit = Arc::new(AtomicBool::new(false));
-        let native = Native {
-            app,
-            commands: self.commands.clone(),
-            quit: quit.clone(),
-            tray,
-        };
+    /// Runs `app` in a native window with `viewport` until it closes.
+    fn run(
+        &self,
+        viewport: egui::ViewportBuilder,
+        app: Box<dyn eframe::App + '_>,
+    ) -> Result<(), String> {
         let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_title(native.app.t().app_title())
-                // The app id a launcher entry's StartupWMClass names.
-                .with_app_id(APP_ID)
-                .with_inner_size([1280.0, 800.0])
-                .with_min_inner_size([800.0, 480.0]),
+            viewport,
             ..Default::default()
         };
         let window = self.window.clone();
@@ -120,37 +184,126 @@ impl Shell {
                 if let Ok(mut held) = window.lock() {
                     *held = Some(cc.egui_ctx.clone());
                 }
-                Ok(Box::new(native))
+                Ok(app)
             }),
         );
         if let Ok(mut held) = self.window.lock() {
             *held = None;
         }
-        ran.map_err(|e| e.to_string())?;
+        ran.map_err(|e| e.to_string())
+    }
+
+    /// Opens the window and runs it until it closes; whether the app is
+    /// to quit.
+    fn window(&self, tray: bool) -> Result<bool, String> {
+        let mut app = App::new(self.store.clone(), self.locale);
+        app.watch_changes(self.changes.clone());
+        app.set_wake(self.events.clone());
+        app.set_autostart(self.autostart.clone());
+        let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
+        app.set_hotkey(Some(hotkey));
+        let quit = Arc::new(AtomicBool::new(false));
+        let viewport = egui::ViewportBuilder::default()
+            .with_title(app.t().app_title())
+            // The app id a launcher entry's StartupWMClass names.
+            .with_app_id(APP_ID)
+            .with_inner_size([1280.0, 800.0])
+            .with_min_inner_size([800.0, 480.0]);
+        let native = Native {
+            app,
+            commands: self.commands.clone(),
+            quit: quit.clone(),
+            tray,
+            new_popup: self.new_popup.clone(),
+            popup: None,
+        };
+        self.run(viewport, Box::new(native))?;
         Ok(quit.load(Ordering::SeqCst) || !tray)
+    }
+
+    /// Opens the capture popup on its own and runs it until it closes;
+    /// what was asked of the app meanwhile.
+    fn popup(&self) -> Result<Option<Command>, String> {
+        let popup = (self.new_popup)();
+        let next = Rc::new(Cell::new(None));
+        let viewport = popup.viewport();
+        let window = PopupWindow {
+            popup,
+            commands: self.commands.clone(),
+            next: next.clone(),
+        };
+        self.run(viewport, Box::new(window))?;
+        Ok(next.get())
     }
 }
 
-fn run() -> Result<(), String> {
-    let login_start = std::env::args().skip(1).any(|a| a == TRAY_ARG);
+/// Opens the store in `dir`.
+fn open_store(dir: &Path) -> Result<Store, String> {
+    Store::open(
+        &dir.join("oldbrainfix.db"),
+        Box::new(chrono::Utc::now),
+        SigningKey::generate,
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// `oldbrainfix capture TEXT`: keeps `text` through the running app, or
+/// on its own when none runs; the exit code.
+fn capture_text(dir: &Path, socket: &Path, t: &L10n, text: &str) -> i32 {
+    if cli::note_text(text).is_none() {
+        eprintln!("oldbrainfix: {}", t.cli_nothing());
+        return cli::USAGE;
+    }
+    let kept = instance::hand_over_text(socket, text).unwrap_or_else(|| {
+        let store = open_store(dir)?;
+        popup::capture(&store, text, Notes::default_nudge())
+            .map(drop)
+            .map_err(|e| e.to_string())
+    });
+    match kept {
+        Ok(()) => cli::OK,
+        Err(e) => {
+            eprintln!("oldbrainfix: {}", t.cli_failed(&e));
+            cli::FAILED
+        }
+    }
+}
+
+fn run() -> Result<i32, String> {
+    let locale = locale_for_system(sys_locale::get_locale().as_deref());
+    let t = L10n::new(locale);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let Ok(launch) = cli::parse(&args) else {
+        eprintln!("{}", t.cli_usage());
+        return Ok(cli::USAGE);
+    };
+    if launch == Launch::Help {
+        println!("{}", t.cli_usage());
+        return Ok(cli::OK);
+    }
     let dir = oldbrainfix_gui::data_dir().ok_or("no data directory for this user")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let socket = dir.join("instance.sock");
-    // Already running: the window opens there, a login start adds nothing.
-    let wish = (!login_start).then_some(Command::Open);
-    if instance::hand_over(&socket, wish) {
-        return Ok(());
+    let first = match launch {
+        Launch::Text(text) => return Ok(capture_text(&dir, &socket, &t, &text)),
+        Launch::Stdin => {
+            let mut text = String::new();
+            if let Err(e) = std::io::stdin().read_to_string(&mut text) {
+                eprintln!("oldbrainfix: {}", t.cli_failed(&e.to_string()));
+                return Ok(cli::FAILED);
+            }
+            return Ok(capture_text(&dir, &socket, &t, &text));
+        }
+        Launch::Window | Launch::Help => Some(Command::Open),
+        Launch::Popup => Some(Command::Capture),
+        // A login start adds nothing to a running app.
+        Launch::Tray => None,
+    };
+    // Already running: the window or the popup opens there.
+    if instance::hand_over(&socket, first) {
+        return Ok(cli::OK);
     }
-    let store = Arc::new(
-        Store::open(
-            &dir.join("oldbrainfix.db"),
-            Box::new(chrono::Utc::now),
-            SigningKey::generate,
-        )
-        .map_err(|e| e.to_string())?,
-    );
-    let locale = locale_for_system(sys_locale::get_locale().as_deref());
-    let t = L10n::new(locale);
+    let store = Arc::new(open_store(&dir)?);
 
     // On by default: set up unless switched off, so a moved program is
     // found again.
@@ -195,8 +348,35 @@ fn run() -> Result<(), String> {
             );
         });
     }
+    let saved: Saved = {
+        let (changes, events, window) = (changes.clone(), events_tx.clone(), window.clone());
+        Arc::new(move || {
+            changes.fetch_add(1, Ordering::SeqCst);
+            let _ = events.send(Event::Wake);
+            wake(&window);
+        })
+    };
+    let new_popup: NewPopup = {
+        let (store, saved) = (store.clone(), saved.clone());
+        Rc::new(move || {
+            let mut popup = CapturePopup::new(store.clone(), locale);
+            let saved = saved.clone();
+            popup.on_saved(Box::new(move || saved()));
+            popup
+        })
+    };
 
-    if let Err(e) = instance::listen(&socket, command_tx.clone(), waker(&window)) {
+    let capture: instance::Capture = {
+        let (store, saved) = (store.clone(), saved.clone());
+        Box::new(move |text| {
+            popup::capture(&store, text, Notes::default_nudge())
+                .map_err(|e| e.to_string())?
+                .ok_or_else(|| t.cli_nothing().to_string())?;
+            saved();
+            Ok(())
+        })
+    };
+    if let Err(e) = instance::listen(&socket, command_tx.clone(), waker(&window), capture) {
         eprintln!("oldbrainfix: {e}");
     }
     let labels = tray::Labels {
@@ -205,7 +385,25 @@ fn run() -> Result<(), String> {
         capture: t.capture_tooltip().into(),
         quit: t.tray_quit().into(),
     };
-    let tray = tray::spawn(labels, command_tx, waker(&window));
+    let tray = tray::spawn(labels, command_tx.clone(), waker(&window));
+
+    // On the main thread, where Windows and macOS hear the key.
+    let chord = DeviceSettings::new(&store)
+        .capture_hotkey()
+        .ok()
+        .and_then(|c| c.parse().ok());
+    let pressed = {
+        let (commands, window) = (command_tx, window.clone());
+        Box::new(move || {
+            let _ = commands.send(Command::Capture);
+            wake(&window);
+        })
+    };
+    let hotkey = Rc::new(RefCell::new(Hotkey::start(
+        chord,
+        t.capture_tooltip().into(),
+        pressed,
+    )));
 
     let shell = Shell {
         store,
@@ -215,33 +413,53 @@ fn run() -> Result<(), String> {
         commands: commands.clone(),
         window,
         autostart,
+        hotkey,
+        new_popup,
     };
     // A login start stays in the tray; without one it shows the window.
-    let mut open = (!login_start || tray.is_none()).then_some(false);
+    let mut next = first.or(tray.is_none().then_some(Command::Open));
     loop {
-        if let Some(capture) = open.take()
-            && shell.window(tray.is_some(), capture)?
-        {
+        let quit = match next.take() {
+            Some(Command::Open) => shell.window(tray.is_some())?,
+            Some(Command::Capture) => match shell.popup()? {
+                Some(Command::Open) => {
+                    next = Some(Command::Open);
+                    false
+                }
+                Some(Command::Quit) => true,
+                // Without a tray nothing is left to come back to.
+                _ => tray.is_none(),
+            },
+            Some(Command::Quit) => true,
+            None => false,
+        };
+        if quit {
             break;
         }
-        let next = match commands.lock() {
+        if next.is_some() {
+            continue;
+        }
+        let waited = match commands.lock() {
             Ok(rx) => rx.recv(),
             Err(_) => break,
         };
-        match next {
-            Ok(Command::Open) => open = Some(false),
-            Ok(Command::Capture) => open = Some(true),
-            Ok(Command::Quit) | Err(_) => break,
+        match waited {
+            Ok(command) => next = Some(command),
+            Err(_) => break,
         }
     }
     drop(tray);
     let _ = std::fs::remove_file(&socket);
-    Ok(())
+    Ok(cli::OK)
 }
 
 fn main() {
-    if let Err(e) = run() {
-        eprintln!("oldbrainfix: {e}");
-        std::process::exit(1);
-    }
+    let code = match run() {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("oldbrainfix: {e}");
+            cli::FAILED
+        }
+    };
+    std::process::exit(code);
 }

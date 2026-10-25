@@ -19,6 +19,8 @@
 //! and from an Area into its last selected Topic. The keys rest while
 //! text is being typed, where Alt+arrows move the cursor.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
@@ -36,6 +38,7 @@ use oldbrainfix_core::{
 use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
+use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -235,6 +238,8 @@ enum Setting {
     NudgeRepeat(i64),
     QuietOn(bool),
     Quiet(QuietHours),
+    /// The capture popup's key chord, as the settings show it.
+    Hotkey(String),
 }
 
 /// The wall clock the window shows days on.
@@ -281,8 +286,10 @@ pub struct App {
     read_at: DateTime<Utc>,
     /// The Quiet Hours as typed in the Settings.
     quiet_text: (String, String),
-    /// Whether the capture field is to take the keyboard, once.
-    focus_capture: bool,
+    /// The capture popup's hotkey, which the Settings move.
+    hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
+    /// The hotkey as typed in the Settings.
+    hotkey_text: String,
 }
 
 impl App {
@@ -314,8 +321,12 @@ impl App {
             autostart: None,
             read_at,
             quiet_text: (String::new(), String::new()),
-            focus_capture: false,
+            hotkey: None,
+            hotkey_text: String::new(),
         };
+        app.hotkey_text = DeviceSettings::new(&app.store)
+            .capture_hotkey()
+            .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         app.refresh();
         app
     }
@@ -342,12 +353,9 @@ impl App {
         self.autostart = autostart;
     }
 
-    /// Shows the capture field with the keyboard in it.
-    pub fn focus_capture(&mut self) {
-        if matches!(self.selection, Selection::Settings | Selection::Trash) {
-            self.select(Selection::Agenda);
-        }
-        self.focus_capture = true;
+    /// The capture popup's hotkey, which the Settings show and move.
+    pub fn set_hotkey(&mut self, hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>) {
+        self.hotkey = hotkey;
     }
 
     /// The Routine or Reminder being made or changed, if any.
@@ -801,6 +809,12 @@ impl App {
             }
             Setting::QuietOn(on) => settings.set_quiet_hours_on(on)?,
             Setting::Quiet(quiet) => settings.set_quiet_hours(quiet)?,
+            Setting::Hotkey(chord) => {
+                settings.set_capture_hotkey(&chord)?;
+                if let (Some(hotkey), Ok(chord)) = (&self.hotkey, chord.parse::<Chord>()) {
+                    hotkey.borrow_mut().rebind(&chord);
+                }
+            }
         }
         Ok(())
     }
@@ -1083,7 +1097,7 @@ impl App {
             {
                 actions.push(Action::Capture(Notes::default_nudge()));
             }
-            let field = ui.add(
+            ui.add(
                 TextEdit::multiline(&mut self.capture)
                     .id(id)
                     .hint_text(t.capture_hint())
@@ -1093,9 +1107,6 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
-            if std::mem::take(&mut self.focus_capture) {
-                field.request_focus();
-            }
             if self.capture.trim().is_empty() {
                 return;
             }
@@ -1576,6 +1587,11 @@ impl App {
         ui.label(RichText::new(t.settings_intro()).color(weak));
         ui.add_space(8.0);
         let quiet_text = &mut self.quiet_text;
+        let hotkey_text = &mut self.hotkey_text;
+        let stored_hotkey = settings
+            .capture_hotkey()
+            .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
+        let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -1600,6 +1616,9 @@ impl App {
                         actions.push(Action::Setting(Setting::Autostart(on)));
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_alarms()).strong().color(text));
@@ -1994,6 +2013,64 @@ fn merge_form(
 /// How much tomorrow is faded on the Agenda (the phone's
 /// `tomorrowOpacity`).
 pub const TOMORROW_OPACITY: f32 = 0.55;
+
+/// The Settings' card on the capture popup's hotkey and the
+/// `oldbrainfix capture` command: the chord as typed, and how the hotkey
+/// stands on this desktop.
+fn quick_capture_card(
+    ui: &mut Ui,
+    t: &L10n,
+    typed: &mut String,
+    stored: &str,
+    status: Option<hotkey::Status>,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(
+        RichText::new(t.quick_capture_heading())
+            .strong()
+            .color(text),
+    );
+    let mut chord = None;
+    ui.horizontal(|ui| {
+        ui.label(RichText::new(t.hotkey_label()).color(text));
+        let field = ui.add(
+            TextEdit::singleline(typed)
+                .id(Id::new("hotkey"))
+                .hint_text(oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY)
+                .text_color(text)
+                .desired_width(180.0),
+        );
+        chord = typed.parse::<Chord>().ok();
+        // Kept once typed out, so no key on the way is grabbed.
+        if field.lost_focus()
+            && let Some(chord) = chord
+            && chord.to_string() != stored
+        {
+            actions.push(Action::Setting(Setting::Hotkey(chord.to_string())));
+        }
+    });
+    let line = match (chord, status) {
+        (None, _) => {
+            ui.label(RichText::new(t.hotkey_invalid()).color(ui.visuals().error_fg_color));
+            None
+        }
+        (Some(_), None) => None,
+        (Some(_), Some(hotkey::Status::Active)) => Some(t.hotkey_active().to_string()),
+        (Some(_), Some(hotkey::Status::Waiting)) => Some(t.hotkey_waiting().to_string()),
+        (Some(_), Some(hotkey::Status::Desktop(key))) => Some(match key {
+            Some(key) => format!("{} {}", t.hotkey_desktop(), t.hotkey_desktop_key(&key)),
+            None => t.hotkey_desktop().to_string(),
+        }),
+        (Some(_), Some(hotkey::Status::Taken)) => Some(t.hotkey_taken().to_string()),
+        (Some(_), Some(hotkey::Status::Unavailable)) => Some(t.hotkey_unavailable().to_string()),
+    };
+    if let Some(line) = line {
+        ui.label(RichText::new(line).small().color(weak));
+    }
+    ui.label(RichText::new(t.capture_command()).small().color(weak));
+}
 
 /// The Nudge repeats offered, in minutes (the phone's choices).
 pub const NUDGE_REPEAT_CHOICES: [i64; 3] = [10, 30, 60];

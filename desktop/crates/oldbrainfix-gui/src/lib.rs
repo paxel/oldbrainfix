@@ -3,17 +3,21 @@
 //! The native window and the eframe glue live in the `oldbrainfix`
 //! binary; everything that can be tested headless lives here so the
 //! kittest harness can drive it: the window, the alarm layer behind the
-//! notifications, the tray, the login start and the one-instance rule.
+//! notifications, the tray, the login start, the one-instance rule, the
+//! command line, the capture popup and its hotkey.
 
 pub mod alerts;
 pub mod app;
 pub mod autostart;
 pub mod background;
+pub mod cli;
+pub mod hotkey;
 pub mod icons;
 pub mod instance;
 pub mod l10n;
 pub mod names;
 pub mod notify;
+pub mod popup;
 pub mod routine_editor;
 pub mod schedule_text;
 pub mod theme;

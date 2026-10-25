@@ -31,5 +31,19 @@
   "trayOpen": "Old Brain Fix öffnen",
   "trayQuit": "Beenden",
   "timeInvalid": "Keine Uhrzeit",
-  "dateInvalid": "Kein Tag"
+  "dateInvalid": "Kein Tag",
+  "popupKeysHint": "Enter speichert sie, mit einem Stupser in 1 Std. Esc behält Getipptes genauso; leer schließt es nur.",
+  "quickCaptureHeading": "Schnell erfassen",
+  "hotkeyLabel": "Tastenkürzel",
+  "hotkeyInvalid": "Gib eine Taste mit Strg, Alt oder Super ein, etwa Strg+Alt+N.",
+  "hotkeyActive": "Wirkt überall auf diesem Computer.",
+  "hotkeyWaiting": "Frage deine Arbeitsumgebung nach dem Kürzel …",
+  "hotkeyDesktop": "Deine Arbeitsumgebung verwaltet dieses Kürzel: Sie fragt einmal nach, schlägt das hier eingetragene vor und lässt es dich in ihren eigenen Tastatureinstellungen ändern.",
+  "hotkeyDesktopKey": "Deine Arbeitsumgebung hat es auf {key} gelegt.",
+  "hotkeyTaken": "Ein anderes Programm nutzt dieses Kürzel schon. Wähle ein anderes.",
+  "hotkeyUnavailable": "Auf dieser Arbeitsumgebung gibt es kein Tastenkürzel. Lege in ihren Tastatureinstellungen eine Taste auf den Befehl unten.",
+  "captureCommand": "Starter, Tastenkürzel-Programme und Makro-Tastaturen können „oldbrainfix capture“ ausführen, um das Erfassen-Fenster zu öffnen, oder „oldbrainfix capture Milch kaufen“, um einen Text sofort zu behalten.",
+  "cliUsage": "Aufruf:\n  oldbrainfix               öffnet das Fenster\n  oldbrainfix capture       öffnet das Erfassen-Fenster\n  oldbrainfix capture TEXT  erfasst TEXT als Notiz, mit einem Stupser in 1 Std.\n  oldbrainfix capture -     erfasst, was über stdin kommt\n\nRückgabewerte: 0 behalten, 1 nicht behalten, 2 falsche Argumente oder nichts zu erfassen.",
+  "cliNothing": "Nichts zu erfassen.",
+  "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}"
 }

@@ -24,10 +24,16 @@ directories = "6"
 sys-locale = "0.3"
 # Desktop notifications, as Catlog's desktop shows them.
 notify-rust = "4"
+# The capture hotkey on X11, Windows and macOS.
+global-hotkey = "0.9"
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
+# The capture hotkey on Wayland, through the GlobalShortcuts portal.
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+async-io = "2"
+futures-lite = "2"
 
 # Closing a notification once its Occurrence is Done.
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
