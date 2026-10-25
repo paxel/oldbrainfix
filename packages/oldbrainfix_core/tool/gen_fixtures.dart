@@ -8,7 +8,9 @@
 /// (`expected.json`). The desktop core loads each log into its own store
 /// and must read the same. The Routine scenario adds what the alarm plan,
 /// the Missed Summary, the Nudge and the Agenda come to at a few held
-/// moments (`alarms.json`), on a European wall clock. Next to them: the
+/// moments (`alarms.json`), on a European wall clock. A scenario with
+/// photos and voice recordings writes their bytes as the store keeps
+/// them, under `photos/<hash>` and `audio/<hash>`. Next to them: the
 /// store's schema, a signed entry with awkward text, the question-mark
 /// scatter, and RRULEs with their Occurrences and the instants of
 /// daylight-saving days (`schedules.json`).
@@ -258,6 +260,64 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'media',
+    about:
+        'Photos and voice recordings: Notes captured with photos, '
+        'recordings or both, with and without text; photos and recordings '
+        'added later; a photo whose Exif, ICC and comment are stripped; the '
+        'same photo on two Notes kept once; Photo Texts and Transcripts, '
+        'empty ones for nothing found; a Note with a Photo Text and one '
+        'with an untranscribed recording merged into another; a trashed '
+        'Note whose media waits for nothing; a photo from another Device '
+        'whose bytes are not here.',
+    build: (store) {
+      final notes = Notes(store);
+      final receipt = notes.capture('', photos: [_photo(1)]);
+      notes.setPhotoText(
+        receipt.id,
+        receipt.photos.single,
+        '  RECEIPT\nTotal 12,50  ',
+      );
+      final voice = notes.capture(
+        'Groceries',
+        recordings: [_recording(1)],
+        nudgeIn: const Duration(minutes: 10),
+      );
+      notes.setTranscript(
+        voice.id,
+        voice.recordings.single,
+        ' Milk, eggs and bread ',
+      );
+      notes.addPhoto(voice.id, _photo(1));
+      final shed = notes.capture(
+        'Shed',
+        photos: [_photo(2), _photo(3)],
+        recordings: [_recording(2)],
+      );
+      notes.addPhoto(shed.id, _photo(4));
+      notes.addRecording(shed.id, _recording(3));
+      notes.setTranscript(shed.id, shed.recordings.single, '');
+      notes.setPhotoText(shed.id, shed.photos.first, '');
+      final dentist = notes.capture('Dentist');
+      final card = notes.capture('', photos: [_photo(5)]);
+      notes.setPhotoText(
+        card.id,
+        card.photos.single,
+        'Dr. Müller, Tuesday 9:00',
+      );
+      notes.merge(card.id, dentist.id);
+      final memo = notes.capture('', recordings: [_recording(4)]);
+      notes.merge(memo.id, dentist.id);
+      final binned = notes.capture(
+        'Old flyer',
+        photos: [_photo(6)],
+        recordings: [_recording(5)],
+      );
+      notes.trash(binned.id);
+      store.append(dentist.id, NoteKeys.photo('ab' * 32), NoteKeys.photoAdded);
+    },
+  ),
+  (
     name: 'routines',
     about:
         'Routines and Reminders spawned from Notes and made with their '
@@ -386,6 +446,49 @@ final _scenarios = <Scenario>[
   ),
 ];
 
+/// A small JPEG, different for every [n], with an APP0, an Exif APP1,
+/// an ICC APP2 and a comment before its tables and scan: stripping keeps
+/// APP0, the tables and the scan.
+Uint8List _photo(int n) {
+  List<int> segment(int marker, List<int> body) => [
+    0xFF,
+    marker,
+    (body.length + 2) >> 8,
+    (body.length + 2) & 0xFF,
+    ...body,
+  ];
+  return Uint8List.fromList([
+    0xFF, 0xD8, //
+    ...segment(0xE0, utf8.encode('JFIF\u0000')),
+    ...segment(0xE1, utf8.encode('Exif\u0000\u0000GPS 52.5N 13.4E')),
+    ...segment(0xE2, utf8.encode('ICC_PROFILE')),
+    ...segment(0xFE, utf8.encode('taken by the fixture')),
+    ...segment(0xDB, [0, n, n, n]),
+    0xFF, 0xDA, 0x00, 0x03, n, //
+    1, 2, 3, n,
+    0xFF, 0xD9,
+  ]);
+}
+
+/// The bytes of a voice recording, different for every [n]; the store
+/// keeps them as they are, whatever they hold.
+Uint8List _recording(int n) =>
+    Uint8List.fromList([...utf8.encode('RIFF voice $n WAVE'), 0, n, 255]);
+
+/// The queries every scenario's search is checked with.
+const _queries = [
+  '',
+  'sauce',
+  'MILK',
+  'receipt',
+  'dentist',
+  'x-ray',
+  'müller',
+  'called',
+  'loop',
+  ' e ',
+];
+
 /// A value that tests how the signed bytes escape text.
 const _awkward =
     'Quote " backslash \\ slash / newline \n tab \t bell \u0001 '
@@ -400,6 +503,10 @@ Map<String, Object?> _note(Note note) => {
   'trashed': note.trashed?.toUtc().toIso8601String(),
   'mergedInto': note.mergedInto,
   'spawned': note.spawned,
+  'photos': note.photos,
+  'recordings': note.recordings,
+  'transcripts': note.transcripts,
+  'photoTexts': note.photoTexts,
 };
 
 Map<String, Object?> _section(Section section) => {
@@ -407,7 +514,15 @@ Map<String, Object?> _section(Section section) => {
   'noteId': section.noteId,
   'text': section.text,
   'captured': section.context.captured.toUtc().toIso8601String(),
+  'photos': section.photos,
+  'recordings': section.recordings,
+  'transcripts': section.transcripts,
+  'photoTexts': section.photoTexts,
 };
+
+List<Map<String, String>> _blobs(List<({String noteId, String hash})> list) => [
+  for (final b in list) {'noteId': b.noteId, 'hash': b.hash},
+];
 
 /// What the core reads from [store]: the desktop core must read the same.
 Map<String, Object?> _expected(Store store) {
@@ -458,7 +573,38 @@ Map<String, Object?> _expected(Store store) {
       for (final note in [...all, ...trashed])
         note.id: [for (final s in notes.sections(note.id)) _section(s)],
     },
+    'untranscribed': _blobs(notes.untranscribed()),
+    'unreadPhotos': _blobs(notes.unreadPhotos()),
+    'search': {
+      for (final query in _queries)
+        query: [for (final n in Search(store).notes(query)) n.id],
+    },
+    'searchWithin': {
+      for (final id in placeIds)
+        id: [for (final n in Search(store).notes('e', within: id)) n.id],
+    },
   };
+}
+
+/// Writes the photos and voice recordings [store] holds as it keeps
+/// them, one file per blob named by its hash, under [out].
+void _writeBlobs(Store store, Directory out) {
+  for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+    final note = Notes(store).byId(id);
+    if (note == null) continue;
+    for (final (dir, hashes, bytes) in [
+      ('photos', note.photos, store.photo),
+      ('audio', note.recordings, store.audio),
+    ]) {
+      for (final hash in hashes) {
+        final held = bytes(hash);
+        if (held == null) continue;
+        final file = File('${out.path}/$dir/$hash');
+        file.parent.createSync(recursive: true);
+        file.writeAsBytesSync(held);
+      }
+    }
+  }
 }
 
 Map<String, Object?> _routine(Routine routine) => {
@@ -1175,6 +1321,7 @@ void main(List<String> args) {
         log.writeln(jsonEncode(entry.toJson()));
       }
       _write(File('${out.path}/log.jsonl'), log.toString());
+      _writeBlobs(store, out);
       _held = _tick.add(const Duration(days: 1));
       _write(
         File('${out.path}/expected.json'),

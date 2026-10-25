@@ -153,7 +153,7 @@ class Speech(private val context: Context) {
 
     private fun transcribeNow(bytes: ByteArray): String? {
         if (!WhisperNative.loaded || !modelFile.isFile) return null
-        val file = File(context.cacheDir, "transcribing.m4a").apply { writeBytes(bytes) }
+        val file = File(context.cacheDir, "transcribing.${Voice.extension(bytes)}").apply { writeBytes(bytes) }
         val samples = try {
             decode(file) ?: return null
         } finally {

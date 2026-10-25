@@ -110,7 +110,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000011",
@@ -120,7 +124,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000012",
@@ -130,7 +138,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000013",
@@ -140,7 +152,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000014",
@@ -150,7 +166,11 @@
       "importance": "important",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000015",
@@ -160,7 +180,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     }
   ],
   "all": [
@@ -207,5 +231,56 @@
     "note:00000000000000000000000000000012": [],
     "note:00000000000000000000000000000011": [],
     "note:00000000000000000000000000000010": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000013",
+      "note:00000000000000000000000000000012",
+      "note:00000000000000000000000000000011",
+      "note:00000000000000000000000000000010"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000014",
+      "note:00000000000000000000000000000013",
+      "note:00000000000000000000000000000012",
+      "note:00000000000000000000000000000011",
+      "note:00000000000000000000000000000010"
+    ]
+  },
+  "searchWithin": {
+    "area:00000000000000000000000000000008": [
+      "note:00000000000000000000000000000013"
+    ],
+    "topic:0000000000000000000000000000000a": [],
+    "topic:00000000000000000000000000000009": [],
+    "area:0000000000000000000000000000000b": [],
+    "topic:0000000000000000000000000000000c": [],
+    "topic:0000000000000000000000000000000d": [],
+    "area:00000000000000000000000000000001": [
+      "note:00000000000000000000000000000011",
+      "note:00000000000000000000000000000010"
+    ],
+    "topic:00000000000000000000000000000004": [],
+    "topic:00000000000000000000000000000003": [],
+    "topic:00000000000000000000000000000002": [
+      "note:00000000000000000000000000000010"
+    ],
+    "area:0000000000000000000000000000000e": [],
+    "area:00000000000000000000000000000005": [],
+    "topic:00000000000000000000000000000006": [],
+    "topic:00000000000000000000000000000007": []
   }
 }

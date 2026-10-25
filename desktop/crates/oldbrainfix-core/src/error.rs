@@ -3,6 +3,9 @@
 pub enum Error {
     #[error("database: {0}")]
     Db(#[from] rusqlite::Error),
+    /// Keeping a photo's or a voice recording's bytes.
+    #[error("file: {0}")]
+    Io(#[from] std::io::Error),
     #[error("{0}")]
     Invalid(String),
 }

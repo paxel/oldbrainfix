@@ -6,6 +6,11 @@
 //! phone's capture screen does; empty, it just closes. The Note stays
 //! Unsorted.
 //!
+//! Its microphone button records voice into the same Note: recording
+//! starts at once, and one big stop button ends it and keeps the Note
+//! with a Nudge in 1 h; the Nudge times, Enter, Esc and closing keep it
+//! as well, so a recording is never lost.
+//!
 //! Closing the popup gives the keyboard back to the window that had it
 //! where the system does so for a closed window: on X11, Windows and
 //! macOS mostly. On Wayland the compositor decides that, and whether the
@@ -19,6 +24,8 @@ use oldbrainfix_core::{APP_ID, Note, Notes, Store};
 
 use crate::cli::note_text;
 use crate::l10n::L10n;
+use crate::media::Recorder;
+use crate::media_view::{self, Voice};
 use crate::theme;
 
 /// What the popup is after a frame.
@@ -53,6 +60,9 @@ pub struct CapturePopup {
     /// What went wrong saving, shown at the top; the text stays.
     error: Option<String>,
     saved: Option<Box<dyn Fn()>>,
+    recorder: Option<Box<dyn Recorder>>,
+    /// A recording that ended but could not be kept yet.
+    recorded: Option<Vec<u8>>,
 }
 
 impl CapturePopup {
@@ -65,7 +75,19 @@ impl CapturePopup {
             focus: true,
             error: None,
             saved: None,
+            recorder: None,
+            recorded: None,
         }
+    }
+
+    /// The microphone voice Notes are recorded with.
+    pub fn set_recorder(&mut self, recorder: Box<dyn Recorder>) {
+        self.recorder = Some(recorder);
+    }
+
+    /// Whether a voice recording runs.
+    pub fn recording(&self) -> bool {
+        self.recorder.as_ref().is_some_and(|r| r.recording())
     }
 
     /// Calls `saved` after every Note kept.
@@ -78,7 +100,7 @@ impl CapturePopup {
         egui::ViewportBuilder::default()
             .with_title(self.t.capture_tooltip())
             .with_app_id(APP_ID)
-            .with_inner_size([460.0, 210.0])
+            .with_inner_size([460.0, 280.0])
             .with_resizable(false)
             .with_minimize_button(false)
             .with_maximize_button(false)
@@ -108,9 +130,26 @@ impl CapturePopup {
     }
 
     fn save(&mut self, nudge_in: Duration) -> Outcome {
-        match capture(&self.store, &self.text, nudge_in) {
+        // A running recording is ended and kept first.
+        if let Some(recorder) = &mut self.recorder
+            && recorder.recording()
+            && let Some(bytes) = recorder.stop()
+        {
+            self.recorded = Some(bytes);
+        }
+        let saved = match self.recorded.clone() {
+            None => capture(&self.store, &self.text, nudge_in),
+            Some(recording) => {
+                let text = note_text(&self.text).unwrap_or_default();
+                Notes::new(&self.store)
+                    .capture_with(text, None, Some(nudge_in), &[], &[recording])
+                    .map(Some)
+            }
+        };
+        match saved {
             Ok(saved) => {
                 self.text.clear();
+                self.recorded = None;
                 self.error = None;
                 if saved.is_some()
                     && let Some(saved) = &self.saved
@@ -134,7 +173,13 @@ impl CapturePopup {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture popup");
-        let typed = note_text(&self.text).is_some();
+        let recording = self
+            .recorder
+            .as_ref()
+            .filter(|r| r.recording())
+            .map(|r| r.elapsed());
+        let typed =
+            note_text(&self.text).is_some() || recording.is_some() || self.recorded.is_some();
         // Enter on a focused button is that button's.
         let in_field = ui.memory(|m| m.has_focus(id));
         let (enter, escape, closing) = ui.input_mut(|i| {
@@ -158,6 +203,8 @@ impl CapturePopup {
             return self.save(Notes::default_nudge());
         }
         let mut picked = None;
+        let mut record = false;
+        let has_recorder = self.recorder.is_some();
         Frame::NONE
             .fill(tones.background)
             .inner_margin(Margin::same(16))
@@ -183,6 +230,13 @@ impl CapturePopup {
                     field.request_focus();
                     ui.ctx().send_viewport_cmd(ViewportCommand::Focus);
                 }
+                if has_recorder {
+                    match media_view::voice_button(ui, &t, recording) {
+                        Some(Voice::Record) => record = true,
+                        Some(Voice::StopAndSave) => picked = Some(Notes::default_nudge()),
+                        None => {}
+                    }
+                }
                 ui.add_space(8.0);
                 ui.label(RichText::new(t.nudge_heading()).strong().color(text));
                 ui.horizontal(|ui| {
@@ -201,6 +255,13 @@ impl CapturePopup {
                 ui.add_space(4.0);
                 ui.label(RichText::new(t.popup_keys_hint()).small().color(weak));
             });
+        if record && let Some(recorder) = &mut self.recorder {
+            if recorder.start() {
+                self.error = None;
+            } else {
+                self.error = Some(t.microphone_missing().to_string());
+            }
+        }
         match picked {
             Some(nudge_in) => self.save(nudge_in),
             None => Outcome::Open,

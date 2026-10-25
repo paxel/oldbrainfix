@@ -1,0 +1,25 @@
+[package]
+name = "oldbrainfix-whisper"
+description = "Transcripts for the Old Brain Fix desktop: the phone's vendored whisper.cpp behind a small C bridge, the speech model it needs, and recordings decoded as Whisper hears them"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[lib]
+name = "oldbrainfix_whisper"
+
+[dependencies]
+sha2 = "0.10"
+hex = "0.4"
+# The phone's AAC .m4a recordings and the desktop's WAV ones.
+symphonia = { version = "0.5.5", default-features = false, features = ["aac", "isomp4", "pcm", "wav"] }
+# The speech model from Old Brain Fix's own release, over HTTPS only.
+ureq = { version = "3", default-features = false, features = ["rustls"] }
+
+[build-dependencies]
+cmake = "0.1.58"
+
+[dev-dependencies]
+tempfile = "3.10"

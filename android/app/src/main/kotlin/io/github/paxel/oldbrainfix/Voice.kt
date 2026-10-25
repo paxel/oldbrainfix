@@ -17,7 +17,8 @@ import java.io.File
  * A recording is AAC in an MPEG-4 (.m4a) file, mono, at 16 kHz and about
  * 64 kbit/s: half a megabyte a minute to keep and sync, and already the
  * sample rate and channel count Whisper listens at, so transcribing only
- * has to decode it, never resample it.
+ * has to decode it, never resample it. The desktop records WAV at the
+ * same rate instead; such a recording plays and transcribes here too.
  */
 class Voice(private val context: Context) {
     private var recorder: MediaRecorder? = null
@@ -27,9 +28,9 @@ class Voice(private val context: Context) {
     private val recordingFile: File
         get() = File(context.cacheDir, "voice").apply { mkdirs() }.let { File(it, "recording.m4a") }
 
-    /** Where the recording being played is written for the player. */
-    private val playingFile: File
-        get() = File(context.cacheDir, "voice").apply { mkdirs() }.let { File(it, "playing.m4a") }
+    /** Where the recording [bytes] being played are written for the player. */
+    private fun playingFile(bytes: ByteArray): File =
+        File(context.cacheDir, "voice").apply { mkdirs() }.let { File(it, "playing.${extension(bytes)}") }
 
     /** Starts recording from the microphone; whether it did. */
     fun start(): Boolean {
@@ -98,7 +99,7 @@ class Voice(private val context: Context) {
         stopPlaying()
         val player = MediaPlayer()
         return try {
-            val file = playingFile.apply { writeBytes(bytes) }
+            val file = playingFile(bytes).apply { writeBytes(bytes) }
             player.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -139,6 +140,17 @@ class Voice(private val context: Context) {
         const val SAMPLE_RATE = 16_000
         const val CHANNELS = 1
         const val BIT_RATE = 64_000
+
+        /**
+         * The file extension of the recording [bytes]: `wav` for a WAV
+         * file (`RIFF`…`WAVE`), as the desktop records, else `m4a`, as
+         * this phone records. Players and extractors read the bytes, the
+         * name only keeps them from guessing wrong.
+         */
+        fun extension(bytes: ByteArray): String {
+            fun tag(at: Int) = if (bytes.size < at + 4) "" else String(bytes, at, 4, Charsets.US_ASCII)
+            return if (tag(0) == "RIFF" && tag(8) == "WAVE") "wav" else "m4a"
+        }
 
         /** Whether the user allowed the microphone. */
         fun granted(context: Context): Boolean =

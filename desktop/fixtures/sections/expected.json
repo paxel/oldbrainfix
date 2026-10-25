@@ -11,7 +11,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": "note:00000000000000000000000000000005",
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -21,7 +25,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": "note:00000000000000000000000000000005",
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000005",
@@ -31,7 +39,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000007",
@@ -41,7 +53,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000008",
@@ -51,7 +67,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": "note:00000000000000000000000000000007",
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000009",
@@ -61,7 +81,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     }
   ],
   "all": [
@@ -83,7 +107,11 @@
         "id": "note:00000000000000000000000000000008",
         "noteId": "note:00000000000000000000000000000007",
         "text": "Loop two",
-        "captured": "2026-01-01T10:00:34.000Z"
+        "captured": "2026-01-01T10:00:34.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       }
     ],
     "note:00000000000000000000000000000005": [
@@ -91,32 +119,83 @@
         "id": "note:00000000000000000000000000000001",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Dentist on Tuesday",
-        "captured": "2026-01-01T10:00:01.000Z"
+        "captured": "2026-01-01T10:00:01.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       },
       {
         "id": "section:00000000000000000000000000000002",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Moved to Wednesday",
-        "captured": "2026-01-01T10:00:05.000Z"
+        "captured": "2026-01-01T10:00:05.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       },
       {
         "id": "note:00000000000000000000000000000003",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Ask about the crown",
-        "captured": "2026-01-01T10:00:10.000Z"
+        "captured": "2026-01-01T10:00:10.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       },
       {
         "id": "section:00000000000000000000000000000004",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Bring the old X-ray",
-        "captured": "2026-01-01T10:00:14.000Z"
+        "captured": "2026-01-01T10:00:14.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       },
       {
         "id": "section:00000000000000000000000000000006",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Called, all set",
-        "captured": "2026-01-01T10:00:25.000Z"
+        "captured": "2026-01-01T10:00:25.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       }
     ]
-  }
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000005"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [
+      "note:00000000000000000000000000000005"
+    ],
+    "x-ray": [
+      "note:00000000000000000000000000000005"
+    ],
+    "müller": [],
+    "called": [
+      "note:00000000000000000000000000000005"
+    ],
+    "loop": [
+      "note:00000000000000000000000000000007"
+    ],
+    " e ": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000007",
+      "note:00000000000000000000000000000005"
+    ]
+  },
+  "searchWithin": {}
 }

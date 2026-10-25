@@ -34,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: System libraries (ALSA for the microphone, cmake for whisper.cpp)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake g++
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

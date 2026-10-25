@@ -81,5 +81,19 @@
   "cliNothing": "Nothing to capture.",
   "@cliNothing": {"description": "Printed when `oldbrainfix capture` gets a blank text."},
   "cliFailed": "The Note could not be kept: {detail}",
-  "@cliFailed": {"description": "Printed when `oldbrainfix capture TEXT` failed.", "placeholders": {"detail": {"type": "String"}}}
+  "@cliFailed": {"description": "Printed when `oldbrainfix capture TEXT` failed.", "placeholders": {"detail": {"type": "String"}}},
+  "speechModelIntro": "Voice Notes get a Transcript you can read and search. Whisper writes it on this computer, in English or German, with a speech model it needs once. The recording is always kept.",
+  "@speechModelIntro": {"description": "Desktop wording of the phone's text."},
+  "speechModelReady": "The speech model is ready. Voice Notes are transcribed on this computer.",
+  "@speechModelReady": {"description": "Desktop wording of the phone's text."},
+  "speechModelPathHint": "Path to ggml-base.bin",
+  "@speechModelPathHint": {"description": "Hint of the desktop settings' field a speech model file is typed or pasted into."},
+  "speechModelUseFile": "Use this file",
+  "@speechModelUseFile": {"description": "Takes the speech model from the file typed into the field above."},
+  "pastePhoto": "Paste a picture",
+  "@pastePhoto": {"description": "Keeps the picture on the clipboard as a photo, in the Note being captured."},
+  "pasteNoPicture": "There is no picture on the clipboard.",
+  "@pasteNoPicture": {"description": "Announced when Paste a picture finds none."},
+  "photosHint": "A pasted picture becomes a photo Note, with what is typed.",
+  "@photosHint": {"description": "Under the desktop's Paste a picture button."}
 }

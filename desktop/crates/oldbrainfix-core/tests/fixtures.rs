@@ -18,15 +18,22 @@ use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, ClockTime, Day, Importance, Note, Notes, NotesGo, Occurrence, Places,
-    Recurrence, Routine, Routines, STARTER_SET, Schedule, Section, SigningKey, SimpleRepeat, Store,
-    WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, ClockTime, Day, Importance, Note, Notes, NotesGo, Occurrence, Places,
+    Recurrence, Routine, Routines, STARTER_SET, Schedule, Search, Section, SigningKey,
+    SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 6] = ["edits", "notes", "places", "routines", "sections", "trash"];
+const SCENARIOS: [&str; 7] = [
+    "edits", "media", "notes", "places", "routines", "sections", "trash",
+];
+
+/// The queries every scenario's search is checked with, the generator's.
+const QUERIES: [&str; 10] = [
+    "", "sauce", "MILK", "receipt", "dentist", "x-ray", "müller", "called", "loop", " e ",
+];
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
@@ -89,6 +96,10 @@ fn note_json(note: &Note) -> Value {
         "trashed": note.trashed.map(dart_iso),
         "mergedInto": note.merged_into,
         "spawned": note.spawned,
+        "photos": note.photos,
+        "recordings": note.recordings,
+        "transcripts": note.transcripts,
+        "photoTexts": note.photo_texts,
     })
 }
 
@@ -98,7 +109,19 @@ fn section_json(section: &Section) -> Value {
         "noteId": section.note_id,
         "text": section.text,
         "captured": dart_iso(section.captured),
+        "photos": section.photos,
+        "recordings": section.recordings,
+        "transcripts": section.transcripts,
+        "photoTexts": section.photo_texts,
     })
+}
+
+fn blobs_json(list: &[Blob]) -> Value {
+    json!(
+        list.iter()
+            .map(|b| json!({"noteId": b.note_id, "hash": b.hash}))
+            .collect::<Vec<_>>()
+    )
 }
 
 /// What this core reads, in the shape of the Dart core's `expected.json`.
@@ -111,6 +134,16 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
     let trashed = notes.trashed()?;
     let mut areas = Vec::new();
     let mut inside = serde_json::Map::new();
+    let mut within = serde_json::Map::new();
+    let search = Search::new(store);
+    let found = |query: &str, place: Option<&str>| -> Result<Value, Box<dyn std::error::Error>> {
+        let ids: Vec<String> = search
+            .notes(query, place)?
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        Ok(json!(ids))
+    };
     for area in places.areas()? {
         let topics = places.topics(&area.id)?;
         let ids = |place: &str| -> Result<Value, Box<dyn std::error::Error>> {
@@ -123,8 +156,10 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             ))
         };
         inside.insert(area.id.clone(), ids(&area.id)?);
+        within.insert(area.id.clone(), found("e", Some(&area.id))?);
         for topic in &topics {
             inside.insert(topic.id.clone(), ids(&topic.id)?);
+            within.insert(topic.id.clone(), found("e", Some(&topic.id))?);
         }
         areas.push(json!({
             "id": area.id,
@@ -152,6 +187,10 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         sections.insert(note.id.clone(), json!(list));
     }
     let ids = |list: &[Note]| list.iter().map(|n| n.id.clone()).collect::<Vec<_>>();
+    let mut searched = serde_json::Map::new();
+    for query in QUERIES {
+        searched.insert(query.to_string(), found(query, None)?);
+    }
     Ok(json!({
         "now": dart_iso(store.now()),
         "device": store.device_id()?,
@@ -162,6 +201,10 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "trashed": ids(&trashed),
         "inside": inside,
         "sections": sections,
+        "untranscribed": blobs_json(&notes.untranscribed()?),
+        "unreadPhotos": blobs_json(&notes.unread_photos()?),
+        "search": searched,
+        "searchWithin": within,
     }))
 }
 
@@ -546,10 +589,106 @@ fn write_edits(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `_photo`: a small JPEG, different for every `n`, with
+/// an APP0, an Exif APP1, an ICC APP2 and a comment before its tables and
+/// scan.
+fn photo(n: u8) -> Vec<u8> {
+    let segment = |marker: u8, body: &[u8]| {
+        let length = (body.len() + 2) as u16;
+        let mut out = vec![0xFF, marker];
+        out.extend_from_slice(&length.to_be_bytes());
+        out.extend_from_slice(body);
+        out
+    };
+    let mut out = vec![0xFF, 0xD8];
+    out.extend(segment(0xE0, b"JFIF\0"));
+    out.extend(segment(0xE1, b"Exif\0\0GPS 52.5N 13.4E"));
+    out.extend(segment(0xE2, b"ICC_PROFILE"));
+    out.extend(segment(0xFE, b"taken by the fixture"));
+    out.extend(segment(0xDB, &[0, n, n, n]));
+    out.extend([0xFF, 0xDA, 0x00, 0x03, n, 1, 2, 3, n, 0xFF, 0xD9]);
+    out
+}
+
+/// The generator's `_recording`.
+fn recording(n: u8) -> Vec<u8> {
+    let mut out = format!("RIFF voice {n} WAVE").into_bytes();
+    out.extend([0, n, 255]);
+    out
+}
+
+/// The generator's `media` scenario.
+fn write_media(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let receipt = notes.capture_with("", None, None, &[photo(1)], &[])?;
+    notes.set_photo_text(&receipt.id, &receipt.photos[0], "  RECEIPT\nTotal 12,50  ")?;
+    let voice = notes.capture_with(
+        "Groceries",
+        None,
+        Some(Duration::minutes(10)),
+        &[],
+        &[recording(1)],
+    )?;
+    notes.set_transcript(&voice.id, &voice.recordings[0], " Milk, eggs and bread ")?;
+    notes.add_photo(&voice.id, &photo(1))?;
+    let shed = notes.capture_with("Shed", None, None, &[photo(2), photo(3)], &[recording(2)])?;
+    notes.add_photo(&shed.id, &photo(4))?;
+    notes.add_recording(&shed.id, &recording(3))?;
+    notes.set_transcript(&shed.id, &shed.recordings[0], "")?;
+    notes.set_photo_text(&shed.id, &shed.photos[0], "")?;
+    let dentist = notes.capture("Dentist", None, None)?;
+    let card = notes.capture_with("", None, None, &[photo(5)], &[])?;
+    notes.set_photo_text(&card.id, &card.photos[0], "Dr. Müller, Tuesday 9:00")?;
+    notes.merge(&card.id, &dentist.id)?;
+    let memo = notes.capture_with("", None, None, &[], &[recording(4)])?;
+    notes.merge(&memo.id, &dentist.id)?;
+    let binned = notes.capture_with("Old flyer", None, None, &[photo(6)], &[recording(5)])?;
+    notes.trash(&binned.id)?;
+    let elsewhere = format!("photo:{}", "ab".repeat(32));
+    store.append(&dentist.id, &elsewhere, Some(note_keys::ADDED), None)?;
+    Ok(())
+}
+
+/// The files under `dir` of a scenario's folder, by name.
+/// A file's name and bytes.
+type Named = (String, Vec<u8>);
+
+fn files(dir: &Path) -> Result<Vec<Named>, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    if dir.is_dir() {
+        for entry in std::fs::read_dir(dir)? {
+            let path = entry?.path();
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+            out.push((name.ok_or("a file name")?, std::fs::read(&path)?));
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+#[test]
+fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let store = Store::open(
+        &dir.path().join("oldbrainfix.db"),
+        Box::new(Utc::now),
+        || Ok(writer_key()),
+    )?;
+    write_media(&store)?;
+    for sub in ["photos", "audio"] {
+        let ours = files(&dir.path().join(sub))?;
+        let theirs = files(&fixtures().join("media").join(sub))?;
+        assert!(!theirs.is_empty(), "{sub}");
+        assert_eq!(ours, theirs, "{sub}");
+    }
+    Ok(())
+}
+
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 6] = [
+    let writers: [(&str, Writer); 7] = [
         ("edits", write_edits),
+        ("media", write_media),
         ("notes", write_notes),
         ("places", write_places),
         ("routines", write_routines),

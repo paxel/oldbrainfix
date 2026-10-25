@@ -11,7 +11,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000004",
@@ -21,7 +25,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -31,7 +39,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000009",
@@ -41,7 +53,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:0000000000000000000000000000000b",
@@ -51,7 +67,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:0000000000000000000000000000000d",
@@ -61,7 +81,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:0000000000000000000000000000000f",
@@ -71,7 +95,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000011",
@@ -81,7 +109,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000013",
@@ -91,7 +123,11 @@
       "importance": "normal",
       "trashed": "2026-01-01T10:02:16.000Z",
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000015",
@@ -101,7 +137,11 @@
       "importance": "normal",
       "trashed": "2026-01-01T10:02:29.000Z",
       "mergedInto": null,
-      "spawned": true
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000017",
@@ -111,7 +151,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000018",
@@ -121,7 +165,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     }
   ],
   "all": [
@@ -158,5 +206,43 @@
     "note:00000000000000000000000000000001": [],
     "note:00000000000000000000000000000015": [],
     "note:00000000000000000000000000000013": []
-  }
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000018",
+      "note:00000000000000000000000000000017",
+      "note:00000000000000000000000000000011",
+      "note:0000000000000000000000000000000f",
+      "note:0000000000000000000000000000000d",
+      "note:0000000000000000000000000000000b",
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [
+      "note:00000000000000000000000000000006"
+    ],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000018",
+      "note:00000000000000000000000000000017",
+      "note:00000000000000000000000000000011",
+      "note:0000000000000000000000000000000f",
+      "note:0000000000000000000000000000000b",
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000001"
+    ]
+  },
+  "searchWithin": {}
 }

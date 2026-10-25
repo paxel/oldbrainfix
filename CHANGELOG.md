@@ -50,7 +50,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - An optional App Lock with a PIN, fingerprint or screen lock that guards your Notes while capturing and alarms stay open.
 - Optional Area Locks that keep single Areas and their Notes hidden until unlocked, with their alarms, Agenda rows, widget and calendar entries shown as "Private Routine" or in full, still checkable.
 - An About page with the version, documentation, source, licences, a way to report problems or write to the developer, and a donation link.
-- A desktop app in the phone's look that captures, edits and sorts Notes, manages Areas, Topics, Routines and Reminders and shows the Agenda like the phone, with drag-and-drop filing, keys in place of swipes, notifications with Re-nag from a tray icon that starts at login unless switched off, and a small capture popup that a global hotkey, the tray or the `oldbrainfix capture` command opens, the command also keeping a given text as a Note without opening anything.
+- A desktop app in the phone's look that captures, edits and sorts Notes, manages Areas, Topics, Routines and Reminders, shows the Agenda like the phone, records and plays voice Notes, keeps pasted pictures as photo Notes, writes Transcripts with Whisper and Photo Texts with ocrs, and finds Notes by their text, Transcripts and Photo Texts, with drag-and-drop filing, keys in place of swipes, notifications with Re-nag from a tray icon that starts at login unless switched off, and a small capture popup that a global hotkey, the tray or the `oldbrainfix capture` command opens, the command also keeping a given text as a Note without opening anything.
 
 ---
 

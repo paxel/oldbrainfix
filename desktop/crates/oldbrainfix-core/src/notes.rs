@@ -1,10 +1,11 @@
 //! Notes and their Sections as the Dart core's `Notes` reads and writes
 //! them: the text, the capture time, the Importance, where a Note is
-//! filed, whether it is in the trash, and what was merged into it. Every
+//! filed, whether it is in the trash, what was merged into it, and its
+//! photos and voice recordings with their Photo Texts and Transcripts. Every
 //! write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -31,6 +32,40 @@ pub mod keys {
     pub const SPAWNED: &str = "spawned";
     /// When the Note's Nudge is due, chosen at Capture.
     pub const NUDGE: &str = "nudge";
+
+    /// One field per photo, `photo:<hash>` = [`ADDED`], so photos added on
+    /// two Devices at once are both kept. The bytes are in the store's
+    /// photos, under the hash.
+    pub const PHOTO_PREFIX: &str = "photo:";
+    /// One field per voice recording, `audio:<hash>` = [`ADDED`], as for
+    /// photos. The bytes are in the store's audio, under the hash.
+    pub const AUDIO_PREFIX: &str = "audio:";
+    /// The value of a photo's or a recording's field.
+    pub const ADDED: &str = "added";
+    /// The Transcript of a voice recording, `transcript:<hash>` = its
+    /// text, on the Note holding `audio:<hash>`. An empty text means
+    /// Whisper heard no words; absent means not transcribed (yet).
+    pub const TRANSCRIPT_PREFIX: &str = "transcript:";
+    /// The Photo Text of a photo, `ocr:<hash>` = the text ocrs recognised
+    /// in it, on the Note holding `photo:<hash>`. An empty text means no
+    /// text was found; absent means not read (yet).
+    pub const OCR_PREFIX: &str = "ocr:";
+
+    pub fn photo(hash: &str) -> String {
+        format!("{PHOTO_PREFIX}{hash}")
+    }
+
+    pub fn audio(hash: &str) -> String {
+        format!("{AUDIO_PREFIX}{hash}")
+    }
+
+    pub fn transcript(hash: &str) -> String {
+        format!("{TRANSCRIPT_PREFIX}{hash}")
+    }
+
+    pub fn ocr(hash: &str) -> String {
+        format!("{OCR_PREFIX}{hash}")
+    }
 
     /// Field keys of a Section.
     pub const TYPE_SECTION: &str = "section";
@@ -86,6 +121,16 @@ pub struct Note {
     pub spawned: bool,
     /// When its Nudge is due, as chosen at Capture; `None` when none was.
     pub nudge: Option<DateTime<Utc>>,
+    /// The hashes of its photos, in the order they were added.
+    pub photos: Vec<String>,
+    /// The hashes of its voice recordings, in the order they were added.
+    pub recordings: Vec<String>,
+    /// The Transcripts of its voice recordings, by recording hash; a
+    /// recording not transcribed yet has none.
+    pub transcripts: BTreeMap<String, String>,
+    /// The Photo Texts of its photos, by photo hash; a photo not read yet
+    /// has none.
+    pub photo_texts: BTreeMap<String, String>,
 }
 
 impl Note {
@@ -119,6 +164,19 @@ pub struct Section {
     pub note_id: String,
     pub text: String,
     pub captured: DateTime<Utc>,
+    /// A merged Note's photos and recordings travel with it, with their
+    /// Photo Texts and Transcripts; an Amend has none.
+    pub photos: Vec<String>,
+    pub recordings: Vec<String>,
+    pub transcripts: BTreeMap<String, String>,
+    pub photo_texts: BTreeMap<String, String>,
+}
+
+/// A photo or a voice recording of a Note, by its hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Blob {
+    pub note_id: String,
+    pub hash: String,
 }
 
 /// Reading Notes.
@@ -151,6 +209,20 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
+        self.capture_with(text, place, nudge_in, &[], &[])
+    }
+
+    /// Captures a new Note as [`Notes::capture`] does, with `photos` and
+    /// voice `recordings`; the text may be empty for a photo or voice
+    /// Note. The photos are kept without their metadata.
+    pub fn capture_with(
+        &self,
+        text: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+        photos: &[Vec<u8>],
+        recordings: &[Vec<u8>],
+    ) -> Result<Note> {
         if let Some(place) = place
             && !Places::new(self.store).is_place(place)?
         {
@@ -159,6 +231,15 @@ impl<'a> Notes<'a> {
         let id = format!("note:{}", self.store.new_id()?);
         let now = self.store.now();
         let at = Some(now);
+        // The bytes are kept before the log names them.
+        let photos = photos
+            .iter()
+            .map(|p| self.store.put_photo(p))
+            .collect::<Result<Vec<_>>>()?;
+        let audio = recordings
+            .iter()
+            .map(|r| self.store.put_audio(r))
+            .collect::<Result<Vec<_>>>()?;
         self.store.batch(|| {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
@@ -170,10 +251,126 @@ impl<'a> Notes<'a> {
             if let Some(nudge_in) = nudge_in {
                 s.append(&id, keys::NUDGE, Some(&dart_iso(now + nudge_in)), at)?;
             }
+            for hash in &photos {
+                s.append(&id, &keys::photo(hash), Some(keys::ADDED), at)?;
+            }
+            for hash in &audio {
+                s.append(&id, &keys::audio(hash), Some(keys::ADDED), at)?;
+            }
             Ok(())
         })?;
         self.by_id(&id)?
             .ok_or_else(|| Error::Invalid("the captured Note is gone".into()))
+    }
+
+    /// Adds the photo `bytes` to the Note `note_id`, without their
+    /// metadata; returns the hash it is kept under.
+    pub fn add_photo(&self, note_id: &str, bytes: &[u8]) -> Result<String> {
+        self.require_note(note_id)?;
+        let hash = self.store.put_photo(bytes)?;
+        self.store
+            .append(note_id, &keys::photo(&hash), Some(keys::ADDED), None)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the photo `hash`, or `None` when they are not on this
+    /// Device (yet).
+    pub fn photo_bytes(&self, hash: &str) -> Option<Vec<u8>> {
+        self.store.photo(hash)
+    }
+
+    /// Adds the voice recording `bytes` to the Note `note_id`; returns
+    /// the hash it is kept under.
+    pub fn add_recording(&self, note_id: &str, bytes: &[u8]) -> Result<String> {
+        self.require_note(note_id)?;
+        let hash = self.store.put_audio(bytes)?;
+        self.store
+            .append(note_id, &keys::audio(&hash), Some(keys::ADDED), None)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the voice recording `hash`, or `None` when they are
+    /// not on this Device (yet).
+    pub fn recording_bytes(&self, hash: &str) -> Option<Vec<u8>> {
+        self.store.audio(hash)
+    }
+
+    /// Keeps `text`, trimmed, as the Transcript of the voice recording
+    /// `hash` of the Note `note_id`, a merged one included, next to the
+    /// recording. An empty text records that no words were heard, so the
+    /// recording is not transcribed again.
+    pub fn set_transcript(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.recordings.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!(
+                "not a recording of {note_id}: {hash}"
+            )));
+        }
+        self.store
+            .append(note_id, &keys::transcript(hash), Some(text.trim()), None)
+            .map(drop)
+    }
+
+    /// Keeps `text`, trimmed, as the Photo Text of the photo `hash` of
+    /// the Note `note_id`, a merged one included, next to the photo. An
+    /// empty text records that no text was found, so the photo is not
+    /// read again.
+    pub fn set_photo_text(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.photos.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!("not a photo of {note_id}: {hash}")));
+        }
+        self.store
+            .append(note_id, &keys::ocr(hash), Some(text.trim()), None)
+            .map(drop)
+    }
+
+    /// The voice recordings without a Transcript, newest capture first:
+    /// those of every Note not in the trash, merged ones included.
+    pub fn untranscribed(&self) -> Result<Vec<Blob>> {
+        self.waiting(|n| (&n.recordings, &n.transcripts))
+    }
+
+    /// The photos without a Photo Text, newest capture first: those of
+    /// every Note not in the trash, merged ones included.
+    pub fn unread_photos(&self) -> Result<Vec<Blob>> {
+        self.waiting(|n| (&n.photos, &n.photo_texts))
+    }
+
+    /// The blobs `of` every Note not in the trash that have no text yet.
+    fn waiting(
+        &self,
+        of: impl Fn(&Note) -> (&Vec<String>, &BTreeMap<String, String>),
+    ) -> Result<Vec<Blob>> {
+        let mut notes = Vec::new();
+        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+            if let Some(note) = self.by_id(&id)?
+                && !note.is_trashed()
+            {
+                let (blobs, texts) = of(&note);
+                if blobs.iter().any(|h| !texts.contains_key(h)) {
+                    notes.push(note);
+                }
+            }
+        }
+        notes.sort_by_key(|n| std::cmp::Reverse(n.captured));
+        let mut out = Vec::new();
+        for note in &notes {
+            let (blobs, texts) = of(note);
+            for hash in blobs {
+                if !texts.contains_key(hash) {
+                    out.push(Blob {
+                        note_id: note.id.clone(),
+                        hash: hash.clone(),
+                    });
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Files the Note `note_id` into the Area or Topic `place_id`, out of
@@ -309,6 +506,11 @@ impl<'a> Notes<'a> {
             merged_into: self.merged_into(id)?,
             spawned: fields.get(keys::SPAWNED).is_some(),
             nudge: fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok()),
+            // The fields come in the order they were first written.
+            photos: added(&fields, keys::PHOTO_PREFIX),
+            recordings: added(&fields, keys::AUDIO_PREFIX),
+            transcripts: texts(&fields, keys::TRANSCRIPT_PREFIX),
+            photo_texts: texts(&fields, keys::OCR_PREFIX),
         }))
     }
 
@@ -393,6 +595,10 @@ impl<'a> Notes<'a> {
                     note_id: note_id.to_string(),
                     text: note.text,
                     captured: note.captured,
+                    photos: note.photos,
+                    recordings: note.recordings,
+                    transcripts: note.transcripts,
+                    photo_texts: note.photo_texts,
                 });
             }
         }
@@ -423,6 +629,10 @@ impl<'a> Notes<'a> {
             note_id: note_id.to_string(),
             text: fields.get(keys::TEXT).unwrap_or_default().to_string(),
             captured: parse_time(captured)?,
+            photos: Vec::new(),
+            recordings: Vec::new(),
+            transcripts: BTreeMap::new(),
+            photo_texts: BTreeMap::new(),
         }))
     }
 
@@ -453,6 +663,26 @@ impl<'a> Notes<'a> {
         }
         Ok(chain.last().filter(|last| *last != id).cloned())
     }
+}
+
+/// The hashes of the photos or recordings under `prefix`, in the order
+/// they were added.
+fn added(fields: &Fields, prefix: &str) -> Vec<String> {
+    fields
+        .iter()
+        .filter(|(_, value)| *value == Some(keys::ADDED))
+        .filter_map(|(key, _)| key.strip_prefix(prefix).map(str::to_string))
+        .collect()
+}
+
+/// The texts under `prefix`, by the hash they belong to.
+fn texts(fields: &Fields, prefix: &str) -> BTreeMap<String, String> {
+    fields
+        .iter()
+        .filter_map(|(key, value)| {
+            Some((key.strip_prefix(prefix)?.to_string(), value?.to_string()))
+        })
+        .collect()
 }
 
 #[cfg(test)]

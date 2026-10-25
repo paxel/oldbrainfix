@@ -7,6 +7,10 @@
 //! One store can be shared between threads: each call, and each batch as
 //! a whole, holds the connection on its own, so two threads never write
 //! into each other's transaction or take the same dseq.
+//!
+//! Photo and voice recording bytes live outside the log, content-addressed
+//! by SHA-256: `photos` and `audio` directories next to the database file,
+//! as the Dart core keeps them, or memory for an in-memory store.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -15,8 +19,11 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 use parking_lot::ReentrantMutex;
 use rusqlite::{Connection, OptionalExtension, Row, params};
+use sha2::{Digest, Sha256};
 
+use crate::blobs::{Blobs, FileBlobs, MemoryBlobs};
 use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
+use crate::photos::strip_jpeg_metadata;
 use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
 use crate::{Error, Result};
 
@@ -76,6 +83,8 @@ pub struct Store {
     db: ReentrantMutex<Connection>,
     clock: Clock,
     ids: IdMaker,
+    photos: Box<dyn Blobs>,
+    audio: Box<dyn Blobs>,
 }
 
 impl Store {
@@ -86,18 +95,25 @@ impl Store {
         clock: Clock,
         new_key: impl FnOnce() -> Result<SigningKey>,
     ) -> Result<Store> {
-        Self::init(Connection::open(path)?, clock, new_key)
+        let dir = path.parent().unwrap_or(Path::new("."));
+        let photos = Box::new(FileBlobs::new(dir.join("photos"))?);
+        let audio = Box::new(FileBlobs::new(dir.join("audio"))?);
+        Self::init(Connection::open(path)?, clock, new_key, photos, audio)
     }
 
     /// Opens a throwaway in-memory store (tests).
     pub fn in_memory(clock: Clock, new_key: impl FnOnce() -> Result<SigningKey>) -> Result<Store> {
-        Self::init(Connection::open_in_memory()?, clock, new_key)
+        let photos = Box::<MemoryBlobs>::default();
+        let audio = Box::<MemoryBlobs>::default();
+        Self::init(Connection::open_in_memory()?, clock, new_key, photos, audio)
     }
 
     fn init(
         db: Connection,
         clock: Clock,
         new_key: impl FnOnce() -> Result<SigningKey>,
+        photos: Box<dyn Blobs>,
+        audio: Box<dyn Blobs>,
     ) -> Result<Store> {
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
@@ -106,6 +122,8 @@ impl Store {
             db: ReentrantMutex::new(db),
             clock,
             ids: Box::new(random_id),
+            photos,
+            audio,
         };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;
@@ -180,6 +198,39 @@ impl Store {
             [key, value],
         )?;
         Ok(())
+    }
+
+    // ------------------------------------------------------------ photos
+
+    /// Keeps the photo `bytes` without their metadata
+    /// ([`strip_jpeg_metadata`]) and returns the hash it is kept under.
+    /// The same photo twice is kept once.
+    pub fn put_photo(&self, bytes: &[u8]) -> Result<String> {
+        let clean = strip_jpeg_metadata(bytes);
+        let hash = hex::encode(Sha256::digest(&clean));
+        self.photos.put(&hash, &clean)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the photo `hash`, or `None` when they are not here.
+    pub fn photo(&self, hash: &str) -> Option<Vec<u8>> {
+        self.photos.get(hash)
+    }
+
+    // ------------------------------------------------------------- audio
+
+    /// Keeps the voice recording `bytes` as they are and returns the hash
+    /// it is kept under. The same recording twice is kept once.
+    pub fn put_audio(&self, bytes: &[u8]) -> Result<String> {
+        let hash = hex::encode(Sha256::digest(bytes));
+        self.audio.put(&hash, bytes)?;
+        Ok(hash)
+    }
+
+    /// The bytes of the voice recording `hash`, or `None` when they are
+    /// not here.
+    pub fn audio(&self, hash: &str) -> Option<Vec<u8>> {
+        self.audio.get(hash)
     }
 
     // --------------------------------------------------------------- log
@@ -496,6 +547,33 @@ pub(crate) mod tests {
         assert!(store.all_entries()?.is_empty());
         store.batch(|| store.append("note:a", "text", Some("kept"), None))?;
         assert_eq!(store.all_entries()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn blobs_lie_next_to_the_database_by_their_hash() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let store = Store::open(&dir.path().join("oldbrainfix.db"), ticking(), || {
+            Ok(SigningKey::from_seed([1; 32]))
+        })?;
+        let photo = store.put_photo(b"not a jpeg")?;
+        let audio = store.put_audio(b"RIFF....WAVE")?;
+        assert_eq!(
+            photo,
+            hex::encode(Sha256::digest(b"not a jpeg")),
+            "the photo's hash"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("photos").join(&photo))?,
+            b"not a jpeg"
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("audio").join(&audio))?,
+            b"RIFF....WAVE"
+        );
+        assert_eq!(store.photo(&photo).as_deref(), Some(&b"not a jpeg"[..]));
+        assert_eq!(store.audio(&photo), None);
+        assert!(store.all_entries()?.is_empty());
         Ok(())
     }
 

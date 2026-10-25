@@ -11,7 +11,11 @@
       "importance": "normal",
       "trashed": "2026-01-01T10:00:05.000Z",
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -21,7 +25,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -31,7 +39,11 @@
       "importance": "normal",
       "trashed": "2025-11-01T00:00:00.000Z",
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000004",
@@ -41,7 +53,11 @@
       "importance": "normal",
       "trashed": null,
       "mergedInto": "note:00000000000000000000000000000005",
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     },
     {
       "id": "note:00000000000000000000000000000005",
@@ -51,7 +67,11 @@
       "importance": "normal",
       "trashed": "2026-01-01T10:00:28.000Z",
       "mergedInto": null,
-      "spawned": false
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
     }
   ],
   "all": [
@@ -72,9 +92,32 @@
         "id": "note:00000000000000000000000000000004",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Into the bin with the other",
-        "captured": "2026-01-01T10:00:19.000Z"
+        "captured": "2026-01-01T10:00:19.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
       }
     ],
     "note:00000000000000000000000000000001": []
-  }
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000002"
+    ],
+    "sauce": [],
+    "MILK": [],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "searchWithin": {}
 }

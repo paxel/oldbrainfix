@@ -18,6 +18,15 @@
 //! the mouse's forward button goes forward into the last selected Area,
 //! and from an Area into its last selected Topic. The keys rest while
 //! text is being typed, where Alt+arrows move the cursor.
+//!
+//! The capture field records voice too: the microphone's button starts
+//! at once and one big stop button ends it and keeps the Note, as do the
+//! Nudge times (UI laws, "Capture"). A picture pasted from the clipboard
+//! or dropped onto the window (where the system hands drops over: not on
+//! Wayland) becomes a photo Note, with what is typed.
+//! The editor shows a Note's photos and plays its recordings, with their
+//! Transcripts. Transcripts and Photo Texts are made in the background
+//! and found by the search over All Notes, an Area or a Topic.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,18 +41,23 @@ use egui::{
 };
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, ClockTime, Day, DeviceSettings, Importance, MissedSummary,
-    Note, Notes, NotesGo, Occurrence, Places, QuietHours, Routine, Routines, Section, Store, Topic,
+    Note, Notes, NotesGo, Occurrence, Places, QuietHours, Routine, Routines, Search, Section,
+    Store, Topic,
 };
 
 use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
+use crate::enrich::Enricher;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::media::{Clipboard, Player, Recorder, photo_from_file};
+use crate::media_view::{self, PhotoCache, Speech, Voice};
 use crate::names::{area_name, topic_name};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
+use crate::speech::{SpeechModel, Status as SpeechStatus};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -179,8 +193,21 @@ struct Deleting {
 enum Action {
     Select(Selection),
     SelectNote(String),
-    /// Captures the capture field's text, nudged this long from now.
+    /// Captures the capture field's text and the recording running,
+    /// nudged this long from now.
     Capture(Duration),
+    /// Starts recording voice into the Note being captured.
+    Record,
+    /// Plays the voice recording with this hash, or stops it playing.
+    Play(String),
+    /// Keeps the picture on the clipboard as a photo Note.
+    PastePhoto,
+    /// Keeps these photos, already made the phone's way, as a photo
+    /// Note.
+    Photos(Vec<Vec<u8>>),
+    /// The search over the Notes shown changed.
+    Search,
+    Speech(Speech),
     /// Keeps the selected Note's edited text.
     SaveText,
     Amend,
@@ -199,6 +226,8 @@ enum Action {
     Look(String),
     Delete(String),
     StartMerge,
+    /// The merge dialog's search changed.
+    MergeQuery,
     CloseDialog,
     AddPlace,
     SaveName,
@@ -290,6 +319,26 @@ pub struct App {
     hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>,
     /// The hotkey as typed in the Settings.
     hotkey_text: String,
+    /// The microphone, the speakers and the clipboard, where there are.
+    recorder: Option<Box<dyn Recorder>>,
+    player: Option<Box<dyn Player>>,
+    /// The recording playing, by its hash.
+    playing: Option<String>,
+    /// A recording that ended but could not be kept yet.
+    recorded: Option<Vec<u8>>,
+    clipboard: Option<Box<dyn Clipboard>>,
+    /// The background threads making Transcripts and Photo Texts.
+    transcriber: Option<Enricher>,
+    reader: Option<Enricher>,
+    /// The speech model the Transcripts need, and whether it was ready
+    /// when last looked at.
+    speech: Option<SpeechModel>,
+    speech_ready: bool,
+    /// A speech model file as typed into the Settings.
+    model_path: String,
+    photos: PhotoCache,
+    /// What the Notes shown are searched for.
+    query: String,
 }
 
 impl App {
@@ -323,6 +372,18 @@ impl App {
             quiet_text: (String::new(), String::new()),
             hotkey: None,
             hotkey_text: String::new(),
+            recorder: None,
+            player: None,
+            playing: None,
+            recorded: None,
+            clipboard: None,
+            transcriber: None,
+            reader: None,
+            speech: None,
+            speech_ready: false,
+            model_path: String::new(),
+            photos: PhotoCache::default(),
+            query: String::new(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -356,6 +417,68 @@ impl App {
     /// The capture popup's hotkey, which the Settings show and move.
     pub fn set_hotkey(&mut self, hotkey: Option<Rc<RefCell<dyn hotkey::Control>>>) {
         self.hotkey = hotkey;
+    }
+
+    /// The microphone voice Notes are recorded with.
+    pub fn set_recorder(&mut self, recorder: Box<dyn Recorder>) {
+        self.recorder = Some(recorder);
+    }
+
+    /// The speakers voice recordings are played on.
+    pub fn set_player(&mut self, player: Box<dyn Player>) {
+        self.player = Some(player);
+    }
+
+    /// The clipboard pictures are pasted from.
+    pub fn set_clipboard(&mut self, clipboard: Box<dyn Clipboard>) {
+        self.clipboard = Some(clipboard);
+    }
+
+    /// The threads making Transcripts and Photo Texts, and the speech
+    /// model the Transcripts wait for; without one, they wait for none.
+    pub fn set_enrichers(
+        &mut self,
+        transcriber: Option<Enricher>,
+        reader: Option<Enricher>,
+        speech: Option<SpeechModel>,
+    ) {
+        self.transcriber = transcriber;
+        self.reader = reader;
+        self.speech = speech;
+        self.speech_ready = false;
+        self.kick();
+    }
+
+    /// Whether a voice recording runs.
+    pub fn recording(&self) -> bool {
+        self.recorder.as_ref().is_some_and(|r| r.recording())
+    }
+
+    /// The text the Notes shown are searched for.
+    pub fn set_query(&mut self, query: &str) {
+        self.query = query.to_string();
+        self.refresh();
+    }
+
+    /// The Notes shown in the middle, by id.
+    pub fn shown_notes(&self) -> Vec<String> {
+        self.view.notes.iter().map(|p| p.note.id.clone()).collect()
+    }
+
+    /// Tells the background threads to look for something to read; the
+    /// Transcripts only once the speech model is ready.
+    fn kick(&mut self) {
+        if let Some(reader) = &self.reader {
+            reader.kick();
+        }
+        let ready = self
+            .speech
+            .as_ref()
+            .is_none_or(|s| s.status() == SpeechStatus::Ready);
+        self.speech_ready = ready;
+        if ready && let Some(transcriber) = &self.transcriber {
+            transcriber.kick();
+        }
     }
 
     /// The Routine or Reminder being made or changed, if any.
@@ -404,7 +527,7 @@ impl App {
     /// capture field's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the selected Note's edited text.
     pub fn flush(&mut self) {
-        if !self.capture.trim().is_empty() {
+        if !self.capture.trim().is_empty() || self.recording() || self.recorded.is_some() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
         self.apply(Action::SaveText);
@@ -450,6 +573,7 @@ impl App {
             self.text_of = shown.map(|n| n.id.clone());
             self.amend.clear();
         }
+        self.kick();
     }
 
     fn read(&self) -> oldbrainfix_core::Result<View> {
@@ -461,11 +585,12 @@ impl App {
             areas.push((area, topics));
         }
         let routines = Routines::new(&self.store);
+        let search = Search::new(&self.store);
         let shown = match &self.selection {
             Selection::Agenda | Selection::Settings => Vec::new(),
-            Selection::All => notes.all()?,
+            Selection::All => search.notes(&self.query, None)?,
             Selection::Unsorted => notes.unsorted()?,
-            Selection::Place(id) => notes.inside(id)?,
+            Selection::Place(id) => search.notes(&self.query, Some(id))?,
             Selection::Trash => notes.trashed()?,
         };
         let place = |note: Note| -> oldbrainfix_core::Result<Placed> {
@@ -569,6 +694,10 @@ impl App {
         match action {
             Action::Select(selection) => {
                 self.save_text()?;
+                // Every level has a search of its own, as on the phone.
+                if selection != self.selection {
+                    self.query.clear();
+                }
                 if let Selection::Place(id) = &selection {
                     if let Some(topic) = self.view.topic(id) {
                         self.trail.area = Some(topic.area_id.clone());
@@ -585,21 +714,63 @@ impl App {
                 self.editor = None;
             }
             Action::Capture(nudge_in) => {
-                let text = self.capture.trim();
-                if text.is_empty() {
-                    return Ok(());
+                // A running recording is ended and kept first; held
+                // until it is, so a failed save loses nothing.
+                if let Some(r) = &mut self.recorder
+                    && r.recording()
+                    && let Some(bytes) = r.stop()
+                {
+                    self.recorded = Some(bytes);
                 }
-                // Captured inside an Area or Topic, the Note is filed
-                // there, as the phone's "Note here".
-                let place = match &self.selection {
-                    Selection::Place(id) => Some(id.as_str()),
-                    _ => None,
+                let recording = self.recorded.clone();
+                self.capture_note(nudge_in, &[], recording.as_slice())?;
+                self.recorded = None;
+            }
+            Action::Record => {
+                if let Some(player) = &mut self.player {
+                    player.stop();
+                }
+                self.playing = None;
+                let started = self.recorder.as_mut().is_some_and(|r| r.start());
+                if !started {
+                    return Err(oldbrainfix_core::Error::Invalid(
+                        self.t.microphone_missing().into(),
+                    ));
+                }
+            }
+            Action::Play(hash) => {
+                let Some(player) = &mut self.player else {
+                    return Ok(());
                 };
-                let note = notes.capture(text, place, Some(nudge_in))?;
-                self.capture.clear();
-                self.save_text()?;
-                self.selected_note = Some(note.id);
-                self.editor = None;
+                if self.playing.take().as_ref() == Some(&hash) {
+                    player.stop();
+                } else if let Some(bytes) = notes.recording_bytes(&hash)
+                    && player.play(bytes)
+                {
+                    self.playing = Some(hash);
+                }
+            }
+            Action::PastePhoto => {
+                let photo = self.clipboard.as_mut().and_then(|c| c.photo());
+                let Some(photo) = photo else {
+                    return Err(oldbrainfix_core::Error::Invalid(
+                        self.t.paste_no_picture().into(),
+                    ));
+                };
+                self.capture_note(Notes::default_nudge(), &[photo], &[])?;
+            }
+            Action::Photos(photos) => {
+                self.capture_note(Notes::default_nudge(), &photos, &[])?;
+            }
+            Action::Search => {}
+            Action::Speech(asked) => {
+                if let Some(speech) = &self.speech {
+                    match asked {
+                        Speech::Download => speech.download(),
+                        Speech::TakeFile(path) => speech.take_file(std::path::Path::new(&path)),
+                        Speech::Cancel => speech.cancel(),
+                    }
+                }
             }
             Action::SaveText => self.save_text()?,
             Action::Amend => {
@@ -660,16 +831,19 @@ impl App {
             Action::Look(area) => self.dialog = Some(Dialog::Look { area }),
             Action::Delete(id) => self.dialog = Some(Dialog::Delete(self.deleting(&id)?)),
             Action::StartMerge => {
-                let others = notes
-                    .all()?
-                    .into_iter()
-                    .filter(|n| n.id != selected)
-                    .map(|n| (n.id, n.text))
-                    .collect();
+                let others = self.merge_candidates("", &selected)?;
                 self.dialog = Some(Dialog::Merge {
                     query: String::new(),
                     others,
                 });
+            }
+            Action::MergeQuery => {
+                if let Some(Dialog::Merge { query, .. }) = &self.dialog {
+                    let found = self.merge_candidates(&query.clone(), &selected)?;
+                    if let Some(Dialog::Merge { others, .. }) = &mut self.dialog {
+                        *others = found;
+                    }
+                }
             }
             Action::CloseDialog => self.dialog = None,
             Action::AddPlace => {
@@ -786,6 +960,54 @@ impl App {
             Action::Setting(setting) => self.set(setting)?,
         }
         Ok(())
+    }
+
+    /// Captures the capture field's text with `photos` and `recordings`
+    /// as a new Note nudged `nudge_in` from now, and shows it; nothing
+    /// when all of them are empty.
+    fn capture_note(
+        &mut self,
+        nudge_in: Duration,
+        photos: &[Vec<u8>],
+        recordings: &[Vec<u8>],
+    ) -> oldbrainfix_core::Result<()> {
+        let text = self.capture.trim();
+        if text.is_empty() && photos.is_empty() && recordings.is_empty() {
+            return Ok(());
+        }
+        // Captured inside an Area or Topic, the Note is filed there, as
+        // the phone's "Note here".
+        let place = match &self.selection {
+            Selection::Place(id) => Some(id.as_str()),
+            _ => None,
+        };
+        let note = Notes::new(&self.store).capture_with(
+            text,
+            place,
+            Some(nudge_in),
+            photos,
+            recordings,
+        )?;
+        self.capture.clear();
+        self.save_text()?;
+        self.selected_note = Some(note.id);
+        self.editor = None;
+        Ok(())
+    }
+
+    /// The Notes the Note `selected` can be merged into that the core's
+    /// search finds for `query`, by id and the title they show under.
+    fn merge_candidates(
+        &self,
+        query: &str,
+        selected: &str,
+    ) -> oldbrainfix_core::Result<Vec<(String, String)>> {
+        Ok(Search::new(&self.store)
+            .notes(query, None)?
+            .into_iter()
+            .filter(|n| n.id != selected)
+            .map(|n| (n.id.clone(), row_title(&self.t, Some(&n))))
+            .collect())
     }
 
     /// Keeps a change made in the Settings.
@@ -934,6 +1156,36 @@ impl App {
         }
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_secs(30));
+        // The speech model came: what waited is transcribed now.
+        let ready = self
+            .speech
+            .as_ref()
+            .is_none_or(|s| s.status() == SpeechStatus::Ready);
+        if ready != self.speech_ready {
+            self.kick();
+        }
+        if self.playing.is_some() {
+            if self.player.as_ref().is_some_and(|p| p.playing()) {
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(250));
+            } else {
+                self.playing = None;
+            }
+        }
+        // Pictures dropped onto the window become a photo Note.
+        let dropped = ui.input(|i| i.raw.dropped_files.clone());
+        let photos: Vec<Vec<u8>> = dropped
+            .iter()
+            .filter_map(|file| match (&file.bytes, &file.path) {
+                (Some(bytes), _) => Some(bytes.to_vec()),
+                (None, Some(path)) => std::fs::read(path).ok(),
+                (None, None) => None,
+            })
+            .filter_map(|bytes| photo_from_file(&bytes))
+            .collect();
+        if !photos.is_empty() {
+            actions.push(Action::Photos(photos));
+        }
         if self.dialog.is_none() {
             let typing = ui.ctx().text_edit_focused();
             ui.input_mut(|i| {
@@ -1089,6 +1341,13 @@ impl App {
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture");
+        let recording = self
+            .recorder
+            .as_ref()
+            .filter(|r| r.recording())
+            .map(|r| r.elapsed());
+        let has_recorder = self.recorder.is_some();
+        let has_clipboard = self.clipboard.is_some();
         embossed(ui, tones, false, None, |ui| {
             let focused = ui.memory(|m| m.has_focus(id));
             if focused
@@ -1107,7 +1366,28 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
-            if self.capture.trim().is_empty() {
+            if has_recorder {
+                match media_view::voice_button(ui, &t, recording) {
+                    Some(Voice::Record) => actions.push(Action::Record),
+                    Some(Voice::StopAndSave) => {
+                        actions.push(Action::Capture(Notes::default_nudge()));
+                    }
+                    None => {}
+                }
+            }
+            if has_clipboard && recording.is_none() {
+                ui.horizontal(|ui| {
+                    icons::show(ui, icons::PASTE, 20.0, text);
+                    if ui
+                        .button(RichText::new(t.paste_photo()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::PastePhoto);
+                    }
+                });
+                ui.label(RichText::new(t.photos_hint()).small().color(weak));
+            }
+            if self.capture.trim().is_empty() && recording.is_none() {
                 return;
             }
             ui.add_space(4.0);
@@ -1146,6 +1426,34 @@ impl App {
             }
         });
         ui.add_space(8.0);
+        let hint = match &self.selection {
+            Selection::All => Some(self.t.search_all_hint()),
+            Selection::Place(id) if self.view.area(id).is_some() => Some(self.t.search_area_hint()),
+            Selection::Place(_) => Some(self.t.search_topic_hint()),
+            _ => None,
+        };
+        if let Some(hint) = hint {
+            ui.horizontal(|ui| {
+                icons::show(ui, icons::SEARCH, 20.0, ui.visuals().weak_text_color());
+                let field = ui.add(
+                    TextEdit::singleline(&mut self.query)
+                        .id(Id::new("search"))
+                        .hint_text(hint)
+                        .text_color(text)
+                        .desired_width(ui.available_width() - 32.0),
+                );
+                if field.changed() {
+                    actions.push(Action::Search);
+                }
+                if !self.query.is_empty()
+                    && icon_button(ui, icons::CLOSE, self.t.clear_search(), text).clicked()
+                {
+                    self.query.clear();
+                    actions.push(Action::Search);
+                }
+            });
+            ui.add_space(8.0);
+        }
         let trash = self.selection == Selection::Trash;
         if !trash {
             ui.spacing_mut().item_spacing.y = 16.0;
@@ -1172,11 +1480,17 @@ impl App {
                 // Room for the emboss around every card.
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
+                let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
                 for placed in &self.view.notes {
                     let selected = self.selected_note.as_deref() == Some(placed.note.id.as_str());
                     // A Note in the trash is restored, not filed.
                     let draggable = !placed.note.is_trashed();
-                    let card = note_card(ui, &self.t, tones, placed, selected, draggable);
+                    let media = CardMedia {
+                        photos: &mut self.photos,
+                        store: &self.store,
+                        transcribing: transcribing.as_deref(),
+                    };
+                    let card = note_card(ui, &self.t, tones, placed, selected, draggable, media);
                     if card.clicked() {
                         actions.push(Action::SelectNote(placed.note.id.clone()));
                     }
@@ -1210,6 +1524,12 @@ impl App {
         let areas = &self.view.areas;
         let edited = &mut self.text;
         let amend = &mut self.amend;
+        let cache = &mut self.photos;
+        let store = &self.store;
+        let playing = self.playing.as_deref();
+        let can_play = self.player.is_some();
+        let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
+        let transcribing = transcribing.as_deref();
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -1247,6 +1567,23 @@ impl App {
                         actions.push(Action::SaveText);
                     }
                 });
+                if !note.photos.is_empty() || !note.recordings.is_empty() {
+                    embossed(ui, tones, false, None, |ui| {
+                        media_view::photos(ui, &t, cache, store, &note.photos);
+                        let clicked = media_view::recordings(
+                            ui,
+                            &t,
+                            &note.recordings,
+                            &note.transcripts,
+                            playing,
+                            transcribing,
+                            can_play,
+                        );
+                        if let Some(hash) = clicked {
+                            actions.push(Action::Play(hash));
+                        }
+                    });
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.importance()).strong().color(text));
                     let choices = [
@@ -1317,7 +1654,22 @@ impl App {
                 });
                 for section in sections {
                     embossed(ui, tones, false, None, |ui| {
-                        ui.label(RichText::new(&section.text).color(text));
+                        if !section.text.is_empty() {
+                            ui.label(RichText::new(&section.text).color(text));
+                        }
+                        media_view::photos(ui, &t, cache, store, &section.photos);
+                        let clicked = media_view::recordings(
+                            ui,
+                            &t,
+                            &section.recordings,
+                            &section.transcripts,
+                            playing,
+                            transcribing,
+                            can_play,
+                        );
+                        if let Some(hash) = clicked {
+                            actions.push(Action::Play(hash));
+                        }
                         ui.label(
                             RichText::new(when(&t, section.captured))
                                 .small()
@@ -1592,6 +1944,8 @@ impl App {
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
+        let speech = self.speech.as_ref();
+        let model_path = &mut self.model_path;
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -1620,6 +1974,13 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
                 });
+                if let Some(speech) = speech {
+                    embossed(ui, tones, false, None, |ui| {
+                        if let Some(asked) = media_view::speech_card(ui, &t, speech, model_path) {
+                            actions.push(Action::Speech(asked));
+                        }
+                    });
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_alarms()).strong().color(text));
                     let mut choices: Vec<i64> = RENAG_CHOICES.to_vec();
@@ -1984,14 +2345,15 @@ fn merge_form(
 ) {
     let weak = ui.visuals().weak_text_color();
     title(ui, t.merge_into());
-    focused_field(ui, (&mut *query, focus), "merge query", t.search_all_hint());
-    let wanted = query.trim().to_lowercase();
-    let mut shown = others
-        .iter()
-        .filter(|(_, text)| text.to_lowercase().contains(&wanted))
-        .peekable();
+    let field = focused_field(ui, (&mut *query, focus), "merge query", t.search_all_hint());
+    if field.changed() {
+        actions.push(Action::MergeQuery);
+    }
+    // The core's search, as on the phone: Transcripts, Photo Texts and
+    // Sections count too.
+    let mut shown = others.iter().peekable();
     if shown.peek().is_none() {
-        let empty = if others.is_empty() {
+        let empty = if query.trim().is_empty() {
             t.no_other_notes()
         } else {
             t.nothing_found()
@@ -2166,6 +2528,9 @@ fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
 fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if !note.text.trim().is_empty() => note.text.trim().to_string(),
+        Some(note) if note.photos.is_empty() && !note.recordings.is_empty() => {
+            t.voice_recording().to_string()
+        }
         Some(_) => t.photo().to_string(),
         None => t.note_gone().to_string(),
     }
@@ -2418,6 +2783,14 @@ pub(crate) fn embossed(
 /// before the place. Important cards carry the accent marker and a
 /// stronger emboss; unimportant ones are dimmed. A `draggable` card can
 /// be dropped onto an Area or Topic.
+/// What a card needs to show its photos and recordings.
+struct CardMedia<'a> {
+    photos: &'a mut PhotoCache,
+    store: &'a Store,
+    /// The recording being transcribed, by its hash.
+    transcribing: Option<&'a str>,
+}
+
 fn note_card(
     ui: &mut Ui,
     t: &L10n,
@@ -2425,6 +2798,7 @@ fn note_card(
     placed: &Placed,
     selected: bool,
     draggable: bool,
+    media: CardMedia,
 ) -> egui::Response {
     let note = &placed.note;
     let important = note.importance == Importance::Important;
@@ -2447,6 +2821,18 @@ fn note_card(
             if !note.text.is_empty() {
                 ui.label(RichText::new(&note.text).size(16.0).color(text));
             }
+            if !note.photos.is_empty() {
+                media_view::thumbnails(ui, t, media.photos, media.store, &note.photos, 64.0, 3);
+            }
+            media_view::recordings(
+                ui,
+                t,
+                &note.recordings,
+                &note.transcripts,
+                None,
+                media.transcribing,
+                false,
+            );
             ui.label(RichText::new(when(t, note.captured)).small().color(weak));
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.

@@ -11,6 +11,10 @@
 //! `oldbrainfix capture TEXT` keeps TEXT without any window, through the
 //! running app when there is one. On Windows it is built without a
 //! console window.
+//!
+//! Transcripts and Photo Texts are made on threads of their own for as
+//! long as the app runs, the Transcripts once the speech model in the
+//! data directory's `whisper` folder is checked.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use std::cell::{Cell, RefCell};
@@ -25,10 +29,13 @@ use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Notes, SigningKey, Stor
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::cli::{self, Launch};
+use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
 use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
+use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
+use oldbrainfix_gui::speech::{SpeechModel, Status};
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
 
@@ -163,6 +170,9 @@ struct Shell {
     autostart: Option<Autostart>,
     hotkey: Rc<RefCell<Hotkey>>,
     new_popup: NewPopup,
+    transcriber: Enricher,
+    reader: Enricher,
+    speech: SpeechModel,
 }
 
 impl Shell {
@@ -202,6 +212,14 @@ impl Shell {
         app.set_autostart(self.autostart.clone());
         let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
         app.set_hotkey(Some(hotkey));
+        app.set_recorder(Box::new(MicRecorder::default()));
+        app.set_player(Box::new(SpeakerPlayer::default()));
+        app.set_clipboard(Box::new(SystemClipboard));
+        app.set_enrichers(
+            Some(self.transcriber.clone()),
+            Some(self.reader.clone()),
+            Some(self.speech.clone()),
+        );
         let quit = Arc::new(AtomicBool::new(false));
         let viewport = egui::ViewportBuilder::default()
             .with_title(app.t().app_title())
@@ -348,18 +366,52 @@ fn run() -> Result<i32, String> {
             );
         });
     }
+    // Transcripts and Photo Texts, each kept one tells the window.
+    let enriched = {
+        let (changes, window) = (changes.clone(), window.clone());
+        move || -> Box<dyn Fn() + Send> {
+            let (changes, window) = (changes.clone(), window.clone());
+            Box::new(move || {
+                changes.fetch_add(1, Ordering::SeqCst);
+                wake(&window);
+            })
+        }
+    };
+    let speech = {
+        let window = window.clone();
+        SpeechModel::new(dir.join("whisper"), Arc::new(move || wake(&window)))
+    };
+    let transcriber = Enricher::spawn(
+        store.clone(),
+        Kind::Transcripts,
+        Box::new(WhisperEngine::new(speech.model())),
+        enriched(),
+    );
+    let reader = Enricher::spawn(
+        store.clone(),
+        Kind::PhotoTexts,
+        Box::new(OcrEngine::default()),
+        enriched(),
+    );
     let saved: Saved = {
         let (changes, events, window) = (changes.clone(), events_tx.clone(), window.clone());
+        let (transcriber, reader, speech) = (transcriber.clone(), reader.clone(), speech.clone());
         Arc::new(move || {
             changes.fetch_add(1, Ordering::SeqCst);
             let _ = events.send(Event::Wake);
             wake(&window);
+            // A voice Note from the popup is transcribed without the window.
+            reader.kick();
+            if speech.status() == Status::Ready {
+                transcriber.kick();
+            }
         })
     };
     let new_popup: NewPopup = {
         let (store, saved) = (store.clone(), saved.clone());
         Rc::new(move || {
             let mut popup = CapturePopup::new(store.clone(), locale);
+            popup.set_recorder(Box::new(MicRecorder::default()));
             let saved = saved.clone();
             popup.on_saved(Box::new(move || saved()));
             popup
@@ -415,6 +467,9 @@ fn run() -> Result<i32, String> {
         autostart,
         hotkey,
         new_popup,
+        transcriber,
+        reader,
+        speech,
     };
     // A login start stays in the tray; without one it shows the window.
     let mut next = first.or(tray.is_none().then_some(Command::Open));

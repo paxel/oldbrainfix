@@ -45,5 +45,12 @@
   "captureCommand": "Starter, Tastenkürzel-Programme und Makro-Tastaturen können „oldbrainfix capture“ ausführen, um das Erfassen-Fenster zu öffnen, oder „oldbrainfix capture Milch kaufen“, um einen Text sofort zu behalten.",
   "cliUsage": "Aufruf:\n  oldbrainfix               öffnet das Fenster\n  oldbrainfix capture       öffnet das Erfassen-Fenster\n  oldbrainfix capture TEXT  erfasst TEXT als Notiz, mit einem Stupser in 1 Std.\n  oldbrainfix capture -     erfasst, was über stdin kommt\n\nRückgabewerte: 0 behalten, 1 nicht behalten, 2 falsche Argumente oder nichts zu erfassen.",
   "cliNothing": "Nichts zu erfassen.",
-  "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}"
+  "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}",
+  "speechModelIntro": "Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Computer, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.",
+  "speechModelReady": "Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Computer transkribiert.",
+  "speechModelPathHint": "Pfad zu ggml-base.bin",
+  "speechModelUseFile": "Diese Datei verwenden",
+  "pastePhoto": "Bild einfügen",
+  "pasteNoPicture": "In der Zwischenablage ist kein Bild.",
+  "photosHint": "Ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz."
 }

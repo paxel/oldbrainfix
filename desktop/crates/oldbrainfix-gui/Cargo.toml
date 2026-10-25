@@ -17,6 +17,7 @@ path = "src/bin/oldbrainfix.rs"
 [dependencies]
 oldbrainfix-core = { path = "../oldbrainfix-core", version = "0.1.0" }
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.1.0" }
+oldbrainfix-whisper = { path = "../oldbrainfix-whisper", version = "0.1.0" }
 eframe = "0.35"
 egui = "0.35"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
@@ -26,6 +27,18 @@ sys-locale = "0.3"
 notify-rust = "4"
 # The capture hotkey on X11, Windows and macOS.
 global-hotkey = "0.9"
+parking_lot = "0.12"
+# Voice Notes: the microphone and the speakers, as Catlog plays its
+# sounds; WAV as the desktop records, AAC in .m4a as the phone does.
+rodio = { version = "0.22", default-features = false, features = ["playback", "recording", "wav", "mp4"] }
+# Pictures pasted in.
+arboard = "3.6"
+# Photos pasted or dropped in, kept as the phone keeps them, and shown.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+# Photo Texts with the phone's engine and models (ADR 0007); only the
+# .rten model format, as android/ocr builds it.
+ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
+rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]

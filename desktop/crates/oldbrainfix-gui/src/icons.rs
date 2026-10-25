@@ -29,6 +29,12 @@ pub const CLOSE: char = '\u{e16a}';
 pub const NOTE: char = '\u{e605}';
 pub const PREVIOUS: char = '\u{e15e}';
 pub const NEXT: char = '\u{e15f}';
+pub const MIC: char = '\u{e3e1}';
+pub const STOP: char = '\u{e606}';
+pub const PLAY: char = '\u{e4cb}';
+pub const PASTE: char = '\u{e192}';
+pub const SEARCH: char = '\u{e567}';
+pub const PHOTO: char = '\u{e4b4}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

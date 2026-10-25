@@ -1,5 +1,6 @@
 package io.github.paxel.oldbrainfix
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,5 +54,15 @@ class VoiceTest {
         assertFalse(Voice.complete("RIFF....WAVEfmt ".toByteArray(Charsets.US_ASCII)))
         // A size smaller than its own header.
         assertFalse(Voice.complete(byteArrayOf(0, 0, 0, 4) + "ftyp".toByteArray(Charsets.US_ASCII)))
+    }
+
+    @Test
+    fun `a desktop WAV recording is named wav and anything else m4a`() {
+        val wav = "RIFF".toByteArray(Charsets.US_ASCII) + ByteArray(4) +
+            "WAVEfmt ".toByteArray(Charsets.US_ASCII)
+        assertEquals("wav", Voice.extension(wav))
+        assertEquals("m4a", Voice.extension(box("ftyp", 16) + box("moov", 8)))
+        assertEquals("m4a", Voice.extension("RIFF".toByteArray(Charsets.US_ASCII)))
+        assertEquals("m4a", Voice.extension(ByteArray(0)))
     }
 }

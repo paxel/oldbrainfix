@@ -1,0 +1,247 @@
+{
+  "now": "2026-01-02T10:00:51.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "",
+      "captured": "2026-01-01T10:00:01.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {
+        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb": "RECEIPT\nTotal 12,50"
+      }
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "Groceries",
+      "captured": "2026-01-01T10:00:07.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
+      ],
+      "recordings": [
+        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
+      ],
+      "transcripts": {
+        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0": "Milk, eggs and bread"
+      },
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Shed",
+      "captured": "2026-01-01T10:00:15.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "7ec527edac2e24eb8eacd5511812e56933e694219d6c927c23672c55371c2664",
+        "27f48b35d69a634fb50fa0404cb641e8fd6dbc4c4fe413edd6869063aeb28fa9",
+        "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
+      ],
+      "recordings": [
+        "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd",
+        "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
+      ],
+      "transcripts": {
+        "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd": ""
+      },
+      "photoTexts": {
+        "7ec527edac2e24eb8eacd5511812e56933e694219d6c927c23672c55371c2664": ""
+      }
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "Dentist",
+      "captured": "2026-01-01T10:00:26.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "abababababababababababababababababababababababababababababababab"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "",
+      "captured": "2026-01-01T10:00:30.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000004",
+      "spawned": false,
+      "photos": [
+        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {
+        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
+      }
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "",
+      "captured": "2026-01-01T10:00:37.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000004",
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d"
+      ],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "Old flyer",
+      "captured": "2026-01-01T10:00:43.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": "2026-01-01T10:00:49.000Z",
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "ec6f9f0e691fcbfd4c1143567ef396e2cad71100efbd8ec89752fea3d2fdbcec"
+      ],
+      "recordings": [
+        "52f0f855e3f6ef7cfd85ef214bcf3b80db8af56da1f0cc1811655661c1aeb442"
+      ],
+      "transcripts": {},
+      "photoTexts": {}
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000001",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000004"
+  ],
+  "trashed": [
+    "note:00000000000000000000000000000007"
+  ],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000004": [
+      {
+        "id": "note:00000000000000000000000000000005",
+        "noteId": "note:00000000000000000000000000000004",
+        "text": "",
+        "captured": "2026-01-01T10:00:30.000Z",
+        "photos": [
+          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+        ],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {
+          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
+        }
+      },
+      {
+        "id": "note:00000000000000000000000000000006",
+        "noteId": "note:00000000000000000000000000000004",
+        "text": "",
+        "captured": "2026-01-01T10:00:37.000Z",
+        "photos": [],
+        "recordings": [
+          "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d"
+        ],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000002": [],
+    "note:00000000000000000000000000000001": [],
+    "note:00000000000000000000000000000007": []
+  },
+  "untranscribed": [
+    {
+      "noteId": "note:00000000000000000000000000000006",
+      "hash": "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000003",
+      "hash": "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
+    }
+  ],
+  "unreadPhotos": [
+    {
+      "noteId": "note:00000000000000000000000000000004",
+      "hash": "abababababababababababababababababababababababababababababababab"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000003",
+      "hash": "27f48b35d69a634fb50fa0404cb641e8fd6dbc4c4fe413edd6869063aeb28fa9"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000003",
+      "hash": "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000002",
+      "hash": "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
+    }
+  ],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000002"
+    ],
+    "receipt": [
+      "note:00000000000000000000000000000001"
+    ],
+    "dentist": [
+      "note:00000000000000000000000000000004"
+    ],
+    "x-ray": [],
+    "müller": [
+      "note:00000000000000000000000000000004"
+    ],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ]
+  },
+  "searchWithin": {}
+}

@@ -3,19 +3,24 @@
 //! screens read from it and write to it, Notes with their Sections, Areas
 //! and Topics, Routines and Reminders with the alarm plan, the Nudge and
 //! the Missed Summary, this Device's settings, and the question marks of
-//! the background. The Dart core
+//! the background; and of the photos and voice recordings kept beside
+//! the log, with their Photo Texts and Transcripts and the search over
+//! them. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
 pub mod alarms;
+pub mod blobs;
 pub mod entry;
 pub mod error;
 pub mod notes;
 pub mod nudges;
+pub mod photos;
 pub mod places;
 pub mod question_marks;
 pub mod routines;
 pub mod schedule;
+pub mod search;
 pub mod settings;
 pub mod signing;
 pub mod store;
@@ -23,7 +28,7 @@ pub mod store;
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
-pub use notes::{Importance, Note, Notes, Section};
+pub use notes::{Blob, Importance, Note, Notes, Section};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
@@ -31,6 +36,7 @@ pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,
     WallClock,
 };
+pub use search::Search;
 pub use settings::DeviceSettings;
 pub use signing::SigningKey;
 pub use store::{Clock, Fields, IdMaker, Store};
