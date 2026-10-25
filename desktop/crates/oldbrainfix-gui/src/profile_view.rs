@@ -106,49 +106,69 @@ impl ProfileView {
     }
 
     fn texture(&mut self, ui: &Ui, profile: &Profile) -> Option<TextureHandle> {
-        let picture = profile.picture.as_ref()?;
         if let Some((id, version, texture)) = &self.picture
             && *id == profile.id
             && *version == profile.version
         {
             return Some(texture.clone());
         }
-        let image = pixels(picture, profile::PICTURE_EDGE)?;
-        let size = [image.width() as usize, image.height() as usize];
-        let texture = ui.ctx().load_texture(
-            format!("profile:{}:{}", profile.id, profile.version),
-            ColorImage::from_rgba_unmultiplied(size, image.as_raw()),
-            TextureOptions::LINEAR,
-        );
+        let texture = load(ui, profile)?;
         self.picture = Some((profile.id.clone(), profile.version, texture.clone()));
         Some(texture)
     }
 }
 
-/// How `name` shows: itself, or "No name" when it is empty.
-pub fn display_name<'a>(t: &'a L10n, name: &'a str) -> &'a str {
-    if name.is_empty() {
-        t.profile_no_name()
-    } else {
-        name
+/// `profile`'s picture as a texture; none for the placeholder.
+fn load(ui: &Ui, profile: &Profile) -> Option<TextureHandle> {
+    let image = pixels(profile.picture.as_ref()?, profile::PICTURE_EDGE)?;
+    let size = [image.width() as usize, image.height() as usize];
+    Some(ui.ctx().load_texture(
+        format!("profile:{}:{}", profile.id, profile.version),
+        ColorImage::from_rgba_unmultiplied(size, image.as_raw()),
+        TextureOptions::LINEAR,
+    ))
+}
+
+/// Other people's pictures as textures, by Profile id and version, made
+/// once each.
+#[derive(Default)]
+pub struct Pictures {
+    textures: std::collections::HashMap<(String, i64), Option<TextureHandle>>,
+}
+
+impl Pictures {
+    fn texture(&mut self, ui: &Ui, profile: &Profile) -> Option<TextureHandle> {
+        self.textures
+            .entry((profile.id.clone(), profile.version))
+            .or_insert_with(|| load(ui, profile))
+            .clone()
     }
 }
 
-/// A Profile's picture in a circle `size` wide, clickable and labelled
-/// `label`; without one, its initials on the circle coloured by its id;
-/// without a Profile, a neutral circle.
-pub fn avatar(
+/// Another person's picture in a circle `size` wide, or their
+/// placeholder, labelled `label` for screen readers and on hover; not
+/// clickable.
+pub fn person_picture(
     ui: &mut Ui,
-    view: &mut ProfileView,
-    profile: Option<&Profile>,
+    pictures: &mut Pictures,
+    profile: &Profile,
     size: f32,
     label: &str,
 ) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), Sense::click());
-    response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), Sense::hover());
+    response.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, label));
+    let texture = pictures.texture(ui, profile);
+    paint(ui, rect, texture, Some(profile));
+    response.on_hover_text(label)
+}
+
+/// Paints `texture` in a circle filling `rect`; without one, the
+/// placeholder of `profile`, or a neutral circle without a Profile.
+fn paint(ui: &Ui, rect: egui::Rect, texture: Option<TextureHandle>, profile: Option<&Profile>) {
+    let size = rect.width();
     let painter = ui.painter_at(rect.expand(2.0));
     let center = rect.center();
-    match profile.and_then(|p| view.texture(ui, p)) {
+    match texture {
         Some(texture) => {
             egui::Image::new(&texture)
                 .corner_radius(size / 2.0)
@@ -181,6 +201,33 @@ pub fn avatar(
             }
         }
     }
+}
+
+/// How `name` shows: itself, or "No name" when it is empty.
+pub fn display_name<'a>(t: &'a L10n, name: &'a str) -> &'a str {
+    if name.is_empty() {
+        t.profile_no_name()
+    } else {
+        name
+    }
+}
+
+/// A Profile's picture in a circle `size` wide, clickable and labelled
+/// `label`; without one, its initials on the circle coloured by its id;
+/// without a Profile, a neutral circle.
+pub fn avatar(
+    ui: &mut Ui,
+    view: &mut ProfileView,
+    profile: Option<&Profile>,
+    size: f32,
+    label: &str,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), Sense::click());
+    response.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    let texture = profile.and_then(|p| view.texture(ui, p));
+    paint(ui, rect, texture, profile);
+    let painter = ui.painter_at(rect.expand(2.0));
+    let center = rect.center();
     if response.hovered() {
         painter.circle_stroke(
             center,

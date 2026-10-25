@@ -25,6 +25,7 @@ pub mod lan;
 pub mod notes;
 pub mod nudges;
 pub mod pairing;
+pub mod people;
 pub mod photos;
 pub mod places;
 pub mod profile;
@@ -47,8 +48,9 @@ pub use error::{Error, Result};
 pub use notes::{Blob, Importance, Note, Notes, Section};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use pairing::PairedDevice;
+pub use people::PersonTaken;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
-pub use profile::{OwnProfile, Profile};
+pub use profile::{OwnProfile, Profile, ProfileChoice};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
 pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,

@@ -127,5 +127,6 @@
     "record": "{\"id\":\"00000000000000000000000000000006\",\"name\":\"Pixel 7\",\"version\":1}",
     "sig": "YCSPwSgN/tixFMtiN9c9OYST1qhm80bQT9fKSoGVLh0LXPB73FZOQ2z0GL6ERgNSqwgIm4OKPkLAobZ/i+wQCg==",
     "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
-  }
+  },
+  "profiles": []
 }

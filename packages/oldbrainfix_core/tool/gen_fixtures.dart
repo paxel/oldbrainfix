@@ -1664,7 +1664,7 @@ Future<void> _backupFixture(Directory root) async {
         .markDone(pills.id, Occurrence(Day(2026, 1, 5), ClockTime(8, 0)));
     final family = Places(ada).addArea('Family');
     ada.ensureAreaKeys();
-    ada.share(family.id, name: 'Ada');
+    ada.share(family.id);
     final joiner = Store.inMemory(
       newKey: () => SigningKey.fromSeed(_joinerSeed),
     );
@@ -2003,8 +2003,14 @@ Map<String, Object?> _roles(Store store, String area, List<String> ids) => {
   'shared': store.isShared(area),
   'people': [
     for (final p in store.people(area))
-      {'id': p.id, 'name': p.name, 'role': p.role.name, 'devices': p.devices},
+      {
+        'id': p.id,
+        'name': store.personShown(p.id).name,
+        'role': p.role.name,
+        'devices': p.devices,
+      },
   ],
+  'authors': {for (final id in ids) id: store.authorOf(id)?.id},
   'mayChange': {for (final id in ids) id: store.mayChange(id)},
   'mayManage': store.mayManage(area),
   'ignored': store.judged.ignored.toList()..sort(),
@@ -2029,7 +2035,7 @@ void _writeAfter(Store store, int seq, File file) {
 /// Area, they sync, she makes Ben a Manager and then removes him. Every
 /// write of the sharing itself, and every session, is at a held clock so
 /// the desktop core writes the same.
-void _sharedFixture(Directory root) {
+Future<void> _sharedFixture(Directory root) async {
   final out = Directory('${root.path}/shared');
   final keep = secretBytes;
   secretBytes = _counted(300);
@@ -2055,6 +2061,11 @@ void _sharedFixture(Directory root) {
     final loose = Notes(ann).capture('Fix the tap');
     Notes(ann).amend(loose.id, 'The hot one');
     Notes(ben).capture('Ben private');
+    // Their Profiles: Ann named hers, Ben's has the defaults.
+    ann
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ann');
+    ben.applyProfileDefaults(name: 'Ben');
     ann.ensureAreaKeys();
     ben.ensureAreaKeys();
     _write(File('${out.path}/before.jsonl'), _log(ann));
@@ -2070,19 +2081,17 @@ void _sharedFixture(Directory root) {
     final shareAt = DateTime.utc(2026, 2, 1, 9);
     _held = shareAt;
     var mark = ann.currentSeq();
-    final area = ann.share(
-      Places.starterId(PlaceKeys.typeArea, 'household'),
-      name: 'Ann',
-    );
+    final area = ann.share(Places.starterId(PlaceKeys.typeArea, 'household'));
     _writeAfter(ann, mark, File('${out.path}/share.jsonl'));
     // The moved Area's key, made here so the desktop core holds the same.
     ann.ensureAreaKeys();
     final keysAfterShare = _keySettings(ann);
 
-    // Her desktop invites Ben's phone: he sends nothing of his own.
+    // Her desktop invites Ben's phone: he sends nothing of his own but
+    // his Profile, which her desktop shows before it answers.
     final sessionAt = DateTime.utc(2026, 2, 1, 10);
     _held = sessionAt;
-    final invite = Invite(area, role: AreaRole.member, name: 'Ben');
+    final invite = Invite(area, role: AreaRole.member);
     final request = syncRequest(
       ben,
       ann.versionVector(),
@@ -2114,6 +2123,33 @@ void _sharedFixture(Directory root) {
     final afterInvite = {
       'host': _expected(ann)..remove('device'),
       'joiner': _expected(ben)..remove('device'),
+      'hostPeople': _people(ann),
+      'joinerPeople': _people(ben),
+    };
+
+    // Ann renames herself and syncs through a shared folder: her Profile
+    // and Ben's go sealed under the Household's key, and Ben reads hers.
+    final folderAt = DateTime.utc(2026, 2, 1, 10, 30);
+    _held = folderAt;
+    ann.renameOwnProfile('Ann Lovelace');
+    final folder = MemorySyncFolder();
+    final nonces = _counted(2000);
+    await folderSync(ann, folder, nonce: () => nonces(sealNonceBytes));
+    final profilesFile = profilesFileName(
+      ann.deviceId,
+      ann.areaKeys().firstWhere((k) => k.scope == area).id,
+    );
+    _writeBytes(
+      File('${out.path}/$profilesFile'),
+      (await folder.read('keys', profilesFile))!,
+    );
+    await folderSync(ben, folder);
+    if (ben.personShown(ann.ownProfile!.id).name != 'Ann Lovelace') {
+      throw StateError('Ben did not read Ann\'s Profile from the folder');
+    }
+    final afterFolder = {
+      'profilesFile': profilesFile,
+      'joinerPeople': _people(ben),
     };
 
     // Ben, a Member: his own Note, an Amend and a Done count; editing
@@ -2142,7 +2178,7 @@ void _sharedFixture(Directory root) {
       ben.append(
         area,
         ShareKeys.role(ben.deviceId),
-        const Grant(AreaRole.manager, 'nobody', 'Ben').encode(),
+        const Grant(AreaRole.manager, 'nobody').encode(),
       );
     });
     _writeAfter(ben, mark, File('${out.path}/member.jsonl'));
@@ -2187,7 +2223,10 @@ void _sharedFixture(Directory root) {
     }
 
     // Ann makes Ben a Manager, then removes him.
-    final person = ann.people(area).firstWhere((p) => p.name == 'Ben').id;
+    final person = ann
+        .people(area)
+        .firstWhere((p) => ann.personShown(p.id).name == 'Ben')
+        .id;
     final roleAt = DateTime.utc(2026, 2, 1, 13);
     _held = roleAt;
     mark = ann.currentSeq();
@@ -2255,7 +2294,7 @@ void _sharedFixture(Directory root) {
     );
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
+      '${_json.convert({'area': area, 'person': person, 'ids': 0x100, 'keysAfterShare': keysAfterShare, 'shareAt': shareAt.toIso8601String(), 'sessionAt': sessionAt.toIso8601String(), 'folderAt': folderAt.toIso8601String(), 'afterFolder': afterFolder, 'syncAt': syncAt.toIso8601String(), 'roleAt': roleAt.toIso8601String(), 'promoteSyncAt': promoteSyncAt.toIso8601String(), 'managerSyncAt': managerSyncAt.toIso8601String(), 'removeAt': removeAt.toIso8601String(), 'lastAt': lastAt.toIso8601String(), 'afterInvite': afterInvite, 'after': after, 'promoted': promoted, 'removed': _roles(ann, area, checked)})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -2263,6 +2302,13 @@ void _sharedFixture(Directory root) {
     ben.close();
   }
 }
+
+/// The Profiles of other people [store] keeps, as both cores keep them:
+/// signed as received, by id.
+Map<String, Object?> _people(Store store) => {
+  for (final (key, value) in store.localSettingsWithPrefix('person:'))
+    key: (jsonDecode(value) as Map)['profile'],
+};
 
 /// [store]'s log, one entry per line.
 String _log(Store store) {
@@ -2472,6 +2518,7 @@ void _profilesFixture(Directory root) {
     ],
     'own': own,
     'takes': takes,
+    'people': _personTakes(),
   };
   _write(File('${dir.path}/profiles.json'), '${_json.convert(fixture)}\n');
 }
@@ -2607,6 +2654,136 @@ Map<String, Object?> _profileTakes() {
     'writer': writer.publicBase64,
     'from': joiner.publicBase64,
     'before': before,
+    'cases': out,
+  };
+}
+
+/// Profiles of other people (#50), each taken by a store that keeps
+/// Ben's Profile (first key the joiner's) and Cat's (first key the
+/// second key) as they were before: what became of each, the signed
+/// Profiles kept after, and the ids Ben's and Cat's stand for then.
+Map<String, Object?> _personTakes() {
+  final writer = SigningKey.fromSeed(_seed);
+  final joiner = SigningKey.fromSeed(_joinerSeed);
+  final second = SigningKey.fromSeed(
+    Uint8List.fromList(List<int>.filled(32, 7)),
+  );
+  final stranger = SigningKey.fromSeed(
+    Uint8List.fromList(List<int>.filled(32, 9)),
+  );
+  const ben = '000000000000000000000000000000b1';
+  const cat = '000000000000000000000000000000c1';
+  const other = '000000000000000000000000000000d1';
+  const mallory = '000000000000000000000000000000e1';
+  String record(String id, String name, int version) =>
+      Profile(id: id, name: name, version: version).encode();
+  ProfileKey bind(SigningKey by, SigningKey key, String id) => ProfileKey(
+    key: key.publicBase64,
+    by: by.publicBase64,
+    sig: by.sign(profileKeyBytes(id, key.publicBase64)),
+  );
+  Map<String, Object?> signed(
+    SigningKey by,
+    String record, {
+    SigningKey? first,
+    List<ProfileKey> keys = const [],
+    List<ProfileAlias> aliases = const [],
+  }) => SignedProfile(
+    record: record,
+    signer: by.publicBase64,
+    sig: by.sign(profileRecordBytes(record)),
+    first: (first ?? by).publicBase64,
+    keys: keys,
+    aliases: aliases,
+  ).toJson();
+  final held = signed(joiner, record(ben, 'Ben', 2));
+  final heldCat = signed(second, record(cat, 'Cat', 1));
+  final cases = <String, Object?>{
+    'first sight of another': signed(stranger, record(other, 'Dan', 1)),
+    'newer, from the first key': signed(joiner, record(ben, 'Benjamin', 3)),
+    'older': signed(joiner, record(ben, 'Benny', 1)),
+    'newer, from a key a bound key joined': signed(
+      second,
+      record(ben, 'Ben B.', 3),
+      first: joiner,
+      keys: [bind(joiner, second, ben)],
+    ),
+    'signed by a key not bound': signed(
+      stranger,
+      record(ben, 'Mallory', 9),
+      first: joiner,
+    ),
+    'a key bound by itself': signed(
+      stranger,
+      record(ben, 'Mallory', 9),
+      first: joiner,
+      keys: [bind(stranger, stranger, ben)],
+    ),
+    'a copied id': signed(stranger, record(ben, 'Mallory', 9)),
+    'the record changed after signing': {
+      ...signed(joiner, record(ben, 'Ben', 3)),
+      'record': record(ben, 'Mallory', 3),
+    },
+    'the own Profile': signed(writer, record('own', 'Ada', 5)),
+    // Cat's Device took Ben's Profile over: her key joined it, and she
+    // gave her own id up with it.
+    'an alias made by a key of the Profile given up': signed(
+      joiner,
+      record(ben, 'Ben', 2),
+      keys: [bind(joiner, second, ben)],
+      aliases: [
+        ProfileAlias(
+          alias: cat,
+          to: ben,
+          by: second.publicBase64,
+          sig: second.sign(profileAliasBytes(cat, ben)),
+        ),
+      ],
+    ),
+    'an alias made by another key': signed(
+      stranger,
+      record(mallory, 'Mallory', 1),
+      aliases: [
+        ProfileAlias(
+          alias: ben,
+          to: mallory,
+          by: stranger.publicBase64,
+          sig: stranger.sign(profileAliasBytes(ben, mallory)),
+        ),
+      ],
+    ),
+  };
+  final out = <Map<String, Object?>>[];
+  for (final MapEntry(key: what, value: profile) in cases.entries) {
+    final store = Store.inMemory(
+      clock: () => DateTime.utc(2026, 3, 1),
+      newKey: () => SigningKey.fromSeed(_seed),
+    );
+    try {
+      store
+        ..setLocalSetting('profile', record('own', 'Ada', 1))
+        ..setLocalSetting('profile:first', writer.publicBase64)
+        ..takePerson(held)
+        ..takePerson(heldCat);
+      final taken = store.takePerson(profile);
+      out.add({
+        'case': what,
+        'profile': profile,
+        'taken': taken.name,
+        'people': _people(store),
+        'resolved': {
+          for (final id in [ben, cat]) id: store.resolvePerson(id),
+        },
+      });
+    } finally {
+      store.close();
+    }
+  }
+  if (out.map((c) => c['taken']).toSet().length != PersonTaken.values.length) {
+    throw StateError('the person takes do not cover every outcome');
+  }
+  return {
+    'held': [held, heldCat],
     'cases': out,
   };
 }
@@ -2845,14 +3022,17 @@ Future<void> main(List<String> args) async {
     '- `shared/`: Ann shares a Starter Set Area with Ben as a Member: her '
     'log before (`before.jsonl`), what sharing wrote (`share.jsonl`, ids '
     'counted from 0x101, at a held clock), Ben\'s log (`joiner.jsonl`), the '
-    'invite session (`request.json`, `answer.json`), what Ben wrote, '
+    'invite session (`request.json`, `answer.json`) with the Profiles '
+    'each then keeps, Ann renamed and publishing the Area\'s Profiles '
+    'into a shared folder (`<device>.<key id>.profiles`, nonces counted '
+    'from 2000) and what Ben keeps after reading it, what Ben wrote, '
     'allowed and not (`member.jsonl`), Ann filing a Note in '
     '(`owner.jsonl`), the paired session after (`request2.json`, '
     '`answer2.json`), Ben made Manager (`role.jsonl`) and writing as one '
     '(`manager.jsonl`), then removed '
     '(`remove.jsonl`) with the answer he gets then (`answer3.json`), and '
-    'what both read and which entries the roles leave out '
-    '(`expected.json`).\n'
+    'what both read, which entries the roles leave out and whose Profile '
+    'marks each Note (`expected.json`).\n'
     '- `sent/`: Ada sends a Note with a Section, a Routine and a Reminder '
     'to Ben: her log (`sender.jsonl`), what sending wrote (`sent.jsonl`, '
     'ids counted from 0x301, at a held clock), the file signed only '
@@ -2883,8 +3063,10 @@ Future<void> main(List<String> args) async {
     'as they are written and records refused, the own Profile\'s local '
     'settings after each step (ids counted from 1), signed Profiles another '
     'of the own Devices sends with what became of each and the settings '
-    'after (`takes`, ids counted from 0x65), and a Profile picture made '
-    'here (`picture.jpg`).\n',
+    'after (`takes`, ids counted from 0x65), Profiles of another person '
+    'taken by a Device that keeps one with what became of each and what '
+    'it keeps after (`people`), and a Profile picture made here '
+    '(`picture.jpg`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -2911,7 +3093,7 @@ Future<void> main(List<String> args) async {
   _conflictsFixture(root);
   await _folder(root);
   await _bundle(root);
-  _sharedFixture(root);
+  await _sharedFixture(root);
   _sentFixture(root);
   await _backupFixture(root);
   _profilesFixture(root);

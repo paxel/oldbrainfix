@@ -14,6 +14,7 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'notes_screen.dart';
 import 'place_names.dart';
+import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'share_area_screen.dart';
 import 'trash_screen.dart';
@@ -45,6 +46,9 @@ class _AreasScreenState extends State<AreasScreen> {
   /// ones (ADR 0013).
   Map<String, AreaAccess> _access = const {};
   Map<String, List<Person>> _people = const {};
+
+  /// The name each person's Profile shows, by Profile id.
+  Map<String, String> _names = const {};
   List<PlacedNote> _hits = const [];
   bool _loaded = false;
 
@@ -78,6 +82,10 @@ class _AreasScreenState extends State<AreasScreen> {
     _people = {
       for (final a in _areas)
         if (store.isShared(a.id)) a.id: store.people(a.id),
+    };
+    _names = {
+      for (final people in _people.values)
+        for (final p in people) p.id: store.personShown(p.id).name,
     };
     _hits = _search(widget.places, _query.text, lock: LockScope.of(context));
   }
@@ -228,7 +236,7 @@ class _AreasScreenState extends State<AreasScreen> {
               ? null
               : [
                   for (final p in _people[area.id] ?? const <Person>[])
-                    p.name.isEmpty ? t.peopleNoName : p.name,
+                    profileDisplayName(t, _names[p.id] ?? ''),
                 ].join(', '),
           leading: _AreaMark(area: area),
           locked: lock?.isAreaClosed(area.id) ?? false,

@@ -308,7 +308,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final t = context.t;
     final placed = _placed;
     if (placed == null) return Scaffold(appBar: AppBar());
-    final (:note, :area, :topic, :changes, :schedules) = placed;
+    final (:note, :area, :topic, :changes, :schedules, author: _) = placed;
     // In a Shared Area a Member changes only their own Notes, and only a
     // Manager their Routines (ADR 0013); Amend stays.
     final amends = _amends;

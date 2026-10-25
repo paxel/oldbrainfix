@@ -32,6 +32,20 @@ In every such session, and for every keys file it opens, a Device whose key is b
 - Another id otherwise: a Device whose Profile still has the defaults takes over one that has none, without a question; when both have them, the lower id stays. When the user changed both, "Which one is you?" waits on both Devices, showing the two Profiles with picture, name and short code; on the phone it opens right after Pairing and stays on the Profile page, on the computer it opens over the window and stays on the Profile page when put off. The first answer settles it: keeping this Device's Profile makes the other id its alias, taking the other one over makes this one's id the other's alias; the next sync carries it, and the other Device then takes the kept Profile over or finds its own question answered.
 
 Taking a Profile over keeps its record, signature, first key, keys and aliases, adds this Device's former id as an alias signed with its own key, and keeps the other's name and picture as chosen unless they were still the defaults. From then on the Profile follows no Device's defaults: once another Device holds it, a phone's name and a computer's login would replace each other's back and forth. A Device that has no Profile yet takes the first one it is sent.
+### The people of a Shared Area (#50)
+
+Another person's Profile is kept as a local setting `person:<id>`, as received with its signature and binding, so it can be passed on unchanged, with when it was first seen here and its picture made again. On first sight the id is bound to the first key and the keys joined to it in a chain; later a record of that id counts only when its first key is the same and one of its bound keys signed it, keys join only when a bound key signed them, aliases only when a bound key made them, and a newer version replaces the record (the same order as for the own Profile). Its name is sanitised and its picture made again on receipt, or the Profile is refused whole. The own Profile and its aliases are never taken from someone else.
+
+The Profiles travel as a list `profiles` of signed Profiles, sorted by id, without `fresh`:
+
+- In a LAN session with another person's Device, request and answer carry the own Profile and the Profiles of the people the grants of the Areas shared with that Device name now; the receiver takes only those whose id, or an id they replaced, those grants name, read after the session's entries. A phone joining a computer that invites it sends nothing but its own Profile (`profile`) for the computer to show; a phone inviting a computer fetches the computer's Profile with `GET /profile`, which a host answers to anyone holding the PIN. The invited Device's Profile must bind the key its device id is made from, or the invite is refused.
+- Between one's own Devices, every Profile kept goes along, and every one is taken.
+- In the shared folder each Device writes, for every Shared Area whose key it holds, `keys/<device>.<key id>.profiles`, sealed with that Area's key (`oldbrainfix:profiles:<device>` as associated data, so a keys file and a Profiles file cannot stand in for each other), holding the own Profile and those of the people the Area's grants name. Only the people of the Area hold its key, so only they read them; a reader takes those the grants name, after the entries. Bundles carry the same files. The nonces follow the keys files, by key id.
+
+The sync format stays 4: no build that speaks 4 was released, so no older peer has to refuse the new fields.
+
+A Note shows its writer's picture, or the placeholder, when another person wrote it: the Device that wrote its first `$type` is not this one, one of its own group, or bound to the own Profile. Its key leads to the Profiles that bind it; in a Shared Area the grant of that Device names the person, and the Profile shown is the kept Profile of that person, through the aliases, among those binding the key, so a Profile that binds somebody else's key shows none of their Notes. Until that Profile arrives, the placeholder of the named id shows. Outside a Shared Area the Profile first seen with the key shows. One's own Notes show no picture.
+
 ## Overrides and People (#52, #53)
 
 An Override is a name and picture one person gives another's Profile for themselves alone ("Mum"), sanitised like a Profile. Overrides sync between one's own Devices and never leave them: they are kept in the log outside every Area, under the personal key (ADR 0012), which no other person holds. A person's picture opens their Profile, and the Profile page lists every stored Profile under People (#52); "Their Notes" there opens the browser filtered to that person (#53).
@@ -50,7 +64,7 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 
 ## Changes to earlier decisions
 
-- ADR 0013: the name a Manager types for an invited person is replaced by the person's Profile, and Notes are marked by Profile through the signing Device's binding and the aliases (#50).
+- ADR 0013: the name a Manager types for an invited person and the person id of the grant are replaced by the person's Profile id; the invite shows the other person's Profile to confirm, and Notes are marked by Profile through the signing Device's binding and the aliases, checked against the grant (#50).
 - ADR 0015: a Sent Item carries the sender's signed Profile, stored and bound only when the item is accepted; "verified" moves from the Sent Item's key to the Profile, by comparing short codes in person (#51).
 - ADR 0016: the backup key belongs to the Profile, not to the Device; the per-Device keys and their hand-over between Devices of #40 and #41 go, and a Backup carries the Profile (#49).
 
@@ -71,3 +85,5 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 - A restored Device is not the Device that made the Profile, so the Profile no longer follows any Device's defaults after a restore.
 - The account picture is read where the system keeps it on Linux (AccountsService's icon or `~/.face`); inside the Flatpak, on Windows and on macOS the initials show until the user picks a picture. The name comes from the user database there too (passwd's full name, Windows' display name).
 - A name cut at 40 code points may lose the end of a long emoji sequence, never the characters before it.
+- A Profile is bound to the keys it came with when it is first seen, from whoever passed it on: a copied id with another first key that arrives first keeps the real one out on that Device. The short code, compared in person, tells them apart.
+- A person removed from a Shared Area keeps its key (ADR 0012, 0013), so they can still read the Profiles published in the shared folder under it afterwards.

@@ -7,8 +7,12 @@ import 'package:image/image.dart' as img;
 
 import 'backup.dart';
 import 'photos.dart';
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
+import 'sync.dart';
+
+part 'people.dart';
 
 /// Profiles (ADR 0017): every person has one, with an id, a name and a
 /// picture. This Device keeps the user's own as local settings, signed

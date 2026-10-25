@@ -8,6 +8,7 @@ import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
+import 'profile.dart';
 import 'sync_screen.dart';
 
 /// How an invite is run; the app passes the core's [lanSync], tests a
@@ -17,13 +18,16 @@ typedef InviteJoin = Future<SyncResult> Function(
   PairInfo info, {
   required String name,
   Invite? invite,
+  Future<bool> Function(ProfileChoice other)? confirm,
 });
 
-/// Shares an Area with another person (ADR 0013): both names, the role
-/// they get, and the pair code their computer shows, scanned or typed.
-/// The phone joins it inviting it, so their computer gets this Area and
-/// nothing else, and the Area shows as shared from then on. A Starter Set
-/// Area goes on under fresh ids; [onShared] hears the id it has now.
+/// Shares an Area with another person (ADR 0013): the role they get,
+/// and the pair code their computer shows, scanned or typed. Nobody types
+/// a name: once the phone reached their computer, it shows their Profile
+/// (ADR 0017), and only when the user confirms it does the phone invite
+/// it, so their computer gets this Area and nothing else, and the Area
+/// shows as shared from then on. A Starter Set Area goes on under fresh
+/// ids; [onShared] hears the id it has now.
 class ShareAreaScreen extends StatefulWidget {
   final Store store;
   final String areaId;
@@ -43,17 +47,6 @@ class ShareAreaScreen extends StatefulWidget {
 }
 
 class _ShareAreaScreenState extends State<ShareAreaScreen> {
-  /// The name this Device's person last shared under.
-  static const _ownNameKey = 'shareName';
-
-  // The own Profile's name until a name was shared under once.
-  late final _own = TextEditingController(
-    text:
-        widget.store.localSetting(_ownNameKey) ??
-        widget.store.ownProfile?.name ??
-        '',
-  );
-  final _their = TextEditingController();
   final _code = TextEditingController();
   var _role = AreaRole.member;
   var _busy = false;
@@ -62,8 +55,6 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
 
   @override
   void dispose() {
-    _own.dispose();
-    _their.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -86,14 +77,22 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     await _invite();
   }
 
+  /// Shows the other person's Profile; true once the user confirms it.
+  Future<bool> _confirm(ProfileChoice other) async {
+    if (!mounted) return false;
+    final area = _area;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (_) => InviteConfirmDialog(
+        area: area == null ? '' : areaName(context.t, area),
+        other: other,
+      ),
+    );
+    return sure ?? false;
+  }
+
   Future<void> _invite() async {
     final t = context.t;
-    final own = _own.text.trim();
-    final their = _their.text.trim();
-    if (own.isEmpty || their.isEmpty) {
-      _announce(t.shareNamesMissing);
-      return;
-    }
     final info = decodePairCode(_code.text);
     if (info == null) {
       _announce(t.syncInvalidCode);
@@ -102,20 +101,26 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     final pairing = PairingScope.of(context);
     final area = _area;
     setState(() => _busy = true);
+    ProfileChoice? confirmed;
     try {
       final store = widget.store;
-      store.setLocalSetting(_ownNameKey, own);
-      _areaId = store.share(_areaId, name: own);
+      _areaId = store.share(_areaId);
       widget.onShared?.call(_areaId);
       final name = await pairing.deviceName();
       await widget.join(
         store,
         info,
         name: name,
-        invite: Invite(_areaId, role: _role, name: their),
+        invite: Invite(_areaId, role: _role),
+        confirm: (other) async {
+          final sure = await _confirm(other);
+          if (sure) confirmed = other;
+          return sure;
+        },
       );
       if (!mounted) return;
-      _announce(t.shareDone(area == null ? '' : areaName(t, area), their));
+      final who = profileDisplayName(t, confirmed?.profile.name ?? '');
+      _announce(t.shareDone(area == null ? '' : areaName(t, area), who));
       Navigator.of(context).pop(true);
     } on SyncException catch (e) {
       if (!mounted) return;
@@ -144,28 +149,6 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           Text(t.shareIntro),
-          const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('own-name'),
-            controller: _own,
-            enabled: !_busy,
-            textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(
-              labelText: t.shareYourName,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            key: const ValueKey('their-name'),
-            controller: _their,
-            enabled: !_busy,
-            textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(
-              labelText: t.shareTheirName,
-              border: const OutlineInputBorder(),
-            ),
-          ),
           const SizedBox(height: 16),
           Text(t.roleHeading, style: Theme.of(context).textTheme.titleSmall),
           RadioGroup<AreaRole>(
@@ -241,8 +224,67 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
   }
 }
 
-/// The people of a Shared Area with their roles, this Device's person
-/// first. A Manager changes their roles and removes them here; anyone
+/// "Share this Area with this person?": the other person's picture, name
+/// and short code, as their computer sent them (ADR 0017), to compare
+/// with the code on their Profile page. Pops with true to share.
+class InviteConfirmDialog extends StatelessWidget {
+  final String area;
+  final ProfileChoice other;
+
+  const InviteConfirmDialog({
+    super.key,
+    required this.area,
+    required this.other,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final text = Theme.of(context).textTheme;
+    return AlertDialog(
+      title: Text(t.inviteConfirmTitle(area)),
+      scrollable: true,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ProfileAvatar(
+            key: const ValueKey('inviteAvatar'),
+            profile: other.profile,
+            size: 72,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            profileDisplayName(t, other.profile.name),
+            style: text.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(t.profileTheirCode, style: text.labelMedium),
+          SelectableText(
+            other.code,
+            style: text.titleLarge?.copyWith(fontFamily: 'monospace'),
+          ),
+          const SizedBox(height: 12),
+          Text(t.inviteConfirmText),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(t.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('inviteConfirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(t.inviteConfirmShare),
+        ),
+      ],
+    );
+  }
+}
+
+/// The people of a Shared Area with their Profiles and roles, this
+/// Device's person first. A Manager changes their roles and removes them here; anyone
 /// else only sees who is in.
 class PeopleScreen extends StatefulWidget {
   final Store store;
@@ -256,6 +298,9 @@ class PeopleScreen extends StatefulWidget {
 
 class _PeopleScreenState extends State<PeopleScreen> {
   List<Person> _people = const [];
+
+  /// Each person's Profile as it shows, by Profile id.
+  Map<String, Profile> _shown = const {};
   String? _mine;
   bool _manages = false;
   Area? _area;
@@ -269,6 +314,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
   void _load() {
     final store = widget.store;
     _people = store.people(widget.areaId);
+    _shown = {for (final p in _people) p.id: store.personShown(p.id)};
     _mine = store.grantsOf(widget.areaId)?.personOf(store.deviceId);
     _manages = store.accessIn(widget.areaId) == AreaAccess.manager;
     _area = Places(store).areaById(widget.areaId);
@@ -319,8 +365,8 @@ class _PeopleScreenState extends State<PeopleScreen> {
     return sure ?? false;
   }
 
-  static String _name(AppLocalizations t, Person person) =>
-      person.name.isEmpty ? t.peopleNoName : person.name;
+  String _name(AppLocalizations t, Person person) =>
+      profileDisplayName(t, _shown[person.id]?.name ?? '');
 
   @override
   Widget build(BuildContext context) {
@@ -336,11 +382,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
             ListTile(
               key: ValueKey('person-${person.id}'),
               contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                person.role == AreaRole.manager
-                    ? Icons.manage_accounts_outlined
-                    : Icons.person_outline,
-              ),
+              leading: ProfileAvatar(profile: _shown[person.id], size: 40),
               title: Text(
                 person.id == _mine
                     ? t.peopleYou(_name(t, person))

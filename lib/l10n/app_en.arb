@@ -965,16 +965,13 @@
       }
     }
   },
-  "shareIntro": "Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.",
-  "shareYourName": "Your name",
-  "shareTheirName": "Their name",
+  "shareIntro": "Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.",
   "roleHeading": "They may",
   "roleManager": "Manager",
   "roleMember": "Member",
   "roleManagerDetail": "Everything in this Area.",
   "roleMemberDetail": "Add Notes and change their own, add to any Note and check off Routines and Reminders.",
   "shareInvite": "Invite",
-  "shareNamesMissing": "Fill in both names first.",
   "shareDone": "{area} is now shared with {name}.",
   "@shareDone": {
     "placeholders": {
@@ -1005,7 +1002,6 @@
       }
     }
   },
-  "peopleNoName": "Someone",
   "makeManager": "Make Manager",
   "makeMember": "Make Member",
   "removePerson": "Remove",
@@ -1219,5 +1215,27 @@
   "profileWhichOtherDevice": "On the other Device",
   "profileWhichPick": "This is me",
   "profileWhichLater": "Later",
-  "profileWhichWaiting": "Your Devices have two Profiles. Pick yours."
+  "profileWhichWaiting": "Your Devices have two Profiles. Pick yours.",
+  "inviteConfirmTitle": "Share {area} with this person?",
+  "@inviteConfirmTitle": {
+    "description": "Over the other person's Profile while inviting them to a Shared Area.",
+    "placeholders": {
+      "area": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteConfirmText": "Compare the code with the one on their Profile page. Only then is anything shared.",
+  "inviteConfirmShare": "Share",
+  "profileTheirCode": "Their code",
+  "authorPicture": "Written by {name}",
+  "@authorPicture": {
+    "description": "Read out for another person's picture on a Note's card.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "shareCancelled": "Nothing was shared."
 }

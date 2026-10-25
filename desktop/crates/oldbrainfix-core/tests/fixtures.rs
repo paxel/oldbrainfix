@@ -1635,8 +1635,19 @@ fn roles_json(
     ids: &[String],
 ) -> Result<Value, Box<dyn std::error::Error>> {
     let mut may = serde_json::Map::new();
+    let mut authors = serde_json::Map::new();
     for id in ids {
         may.insert(id.clone(), json!(store.may_change(id)?));
+        authors.insert(id.clone(), json!(store.author_of(id)?.map(|p| p.id)));
+    }
+    let mut people = Vec::new();
+    for p in store.people(area)? {
+        people.push(json!({
+            "id": p.id,
+            "name": store.person_shown(&p.id)?.name,
+            "role": p.role.name(),
+            "devices": p.devices,
+        }));
     }
     let mut ignored: Vec<String> = store.judged()?.ignored.iter().cloned().collect();
     ignored.sort();
@@ -1651,17 +1662,24 @@ fn roles_json(
     Ok(json!({
         "access": store.access_in(area, None)?.name(),
         "shared": store.is_shared(area)?,
-        "people": store.people(area)?.iter().map(|p| json!({
-            "id": p.id,
-            "name": p.name,
-            "role": p.role.name(),
-            "devices": p.devices,
-        })).collect::<Vec<_>>(),
+        "people": people,
+        "authors": authors,
         "mayChange": may,
         "mayManage": store.may_manage(Some(area))?,
         "ignored": ignored,
         "routines": routines,
     }))
+}
+
+/// The Profiles of other people `store` keeps, signed as received, as
+/// the generator's `_people`.
+fn people_json(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let mut out = serde_json::Map::new();
+    for (key, value) in store.local_settings_with_prefix("person:")? {
+        let held: Value = serde_json::from_str(&value)?;
+        out.insert(key, held["profile"].clone());
+    }
+    Ok(Value::Object(out))
 }
 
 fn without_device(mut value: Value) -> Value {
@@ -1676,7 +1694,7 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     use oldbrainfix_core::lan::{
         Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
     };
-    use oldbrainfix_core::{AreaRole, Invite, PairedDevice};
+    use oldbrainfix_core::{AreaRole, Invite, OwnProfile, PairedDevice};
     let dir = fixtures().join("shared");
     let expected = read_json(&dir.join("expected.json"))?;
     let at = |key: &str| -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
@@ -1695,10 +1713,7 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     // Sharing the starter Household moves it and makes Ann its Manager,
     // to the same entries.
     let mark = ann.current_seq()?;
-    let area = ann.share(
-        &oldbrainfix_core::places::starter_id("area", "household"),
-        "Ann",
-    )?;
+    let area = ann.share(&oldbrainfix_core::places::starter_id("area", "household"))?;
     assert_eq!(area, expected["area"].as_str().ok_or("area")?);
     assert_eq!(
         lines_after(&ann, mark)?,
@@ -1727,7 +1742,6 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     let invite = Invite {
         area: area.clone(),
         role: AreaRole::Member,
-        name: "Ben".into(),
     };
     let (answer, session) =
         answer_sync_inviting(&ann, &request, "Desk", Some(&invite))?.ok_or("an answer")?;
@@ -1756,6 +1770,30 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     let after_invite = &expected["afterInvite"];
     assert_eq!(without_device(read(&ann)?), after_invite["host"]);
     assert_eq!(without_device(read(&ben)?), after_invite["joiner"]);
+    assert_eq!(people_json(&ann)?, after_invite["hostPeople"]);
+    assert_eq!(people_json(&ben)?, after_invite["joinerPeople"]);
+
+    // Ann renames herself and syncs through a shared folder: the
+    // Household's Profiles go sealed under its key, as the Dart core
+    // sealed them, and Ben reads hers.
+    *clock.lock() = at("folderAt")?;
+    OwnProfile::new(&ann).rename("Ann Lovelace")?;
+    let mut folder = oldbrainfix_core::folder::MemoryFolder::default();
+    let mut nonces = counted_nonces_after(2000);
+    oldbrainfix_core::folder::folder_sync(&ann, &mut folder, &mut nonces)?;
+    let after_folder = &expected["afterFolder"];
+    let file = after_folder["profilesFile"].as_str().ok_or("a file")?;
+    assert_eq!(
+        oldbrainfix_core::folder::SyncFolder::read(&folder, "keys", file)?,
+        Some(std::fs::read(dir.join(file))?)
+    );
+    let taken = oldbrainfix_core::folder::folder_sync(
+        &ben,
+        &mut folder,
+        &mut oldbrainfix_core::folder::random_nonce,
+    )?;
+    assert!(taken.profile_changed);
+    assert_eq!(people_json(&ben)?, after_folder["joinerPeople"]);
 
     // What Ben wrote, allowed and not, and Ann filing a Note in; then a
     // paired session: only the Area goes, the filed Note whole.
@@ -2269,6 +2307,42 @@ fn profiles_come_out_as_the_dart_core_has_them() -> TestResult {
             "{}",
             case["case"]
         );
+    }
+
+    // Profiles of another person, each taken by a Device that keeps
+    // Ben's: an update signed by a key not bound to it is refused.
+    let people = &fixture["people"];
+    let at = Utc
+        .with_ymd_and_hms(2026, 3, 1, 0, 0, 0)
+        .single()
+        .ok_or("a time")?;
+    for case in people["cases"].as_array().ok_or("cases")? {
+        let store = Store::in_memory(Box::new(move || at), || Ok(writer_key()))?;
+        store.set_local_setting(
+            "profile",
+            &Profile {
+                id: "own".into(),
+                name: "Ada".into(),
+                picture: None,
+                version: 1,
+            }
+            .encode(),
+        )?;
+        store.set_local_setting("profile:first", &BASE64.encode(writer_key().public_key()))?;
+        for held in people["held"].as_array().ok_or("held")? {
+            store.take_person(held, None)?;
+        }
+        let taken = store.take_person(&case["profile"], None)?;
+        assert_eq!(taken.name(), case["taken"], "{}", case["case"]);
+        assert_eq!(people_json(&store)?, case["people"], "{}", case["case"]);
+        for (id, resolved) in case["resolved"].as_object().ok_or("resolved")? {
+            assert_eq!(
+                json!(store.resolve_person(id)?),
+                *resolved,
+                "{}",
+                case["case"]
+            );
+        }
     }
     Ok(())
 }

@@ -21,12 +21,14 @@ use oldbrainfix_core::lan::{
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::{
-    AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, Routines, Store,
+    AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, ProfileChoice,
+    Routines, Store,
 };
 
 use crate::app::{Wall, embossed};
 use crate::l10n::L10n;
 use crate::names::area_name;
+use crate::profile_view::{Pictures, display_name, person_picture};
 use crate::schedule_text::schedule_text;
 use crate::theme::Tones;
 
@@ -66,8 +68,12 @@ pub enum SyncAction {
 pub struct SyncHost {
     host: Option<Host>,
     /// A Device not paired yet that asked to sync, waiting for the
-    /// user's answer; its request is held open meanwhile.
-    asking: Option<(Request, JoinAsk)>,
+    /// user's answer; its request is held open meanwhile. While this
+    /// host invites, every joiner waits so, with the Profile its person
+    /// sent, for the user to confirm (ADR 0017).
+    asking: Option<(Request, JoinAsk, Option<ProfileChoice>)>,
+    /// The pictures of the people asking.
+    pictures: Pictures,
     /// Why hosting could not start, or what a session choked on.
     error: Option<String>,
     no_network: bool,
@@ -135,7 +141,7 @@ impl SyncHost {
 
     /// Stops the host, the invite left as it is.
     fn halt(&mut self) {
-        if let Some((request, _)) = self.asking.take() {
+        if let Some((request, _, _)) = self.asking.take() {
             request.reply(Response::declined());
         }
         if let Some(mut host) = self.host.take() {
@@ -166,7 +172,15 @@ impl SyncHost {
 
     /// The Device waiting for the user's answer.
     pub fn asking(&self) -> Option<&JoinAsk> {
-        self.asking.as_ref().map(|(_, ask)| ask)
+        self.asking.as_ref().map(|(_, ask, _)| ask)
+    }
+
+    /// The Profile of the person invited, waiting for the user to
+    /// confirm it.
+    pub fn asking_profile(&self) -> Option<&ProfileChoice> {
+        self.asking
+            .as_ref()
+            .and_then(|(_, _, profile)| profile.as_ref())
     }
 
     /// Answers what the joiners sent since last frame, as this Device
@@ -178,15 +192,22 @@ impl SyncHost {
                 break;
             };
             if let Some(ask) = request.join_ask() {
+                // Invited, the joiner shows its person's Profile, and the
+                // user confirms it even for a Device trusted before; one
+                // without one is refused by the answer.
+                let profile = self
+                    .inviting
+                    .as_ref()
+                    .and_then(|_| request.joiner_profile(store));
                 let pin = self.host.as_ref().map(|h| h.pin().to_string());
                 let trusted =
                     pin.is_some_and(|pin| store.trusts_joiner(&ask, &pin).unwrap_or(false));
-                if !trusted {
+                if !trusted || profile.is_some() {
                     if self.asking.is_some() {
                         // One question at a time; the other tries again.
                         request.reply(Response::status(503));
                     } else {
-                        self.asking = Some((request, ask));
+                        self.asking = Some((request, ask, profile));
                     }
                     continue;
                 }
@@ -199,7 +220,7 @@ impl SyncHost {
     /// The user's answer to the Device asking. Returns whether the log
     /// changed.
     pub fn answer(&mut self, store: &Store, trust: bool, name: &str) -> bool {
-        let Some((request, _)) = self.asking.take() else {
+        let Some((request, _, _)) = self.asking.take() else {
             return false;
         };
         if trust {
@@ -232,17 +253,22 @@ impl SyncHost {
                     }
                 }
                 if let Some(area) = &session.shared_area {
-                    let who = match &self.inviting {
-                        Some(invite) => invite.name.clone(),
-                        None => session.name.clone(),
-                    };
+                    // The person's Profile, as the grant names it.
+                    let who = store
+                        .grants_of(area)
+                        .ok()
+                        .flatten()
+                        .and_then(|g| g.person_of(&session.peer).map(str::to_string))
+                        .and_then(|person| store.person_shown(&person).ok())
+                        .map(|p| p.name)
+                        .unwrap_or_default();
                     self.shared = Some((who, area.clone()));
                 }
                 self.refused = session.report.refused_count();
                 self.found = session.conflicts.len();
                 self.last = Some((session.name, session.applied.len()));
                 self.reload_conflicts(store);
-                !session.applied.is_empty() || session.profile.changed()
+                !session.applied.is_empty() || session.profile.changed() || session.people_changed
             }
             Err(e) => {
                 request.reply(Response::status(500));
@@ -276,7 +302,54 @@ impl SyncHost {
                 if let Some(message) = &self.error {
                     ui.label(RichText::new(message).color(error));
                 }
-                if let Some(ask) = self.asking() {
+                if let (Some(choice), Some(invite)) =
+                    (self.asking_profile().cloned(), self.inviting.clone())
+                {
+                    let area = Places::new(store)
+                        .area_by_id(&invite.area)
+                        .ok()
+                        .flatten()
+                        .map(|a| area_name(t, &a))
+                        .unwrap_or_default();
+                    let name = display_name(t, &choice.profile.name).to_string();
+                    embossed(ui, tones, true, None, |ui| {
+                        ui.label(
+                            RichText::new(t.invite_confirm_title(&area))
+                                .strong()
+                                .color(text),
+                        );
+                        ui.horizontal(|ui| {
+                            person_picture(ui, &mut self.pictures, &choice.profile, 56.0, &name);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&name).strong().color(text));
+                                ui.label(
+                                    RichText::new(format!(
+                                        "{}: {}",
+                                        t.profile_their_code(),
+                                        choice.code
+                                    ))
+                                    .monospace()
+                                    .color(text),
+                                );
+                            });
+                        });
+                        ui.label(RichText::new(t.invite_confirm_text()).color(weak));
+                        ui.horizontal(|ui| {
+                            if ui
+                                .button(RichText::new(t.invite_confirm_share()).color(text))
+                                .clicked()
+                            {
+                                action = Some(SyncAction::Trust(true));
+                            }
+                            if ui
+                                .button(RichText::new(t.sync_refuse()).color(text))
+                                .clicked()
+                            {
+                                action = Some(SyncAction::Trust(false));
+                            }
+                        });
+                    });
+                } else if let Some(ask) = self.asking() {
                     let who = if ask.name.is_empty() {
                         t.unnamed_device().to_string()
                     } else {
@@ -317,7 +390,7 @@ impl SyncHost {
                     };
                     embossed(ui, tones, true, None, |ui| {
                         ui.label(
-                            RichText::new(t.inviting_banner(&invite.name, &area, role))
+                            RichText::new(t.inviting_banner(&area, role))
                                 .strong()
                                 .color(text),
                         );
@@ -370,6 +443,7 @@ impl SyncHost {
                         && let Ok(Some(area)) = Places::new(store).area_by_id(area)
                     {
                         let area = area_name(t, &area);
+                        let who = display_name(t, who);
                         let said = if self.inviting.is_some() {
                             t.share_done(&area, who)
                         } else {

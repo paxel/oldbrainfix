@@ -114,5 +114,23 @@
       "key": "FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ=",
       "scope": "area:00000000000000000000000000000101"
     }
+  ],
+  "profiles": [
+    {
+      "aliases": [],
+      "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "keys": [],
+      "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann Lovelace\",\"version\":3}",
+      "sig": "v+/hPzY/tA+OqxUlzSDJK6/XucrISSES2uNzw663LZBHqjWoqlpHNFIAKxyEuGXt6xWS+RHVU3zoExd+veQYAA==",
+      "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    },
+    {
+      "aliases": [],
+      "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "keys": [],
+      "record": "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}",
+      "sig": "Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==",
+      "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+    }
   ]
 }

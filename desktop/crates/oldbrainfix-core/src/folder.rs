@@ -192,6 +192,12 @@ pub fn keys_file_name(device: &str, key: &str) -> String {
     format!("{device}.{key}.keys")
 }
 
+/// The Profiles of a Shared Area's people a Device publishes, sealed
+/// with the Area's key (ADR 0017): `keys/<device>.<key id>.profiles`.
+pub fn profiles_file_name(device: &str, key: &str) -> String {
+    format!("{device}.{key}.profiles")
+}
+
 /// One segment as the manifest names it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
@@ -289,7 +295,7 @@ pub fn random_nonce() -> Result<[u8; SEAL_NONCE_BYTES]> {
 /// learns the keys the others published, takes in what is new in their
 /// segments, then publishes this Device's keys, entries and blobs and
 /// fetches the blobs the log lacks. The nonces come from `nonce` in the
-/// Dart core's order: keys files, entry lines, blobs.
+/// Dart core's order: keys files, Profiles files, entry lines, blobs.
 pub fn folder_sync(
     store: &Store,
     folder: &mut dyn SyncFolder,
@@ -307,8 +313,10 @@ pub fn folder_sync(
     let before = store.current_seq()?;
     let (applied, unreadable) = read_foreign(store, folder, &mut report, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
+    let people = learn_profiles(store, folder)?;
     store.ensure_area_keys()?;
     publish_keys(store, folder, nonce)?;
+    publish_profiles(store, folder, nonce)?;
     let entries_out = publish_entries(store, folder, nonce)?;
     let mut names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
     let blobs_in = fetch_blobs(store, folder, &names)?;
@@ -323,7 +331,7 @@ pub fn folder_sync(
         moment,
         report,
         conflicts,
-        profile_changed,
+        profile_changed: profile_changed || people,
     })
 }
 
@@ -344,6 +352,7 @@ pub fn read_sealed(
     let before = store.current_seq()?;
     let (applied, unreadable) = read_foreign(store, folder, &mut report, false)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
+    let people = learn_profiles(store, folder)?;
     let names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
     let blobs_in = fetch_blobs(store, folder, &names)?;
     let conflicts = store.conflicts_among(&applied)?;
@@ -356,7 +365,7 @@ pub fn read_sealed(
         moment,
         report,
         conflicts,
-        profile_changed,
+        profile_changed: profile_changed || people,
     })
 }
 
@@ -374,6 +383,7 @@ pub fn write_sealed(
 ) -> Result<(usize, usize)> {
     store.ensure_area_keys()?;
     publish_keys(store, folder, nonce)?;
+    publish_profiles(store, folder, nonce)?;
     let out = write_segments(store, folder, nonce, entries, Vec::new(), 1)?;
     let blobs_out = publish_blobs(store, folder, &mut BTreeSet::new(), nonce, Some(blobs))?;
     Ok((out, blobs_out))
@@ -446,6 +456,45 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
         }
     }
     Ok(profile_changed)
+}
+
+/// Opens every other Device's Profiles file sealed with the key of a
+/// Shared Area held here and takes in the Profiles of the people that
+/// Area's grants name (ADR 0017), as the Dart core's `_learnProfiles`.
+/// Read after the entries, so the grants that came with them count.
+/// Returns whether a Profile came in or changed.
+fn learn_profiles(store: &Store, folder: &dyn SyncFolder) -> Result<bool> {
+    let own = store.device_id()?;
+    let mut changed = false;
+    for name in folder.list("keys")? {
+        if !name.ends_with(".profiles") {
+            continue;
+        }
+        let Some((device, id)) = device_and_key(&name) else {
+            continue;
+        };
+        if device == own {
+            continue;
+        }
+        let Some(key) = store.area_key(id)? else {
+            continue;
+        };
+        if !store.is_shared(&key.scope)? {
+            continue;
+        }
+        let Ok(Some(bytes)) = folder.read("keys", &name) else {
+            continue;
+        };
+        let Some(plain) = unseal(&key.key, &bytes, &sealed_as::profiles(device)) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_slice::<Value>(&plain) else {
+            continue;
+        };
+        let allowed = store.people_of(&key.scope)?;
+        changed |= store.take_people(json.get("profiles"), Some(&allowed))?;
+    }
+    Ok(changed)
 }
 
 fn read_state_key(device: &str) -> String {
@@ -605,6 +654,38 @@ fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -
     let aad = sealed_as::keys(&own);
     for key in keys.iter().filter(|k| k.scope == PERSONAL_SCOPE) {
         let name = keys_file_name(&own, &key.id());
+        let said = folder
+            .read("keys", &name)?
+            .and_then(|held| unseal(&key.key, &held, &aad));
+        if said.as_deref() == Some(plain.as_slice()) {
+            continue;
+        }
+        let sealed = seal(&key.key, &plain, &aad, &nonce()?)?;
+        folder.write("keys", &name, &sealed)?;
+    }
+    Ok(())
+}
+
+/// Publishes, for every Shared Area whose key this Device holds, the
+/// Profiles of the people its grants name, the own one among them,
+/// sealed with that Area's key, as the Dart core's `_publishProfiles`:
+/// by key id; a file that already says the same stays untouched.
+fn publish_profiles(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<()> {
+    let own = store.device_id()?;
+    let mut keys = store.area_keys()?;
+    keys.sort_by_key(AreaKey::id);
+    let aad = sealed_as::profiles(&own);
+    for key in keys {
+        if key.scope == PERSONAL_SCOPE || !store.is_shared(&key.scope)? {
+            continue;
+        }
+        let areas = std::collections::HashSet::from([key.scope.clone()]);
+        let profiles = store.profiles_to_send(Some(&areas))?;
+        if profiles.is_empty() {
+            continue;
+        }
+        let plain = json!({"profiles": profiles}).to_string().into_bytes();
+        let name = profiles_file_name(&own, &key.id());
         let said = folder
             .read("keys", &name)?
             .and_then(|held| unseal(&key.key, &held, &aad));

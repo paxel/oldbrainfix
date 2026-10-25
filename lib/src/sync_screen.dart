@@ -185,7 +185,14 @@ class _SyncScreenState extends State<SyncScreen> {
           ? null
           : Places(widget.store).areaById(result.session.sharedArea ?? '');
       if (shared != null) {
-        _announce(t.sharedWithYou(result.session.name, areaName(t, shared)));
+        // Who shared it, as their Profile shows (ADR 0017).
+        final person = widget.store
+            .grantsOf(shared.id)
+            ?.personOf(result.session.peer);
+        final who = person == null
+            ? result.session.name
+            : profileDisplayName(t, widget.store.personShown(person).name);
+        _announce(t.sharedWithYou(who, areaName(t, shared)));
       }
       final refused = result.session.report.refusedCount;
       if (refused > 0) _announce(t.syncRefused(refused));
@@ -516,6 +523,7 @@ String syncFailureText(AppLocalizations t, SyncFailure failure) =>
       SyncFailure.wrongPin => t.syncFailWrongPin,
       SyncFailure.locked => t.syncFailLocked,
       SyncFailure.declined => t.syncFailDeclined,
+      SyncFailure.cancelled => t.shareCancelled,
       SyncFailure.format => t.syncFailFormat,
       SyncFailure.failed => t.syncFailFailed,
     };

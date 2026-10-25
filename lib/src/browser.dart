@@ -118,12 +118,13 @@ List<Widget> diaryCards(
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
   return [
-    for (final (:note, :area, :topic, :changes, :schedules) in shown)
+    for (final (:note, :area, :topic, :changes, :schedules, :author) in shown)
       NoteCard(
         note: note,
         when: when,
         area: area,
         topic: topic,
+        author: author,
         // What a Member may not do to it is not offered (ADR 0013).
         onFile: changes ? () => onFile(note) : null,
         onMerge: changes ? () => onMerge(note) : null,

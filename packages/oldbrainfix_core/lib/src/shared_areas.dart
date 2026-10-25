@@ -5,6 +5,7 @@ import 'entry.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'places.dart';
+import 'profiles.dart';
 import 'routines.dart';
 import 'store.dart';
 
@@ -48,35 +49,28 @@ abstract final class ShareKeys {
   static const movedTo = 'movedTo';
 }
 
-/// One grant as it is signed: the role, the person the Device belongs
-/// to and the name that person goes by.
+/// One grant as it is signed: the role, and the Profile of the person
+/// the Device belongs to (ADR 0017).
 class Grant {
   final AreaRole role;
 
-  /// The person's id: the id of the Device first invited for them.
-  final String person;
-  final String name;
+  /// The id of the person's Profile, as the grant named it.
+  final String profile;
 
-  const Grant(this.role, this.person, this.name);
+  const Grant(this.role, this.profile);
 
   /// The value of the grant field: keys sorted, no spaces, the same from
   /// both cores.
-  String encode() =>
-      jsonEncode({'name': name, 'person': person, 'role': role.name});
+  String encode() => jsonEncode({'profile': profile, 'role': role.name});
 
   /// The grant in [value]; null when it is none.
   static Grant? parse(String value) {
     try {
       final json = jsonDecode(value);
-      if (json
-          case {
-            'name': final String name,
-            'person': final String person,
-            'role': final String role,
-          }
-          when person.isNotEmpty) {
+      if (json case {'profile': final String profile, 'role': final String role}
+          when profile.isNotEmpty) {
         final r = AreaRole.values.asNameMap()[role];
-        return r == null ? null : Grant(r, person, name);
+        return r == null ? null : Grant(r, profile);
       }
     } on FormatException {
       return null;
@@ -85,21 +79,16 @@ class Grant {
   }
 }
 
-/// Someone a Shared Area is shared with, as its grants say now.
+/// Someone a Shared Area is shared with, as its grants say now: the id
+/// of their Profile as the grants name it.
 class Person {
   final String id;
-  final String name;
   final AreaRole role;
 
   /// The ids of their Devices that hold the role, sorted.
   final List<String> devices;
 
-  const Person({
-    required this.id,
-    required this.name,
-    required this.role,
-    required this.devices,
-  });
+  const Person({required this.id, required this.role, required this.devices});
 }
 
 /// A grant that counts, with the entry that signed it; [grant] is null
@@ -124,13 +113,20 @@ class AreaGrants {
   /// Whether [device] was ever granted anything here.
   bool everGranted(String device) => _byDevice.containsKey(device);
 
-  /// The person [device] belongs to: of its last grant that named one.
+  /// The person [device] belongs to, the id of their Profile: of its
+  /// last grant that named one.
   String? personOf(String device) {
     for (final g in (_byDevice[device] ?? const <_Granted>[]).reversed) {
-      if (g.grant case final grant?) return grant.person;
+      if (g.grant case final grant?) return grant.profile;
     }
     return null;
   }
+
+  /// The Profile ids the grants that hold now name, sorted.
+  List<String> get profiles => {
+    for (final g in _byDevice.values)
+      if (g.last.grant case final grant?) grant.profile,
+  }.toList()..sort();
 
   /// What [device] may do at the entry [at]: everything before the
   /// first grant; else as its last grant before it says, or its first
@@ -205,7 +201,7 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         if (signer.role == AreaRole.manager) return true;
         return grant != null &&
             grant.role == AreaRole.member &&
-            grant.person == signer.person &&
+            grant.profile == signer.profile &&
             !byDevice.containsKey(target);
       }
 
@@ -433,7 +429,7 @@ extension SharedAreas on Store {
   }
 
   /// The people of the Shared Area [areaId] as its grants say now, this
-  /// Device's own first, then by name.
+  /// Device's own first, then by the name of their Profile.
   List<Person> people(String areaId) {
     final grants = grantsOf(areaId);
     if (grants == null) return const [];
@@ -441,20 +437,21 @@ extension SharedAreas on Store {
     for (final device in grants.devices) {
       final grant = grants.grantOf(device);
       if (grant == null) continue;
-      final held = byPerson[grant.person];
+      final held = byPerson[grant.profile];
       if (held == null) {
-        byPerson[grant.person] = (grant, [device]);
+        byPerson[grant.profile] = (grant, [device]);
       } else {
         held.$2.add(device);
       }
     }
     final mine = grants.personOf(deviceId);
+    final names = {for (final id in byPerson.keys) id: personShown(id).name};
     return [
       for (final MapEntry(:key, value: (grant, devices)) in byPerson.entries)
-        Person(id: key, name: grant.name, role: grant.role, devices: devices),
+        Person(id: key, role: grant.role, devices: devices),
     ]..sort((a, b) {
       if ((a.id == mine) != (b.id == mine)) return a.id == mine ? -1 : 1;
-      final byName = a.name.compareTo(b.name);
+      final byName = names[a.id]!.compareTo(names[b.id]!);
       return byName != 0 ? byName : a.id.compareTo(b.id);
     });
   }
@@ -467,14 +464,16 @@ extension SharedAreas on Store {
 
   /// Shares the Area [areaId]: moves it to fresh ids first when every
   /// Device plants it under the same one (a Starter Set Area), then
-  /// makes this Device its first Manager, going by [name], and every own
-  /// paired Device a Manager with it. Returns the id the Area goes on
-  /// under. An Area already shared stays as it is.
-  String share(String areaId, {required String name}) {
+  /// makes this Device its first Manager, under the own Profile, and
+  /// every own paired Device a Manager with it. Returns the id the Area
+  /// goes on under. An Area already shared stays as it is.
+  String share(String areaId) {
     if (isShared(areaId)) return areaId;
     return batch(() {
       final id = areaId == _starterAreaId(areaId) ? _rehome(areaId) : areaId;
-      final grant = Grant(AreaRole.manager, deviceId, name.trim()).encode();
+      // Without a Profile yet (only in tests) the Device stands for it.
+      final profile = ownProfile?.id ?? deviceId;
+      final grant = Grant(AreaRole.manager, profile).encode();
       append(id, ShareKeys.role(deviceId), grant);
       for (final device in pairedDevices()) {
         if (!device.shared) append(id, ShareKeys.role(device.id), grant);
@@ -484,23 +483,19 @@ extension SharedAreas on Store {
   }
 
   /// Grants [device] [role] in the Shared Area [areaId], as the person
-  /// [name]: under the person it already belongs to there, else a new
-  /// one of its own. Nothing for a Device of this one's own group.
+  /// whose Profile is [profile]: under the person it already belongs to
+  /// there, else that one. Nothing for a Device of this one's own group.
   void invite(
     String areaId,
     String device, {
     required AreaRole role,
-    required String name,
+    required String profile,
   }) {
     // A Device of this one's own group is no other person: it keeps the
-    // role it has, under its own name.
+    // role it has.
     if (isOwnDevice(device)) return;
-    final person = grantsOf(areaId)?.personOf(device) ?? device;
-    append(
-      areaId,
-      ShareKeys.role(device),
-      Grant(role, person, name.trim()).encode(),
-    );
+    final person = grantsOf(areaId)?.personOf(device) ?? profile;
+    append(areaId, ShareKeys.role(device), Grant(role, person).encode());
   }
 
   /// Gives every Device of [person] in [areaId] the role [role].
@@ -510,13 +505,9 @@ extension SharedAreas on Store {
     batch(() {
       for (final device in grants.devices) {
         final grant = grants.grantOf(device);
-        if (grant == null || grant.person != person) continue;
+        if (grant == null || grant.profile != person) continue;
         if (grant.role == role) continue;
-        append(
-          areaId,
-          ShareKeys.role(device),
-          Grant(role, person, grant.name).encode(),
-        );
+        append(areaId, ShareKeys.role(device), Grant(role, person).encode());
       }
     });
   }
@@ -529,7 +520,7 @@ extension SharedAreas on Store {
     if (grants == null) return;
     batch(() {
       for (final device in grants.devices) {
-        if (grants.grantOf(device)?.person == person) {
+        if (grants.grantOf(device)?.profile == person) {
           append(areaId, ShareKeys.role(device), null);
         }
       }
@@ -537,7 +528,7 @@ extension SharedAreas on Store {
   }
 
   /// Gives the Device [peer] of this Device's own group, met in a sync,
-  /// this Device's role, person and name in every Shared Area where it
+  /// this Device's role and person in every Shared Area where it
   /// holds one and [peer] never held any. Returns how many it gave.
   int extendRolesTo(String peer) {
     if (peer.isEmpty || peer == deviceId) return 0;

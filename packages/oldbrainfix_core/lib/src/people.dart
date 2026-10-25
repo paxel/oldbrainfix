@@ -1,0 +1,424 @@
+part of 'profiles.dart';
+
+/// Other people's Profiles (ADR 0017, #50): the Profiles of the people
+/// this Device shares an Area with, as they arrived with the Area's sync
+/// or a bundle. Each is kept as a local setting `person:<id>`, as
+/// received with its signature, so it can be passed on unchanged:
+/// `{"profile":…,"seen":…,"shown":…}`, the signed Profile, when it was
+/// first seen here, and its picture made again for the screen. On first
+/// sight an id is bound to the keys that came with it; later a record
+/// counts only when one of them signed it.
+
+/// What became of another person's Profile that came in.
+enum PersonTaken {
+  /// Nothing new.
+  unchanged,
+
+  /// Its signatures did not hold, it was signed by a key not bound to
+  /// the Profile kept here, a copied id, or not wanted from that sender.
+  refused,
+
+  /// Seen for the first time and kept, bound to the keys it came with.
+  added,
+
+  /// A newer record, keys or aliases of a Profile kept here.
+  updated,
+}
+
+/// A Profile of another person as this Device keeps it.
+class _Held {
+  final SignedProfile sent;
+
+  /// The record read, with the picture made again.
+  final Profile profile;
+  final Set<String> bound;
+  final String seen;
+
+  const _Held(this.sent, this.profile, this.bound, this.seen);
+
+  String get id => profile.id;
+}
+
+/// Every kept Profile by id, and the ids they replaced.
+class _PeopleIndex {
+  final Map<String, _Held> byId;
+  final Map<String, String> aliasTo;
+
+  const _PeopleIndex(this.byId, this.aliasTo);
+}
+
+/// The own Profile's ids and keys, with what they were read from.
+typedef _OwnKeys = ({String stamp, Set<String> ids, Set<String> bound});
+
+final _peopleIndex = Expando<_PeopleIndex>('people');
+final _ownKeysIndex = Expando<_OwnKeys>('ownKeys');
+
+extension People on Store {
+  static const _prefix = 'person:';
+
+  _PeopleIndex get _people => _peopleIndex[this] ??= _readPeople();
+
+  _PeopleIndex _readPeople() {
+    final byId = <String, _Held>{};
+    for (final (key, raw) in localSettingsWithPrefix(_prefix)) {
+      final held = _readHeld(raw);
+      if (held != null && key == '$_prefix${held.id}') byId[held.id] = held;
+    }
+    // An id counts as replaced only when its own Profile is kept here
+    // and a key bound to it made the alias: one Profile cannot claim to
+    // replace somebody else's.
+    final aliasTo = <String, String>{};
+    for (final id in byId.keys.toList()..sort()) {
+      for (final a in byId[id]!.sent.aliases) {
+        if (a.alias != id && _replaced(byId, a)) {
+          aliasTo.putIfAbsent(a.alias, () => id);
+        }
+      }
+    }
+    return _PeopleIndex(byId, aliasTo);
+  }
+
+  /// Whether [a] gives up a Profile kept in [byId], made by a key bound
+  /// to it.
+  static bool _replaced(Map<String, _Held> byId, ProfileAlias a) =>
+      byId[a.alias]?.bound.contains(a.by) ?? false;
+
+  static _Held? _readHeld(String raw) {
+    try {
+      final json = jsonDecode(raw);
+      if (json case {'profile': final Object sent, 'seen': final String seen}) {
+        final signed = SignedProfile.fromJson(sent);
+        final profile = signed == null ? null : Profile.parse(signed.record);
+        if (signed == null || profile == null) return null;
+        final shown = json['shown'];
+        return _Held(
+          signed,
+          Profile(
+            id: profile.id,
+            name: profile.name,
+            picture: shown is String ? base64.decode(shown) : null,
+            version: profile.version,
+          ),
+          _chain(profile.id, signed.first, signed.keys).$1,
+          seen,
+        );
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
+  }
+
+  /// The ids of the own Profile and the keys bound to it.
+  _OwnKeys get _own {
+    final record = localSetting(OwnProfile._record) ?? '';
+    final first = localSetting(OwnProfile._first) ?? '';
+    final keys = localSetting(OwnProfile._keys) ?? '';
+    final aliases = localSetting(OwnProfile._aliases) ?? '';
+    final stamp = '$first\n$keys\n$aliases\n$record';
+    final held = _ownKeysIndex[this];
+    if (held != null && held.stamp == stamp) return held;
+    final profile = Profile.parse(record);
+    final made = (
+      stamp: stamp,
+      ids: {?profile?.id, ...ownProfileAliases},
+      bound: profile == null || !_isKey(first)
+          ? <String>{}
+          : _chain(profile.id, first, _heldKeys).$1,
+    );
+    _ownKeysIndex[this] = made;
+    return made;
+  }
+
+  /// Whether the Profile id [id] is the own Profile's, or one it
+  /// replaced.
+  bool isOwnPerson(String id) => _own.ids.contains(id);
+
+  /// The id [id] stands for now: the Profile kept here that replaced it,
+  /// through every alias, else [id] itself.
+  String resolvePerson(String id) {
+    final aliasTo = _people.aliasTo;
+    var at = id;
+    for (var i = 0; i <= aliasTo.length; i++) {
+      final next = aliasTo[at];
+      if (next == null) break;
+      at = next;
+    }
+    return at;
+  }
+
+  /// The person [id] as every screen shows them: the own Profile for
+  /// one's own ids, a Profile kept here through its aliases with its
+  /// picture made again, else the placeholder with no name, until their
+  /// Profile arrives.
+  Profile personShown(String id) {
+    if (isOwnPerson(id)) {
+      if (ownProfile case final own?) return own;
+    }
+    final resolved = resolvePerson(id);
+    return _people.byId[resolved]?.profile ??
+        Profile(id: resolved, name: '', version: 1);
+  }
+
+  /// The short code of the person [id]'s Profile, when it is kept here
+  /// or is the own one.
+  String? personCode(String id) {
+    if (isOwnPerson(id)) return ownProfileCode;
+    final held = _people.byId[resolvePerson(id)];
+    return held == null
+        ? null
+        : profileShortCode(held.id, base64.decode(held.sent.first));
+  }
+
+  /// Every Profile of another person kept here, by id.
+  List<Profile> get keptPeople {
+    final ids = _people.byId.keys.toList()..sort();
+    return [for (final id in ids) _people.byId[id]!.profile];
+  }
+
+  /// The Profile [json] that the Device [device] sent of its person, to
+  /// show before an invite: its signatures hold, its binding holds the
+  /// key [device] is named for, and its picture is made again. Null when
+  /// any of it fails.
+  ProfileChoice? sentProfileOf(Object? json, {required String device}) {
+    final sent = SignedProfile.fromJson(json);
+    final checked = sent == null ? null : _check(sent);
+    if (sent == null || checked == null) return null;
+    final p = checked.profile;
+    final bound = _chain(p.id, sent.first, sent.keys).$1;
+    if (!bound.any((k) => deviceIdFromKey(base64.decode(k)) == device)) {
+      return null;
+    }
+    return (
+      profile: Profile(
+        id: p.id,
+        name: p.name,
+        picture: checked.shown,
+        version: p.version,
+      ),
+      code: profileShortCode(p.id, base64.decode(sent.first)),
+    );
+  }
+
+  /// Takes in every Profile of [list] (signed Profiles as JSON) that
+  /// [allowed] lets in by id, or by the id of a Profile kept here that it
+  /// replaced; all of them without [allowed]. Returns whether any was added or changed.
+  bool takePeople(Object? list, {bool Function(String id)? allowed}) {
+    var changed = false;
+    for (final json in list is List ? list : const []) {
+      final taken = takePerson(json, allowed: allowed);
+      if (taken == PersonTaken.added || taken == PersonTaken.updated) {
+        changed = true;
+      }
+    }
+    if (changed) profileChanged();
+    return changed;
+  }
+
+  /// Takes in another person's Profile [json]: kept on first sight,
+  /// bound to the keys it came with; later a newer record replaces the
+  /// one kept only when a key bound to it signed it, keys join only when
+  /// a bound key signed them, and aliases only when a bound key made
+  /// them. Its name is sanitised and its picture made again, or it is
+  /// refused. The own Profile is left to [OwnProfile.takeOwnProfile].
+  PersonTaken takePerson(Object? json, {bool Function(String id)? allowed}) {
+    final theirs = SignedProfile.fromJson(json);
+    final checked = theirs == null ? null : _check(theirs);
+    if (theirs == null || checked == null) return PersonTaken.refused;
+    final id = checked.profile.id;
+    if (isOwnPerson(id)) return PersonTaken.unchanged;
+    if (allowed != null &&
+        !allowed(id) &&
+        !theirs.aliases.any(
+          (a) => allowed(a.alias) && _replaced(_people.byId, a) && a.signed,
+        )) {
+      return PersonTaken.refused;
+    }
+    final held = _people.byId[id];
+    if (held == null) {
+      final bound = _chain(id, theirs.first, theirs.keys).$1;
+      _keepPerson(
+        SignedProfile(
+          record: theirs.record,
+          signer: theirs.signer,
+          sig: theirs.sig,
+          first: theirs.first,
+          keys: checked.keys,
+          aliases: _sortedAliases([
+            for (final a in theirs.aliases)
+              if (a.alias != id && bound.contains(a.by) && a.signed) a,
+          ]),
+        ),
+        checked.shown,
+        clock().toUtc().toIso8601String(),
+      );
+      return PersonTaken.added;
+    }
+    // A copied id with another first key is somebody else.
+    if (theirs.first != held.sent.first) return PersonTaken.refused;
+    final (bound, keys) = _chain(
+      id,
+      held.sent.first,
+      theirs.keys,
+      held: held.sent.keys,
+    );
+    if (!bound.contains(theirs.signer)) return PersonTaken.refused;
+    final aliases = {for (final a in held.sent.aliases) a.alias: a};
+    for (final a in theirs.aliases) {
+      if (a.alias == id || aliases.containsKey(a.alias)) continue;
+      if (bound.contains(a.by) && a.signed) aliases[a.alias] = a;
+    }
+    final kept = Profile.parse(held.sent.record);
+    final newer =
+        kept == null ||
+        _replaces(theirs.record, checked.profile, held.sent.record, kept);
+    final next = SignedProfile(
+      record: newer ? theirs.record : held.sent.record,
+      signer: newer ? theirs.signer : held.sent.signer,
+      sig: newer ? theirs.sig : held.sent.sig,
+      first: held.sent.first,
+      keys: keys,
+      aliases: _sortedAliases(aliases.values),
+    );
+    if (jsonEncode(next.toJson()) == jsonEncode(held.sent.toJson())) {
+      return PersonTaken.unchanged;
+    }
+    _keepPerson(next, newer ? checked.shown : held.profile.picture, held.seen);
+    return PersonTaken.updated;
+  }
+
+  static List<ProfileAlias> _sortedAliases(Iterable<ProfileAlias> aliases) =>
+      aliases.toList()..sort((a, b) => _compareUtf8(a.alias, b.alias));
+
+  void _keepPerson(SignedProfile sent, Uint8List? shown, String seen) {
+    final id = Profile.parse(sent.record)?.id;
+    if (id == null) return;
+    setLocalSetting(
+      '$_prefix$id',
+      jsonEncode({
+        'profile': sent.toJson(),
+        'seen': seen,
+        if (shown != null) 'shown': base64.encode(shown),
+      }),
+    );
+    _peopleIndex[this] = null;
+  }
+
+  /// The signed Profiles that go out with a sync, as JSON, sorted by id.
+  /// To one of the user's own Devices ([areas] null) every Profile of
+  /// another person kept here; to another person's Device, or sealed
+  /// under an Area's key, the own Profile and the Profiles of the people
+  /// the grants of [areas] name now, so only the people of an Area get
+  /// those of its people.
+  List<Map<String, Object?>> profilesToSend({Set<String>? areas}) {
+    final out = <String, Map<String, Object?>>{};
+    if (areas == null) {
+      for (final held in _people.byId.values) {
+        out[held.id] = held.sent.toJson();
+      }
+    } else {
+      if (ownSignedProfile case final own?) {
+        final id = Profile.parse(own.record)?.id;
+        if (id != null) {
+          out[id] = SignedProfile(
+            record: own.record,
+            signer: own.signer,
+            sig: own.sig,
+            first: own.first,
+            keys: own.keys,
+            aliases: own.aliases,
+          ).toJson();
+        }
+      }
+      for (final area in areas) {
+        for (final named in grantsOf(area)?.profiles ?? const <String>[]) {
+          if (isOwnPerson(named)) continue;
+          final held = _people.byId[resolvePerson(named)];
+          if (held != null) out[held.id] = held.sent.toJson();
+        }
+      }
+    }
+    final ids = out.keys.toList()..sort(_compareUtf8);
+    return [for (final id in ids) out[id]!];
+  }
+
+  /// The own Profile as it goes to another person: signed, with its
+  /// binding and aliases, without what only one's own Devices are told.
+  Map<String, Object?>? get ownProfileForOthers {
+    final own = ownSignedProfile;
+    if (own == null) return null;
+    return SignedProfile(
+      record: own.record,
+      signer: own.signer,
+      sig: own.sig,
+      first: own.first,
+      keys: own.keys,
+      aliases: own.aliases,
+    ).toJson();
+  }
+
+  /// Which Profile ids may come from the Device [peer] of another
+  /// person: those the grants of an Area shared with it name.
+  bool Function(String id) peopleFrom(String peer) {
+    final areas = areasSharedWith(peer);
+    final named = <String>{
+      for (final area in areas) ...?grantsOf(area)?.profiles,
+    };
+    return named.contains;
+  }
+
+  /// Which Profile ids may come sealed under the key of the Area
+  /// [area]: those its grants name.
+  bool Function(String id) peopleOf(String area) =>
+      (grantsOf(area)?.profiles ?? const <String>[]).toSet().contains;
+
+  /// The person who wrote the Note or Section [entity], as their Profile
+  /// shows: through the key of the Device that wrote its first `$type`,
+  /// the Profile bound to it, through its aliases. In a Shared Area the
+  /// grant of that Device names whose Profile it must be, so a Profile
+  /// that claims somebody else's key shows nobody's Notes; until that
+  /// Profile arrives, its placeholder. Null for the user's own: written
+  /// on this Device, one of its own group, or a Device bound to the own
+  /// Profile; and for a Note whose writer is not known.
+  Profile? authorOf(String entity) {
+    String? device;
+    for (final e in history(entity)) {
+      if (e.field == r'$type') {
+        device = e.device;
+        break;
+      }
+    }
+    if (device == null || device == deviceId || isOwnDevice(device)) {
+      return null;
+    }
+    final keyBytes = pinnedKey(device)?.record.publicKey;
+    final key = keyBytes == null ? null : base64.encode(keyBytes);
+    if (key != null && _own.bound.contains(key)) return null;
+    final area = areaOf(entity);
+    final named = area == null ? null : grantsOf(area)?.personOf(device);
+    if (named != null && isOwnPerson(named)) return null;
+    final candidates =
+        [
+          if (key != null)
+            for (final held in _people.byId.values)
+              if (held.bound.contains(key)) held,
+        ]..sort((a, b) {
+          final bySeen = a.seen.compareTo(b.seen);
+          return bySeen != 0 ? bySeen : _compareUtf8(a.id, b.id);
+        });
+    final byId = _people.byId;
+    if (named == null) {
+      final first = candidates.firstOrNull;
+      return first == null
+          ? null
+          : (byId[resolvePerson(first.id)] ?? first).profile;
+    }
+    final target = resolvePerson(named);
+    for (final held in candidates) {
+      if (resolvePerson(held.id) == target) {
+        return (byId[target] ?? held).profile;
+      }
+    }
+    return Profile(id: target, name: '', version: 1);
+  }
+}

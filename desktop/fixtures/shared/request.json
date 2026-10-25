@@ -17,5 +17,13 @@
     }
   ],
   "areaKeys": [],
+  "profile": {
+    "aliases": [],
+    "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+    "keys": [],
+    "record": "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}",
+    "sig": "Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==",
+    "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+  },
   "invited": true
 }

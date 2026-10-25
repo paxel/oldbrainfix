@@ -2693,20 +2693,8 @@ abstract class AppLocalizations {
   /// No description provided for @shareIntro.
   ///
   /// In en, this message translates to:
-  /// **'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.'**
+  /// **'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.'**
   String get shareIntro;
-
-  /// No description provided for @shareYourName.
-  ///
-  /// In en, this message translates to:
-  /// **'Your name'**
-  String get shareYourName;
-
-  /// No description provided for @shareTheirName.
-  ///
-  /// In en, this message translates to:
-  /// **'Their name'**
-  String get shareTheirName;
 
   /// No description provided for @roleHeading.
   ///
@@ -2744,12 +2732,6 @@ abstract class AppLocalizations {
   /// **'Invite'**
   String get shareInvite;
 
-  /// No description provided for @shareNamesMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'Fill in both names first.'**
-  String get shareNamesMissing;
-
   /// No description provided for @shareDone.
   ///
   /// In en, this message translates to:
@@ -2767,12 +2749,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name} (you)'**
   String peopleYou(String name);
-
-  /// No description provided for @peopleNoName.
-  ///
-  /// In en, this message translates to:
-  /// **'Someone'**
-  String get peopleNoName;
 
   /// No description provided for @makeManager.
   ///
@@ -3631,6 +3607,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your Devices have two Profiles. Pick yours.'**
   String get profileWhichWaiting;
+
+  /// Over the other person's Profile while inviting them to a Shared Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Share {area} with this person?'**
+  String inviteConfirmTitle(String area);
+
+  /// No description provided for @inviteConfirmText.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare the code with the one on their Profile page. Only then is anything shared.'**
+  String get inviteConfirmText;
+
+  /// No description provided for @inviteConfirmShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get inviteConfirmShare;
+
+  /// No description provided for @profileTheirCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Their code'**
+  String get profileTheirCode;
+
+  /// Read out for another person's picture on a Note's card.
+  ///
+  /// In en, this message translates to:
+  /// **'Written by {name}'**
+  String authorPicture(String name);
+
+  /// No description provided for @shareCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was shared.'**
+  String get shareCancelled;
 }
 
 class _AppLocalizationsDelegate

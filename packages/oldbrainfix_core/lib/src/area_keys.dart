@@ -141,6 +141,10 @@ Uint8List? unseal(List<int> key, List<int> sealed, {required String aad}) {
 abstract final class SealedAs {
   static const entry = 'oldbrainfix:entry';
   static String keys(String device) => 'oldbrainfix:keys:$device';
+
+  /// The Profiles of a Shared Area's people a Device publishes, sealed
+  /// with that Area's key (ADR 0017).
+  static String profiles(String device) => 'oldbrainfix:profiles:$device';
   static String blob(String ref) => 'oldbrainfix:blob:$ref';
 
   /// The backup key, sealed with the key the passphrase derives.

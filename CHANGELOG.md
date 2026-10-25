@@ -52,7 +52,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Things changed on two Devices before a sync show up as conflicts on phone and desktop, and the version you pick stays on every Device.
 - Phone and desktop also sync through a shared folder such as Syncthing, Nextcloud or a USB stick, on their own and in the background, with everything in it end-to-end encrypted per Area.
 - Send what is new as an encrypted sync bundle file through any messenger and import it on the other paired Device.
-- Share a single Area with another person as Manager or Member; every other Area stays private.
+- Share a single Area with another person as Manager or Member after confirming their Profile, with their picture on the Notes they write there; every other Area stays private.
 - Send a Note with its Routines and Reminders as a signed file to another Old Brain Fix user, encrypted when you know them, who previews it and accepts it into Unsorted with its alarms on; later updates or cancellations from the same sender change it or move it to the trash.
 - Encrypted Backups of all Areas, Notes, photos, voice recordings, Routines and their history, by hand or weekly into a folder you choose, restored on a new install with your passphrase or the recovery key on a printable Recovery Sheet.
 - One passphrase and one Recovery Sheet open the Backups of all your Devices, a restored Backup brings your Profile back, and an opt-in Google backup keeps only the newest encrypted Backup, offered with the passphrase or recovery key on a new phone.

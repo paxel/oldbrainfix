@@ -358,16 +358,21 @@ void main() {
       final ann = device(clock, 'Ann')..setLocalSetting('author', 'Ann');
       final ben = device(clock, 'Ben')..setLocalSetting('author', 'Ben');
       final house = Places(ann).addArea('Household');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final annBefore = held(ann), benBefore = held(ben);
       final invited = exchange(
         ben,
         ann,
-        inviting: Invite(area, role: AreaRole.member, name: 'Ben'),
+        inviting: Invite(area, role: AreaRole.member),
       );
       final later = exchange(ben, ann);
+      // Invited, Ben's phone sends its Profile as it goes to other
+      // people, for Ann's desk to show; never what only his own Devices
+      // are told.
+      expect(invited.request['profile'], ben.ownProfileForOthers);
+      expect(invited.request['profile'] as Map, isNot(contains('fresh')));
+      expect(later.request.containsKey('profile'), isFalse);
       for (final e in [invited, later]) {
-        expect(e.request.containsKey('profile'), isFalse);
         expect(e.answer.containsKey('profile'), isFalse);
       }
       expect(held(ann), annBefore);

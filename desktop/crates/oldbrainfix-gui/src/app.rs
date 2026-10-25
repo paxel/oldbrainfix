@@ -104,12 +104,14 @@ pub enum Selection {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DraggedNote(pub String);
 
-/// A Note with the Area and Topic it is filed in.
+/// A Note with the Area and Topic it is filed in, and the Profile of the
+/// other person who wrote it; none for the user's own.
 #[derive(Debug, Clone)]
 struct Placed {
     note: Note,
     area: Option<Area>,
     topic: Option<Topic>,
+    author: Option<Profile>,
 }
 
 /// One Agenda row with the Area its Note is filed in.
@@ -156,6 +158,8 @@ struct View {
     /// ones.
     access: std::collections::HashMap<String, AreaAccess>,
     people: std::collections::HashMap<String, Vec<Person>>,
+    /// The name each person's Profile shows, by Profile id.
+    names: std::collections::HashMap<String, String>,
     /// The person this Device belongs to in each Shared Area.
     mine: std::collections::HashMap<String, String>,
     /// What this Device may do to the selected Note.
@@ -231,12 +235,9 @@ enum Dialog {
     DeleteRoutine {
         question: String,
     },
-    /// Sharing the Area `area`: both names and the role the other
-    /// person gets.
+    /// Sharing the Area `area`: the role the other person gets.
     Share {
         area: String,
-        own: String,
-        their: String,
         role: AreaRole,
     },
     /// Sending the Note `note`: to one of `recipients`, encrypted, or to
@@ -463,6 +464,8 @@ pub struct App {
     /// Asks for a speech model file of the user's own.
     model_picker: FolderPicker,
     photos: PhotoCache,
+    /// Other people's pictures on the cards.
+    pictures: profile_view::Pictures,
     /// What the Notes shown are searched for.
     query: String,
     /// The LAN session hosted while the Sync view shows, and the name
@@ -590,6 +593,7 @@ impl App {
             speech_ready: false,
             model_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_file()),
             photos: PhotoCache::default(),
+            pictures: profile_view::Pictures::default(),
             query: String::new(),
             sync: SyncHost::default(),
             sync_name: device_name(),
@@ -1151,12 +1155,17 @@ impl App {
         let mut areas = Vec::new();
         let mut access = std::collections::HashMap::new();
         let mut people = std::collections::HashMap::new();
+        let mut names = std::collections::HashMap::new();
         let mut mine = std::collections::HashMap::new();
         for area in places.areas()? {
             let topics = places.topics(&area.id)?;
             access.insert(area.id.clone(), self.store.access_in(&area.id, None)?);
             if let Some(grants) = self.store.grants_of(&area.id)? {
-                people.insert(area.id.clone(), self.store.people(&area.id)?);
+                let shared = self.store.people(&area.id)?;
+                for person in &shared {
+                    names.insert(person.id.clone(), self.store.person_shown(&person.id)?.name);
+                }
+                people.insert(area.id.clone(), shared);
                 if let Some(person) = grants.person_of(&self.store.device_id()?) {
                     mine.insert(area.id.clone(), person.to_string());
                 }
@@ -1177,12 +1186,15 @@ impl App {
             Selection::Place(id) => search.notes(&self.query, Some(id))?,
             Selection::Trash => notes.trashed()?,
         };
+        let store = &self.store;
         let place = |note: Note| -> oldbrainfix_core::Result<Placed> {
+            let author = store.author_of(&note.id)?;
             let Some(id) = note.place.clone() else {
                 return Ok(Placed {
                     note,
                     area: None,
                     topic: None,
+                    author,
                 });
             };
             let topic = places.topic_by_id(&id)?;
@@ -1191,6 +1203,7 @@ impl App {
                 note,
                 area: places.area_by_id(&area_id)?,
                 topic,
+                author,
             })
         };
         let detail = match &self.selected_note {
@@ -1257,6 +1270,7 @@ impl App {
             areas,
             access,
             people,
+            names,
             mine,
             may,
             notes: placed,
@@ -1655,41 +1669,17 @@ impl App {
             Action::Share(area) => {
                 self.dialog = Some(Dialog::Share {
                     area,
-                    // The own Profile's name until a name was shared
-                    // under once.
-                    own: match self.store.local_setting(SHARE_NAME)? {
-                        Some(name) => name,
-                        None => OwnProfile::new(&self.store)
-                            .get()?
-                            .map(|p| p.name)
-                            .unwrap_or_default(),
-                    },
-                    their: String::new(),
                     role: AreaRole::Member,
                 });
             }
             Action::StartInvite => {
-                if let Some(Dialog::Share {
-                    area,
-                    own,
-                    their,
-                    role,
-                }) = self.dialog.clone()
-                {
-                    self.store.set_local_setting(SHARE_NAME, own.trim())?;
-                    let area = self.store.share(&area, &own)?;
+                if let Some(Dialog::Share { area, role }) = self.dialog.clone() {
+                    let area = self.store.share(&area)?;
                     self.dialog = None;
                     self.save_text()?;
                     self.query.clear();
                     self.selection = Selection::Sync;
-                    self.sync.start_inviting(
-                        &self.store,
-                        Invite {
-                            area,
-                            role,
-                            name: their.trim().to_string(),
-                        },
-                    );
+                    self.sync.start_inviting(&self.store, Invite { area, role });
                 }
             }
             Action::Sync(SyncAction::StopInviting) => self.sync.stop_inviting(&self.store),
@@ -1701,7 +1691,7 @@ impl App {
                     .people
                     .get(&area)
                     .and_then(|people| people.iter().find(|p| p.id == person))
-                    .map(|p| person_name(&self.t, p))
+                    .map(|p| person_name(&self.t, &self.view.names, p))
                     .unwrap_or_default();
                 let shown = self.shown_name(&area);
                 self.dialog = Some(Dialog::RemovePerson {
@@ -2131,8 +2121,10 @@ impl App {
                         matches!(access, None | Some(AreaAccess::Owner | AreaAccess::Manager));
                     let people = self.view.people.get(&area.id);
                     if let Some(people) = people {
-                        let names: Vec<String> =
-                            people.iter().map(|p| person_name(&t, p)).collect();
+                        let names: Vec<String> = people
+                            .iter()
+                            .map(|p| person_name(&t, &self.view.names, p))
+                            .collect();
                         ui.horizontal(|ui| {
                             ui.add_space(32.0);
                             ui.label(
@@ -2398,6 +2390,7 @@ impl App {
                     let draggable = !placed.note.is_trashed();
                     let media = CardMedia {
                         photos: &mut self.photos,
+                        pictures: &mut self.pictures,
                         store: &self.store,
                         transcribing: transcribing.as_deref(),
                     };
@@ -2736,17 +2729,12 @@ impl App {
                             }
                         });
                     }
-                    Dialog::Share {
-                        area,
-                        own,
-                        their,
-                        role,
-                    } => {
+                    Dialog::Share { area, role } => {
                         let shown = view
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(ui, &t, &shown, (own, their, role), focus, actions);
+                        share_form(ui, &t, &shown, role, actions);
                     }
                     Dialog::Send {
                         recipients,
@@ -2760,7 +2748,8 @@ impl App {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
                         let mine = view.mine.get(area).map(String::as_str);
-                        people_form(ui, &t, area, (people, mine), manages, actions);
+                        let names = &view.names;
+                        people_form(ui, &t, area, (people, names, mine), manages, actions);
                     }
                     Dialog::RemovePerson { question, .. } => {
                         title(ui, question);
@@ -3371,29 +3360,14 @@ fn name_form(
     });
 }
 
-/// How an Area is shared: both names, the role, and the button that
-/// shows the invite's code.
-fn share_form(
-    ui: &mut Ui,
-    t: &L10n,
-    area: &str,
-    (own, their, role): (&mut String, &mut String, &mut AreaRole),
-    focus: bool,
-    actions: &mut Vec<Action>,
-) {
+/// How an Area is shared: the role, and the button that shows the
+/// invite's code. Nobody types a name: the other person's Profile shows
+/// when their phone joins, to confirm (ADR 0017).
+fn share_form(ui: &mut Ui, t: &L10n, area: &str, role: &mut AreaRole, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     title(ui, &t.share_title(area));
     ui.label(RichText::new(t.share_host_intro()).color(weak));
-    ui.label(RichText::new(t.share_your_name()).color(text));
-    focused_field(ui, (&mut *own, focus), "share own", t.name_hint());
-    ui.label(RichText::new(t.share_their_name()).color(text));
-    ui.add(
-        TextEdit::singleline(their)
-            .id(Id::new("share their"))
-            .hint_text(t.name_hint())
-            .text_color(text),
-    );
     ui.label(RichText::new(t.role_heading()).strong().color(text));
     for (choice, label, detail) in [
         (AreaRole::Member, t.role_member(), t.role_member_detail()),
@@ -3402,11 +3376,12 @@ fn share_form(
         ui.radio_value(role, choice, RichText::new(label).color(text));
         ui.label(RichText::new(detail).small().color(weak));
     }
-    let ready = !own.trim().is_empty() && !their.trim().is_empty();
     ui.horizontal(|ui| {
         cancel(ui, t, actions);
-        let button = egui::Button::new(RichText::new(t.share_show_code()).color(text));
-        if ui.add_enabled(ready, button).clicked() {
+        if ui
+            .button(RichText::new(t.share_show_code()).color(text))
+            .clicked()
+        {
             actions.push(Action::StartInvite);
         }
     });
@@ -3605,7 +3580,11 @@ fn people_form(
     ui: &mut Ui,
     t: &L10n,
     area: &str,
-    (people, mine): (&[Person], Option<&str>),
+    (people, names, mine): (
+        &[Person],
+        &std::collections::HashMap<String, String>,
+        Option<&str>,
+    ),
     manages: bool,
     actions: &mut Vec<Action>,
 ) {
@@ -3615,7 +3594,7 @@ fn people_form(
     ui.label(RichText::new(t.people_intro()).small().color(weak));
     for person in people {
         let own = Some(person.id.as_str()) == mine;
-        let name = person_name(t, person);
+        let name = person_name(t, names, person);
         let name = if own { t.people_you(&name) } else { name };
         let role = match person.role {
             AreaRole::Manager => t.role_manager(),
@@ -3805,17 +3784,15 @@ fn merge_form(
 /// `tomorrowOpacity`).
 pub const TOMORROW_OPACITY: f32 = 0.55;
 
-/// The local setting holding the name this Device's person last shared
-/// an Area under, as the phone keeps it.
-const SHARE_NAME: &str = "shareName";
-
-/// The name `person` goes by, or a word for someone without one.
-fn person_name(t: &L10n, person: &Person) -> String {
-    if person.name.is_empty() {
-        t.people_no_name().to_string()
-    } else {
-        person.name.clone()
-    }
+/// The name `person`'s Profile shows (`names`, by Profile id), or "No
+/// name".
+fn person_name(
+    t: &L10n,
+    names: &std::collections::HashMap<String, String>,
+    person: &Person,
+) -> String {
+    let name = names.get(&person.id).map_or("", String::as_str);
+    profile_view::display_name(t, name).to_string()
 }
 
 /// The Settings' card on the capture popup's hotkey and the
@@ -4228,6 +4205,7 @@ pub(crate) fn embossed(
 /// What a card needs to show its photos and recordings.
 struct CardMedia<'a> {
     photos: &'a mut PhotoCache,
+    pictures: &'a mut profile_view::Pictures,
     store: &'a Store,
     /// The recording being transcribed, by its hash.
     transcribing: Option<&'a str>,
@@ -4275,7 +4253,21 @@ fn note_card(
                 media.transcribing,
                 false,
             );
-            ui.label(RichText::new(when(t, note.captured)).small().color(weak));
+            // Another person's Note shows their picture (ADR 0017); the
+            // user's own none.
+            ui.horizontal(|ui| {
+                if let Some(author) = &placed.author {
+                    let name = profile_view::display_name(t, &author.name);
+                    profile_view::person_picture(
+                        ui,
+                        media.pictures,
+                        author,
+                        20.0,
+                        &t.author_picture(name),
+                    );
+                }
+                ui.label(RichText::new(when(t, note.captured)).small().color(weak));
+            });
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.
             let place = match place_line(t, placed) {

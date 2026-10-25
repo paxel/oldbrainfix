@@ -65,6 +65,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A card shows date, time and, when known, the Named Place or location,
   plus a Capture Context icon when there is more to see. Tapping the card
   opens the full editor, which shows everything about the Note.
+- Another person's Note shows their Profile picture, or its
+  placeholder, on its card; one's own Notes show none.
 - An Area's colour and icon mark its cards, Agenda rows and alarms.
 - **Important** cards get an accent marker and a stronger emboss;
   **unimportant** ones are dimmed; normal is plain.

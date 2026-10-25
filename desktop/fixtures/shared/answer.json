@@ -208,22 +208,22 @@
       "dseq": 43,
       "entity": "area:00000000000000000000000000000101",
       "field": "role:65b60673d6ed884bf01c2c222d82ada0",
-      "value": "{\"name\":\"Ann\",\"person\":\"65b60673d6ed884bf01c2c222d82ada0\",\"role\":\"manager\"}",
+      "value": "{\"profile\":\"00000000000000000000000000000007\",\"role\":\"manager\"}",
       "date": "2026-02-01T09:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T09:00:00.000Z",
-      "sig": "HwOTcTb2wiqsjqZBB7hz/Y+JdWH9shw2fBgNwO0n3Yq2lbOCMUIaMhfeWeCwrP4MJVIRVwvGGqNM3F/wzV/EBg=="
+      "sig": "48YLs0ZcytrKJZj0pR5AyZlW807K9uMfdguzALH2nxwuKpjDUIlk7wPhrWyvZBhvf0Catt1vEauwCwf3YLTZCA=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
       "dseq": 44,
       "entity": "area:00000000000000000000000000000101",
       "field": "role:c945cbf2a5602002141e2fb9d17054d6",
-      "value": "{\"name\":\"Ben\",\"person\":\"c945cbf2a5602002141e2fb9d17054d6\",\"role\":\"member\"}",
+      "value": "{\"profile\":\"00000000000000000000000000000008\",\"role\":\"member\"}",
       "date": "2026-02-01T10:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T10:00:00.000Z",
-      "sig": "dKENR4i2UAAk/p4yFEeGuUr5vx+wp+CqhLxGTzl7XMJTY/n97e8OtRfZ1HWImj8KjgdAp6KY7U/YyiIq3g+yBg=="
+      "sig": "YHynf7EFnl4nOuBBhRcGDUDTMgr6FpGvYa3Mt8y+Zl0ZopX+0RFnzAGAXNuQm9tNPcTMvhat/mOoDg/zSPXrDw=="
     }
   ],
   "wantBlobs": [],
@@ -247,6 +247,24 @@
     {
       "key": "FRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ=",
       "scope": "area:00000000000000000000000000000101"
+    }
+  ],
+  "profiles": [
+    {
+      "aliases": [],
+      "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "keys": [],
+      "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann\",\"version\":2}",
+      "sig": "RHUx42TOeNdV0PuXSyj09tAqHpS/eKVZb1RqTTtzAohYpopT5WKMdcP7WCR7UqJupf4rJXc4PUEKrAnux/i5Dw==",
+      "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    },
+    {
+      "aliases": [],
+      "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "keys": [],
+      "record": "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}",
+      "sig": "Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==",
+      "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
     }
   ],
   "invite": {

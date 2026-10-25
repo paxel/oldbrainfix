@@ -461,5 +461,475 @@
         }
       }
     ]
+  },
+  "people": {
+    "held": [
+      {
+        "aliases": [],
+        "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+        "keys": [],
+        "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+        "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+        "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+      },
+      {
+        "aliases": [],
+        "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+        "keys": [],
+        "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+        "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+        "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+      }
+    ],
+    "cases": [
+      {
+        "case": "first sight of another",
+        "profile": {
+          "aliases": [],
+          "first": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000d1\",\"name\":\"Dan\",\"version\":1}",
+          "sig": "e6UhBfTxMzfRIbc266gkzx6Q8pKRZkXxFXXmCQPh1yyL5wGCBMEXxeYTGGwCwHFKi+jw4vOZE7XPhfv1QefeAQ==",
+          "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+        },
+        "taken": "added",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          },
+          "person:000000000000000000000000000000d1": {
+            "aliases": [],
+            "first": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000d1\",\"name\":\"Dan\",\"version\":1}",
+            "sig": "e6UhBfTxMzfRIbc266gkzx6Q8pKRZkXxFXXmCQPh1yyL5wGCBMEXxeYTGGwCwHFKi+jw4vOZE7XPhfv1QefeAQ==",
+            "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "newer, from the first key",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Benjamin\",\"version\":3}",
+          "sig": "+AAeDlf/XiCy6Myc8QGadWDMrA8UTEEogIGnJqpHGzY7vUD8moVRpyYBXNx6KZzFbxXD65pqth6jE9gnqfxeCQ==",
+          "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+        },
+        "taken": "updated",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Benjamin\",\"version\":3}",
+            "sig": "+AAeDlf/XiCy6Myc8QGadWDMrA8UTEEogIGnJqpHGzY7vUD8moVRpyYBXNx6KZzFbxXD65pqth6jE9gnqfxeCQ==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "older",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Benny\",\"version\":1}",
+          "sig": "HgNATrPrL5L0EHSmhBcE9QMnCGNw54Ku/ySnweyXY5ANz1ABoRCsX3dOqWooZodCDr6KLyeyGZR5Z0j4hVGODw==",
+          "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+        },
+        "taken": "unchanged",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "newer, from a key a bound key joined",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [
+            {
+              "by": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+              "key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+              "sig": "gzHg5LOCgY0Lbxp+dPVzy8EsmrVu7t6JN/eOXykgdnZSShG/wjlk6Nvk17zjYqUUAid2wPaE27u9aN+IDOIBDQ=="
+            }
+          ],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben B.\",\"version\":3}",
+          "sig": "MNApACuci416BLRvlNyji1Dh903mxppokEcjfBDBzUVLGGvt5PG1x2fgdHMZFfkVxm+Q/AkRlht4Kd45RncICw==",
+          "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+        },
+        "taken": "updated",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [
+              {
+                "by": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+                "key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+                "sig": "gzHg5LOCgY0Lbxp+dPVzy8EsmrVu7t6JN/eOXykgdnZSShG/wjlk6Nvk17zjYqUUAid2wPaE27u9aN+IDOIBDQ=="
+              }
+            ],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben B.\",\"version\":3}",
+            "sig": "MNApACuci416BLRvlNyji1Dh903mxppokEcjfBDBzUVLGGvt5PG1x2fgdHMZFfkVxm+Q/AkRlht4Kd45RncICw==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "signed by a key not bound",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Mallory\",\"version\":9}",
+          "sig": "vrx2Qy5C00Fq/Iq02ytr83HUI3el4qA2qqHjgvQ24kdtYl129rcx7stKVMXl4VvPxxCecDt0AOS0wuRbtTQcDQ==",
+          "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+        },
+        "taken": "refused",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "a key bound by itself",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [
+            {
+              "by": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+              "key": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+              "sig": "3A9r+O14CXxI999vCJZJOAPCj1fRuRKPGwTkzBivSZ3LPJjYtzmXv7lGyz0B7vZWicwAK9tEW/uVKWC88GuQBw=="
+            }
+          ],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Mallory\",\"version\":9}",
+          "sig": "vrx2Qy5C00Fq/Iq02ytr83HUI3el4qA2qqHjgvQ24kdtYl129rcx7stKVMXl4VvPxxCecDt0AOS0wuRbtTQcDQ==",
+          "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+        },
+        "taken": "refused",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "a copied id",
+        "profile": {
+          "aliases": [],
+          "first": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Mallory\",\"version\":9}",
+          "sig": "vrx2Qy5C00Fq/Iq02ytr83HUI3el4qA2qqHjgvQ24kdtYl129rcx7stKVMXl4VvPxxCecDt0AOS0wuRbtTQcDQ==",
+          "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+        },
+        "taken": "refused",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "the record changed after signing",
+        "profile": {
+          "aliases": [],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Mallory\",\"version\":3}",
+          "sig": "mDmbnbZgjDWPoGi9RkbJ4KKB6QgbMFzNVCTYbcdazFTgOd/d9EmvosDIYEfEetsRalT8Sb4J74a+LB9+ZGu/BQ==",
+          "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+        },
+        "taken": "refused",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "the own Profile",
+        "profile": {
+          "aliases": [],
+          "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+          "keys": [],
+          "record": "{\"id\":\"own\",\"name\":\"Ada\",\"version\":5}",
+          "sig": "Xf39FhihLQmbSyfg+Ef8hNodoa7DHyzUI/ardPRw/oGOUl3tdQ8g7s9leztjaVDFrsHcJw5aDuJu1D31c9WyAg==",
+          "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+        },
+        "taken": "unchanged",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      },
+      {
+        "case": "an alias made by a key of the Profile given up",
+        "profile": {
+          "aliases": [
+            {
+              "alias": "000000000000000000000000000000c1",
+              "by": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+              "sig": "OQPCNtw//X1v2Kg+kjQmbG0v9ISVZwPa6rgU3q5MGHTKklX8Q8cttbBD6NEiNAnunRoZN2eIZTqvIByiba/yBg==",
+              "to": "000000000000000000000000000000b1"
+            }
+          ],
+          "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+          "keys": [
+            {
+              "by": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+              "key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+              "sig": "gzHg5LOCgY0Lbxp+dPVzy8EsmrVu7t6JN/eOXykgdnZSShG/wjlk6Nvk17zjYqUUAid2wPaE27u9aN+IDOIBDQ=="
+            }
+          ],
+          "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+          "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+          "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+        },
+        "taken": "updated",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [
+              {
+                "alias": "000000000000000000000000000000c1",
+                "by": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+                "sig": "OQPCNtw//X1v2Kg+kjQmbG0v9ISVZwPa6rgU3q5MGHTKklX8Q8cttbBD6NEiNAnunRoZN2eIZTqvIByiba/yBg==",
+                "to": "000000000000000000000000000000b1"
+              }
+            ],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [
+              {
+                "by": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+                "key": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+                "sig": "gzHg5LOCgY0Lbxp+dPVzy8EsmrVu7t6JN/eOXykgdnZSShG/wjlk6Nvk17zjYqUUAid2wPaE27u9aN+IDOIBDQ=="
+              }
+            ],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000b1"
+        }
+      },
+      {
+        "case": "an alias made by another key",
+        "profile": {
+          "aliases": [
+            {
+              "alias": "000000000000000000000000000000b1",
+              "by": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+              "sig": "oBt30TLKqV0EiZaZnxYddEHU/XED777TXdxSbJNYFY1dmKOXz2WzG+9goQYRyMhVdr/+JXAvXZ2j36RgzS8kDQ==",
+              "to": "000000000000000000000000000000e1"
+            }
+          ],
+          "first": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+          "keys": [],
+          "record": "{\"id\":\"000000000000000000000000000000e1\",\"name\":\"Mallory\",\"version\":1}",
+          "sig": "RqQ/WQYb7i+t2HrB2bGc9tHWQezf+7R5SpFzEsAXILeNJXQtR/1q4wc57VqWNx2A7Q1tDZwryPTVUvFJJA0jBA==",
+          "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+        },
+        "taken": "added",
+        "people": {
+          "person:000000000000000000000000000000b1": {
+            "aliases": [],
+            "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000b1\",\"name\":\"Ben\",\"version\":2}",
+            "sig": "Hnh3xw0uMYgjSKIlUKOkBdiBwsFOFrA2pvKkMC/GMm9yT8B50amXvnyh59CnkOsaXfyiHRpcJRvPxtS6DBkhBA==",
+            "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+          },
+          "person:000000000000000000000000000000c1": {
+            "aliases": [],
+            "first": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000c1\",\"name\":\"Cat\",\"version\":1}",
+            "sig": "Lg9ggX6sD53KbDMDfMKzfr6kRzZVSonSL9Q3xhDDIqGYIYy51yxw/tad+X84cIU61EGpp+maUM8wto5IPXT4BQ==",
+            "signer": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw="
+          },
+          "person:000000000000000000000000000000e1": {
+            "aliases": [
+              {
+                "alias": "000000000000000000000000000000b1",
+                "by": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+                "sig": "oBt30TLKqV0EiZaZnxYddEHU/XED777TXdxSbJNYFY1dmKOXz2WzG+9goQYRyMhVdr/+JXAvXZ2j36RgzS8kDQ==",
+                "to": "000000000000000000000000000000e1"
+              }
+            ],
+            "first": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg=",
+            "keys": [],
+            "record": "{\"id\":\"000000000000000000000000000000e1\",\"name\":\"Mallory\",\"version\":1}",
+            "sig": "RqQ/WQYb7i+t2HrB2bGc9tHWQezf+7R5SpFzEsAXILeNJXQtR/1q4wc57VqWNx2A7Q1tDZwryPTVUvFJJA0jBA==",
+            "signer": "/RckOFqgx1tk+3jNYC+h2ZH96/drE8WO1wLqyDXp9hg="
+          }
+        },
+        "resolved": {
+          "000000000000000000000000000000b1": "000000000000000000000000000000b1",
+          "000000000000000000000000000000c1": "000000000000000000000000000000c1"
+        }
+      }
+    ]
   }
 }

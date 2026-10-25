@@ -41,6 +41,12 @@ pub mod sealed_as {
         format!("oldbrainfix:keys:{device}")
     }
 
+    /// The Profiles of a Shared Area's people a Device publishes, sealed
+    /// with that Area's key (ADR 0017).
+    pub fn profiles(device: &str) -> String {
+        format!("oldbrainfix:profiles:{device}")
+    }
+
     pub fn blob(reference: &str) -> String {
         format!("oldbrainfix:blob:{reference}")
     }

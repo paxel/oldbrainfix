@@ -100,6 +100,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                             :topic,
                             changes: _,
                             schedules: _,
+                            :author,
                           )
                           in _shown)
                         NoteCard(
@@ -107,6 +108,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                           when: when,
                           area: area,
                           topic: topic,
+                          author: author,
                           onTap: () => Navigator.of(context).pop(note.id),
                         ),
                     ],

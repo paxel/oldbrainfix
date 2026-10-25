@@ -175,6 +175,10 @@ String segmentName(String device, String key, int n) => '$device.$key.$n.seg';
 /// `keys/<device>.<key id>.keys`.
 String keysFileName(String device, String key) => '$device.$key.keys';
 
+/// The Profiles of a Shared Area's people a Device publishes, sealed
+/// with the Area's key (ADR 0017): `keys/<device>.<key id>.profiles`.
+String profilesFileName(String device, String key) => '$device.$key.profiles';
+
 /// One segment as the manifest names it.
 typedef Segment = ({String name, String key, int lines});
 
@@ -282,8 +286,10 @@ Future<FolderSyncResult> folderSync(
     changed: applied.isNotEmpty,
     cause: MomentCause.folder,
   );
+  final people = await _learnProfiles(store, folder);
   store.ensureAreaKeys();
   await _publishKeys(store, folder, nextNonce);
+  await _publishProfiles(store, folder, nextNonce);
   final entriesOut = await _publishEntries(store, folder, nextNonce);
   final names = (await folder.list('blobs')).toSet();
   final blobsIn = await _fetchBlobs(store, folder, names);
@@ -297,7 +303,7 @@ Future<FolderSyncResult> folderSync(
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
-    profileChanged: profileChanged,
+    profileChanged: profileChanged || people,
   );
 }
 
@@ -327,6 +333,7 @@ Future<FolderSyncResult> readSealed(
     cause: cause,
     label: label,
   );
+  final people = await _learnProfiles(store, folder);
   final names = (await folder.list('blobs')).toSet();
   final blobsIn = await _fetchBlobs(store, folder, names);
   return FolderSyncResult(
@@ -338,7 +345,7 @@ Future<FolderSyncResult> readSealed(
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
-    profileChanged: profileChanged,
+    profileChanged: profileChanged || people,
   );
 }
 
@@ -357,6 +364,7 @@ Future<({int entries, int blobs})> writeSealed(
 }) async {
   store.ensureAreaKeys();
   await _publishKeys(store, folder, nonce);
+  await _publishProfiles(store, folder, nonce);
   final out = await _writeSegments(
     store,
     folder,
@@ -446,6 +454,47 @@ Future<bool> _learnKeys(
     }
   }
   return profileChanged;
+}
+
+/// Opens every other Device's Profiles file sealed with the key of a
+/// Shared Area held here and takes in the Profiles of the people that
+/// Area's grants name (ADR 0017); the rest stay out. Read after the
+/// entries, so the grants that came with them count. Returns whether a
+/// Profile came in or changed.
+Future<bool> _learnProfiles(Store store, SyncFolder folder) async {
+  final self = store.deviceId;
+  var changed = false;
+  for (final name in await folder.list('keys')) {
+    if (!name.endsWith('.profiles')) continue;
+    final (device, id) = _deviceAndKey(name) ?? ('', '');
+    if (device.isEmpty || device == self) continue;
+    final key = store.areaKey(id);
+    if (key == null || !store.isShared(key.scope)) continue;
+    final Uint8List? plain;
+    try {
+      final bytes = await folder.read('keys', name);
+      plain = bytes == null
+          ? null
+          : unseal(key.key, bytes, aad: SealedAs.profiles(device));
+    } on FileSystemException {
+      continue;
+    }
+    if (plain == null) continue;
+    final Object? json;
+    try {
+      json = jsonDecode(utf8.decode(plain));
+    } on FormatException {
+      continue;
+    }
+    if (json is! Map) continue;
+    if (store.takePeople(
+      json['profiles'],
+      allowed: store.peopleOf(key.scope),
+    )) {
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 /// What this Device remembers of a writer's segments: the generation it
@@ -613,6 +662,37 @@ Future<void> _publishKeys(
       'keys',
       name,
       seal(key.key, plain, aad: SealedAs.keys(self), nonce: nonce()),
+    );
+  }
+}
+
+/// Publishes, for every Shared Area whose key this Device holds, the
+/// Profiles of the people its grants name, the own one among them,
+/// sealed with that Area's key, so only the people of the Area read them
+/// (ADR 0017). By key id; a file that already says the same stays
+/// untouched.
+Future<void> _publishProfiles(
+  Store store,
+  SyncFolder folder,
+  Uint8List Function() nonce,
+) async {
+  final self = store.deviceId;
+  final keys = store.areaKeys()..sort((a, b) => a.id.compareTo(b.id));
+  for (final key in keys) {
+    if (key.scope == personalScope || !store.isShared(key.scope)) continue;
+    final profiles = store.profilesToSend(areas: {key.scope});
+    if (profiles.isEmpty) continue;
+    final plain = utf8.encode(jsonEncode({'profiles': profiles}));
+    final name = profilesFileName(self, key.id);
+    final held = await folder.read('keys', name);
+    final said = held == null
+        ? null
+        : unseal(key.key, held, aad: SealedAs.profiles(self));
+    if (said != null && _same(said, plain)) continue;
+    await folder.write(
+      'keys',
+      name,
+      seal(key.key, plain, aad: SealedAs.profiles(self), nonce: nonce()),
     );
   }
 }

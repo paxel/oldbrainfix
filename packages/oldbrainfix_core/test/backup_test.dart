@@ -377,7 +377,7 @@ void main() {
       addTearDown(old.close);
       final area = Places(old).addArea('Family');
       old.ensureAreaKeys();
-      final shared = old.share(area.id, name: 'Ann');
+      final shared = old.share(area.id);
       expect(old.accessIn(shared), AreaAccess.manager);
       final code = await setUpBackups(old, passphrase, kdf: cheap);
       final path = '${dir.path}/ann.$backupExtension';
@@ -610,20 +610,19 @@ void main() {
       final annCode = await setUpBackups(ann, passphrase, kdf: cheap);
       final benCode = await setUpBackups(ben, passphrase, kdf: cheap);
       final house = Places(ann).addArea('Household');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final invited = exchange(
         ben,
         ann,
-        inviting: Invite(area, role: AreaRole.member, name: 'Ben'),
+        inviting: Invite(area, role: AreaRole.member),
       );
       final later = exchange(ben, ann);
       final inviting = exchange(
         ann,
         ben,
         invite: Invite(
-          ann.share(Places(ann).addArea('Garden').id, name: 'Ann'),
+          ann.share(Places(ann).addArea('Garden').id),
           role: AreaRole.member,
-          name: 'Ben',
         ),
       );
       for (final e in [invited, later, inviting]) {

@@ -48,6 +48,7 @@ Exchange exchange(
       hostDevice: host.deviceId,
       invited: invited,
       invite: invite,
+      hostProfile: invite == null ? null : profileAnswer(host)['profile'],
     ),
   );
   final done = answerSync(host, request, name: 'Desk', inviting: inviting)!;
@@ -101,9 +102,9 @@ void main() {
 
   setUp(() {
     clock = ticking();
-    ann = Store.inMemory(clock: clock);
-    annDesk = Store.inMemory(clock: clock);
-    ben = Store.inMemory(clock: clock);
+    ann = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ann');
+    annDesk = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ann');
+    ben = Store.inMemory(clock: clock)..applyProfileDefaults(name: 'Ben');
   });
 
   tearDown(() {
@@ -131,12 +132,8 @@ void main() {
     final health = places.addArea('Health');
     final secret = Notes(ann).capture('Blood results', place: health.id);
     Notes(ann).capture('Unsorted thought');
-    final area = ann.share(house.id, name: 'Ann');
-    exchange(
-      ben,
-      ann,
-      inviting: Invite(area, role: role, name: 'Ben'),
-    );
+    final area = ann.share(house.id);
+    exchange(ben, ann, inviting: Invite(area, role: role));
     return (
       area: area,
       topic: kitchen.id,
@@ -152,7 +149,7 @@ void main() {
       exchange(annDesk, ann);
       expect(ann.isShared(house.id), isFalse);
       expect(ann.accessIn(house.id), AreaAccess.owner);
-      expect(ann.share(house.id, name: 'Ann'), house.id);
+      expect(ann.share(house.id), house.id);
       expect(ann.isShared(house.id), isTrue);
       expect(ann.accessIn(house.id), AreaAccess.manager);
       expect(
@@ -160,7 +157,7 @@ void main() {
         AreaAccess.manager,
       );
       final people = ann.people(house.id);
-      expect(people.single.name, 'Ann');
+      expect(ann.personShown(people.single.id).name, 'Ann');
       expect(
         people.single.devices,
         unorderedEquals([ann.deviceId, annDesk.deviceId]),
@@ -174,7 +171,7 @@ void main() {
       final note = Notes(ann).capture('Descale the kettle', place: kitchen);
       final trashed = Notes(ann).capture('Old', place: starter);
       Notes(ann).trash(trashed.id);
-      final id = ann.share(starter, name: 'Ann');
+      final id = ann.share(starter);
       expect(id, isNot(starter));
       expect(Places(ann).areaById(starter), isNull);
       final area = Places(ann).areaById(id)!;
@@ -194,7 +191,7 @@ void main() {
       Places(ann).plantStarterSet({'health'});
       final starter = Places.starterId(PlaceKeys.typeArea, 'health');
       ann.setAreaLocked(starter, true);
-      final id = ann.share(starter, name: 'Ann');
+      final id = ann.share(starter);
       expect(ann.isAreaLocked(id), isTrue);
       expect(ann.isAreaMasked(id), isTrue);
     });
@@ -213,10 +210,10 @@ void main() {
         for (final k in ben.areaKeys()) k.id,
       ], isNot(contains(ann.writingKey(personalScope)!.id)));
       expect(ben.accessIn(h.area), AreaAccess.member);
-      expect(ben.people(h.area).map((p) => (p.name, p.role)), [
-        ('Ben', AreaRole.member),
-        ('Ann', AreaRole.manager),
-      ]);
+      expect(
+        ben.people(h.area).map((p) => (ben.personShown(p.id).name, p.role)),
+        [('Ben', AreaRole.member), ('Ann', AreaRole.manager)],
+      );
     });
 
     test('a host invited sends nothing of its own; an inviting joiner '
@@ -225,11 +222,11 @@ void main() {
       final house = Places(ann).addArea('Household');
       Notes(ann).capture('Ann private');
       Notes(ann).capture('Shopping', place: house.id);
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final done = exchange(
         ann,
         ben,
-        invite: Invite(area, role: AreaRole.member, name: 'Ben'),
+        invite: Invite(area, role: AreaRole.member),
       );
       expect(done.request['invite'], {'area': area});
       expect(
@@ -258,11 +255,11 @@ void main() {
     test('the other way round the joiner sends nothing at all', () {
       Notes(ben).capture('Ben private');
       final house = Places(ann).addArea('Household');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final done = exchange(
         ben,
         ann,
-        inviting: Invite(area, role: AreaRole.member, name: 'Ben'),
+        inviting: Invite(area, role: AreaRole.member),
       );
       expect(done.request['invited'], isTrue);
       expect(done.request['entries'], isEmpty);
@@ -276,7 +273,7 @@ void main() {
       for (final e in ann.allEntries()) {
         ben.applyEntries([e], keys: ann.keyRecords());
       }
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       expect(area, house.id);
       expect(ben.refusesInvite(area), isTrue);
       final request = wire(
@@ -285,7 +282,8 @@ void main() {
           ben.versionVector(),
           name: 'Phone',
           hostDevice: ben.deviceId,
-          invite: Invite(area, role: AreaRole.member, name: 'Ben'),
+          invite: Invite(area, role: AreaRole.member),
+          hostProfile: profileAnswer(ben)['profile'],
         ),
       );
       expect(answerSync(ben, request, name: 'Desk'), isNull);
@@ -294,8 +292,8 @@ void main() {
     test('an own Device is not invited, either way', () async {
       final house = Places(ann).addArea('Household');
       exchange(annDesk, ann);
-      final area = ann.share(house.id, name: 'Ann');
-      final invite = Invite(area, role: AreaRole.member, name: 'Ben');
+      final area = ann.share(house.id);
+      final invite = Invite(area, role: AreaRole.member);
       final asked = wire(
         syncRequest(
           annDesk,
@@ -313,6 +311,7 @@ void main() {
           name: 'Phone',
           hostDevice: annDesk.deviceId,
           invite: invite,
+          hostProfile: profileAnswer(annDesk)['profile'],
         ),
       );
       expect(answerSync(annDesk, inviting, name: 'Desk'), isNull);
@@ -340,12 +339,12 @@ void main() {
         await host.stop();
       }
       expect(ann.isSharedPeer(annDesk.deviceId), isFalse);
-      expect(ann.people(area).single.name, 'Ann');
+      expect(ann.personShown(ann.people(area).single.id).name, 'Ann');
     });
 
     test('a host inviting answers only a joiner that knows it', () {
       final house = Places(ann).addArea('Household');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final request = wire(
         syncRequest(ben, ann.versionVector(), name: 'Phone'),
       );
@@ -354,7 +353,7 @@ void main() {
           ann,
           request,
           name: 'Desk',
-          inviting: Invite(area, role: AreaRole.member, name: 'Ben'),
+          inviting: Invite(area, role: AreaRole.member),
         ),
         isNull,
       );
@@ -420,7 +419,9 @@ void main() {
     test('a Manager does everything, and Managers change roles', () {
       final h = household(AreaRole.member);
       Notes(ben).edit(h.note, 'Too early');
-      final person = ann.people(h.area).firstWhere((p) => p.name == 'Ben');
+      final person = ann
+          .people(h.area)
+          .firstWhere((p) => ann.personShown(p.id).name == 'Ben');
       exchange(ben, ann);
       ann.setRole(h.area, person.id, AreaRole.manager);
       exchange(ben, ann);
@@ -440,7 +441,9 @@ void main() {
       // A Member cannot hand out roles.
       ann.setRole(h.area, person.id, AreaRole.member);
       exchange(ben, ann);
-      final mine = ben.people(h.area).firstWhere((p) => p.name == 'Ann');
+      final mine = ben
+          .people(h.area)
+          .firstWhere((p) => ben.personShown(p.id).name == 'Ann');
       ben.setRole(h.area, mine.id, AreaRole.member);
       exchange(ben, ann);
       expect(ann.accessIn(h.area), AreaAccess.manager);
@@ -450,9 +453,13 @@ void main() {
       final h = household(AreaRole.member);
       final own = Notes(ben).capture('Ben was here', place: h.area);
       exchange(ben, ann);
-      final person = ann.people(h.area).firstWhere((p) => p.name == 'Ben');
+      final person = ann
+          .people(h.area)
+          .firstWhere((p) => ann.personShown(p.id).name == 'Ben');
       ann.removePerson(h.area, person.id);
-      expect(ann.people(h.area).map((p) => p.name), ['Ann']);
+      expect(ann.people(h.area).map((p) => ann.personShown(p.id).name), [
+        'Ann',
+      ]);
       expect(ann.areasSharedWith(ben.deviceId), isEmpty);
       Notes(ann).capture('After Ben', place: h.area);
       Notes(ben).edit(own.id, 'Ben after removal');
@@ -472,7 +479,10 @@ void main() {
           AreaAccess.member,
         );
         expect(
-          ben.people(h.area).firstWhere((p) => p.name == 'Ben').devices,
+          ben
+              .people(h.area)
+              .firstWhere((p) => ben.personShown(p.id).name == 'Ben')
+              .devices,
           hasLength(2),
         );
         // Gone with the next sync; Ann takes it from either.
@@ -578,9 +588,9 @@ void main() {
       Notes(ann).capture('Shopping', place: house.id);
       Notes(ann).capture('Ann private');
       Notes(ben).capture('Ben private');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final host = TestHost(ann)
-        ..inviting = Invite(area, role: AreaRole.member, name: 'Ben');
+        ..inviting = Invite(area, role: AreaRole.member);
       await host.start();
       try {
         final result = await lanSync(
@@ -605,7 +615,7 @@ void main() {
       }
 
       final other = Places(ann).addArea('Garden');
-      final garden = ann.share(other.id, name: 'Ann');
+      final garden = ann.share(other.id);
       Notes(ann).capture('Mow', place: garden);
       final benHost = TestHost(ben);
       await benHost.start();
@@ -614,7 +624,7 @@ void main() {
           ann,
           decodePairCode(benHost.code())!,
           name: 'Phone',
-          invite: Invite(garden, role: AreaRole.manager, name: 'Ben'),
+          invite: Invite(garden, role: AreaRole.manager),
         );
         expect(ben.accessIn(garden), AreaAccess.manager);
         expect(
@@ -632,9 +642,9 @@ void main() {
 
     test('two Devices inviting each other get nowhere', () async {
       final house = Places(ann).addArea('Household');
-      final area = ann.share(house.id, name: 'Ann');
+      final area = ann.share(house.id);
       final host = TestHost(ben)
-        ..inviting = Invite('area:x', role: AreaRole.member, name: 'Ann');
+        ..inviting = Invite('area:x', role: AreaRole.member);
       await host.start();
       try {
         await expectLater(
@@ -642,7 +652,7 @@ void main() {
             ann,
             decodePairCode(host.code())!,
             name: 'Phone',
-            invite: Invite(area, role: AreaRole.member, name: 'Ben'),
+            invite: Invite(area, role: AreaRole.member),
           ),
           throwsA(
             isA<SyncException>().having(

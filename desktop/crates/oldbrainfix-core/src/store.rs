@@ -119,6 +119,11 @@ pub struct Store {
     /// Counts the changes, so a judgement worked out while another
     /// thread wrote is not kept.
     generation: std::sync::atomic::AtomicU64,
+    /// Other people's Profiles as read from the local settings, until
+    /// one is kept ([`crate::people`]).
+    pub(crate) people: Mutex<Option<Arc<crate::people::PeopleIndex>>>,
+    /// The own Profile's ids and keys, with what they were read from.
+    pub(crate) own_keys: Mutex<Option<Arc<crate::people::OwnKeys>>>,
 }
 
 impl Store {
@@ -173,6 +178,8 @@ impl Store {
             audio,
             judged: Mutex::new(None),
             generation: std::sync::atomic::AtomicU64::new(0),
+            people: Mutex::new(None),
+            own_keys: Mutex::new(None),
         };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;

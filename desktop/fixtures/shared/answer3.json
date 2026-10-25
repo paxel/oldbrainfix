@@ -20,5 +20,15 @@
       "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
     }
   ],
-  "areaKeys": []
+  "areaKeys": [],
+  "profiles": [
+    {
+      "aliases": [],
+      "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "keys": [],
+      "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann Lovelace\",\"version\":3}",
+      "sig": "v+/hPzY/tA+OqxUlzSDJK6/XucrISSES2uNzw663LZBHqjWoqlpHNFIAKxyEuGXt6xWS+RHVU3zoExd+veQYAA==",
+      "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    }
+  ]
 }

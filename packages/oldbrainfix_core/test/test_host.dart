@@ -117,6 +117,9 @@ class TestHost {
         if (inviting != null) res.headers.set(inviteHeader, '1');
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode(store.versionVector()));
+      } else if (req.method == 'GET' && path == '/profile') {
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(profileAnswer(store)));
       } else if (req.method == 'POST' && path == '/sync') {
         final sent = (jsonDecode(utf8.decode(body)) as Map)
             .cast<String, Object?>();

@@ -1667,13 +1667,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareIntro =>
-      'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. They get this Area and nothing else.';
-
-  @override
-  String get shareYourName => 'Your name';
-
-  @override
-  String get shareTheirName => 'Their name';
+      'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.';
 
   @override
   String get roleHeading => 'They may';
@@ -1695,9 +1689,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shareInvite => 'Invite';
 
   @override
-  String get shareNamesMissing => 'Fill in both names first.';
-
-  @override
   String shareDone(String area, String name) {
     return '$area is now shared with $name.';
   }
@@ -1711,9 +1702,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String peopleYou(String name) {
     return '$name (you)';
   }
-
-  @override
-  String get peopleNoName => 'Someone';
 
   @override
   String get makeManager => 'Make Manager';
@@ -2232,4 +2220,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profileWhichWaiting =>
       'Your Devices have two Profiles. Pick yours.';
+
+  @override
+  String inviteConfirmTitle(String area) {
+    return 'Share $area with this person?';
+  }
+
+  @override
+  String get inviteConfirmText =>
+      'Compare the code with the one on their Profile page. Only then is anything shared.';
+
+  @override
+  String get inviteConfirmShare => 'Share';
+
+  @override
+  String get profileTheirCode => 'Their code';
+
+  @override
+  String authorPicture(String name) {
+    return 'Written by $name';
+  }
+
+  @override
+  String get shareCancelled => 'Nothing was shared.';
 }

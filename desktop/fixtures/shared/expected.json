@@ -1,6 +1,6 @@
 {
   "area": "area:00000000000000000000000000000101",
-  "person": "c945cbf2a5602002141e2fb9d17054d6",
+  "person": "00000000000000000000000000000008",
   "ids": 256,
   "keysAfterShare": [
     [
@@ -18,10 +18,40 @@
     [
       "areakey:772c696bbf5e6f98",
       "{\"key\":\"y8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6eo=\",\"scope\":\"area:starter-household\"}"
+    ],
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"RHUx42TOeNdV0PuXSyj09tAqHpS/eKVZb1RqTTtzAohYpopT5WKMdcP7WCR7UqJupf4rJXc4PUEKrAnux/i5Dw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
     ]
   ],
   "shareAt": "2026-02-01T09:00:00.000Z",
   "sessionAt": "2026-02-01T10:00:00.000Z",
+  "folderAt": "2026-02-01T10:30:00.000Z",
+  "afterFolder": {
+    "profilesFile": "65b60673d6ed884bf01c2c222d82ada0.433b042ce43517cc.profiles",
+    "joinerPeople": {
+      "person:00000000000000000000000000000007": {
+        "aliases": [],
+        "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+        "keys": [],
+        "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann Lovelace\",\"version\":3}",
+        "sig": "v+/hPzY/tA+OqxUlzSDJK6/XucrISSES2uNzw663LZBHqjWoqlpHNFIAKxyEuGXt6xWS+RHVU3zoExd+veQYAA==",
+        "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+      }
+    }
+  },
   "syncAt": "2026-02-01T12:00:00.000Z",
   "roleAt": "2026-02-01T13:00:00.000Z",
   "promoteSyncAt": "2026-02-01T13:15:00.000Z",
@@ -263,6 +293,26 @@
         "topic:00000000000000000000000000000102": []
       },
       "conflicts": []
+    },
+    "hostPeople": {
+      "person:00000000000000000000000000000008": {
+        "aliases": [],
+        "first": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+        "keys": [],
+        "record": "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}",
+        "sig": "Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==",
+        "signer": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+      }
+    },
+    "joinerPeople": {
+      "person:00000000000000000000000000000007": {
+        "aliases": [],
+        "first": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+        "keys": [],
+        "record": "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann\",\"version\":2}",
+        "sig": "RHUx42TOeNdV0PuXSyj09tAqHpS/eKVZb1RqTTtzAohYpopT5WKMdcP7WCR7UqJupf4rJXc4PUEKrAnux/i5Dw==",
+        "signer": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+      }
     }
   },
   "after": {
@@ -633,15 +683,15 @@
       "shared": true,
       "people": [
         {
-          "id": "65b60673d6ed884bf01c2c222d82ada0",
-          "name": "Ann",
+          "id": "00000000000000000000000000000007",
+          "name": "Ann Lovelace",
           "role": "manager",
           "devices": [
             "65b60673d6ed884bf01c2c222d82ada0"
           ]
         },
         {
-          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "id": "00000000000000000000000000000008",
           "name": "Ben",
           "role": "member",
           "devices": [
@@ -649,6 +699,12 @@
           ]
         }
       ],
+      "authors": {
+        "note:00000000000000000000000000000001": null,
+        "note:00000000000000000000000000000103": "00000000000000000000000000000008",
+        "note:00000000000000000000000000000004": null,
+        "note:00000000000000000000000000000003": null
+      },
       "mayChange": {
         "note:00000000000000000000000000000001": true,
         "note:00000000000000000000000000000103": true,
@@ -690,7 +746,7 @@
       "shared": true,
       "people": [
         {
-          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "id": "00000000000000000000000000000008",
           "name": "Ben",
           "role": "member",
           "devices": [
@@ -698,14 +754,20 @@
           ]
         },
         {
-          "id": "65b60673d6ed884bf01c2c222d82ada0",
-          "name": "Ann",
+          "id": "00000000000000000000000000000007",
+          "name": "Ann Lovelace",
           "role": "manager",
           "devices": [
             "65b60673d6ed884bf01c2c222d82ada0"
           ]
         }
       ],
+      "authors": {
+        "note:00000000000000000000000000000001": "00000000000000000000000000000007",
+        "note:00000000000000000000000000000103": null,
+        "note:00000000000000000000000000000004": "00000000000000000000000000000007",
+        "note:00000000000000000000000000000003": null
+      },
       "mayChange": {
         "note:00000000000000000000000000000001": false,
         "note:00000000000000000000000000000103": true,
@@ -753,15 +815,15 @@
       "shared": true,
       "people": [
         {
-          "id": "65b60673d6ed884bf01c2c222d82ada0",
-          "name": "Ann",
+          "id": "00000000000000000000000000000007",
+          "name": "Ann Lovelace",
           "role": "manager",
           "devices": [
             "65b60673d6ed884bf01c2c222d82ada0"
           ]
         },
         {
-          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "id": "00000000000000000000000000000008",
           "name": "Ben",
           "role": "manager",
           "devices": [
@@ -769,6 +831,12 @@
           ]
         }
       ],
+      "authors": {
+        "note:00000000000000000000000000000001": null,
+        "note:00000000000000000000000000000103": "00000000000000000000000000000008",
+        "note:00000000000000000000000000000004": null,
+        "note:00000000000000000000000000000003": null
+      },
       "mayChange": {
         "note:00000000000000000000000000000001": true,
         "note:00000000000000000000000000000103": true,
@@ -810,7 +878,7 @@
       "shared": true,
       "people": [
         {
-          "id": "c945cbf2a5602002141e2fb9d17054d6",
+          "id": "00000000000000000000000000000008",
           "name": "Ben",
           "role": "manager",
           "devices": [
@@ -818,14 +886,20 @@
           ]
         },
         {
-          "id": "65b60673d6ed884bf01c2c222d82ada0",
-          "name": "Ann",
+          "id": "00000000000000000000000000000007",
+          "name": "Ann Lovelace",
           "role": "manager",
           "devices": [
             "65b60673d6ed884bf01c2c222d82ada0"
           ]
         }
       ],
+      "authors": {
+        "note:00000000000000000000000000000001": "00000000000000000000000000000007",
+        "note:00000000000000000000000000000103": null,
+        "note:00000000000000000000000000000004": "00000000000000000000000000000007",
+        "note:00000000000000000000000000000003": null
+      },
       "mayChange": {
         "note:00000000000000000000000000000001": true,
         "note:00000000000000000000000000000103": true,
@@ -872,14 +946,20 @@
     "shared": true,
     "people": [
       {
-        "id": "65b60673d6ed884bf01c2c222d82ada0",
-        "name": "Ann",
+        "id": "00000000000000000000000000000007",
+        "name": "Ann Lovelace",
         "role": "manager",
         "devices": [
           "65b60673d6ed884bf01c2c222d82ada0"
         ]
       }
     ],
+    "authors": {
+      "note:00000000000000000000000000000001": null,
+      "note:00000000000000000000000000000103": "00000000000000000000000000000008",
+      "note:00000000000000000000000000000004": null,
+      "note:00000000000000000000000000000003": null
+    },
     "mayChange": {
       "note:00000000000000000000000000000001": true,
       "note:00000000000000000000000000000103": true,

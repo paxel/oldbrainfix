@@ -393,7 +393,7 @@ pub fn alias_bytes(alias: &str, to: &str) -> Vec<u8> {
 }
 
 /// Whether `text` is a public key in standard base64, as written.
-fn is_key(text: &str) -> bool {
+pub(crate) fn is_key(text: &str) -> bool {
     BASE64
         .decode(text)
         .is_ok_and(|bytes| bytes.len() == 32 && BASE64.encode(&bytes) == text)
@@ -532,7 +532,7 @@ impl SignedProfile {
 /// The keys bound to the Profile `id` from `first` on: every key of
 /// `held`, then of `offered`, signed by one bound before it, until no
 /// more join; with the statements that bound them, sorted by key.
-fn chain(
+pub(crate) fn chain(
     id: &str,
     first: &str,
     held: &[ProfileKey],
@@ -561,15 +561,15 @@ fn chain(
 
 /// A received Profile whose signatures held: its record read, the keys
 /// joined to its binding, and its picture made again for the screen.
-struct Checked {
-    profile: Profile,
-    keys: Vec<ProfileKey>,
-    shown: Option<Vec<u8>>,
+pub(crate) struct Checked {
+    pub(crate) profile: Profile,
+    pub(crate) keys: Vec<ProfileKey>,
+    pub(crate) shown: Option<Vec<u8>>,
 }
 
 /// `sent` checked: its binding from the first key, its signer bound, the
 /// signature over its record, the record, and its picture made again.
-fn check(sent: &SignedProfile) -> Option<Checked> {
+pub(crate) fn check(sent: &SignedProfile) -> Option<Checked> {
     let profile = Profile::parse(&sent.record)?;
     let (bound, keys) = chain(&profile.id, &sent.first, &[], &sent.keys);
     if !bound.contains(&sent.signer)
@@ -591,7 +591,7 @@ fn check(sent: &SignedProfile) -> Option<Checked> {
 /// Whether the record `a` replaces `b`: a higher version, or at the same
 /// version the larger bytes, so two Devices that changed it apart end up
 /// with the same one.
-fn replaces(a: &str, pa: &Profile, b: &str, pb: &Profile) -> bool {
+pub(crate) fn replaces(a: &str, pa: &Profile, b: &str, pb: &Profile) -> bool {
     if pa.version != pb.version {
         pa.version > pb.version
     } else {
@@ -663,13 +663,13 @@ pub struct ProfileChoice {
 
 // ------------------------------------------------------- own Profile
 
-const RECORD: &str = "profile";
-const FIRST: &str = "profile:first";
+pub(crate) const RECORD: &str = "profile";
+pub(crate) const FIRST: &str = "profile:first";
 const NAME_CHOSEN: &str = "profile:nameChosen";
 const PICTURE_CHOSEN: &str = "profile:pictureChosen";
 const SIGNED: &str = "profile:signed";
-const KEYS: &str = "profile:keys";
-const ALIASES: &str = "profile:aliases";
+pub(crate) const KEYS: &str = "profile:keys";
+pub(crate) const ALIASES: &str = "profile:aliases";
 const SHOWN: &str = "profile:shown";
 const ASKED: &str = "profile:asked";
 
@@ -783,7 +783,7 @@ impl<'a> OwnProfile<'a> {
             .unwrap_or_default())
     }
 
-    fn held_keys(&self) -> Result<Vec<ProfileKey>> {
+    pub(crate) fn held_keys(&self) -> Result<Vec<ProfileKey>> {
         self.list(KEYS, ProfileKey::from_json)
     }
 

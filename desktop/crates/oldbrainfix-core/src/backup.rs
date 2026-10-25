@@ -1272,7 +1272,7 @@ mod tests {
         let old = device(dir.path(), "ann", &held(1), 1)?;
         let area = Places::new(&old).add_area("Family")?;
         old.ensure_area_keys()?;
-        let shared = old.share(&area.id, "Ann")?;
+        let shared = old.share(&area.id)?;
         let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
         let path = dir.path().join("ann.obfbackup");
         write_backup(&old, &path, &mut system_random)?;

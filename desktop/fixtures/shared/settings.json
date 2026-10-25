@@ -11,12 +11,40 @@
     [
       "areakey:772c696bbf5e6f98",
       "{\"key\":\"y8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6eo=\",\"scope\":\"area:starter-household\"}"
+    ],
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000007\",\"name\":\"Ann\",\"version\":2}"
+    ],
+    [
+      "profile:first",
+      "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+    ],
+    [
+      "profile:nameChosen",
+      "true"
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"RHUx42TOeNdV0PuXSyj09tAqHpS/eKVZb1RqTTtzAohYpopT5WKMdcP7WCR7UqJupf4rJXc4PUEKrAnux/i5Dw==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
     ]
   ],
   "joiner": [
     [
       "areakey:b92e87964e56e1bd",
       "{\"key\":\"8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "profile",
+      "{\"id\":\"00000000000000000000000000000008\",\"name\":\"Ben\",\"version\":1}"
+    ],
+    [
+      "profile:first",
+      "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA="
+    ],
+    [
+      "profile:signed",
+      "{\"sig\":\"Me/fEuSp17Y4CsD4PfK3rLQcT5F4Jl0TrgCclXwdXXrEea8H+Eu7cp+kCni5FaY5pQ+vpE9biSfX1mnWNlRfCw==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"}"
     ]
   ]
 }

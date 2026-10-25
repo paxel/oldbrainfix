@@ -7,26 +7,32 @@ import 'l10n.dart';
 import 'look.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
+import 'profile.dart';
 import 'speech_platform.dart';
 import 'voice_platform.dart';
 
 /// A Note with the Area and Topic it is filed in, read once per change.
-/// A Note with where it is filed and what this Device may do to it in a
+/// A Note with where it is filed, what this Device may do to it in a
 /// Shared Area (ADR 0013): change it ([changes]: file, merge, edit,
-/// delete) and give it Routines or Reminders ([schedules]).
+/// delete) and give it Routines or Reminders ([schedules]), and the
+/// Profile of the other person who wrote it ([author], ADR 0017; null
+/// for the user's own).
 typedef PlacedNote = ({
   Note note,
   Area? area,
   Topic? topic,
   bool changes,
   bool schedules,
+  Profile? author,
 });
 
-/// Looks up where [note] is filed, and what this Device may do to it.
+/// Looks up where [note] is filed, what this Device may do to it, and
+/// whose it is.
 PlacedNote placeNote(Places places, Note note) {
   final store = places.store;
   final changes = store.mayChange(note.id);
   final schedules = store.mayManage(store.areaOf(note.id));
+  final author = store.authorOf(note.id);
   final place = note.place;
   if (place == null) {
     return (
@@ -35,6 +41,7 @@ PlacedNote placeNote(Places places, Note note) {
       topic: null,
       changes: changes,
       schedules: schedules,
+      author: author,
     );
   }
   final topic = places.topicById(place);
@@ -45,6 +52,7 @@ PlacedNote placeNote(Places places, Note note) {
     topic: topic,
     changes: changes,
     schedules: schedules,
+    author: author,
   );
 }
 
@@ -67,7 +75,8 @@ String? whereCaptured(CaptureContext capture) =>
 /// the start of its Transcript under it, capture
 /// time, the Named Place or
 /// coordinates it was captured at with an icon when there is more
-/// Capture Context, and where it is filed. Its Area's colour runs down
+/// Capture Context, and where it is filed; another person's Note leads
+/// its time with their picture (ADR 0017). Its Area's colour runs down
 /// the left edge and its icon leads the place line. Its enrich options
 /// file it, spawn a Routine or Reminder from it, and merge it. An
 /// important Note gets an accent marker and a stronger emboss, an
@@ -82,6 +91,10 @@ class NoteCard extends StatelessWidget {
   /// it is Unsorted.
   final Area? area;
   final Topic? topic;
+
+  /// The Profile of the other person who wrote the Note; null for the
+  /// user's own, which shows no picture.
+  final Profile? author;
 
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
@@ -111,6 +124,7 @@ class NoteCard extends StatelessWidget {
     required this.when,
     this.area,
     this.topic,
+    this.author,
     this.onFile,
     this.onMerge,
     this.onSchedule,
@@ -217,6 +231,19 @@ class NoteCard extends StatelessWidget {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             spacing: 4,
                             children: [
+                              if (author case final author?)
+                                Semantics(
+                                  label: t.authorPicture(
+                                    profileDisplayName(t, author.name),
+                                  ),
+                                  image: true,
+                                  excludeSemantics: true,
+                                  child: ProfileAvatar(
+                                    key: const ValueKey('author'),
+                                    profile: author,
+                                    size: 20,
+                                  ),
+                                ),
                               Text(
                                 when.format(note.captured.toLocal()),
                                 style: text.bodySmall,

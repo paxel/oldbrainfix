@@ -53,8 +53,9 @@ const proofHeader = 'x-oldbrainfix-proof';
 /// refused with the reason, never half understood. Format 2 carries the
 /// entries' causal contexts, which format 1 would refuse as forged;
 /// format 3 the invites to Shared Areas, which format 2 would answer
-/// with everything it holds; format 4 the own Profile between one's own
-/// Devices (ADR 0017), which format 3 would leave behind.
+/// with everything it holds; format 4 the Profiles (ADR 0017), the own
+/// one between one's own Devices and those of the people of a Shared
+/// Area with its sync, which format 3 would leave behind.
 const syncFormat = 4;
 
 const pinFailuresPerAddress = 5;
@@ -83,6 +84,9 @@ class SyncSession {
   /// What became of the own Profile the other Device sent (ADR 0017).
   final ProfileTaken profile;
 
+  /// Whether a Profile of another person came in or changed.
+  final bool peopleChanged;
+
   const SyncSession({
     required this.peer,
     required this.name,
@@ -92,18 +96,27 @@ class SyncSession {
     this.conflicts = const [],
     this.sharedArea,
     this.profile = ProfileTaken.unchanged,
+    this.peopleChanged = false,
   });
 }
 
-/// What the inviting side of a session hands out (ADR 0013): the Area,
-/// the role the other Device gets there and the name its person goes by.
+/// What the inviting side of a session hands out (ADR 0013): the Area
+/// and the role the other Device gets there. The person it is given to
+/// is the one whose Profile that Device sent, which the inviter saw
+/// first (ADR 0017).
 class Invite {
   final String areaId;
   final AreaRole role;
-  final String name;
 
-  const Invite(this.areaId, {required this.role, required this.name});
+  const Invite(this.areaId, {required this.role});
 }
+
+/// The host's answer to `GET /profile`: its own Profile, signed, as it
+/// goes to another person, for an inviting joiner to show before it
+/// invites (ADR 0017); empty before the Profile exists.
+Map<String, Object?> profileAnswer(Store store) => {
+  'profile': ?store.ownProfileForOthers,
+};
 
 Map<String, int> _vector(Object? json) => {
   if (json is Map)
@@ -166,10 +179,13 @@ bool trustsPairedJoiner(
 /// Profile itself, signed, with its binding (ADR 0017) as well.
 ///
 /// To another person's Device (ADR 0013) only what it shares goes: when
-/// the host invites this Device ([invited]), nothing at all; when this
-/// Device invites the host ([invite]), the grant written first and the
-/// Area's whole history; to a Device paired by invite before, what lies
-/// in the Areas it holds a role in.
+/// the host invites this Device ([invited]), nothing but the own Profile
+/// for the host to show; when this Device invites the host ([invite]),
+/// the grant written first, to the person whose Profile the host sent
+/// ([hostProfile], kept here), and the Area's whole history; to a Device
+/// paired by invite before, what lies in the Areas it holds a role in.
+/// The Profiles of the people of those Areas go along (ADR 0017); to a
+/// Device of this one's own group every Profile kept here.
 Map<String, Object?> syncRequest(
   Store store,
   Map<String, int> hostVector, {
@@ -178,22 +194,21 @@ Map<String, Object?> syncRequest(
   String pin = '',
   bool invited = false,
   Invite? invite,
+  Object? hostProfile,
 }) {
   store.ensureAreaKeys();
   final List<Entry> entries;
   final List<AreaKey> areaKeys;
   // The backup key goes to a Device of its own group only.
   var own = false;
+  List<Map<String, Object?>>? profiles;
   if (invited) {
     entries = const [];
     areaKeys = const [];
   } else if (invite != null) {
-    store.invite(
-      invite.areaId,
-      hostDevice,
-      role: invite.role,
-      name: invite.name,
-    );
+    final person = _invitedPerson(store, hostProfile, hostDevice);
+    if (person == null) throw const SyncException(SyncFailure.failed);
+    store.invite(invite.areaId, hostDevice, role: invite.role, profile: person);
     entries = store.entriesFor(
       hostDevice,
       const {},
@@ -201,12 +216,17 @@ Map<String, Object?> syncRequest(
       also: {invite.areaId},
     );
     areaKeys = store.areaKeysFor(hostDevice, also: {invite.areaId});
+    profiles = store.profilesToSend(
+      areas: {...store.areasSharedWith(hostDevice), invite.areaId},
+    );
   } else if (store.isSharedPeer(hostDevice)) {
     entries = store.entriesFor(hostDevice, hostVector);
     areaKeys = store.areaKeysFor(hostDevice);
+    profiles = store.profilesToSend(areas: store.areasSharedWith(hostDevice));
   } else {
     entries = store.entriesSince(hostVector);
     areaKeys = store.areaKeys();
+    profiles = store.profilesToSend();
     own = true;
   }
   return {
@@ -220,9 +240,21 @@ Map<String, Object?> syncRequest(
     'areaKeys': [for (final k in areaKeys) k.toJson()],
     if (own) 'backupKey': ?store.backupKeyToSend,
     if (own) 'profile': ?store.ownProfileJson,
+    if (invited) 'profile': ?store.ownProfileForOthers,
+    'profiles': ?profiles,
     if (invited) 'invited': true,
     if (invite != null) 'invite': {'area': invite.areaId},
   };
+}
+
+/// Keeps the Profile [json] the Device [device] sent of its person for
+/// an invite, and returns its id; null when it is none, or its binding
+/// does not hold that Device's key.
+String? _invitedPerson(Store store, Object? json, String device) {
+  final choice = store.sentProfileOf(json, device: device);
+  if (choice == null) return null;
+  store.takePeople([json]);
+  return choice.profile.id;
 }
 
 /// The Area a `POST /sync` body or an answer invites to, if any.
@@ -273,6 +305,12 @@ List<String> _missingFor(Store store, String peer) {
   if (inviting != null && (body['invited'] != true || peer.isEmpty)) {
     return null;
   }
+  // The person invited is the one whose Profile the joiner sent, and the
+  // user saw before the session went on.
+  if (inviting != null &&
+      store.sentProfileOf(body['profile'], device: peer) == null) {
+    return null;
+  }
   if (invitedTo != null &&
       (inviting != null || store.refusesInvite(invitedTo))) {
     return null;
@@ -307,16 +345,22 @@ List<String> _missingFor(Store store, String peer) {
   }
   store.ensureAreaKeys();
   var profile = ProfileTaken.unchanged;
+  var people = false;
   if (inviting != null) {
-    store.invite(
-      inviting.areaId,
-      peer,
-      role: inviting.role,
-      name: inviting.name,
-    );
+    final person = _invitedPerson(store, body['profile'], peer);
+    if (person != null) {
+      store.invite(inviting.areaId, peer, role: inviting.role, profile: person);
+    }
+    people = person != null;
   } else if (!shared) {
     store.extendRolesTo(peer);
     profile = _takeProfile(store, peer, body);
+    people = store.takePeople(body['profiles']);
+  } else {
+    people = store.takePeople(
+      body['profiles'],
+      allowed: store.peopleFrom(peer),
+    );
   }
   final moment = store.momentFor(
     before: before,
@@ -348,6 +392,9 @@ List<String> _missingFor(Store store, String peer) {
       ],
       if (!shared) 'backupKey': ?store.backupKeyToSend,
       if (!shared) 'profile': ?store.ownProfileJson,
+      'profiles': shared
+          ? store.profilesToSend(areas: store.areasSharedWith(peer))
+          : store.profilesToSend(),
       if (inviting != null) 'invite': {'area': inviting.areaId},
     },
     session: SyncSession(
@@ -359,6 +406,7 @@ List<String> _missingFor(Store store, String peer) {
       conflicts: store.conflictsAmong(applied),
       sharedArea: sharedArea,
       profile: profile,
+      peopleChanged: people,
     ),
   );
 }
@@ -406,15 +454,21 @@ SyncSession applyAnswer(
     report: report,
   );
   var profile = ProfileTaken.unchanged;
+  final bool people;
   if (shared) {
     final areas = {...store.areasSharedWith(host), ?invitedTo};
     store.learnAreaKeys([
       for (final k in areaKeysOf(answer['areaKeys']))
         if (areas.contains(k.scope)) k,
     ]);
+    people = store.takePeople(
+      answer['profiles'],
+      allowed: store.peopleFrom(host),
+    );
   } else {
     store.extendRolesTo(host);
     profile = _takeProfile(store, host, answer);
+    people = store.takePeople(answer['profiles']);
   }
   return SyncSession(
     peer: host,
@@ -430,6 +484,7 @@ SyncSession applyAnswer(
     conflicts: store.conflictsAmong(applied),
     sharedArea: invitedTo ?? invitedBy,
     profile: profile,
+    peopleChanged: people,
   );
 }
 
@@ -450,6 +505,9 @@ enum SyncFailure {
 
   /// The host said no to this Device.
   declined,
+
+  /// The user did not confirm the person an invite was for.
+  cancelled,
 
   /// The other side speaks another wire format.
   format,
@@ -502,13 +560,16 @@ bool fingerprintMatches(List<int> actual, List<int> expected) {
 /// with the whole fingerprint of its certificate. Throws a
 /// [SyncException]; an address outside the local network is refused
 /// before anything is sent. With [invite], the host is another person's
-/// Device, invited to a Shared Area (ADR 0013); a host that invites this
-/// Device itself says so before anything is sent.
+/// Device, invited to a Shared Area (ADR 0013): its Profile is fetched
+/// first and shown through [confirm] (ADR 0017), and nothing is sent
+/// unless the user confirms it; a host that invites this Device itself
+/// says so before anything is sent.
 Future<SyncResult> lanSync(
   Store store,
   PairInfo info, {
   required String name,
   Invite? invite,
+  Future<bool> Function(ProfileChoice other)? confirm,
   Duration timeout = const Duration(seconds: 20),
 }) async {
   if (!isPrivateHost(info.host)) {
@@ -522,6 +583,7 @@ Future<SyncResult> lanSync(
     pin: info.pin,
     name: name,
     invite: invite,
+    confirm: confirm,
     timeout: timeout,
   );
 }
@@ -574,6 +636,7 @@ Future<SyncResult> _sync(
   String? paired,
   required String name,
   Invite? invite,
+  Future<bool> Function(ProfileChoice other)? confirm,
   required Duration timeout,
 }) async {
   List<int>? seen;
@@ -698,6 +761,19 @@ Future<SyncResult> _sync(
       throw const SyncException(SyncFailure.declined);
     }
     final shared = invited || invite != null || store.isSharedPeer(hostDevice);
+    // The person invited is the one whose Profile the host shows, once
+    // the user confirmed it.
+    Object? hostProfile;
+    if (invite != null) {
+      final profileCall = await call('GET', '/profile');
+      if (profileCall == null) throw const SyncException(SyncFailure.failed);
+      hostProfile = decode(profileCall.$2)['profile'];
+      final choice = store.sentProfileOf(hostProfile, device: hostDevice);
+      if (choice == null) throw const SyncException(SyncFailure.failed);
+      if (confirm != null && !await confirm(choice)) {
+        throw const SyncException(SyncFailure.cancelled);
+      }
+    }
     final request = syncRequest(
       store,
       hostVector,
@@ -706,6 +782,7 @@ Future<SyncResult> _sync(
       pin: pin,
       invited: invited,
       invite: invite,
+      hostProfile: hostProfile,
     );
     final syncCall = await call(
       'POST',

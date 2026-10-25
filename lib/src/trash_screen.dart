@@ -141,12 +141,14 @@ class _TrashScreenState extends State<TrashScreen> {
                     :final topic,
                     :final changes,
                     schedules: _,
+                    :final author,
                   ))
                     NoteCard(
                       note: note,
                       when: when,
                       area: area,
                       topic: topic,
+                      author: author,
                       // Only who may change it restores it (ADR 0013).
                       footer: changes
                           ? _footer(

@@ -6,6 +6,7 @@ import 'box_keys.dart';
 import 'entry.dart';
 import 'notes.dart';
 import 'pairing.dart';
+import 'profiles.dart';
 import 'routines.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
@@ -263,7 +264,7 @@ List<Recipient> sentItemRecipients(Store store) {
     for (final person in store.people(area)) {
       if (person.devices.any(own)) continue;
       devices.putIfAbsent(person.id, () => {}).addAll(person.devices);
-      names.putIfAbsent(person.id, () => person.name);
+      names.putIfAbsent(person.id, () => store.personShown(person.id).name);
     }
   }
   final grouped = {for (final ds in devices.values) ...ds};

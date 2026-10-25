@@ -92,53 +92,51 @@ impl AreaAccess {
     }
 }
 
-/// One grant as it is signed, as the Dart core's `Grant`.
+/// One grant as it is signed, as the Dart core's `Grant`: the role, and
+/// the Profile of the person the Device belongs to (ADR 0017).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grant {
     pub role: AreaRole,
-    /// The person's id: the id of the Device first invited for them.
-    pub person: String,
-    pub name: String,
+    /// The id of the person's Profile, as the grant named it.
+    pub profile: String,
 }
 
 impl Grant {
     /// The value of the grant field: keys sorted, no spaces.
     pub fn encode(&self) -> String {
-        json!({"name": self.name, "person": self.person, "role": self.role.name()}).to_string()
+        json!({"profile": self.profile, "role": self.role.name()}).to_string()
     }
 
     /// The grant in `value`; `None` when it is none.
     pub fn parse(value: &str) -> Option<Grant> {
         let json: Value = serde_json::from_str(value).ok()?;
-        let name = json.get("name")?.as_str()?;
-        let person = json.get("person")?.as_str()?;
+        let profile = json.get("profile")?.as_str()?;
         let role = AreaRole::parse(json.get("role")?.as_str()?)?;
-        if person.is_empty() {
+        if profile.is_empty() {
             return None;
         }
         Some(Grant {
             role,
-            person: person.to_string(),
-            name: name.to_string(),
+            profile: profile.to_string(),
         })
     }
 }
 
 /// What the inviting side of a session hands out, as the Dart core's
-/// `Invite`: the Area, the role the other Device gets there and the name
-/// its person goes by.
+/// `Invite`: the Area and the role the other Device gets there. The
+/// person it is given to is the one whose Profile that Device sent,
+/// which the inviter saw first (ADR 0017).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Invite {
     pub area: String,
     pub role: AreaRole,
-    pub name: String,
 }
 
-/// Someone a Shared Area is shared with, as its grants say now.
+/// Someone a Shared Area is shared with, as its grants say now: the id
+/// of their Profile as the grants name it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Person {
     pub id: String,
-    pub name: String,
     pub role: AreaRole,
     /// The ids of their Devices that hold the role, sorted.
     pub devices: Vec<String>,
@@ -177,13 +175,24 @@ impl AreaGrants {
         self.by_device.contains_key(device)
     }
 
-    /// The person `device` belongs to: of its last grant that named one.
+    /// The person `device` belongs to, the id of their Profile: of its
+    /// last grant that named one.
     pub fn person_of(&self, device: &str) -> Option<&str> {
         self.by_device
             .get(device)?
             .iter()
             .rev()
-            .find_map(|g| g.grant.as_ref().map(|grant| grant.person.as_str()))
+            .find_map(|g| g.grant.as_ref().map(|grant| grant.profile.as_str()))
+    }
+
+    /// The Profile ids the grants that hold now name, sorted.
+    pub fn profiles(&self) -> Vec<String> {
+        let named: std::collections::BTreeSet<String> = self
+            .by_device
+            .values()
+            .filter_map(|g| g.last()?.grant.as_ref().map(|grant| grant.profile.clone()))
+            .collect();
+        named.into_iter().collect()
     }
 
     /// What `device` may do at the entry `at`: everything before the
@@ -297,7 +306,7 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                     Some(signer) if signer.role == AreaRole::Manager => true,
                     Some(signer) => grant.as_ref().is_some_and(|g| {
                         g.role == AreaRole::Member
-                            && g.person == signer.person
+                            && g.profile == signer.profile
                             && !by_device.contains_key(target)
                     }),
                 }
@@ -579,7 +588,7 @@ impl Store {
     }
 
     /// The people of the Shared Area `area` as its grants say now, this
-    /// Device's own first, then by name.
+    /// Device's own first, then by the name of their Profile.
     pub fn people(&self, area: &str) -> Result<Vec<Person>> {
         let Some(grants) = self.grants_of(area)? else {
             return Ok(Vec::new());
@@ -589,23 +598,26 @@ impl Store {
             let Some(grant) = grants.grant_of(&device) else {
                 continue;
             };
-            match people.iter_mut().find(|p| p.id == grant.person) {
+            match people.iter_mut().find(|p| p.id == grant.profile) {
                 Some(person) => person.devices.push(device),
                 None => people.push(Person {
-                    id: grant.person.clone(),
-                    name: grant.name.clone(),
+                    id: grant.profile.clone(),
                     role: grant.role,
                     devices: vec![device],
                 }),
             }
         }
         let mine = grants.person_of(&self.device_id()?).map(str::to_string);
+        let mut names = HashMap::new();
+        for p in &people {
+            names.insert(p.id.clone(), self.person_shown(&p.id)?.name);
+        }
         people.sort_by(|a, b| {
             let a_mine = Some(&a.id) == mine.as_ref();
             let b_mine = Some(&b.id) == mine.as_ref();
             b_mine
                 .cmp(&a_mine)
-                .then_with(|| crate::store::utf16_cmp(&a.name, &b.name))
+                .then_with(|| crate::store::utf16_cmp(&names[&a.id], &names[&b.id]))
                 .then_with(|| a.id.cmp(&b.id))
         });
         Ok(people)
@@ -624,9 +636,9 @@ impl Store {
 
     /// Shares the Area `area`, as the Dart core's `share`: moves it to
     /// fresh ids first when it has a Starter Set id, then makes this
-    /// Device its first Manager going by `name`, and every own paired
-    /// Device a Manager with it. Returns the id it goes on under.
-    pub fn share(&self, area: &str, name: &str) -> Result<String> {
+    /// Device its first Manager, under the own Profile, and every own
+    /// paired Device a Manager with it. Returns the id it goes on under.
+    pub fn share(&self, area: &str) -> Result<String> {
         if self.is_shared(area)? {
             return Ok(area.to_string());
         }
@@ -640,10 +652,15 @@ impl Store {
                 area.to_string()
             };
             let me = self.device_id()?;
+            // Without a Profile yet (only in tests) the Device stands for
+            // it.
+            let profile = match crate::profile::OwnProfile::new(self).get()? {
+                Some(own) => own.id,
+                None => me.clone(),
+            };
             let grant = Grant {
                 role: AreaRole::Manager,
-                person: me.clone(),
-                name: name.trim().to_string(),
+                profile,
             }
             .encode();
             self.append(&id, &role_field(&me), Some(&grant), None)?;
@@ -656,23 +673,22 @@ impl Store {
         })
     }
 
-    /// Grants `device` `role` in `area`, as the person `name`: under the
-    /// person it already belongs to there, else a new one of its own.
-    /// Nothing for a Device of this one's own group.
-    pub fn invite(&self, area: &str, device: &str, role: AreaRole, name: &str) -> Result<()> {
+    /// Grants `device` `role` in `area`, as the person whose Profile is
+    /// `profile`: under the person it already belongs to there, else
+    /// that one. Nothing for a Device of this one's own group.
+    pub fn invite(&self, area: &str, device: &str, role: AreaRole, profile: &str) -> Result<()> {
         // A Device of this one's own group is no other person: it keeps
-        // the role it has, under its own name.
+        // the role it has.
         if self.is_own_device(device)? {
             return Ok(());
         }
         let person = self
             .grants_of(area)?
             .and_then(|g| g.person_of(device).map(str::to_string))
-            .unwrap_or_else(|| device.to_string());
+            .unwrap_or_else(|| profile.to_string());
         let grant = Grant {
             role,
-            person,
-            name: name.trim().to_string(),
+            profile: person,
         };
         self.append(area, &role_field(device), Some(&grant.encode()), None)
             .map(drop)
@@ -688,13 +704,12 @@ impl Store {
                 let Some(grant) = grants.grant_of(&device) else {
                     continue;
                 };
-                if grant.person != person || grant.role == role {
+                if grant.profile != person || grant.role == role {
                     continue;
                 }
                 let next = Grant {
                     role,
-                    person: person.to_string(),
-                    name: grant.name.clone(),
+                    profile: person.to_string(),
                 };
                 self.append(area, &role_field(&device), Some(&next.encode()), None)?;
             }
@@ -710,7 +725,7 @@ impl Store {
         };
         self.batch(|| {
             for device in grants.devices() {
-                if grants.grant_of(&device).map(|g| g.person.as_str()) == Some(person) {
+                if grants.grant_of(&device).map(|g| g.profile.as_str()) == Some(person) {
                     self.append(area, &role_field(&device), None, None)?;
                 }
             }
@@ -719,7 +734,7 @@ impl Store {
     }
 
     /// Gives the Device `peer` of this Device's own group this Device's
-    /// role, person and name in every Shared Area where it holds one and
+    /// role and person in every Shared Area where it holds one and
     /// `peer` never held any. Returns how many it gave.
     pub fn extend_roles_to(&self, peer: &str) -> Result<usize> {
         let me = self.device_id()?;
@@ -955,8 +970,12 @@ mod tests {
 
     type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
 
+    /// A Device with its own Profile: Ann's, Ben's or the laptop's.
     fn device(seed: u8) -> Result<Store> {
-        Store::in_memory(ticking(), move || Ok(SigningKey::from_seed([seed; 32])))
+        let store = Store::in_memory(ticking(), move || Ok(SigningKey::from_seed([seed; 32])))?;
+        let name = ["", "Ann", "Ben", "Laptop"][usize::from(seed).min(3)];
+        crate::profile::OwnProfile::new(&store).apply_defaults(name, None)?;
+        Ok(store)
     }
 
     #[test]
@@ -965,11 +984,10 @@ mod tests {
         let ben = device(2)?;
         let house = Places::new(&ann).add_area("Household")?;
         let milk = Notes::new(&ann).capture("Buy milk", Some(&house.id), None)?;
-        let area = ann.share(&house.id, "Ann")?;
+        let area = ann.share(&house.id)?;
         let invite = Invite {
             area: area.clone(),
             role: AreaRole::Member,
-            name: "Ben".into(),
         };
         let request = sync_request_as(
             &ben,
@@ -1014,7 +1032,7 @@ mod tests {
         let ann = device(1)?;
         let laptop = device(3)?;
         let house = Places::new(&ann).add_area("Household")?;
-        let area = ann.share(&house.id, "Ann")?;
+        let area = ann.share(&house.id)?;
         ann.remember_device(&crate::PairedDevice {
             id: laptop.device_id()?,
             name: "Laptop".into(),
@@ -1027,7 +1045,6 @@ mod tests {
         let invite = Invite {
             area,
             role: AreaRole::Member,
-            name: "Ben".into(),
         };
         let invited = sync_request_as(
             &laptop,
@@ -1038,23 +1055,23 @@ mod tests {
             Joining::Invited,
         )?;
         assert!(answer_sync_inviting(&ann, &invited, "Desk", Some(&invite))?.is_none());
+        let host_profile = crate::lan::profile_answer(&ann)?;
         let inviting = sync_request_as(
             &laptop,
             &ann.version_vector()?,
             "Laptop",
             &ann.device_id()?,
             "",
-            Joining::Inviting(&invite),
+            Joining::Inviting(&invite, host_profile.get("profile")),
         )?;
         assert!(answer_sync(&ann, &inviting, "Desk")?.is_none());
         assert!(!ann.is_shared_peer(&laptop.device_id()?)?);
         // Nor is it granted anything as another person.
-        ann.invite(&invite.area, &laptop.device_id()?, AreaRole::Member, "Ben")?;
-        let names: Vec<String> = ann
-            .people(&invite.area)?
-            .into_iter()
-            .map(|p| p.name)
-            .collect();
+        ann.invite(&invite.area, &laptop.device_id()?, AreaRole::Member, "ben")?;
+        let mut names = Vec::new();
+        for p in ann.people(&invite.area)? {
+            names.push(ann.person_shown(&p.id)?.name);
+        }
         assert_eq!(names, vec!["Ann".to_string()]);
         Ok(())
     }
@@ -1064,7 +1081,7 @@ mod tests {
         let ann = device(1)?;
         let laptop = device(3)?;
         let house = Places::new(&ann).add_area("Household")?;
-        let area = ann.share(&house.id, "Ann")?;
+        let area = ann.share(&house.id)?;
         let request = sync_request(&laptop, &ann.version_vector()?, "Laptop", "", "")?;
         let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
         crate::lan::apply_answer(&laptop, &answer)?;

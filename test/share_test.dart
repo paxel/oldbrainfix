@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
@@ -43,14 +44,18 @@ void main() {
   setUp(() {
     ann = Store.inMemory()
       ..starterSetOffered = true
-      ..alarmSetupDone = true;
+      ..alarmSetupDone = true
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ann');
     ben = Store.inMemory()
       ..starterSetOffered = true
-      ..alarmSetupDone = true;
+      ..alarmSetupDone = true
+      ..applyProfileDefaults(name: 'Pixel')
+      ..renameOwnProfile('Ben');
     final house = Places(ann).addArea('Household');
     milk = Notes(ann).capture('Buy milk', place: house.id).id;
     Routines(ann).spawn(milk, Schedule(start: Day(2026, 3, 1)));
-    area = ann.share(house.id, name: 'Ann');
+    area = ann.share(house.id);
   });
   tearDown(() {
     ann.close();
@@ -71,7 +76,37 @@ void main() {
         ),
       ),
       name: 'Desk',
-      inviting: Invite(area, role: role, name: 'Ben'),
+      inviting: Invite(area, role: role),
+    )!;
+    applyAnswer(ben, wire(done.answer), shared: true);
+    for (final (store, peer) in [(ann, ben), (ben, ann)]) {
+      store.rememberDevice(
+        PairedDevice(
+          id: peer.deviceId,
+          name: '',
+          fingerprint: '',
+          host: null,
+          port: null,
+          lastSync: DateTime.utc(2026, 3, 1),
+          shared: true,
+        ),
+      );
+    }
+  }
+
+  /// Ben's phone and Ann's computer sync once more, as paired.
+  void sync() {
+    final done = answerSync(
+      ann,
+      wire(
+        syncRequest(
+          ben,
+          ann.versionVector(),
+          name: 'Phone',
+          hostDevice: ann.deviceId,
+        ),
+      ),
+      name: 'Desk',
     )!;
     applyAnswer(ben, wire(done.answer), shared: true);
   }
@@ -174,13 +209,53 @@ void main() {
     expect(find.text('Remove Ben from Household?'), findsOneWidget);
     await tester.tap(find.text('Remove').last);
     await tester.pumpAndSettle();
-    expect(ann.people(area).map((p) => p.name), ['Ann']);
+    expect(ann.people(area).map((p) => ann.personShown(p.id).name), ['Ann']);
     expect(find.text('Ben'), findsNothing);
   });
 
-  testWidgets('sharing joins the other computer inviting it to the Area', (
+  testWidgets('other people\'s Notes show their picture; one\'s own none', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
+    invite(AreaRole.member);
+    Notes(ben).capture('Ben buys bread', place: area);
+    sync();
+    for (final (store, mine, theirs, who) in [
+      (ben, 'Ben buys bread', 'Buy milk', 'Ann'),
+      (ann, 'Buy milk', 'Ben buys bread', 'Ben'),
+    ]) {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Household'));
+      await tester.pumpAndSettle();
+      final cards = find.byType(NoteCard);
+      expect(cards, findsNWidgets(2));
+      Finder cardOf(String text) =>
+          find.ancestor(of: find.text(text), matching: cards);
+      expect(
+        find.descendant(
+          of: cardOf(theirs),
+          matching: find.byKey(const ValueKey('author')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: cardOf(mine),
+          matching: find.byKey(const ValueKey('author')),
+        ),
+        findsNothing,
+      );
+      expect(find.bySemanticsLabel(RegExp('Written by $who')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    semantics.dispose();
+  });
+
+  testWidgets('sharing shows the other person\'s Profile and invites only '
+      'once it is confirmed', (tester) async {
     // Tall enough for the whole form.
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -188,13 +263,20 @@ void main() {
     final announcements = Announcements();
     final house = Places(ben).addArea('Garden');
     final invites = <Invite?>[];
-    // Ben's computer, as the core answers when invited.
+    // Ann's computer, as the core answers when invited: its Profile
+    // first, then the session once the user confirmed it.
     Future<SyncResult> join(
       Store store,
       PairInfo info, {
       required String name,
       Invite? invite,
+      Future<bool> Function(ProfileChoice other)? confirm,
     }) async {
+      final hostProfile = profileAnswer(ann)['profile'];
+      final choice = store.sentProfileOf(hostProfile, device: ann.deviceId)!;
+      if (confirm != null && !await confirm(choice)) {
+        throw const SyncException(SyncFailure.cancelled);
+      }
       invites.add(invite);
       final request = wire(
         syncRequest(
@@ -203,6 +285,7 @@ void main() {
           name: name,
           hostDevice: ann.deviceId,
           invite: invite,
+          hostProfile: hostProfile,
         ),
       );
       final done = answerSync(ann, request, name: 'Desk')!;
@@ -220,7 +303,6 @@ void main() {
       );
     }
 
-    ben.applyProfileDefaults(name: 'Ben Bauer');
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('en'),
@@ -241,27 +323,39 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    // The own name starts as the own Profile's.
-    expect(find.text('Ben Bauer'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('invite')));
-    await tester.pumpAndSettle();
-    expect(announcements.visible, 'Fill in both names first.');
-    expect(invites, isEmpty);
-    announcements.dismiss();
-    await tester.enterText(find.byKey(const ValueKey('own-name')), 'Ben');
-    await tester.enterText(find.byKey(const ValueKey('their-name')), 'Ann');
+    // Nobody types a name.
+    expect(find.text('Your name'), findsNothing);
+    expect(find.text('Their name'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('role-manager')));
     await tester.enterText(find.byKey(const ValueKey('share-code')), code);
     await tester.tap(find.byKey(const ValueKey('invite')));
+    // The progress turns behind the question: no settling meanwhile.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    // Ann's Profile shows to confirm; put off, nothing is shared.
+    expect(find.text('Share Garden with this person?'), findsOneWidget);
+    expect(find.text('Ann'), findsOneWidget);
+    expect(find.text(ann.ownProfileCode!), findsOneWidget);
+    expect(find.byKey(const ValueKey('inviteAvatar')), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(invites, isEmpty);
+    expect(ann.accessIn(house.id), AreaAccess.owner);
+    expect(announcements.visible, 'Nothing was shared.');
+    announcements.dismiss();
+    await tester.tap(find.byKey(const ValueKey('invite')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byKey(const ValueKey('inviteConfirm')));
     await tester.pumpAndSettle();
     final sent = invites.single!;
-    expect(
-      (sent.areaId, sent.role, sent.name),
-      (house.id, AreaRole.manager, 'Ann'),
-    );
+    expect((sent.areaId, sent.role), (house.id, AreaRole.manager));
     expect(ben.isShared(house.id), isTrue);
     expect(ann.accessIn(house.id), AreaAccess.manager);
-    expect(ben.localSetting('shareName'), 'Ben');
+    expect(ben.people(house.id).map((p) => ben.personShown(p.id).name), [
+      'Ben',
+      'Ann',
+    ]);
     expect(announcements.visible, 'Garden is now shared with Ann.');
   });
 }

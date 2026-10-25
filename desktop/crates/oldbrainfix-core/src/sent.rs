@@ -260,7 +260,9 @@ impl Store {
                     .entry(person.id.clone())
                     .or_default()
                     .extend(person.devices.iter().cloned());
-                names.entry(person.id.clone()).or_insert(person.name);
+                if !names.contains_key(&person.id) {
+                    names.insert(person.id.clone(), self.person_shown(&person.id)?.name);
+                }
             }
         }
         let grouped: std::collections::HashSet<String> =
