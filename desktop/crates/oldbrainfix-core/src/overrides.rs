@@ -130,6 +130,46 @@ impl Store {
         })
     }
 
+    /// The newest value of `field` on `entity` that one of the user's own
+    /// Devices wrote (`written_by_own`); none when none did. In a Shared
+    /// Area another person's Device can write any field of a Note, so a
+    /// link one's own Devices keep is read this way. `own` remembers,
+    /// across calls, which Devices are one's own.
+    pub(crate) fn own_current(
+        &self,
+        entity: &str,
+        field: &str,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<Option<String>> {
+        let mut held: Option<Entry> = None;
+        for e in self.history(entity)? {
+            if e.field != field || !self.written_by_own_in(&e.device, own)? {
+                continue;
+            }
+            if held
+                .as_ref()
+                .is_none_or(|h| Store::latest_wins(&e, h) == Ordering::Greater)
+            {
+                held = Some(e);
+            }
+        }
+        Ok(held.and_then(|e| e.value))
+    }
+
+    /// `written_by_own`, remembered in `own`.
+    pub(crate) fn written_by_own_in(
+        &self,
+        device: &str,
+        own: &mut HashMap<String, bool>,
+    ) -> Result<bool> {
+        if let Some(known) = own.get(device) {
+            return Ok(*known);
+        }
+        let known = self.written_by_own(device)?;
+        own.insert(device.to_string(), known);
+        Ok(known)
+    }
+
     /// Whether the Device `device` is one of the user's own: this one,
     /// one paired as its own, or one whose key is bound to the own
     /// Profile.

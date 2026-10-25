@@ -609,6 +609,166 @@ void main() {
     });
   });
 
+  group('Sent Item links', () {
+    /// Cid's Note "Hi" with a Reminder, accepted on Ann's phone: Cid's
+    /// Note and the Note Ann holds it as.
+    ({Store cid, String sent, String held}) fromCid() {
+      final cid = device(clock, 'Cid');
+      final sent = Notes(cid).capture('Hi').id;
+      Routines(cid).spawn(
+        sent,
+        Schedule(start: Day(2026, 3, 3), times: [ClockTime(10, 0)]),
+      );
+      final held = acceptSentItem(
+        ann,
+        openSentItem(ann, sendNote(cid, sent)).item,
+      )!;
+      return (cid: cid, sent: sent, held: held);
+    }
+
+    /// The `received` link Ann's phone keeps on [held], with [version].
+    String relinked(String held, int version) => jsonEncode({
+      ...jsonDecode(ann.current(held, 'received')!) as Map<String, Object?>,
+      'version': version,
+    });
+
+    test('a Sent Item\'s link another person\'s Device wrote on Ann\'s Note '
+        'is no Note its update or cancellation reaches', () {
+      final area = household();
+      final (:cid, :sent, :held) = fromCid();
+      // A Manager can write on Ann's Note too.
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      final rent = Notes(ann).capture('Pay the rent', place: area).id;
+      exchange(ben, ann);
+      ben.append(rent, 'received', relinked(held, 1));
+      exchange(ben, ann);
+      expect(ann.current(rent, 'received'), isNotNull, reason: 'it landed');
+
+      Notes(cid).edit(sent, 'Hi again');
+      final update = openSentItem(ann, sendNote(cid, sent));
+      expect(update.state, SentItemState.update);
+      expect(update.accepted, held);
+      expect(acceptSentItem(ann, update.item), held);
+      expect(Notes(ann).byId(held)!.text, 'Hi again');
+      expect(Notes(ann).byId(rent)!.text, 'Pay the rent');
+
+      final cancel = openSentItem(ann, sendNote(cid, sent, cancel: true));
+      expect(cancel.state, SentItemState.cancel);
+      expect(acceptSentItem(ann, cancel.item), held);
+      expect(Notes(ann).byId(held)!.isTrashed, isTrue);
+      expect(Notes(ann).byId(rent)!.isTrashed, isFalse);
+    });
+
+    test('a Member\'s own Note linked to a Sent Item never accepted here '
+        'is neither cancelled nor updated', () {
+      final area = household();
+      final cid = device(clock, 'Cid');
+      final sent = Notes(cid).capture('Hi').id;
+      final item = openSentItem(ann, sendNote(cid, sent)).item;
+      final eggs = Notes(ben).capture('Eggs', place: area).id;
+      ben.append(
+        eggs,
+        'received',
+        jsonEncode({
+          'from': base64.encode(cid.signingKey.publicKey),
+          'id': item.id,
+          'profile': idOf(cid),
+          'version': 1,
+        }),
+      );
+      exchange(ben, ann);
+      expect(ann.current(eggs, 'received'), isNotNull, reason: 'it landed');
+
+      final cancel = openSentItem(ann, sendNote(cid, sent, cancel: true));
+      expect(cancel.state, SentItemState.nothingToCancel);
+      expect(acceptSentItem(ann, cancel.item), isNull);
+      expect(Notes(ann).byId(eggs)!.isTrashed, isFalse);
+
+      final update = openSentItem(ann, sendNote(cid, sent));
+      expect(update.state, SentItemState.fresh);
+      expect(acceptSentItem(ann, update.item), isNot(eggs));
+      expect(Notes(ann).byId(eggs)!.text, 'Eggs');
+    });
+
+    test('the link one\'s own phone wrote carries an update applied on the '
+        'desk and a cancellation back on the phone', () {
+      household();
+      final (:cid, :sent, :held) = fromCid();
+      exchange(annDesk, ann);
+      Notes(cid).edit(sent, 'Hi again');
+      final update = openSentItem(annDesk, sendNote(cid, sent));
+      expect(update.state, SentItemState.update);
+      expect(update.changes!.routinesAdded, isEmpty);
+      expect(acceptSentItem(annDesk, update.item), held);
+      expect(Notes(annDesk).byId(held)!.text, 'Hi again');
+      exchange(annDesk, ann);
+
+      final cancel = openSentItem(ann, sendNote(cid, sent, cancel: true));
+      expect(cancel.state, SentItemState.cancel);
+      expect(acceptSentItem(ann, cancel.item), held);
+      expect(Notes(ann).byId(held)!.isTrashed, isTrue);
+      expect(Routines(ann).all(), isEmpty, reason: 'alarms off');
+    });
+
+    test('a newer link another person\'s Device wrote does not hide the one '
+        'accepting wrote from an update', () {
+      final area = household();
+      final (:cid, :sent, :held) = fromCid();
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      Notes(ann).file(held, area);
+      exchange(ben, ann);
+      final routine = Routines(ann).ofNote(held).single.id;
+      // Claims every version is held already, and the Reminder is
+      // none of Cid's.
+      ben.append(held, 'received', relinked(held, 99));
+      ben.append(routine, 'received', 'routine:forged');
+      exchange(ben, ann);
+      expect(
+        (jsonDecode(ann.current(held, 'received')!) as Map)['version'],
+        99,
+        reason: 'it landed',
+      );
+      expect(ann.current(routine, 'received'), 'routine:forged');
+
+      Notes(cid).edit(sent, 'Hi again');
+      final update = openSentItem(ann, sendNote(cid, sent));
+      expect(update.state, SentItemState.update);
+      expect(update.changes!.routinesAdded, isEmpty);
+      expect(update.changes!.routinesRemoved, isEmpty);
+      acceptSentItem(ann, update.item);
+      expect(Notes(ann).byId(held)!.text, 'Hi again');
+      expect(Routines(ann).ofNote(held), hasLength(1));
+    });
+
+    test('a text another person\'s Device wrote with a link is not the one '
+        'the sender sent last', () {
+      final area = household();
+      final (:cid, :sent, :held) = fromCid();
+      ann.setRole(area, idOf(ben), AreaRole.manager);
+      exchange(ben, ann);
+      Notes(ann).file(held, area);
+      exchange(ben, ann);
+      // Both at once, as accepting writes them.
+      final at = clock().add(const Duration(hours: 1));
+      ben.append(
+        held,
+        NoteKeys.text,
+        StoredText.of('plain', 'Hi from Ben').encode(),
+        date: at,
+      );
+      ben.append(held, 'received', relinked(held, 1), date: at);
+      exchange(ben, ann);
+      expect(Notes(ann).byId(held)!.text, 'Hi from Ben', reason: 'it landed');
+
+      Notes(cid).edit(sent, 'Hi again');
+      final update = openSentItem(ann, sendNote(cid, sent));
+      expect(update.changes!.textBefore, 'Hi from Ben');
+      expect(update.changes!.textEdited, isTrue);
+    });
+  });
+
   group('the shared folder and bundles', () {
     test('the people\'s Profiles go sealed under the Area\'s key', () async {
       final area = household();

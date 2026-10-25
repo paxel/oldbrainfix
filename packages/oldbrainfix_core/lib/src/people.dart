@@ -598,12 +598,7 @@ extension People on Store {
   /// of the user's own Devices wrote counts: another person's Device in
   /// a Shared Area could write any.
   ({String key, String person})? _receivedFrom(String entity) {
-    Entry? held;
-    for (final e in history(entity)) {
-      if (e.field != 'received' || !_writtenByOwn(e.device)) continue;
-      if (held == null || Store.latestWins(e, held) > 0) held = e;
-    }
-    final raw = held?.value;
+    final raw = currentByOwn(entity, 'received');
     if (raw == null) return null;
     try {
       if (jsonDecode(raw) case {

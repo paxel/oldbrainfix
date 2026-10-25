@@ -702,14 +702,16 @@ typedef _Held = ({String note, int version});
 /// The Note [item] was accepted as here from the same key, in the trash
 /// or merged too, the newest of them, with the version it holds. Throws
 /// [SentItemNotFromSender] when only another key's Sent Item has its id.
+/// Only a link one of the user's own Devices wrote counts (ADR 0015).
 _Held? _held(Store store, SentItem item) {
   final from = base64.encode(item.from.publicKey);
   final notes = Notes(store);
+  final own = <String, bool>{};
   _Held? found;
   DateTime? newest;
   var foreign = false;
   for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-    final link = _received(store.current(id, SentKeys.received));
+    final link = _received(store.currentByOwn(id, SentKeys.received, own));
     if (link == null || link.id != item.id) continue;
     if (link.from != from) {
       foreign = true;
@@ -779,9 +781,10 @@ SentItemChanges _changes(
   };
   final routines = Routines(store);
   final theirs = <String, Routine>{};
+  final own = <String, bool>{};
   for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
     if (store.current(id, RoutineKeys.note) != noteId) continue;
-    final from = store.current(id, SentKeys.received);
+    final from = store.currentByOwn(id, SentKeys.received, own);
     final routine = routines.byId(id);
     if (from == null || routine == null) continue;
     theirs.putIfAbsent(from, () => routine);
@@ -817,17 +820,22 @@ SentItemChanges _changes(
 
 /// The text the sender last sent for the Note [noteId]: the newest text
 /// written with its link, as accepting and applying write both at once;
-/// null when there is none.
+/// null when there is none. Only what one's own Devices wrote counts.
 StoredText? _lastSentText(Store store, String noteId) {
   final history = store.history(noteId);
+  final own = <String, bool>{};
+  bool byOwn(Entry e) =>
+      own.putIfAbsent(e.device, () => store.writtenByOwn(e.device));
   final linked = {
     for (final e in history)
-      if (e.field == SentKeys.received) e.date.microsecondsSinceEpoch,
+      if (e.field == SentKeys.received && byOwn(e))
+        e.date.microsecondsSinceEpoch,
   };
   Entry? last;
   for (final e in history) {
     if (e.field != NoteKeys.text ||
-        !linked.contains(e.date.microsecondsSinceEpoch)) {
+        !linked.contains(e.date.microsecondsSinceEpoch) ||
+        !byOwn(e)) {
       continue;
     }
     if (last == null || !e.date.isBefore(last.date)) last = e;

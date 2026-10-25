@@ -34,7 +34,7 @@ extension Overrides on Store {
     for (final e in history('${OverrideKeys.prefix}${resolvePerson(id)}')) {
       final isName = e.field == OverrideKeys.name;
       if (!isName && e.field != OverrideKeys.picture) continue;
-      if (!own.putIfAbsent(e.device, () => _writtenByOwn(e.device))) continue;
+      if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
       final held = isName ? name : picture;
       if (held != null && Store.latestWins(e, held) <= 0) continue;
       if (isName) {
@@ -91,9 +91,27 @@ extension Overrides on Store {
     );
   }
 
+  /// The newest value of [field] on [entity] that one of the user's own
+  /// Devices wrote ([writtenByOwn]); null when none did. In a Shared
+  /// Area another person's Device can write any field of a Note, so a
+  /// link one's own Devices keep is read this way. [own] remembers, across
+  /// calls, which Devices are one's own.
+  @internal
+  String? currentByOwn(String entity, String field, [Map<String, bool>? own]) {
+    own ??= {};
+    Entry? held;
+    for (final e in history(entity)) {
+      if (e.field != field) continue;
+      if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
+      if (held == null || Store.latestWins(e, held) > 0) held = e;
+    }
+    return held?.value;
+  }
+
   /// Whether the Device [device] is one of the user's own: this one, one
   /// paired as its own, or one whose key is bound to the own Profile.
-  bool _writtenByOwn(String device) {
+  @internal
+  bool writtenByOwn(String device) {
     if (device == deviceId || isOwnDevice(device)) return true;
     final key = pinnedKey(device)?.record.publicKey;
     return key != null && People(this)._own.bound.contains(base64.encode(key));

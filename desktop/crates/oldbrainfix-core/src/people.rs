@@ -10,7 +10,6 @@
 //! user compared its short code in person (#51); it stays on this
 //! Device and is kept through every newer record.
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 
@@ -19,7 +18,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use serde_json::{Value, json};
 
 use crate::Result;
-use crate::entry::{Entry, dart_iso};
+use crate::entry::dart_iso;
 use crate::notes::Note;
 use crate::profile::{
     ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SentProfile,
@@ -761,19 +760,7 @@ impl Store {
     /// one of the user's own Devices wrote counts: another person's
     /// Device in a Shared Area could write any.
     fn received_from(&self, entity: &str) -> Result<Option<(String, String)>> {
-        let mut held: Option<Entry> = None;
-        for e in self.history(entity)? {
-            if e.field != "received" || !self.written_by_own(&e.device)? {
-                continue;
-            }
-            if held
-                .as_ref()
-                .is_none_or(|h| Store::latest_wins(&e, h) == Ordering::Greater)
-            {
-                held = Some(e);
-            }
-        }
-        let Some(raw) = held.and_then(|e| e.value) else {
+        let Some(raw) = self.own_current(entity, "received", &mut Default::default())? else {
             return Ok(None);
         };
         let Ok(link) = serde_json::from_str::<Value>(&raw) else {
@@ -859,6 +846,7 @@ mod tests {
         sync_request_as,
     };
     use crate::profile::{ProfileKey, key_bytes, record_bytes};
+    use crate::sent::SentItemState;
     use crate::shared::{AreaRole, Invite};
     use crate::signing::SigningKey;
     use crate::store::tests::ticking;
@@ -1336,6 +1324,228 @@ mod tests {
         sync(&ben, &ann)?;
         assert_eq!(ann.current(&cids, "received")?, Some(forged), "it landed");
         assert_eq!(ann.author_of(&cids)?.map(|p| p.id), Some(own_id(&cid)?));
+        Ok(())
+    }
+
+    type Boxed<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    /// Cid's Note "Hi" with a Reminder, accepted on `ann`: Cid's Note and
+    /// the Note `ann` holds it as.
+    fn from_cid(ann: &Store, cid: &Store) -> Boxed<(String, String)> {
+        let sent = Notes::new(cid).capture("Hi", None, None)?.id;
+        let schedule = crate::Schedule::new(
+            crate::Day::parse("2026-03-03").ok_or("day")?,
+            &[crate::ClockTime::parse("10:00").ok_or("time")?],
+            None,
+        )
+        .ok_or("schedule")?;
+        crate::Routines::new(cid).spawn(&sent, &schedule)?;
+        let held = accepted(ann, &cid.send_note(&sent, None, false)?)?;
+        Ok((sent, held))
+    }
+
+    /// The `received` link `ann` keeps on `held`, with `version`.
+    fn relinked(ann: &Store, held: &str, version: i64) -> Boxed<String> {
+        let mut link: Value =
+            serde_json::from_str(&ann.current(held, "received")?.ok_or("a link")?)?;
+        link["version"] = json!(version);
+        Ok(link.to_string())
+    }
+
+    fn opened(store: &Store, file: &[u8]) -> Boxed<crate::sent::Opened> {
+        Ok(store.open_sent_item(file)?.map_err(|_| "a Sent Item")?)
+    }
+
+    fn text_of(store: &Store, note: &str) -> Boxed<String> {
+        Ok(Notes::new(store).by_id(note)?.ok_or("a Note")?.text)
+    }
+
+    fn trashed(store: &Store, note: &str) -> Boxed<bool> {
+        Ok(Notes::new(store).by_id(note)?.ok_or("a Note")?.is_trashed())
+    }
+
+    #[test]
+    fn a_sent_items_link_another_persons_device_wrote_is_no_note_it_reaches() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let (sent, held) = from_cid(&ann, &cid)?;
+        // A Manager can write on Ann's Note too.
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        let rent = Notes::new(&ann)
+            .capture("Pay the rent", Some(&area), None)?
+            .id;
+        sync(&ben, &ann)?;
+        // Later than the grant: each Device has a clock of its own.
+        let later = ann.now() + chrono::Duration::hours(1);
+        ben.append(
+            &rent,
+            "received",
+            Some(&relinked(&ann, &held, 1)?),
+            Some(later),
+        )?;
+        sync(&ben, &ann)?;
+        assert!(ann.current(&rent, "received")?.is_some(), "it landed");
+
+        Notes::new(&cid).edit(&sent, "Hi again")?;
+        let update = opened(&ann, &cid.send_note(&sent, None, false)?)?;
+        assert_eq!(update.state, SentItemState::Update);
+        assert_eq!(update.accepted.as_deref(), Some(held.as_str()));
+        assert_eq!(
+            ann.accept_sent_item(&update.item, false)?,
+            Some(held.clone())
+        );
+        assert_eq!(text_of(&ann, &held)?, "Hi again");
+        assert_eq!(text_of(&ann, &rent)?, "Pay the rent");
+
+        let cancel = opened(&ann, &cid.send_note(&sent, None, true)?)?;
+        assert_eq!(cancel.state, SentItemState::Cancel);
+        assert_eq!(
+            ann.accept_sent_item(&cancel.item, false)?,
+            Some(held.clone())
+        );
+        assert!(trashed(&ann, &held)?);
+        assert!(!trashed(&ann, &rent)?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_own_note_linked_to_a_sent_item_never_accepted_is_left_alone() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let sent = Notes::new(&cid).capture("Hi", None, None)?.id;
+        let item = opened(&ann, &cid.send_note(&sent, None, false)?)?.item;
+        let eggs = Notes::new(&ben).capture("Eggs", Some(&area), None)?.id;
+        let forged = json!({
+            "from": key_of(&cid)?,
+            "id": item.id,
+            "profile": own_id(&cid)?,
+            "version": 1,
+        });
+        ben.append(&eggs, "received", Some(&forged.to_string()), None)?;
+        sync(&ben, &ann)?;
+        assert!(ann.current(&eggs, "received")?.is_some(), "it landed");
+
+        let cancel = opened(&ann, &cid.send_note(&sent, None, true)?)?;
+        assert_eq!(cancel.state, SentItemState::NothingToCancel);
+        assert_eq!(ann.accept_sent_item(&cancel.item, false)?, None);
+        assert!(!trashed(&ann, &eggs)?);
+
+        let update = opened(&ann, &cid.send_note(&sent, None, false)?)?;
+        assert_eq!(update.state, SentItemState::Fresh);
+        assert_ne!(
+            ann.accept_sent_item(&update.item, false)?,
+            Some(eggs.clone())
+        );
+        assert_eq!(text_of(&ann, &eggs)?, "Eggs");
+        Ok(())
+    }
+
+    #[test]
+    fn the_link_ones_own_phone_wrote_carries_updates_applied_on_the_desk() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([4; 32])))?;
+        let cid = device(3, "Cid")?;
+        remember(&ann, &desk, false)?;
+        remember(&desk, &ann, false)?;
+        let (sent, held) = from_cid(&ann, &cid)?;
+        own_sync(&desk, &ann)?;
+        Notes::new(&cid).edit(&sent, "Hi again")?;
+        let update = opened(&desk, &cid.send_note(&sent, None, false)?)?;
+        assert_eq!(update.state, SentItemState::Update);
+        assert!(update.changes.ok_or("changes")?.routines_added.is_empty());
+        assert_eq!(
+            desk.accept_sent_item(&update.item, false)?,
+            Some(held.clone())
+        );
+        assert_eq!(text_of(&desk, &held)?, "Hi again");
+        own_sync(&desk, &ann)?;
+
+        let cancel = opened(&ann, &cid.send_note(&sent, None, true)?)?;
+        assert_eq!(cancel.state, SentItemState::Cancel);
+        assert_eq!(
+            ann.accept_sent_item(&cancel.item, false)?,
+            Some(held.clone())
+        );
+        assert!(trashed(&ann, &held)?);
+        assert!(crate::Routines::new(&ann).all()?.is_empty(), "alarms off");
+        Ok(())
+    }
+
+    #[test]
+    fn a_newer_link_another_persons_device_wrote_hides_no_update() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let (sent, held) = from_cid(&ann, &cid)?;
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        Notes::new(&ann).file(&held, &area)?;
+        sync(&ben, &ann)?;
+        let routines = crate::Routines::new(&ann).of_note(&held)?;
+        let [routine] = routines.as_slice() else {
+            return Err("one Reminder".into());
+        };
+        // Claims every version is held already, and the Reminder is none
+        // of Cid's; later than anything Ann wrote.
+        let later = ann.now() + chrono::Duration::hours(1);
+        ben.append(
+            &held,
+            "received",
+            Some(&relinked(&ann, &held, 99)?),
+            Some(later),
+        )?;
+        ben.append(&routine.id, "received", Some("routine:forged"), Some(later))?;
+        sync(&ben, &ann)?;
+        let landed: Value =
+            serde_json::from_str(&ann.current(&held, "received")?.ok_or("a link")?)?;
+        assert_eq!(landed["version"], json!(99), "it landed");
+        assert_eq!(
+            ann.current(&routine.id, "received")?.as_deref(),
+            Some("routine:forged")
+        );
+
+        Notes::new(&cid).edit(&sent, "Hi again")?;
+        let update = opened(&ann, &cid.send_note(&sent, None, false)?)?;
+        assert_eq!(update.state, SentItemState::Update);
+        let changes = update.changes.clone().ok_or("changes")?;
+        assert!(changes.routines_added.is_empty());
+        assert!(changes.routines_removed.is_empty());
+        ann.accept_sent_item(&update.item, false)?;
+        assert_eq!(text_of(&ann, &held)?, "Hi again");
+        assert_eq!(crate::Routines::new(&ann).of_note(&held)?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_another_persons_device_wrote_with_a_link_is_not_the_one_sent_last() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let cid = device(3, "Cid")?;
+        let area = household(&ann, &ben)?;
+        let (sent, held) = from_cid(&ann, &cid)?;
+        ann.set_role(&area, &own_id(&ben)?, AreaRole::Manager)?;
+        sync(&ben, &ann)?;
+        Notes::new(&ann).file(&held, &area)?;
+        sync(&ben, &ann)?;
+        // Both at once, as accepting writes them.
+        let later = Some(ann.now() + chrono::Duration::hours(1));
+        let text = crate::StoredText::of("plain", "Hi from Ben").encode();
+        ben.append(&held, crate::notes::keys::TEXT, Some(&text), later)?;
+        ben.append(&held, "received", Some(&relinked(&ann, &held, 1)?), later)?;
+        sync(&ben, &ann)?;
+        assert_eq!(text_of(&ann, &held)?, "Hi from Ben", "it landed");
+
+        Notes::new(&cid).edit(&sent, "Hi again")?;
+        let update = opened(&ann, &cid.send_note(&sent, None, false)?)?;
+        let changes = update.changes.ok_or("changes")?;
+        assert_eq!(changes.text_before.as_deref(), Some("Hi from Ben"));
+        assert!(changes.text_edited);
         Ok(())
     }
 

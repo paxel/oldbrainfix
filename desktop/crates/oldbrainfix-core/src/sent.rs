@@ -11,6 +11,8 @@
 //! schedules of its Routines and Reminders; never its Capture Context,
 //! photos or voice recordings.
 
+use std::collections::HashMap;
+
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Utc};
@@ -478,15 +480,17 @@ impl Store {
 
     /// The Note `item` was accepted as here from the same key, in the
     /// trash or merged too, the newest of them, with the version it holds;
-    /// and whether another key's Sent Item has its id.
+    /// and whether another key's Sent Item has its id. Only a link one of
+    /// the user's own Devices wrote counts (ADR 0015).
     fn held(&self, item: &SentItem) -> Result<(Option<Held>, bool)> {
         let from = BASE64.encode(&item.from.public_key);
         let notes = Notes::new(self);
+        let mut own = HashMap::new();
         let mut found: Option<(DateTime<Utc>, Held)> = None;
         let mut foreign = false;
         for id in self.entities_of_type(note_keys::TYPE_NOTE)? {
             let Some(link) = self
-                .current(&id, keys::RECEIVED)?
+                .own_current(&id, keys::RECEIVED, &mut own)?
                 .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
             else {
                 continue;
@@ -573,6 +577,7 @@ impl Store {
             .collect();
         let routines = Routines::new(self);
         let mut theirs: Vec<(String, Routine)> = Vec::new();
+        let mut own = HashMap::new();
         let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
         ids.sort();
         for id in ids {
@@ -582,7 +587,7 @@ impl Store {
             if routine.note_id != note_id {
                 continue;
             }
-            let Some(from) = self.current(&id, keys::RECEIVED)? else {
+            let Some(from) = self.own_current(&id, keys::RECEIVED, &mut own)? else {
                 continue;
             };
             if !theirs.iter().any(|(f, _)| *f == from) {
@@ -630,9 +635,15 @@ impl Store {
 
     /// The text the sender last sent for the Note `note_id`: the newest
     /// text written with its link, as accepting and applying write both
-    /// at once.
+    /// at once. Only what one's own Devices wrote counts.
     fn last_sent_text(&self, note_id: &str) -> Result<Option<StoredText>> {
-        let history = self.history(note_id)?;
+        let mut own = HashMap::new();
+        let mut history = Vec::new();
+        for e in self.history(note_id)? {
+            if self.written_by_own_in(&e.device, &mut own)? {
+                history.push(e);
+            }
+        }
         let linked: std::collections::HashSet<DateTime<Utc>> = history
             .iter()
             .filter(|e| e.field == keys::RECEIVED)
