@@ -109,11 +109,13 @@ impl Store {
         )
     }
 
-    /// Forgets the paired Device `id` and its switch; its key stays.
+    /// Forgets the paired Device `id`, its switch and the backup key it
+    /// sent (ADR 0016); its signing key stays.
     pub fn forget_device(&self, id: &str) -> Result<()> {
         self.remove_local_setting(&format!("{PREFIX}{id}"))?;
         self.remove_local_setting(&format!("{AUTO_PREFIX}{id}"))?;
-        self.remove_local_setting(&format!("{HELD_PREFIX}{id}"))
+        self.remove_local_setting(&format!("{HELD_PREFIX}{id}"))?;
+        self.forget_backup_key(id)
     }
 
     /// The version vector the Device `id` last said it holds, in a LAN

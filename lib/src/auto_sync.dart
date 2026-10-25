@@ -137,11 +137,16 @@ class AutoSync extends ChangeNotifier {
     final work = workDir;
     if (work == null || _disposed) return Future.value();
     if (_backingUp case final running?) return running;
-    final run = backUpIfDue(store, folders.openBackups, work).then(
-      (_) {},
-      // Kept as the Backups page's status.
-      onError: (Object _) {},
-    );
+    final run = openAutoBackup(folders)
+        .then(
+          (auto) =>
+              backUpIfDue(store, folders.openBackups, work, autoBackup: auto),
+        )
+        .then(
+          (_) {},
+          // Kept as the Backups page's status.
+          onError: (Object _) {},
+        );
     _backingUp = run;
     return run.whenComplete(() {
       if (identical(_backingUp, run)) _backingUp = null;
@@ -329,7 +334,12 @@ Future<void> backgroundSync({
   }
   if (workDir != null) {
     try {
-      await backUpIfDue(store, folders.openBackups, workDir);
+      await backUpIfDue(
+        store,
+        folders.openBackups,
+        workDir,
+        autoBackup: await openAutoBackup(folders),
+      );
     } on Object {
       // Kept as the Backups page's status; the next run tries again.
     }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -384,6 +385,11 @@ class _HomeState extends State<_Home> {
   /// where a file can be picked; worked out once.
   late final bool _restorable =
       widget.bundles.available && widget.store.currentSeq() == 0;
+
+  /// The Backup Android's Auto Backup brought back with the app, found
+  /// on the first start (ADR 0010): opened at once, asking for the
+  /// passphrase or the recovery key.
+  String? _found;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
@@ -424,6 +430,7 @@ class _HomeState extends State<_Home> {
       widget.autoSync.shown();
       // A bundle that opened the app.
       unawaited(_importOpened());
+      unawaited(_autoBackupStart());
     });
     // Back from the background, or from a settings page: apply what was
     // tapped meanwhile, see what is allowed now, arm again. Arms on the
@@ -634,13 +641,43 @@ class _HomeState extends State<_Home> {
     setState(() => _starterSetOffered = true);
   }
 
+  /// The platform's backup is told the opt-in this Device keeps, and on
+  /// the first start a Backup that came back with the app is offered at
+  /// once.
+  Future<void> _autoBackupStart() async {
+    final folders = widget.autoSync.folders;
+    await folders.setAutoBackup(widget.store.autoBackupOn);
+    if (_starterSetOffered || widget.store.currentSeq() != 0) return;
+    final dir = await folders.autoBackupDir();
+    if (!mounted || dir == null) return;
+    final found = newestBackupIn(dir);
+    if (found == null) return;
+    setState(() => _found = found);
+    await _restore();
+  }
+
   /// Restores a Backup into the empty log; the Starter Set is not
-  /// offered after, the Areas came with it.
+  /// offered after, the Areas came with it. The one that came back with
+  /// the app is removed once restored.
   Future<void> _restore() async {
+    final found = _found;
     final restored = await Navigator.of(context).push<RestoreResult>(
-      MaterialPageRoute(builder: (_) => RestoreScreen(store: widget.store)),
+      MaterialPageRoute(
+        builder: (_) => RestoreScreen(
+          store: widget.store,
+          found: found != null && File(found).existsSync() ? found : null,
+        ),
+      ),
     );
     if (!mounted || restored == null) return;
+    if (found != null) {
+      try {
+        File(found).deleteSync();
+      } on FileSystemException {
+        // Gone already.
+      }
+      _found = null;
+    }
     widget.store.starterSetOffered = true;
     setState(() => _starterSetOffered = true);
     unawaited(widget.alarms.refresh());
@@ -658,7 +695,9 @@ class _HomeState extends State<_Home> {
     if (!_starterSetOffered) {
       return StarterSetScreen(
         onDone: _plant,
-        onRestore: _restorable ? () => unawaited(_restore()) : null,
+        onRestore: _restorable || _found != null
+            ? () => unawaited(_restore())
+            : null,
       );
     }
     if (!_alarmSetupDone) {

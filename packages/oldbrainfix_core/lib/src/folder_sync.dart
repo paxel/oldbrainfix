@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'area_keys.dart';
+import 'backup.dart';
 import 'conflicts.dart';
 import 'entry.dart';
 import 'shared_areas.dart';
@@ -419,6 +420,8 @@ Future<void> _learnKeys(
         for (final k in json['signing'] is List ? json['signing'] : const [])
           ?KeyRecord.fromJson(k),
       ], report: report);
+      // Only the writer's own: the file is sealed and bound to it.
+      store.learnBackupKey(device, json['backupKey']);
       if (store.learnAreaKeys(areaKeysOf(json['areaKeys'])) > 0) {
         learned = true;
       }
@@ -560,9 +563,9 @@ Future<List<Entry>?> _segmentEntries(
 }
 
 /// Publishes the keys this Device holds, its own signing key and every
-/// one it pinned, sealed once with each personal key it holds, so a
-/// Device holding any of them learns the rest. A file that already says
-/// the same stays untouched.
+/// one it pinned, and its own backup key (ADR 0016), sealed once with
+/// each personal key it holds, so a Device holding any of them learns
+/// the rest. A file that already says the same stays untouched.
 Future<void> _publishKeys(
   Store store,
   SyncFolder folder,
@@ -573,6 +576,7 @@ Future<void> _publishKeys(
   final plain = utf8.encode(
     jsonEncode({
       'areaKeys': [for (final k in keys) k.toJson()],
+      'backupKey': ?store.backupKeyToSend,
       'signing': [for (final k in store.keyRecords()) k.toJson()],
     }),
   );

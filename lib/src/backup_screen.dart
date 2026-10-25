@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
+import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'folder_platform.dart';
@@ -51,9 +52,12 @@ Uint8List recoverySheetBytes(
 
 /// Backups, inside Settings (ADR 0010, 0016): set up once with a
 /// passphrase, which makes the Recovery Sheet to print or share at once
-/// and again later; then the folder they go into, the weekly switch,
-/// "Back up now" and how the last one went. What happened, or why not,
-/// is announced at the top.
+/// and again later; then the opt-in to keep the newest one in the user's
+/// Google account where the platform has one, the folder they go into,
+/// the weekly switch, "Back up now" and how the last one went; and the
+/// recovery keys of the other Devices of this one's group, each shown
+/// after this Device's own unlock. What happened, or why not, is
+/// announced at the top.
 class BackupScreen extends StatefulWidget {
   final Store store;
 
@@ -85,6 +89,13 @@ class _BackupScreenState extends State<BackupScreen> {
   String? _folderName;
   var _named = false;
 
+  /// The directory Auto Backup takes the newest Backup from, where the
+  /// platform has one.
+  String? _autoDir;
+
+  /// Whether the newest Backup there is too large for Google to take.
+  var _autoTooBig = false;
+
   Store get _store => widget.store;
 
   @override
@@ -93,6 +104,7 @@ class _BackupScreenState extends State<BackupScreen> {
     if (!_named) {
       _named = true;
       unawaited(_nameFolder());
+      unawaited(_findAutoDir());
     }
   }
 
@@ -111,6 +123,93 @@ class _BackupScreenState extends State<BackupScreen> {
     final name = await FolderScope.of(context).displayName(folder);
     if (!mounted) return;
     setState(() => _folderName = name);
+  }
+
+  Future<void> _findAutoDir() async {
+    final dir = await FolderScope.of(context).autoBackupDir();
+    if (!mounted) return;
+    setState(() {
+      _autoDir = dir;
+      _autoTooBig = _tooBig(dir);
+    });
+  }
+
+  /// Whether a Backup in [dir] is larger than Auto Backup takes.
+  static bool _tooBig(String? dir) {
+    if (dir == null) return false;
+    try {
+      return Directory(dir).listSync().whereType<File>().any(
+        (f) =>
+            f.path.endsWith('.$backupExtension') &&
+            f.lengthSync() > autoBackupQuotaBytes,
+      );
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  /// Opts in to Auto Backup, with a Backup there at once, or out of it,
+  /// the one there removed.
+  Future<void> _setAuto(bool on) async {
+    final folders = FolderScope.of(context);
+    final dir = _autoDir;
+    if (dir == null) return;
+    setState(() => _store.autoBackupOn = on);
+    await folders.setAutoBackup(on);
+    if (!mounted) return;
+    AutoSyncScope.of(context)?.devicesChanged();
+    if (on) {
+      await _backUp();
+      return;
+    }
+    final copy = LocalBackupFolder(dir);
+    try {
+      for (final name in await copy.list()) {
+        await copy.delete(name);
+      }
+    } on FileSystemException {
+      // Nothing there to take: the agent backs up nothing now anyway.
+    }
+    if (mounted) setState(() => _autoTooBig = false);
+  }
+
+  /// Shows the recovery key of [other] after this Device's own unlock.
+  Future<void> _showOther(OtherRecoveryKey other) async {
+    final t = context.t;
+    final lock = LockScope.of(context);
+    final ok = await confirmUnlock(
+      context,
+      lock,
+      title: t.backupOthersUnlock(other.device.name),
+    );
+    if (!ok || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.key_outlined),
+        title: Text(t.backupOthersKeyTitle(other.device.name)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SelectableText(
+              other.code,
+              key: const ValueKey('other-code'),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontFamily: 'monospace'),
+            ),
+            const SizedBox(height: 12),
+            Text(t.backupOthersKeyHint),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(t.backupOthersClose),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _setUp() async {
@@ -201,19 +300,30 @@ class _BackupScreenState extends State<BackupScreen> {
   Future<void> _backUp() async {
     final t = context.t;
     final folder = _store.backupFolder;
-    if (folder == null || _backingUp) return;
+    final auto = _store.autoBackupOn ? _autoDir : null;
+    if ((folder == null && auto == null) || _backingUp) return;
     final folders = FolderScope.of(context);
     final work =
         AutoSyncScope.of(context)?.workDir ?? Directory.systemTemp.path;
     setState(() => _backingUp = true);
     try {
-      await backUpNow(_store, folders.openBackups(folder), work);
+      await backUpNow(
+        _store,
+        folder == null ? null : folders.openBackups(folder),
+        work,
+        autoBackup: auto == null ? null : LocalBackupFolder(auto),
+      );
       if (mounted) _announce(t.backupDone);
     } on Object {
       // Kept as the status below as well.
       if (mounted) _announce(t.backupFailed);
     } finally {
-      if (mounted) setState(() => _backingUp = false);
+      if (mounted) {
+        setState(() {
+          _backingUp = false;
+          _autoTooBig = _tooBig(_autoDir);
+        });
+      }
     }
   }
 
@@ -300,6 +410,25 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
         ],
       ),
+      if (_autoDir != null)
+        _Card(
+          title: t.backupAutoTitle,
+          children: [
+            SwitchListTile(
+              key: const ValueKey('backup-auto'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.backupAutoSwitch),
+              subtitle: Text(t.backupAutoDetail),
+              value: _store.autoBackupOn,
+              onChanged: _backingUp ? null : _setAuto,
+            ),
+            if (_store.autoBackupOn && _autoTooBig)
+              Text(
+                t.backupAutoTooBig,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+          ],
+        ),
       if (folders.available)
         _Card(
           title: t.backupFolderTitle,
@@ -319,7 +448,7 @@ class _BackupScreenState extends State<BackupScreen> {
                 label: Text(t.backupChooseFolder),
               ),
             ),
-            if (folder != null) ...[
+            if (folder != null || _store.autoBackupOn) ...[
               SwitchListTile(
                 key: const ValueKey('backup-weekly'),
                 contentPadding: EdgeInsets.zero,
@@ -346,6 +475,40 @@ class _BackupScreenState extends State<BackupScreen> {
     ];
   }
 
+  /// The recovery keys of the other Devices of this one's group, each
+  /// a tap and this Device's unlock away.
+  List<Widget> _others(AppLocalizations t, DateFormat when) {
+    final others = _store.otherRecoveryKeys();
+    if (others.isEmpty) return const [];
+    return [
+      if (!_store.backupsSetUp) const SizedBox(height: 16),
+      _Card(
+        title: t.backupOthersTitle,
+        children: [
+          Text(t.backupOthersIntro),
+          for (final other in others)
+            ListTile(
+              key: ValueKey('other-${other.device.id}'),
+              contentPadding: EdgeInsets.zero,
+              title: Text(other.device.name),
+              subtitle: Text(
+                t.backupOthersDetail(
+                  other.shortId,
+                  when.format(other.learned.toLocal()),
+                ),
+              ),
+              trailing: IconButton(
+                tooltip: t.backupOthersShow,
+                icon: const Icon(Icons.key_outlined),
+                onPressed: () => unawaited(_showOther(other)),
+              ),
+              onTap: () => unawaited(_showOther(other)),
+            ),
+        ],
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -359,6 +522,7 @@ class _BackupScreenState extends State<BackupScreen> {
           Text(t.backupsIntro),
           const SizedBox(height: 16),
           if (_store.backupsSetUp) ..._setUpDone(t, when) else ..._setUpForm(t),
+          ..._others(t, when),
         ],
       ),
     );

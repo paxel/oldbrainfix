@@ -1011,6 +1011,8 @@ pub fn sync_request_as(
     joining: Joining,
 ) -> Result<Value> {
     store.ensure_area_keys()?;
+    // This Device's backup key goes to a Device of its own group only.
+    let own = matches!(joining, Joining::Plain) && !store.is_shared_peer(host_device)?;
     let (entries, area_keys) = match joining {
         Joining::Invited => (Vec::new(), Vec::new()),
         Joining::Inviting(invite) => {
@@ -1046,6 +1048,9 @@ pub fn sync_request_as(
                 map.insert("invite".to_string(), json!({"area": invite.area}));
             }
             Joining::Plain => {}
+        }
+        if own && let Some(key) = store.backup_key_to_send()? {
+            map.insert("backupKey".to_string(), Value::String(key));
         }
     }
     Ok(body)
@@ -1110,6 +1115,7 @@ pub fn answer_sync_inviting(
     let offered = area_keys_of(body.get("areaKeys"));
     if !shared {
         store.learn_area_keys(&offered)?;
+        store.learn_backup_key(&peer, body.get("backupKey"))?;
     }
     let entries = if inviting.is_some() {
         Vec::new()
@@ -1169,6 +1175,12 @@ pub fn answer_sync_inviting(
     {
         map.insert("invite".to_string(), json!({"area": invite.area}));
     }
+    if !shared
+        && let Some(key) = store.backup_key_to_send()?
+        && let Some(map) = answer.as_object_mut()
+    {
+        map.insert("backupKey".to_string(), Value::String(key));
+    }
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Some((
         answer,
@@ -1215,6 +1227,7 @@ pub fn apply_answer_as(
     let offered = area_keys_of(answer.get("areaKeys"));
     if !shared {
         store.learn_area_keys(&offered)?;
+        store.learn_backup_key(&host, answer.get("backupKey"))?;
     }
     let applied = store.apply_entries(
         &entries_of(answer.get("entries")),
@@ -2089,6 +2102,10 @@ mod tests {
                 .all(|n| n.text != "Phone private")
         );
 
+        // Backups set up on both: no backup key goes to another person.
+        for store in [&desk, &phone] {
+            store.set_local_setting("backup:key", &BASE64.encode([9u8; 32]))?;
+        }
         let body = sync_request_as(
             &phone,
             &desk.version_vector()?,
@@ -2099,6 +2116,7 @@ mod tests {
         )?;
         assert_eq!(body["entries"], json!([]));
         assert_eq!(body["areaKeys"], json!([]));
+        assert!(body.get("backupKey").is_none());
         let (response, session) =
             desk.serve_sync_inviting(body.to_string().as_bytes(), "Desk", Some(&invite))?;
         assert_eq!(response.status, 200);
@@ -2111,7 +2129,10 @@ mod tests {
             .filter_map(|k| k["scope"].as_str())
             .collect();
         assert_eq!(scopes, vec![area.as_str()]);
+        assert!(answer.get("backupKey").is_none());
         apply_answer_as(&phone, &answer, true, None)?;
+        assert!(phone.held_backup_key(&desk.device_id()?)?.is_none());
+        assert!(desk.held_backup_key(&phone.device_id()?)?.is_none());
         let texts: Vec<String> = Notes::new(&phone)
             .all()?
             .into_iter()

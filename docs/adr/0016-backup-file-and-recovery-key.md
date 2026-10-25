@@ -19,9 +19,26 @@ Backups go into a folder the user picks (a document tree on the phone, a directo
 
 ## Consequences
 
-- One Recovery Sheet per Device: the backup key never travels, so a paired Device cannot show another's recovery key yet (ADR 0010 promises it; left for later).
+- One Recovery Sheet per Device; the other Devices of its group hold its backup key too (below), so whoever reaches one of them reads its Backups as well.
 - A changed passphrase would still open the Backups made before; changing it is left out for now.
 - Sent Items sent before the restore can no longer be updated or cancelled; sending the Note again sends a new one (ADR 0015). Files encrypted to the old Device's X25519 key, updates and cancellations included, do not open on the new one until their senders met its key record in a sync.
 - The other people of a Shared Area take the new Device's entries once they met it, or a Device of its group, in a sync (ADR 0013).
 - The one role entry the restored Device signs as the old one collides with the old Device's next entry if that Device still runs; restoring is meant for a Device that is gone.
 - Restoring writes the blobs before the log is committed: a file found damaged half-way leaves blobs nobody refers to, never a half log.
+
+## Recovery through paired Devices, and Google's copy (#41)
+
+A Device sends its own backup key, and only its own, to the Devices of its own group: as `backupKey` (base64) in the `POST /sync` body and in the answer of a LAN session that is not with another person's Device (never to a Device paired by invite, nor while inviting or invited, ADR 0013), and in its keys file in the shared folder, which only its personal key opens (ADR 0012) and bundles carry likewise. The field is left out before Backups are set up, so files and sessions without it stay byte-identical. The receiver keeps it as a local setting `backupkey:<device>` = `{"key":…,"learned":…}` under the sender's id: over LAN the session's peer, which the session authenticates, so nobody there can send a key under another Device's name; in the folder and in bundles the keys file's writer, which the personal key only proves to be of the group, whose Devices are trusted alike. A newer key replaces the one held, as the newest Backups use it. Forgetting a paired Device drops its key, and only Devices still paired and of the own group show theirs: in the Backups card, by name, with the first 8 digits its Backup files end in, the key itself only after this Device's own unlock. On the phone that is the App Lock's PIN, or biometrics where they are on; without an App Lock, the phone's own screen lock where it has one. The desktop has no App Lock yet: its unlock is the computer's login, and the key shows on a click.
+
+On Android the app's backup agent (`AutoBackup.kt`) takes part in Auto Backup (`fullBackupOnly`) and backs up nothing until the user opts in on the Backups page, a Device setting (`backup:auto`, ADR 0008) mirrored to a flag the agent reads without Flutter. Opted in, the weekly Backup, or one written by hand, also goes into the app's own `files/google-backup/`, with nothing else kept there, and the agent hands Google that one file and nothing else, never the database; with it on, no folder is needed for weekly Backups. A file larger than the quota Google takes (25 MiB) is left out and the page says so. Restoring takes back only a Backup file into that directory. On the first start of a new phone, a Backup found there opens at once, asking for the passphrase or the recovery key; it is removed once restored, kept when the user starts without it. The opt-in does not come back with it.
+
+### Considered Options (#41)
+
+- Every backup key a Device holds relayed on to the rest of its group, as Area keys are (rejected: a key could then arrive under a Device id it never came from, and a Device that never met the lost one would show it).
+- The opt-in kept only as a file the agent looks for (rejected: the agent must not need Flutter, and a Backup file restored from Google must not count as opting in on the new phone).
+
+### Consequences (#41)
+
+- A Device that set Backups up again shows the newest key only; the older Backups of the other Device, still in its folder, need the older Recovery Sheet.
+- Google's copy is at most a week old, and only the newest one: Android keeps no history of it.
+- A Backup larger than 25 MiB, photos and recordings counting, never reaches Google.

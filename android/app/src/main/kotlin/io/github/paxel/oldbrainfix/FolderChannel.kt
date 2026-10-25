@@ -15,7 +15,9 @@ import java.util.concurrent.Executors
  * tree URI, good for shared storage, a USB stick and cloud providers
  * alike, none of which is a path an app may read. Dart sees the folder
  * as `oldbrainfix-sync` with `keys` and `blobs` inside, addressed by
- * name; Backups go straight into the folder picked for them ([put]).
+ * name; Backups go straight into the folder picked for them ([put]),
+ * and the one Auto Backup may take lies in the app's own files
+ * ([AutoBackup]).
  * Everything here needs only a [Context], so the background
  * sync's engine (SyncWorker) answers it as the app does; picking the
  * tree is the Activity's ([MainActivity]). The files are read and
@@ -30,7 +32,9 @@ object FolderChannel {
 
     /** Answers [call] and returns true, or false when it is not one of these. */
     fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure")) return false
+        if (call.method !in setOf("name", "list", "read", "write", "put", "delete", "ensure", "autoBackupDir", "autoBackup")) {
+            return false
+        }
         val app = context.applicationContext
         io.execute {
             val answer = try {
@@ -49,6 +53,13 @@ object FolderChannel {
     }
 
     private fun answer(context: Context, call: MethodCall): Any? = when (call.method) {
+        // The app's own directory whose Backup Auto Backup may take, and
+        // the user's opt-in to it ([AutoBackup]).
+        "autoBackupDir" -> AutoBackup.dir(context).apply { mkdirs() }.absolutePath
+        "autoBackup" -> {
+            AutoBackup.setOptedIn(context, call.argument<Boolean>("on") == true)
+            null
+        }
         "name" -> tree(context, call)?.name
         "list" -> dir(context, call, create = false)?.listFiles()
             ?.filter { it.isFile }?.mapNotNull { it.name } ?: emptyList<String>()

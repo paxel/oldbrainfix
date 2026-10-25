@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'backup.dart';
 import 'store.dart';
 
 /// A Device this one has synced with in person (CONTEXT.md, Pairing),
@@ -108,10 +109,12 @@ extension Pairing on Store {
     setLocalSetting('$_prefix${device.id}', jsonEncode(kept.toJson()));
   }
 
-  /// Forgets the paired Device [id]. Its key stays: the entries it wrote
-  /// are still checked against it.
+  /// Forgets the paired Device [id], and the backup key it sent (ADR
+  /// 0016). Its signing key stays: the entries it wrote are still
+  /// checked against it.
   void forgetDevice(String id) {
     removeLocalSetting('$_prefix$id');
+    forgetBackupKey(id);
     removeLocalSetting('$_autoPrefix$id');
     removeLocalSetting('$_heldPrefix$id');
   }

@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
+
+import 'shared_areas_test.dart' show exchange;
 
 /// A cost tests can afford; files say what they were made with.
 const cheap = BackupKdf(memory: 64, iterations: 1);
@@ -471,6 +474,219 @@ void main() {
       await backUpNow(store, LocalBackupFolder(there.path), dir.path);
       expect(store.backupFailed, isNull);
       expect(store.lastBackup, now);
+    });
+  });
+
+  group('recovery through a paired Device', () {
+    test('a Device of the own group holds the other\'s backup key after a '
+        'LAN session and shows it as its recovery key', () async {
+      final clock = ticking();
+      final phone = Store.inMemory(clock: clock);
+      final desk = Store.inMemory(clock: clock);
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      final code = await setUpBackups(phone, passphrase, kdf: cheap);
+      final first = exchange(phone, desk);
+      expect(first.request['backupKey'], phone.backupKeyToSend);
+      expect(first.answer.containsKey('backupKey'), isFalse);
+
+      final shown = desk.otherRecoveryKeys().single;
+      expect(shown.device.id, phone.deviceId);
+      expect(shown.device.name, 'Phone');
+      expect(shown.code, code);
+      expect(shown.shortId, phone.deviceId.substring(0, 8));
+      expect(phone.otherRecoveryKeys(), isEmpty);
+
+      // The desk sets up as well; its key goes the other way.
+      final deskCode = await setUpBackups(desk, passphrase, kdf: cheap);
+      exchange(phone, desk);
+      expect(phone.otherRecoveryKeys().single.code, deskCode);
+
+      // Set up again on the phone: the newest key is the one shown.
+      final again = await setUpBackups(phone, passphrase, kdf: cheap);
+      exchange(phone, desk);
+      expect(desk.otherRecoveryKeys().single.code, again);
+
+      // The key opens the phone's Backups on a new Device.
+      final path = '${dir.path}/phone.$backupExtension';
+      await writeBackup(phone, path);
+      final header = readBackupHeader(path)!;
+      expect(
+        await unlockBackup(
+          header,
+          recoveryCode: desk.otherRecoveryKeys()[0].code,
+        ),
+        isNotNull,
+      );
+
+      // Forgotten: no longer paired, its key goes too.
+      desk.forgetDevice(phone.deviceId);
+      expect(desk.heldBackupKey(phone.deviceId), isNull);
+      expect(desk.otherRecoveryKeys(), isEmpty);
+    });
+
+    test('another person\'s Device neither gets nor gives a backup '
+        'key', () async {
+      final clock = ticking();
+      final ann = Store.inMemory(clock: clock)
+        ..setLocalSetting('author', 'Ann');
+      final ben = Store.inMemory(clock: clock)
+        ..setLocalSetting('author', 'Ben');
+      addTearDown(ann.close);
+      addTearDown(ben.close);
+      await setUpBackups(ann, passphrase, kdf: cheap);
+      await setUpBackups(ben, passphrase, kdf: cheap);
+      final house = Places(ann).addArea('Household');
+      final area = ann.share(house.id, name: 'Ann');
+      final invited = exchange(
+        ben,
+        ann,
+        inviting: Invite(area, role: AreaRole.member, name: 'Ben'),
+      );
+      final later = exchange(ben, ann);
+      final inviting = exchange(
+        ann,
+        ben,
+        invite: Invite(
+          ann.share(Places(ann).addArea('Garden').id, name: 'Ann'),
+          role: AreaRole.member,
+          name: 'Ben',
+        ),
+      );
+      for (final e in [invited, later, inviting]) {
+        expect(e.request.containsKey('backupKey'), isFalse);
+        expect(e.answer.containsKey('backupKey'), isFalse);
+      }
+      expect(ann.heldBackupKey(ben.deviceId), isNull);
+      expect(ben.heldBackupKey(ann.deviceId), isNull);
+      expect(ann.otherRecoveryKeys(), isEmpty);
+      expect(ben.otherRecoveryKeys(), isEmpty);
+    });
+
+    test('a key is taken only as the sender\'s own, and only as one', () {
+      final store = Store.inMemory(clock: ticking());
+      addTearDown(store.close);
+      final key = base64.encode(List.filled(backupKeyBytes, 7));
+      expect(store.learnBackupKey(store.deviceId, key), isFalse);
+      expect(store.learnBackupKey('', key), isFalse);
+      expect(store.learnBackupKey('a' * 32, 'no base64!'), isFalse);
+      expect(store.learnBackupKey('a' * 32, base64.encode([1, 2, 3])), isFalse);
+      expect(store.learnBackupKey('a' * 32, 42), isFalse);
+      expect(store.learnBackupKey('a' * 32, key), isTrue);
+      expect(store.learnBackupKey('a' * 32, key), isFalse, reason: 'held');
+      // Not paired: held, but not shown.
+      expect(store.otherRecoveryKeys(), isEmpty);
+    });
+
+    test('the shared folder carries it to a Device of the own group, in '
+        'the keys file sealed with the personal key', () async {
+      final clock = ticking();
+      final phone = Store.inMemory(clock: clock);
+      final desk = Store.inMemory(clock: clock);
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      exchange(phone, desk);
+      final code = await setUpBackups(phone, passphrase, kdf: cheap);
+      final folder = MemorySyncFolder();
+      await folderSync(phone, folder);
+      expect(desk.heldBackupKey(phone.deviceId), isNull);
+      await folderSync(desk, folder);
+      expect(desk.otherRecoveryKeys().single.code, code);
+      // Nothing of it in plain text.
+      final key = phone.backupKeyToSend!;
+      for (final files in folder.dirs.values) {
+        for (final bytes in files.values) {
+          expect(
+            latin1.decode(bytes, allowInvalid: true),
+            isNot(contains(key)),
+          );
+        }
+      }
+    });
+
+    test('a bundle for a Device of the own group carries it too', () async {
+      final clock = ticking();
+      final phone = Store.inMemory(clock: clock);
+      final desk = Store.inMemory(clock: clock);
+      addTearDown(phone.close);
+      addTearDown(desk.close);
+      exchange(phone, desk);
+      final code = await setUpBackups(phone, passphrase, kdf: cheap);
+      Notes(phone).capture('Written since');
+      final path = '${dir.path}/phone.$bundleExtension';
+      expect(
+        await writeBundle(phone, path, forDevice: desk.deviceId),
+        isNotNull,
+      );
+      await importBundle(desk, path);
+      expect(desk.otherRecoveryKeys().single.code, code);
+    });
+  });
+
+  group('Auto Backup', () {
+    test('is off until opted in, then the weekly Backup goes there alone, '
+        'without a folder, the newest only', () async {
+      var now = DateTime.utc(2026, 10, 1, 9);
+      final store = Store.inMemory(clock: () => now);
+      addTearDown(store.close);
+      final auto = Directory('${dir.path}/auto')..createSync();
+      final work = Directory('${dir.path}/work')..createSync();
+      final copy = LocalBackupFolder(auto.path);
+      BackupFolder open(String path) => LocalBackupFolder(path);
+      await setUpBackups(store, passphrase, kdf: cheap);
+      expect(store.autoBackupOn, isFalse);
+      expect(store.backupsScheduled, isFalse);
+      expect(
+        await backUpIfDue(store, open, work.path, autoBackup: copy),
+        isNull,
+      );
+      expect(auto.listSync(), isEmpty);
+
+      store.autoBackupOn = true;
+      expect(store.backupsScheduled, isTrue);
+      // A Backup of an older Device, restored from there, makes way.
+      File('${auto.path}/oldbrainfix-20200101-000000-ffffffff.obfbackup')
+          .writeAsStringSync('an older Device');
+      final first = await backUpIfDue(store, open, work.path, autoBackup: copy);
+      expect(await copy.list(), [first]);
+      now = now.add(const Duration(days: 7));
+      final second = await backUpIfDue(
+        store,
+        open,
+        work.path,
+        autoBackup: copy,
+      );
+      expect(second, isNot(first));
+      expect(await copy.list(), [second]);
+      expect(readBackupHeader('${auto.path}/$second')?.created, now);
+
+      // With a folder too, both get it.
+      final folder = Directory('${dir.path}/folder')..createSync();
+      store.backupFolder = folder.path;
+      now = now.add(const Duration(days: 7));
+      final third = await backUpIfDue(store, open, work.path, autoBackup: copy);
+      expect(await LocalBackupFolder(folder.path).list(), [third]);
+      expect(await copy.list(), [third]);
+
+      // Opted out: the folder alone.
+      store.autoBackupOn = false;
+      now = now.add(const Duration(days: 7));
+      final fourth = await backUpIfDue(
+        store,
+        open,
+        work.path,
+        autoBackup: copy,
+      );
+      expect(await copy.list(), [third]);
+      expect(await LocalBackupFolder(folder.path).list(), [third, fourth]);
+      expect(store.backupFolder, isNotNull);
+    });
+
+    test('a Backup needs somewhere to go', () async {
+      final store = Store.inMemory(clock: ticking());
+      addTearDown(store.close);
+      await setUpBackups(store, passphrase, kdf: cheap);
+      expect(() => backUpNow(store, null, dir.path), throwsArgumentError);
     });
   });
 

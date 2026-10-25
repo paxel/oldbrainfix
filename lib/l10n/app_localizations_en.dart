@@ -2124,4 +2124,64 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get recoverySheetStepSettings =>
       'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.';
+
+  @override
+  String get backupOthersTitle => 'Recovery keys of your other Devices';
+
+  @override
+  String get backupOthersIntro =>
+      'Lost one of your other Devices? Its recovery key opens its Backups on a new one. Whoever holds it can read them: show it only to type it in.';
+
+  @override
+  String backupOthersDetail(String id, String when) {
+    return 'Its Backup files end in $id. Received $when.';
+  }
+
+  @override
+  String get backupOthersShow => 'Show recovery key';
+
+  @override
+  String get backupOthersHide => 'Hide';
+
+  @override
+  String backupOthersUnlock(String name) {
+    return 'Show the recovery key of $name';
+  }
+
+  @override
+  String backupOthersKeyTitle(String name) {
+    return 'Recovery key of $name';
+  }
+
+  @override
+  String get backupOthersKeyHint =>
+      'On the new Device, choose its Backup file and type this key where it asks for the passphrase or the recovery key.';
+
+  @override
+  String get backupOthersClose => 'Close';
+
+  @override
+  String get backupAutoTitle => 'Google backup';
+
+  @override
+  String get backupAutoSwitch =>
+      'Also keep the newest Backup in my Google account';
+
+  @override
+  String get backupAutoDetail =>
+      'Android\'s own backup then keeps the newest Backup file, encrypted as it is, in your Google account, and nothing else of the app. On a new phone it comes back with your apps, and the app asks for the passphrase or the recovery key.';
+
+  @override
+  String get backupAutoTooBig =>
+      'The newest Backup is larger than the 25 MB Android sends to Google, so Google keeps none. A folder still takes it.';
+
+  @override
+  String get restoreFoundTitle => 'A Backup came back';
+
+  @override
+  String get restoreFound =>
+      'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.';
+
+  @override
+  String get restoreFoundSkip => 'Start without it';
 }

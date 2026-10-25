@@ -41,6 +41,12 @@ class FakeFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
+
+  @override
+  Future<String?> autoBackupDir() async => null;
+
+  @override
+  Future<void> setAutoBackup(bool on) async {}
 }
 
 void main() {

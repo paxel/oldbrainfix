@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import 'area_keys.dart';
+import 'backup.dart';
 import 'conflicts.dart';
 import 'entry.dart';
 import 'pair_code.dart';
@@ -154,7 +155,8 @@ bool trustsPairedJoiner(
 /// over [hostDevice] and [pin] that it holds its own key: a host that
 /// paired with it before lets it in without asking only then. The
 /// Area keys travel along (ADR 0012): only over this session, which the
-/// pair code or the pinned certificate authenticated.
+/// pair code or the pinned certificate authenticated; to a Device of
+/// this one's own group this Device's backup key as well (ADR 0016).
 ///
 /// To another person's Device (ADR 0013) only what it shares goes: when
 /// the host invites this Device ([invited]), nothing at all; when this
@@ -173,6 +175,8 @@ Map<String, Object?> syncRequest(
   store.ensureAreaKeys();
   final List<Entry> entries;
   final List<AreaKey> areaKeys;
+  // This Device's backup key goes to a Device of its own group only.
+  var own = false;
   if (invited) {
     entries = const [];
     areaKeys = const [];
@@ -196,6 +200,7 @@ Map<String, Object?> syncRequest(
   } else {
     entries = store.entriesSince(hostVector);
     areaKeys = store.areaKeys();
+    own = true;
   }
   return {
     'format': syncFormat,
@@ -206,6 +211,7 @@ Map<String, Object?> syncRequest(
     'entries': [for (final e in entries) e.toJson()],
     'keys': [for (final k in store.keyRecords()) k.toJson()],
     'areaKeys': [for (final k in areaKeys) k.toJson()],
+    if (own) 'backupKey': ?store.backupKeyToSend,
     if (invited) 'invited': true,
     if (invite != null) 'invite': {'area': invite.areaId},
   };
@@ -273,7 +279,10 @@ List<String> _missingFor(Store store, String peer) {
   final sharedArea = inviting?.areaId ?? invitedTo;
   final report = ImportReport();
   final before = store.currentSeq();
-  if (!shared) store.learnAreaKeys(areaKeysOf(body['areaKeys']));
+  if (!shared) {
+    store.learnAreaKeys(areaKeysOf(body['areaKeys']));
+    store.learnBackupKey(peer, body['backupKey']);
+  }
   final applied = store.applyEntries(
     inviting != null ? const [] : _entries(body['entries']),
     keys: _keys(body['keys']),
@@ -326,6 +335,7 @@ List<String> _missingFor(Store store, String peer) {
         for (final k in shared ? store.areaKeysFor(peer) : store.areaKeys())
           k.toJson(),
       ],
+      if (!shared) 'backupKey': ?store.backupKeyToSend,
       if (inviting != null) 'invite': {'area': inviting.areaId},
     },
     session: SyncSession(
@@ -361,7 +371,10 @@ SyncSession applyAnswer(
   }
   final report = ImportReport();
   final before = store.currentSeq();
-  if (!shared) store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
+  if (!shared) {
+    store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
+    store.learnBackupKey(host, answer['backupKey']);
+  }
   final applied = store.applyEntries(
     _entries(answer['entries']),
     keys: _keys(answer['keys']),

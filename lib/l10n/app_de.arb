@@ -555,5 +555,21 @@
   "recoverySheetPdfIntro": "Dieser Wiederherstellungsschlüssel öffnet die Sicherungen dieses Geräts, auch wenn die Passphrase vergessen ist. Wer ihn hat, kann sie lesen: Bewahre dieses Blatt sicher auf, in einer Schublade oder einem Passwort-Manager, nie neben den Sicherungen.",
   "recoverySheetKey": "Wiederherstellungsschlüssel",
   "recoverySheetStepRestore": "Zum Wiederherstellen installiere Old Brain Fix, wähle auf dem ersten Bildschirm „Aus einer Sicherung wiederherstellen“, nimm die neueste Sicherungsdatei und tippe diesen Schlüssel ein oder scanne den QR-Code.",
-  "recoverySheetStepSettings": "Einstellungen wie Alarme, Ruhezeiten und Sperren sind nicht in einer Sicherung. Stell sie auf dem neuen Gerät neu ein und kopple es noch einmal mit deinen anderen Geräten."
+  "recoverySheetStepSettings": "Einstellungen wie Alarme, Ruhezeiten und Sperren sind nicht in einer Sicherung. Stell sie auf dem neuen Gerät neu ein und kopple es noch einmal mit deinen anderen Geräten.",
+  "backupOthersTitle": "Wiederherstellungsschlüssel deiner anderen Geräte",
+  "backupOthersIntro": "Eines deiner anderen Geräte ist verloren? Sein Wiederherstellungsschlüssel öffnet seine Sicherungen auf einem neuen. Wer ihn hat, kann sie lesen: Zeig ihn nur zum Eintippen.",
+  "backupOthersDetail": "Seine Sicherungsdateien enden auf {id}. Erhalten am {when}.",
+  "backupOthersShow": "Wiederherstellungsschlüssel zeigen",
+  "backupOthersHide": "Verbergen",
+  "backupOthersUnlock": "Wiederherstellungsschlüssel von {name} zeigen",
+  "backupOthersKeyTitle": "Wiederherstellungsschlüssel von {name}",
+  "backupOthersKeyHint": "Wähle auf dem neuen Gerät seine Sicherungsdatei und tippe diesen Schlüssel dort ein, wo nach der Passphrase oder dem Wiederherstellungsschlüssel gefragt wird.",
+  "backupOthersClose": "Schließen",
+  "backupAutoTitle": "Google-Sicherung",
+  "backupAutoSwitch": "Die neueste Sicherung auch in meinem Google-Konto aufbewahren",
+  "backupAutoDetail": "Die Sicherung von Android bewahrt dann die neueste Sicherungsdatei, verschlüsselt wie sie ist, in deinem Google-Konto auf, sonst nichts von der App. Auf einem neuen Handy kommt sie mit deinen Apps zurück, und die App fragt nach der Passphrase oder dem Wiederherstellungsschlüssel.",
+  "backupAutoTooBig": "Die neueste Sicherung ist größer als die 25 MB, die Android an Google schickt, deshalb bewahrt Google keine auf. Ein Ordner nimmt sie weiter.",
+  "restoreFoundTitle": "Eine Sicherung ist zurück",
+  "restoreFound": "Dieses Handy hat eine Sicherung aus deinem Google-Konto zurückgebracht. Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt oder von einem deiner anderen Geräte.",
+  "restoreFoundSkip": "Ohne sie anfangen"
 }

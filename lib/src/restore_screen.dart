@@ -13,12 +13,48 @@ import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 
+/// The newest Backup in [dir] by when it was made, or null when none
+/// lies there: what Android's Auto Backup brought back (ADR 0010).
+String? newestBackupIn(String dir) {
+  final List<File> files;
+  try {
+    files = Directory(dir).listSync().whereType<File>().toList();
+  } on FileSystemException {
+    return null;
+  }
+  String? newest;
+  DateTime? made;
+  for (final file in files) {
+    if (!file.path.endsWith('.$backupExtension')) continue;
+    final BackupHeader? header;
+    try {
+      header = readBackupHeader(file.path);
+    } on FileSystemException {
+      continue;
+    }
+    if (header == null) continue;
+    if (made == null || header.created.isAfter(made)) {
+      newest = file.path;
+      made = header.created;
+    }
+  }
+  return newest;
+}
+
 /// First start, before the Starter Set (ADR 0016): a Backup file picked
 /// and opened with the passphrase, or with the recovery key typed or
 /// scanned from the Recovery Sheet, goes into the empty log. Pops with
 /// what was restored; why nothing was is announced at the top.
+///
+/// With [found], the Backup Android's Auto Backup brought back from the
+/// user's Google account (ADR 0010) is open at once, asking for the
+/// passphrase or the recovery key; it is never removed here, and
+/// "Start without it" pops with nothing.
 class RestoreScreen extends StatefulWidget {
   final Store store;
+
+  /// The Backup that came back with the app, if one did.
+  final String? found;
 
   /// How the passphrase's key is derived; in an isolate by default.
   final PassKeyDeriver derive;
@@ -26,6 +62,7 @@ class RestoreScreen extends StatefulWidget {
   const RestoreScreen({
     super.key,
     required this.store,
+    this.found,
     this.derive = isolatePassKey,
   });
 
@@ -41,6 +78,15 @@ class _RestoreScreenState extends State<RestoreScreen> {
   var _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.found case final found?) {
+      _header = readBackupHeader(found);
+      if (_header != null) _path = found;
+    }
+  }
+
+  @override
   void dispose() {
     _passphrase.dispose();
     _code.dispose();
@@ -50,10 +96,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
 
   void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
 
-  /// Removes the copy of the file picked.
+  /// Removes the copy of the file picked; the Backup that came back with
+  /// the app stays.
   void _drop() {
     final path = _path;
-    if (path == null) return;
+    if (path == null || path == widget.found) return;
     try {
       File(path).deleteSync();
     } on FileSystemException {
@@ -218,24 +265,40 @@ class _RestoreScreenState extends State<RestoreScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final header = _header;
+    final found = _path != null && _path == widget.found;
+    final pick = FilledButton.icon(
+      key: const ValueKey('restore-pick'),
+      onPressed: _busy ? null : _pick,
+      icon: const Icon(Icons.file_open_outlined),
+      label: Text(t.restorePick),
+    );
     return Scaffold(
-      appBar: AppBar(title: Text(t.restoreOffer)),
+      appBar: AppBar(title: Text(found ? t.restoreFoundTitle : t.restoreOffer)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Text(t.restoreIntro),
+          Text(found ? t.restoreFound : t.restoreIntro),
           const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              key: const ValueKey('restore-pick'),
-              onPressed: _busy ? null : _pick,
-              icon: const Icon(Icons.file_open_outlined),
-              label: Text(t.restorePick),
-            ),
-          ),
-          const SizedBox(height: 16),
+          if (!found) ...[
+            Align(alignment: Alignment.centerLeft, child: pick),
+            const SizedBox(height: 16),
+          ],
           if (header != null) ..._unlock(t, header),
+          if (found) ...[
+            const SizedBox(height: 24),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  key: const ValueKey('restore-skip'),
+                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                  child: Text(t.restoreFoundSkip),
+                ),
+                if (BundleScope.of(context).available) pick,
+              ],
+            ),
+          ],
         ],
       ),
     );

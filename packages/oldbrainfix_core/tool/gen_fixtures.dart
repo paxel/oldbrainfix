@@ -1321,6 +1321,19 @@ void _conflictsFixture(Directory root) {
   }
 }
 
+/// The keys [store] holds, its own backup key among them (ADR 0016).
+List<List<String>> _keysWithBackup(Store store) => [
+  ..._keySettings(store),
+  if (store.localSetting('backup:key') case final key?) ['backup:key', key],
+];
+
+/// The backup key [store] holds of [other], base64, or null.
+String? _heldBackupKey(Store store, Store other) =>
+    switch (store.heldBackupKey(other.deviceId)) {
+      final held? => base64.encode(held.key),
+      null => null,
+    };
+
 /// Two Devices that met once and wrote more since, then one more LAN
 /// session between them: the logs and keys before it, the joiner's
 /// request, the host's answer, and what both read after it.
@@ -1350,12 +1363,21 @@ void _sync(Directory root) {
         .rename(Places.starterId(PlaceKeys.typeArea, 'work'), 'Office');
     Notes(joiner).capture('Pills at eight', photos: [_photo(6)]);
     Notes(host).amend(dentist.id, 'Tuesday works');
+    // Both set Backups up meanwhile: each backup key goes to the other.
+    host.setLocalSetting(
+      'backup:key',
+      base64.encode(List<int>.generate(32, (i) => 41 + i)),
+    );
+    joiner.setLocalSetting(
+      'backup:key',
+      base64.encode(List<int>.generate(32, (i) => 73 + i)),
+    );
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
     _write(
       File('${out.path}/settings.json'),
-      '${_json.convert({'host': _keySettings(host), 'joiner': _keySettings(joiner)})}\n',
+      '${_json.convert({'host': _keysWithBackup(host), 'joiner': _keysWithBackup(joiner)})}\n',
     );
     final hostVector = host.versionVector();
     final request = syncRequest(
@@ -1370,6 +1392,10 @@ void _sync(Directory root) {
     _write(File('${out.path}/request.json'), '${_json.convert(request)}\n');
     _write(File('${out.path}/answer.json'), '${_json.convert(done.answer)}\n');
     applyAnswer(joiner, done.answer);
+    _write(
+      File('${out.path}/backup_keys.json'),
+      '${_json.convert({'host': _heldBackupKey(host, joiner), 'joiner': _heldBackupKey(joiner, host)})}\n',
+    );
     _held = _tick.add(const Duration(days: 1));
     final expected = _expected(host)..remove('device');
     final joined = _expected(joiner)..remove('device');
@@ -1444,12 +1470,17 @@ Future<void> _folder(Directory root) async {
     );
     NamedPlaces(host).add('Home', Coordinates(52.52, 13.405), radius: 150);
     host.ensureAreaKeys();
+    // Backups set up on the host: its keys file carries its backup key.
+    host.setLocalSetting(
+      'backup:key',
+      base64.encode(List<int>.generate(32, (i) => 97 + i)),
+    );
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
     _write(
       File('${out.path}/settings.json'),
-      '${_json.convert({'host': _keySettings(host), 'joiner': _keySettings(joiner)})}\n',
+      '${_json.convert({'host': _keysWithBackup(host), 'joiner': _keysWithBackup(joiner)})}\n',
     );
     final folder = MemorySyncFolder();
     final nonces = _counted(1000);
@@ -1468,7 +1499,7 @@ Future<void> _folder(Directory root) async {
     }
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'read': expected})}\n',
+      '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'backupKey': _heldBackupKey(joiner, host), 'read': expected})}\n',
     );
   } finally {
     secretBytes = keep;
@@ -2441,8 +2472,9 @@ Future<void> main(List<String> args) async {
     '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
     'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
     'request (with its proof for the PIN 246810) and the host\'s answer, '
-    'both with the Area keys they hand over, and what both read after the '
-    'joiner took it in (`expected.json`).\n'
+    'both with the Area keys and the backup key they hand over, the '
+    'backup key each then holds of the other (`backup_keys.json`), and '
+    'what both read after the joiner took it in (`expected.json`).\n'
     '- `conflicts/`: two Devices that met once, then edited the same Note '
     'text, Area name and Routine schedule apart, wrote the same value on '
     'both sides and renamed a Topic on one side only: their logs, the '
@@ -2456,8 +2488,9 @@ Future<void> main(List<String> args) async {
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
     'keys each holds (`settings.json`), the folder the host wrote '
-    '(`$syncFolderRoot/`, nonces counted from 1001 on), and what the '
-    'joiner reads from it (`expected.json`).\n'
+    '(`$syncFolderRoot/`, nonces counted from 1001 on; its keys file '
+    'carries the host\'s backup key), and what the joiner reads from it '
+    '(`expected.json`).\n'
     '- `bundle/`: two Devices that met once; the host wrote more since, a '
     'new Area among it, and a bundle for the joiner: both logs with their '
     'blobs, the keys each holds and what each was told the other holds '

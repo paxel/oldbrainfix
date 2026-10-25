@@ -473,6 +473,8 @@ pub struct App {
     notice: Option<String>,
     /// The passphrase being typed into the Backups card.
     backup_form: Passphrase,
+    /// The other Devices whose recovery key the Backups card shows.
+    recovery_shown: std::collections::BTreeSet<String>,
     /// The first start's view, while it shows instead of the panes.
     welcome: Option<Welcome>,
     /// Ask where to save the Recovery Sheet and which Backup to restore.
@@ -572,6 +574,7 @@ impl App {
             handed: None,
             notice: None,
             backup_form: Passphrase::default(),
+            recovery_shown: Default::default(),
             welcome: None,
             sheet_saver: Box::new(|title, name| {
                 sheet_dialog(title).set_file_name(name).save_file()
@@ -2839,7 +2842,12 @@ impl App {
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
         let model_path = &mut self.model_path;
-        let (store, wall, backup_form) = (&self.store, &self.wall, &mut self.backup_form);
+        let (store, wall, backup_form, recovery_shown) = (
+            &self.store,
+            &self.wall,
+            &mut self.backup_form,
+            &mut self.recovery_shown,
+        );
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -2877,7 +2885,7 @@ impl App {
                 });
                 embossed(ui, tones, false, None, |ui| {
                     let mut asked = Vec::new();
-                    backup_view::card(ui, &t, store, wall, backup_form, &mut asked);
+                    backup_view::card(ui, &t, store, wall, backup_form, recovery_shown, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Backup));
                 });
                 embossed(ui, tones, false, None, |ui| {

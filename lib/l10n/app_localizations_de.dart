@@ -2143,4 +2143,65 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get recoverySheetStepSettings =>
       'Einstellungen wie Alarme, Ruhezeiten und Sperren sind nicht in einer Sicherung. Stell sie auf dem neuen Gerät neu ein und kopple es noch einmal mit deinen anderen Geräten.';
+
+  @override
+  String get backupOthersTitle =>
+      'Wiederherstellungsschlüssel deiner anderen Geräte';
+
+  @override
+  String get backupOthersIntro =>
+      'Eines deiner anderen Geräte ist verloren? Sein Wiederherstellungsschlüssel öffnet seine Sicherungen auf einem neuen. Wer ihn hat, kann sie lesen: Zeig ihn nur zum Eintippen.';
+
+  @override
+  String backupOthersDetail(String id, String when) {
+    return 'Seine Sicherungsdateien enden auf $id. Erhalten am $when.';
+  }
+
+  @override
+  String get backupOthersShow => 'Wiederherstellungsschlüssel zeigen';
+
+  @override
+  String get backupOthersHide => 'Verbergen';
+
+  @override
+  String backupOthersUnlock(String name) {
+    return 'Wiederherstellungsschlüssel von $name zeigen';
+  }
+
+  @override
+  String backupOthersKeyTitle(String name) {
+    return 'Wiederherstellungsschlüssel von $name';
+  }
+
+  @override
+  String get backupOthersKeyHint =>
+      'Wähle auf dem neuen Gerät seine Sicherungsdatei und tippe diesen Schlüssel dort ein, wo nach der Passphrase oder dem Wiederherstellungsschlüssel gefragt wird.';
+
+  @override
+  String get backupOthersClose => 'Schließen';
+
+  @override
+  String get backupAutoTitle => 'Google-Sicherung';
+
+  @override
+  String get backupAutoSwitch =>
+      'Die neueste Sicherung auch in meinem Google-Konto aufbewahren';
+
+  @override
+  String get backupAutoDetail =>
+      'Die Sicherung von Android bewahrt dann die neueste Sicherungsdatei, verschlüsselt wie sie ist, in deinem Google-Konto auf, sonst nichts von der App. Auf einem neuen Handy kommt sie mit deinen Apps zurück, und die App fragt nach der Passphrase oder dem Wiederherstellungsschlüssel.';
+
+  @override
+  String get backupAutoTooBig =>
+      'Die neueste Sicherung ist größer als die 25 MB, die Android an Google schickt, deshalb bewahrt Google keine auf. Ein Ordner nimmt sie weiter.';
+
+  @override
+  String get restoreFoundTitle => 'Eine Sicherung ist zurück';
+
+  @override
+  String get restoreFound =>
+      'Dieses Handy hat eine Sicherung aus deinem Google-Konto zurückgebracht. Öffne sie mit deiner Passphrase oder mit dem Wiederherstellungsschlüssel vom Wiederherstellungsblatt oder von einem deiner anderen Geräte.';
+
+  @override
+  String get restoreFoundSkip => 'Ohne sie anfangen';
 }

@@ -3433,6 +3433,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.'**
   String get recoverySheetStepSettings;
+
+  /// No description provided for @backupOthersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery keys of your other Devices'**
+  String get backupOthersTitle;
+
+  /// No description provided for @backupOthersIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost one of your other Devices? Its recovery key opens its Backups on a new one. Whoever holds it can read them: show it only to type it in.'**
+  String get backupOthersIntro;
+
+  /// No description provided for @backupOthersDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Its Backup files end in {id}. Received {when}.'**
+  String backupOthersDetail(String id, String when);
+
+  /// No description provided for @backupOthersShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show recovery key'**
+  String get backupOthersShow;
+
+  /// No description provided for @backupOthersHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get backupOthersHide;
+
+  /// No description provided for @backupOthersUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the recovery key of {name}'**
+  String backupOthersUnlock(String name);
+
+  /// No description provided for @backupOthersKeyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery key of {name}'**
+  String backupOthersKeyTitle(String name);
+
+  /// No description provided for @backupOthersKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On the new Device, choose its Backup file and type this key where it asks for the passphrase or the recovery key.'**
+  String get backupOthersKeyHint;
+
+  /// No description provided for @backupOthersClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get backupOthersClose;
+
+  /// No description provided for @backupAutoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google backup'**
+  String get backupAutoTitle;
+
+  /// No description provided for @backupAutoSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Also keep the newest Backup in my Google account'**
+  String get backupAutoSwitch;
+
+  /// No description provided for @backupAutoDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Android\'s own backup then keeps the newest Backup file, encrypted as it is, in your Google account, and nothing else of the app. On a new phone it comes back with your apps, and the app asks for the passphrase or the recovery key.'**
+  String get backupAutoDetail;
+
+  /// No description provided for @backupAutoTooBig.
+  ///
+  /// In en, this message translates to:
+  /// **'The newest Backup is larger than the 25 MB Android sends to Google, so Google keeps none. A folder still takes it.'**
+  String get backupAutoTooBig;
+
+  /// No description provided for @restoreFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A Backup came back'**
+  String get restoreFoundTitle;
+
+  /// No description provided for @restoreFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.'**
+  String get restoreFound;
+
+  /// No description provided for @restoreFoundSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start without it'**
+  String get restoreFoundSkip;
 }
 
 class _AppLocalizationsDelegate

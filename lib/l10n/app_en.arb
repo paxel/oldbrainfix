@@ -1185,5 +1185,45 @@
   "recoverySheetPdfIntro": "This recovery key opens the Backups of this Device, even when the passphrase is forgotten. Whoever holds it can read them: keep this sheet somewhere safe, in a drawer or a password manager, never next to the Backups.",
   "recoverySheetKey": "Recovery key",
   "recoverySheetStepRestore": "To restore, install Old Brain Fix, choose “Restore from a Backup” on the first screen, pick the newest Backup file and type this key, or scan the QR code.",
-  "recoverySheetStepSettings": "Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices."
+  "recoverySheetStepSettings": "Settings such as alarms, Quiet Hours and locks are not in a Backup. Set them again on the new Device, and pair it again with your other Devices.",
+  "backupOthersTitle": "Recovery keys of your other Devices",
+  "backupOthersIntro": "Lost one of your other Devices? Its recovery key opens its Backups on a new one. Whoever holds it can read them: show it only to type it in.",
+  "backupOthersDetail": "Its Backup files end in {id}. Received {when}.",
+  "@backupOthersDetail": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "backupOthersShow": "Show recovery key",
+  "backupOthersHide": "Hide",
+  "backupOthersUnlock": "Show the recovery key of {name}",
+  "@backupOthersUnlock": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "backupOthersKeyTitle": "Recovery key of {name}",
+  "@backupOthersKeyTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "backupOthersKeyHint": "On the new Device, choose its Backup file and type this key where it asks for the passphrase or the recovery key.",
+  "backupOthersClose": "Close",
+  "backupAutoTitle": "Google backup",
+  "backupAutoSwitch": "Also keep the newest Backup in my Google account",
+  "backupAutoDetail": "Android's own backup then keeps the newest Backup file, encrypted as it is, in your Google account, and nothing else of the app. On a new phone it comes back with your apps, and the app asks for the passphrase or the recovery key.",
+  "backupAutoTooBig": "The newest Backup is larger than the 25 MB Android sends to Google, so Google keeps none. A folder still takes it.",
+  "restoreFoundTitle": "A Backup came back",
+  "restoreFound": "This phone brought a Backup back from your Google account. Open it with your passphrase or with the recovery key from the Recovery Sheet or from one of your other Devices.",
+  "restoreFoundSkip": "Start without it"
 }

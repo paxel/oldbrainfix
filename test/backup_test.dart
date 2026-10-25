@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/folder_platform.dart';
@@ -16,6 +17,7 @@ import 'package:oldbrainfix/src/restore_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
+import 'fake_lock.dart';
 import 'fake_photos.dart';
 
 /// A stand-in for Argon2id, quick in a widget test: the real one is the
@@ -35,11 +37,16 @@ Future<Uint8List> quickKey(
 }
 
 /// Backups go into a directory the test made; the picker answers it.
+/// With [auto], Auto Backup takes the newest from there.
 class DirFolders implements FolderPlatform {
   final String path;
+  final String? auto;
   var picked = 0;
 
-  DirFolders(this.path);
+  /// What the agent was told last, if anything.
+  bool? optedIn;
+
+  DirFolders(this.path, {this.auto});
 
   @override
   bool get available => true;
@@ -58,6 +65,12 @@ class DirFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
+
+  @override
+  Future<String?> autoBackupDir() async => auto;
+
+  @override
+  Future<void> setAutoBackup(bool on) async => optedIn = on;
 }
 
 /// Reads the QR the test says is in the photo.
@@ -112,6 +125,7 @@ void main() {
     FolderPlatform folders = const NoFolders(),
     PhotoPlatform? photos,
     PairingPlatform? pairing,
+    AppLock? lock,
   }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
@@ -132,7 +146,12 @@ void main() {
                 folders: folders,
                 child: BundleScope(
                   bundles: bundles,
-                  child: child ?? const SizedBox.shrink(),
+                  child: lock == null
+                      ? child ?? const SizedBox.shrink()
+                      : LockScope(
+                          lock: lock,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                 ),
               ),
             ),
@@ -228,6 +247,137 @@ void main() {
       await tester.pumpAndSettle();
       expect(announcements.visible, startsWith('The Backup could not'));
       expect(find.textContaining('could not be written'), findsWidgets);
+    });
+
+    testWidgets('keeps the newest Backup for Google only once opted in', (
+      tester,
+    ) async {
+      final store = Store.inMemory(clock: () => now);
+      addTearDown(store.close);
+      await setUpBackups(store, 'correct horse', derive: quickKey);
+      final folder = Directory('${dir.path}/backups')..createSync();
+      final auto = Directory('${dir.path}/google-backup')..createSync();
+      final folders = DirFolders(folder.path, auto: auto.path);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        folders: folders,
+      );
+      expect(find.text('Google backup'), findsOneWidget);
+      expect(store.autoBackupOn, isFalse);
+      expect(auto.listSync(), isEmpty);
+      expect(find.byKey(const ValueKey('backup-now')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('backup-auto')));
+      await tester.pumpAndSettle();
+      expect(store.autoBackupOn, isTrue);
+      expect(folders.optedIn, isTrue);
+      expect(announcements.visible, 'Backup written.');
+      final kept = auto.listSync().whereType<File>().single;
+      expect(readBackupHeader(kept.path)?.created, now);
+      // No folder needed: nothing went there, and the weekly one is on.
+      expect(folder.listSync(), isEmpty);
+      expect(store.backupsScheduled, isTrue);
+      expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('backup-auto')));
+      await tester.pumpAndSettle();
+      expect(store.autoBackupOn, isFalse);
+      expect(folders.optedIn, isFalse);
+      expect(auto.listSync(), isEmpty);
+      expect(store.backupsScheduled, isFalse);
+    });
+
+    testWidgets('offers no Google backup where the platform has none', (
+      tester,
+    ) async {
+      final store = Store.inMemory(clock: () => now);
+      addTearDown(store.close);
+      await setUpBackups(store, 'correct horse', derive: quickKey);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        folders: DirFolders(dir.path),
+      );
+      expect(find.text('Google backup'), findsNothing);
+    });
+  });
+
+  group('another Device\'s recovery key', () {
+    /// This Device, paired with the Phone, which sent its backup key.
+    Future<(Store, String)> paired() async {
+      final phone = Store.inMemory(clock: () => now);
+      addTearDown(phone.close);
+      final code = await setUpBackups(phone, 'correct horse', derive: quickKey);
+      final store = Store.inMemory(clock: () => now);
+      addTearDown(store.close);
+      store
+        ..learnBackupKey(phone.deviceId, phone.backupKeyToSend)
+        ..rememberDevice(
+          PairedDevice(
+            id: phone.deviceId,
+            name: 'Phone',
+            fingerprint: '',
+            host: null,
+            port: null,
+            lastSync: now,
+          ),
+        );
+      return (store, code);
+    }
+
+    testWidgets('shows after the App Lock\'s PIN, also before Backups are '
+        'set up here', (tester) async {
+      final (store, code) = await paired();
+      store.setPin('1234', iterations: 1);
+      final lock = AppLock(store: store, platform: FakeBiometrics(can: false));
+      addTearDown(lock.dispose);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        lock: lock,
+      );
+      expect(find.text('Recovery keys of your other Devices'), findsOneWidget);
+      expect(find.text('Phone'), findsOneWidget);
+      expect(find.text(code), findsNothing);
+
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
+      expect(find.text('Show the recovery key of Phone'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '9999');
+      await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text(code), findsNothing);
+      await tester.enterText(find.byKey(const ValueKey('pinField')), '1234');
+      await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('Recovery key of Phone'), findsOneWidget);
+      expect(find.text(code), findsOneWidget);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text(code), findsNothing);
+    });
+
+    testWidgets('without an App Lock, shows after the phone\'s own screen '
+        'lock', (tester) async {
+      final (store, code) = await paired();
+      final biometrics = FakeBiometrics(answer: false);
+      final lock = AppLock(store: store, platform: biometrics);
+      addTearDown(lock.dispose);
+      await page(
+        tester,
+        BackupScreen(store: store, derive: quickKey),
+        lock: lock,
+      );
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
+      expect(biometrics.asked, ['Show the recovery key of Phone']);
+      expect(find.text(code), findsNothing);
+
+      biometrics.answer = true;
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
+      expect(find.text(code), findsOneWidget);
     });
   });
 
@@ -338,6 +488,69 @@ void main() {
       expect(store.starterSetOffered, isTrue);
       expect(Places(store).areas().single.name, 'Doctor');
       expect(store.recoveryCode, code);
+    });
+
+    testWidgets('a Backup that came back from Google is opened at once on '
+        'first start, and kept until it is restored', (tester) async {
+      final (path, code) = await backup();
+      final store = Store.inMemory(clock: () => now);
+      addTearDown(store.close);
+      final auto = Directory('${dir.path}/google-backup')..createSync();
+      final found =
+          '${auto.path}/oldbrainfix-20261024-090000-abcdef01.'
+          '$backupExtension';
+      File(path).copySync(found);
+      final folders = DirFolders(dir.path, auto: auto.path);
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        OldBrainFixApp(
+          store: store,
+          announcements: announcements,
+          bundles: bundles,
+          folders: folders,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('A Backup came back'), findsOneWidget);
+      expect(find.textContaining('Backup of October 24, 2026'), findsOneWidget);
+      expect(find.byKey(const ValueKey('restore-passphrase')), findsOneWidget);
+      expect(find.byKey(const ValueKey('restore-code')), findsOneWidget);
+      // The opt-in stays off on the new phone: its agent is told so.
+      expect(folders.optedIn, isFalse);
+
+      // Not now: back to the Starter Set, the file kept.
+      await tester.tap(find.byKey(const ValueKey('restore-skip')));
+      await tester.pumpAndSettle();
+      expect(find.text('Pick your Areas'), findsOneWidget);
+      expect(File(found).existsSync(), isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('restore-offer')));
+      await tester.pumpAndSettle();
+      expect(find.text('A Backup came back'), findsOneWidget);
+      // Another Device's key: no Argon2id here, the app's runs in an
+      // isolate.
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-code')),
+        encodeRecoveryCode(Uint8List(backupKeyBytes)),
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(
+        announcements.visible,
+        'This passphrase or recovery key does not open the Backup.',
+      );
+      expect(File(found).existsSync(), isTrue);
+
+      announcements.dismiss();
+      await tester.enterText(find.byKey(const ValueKey('restore-code')), code);
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(announcements.visible, startsWith('Restored: '));
+      expect(Places(store).areas().single.name, 'Doctor');
+      expect(File(found).existsSync(), isFalse);
+      expect(store.autoBackupOn, isFalse);
     });
 
     testWidgets('is not offered once the log holds anything', (tester) async {

@@ -43,10 +43,16 @@
     <!-- The App Lock and the Area Locks unlock with biometrics or the
          screen lock as well as with their PIN. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Android's Auto Backup to the user's Google account (ADR 0010):
+         the agent backs up nothing until the user opts in, and then only
+         the encrypted Backup file, never the database. -->
     <application
         android:label="Old Brain Fix"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:backupAgent=".AutoBackupAgent"
+        android:fullBackupOnly="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

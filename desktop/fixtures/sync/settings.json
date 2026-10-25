@@ -15,6 +15,10 @@
     [
       "areakey:540f38ddbc8623e5",
       "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "backup:key",
+      "KSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0g="
     ]
   ],
   "joiner": [
@@ -33,6 +37,10 @@
     [
       "areakey:540f38ddbc8623e5",
       "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "backup:key",
+      "SUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2g="
     ]
   ]
 }

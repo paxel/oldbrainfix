@@ -10,6 +10,7 @@ import 'package:cryptography/dart.dart' show DartArgon2id;
 
 import 'area_keys.dart';
 import 'entry.dart';
+import 'pairing.dart';
 import 'recovery_sheet.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
@@ -43,6 +44,10 @@ const backupsKept = 4;
 
 /// How often a scheduled Backup is written.
 const backupInterval = Duration(days: 7);
+
+/// The most Android's Auto Backup takes of an app; a larger copy is not
+/// sent at all.
+const autoBackupQuotaBytes = 25 << 20;
 
 /// The shortest passphrase taken: the Recovery Sheet is there for a
 /// forgotten one, a guessable one has no remedy.
@@ -314,6 +319,8 @@ extension Backups on Store {
   static const _weekly = 'backup:weekly';
   static const _last = 'backup:last';
   static const _failed = 'backup:failed';
+  static const _auto = 'backup:auto';
+  static const _heldPrefix = 'backupkey:';
 
   /// The backup key, once Backups are set up.
   Uint8List? get backupKey {
@@ -365,10 +372,18 @@ extension Backups on Store {
   set backupsWeekly(bool on) =>
       on ? removeLocalSetting(_weekly) : setLocalSetting(_weekly, 'off');
 
+  /// Whether the newest Backup also goes to the platform's own backup
+  /// (Android's Auto Backup to the user's Google account, ADR 0010); off
+  /// unless the user opted in.
+  bool get autoBackupOn => localSetting(_auto) == 'on';
+
+  set autoBackupOn(bool on) =>
+      on ? setLocalSetting(_auto, 'on') : removeLocalSetting(_auto);
+
   /// Whether Backups are written on their own: set up, a folder chosen
-  /// and weekly on.
+  /// or Auto Backup on, and weekly on.
   bool get backupsScheduled =>
-      backupsSetUp && backupFolder != null && backupsWeekly;
+      backupsSetUp && (backupFolder != null || autoBackupOn) && backupsWeekly;
 
   /// When the last Backup was written here.
   DateTime? get lastBackup =>
@@ -392,6 +407,88 @@ extension Backups on Store {
 
   void _failedAt(DateTime at) =>
       setLocalSetting(_failed, at.toUtc().toIso8601String());
+
+  /// This Device's backup key as it travels to the Devices of its own
+  /// group (ADR 0016): base64, or null before Backups are set up.
+  String? get backupKeyToSend => switch (backupKey) {
+    final key? => base64.encode(key),
+    null => null,
+  };
+
+  /// The backup key [device] sent of its own: over a LAN session with
+  /// it, or in its keys file in the shared folder, both of this Device's
+  /// own group only. Kept as it came, the newest one replacing what was
+  /// held, with when it was learned. Returns whether anything changed.
+  bool learnBackupKey(String device, Object? sent) {
+    if (device.isEmpty || device == deviceId || sent is! String) return false;
+    final Uint8List key;
+    try {
+      key = base64.decode(sent);
+    } on FormatException {
+      return false;
+    }
+    if (key.length != backupKeyBytes) return false;
+    if (heldBackupKey(device)?.key case final held?
+        when base64.encode(held) == sent) {
+      return false;
+    }
+    setLocalSetting(
+      '$_heldPrefix$device',
+      jsonEncode({'key': sent, 'learned': clock().toUtc().toIso8601String()}),
+    );
+    return true;
+  }
+
+  /// The backup key the Device [device] sent, and when it came.
+  ({Uint8List key, DateTime learned})? heldBackupKey(String device) {
+    final raw = localSetting('$_heldPrefix$device');
+    if (raw == null) return null;
+    try {
+      if (jsonDecode(raw) case {
+        'key': final String key,
+        'learned': final String learned,
+      }) {
+        final bytes = base64.decode(key);
+        final at = DateTime.tryParse(learned);
+        if (bytes.length == backupKeyBytes && at != null) {
+          return (key: bytes, learned: at.toUtc());
+        }
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
+  }
+
+  /// Drops the backup key of [device], as forgetting it does.
+  void forgetBackupKey(String device) =>
+      removeLocalSetting('$_heldPrefix$device');
+
+  /// The recovery keys of the Devices still paired with this one and of
+  /// its own group (never one paired by invite), by name: what this
+  /// Device shows again, after its own unlock, for one that was lost.
+  List<OtherRecoveryKey> otherRecoveryKeys() => [
+    for (final device in pairedDevices())
+      if (!device.shared)
+        if (heldBackupKey(device.id) case final held?)
+          OtherRecoveryKey(device, encodeRecoveryCode(held.key), held.learned),
+  ];
+}
+
+/// The recovery key of another Device of this one's group (ADR 0016).
+class OtherRecoveryKey {
+  final PairedDevice device;
+
+  /// As the Recovery Sheet of that Device shows it.
+  final String code;
+
+  /// When it came here.
+  final DateTime learned;
+
+  const OtherRecoveryKey(this.device, this.code, this.learned);
+
+  /// The first 8 digits of its device id, as its Backup files are named.
+  String get shortId => device.id.substring(0, min(8, device.id.length));
 }
 
 /// Sets Backups up with [passphrase]: a new backup key, sealed with the
@@ -990,26 +1087,41 @@ bool isBackupOf(String name, String device) => RegExp(
   '\\.$backupExtension\$',
 ).hasMatch(name);
 
-/// Writes a Backup into [folder] now, through a file in [workDir], and
-/// lets only the newest [backupsKept] of this Device stay. Returns its
-/// name; a failure is kept for the screen and thrown on.
+/// Writes a Backup now, through a file in [workDir], into [folder] and,
+/// when given, into [autoBackup], the directory the platform's own
+/// backup takes it from; only the newest [backupsKept] of this Device
+/// stay in [folder], and nothing but it in [autoBackup] (a Backup of an
+/// older Device restored from there included). Returns its name; a
+/// failure is kept for the screen and thrown on.
 Future<String> backUpNow(
   Store store,
-  BackupFolder folder,
-  String workDir,
-) async {
+  BackupFolder? folder,
+  String workDir, {
+  BackupFolder? autoBackup,
+}) async {
+  if (folder == null && autoBackup == null) {
+    throw ArgumentError('A Backup needs somewhere to go');
+  }
   final now = store.clock().toUtc();
   final name = backupFileName(now, store.deviceId);
   final tmp = File('$workDir/$name');
   try {
     await writeBackup(store, tmp.path);
-    await folder.put(name, tmp.path);
-    final mine = [
-      for (final n in await folder.list())
-        if (isBackupOf(n, store.deviceId)) n,
-    ]..sort();
-    for (final n in mine.take(max(0, mine.length - backupsKept))) {
-      await folder.delete(n);
+    if (folder != null) {
+      await folder.put(name, tmp.path);
+      final mine = [
+        for (final n in await folder.list())
+          if (isBackupOf(n, store.deviceId)) n,
+      ]..sort();
+      for (final n in mine.take(max(0, mine.length - backupsKept))) {
+        await folder.delete(n);
+      }
+    }
+    if (autoBackup != null) {
+      await autoBackup.put(name, tmp.path);
+      for (final n in await autoBackup.list()) {
+        if (n != name) await autoBackup.delete(n);
+      }
     }
   } on Object {
     store._failedAt(now);
@@ -1022,13 +1134,22 @@ Future<String> backUpNow(
 }
 
 /// Writes the scheduled Backup when it is due, into the folder [open]
-/// makes of the one chosen; returns its name, or null when none was due.
+/// makes of the one chosen and, while Auto Backup is on, into
+/// [autoBackup]; returns its name, or null when none was due.
 Future<String?> backUpIfDue(
   Store store,
   BackupFolder Function(String folder) open,
-  String workDir,
-) async {
+  String workDir, {
+  BackupFolder? autoBackup,
+}) async {
+  if (!store.backupDue(store.clock())) return null;
   final folder = store.backupFolder;
-  if (folder == null || !store.backupDue(store.clock())) return null;
-  return backUpNow(store, open(folder), workDir);
+  final auto = store.autoBackupOn ? autoBackup : null;
+  if (folder == null && auto == null) return null;
+  return backUpNow(
+    store,
+    folder == null ? null : open(folder),
+    workDir,
+    autoBackup: auto,
+  );
 }

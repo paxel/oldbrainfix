@@ -1214,9 +1214,16 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
     assert!(session.moment.is_some());
     assert_eq!(session.report.refused_count(), 0);
 
-    // Both end up reading the same.
+    // Both end up reading the same, and each holds the other's backup key.
     let back = apply_answer(&joiner, &answer)?;
     assert_eq!(back.name, "Desk");
+    let held = read_json(&dir.join("backup_keys.json"))?;
+    for (side, store, other) in [("host", &host, &joiner), ("joiner", &joiner, &host)] {
+        let key = store
+            .held_backup_key(&other.device_id()?)?
+            .map(|(k, _)| BASE64.encode(k));
+        assert_eq!(key.as_deref(), held[side].as_str(), "{side}");
+    }
     assert!(!back.applied.is_empty());
     if let Some(map) = expected.as_object_mut() {
         map.remove("device");
@@ -1407,6 +1414,12 @@ fn the_folder_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestRes
     );
     assert_eq!(result.unreadable, 0);
     assert_eq!(result.report.refused_count(), 0);
+    // The host's backup key came in its keys file.
+    let host_id = oldbrainfix_core::signing::device_id_from_key(&writer_key().public_key());
+    let key = joiner
+        .held_backup_key(&host_id)?
+        .map(|(k, _)| BASE64.encode(k));
+    assert_eq!(key.as_deref(), expected["backupKey"].as_str());
     let mut actual = read(&joiner)?;
     if let Some(map) = actual.as_object_mut() {
         map.remove("device");

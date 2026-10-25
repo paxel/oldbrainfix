@@ -420,6 +420,8 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
                 .map(|list| list.iter().filter_map(KeyRecord::from_json).collect())
                 .unwrap_or_default();
             store.learn_keys(&signing, None, report)?;
+            // Only the writer's own: the file is sealed and bound to it.
+            store.learn_backup_key(device, json.get("backupKey"))?;
             if store.learn_area_keys(&area_keys_of(json.get("areaKeys")))? > 0 {
                 learned = true;
             }
@@ -558,12 +560,27 @@ fn read_foreign(
 fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<()> {
     let own = store.device_id()?;
     let keys = store.area_keys()?;
-    let plain = json!({
-        "areaKeys": keys.iter().map(AreaKey::to_json).collect::<Vec<_>>(),
-        "signing": store.key_records()?.iter().map(KeyRecord::to_json).collect::<Vec<_>>(),
-    })
-    .to_string()
-    .into_bytes();
+    // Keys in sorted order, whether or not serde_json keeps the order
+    // they went in: the bytes are the Dart core's.
+    let mut map = serde_json::Map::new();
+    map.insert(
+        "areaKeys".into(),
+        json!(keys.iter().map(AreaKey::to_json).collect::<Vec<_>>()),
+    );
+    if let Some(key) = store.backup_key_to_send()? {
+        map.insert("backupKey".into(), Value::String(key));
+    }
+    map.insert(
+        "signing".into(),
+        json!(
+            store
+                .key_records()?
+                .iter()
+                .map(KeyRecord::to_json)
+                .collect::<Vec<_>>()
+        ),
+    );
+    let plain = Value::Object(map).to_string().into_bytes();
     let aad = sealed_as::keys(&own);
     for key in keys.iter().filter(|k| k.scope == PERSONAL_SCOPE) {
         let name = keys_file_name(&own, &key.id());

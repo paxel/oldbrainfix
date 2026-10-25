@@ -151,6 +151,22 @@ Future<bool> confirmOwner(
   return ok ?? false;
 }
 
+/// Makes sure it is the owner before something only the owner may
+/// see, such as another Device's recovery key (ADR 0016): this Device's
+/// own unlock, the App Lock's PIN (or biometrics) when there is one,
+/// else the phone's screen lock where it has one. Whether they are; true
+/// at once on a Device with neither.
+Future<bool> confirmUnlock(
+  BuildContext context,
+  AppLock? lock, {
+  required String title,
+}) async {
+  if (lock == null) return true;
+  if (lock.store.hasPin) return confirmOwner(context, lock, title: title);
+  if (!await lock.platform.available()) return true;
+  return lock.biometrics(title, anyway: true);
+}
+
 /// Opens the locked Area [areaId] after [confirmOwner]; true at once when
 /// it is not closed or there is no lock.
 Future<bool> openLockedArea(

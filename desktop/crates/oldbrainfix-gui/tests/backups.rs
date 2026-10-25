@@ -131,6 +131,41 @@ fn backups_are_set_up_the_sheet_saved_and_a_folder_gets_one_at_once() -> TestRes
     Ok(())
 }
 
+#[test]
+fn the_recovery_key_of_a_paired_phone_shows_once_asked_for() -> TestResult {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    use oldbrainfix_core::pairing::PairedDevice;
+    let phone = store(2)?;
+    let desk = store(1)?;
+    let code = backup::set_up(&phone, "correct horse", CHEAP, &mut system_random)?;
+    let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+    let (answer, _) = answer_sync(&desk, &request, "Desk")?.ok_or("an answer")?;
+    apply_answer(&phone, &answer)?;
+    desk.remember_device(&PairedDevice {
+        id: phone.device_id()?,
+        name: "Pixel".into(),
+        fingerprint: String::new(),
+        host: None,
+        port: None,
+        last_sync: desk.now(),
+        shared: false,
+    })?;
+    let mut app = App::new(desk, "en");
+    app.select(Selection::Settings);
+    let mut harness = window(app);
+    assert!(shows(&harness, "Recovery keys of your other Devices"));
+    assert!(shows(&harness, "Pixel"));
+    let short: String = phone.device_id()?.chars().take(8).collect();
+    assert!(shows(&harness, &format!("end in {short}")));
+    assert!(harness.query_all_by_value(&code).next().is_none());
+
+    click(&mut harness, "Show recovery key");
+    assert!(harness.query_all_by_value(&code).next().is_some());
+    click(&mut harness, "Hide");
+    assert!(harness.query_all_by_value(&code).next().is_none());
+    Ok(())
+}
+
 /// A Backup of a Device with a Note in an Area, and its recovery key.
 fn old_backup(
     dir: &std::path::Path,

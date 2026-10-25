@@ -23,6 +23,7 @@ use sha2::{Digest, Sha256};
 
 use crate::entry::{WireEntry, dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, SEAL_TAG_BYTES, seal, unseal};
+use crate::pairing::PairedDevice;
 use crate::recovery;
 use crate::shared::{ROLE_PREFIX, role_field};
 use crate::signing::{
@@ -298,6 +299,25 @@ const FOLDER: &str = "backup:folder";
 const WEEKLY: &str = "backup:weekly";
 const LAST: &str = "backup:last";
 const FAILED: &str = "backup:failed";
+const HELD_PREFIX: &str = "backupkey:";
+
+/// The recovery key of another Device of this one's group (ADR 0016), as
+/// the Dart core's `OtherRecoveryKey`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OtherRecoveryKey {
+    pub device: PairedDevice,
+    /// As the Recovery Sheet of that Device shows it.
+    pub code: String,
+    /// When it came here.
+    pub learned: DateTime<Utc>,
+}
+
+impl OtherRecoveryKey {
+    /// The first 8 digits of its device id, as its Backup files are named.
+    pub fn short_id(&self) -> String {
+        self.device.id.chars().take(8).collect()
+    }
+}
 
 impl Store {
     /// The backup key, once Backups are set up.
@@ -373,6 +393,91 @@ impl Store {
         Ok(self
             .local_setting(FAILED)?
             .and_then(|raw| parse_time(&raw).ok()))
+    }
+
+    /// This Device's backup key as it travels to the Devices of its own
+    /// group (ADR 0016): base64, or none before Backups are set up.
+    pub fn backup_key_to_send(&self) -> Result<Option<String>> {
+        Ok(self.backup_key()?.map(|k| BASE64.encode(k)))
+    }
+
+    /// The backup key `device` sent of its own, over a LAN session with
+    /// it or in its keys file in the shared folder, as the Dart core's
+    /// `learnBackupKey`: the newest replaces what was held. Whether
+    /// anything changed.
+    pub fn learn_backup_key(&self, device: &str, sent: Option<&Value>) -> Result<bool> {
+        let Some(sent) = sent.and_then(Value::as_str) else {
+            return Ok(false);
+        };
+        if device.is_empty() || device == self.device_id()? {
+            return Ok(false);
+        }
+        let Some(key) = BASE64
+            .decode(sent)
+            .ok()
+            .and_then(|k| <[u8; KEY_BYTES]>::try_from(k).ok())
+        else {
+            return Ok(false);
+        };
+        if self
+            .held_backup_key(device)?
+            .is_some_and(|(held, _)| held == key)
+        {
+            return Ok(false);
+        }
+        self.set_local_setting(
+            &format!("{HELD_PREFIX}{device}"),
+            &json!({"key": sent, "learned": dart_iso(self.now())}).to_string(),
+        )?;
+        Ok(true)
+    }
+
+    /// The backup key the Device `device` sent, and when it came.
+    pub fn held_backup_key(
+        &self,
+        device: &str,
+    ) -> Result<Option<([u8; KEY_BYTES], DateTime<Utc>)>> {
+        let Some(raw) = self.local_setting(&format!("{HELD_PREFIX}{device}"))? else {
+            return Ok(None);
+        };
+        let Ok(json) = serde_json::from_str::<Value>(&raw) else {
+            return Ok(None);
+        };
+        let key = json
+            .get("key")
+            .and_then(Value::as_str)
+            .and_then(|k| BASE64.decode(k).ok())
+            .and_then(|k| <[u8; KEY_BYTES]>::try_from(k).ok());
+        let learned = json
+            .get("learned")
+            .and_then(Value::as_str)
+            .and_then(|at| parse_time(at).ok());
+        Ok(key.zip(learned))
+    }
+
+    /// Drops the backup key of `device`, as forgetting it does.
+    pub fn forget_backup_key(&self, device: &str) -> Result<()> {
+        self.remove_local_setting(&format!("{HELD_PREFIX}{device}"))
+    }
+
+    /// The recovery keys of the Devices still paired with this one and of
+    /// its own group (never one paired by invite), by name: what this
+    /// Device shows again for one that was lost.
+    pub fn other_recovery_keys(&self) -> Result<Vec<OtherRecoveryKey>> {
+        let mut out = Vec::new();
+        for device in self.paired_devices()? {
+            if device.shared {
+                continue;
+            }
+            if let Some((key, learned)) = self.held_backup_key(&device.id)? {
+                out.push(OtherRecoveryKey {
+                    code: recovery::encode_code(&key),
+                    device,
+                    learned,
+                });
+            }
+        }
+        Ok(out)
     }
 
     /// Whether a scheduled Backup is due at `now`.
@@ -1242,6 +1347,58 @@ mod tests {
         let store = Store::in_memory(clock(&held(1)), || Ok(SigningKey::from_seed([1; 32])))?;
         assert!(set_up(&store, " short ", CHEAP, &mut system_random).is_err());
         assert!(!store.backups_set_up()?);
+        Ok(())
+    }
+
+    #[test]
+    fn a_device_of_the_own_group_shows_the_others_recovery_key() -> Result<()> {
+        use crate::lan::{answer_sync, apply_answer, sync_request};
+        use crate::pairing::PairedDevice;
+        let dir = tempfile::tempdir()?;
+        let at = held(1);
+        let phone = device(dir.path(), "phone", &at, 1)?;
+        let desk = device(dir.path(), "desk", &at, 2)?;
+        let code = set_up(&phone, PASSPHRASE, CHEAP, &mut system_random)?;
+        let request = sync_request(&phone, &desk.version_vector()?, "Phone", "", "")?;
+        assert_eq!(
+            request["backupKey"].as_str(),
+            phone.backup_key_to_send()?.as_deref()
+        );
+        let (answer, _) =
+            answer_sync(&desk, &request, "Desk")?.ok_or(Error::Invalid("no".into()))?;
+        assert!(answer.get("backupKey").is_none());
+        apply_answer(&phone, &answer)?;
+        // Held, but shown only once paired.
+        assert!(desk.held_backup_key(&phone.device_id()?)?.is_some());
+        assert!(desk.other_recovery_keys()?.is_empty());
+        desk.remember_device(&PairedDevice {
+            id: phone.device_id()?,
+            name: "Phone".into(),
+            fingerprint: String::new(),
+            host: None,
+            port: None,
+            last_sync: desk.now(),
+            shared: false,
+        })?;
+        let shown = desk.other_recovery_keys()?;
+        assert_eq!(shown.len(), 1);
+        assert_eq!(shown[0].code, code);
+        assert_eq!(shown[0].short_id(), phone.device_id()?[..8]);
+
+        // Nothing but a 32-byte key of the sender's own is taken.
+        let own = desk.device_id()?;
+        let key = json!(BASE64.encode([7u8; 32]));
+        assert!(!desk.learn_backup_key(&own, Some(&key))?);
+        assert!(!desk.learn_backup_key("", Some(&key))?);
+        assert!(!desk.learn_backup_key("x", Some(&json!("AAEC")))?);
+        assert!(!desk.learn_backup_key("x", Some(&json!(42)))?);
+        assert!(desk.learn_backup_key("x", Some(&key))?);
+        assert!(!desk.learn_backup_key("x", Some(&key))?);
+
+        // Forgotten: its key goes too.
+        desk.forget_device(&phone.device_id()?)?;
+        assert!(desk.held_backup_key(&phone.device_id()?)?.is_none());
+        assert!(desk.other_recovery_keys()?.is_empty());
         Ok(())
     }
 }

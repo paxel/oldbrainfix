@@ -5,8 +5,9 @@ import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// The platform seam for the shared folder (android/…/FolderChannel.kt):
-/// picking it, its name for people, and the folder itself. Widget tests
-/// hand in a fake.
+/// picking it, its name for people, and the folder itself; the Backup
+/// folder, and the directory Auto Backup takes the newest Backup from
+/// (android/…/AutoBackup.kt). Widget tests hand in a fake.
 abstract interface class FolderPlatform {
   /// Whether a folder can be picked here.
   bool get available;
@@ -23,7 +24,25 @@ abstract interface class FolderPlatform {
 
   /// The [folder] kept by [pick], as Backups go into it (ADR 0016).
   BackupFolder openBackups(String folder);
+
+  /// The app's own directory the platform's backup (Android's Auto
+  /// Backup to the user's Google account, ADR 0010) takes the newest
+  /// Backup from, and where one lies after a restore from there; null
+  /// where there is none.
+  Future<String?> autoBackupDir();
+
+  /// Tells the platform's backup whether the user opted in; until then
+  /// it takes nothing at all.
+  Future<void> setAutoBackup(bool on);
 }
+
+/// The directory of [folders]'s Auto Backup as Backups go into it; null
+/// where there is none.
+Future<BackupFolder?> openAutoBackup(FolderPlatform folders) async =>
+    switch (await folders.autoBackupDir()) {
+      final dir? => LocalBackupFolder(dir),
+      null => null,
+    };
 
 /// No shared folder: the default where none is handed in.
 class NoFolders implements FolderPlatform {
@@ -43,6 +62,12 @@ class NoFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => LocalBackupFolder(folder);
+
+  @override
+  Future<String?> autoBackupDir() async => null;
+
+  @override
+  Future<void> setAutoBackup(bool on) async {}
 }
 
 /// Android's folder picker and the document tree it grants (Storage
@@ -85,6 +110,28 @@ class AndroidFolders implements FolderPlatform {
 
   @override
   BackupFolder openBackups(String folder) => SafBackupFolder(folder);
+
+  @override
+  Future<String?> autoBackupDir() async {
+    try {
+      return await channel.invokeMethod<String>('autoBackupDir');
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> setAutoBackup(bool on) async {
+    try {
+      await channel.invokeMethod<void>('autoBackup', {'on': on});
+    } on PlatformException {
+      // The agent keeps what it had; the switch is tried again at start.
+    } on MissingPluginException {
+      // No agent here.
+    }
+  }
 }
 
 /// The Backup folder through the document tree the picker granted:
