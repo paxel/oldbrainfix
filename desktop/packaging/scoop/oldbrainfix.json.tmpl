@@ -1,0 +1,21 @@
+{
+    "version": "{{VERSION}}",
+    "description": "Capture a thought in one tap, get nagged until it is sorted or done",
+    "homepage": "https://github.com/paxel/oldbrainfix",
+    "license": "MIT OR Apache-2.0",
+    "url": "https://github.com/paxel/oldbrainfix/releases/download/v{{VERSION}}/oldbrainfix-{{VERSION}}-windows-x86_64.zip",
+    "hash": "{{SHA_WINDOWS_X86_64}}",
+    "bin": "oldbrainfix.exe",
+    "shortcuts": [
+        [
+            "oldbrainfix.exe",
+            "Old Brain Fix"
+        ]
+    ],
+    "checkver": {
+        "github": "https://github.com/paxel/oldbrainfix"
+    },
+    "autoupdate": {
+        "url": "https://github.com/paxel/oldbrainfix/releases/download/v$version/oldbrainfix-$version-windows-x86_64.zip"
+    }
+}

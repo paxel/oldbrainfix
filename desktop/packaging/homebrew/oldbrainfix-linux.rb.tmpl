@@ -1,0 +1,80 @@
+class Oldbrainfix < Formula
+  desc "Capture a thought in one tap, get nagged until it is sorted or done"
+  homepage "https://github.com/paxel/oldbrainfix"
+  version "{{VERSION}}"
+  license any_of: ["MIT", "Apache-2.0"]
+
+  depends_on :linux
+
+  on_arm do
+    url "https://github.com/paxel/oldbrainfix/releases/download/v#{version}/oldbrainfix-#{version}-linux-arm64.tar.gz"
+    sha256 "{{SHA_LINUX_ARM64}}"
+  end
+  on_intel do
+    url "https://github.com/paxel/oldbrainfix/releases/download/v#{version}/oldbrainfix-#{version}-linux-x86_64.tar.gz"
+    sha256 "{{SHA_LINUX_X86_64}}"
+  end
+
+  def install
+    libexec.install Dir["*"]
+    # A symlink, not a wrapper script: the app finds this stable path back
+    # from its Cellar binary and writes it into its own launcher entry.
+    bin.install_symlink libexec/"oldbrainfix"
+
+    # An absolute Exec: a desktop session does not read Homebrew's shell environment,
+    # so its bin directory is not on the session's PATH. The icon stays a theme name,
+    # "oldbrainfix": the install step below puts the PNG into ~/.local/share/icons,
+    # where every desktop looks, and the app itself keeps it there on every start.
+    inreplace libexec/"io.github.paxel.oldbrainfix.desktop" do |entry|
+      entry.gsub! "Exec=oldbrainfix", "Exec=#{opt_bin}/oldbrainfix"
+    end
+
+    # The helper and everything it copies live together, so it finds the icon next to
+    # itself. A wrapper rather than a symlink, for the same reason.
+    (libexec/"install-icon.sh").chmod 0755
+    (bin/"oldbrainfix-install-icon").write <<~SH
+      #!/bin/sh
+      exec "#{opt_libexec}/install-icon.sh" "$@"
+    SH
+    (bin/"oldbrainfix-install-icon").chmod 0755
+
+    # Also in Homebrew's own share, for the sessions that do read it.
+    (share/"applications").mkpath
+    cp libexec/"io.github.paxel.oldbrainfix.desktop", share/"applications/io.github.paxel.oldbrainfix.desktop"
+    (share/"icons/hicolor/256x256/apps").mkpath
+    cp libexec/"icon_256.png", share/"icons/hicolor/256x256/apps/oldbrainfix.png"
+  end
+
+  # Homebrew's own share directory is not on a desktop session's XDG_DATA_DIRS, so the
+  # entry above alone stays invisible to menus: the app could not be started at all.
+  # This step puts the launcher entry and the icon into ~/.local/share, which every
+  # session reads. Declared steps replace the post_install method since Homebrew 7.0.
+  # A home that cannot be written (a container, a bottle build, a post-install
+  # sandbox) must not fail the install over a menu entry: the app writes the same
+  # entry itself on its first start.
+  post_install_steps do
+    run "install-icon.sh", base: :libexec, must_succeed: false
+  end
+
+  def caveats
+    <<~EOS
+      Needs the usual desktop libraries from your distribution: X11 or
+      Wayland with libxkbcommon, and ALSA for voice Notes
+      (e.g. Debian/Ubuntu: sudo apt install libxkbcommon0 libasound2t64).
+
+      The install puts Old Brain Fix into your application menu under
+      ~/.local/share. If it is missing there, for another user on this
+      machine, or with a custom XDG_DATA_HOME, run:
+
+        oldbrainfix-install-icon
+
+      Before brew uninstall, to take the menu entry out again:
+
+        oldbrainfix-install-icon --uninstall
+    EOS
+  end
+
+  test do
+    assert_predicate libexec/"oldbrainfix", :exist?
+  end
+end

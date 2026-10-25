@@ -42,7 +42,7 @@ impl Notifier for DesktopNotifier {
         n.summary(&notice.title)
             .body(&notice.body)
             .appname(oldbrainfix_core::APP_NAME)
-            .icon(oldbrainfix_core::APP_ID)
+            .icon(crate::ICON_NAME)
             .hint(Hint::DesktopEntry(oldbrainfix_core::APP_ID.into()));
         for (id, label) in &notice.actions {
             n.action(id, label);

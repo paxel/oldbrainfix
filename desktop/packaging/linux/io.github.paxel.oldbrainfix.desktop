@@ -1,0 +1,16 @@
+[Desktop Entry]
+Name=Old Brain Fix
+Comment=Capture a thought in one tap. Get nagged until it is sorted or done.
+Exec=oldbrainfix
+Icon=oldbrainfix
+Terminal=false
+Type=Application
+Categories=Utility;
+# The running window carries this app id (set in the desktop binary). On
+# Wayland the compositor finds this entry by its file name, which is why
+# the file is called io.github.paxel.oldbrainfix.desktop; on X11 it
+# matches the window class below instead.
+StartupWMClass=io.github.paxel.oldbrainfix
+# The app refreshes an entry carrying this key on every start, e.g. after
+# the binary moved; remove the key to keep your own edits.
+X-Oldbrainfix-Managed=true

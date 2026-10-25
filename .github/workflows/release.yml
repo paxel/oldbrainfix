@@ -2,18 +2,26 @@
 # `v*` tag (or the manual dispatch button) runs it:
 #
 #   gate           — analyze fatal-infos, all Dart tests, the OCR library's
-#                    tests, tag = pubspec version
+#                    tests, the desktop's format, lint and tests,
+#                    tag = pubspec version = desktop Cargo version
 #   build-android  — signed per-ABI + universal APKs and the Play bundle,
 #                    the Kotlin unit tests,
 #                    refused when signed with the debug key; the bundle
 #                    goes to Google Play's internal track
+#   build-linux    — Rust desktop: tar.gz, .deb, AppImage and Flatpak per arch
+#   build-windows  — Rust desktop: zip with oldbrainfix.exe
+#   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
+#   render-channels — Homebrew cask + formula and Scoop manifest rendered from
+#                    the artifacts, uploaded as an artifact on every run
 #   fdroid         — the arm64 APK and the store listing into paxel/fdroid
 #   release        — GitHub Release, notes = the CHANGELOG section for the tag
+#   channels       — the rendered files pushed to the tap and the bucket, after
+#                    the Release, when publishing
 #
 # The Whisper model is not part of any of this: the app downloads it from
 # the separate `whisper-model-v1` release, which no tag here touches.
 #
-# Publishing (Play, F-Droid, the Release) happens on a tag, or on a manual
+# Publishing (Play, F-Droid, the Release, the tap and the bucket) happens on a tag, or on a manual
 # dispatch that says publish=true. A dispatch without it is the dry run:
 # every artifact is built and uploaded, nothing leaves GitHub.
 #
@@ -21,7 +29,8 @@
 #   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD — upload keystore,
 #                 key alias `oldbrainfix`
 #   PLAY_SERVICE_ACCOUNT_JSON — Play Console service account
-#   CHANNEL_PAT — PAT with push access to paxel/fdroid
+#   CHANNEL_PAT — PAT with push access to paxel/fdroid, paxel/homebrew-tap
+#                 and paxel/scoop-bucket
 #   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
 #                 the same one cat(a)log and Chaos Alert use
 name: Release
@@ -38,7 +47,7 @@ on:
         description: "Release tag (e.g. v0.1.0)"
         required: true
       publish:
-        description: "Publish (release, Play, F-Droid); off = dry run"
+        description: "Publish (release, Play, F-Droid, tap, bucket); off = dry run"
         type: boolean
         default: false
 
@@ -53,11 +62,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Tag and pubspec version agree
+      - name: Tag, pubspec version and desktop Cargo version agree
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
+          cargo_ver=$(grep -m1 '^version = ' desktop/Cargo.toml | sed -E 's/version = "(.*)"/\1/')
           tag=${RELEASE_TAG#v}
           [ "$ver" = "$tag" ] || { echo "tag v$tag != pubspec version $ver" >&2; exit 1; }
+          [ "$cargo_ver" = "$tag" ] || { echo "tag v$tag != desktop Cargo version $cargo_ver" >&2; exit 1; }
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -76,9 +87,22 @@ jobs:
       - name: No untranslated strings
         run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - name: OCR library — unit tests
         working-directory: android/ocr
         run: cargo test --locked
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Desktop build dependencies (ALSA for the microphone, cmake for whisper.cpp)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++
+      - name: Desktop — format, lint and test
+        working-directory: desktop
+        run: |
+          cargo fmt --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
       - name: What's-new tool — unit tests
         working-directory: tool
         run: python3 -m unittest test_whats_new
@@ -177,6 +201,118 @@ jobs:
           track: internal
           status: completed
 
+  build-linux:
+    name: Linux desktop (${{ matrix.arch }})
+    needs: gate
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config cmake g++ curl file flatpak flatpak-builder
+      - name: Build
+        working-directory: desktop
+        run: cargo build --release --locked --bin oldbrainfix
+      - name: Pack tar.gz, .deb and AppImage
+        run: |
+          v="${RELEASE_TAG#v}"
+          desktop/packaging/linux/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
+      - name: Pack the Flatpak
+        run: |
+          # flatpak-builder sandboxes through bwrap, which Ubuntu's
+          # AppArmor default refuses user namespaces to.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          v="${RELEASE_TAG#v}"
+          desktop/packaging/flatpak/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+
+  build-windows:
+    name: Windows desktop
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Build
+        working-directory: desktop
+        run: cargo build --release --locked --bin oldbrainfix
+      - name: Pack
+        shell: pwsh
+        run: |
+          $v = $env:RELEASE_TAG.TrimStart("v")
+          desktop\packaging\windows\pack.ps1 -Version $v -Binary desktop\target\release\oldbrainfix.exe -Dist dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows
+          path: dist/*
+
+  build-macos:
+    name: macOS desktop (${{ matrix.arch }})
+    needs: gate
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          # Last Intel image GitHub offers; when it retires, switch the
+          # x86_64 artifact to a cross-compile from the arm64 runner.
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Build
+        working-directory: desktop
+        run: cargo build --release --locked --bin oldbrainfix
+      - name: App bundle into dmg (ad-hoc signed)
+        run: |
+          v="${RELEASE_TAG#v}"
+          desktop/packaging/macos/pack.sh "$v" "${{ matrix.arch }}" desktop/target/release/oldbrainfix dist
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/*
+
+  render-channels:
+    name: Render cask, formula and manifest
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: "{linux-*,windows,macos-*}"
+          path: dist
+          merge-multiple: true
+      - name: Render from the templates with the artifacts' checksums
+        run: desktop/packaging/render-channels.sh "${RELEASE_TAG#v}" dist out
+      - uses: actions/upload-artifact@v6
+        with:
+          name: channels
+          path: out/*
+
   fdroid:
     name: F-Droid repo
     needs: build-android
@@ -258,15 +394,18 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: build-android
+    needs: [build-android, build-linux, build-windows, build-macos]
     if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
+      # Not the rendered channel files, which render-channels may be
+      # uploading meanwhile.
       - uses: actions/download-artifact@v7
         with:
+          pattern: "{android,linux-*,windows,macos-*}"
           path: dist
           merge-multiple: true
       - name: Release notes from the CHANGELOG section
@@ -292,3 +431,41 @@ jobs:
               --notes-file notes.md \
               dist/*
           fi
+
+  # Only after the Release exists: the cask, the formula and the manifest
+  # point at its assets, so nothing may be pushed before they are there.
+  channels:
+    name: Homebrew tap + Scoop bucket
+    needs: [release, render-channels]
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: channels
+          path: out
+      - name: Push to the tap
+        env:
+          GH_TOKEN: ${{ secrets.CHANNEL_PAT }}
+        run: |
+          ver=${RELEASE_TAG#v}
+          git config --global user.name "oldbrainfix-release-bot"
+          git config --global user.email "taum@tuta.io"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/paxel/homebrew-tap.git" tap
+          mkdir -p tap/Casks tap/Formula
+          cp out/oldbrainfix-cask.rb tap/Casks/oldbrainfix.rb
+          cp out/oldbrainfix-formula.rb tap/Formula/oldbrainfix.rb
+          git -C tap add Casks/oldbrainfix.rb Formula/oldbrainfix.rb
+          git -C tap diff --cached --quiet || git -C tap commit -m "oldbrainfix $ver"
+          git -C tap push
+      - name: Push to the bucket
+        env:
+          GH_TOKEN: ${{ secrets.CHANNEL_PAT }}
+        run: |
+          ver=${RELEASE_TAG#v}
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/paxel/scoop-bucket.git" bucket
+          mkdir -p bucket/bucket
+          cp out/oldbrainfix.json bucket/bucket/oldbrainfix.json
+          git -C bucket add bucket/oldbrainfix.json
+          git -C bucket diff --cached --quiet || git -C bucket commit -m "oldbrainfix $ver"
+          git -C bucket push

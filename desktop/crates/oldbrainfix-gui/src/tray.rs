@@ -173,4 +173,27 @@ mod tests {
         assert_eq!(at(16, 8), &[255, 0x00, 0x79, 0x6B]);
         assert_eq!(at(16, 16)[0], 255);
     }
+
+    #[test]
+    fn the_packaged_icons_are_the_tray_icon() {
+        // Launcher, .deb, AppImage, Flatpak, macOS and Windows ship these.
+        for (size, png) in [
+            (
+                256,
+                &include_bytes!("../../../packaging/icon/icon_256.png")[..],
+            ),
+            (
+                1024,
+                &include_bytes!("../../../packaging/icon/icon.png")[..],
+            ),
+        ] {
+            let rgba = image::load_from_memory(png).unwrap().to_rgba8();
+            assert_eq!(rgba.dimensions(), (size as u32, size as u32));
+            let argb: Vec<u8> = rgba
+                .pixels()
+                .flat_map(|p| [p[3], p[0], p[1], p[2]])
+                .collect();
+            assert!(argb == icon_argb(size), "{size} px icon differs");
+        }
+    }
 }

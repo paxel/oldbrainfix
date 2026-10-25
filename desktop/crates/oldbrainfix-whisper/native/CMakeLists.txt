@@ -16,6 +16,8 @@ set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 # Only the CPU backend is vendored: no Metal or BLAS, also on macOS.
 set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_BLAS OFF CACHE BOOL "" FORCE)
+# Accelerate would need the framework linked, which cargo never hears of.
+set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
 set(GGML_BACKEND_DL OFF CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
 set(GGML_CCACHE OFF CACHE BOOL "" FORCE)

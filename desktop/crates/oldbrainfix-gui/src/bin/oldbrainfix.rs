@@ -373,6 +373,9 @@ fn run() -> Result<i32, String> {
     if instance::hand_over(&socket, first) {
         return Ok(cli::OK);
     }
+    // The menu entry and icon the window's app id names, kept current.
+    #[cfg(target_os = "linux")]
+    std::thread::spawn(oldbrainfix_gui::launcher::register);
     let store = Arc::new(open_store(&dir)?);
 
     // On by default: set up unless switched off, so a moved program is

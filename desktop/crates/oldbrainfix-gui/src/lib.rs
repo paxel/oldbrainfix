@@ -26,6 +26,8 @@ pub mod hotkey;
 pub mod icons;
 pub mod instance;
 pub mod l10n;
+#[cfg(target_os = "linux")]
+pub mod launcher;
 pub mod media;
 pub mod media_view;
 pub mod names;
@@ -41,6 +43,10 @@ pub mod tray;
 pub use app::{App, Selection, Wall, local_wall};
 
 use std::path::PathBuf;
+
+/// The icon's theme name in launcher entries and notifications, backed
+/// by `icons/hicolor/256x256/apps/oldbrainfix.png`.
+pub const ICON_NAME: &str = "oldbrainfix";
 
 /// Where the desktop keeps its store: the system's data directory for
 /// the app, e.g. `~/.local/share/oldbrainfix` on Linux.

@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use oldbrainfix_core::{APP_ID, APP_NAME};
 
+use crate::ICON_NAME;
+
 /// The argument the login start runs with: into the tray, no window.
 pub const TRAY_ARG: &str = "--tray";
 
@@ -39,7 +41,7 @@ pub fn desktop_entry(exe: &Path) -> String {
          Type=Application\n\
          Name={APP_NAME}\n\
          Exec={} {TRAY_ARG}\n\
-         Icon={APP_ID}\n\
+         Icon={ICON_NAME}\n\
          Terminal=false\n\
          X-GNOME-Autostart-enabled=true\n",
         exec_quoted(exe)
@@ -195,7 +197,7 @@ mod tests {
         assert!(entry.starts_with("[Desktop Entry]\n"));
         assert!(entry.contains("\nExec=\"/opt/old brain/oldbrainfix\" --tray\n"));
         assert!(entry.contains("\nName=Old Brain Fix\n"));
-        assert!(entry.contains("\nIcon=io.github.paxel.oldbrainfix\n"));
+        assert!(entry.contains("\nIcon=oldbrainfix\n"));
         assert_eq!(exec_quoted(Path::new("/a\"b$c%")), "\"/a\\\"b\\$c%%\"");
     }
 

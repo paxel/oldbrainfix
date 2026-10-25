@@ -1,0 +1,50 @@
+# The Flatpak of the desktop app, wrapped around the binary the release
+# builds (as the tarball, .deb and AppImage are), not built from source
+# in the sandbox. packaging/flatpak/pack.sh puts the files named below
+# next to a copy of this manifest and runs flatpak-builder.
+app-id: io.github.paxel.oldbrainfix
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+command: oldbrainfix
+# Flatpak exports only icons named after the app id; this renames the
+# icon and the entry's Icon= line to match.
+rename-icon: oldbrainfix
+finish-args:
+  # The window.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Voice Notes: the microphone and playback.
+  - --socket=pulseaudio
+  # Sync with the phone on the home network, the speech model download.
+  - --share=network
+  # The shared folder (Syncthing, Nextcloud, a USB stick) is a path the
+  # app keeps and syncs through in the background, wherever it lives.
+  - --filesystem=home
+  - --filesystem=/media
+  - --filesystem=/run/media
+  # Notifications with Done and Snooze, and the tray icon.
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --own-name=org.kde.StatusNotifierItem-*
+modules:
+  - name: oldbrainfix
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 oldbrainfix /app/bin/oldbrainfix
+      - install -Dm644 io.github.paxel.oldbrainfix.desktop /app/share/applications/io.github.paxel.oldbrainfix.desktop
+      - install -Dm644 icon_256.png /app/share/icons/hicolor/256x256/apps/oldbrainfix.png
+      - install -Dm644 -t /app/share/licenses/io.github.paxel.oldbrainfix LICENSE-APACHE LICENSE-MIT
+    sources:
+      - type: file
+        path: oldbrainfix
+      - type: file
+        path: io.github.paxel.oldbrainfix.desktop
+      - type: file
+        path: icon_256.png
+      - type: file
+        path: LICENSE-APACHE
+      - type: file
+        path: LICENSE-MIT

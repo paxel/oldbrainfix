@@ -1,0 +1,21 @@
+cask "oldbrainfix" do
+  version "{{VERSION}}"
+
+  arch arm: "arm64", intel: "x86_64"
+  sha256 arm:   "{{SHA_MACOS_ARM64}}",
+         intel: "{{SHA_MACOS_X86_64}}"
+
+  url "https://github.com/paxel/oldbrainfix/releases/download/v#{version}/oldbrainfix-#{version}-macos-#{arch}.dmg"
+  name "Old Brain Fix"
+  desc "Capture a thought in one tap, get nagged until it is sorted or done"
+  homepage "https://github.com/paxel/oldbrainfix"
+
+  app "Old Brain Fix.app"
+  binary "#{appdir}/Old Brain Fix.app/Contents/MacOS/oldbrainfix"
+
+  caveats <<~EOS
+    The app is not signed with an Apple Developer certificate. On first
+    launch macOS refuses it: open System Settings, Privacy & Security, and
+    choose Open Anyway.
+  EOS
+end
