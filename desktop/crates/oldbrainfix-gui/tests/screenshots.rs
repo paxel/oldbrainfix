@@ -1,12 +1,12 @@
-//! The screenshots of the Flathub listing (#45), not a test suite: the
+//! Desktop screenshots (#45), not a test suite: the
 //! window over a small demo store, drawn by egui_kittest through wgpu and
 //! written as PNG files to `$SCREENSHOTS_DIR` (else
-//! `target/flathub-screenshots`). The release workflow renders them and
+//! `target/screenshots`). The release workflow renders them and
 //! attaches them to the GitHub Release, which the metainfo points at.
 //! Ignored: they need a GPU or a software Vulkan such as lavapipe.
 //!
 //! ```sh
-//! SCREENSHOTS_DIR=/tmp/shots cargo test -p oldbrainfix-gui --test flathub_screenshots -- --ignored
+//! SCREENSHOTS_DIR=/tmp/shots cargo test -p oldbrainfix-gui --test screenshots -- --ignored
 //! ```
 
 use std::path::PathBuf;
@@ -31,7 +31,7 @@ pub const FILES: [&str; 3] = [
 
 fn out_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let dir = std::env::var_os("SCREENSHOTS_DIR").map_or_else(
-        || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/flathub-screenshots"),
+        || PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/screenshots"),
         PathBuf::from,
     );
     std::fs::create_dir_all(&dir)?;
@@ -149,7 +149,7 @@ fn shoot(harness: &mut Harness<'static, App>, name: &str) -> TestResult {
 
 #[test]
 #[ignore = "needs a GPU or a software Vulkan; run by the release workflow"]
-fn render_the_flathub_screenshots() -> TestResult {
+fn render_the_screenshots() -> TestResult {
     let (store, ids) = demo()?;
     let mut app = App::new(store, "en");
     app.set_wall_clock(Arc::new(utc));

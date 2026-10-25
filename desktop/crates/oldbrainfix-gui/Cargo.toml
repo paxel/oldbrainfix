@@ -66,7 +66,7 @@ zbus = { version = "5", default-features = false, features = ["async-io", "block
 oldbrainfix-l10n = { path = "../oldbrainfix-l10n", version = "0.1.0" }
 
 [dev-dependencies]
-# wgpu draws the Flathub screenshots (tests/flathub_screenshots.rs).
+# wgpu draws the desktop screenshots (tests/screenshots.rs).
 egui_kittest = { version = "0.35", features = ["wgpu"] }
 # A phone joining the Sync view in the tests.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
