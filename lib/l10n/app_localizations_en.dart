@@ -1771,22 +1771,40 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sentItemSomeone => 'Someone';
-
-  @override
   String sentItemVerified(String code) {
-    return 'Verified: met in person. Key $code';
+    return 'Verified: code compared in person. Code $code';
   }
 
   @override
   String sentItemKnown(String code) {
-    return 'Not verified: known from syncing, never met in person. Key $code';
+    return 'Not verified: known here, code not compared yet. Code $code';
   }
 
   @override
   String sentItemUnknown(String code) {
-    return 'Not verified: never met. Key $code';
+    return 'Not verified: this Profile is new here. Code $code';
   }
+
+  @override
+  String get sentItemCompare => 'Compare codes';
+
+  @override
+  String sentItemCompareHint(String name, String code) {
+    return 'Ask $name, in person, to read out the code on their Profile page. It must be $code.';
+  }
+
+  @override
+  String get sentItemCodesMatch => 'Codes match';
+
+  @override
+  String get sentItemCodesDiffer => 'Codes differ';
+
+  @override
+  String get sentItemVerifiedOnAccept => 'Marked as verified when you accept.';
+
+  @override
+  String get sentItemCodesDiffered =>
+      'The codes differ: this file may not come from the person it names.';
 
   @override
   String get sentItemEncrypted => 'It came encrypted to this Device.';

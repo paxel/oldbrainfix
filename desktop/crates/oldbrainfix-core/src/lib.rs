@@ -50,7 +50,7 @@ pub use nudges::{PlannedNudge, QuietHours};
 pub use pairing::PairedDevice;
 pub use people::PersonTaken;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
-pub use profile::{OwnProfile, Profile, ProfileChoice};
+pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
 pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,

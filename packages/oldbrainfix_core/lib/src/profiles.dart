@@ -642,6 +642,16 @@ enum ProfileTaken {
 /// picture made again, and its short code.
 typedef ProfileChoice = ({Profile profile, String code});
 
+/// The sender's Profile a Sent Item carries, as its preview shows it:
+/// the record with the picture made again, its short code, whether it
+/// is kept here already, and whether its code was compared in person.
+typedef SentProfile = ({
+  Profile profile,
+  String code,
+  bool kept,
+  bool verified,
+});
+
 // ------------------------------------------------------- own Profile
 
 /// The user's own Profile on this Device (ADR 0017), kept as local

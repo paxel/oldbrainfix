@@ -4,7 +4,22 @@ import 'dart:typed_data';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
-import 'sync_test.dart' show device, ticking;
+import 'sync_test.dart' show ticking;
+import 'sync_test.dart' as sync;
+
+/// A Device of the person [name], with its own Profile, as the app
+/// makes one at its first start.
+Store device(DateTime Function() clock, String name) =>
+    sync.device(clock, name)..applyProfileDefaults(name: name);
+
+/// The own Profile of [store] as a Sent Item carries it.
+SignedProfile _profileOf(Store store) =>
+    SignedProfile.fromJson(store.ownProfileForOthers)!;
+
+/// The `person:` settings of [store]: the Profiles of other people it
+/// keeps.
+List<(String, String)> _people(Store store) =>
+    store.localSettingsWithPrefix('person:').toList();
 
 Uint8List _hex(String s) => fromHex(s.replaceAll(RegExp(r'\s'), ''));
 
@@ -124,7 +139,8 @@ void main() {
       expect(opened.accepted, isNull);
       final item = opened.item;
       expect(item.version, 1);
-      expect(item.name, 'Ann');
+      expect(opened.sender.name, 'Ann');
+      expect(opened.code, ann.ownProfileCode);
       expect(item.from.device, ann.deviceId);
       expect(item.text, 'Dentist on Friday');
       expect([for (final s in item.sections) s.text], ['Bring the card']);
@@ -188,10 +204,12 @@ void main() {
       expect(utf8.decode(file), isNot(contains('Ann')));
       expect(looksLikeSentItem(file), isTrue);
 
+      // A key met in person no longer verifies the sender: only the
+      // Profile's short code compared does (#51).
       ben.learnKeys([ann.ownKeyRecord], verifiedDevice: ann.deviceId);
       final opened = openSentItem(ben, file);
       expect(opened.encrypted, isTrue);
-      expect(opened.trust, SenderTrust.verified);
+      expect(opened.trust, SenderTrust.unknown);
       expect(opened.item.text, 'Secret plan');
       expect(() => openSentItem(eve, file), throwsA(isA<SentItemNotForUs>()));
     });
@@ -241,7 +259,7 @@ void main() {
           id: 'x',
           version: 1,
           from: ann.ownKeyRecord,
-          name: 'Ann',
+          profile: _profileOf(ann),
           text: 'Cancelled',
         ),
         mallory.signingKey,
@@ -283,7 +301,7 @@ void main() {
       expect(link, {
         'from': base64.encode(ann.signingKey.publicKey),
         'id': opened.item.id,
-        'name': 'Ann',
+        'profile': ann.ownProfile!.id,
         'version': 1,
       });
       expect(Routines(ben).all(), hasLength(1), reason: 'alarms come from it');
@@ -319,7 +337,7 @@ void main() {
           version: 2,
           cancel: cancel,
           from: eve.ownKeyRecord,
-          name: 'Ann',
+          profile: _profileOf(eve),
           text: 'Fake',
         );
         expect(
@@ -557,6 +575,160 @@ void main() {
       expect(opened.accepted, isNull);
       expect(acceptSentItem(ben, opened.item), isNull);
       expect(ben.allEntries(), hasLength(count));
+    });
+  });
+  group("the sender's Profile", () {
+    test('the preview shows it and keeps nothing; accepting keeps it', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final cid = device(clock, 'Cid');
+      final annId = ann.ownProfile!.id;
+      final file = sendNote(ann, Notes(ann).capture('Dentist').id);
+
+      final opened = openSentItem(ben, file);
+      expect(opened.sender.id, annId);
+      expect(opened.sender.name, 'Ann');
+      expect(opened.code, ann.ownProfileCode);
+      expect(opened.trust, SenderTrust.unknown);
+      // Declining is not accepting: nothing is kept.
+      expect(_people(ben), isEmpty);
+      expect(ben.personCode(annId), isNull);
+
+      final note = acceptSentItem(ben, opened.item)!;
+      expect(ben.keptPeople.map((p) => p.id), [annId]);
+      expect(ben.personShown(annId).name, 'Ann');
+      expect(ben.personCode(annId), ann.ownProfileCode);
+      expect(ben.personVerified(annId), isFalse);
+      // The accepted Note shows its sender, as other people's Notes do.
+      expect(ben.authorOf(note)?.id, annId);
+      expect(ben.authorOf(Notes(ben).capture('Mine').id), isNull);
+      // Kept now: the next one from her is known, and opening it
+      // changes nothing that is kept.
+      final kept = _people(ben);
+      final again = openSentItem(
+        ben,
+        sendNote(ann, Notes(ann).capture('Later').id),
+      );
+      expect(again.trust, SenderTrust.known);
+      expect(_people(ben), kept);
+      // Somebody else's Note is nobody's but theirs.
+      expect(openSentItem(cid, file).trust, SenderTrust.unknown);
+      // Sent to oneself: one's own Profile, verified, never kept.
+      final mine = openSentItem(ann, file);
+      expect(mine.trust, SenderTrust.verified);
+      acceptSentItem(ann, mine.item);
+      expect(_people(ann), isEmpty);
+    });
+
+    test('a Profile not bound to the key that signed is refused', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final eve = device(clock, 'Eve');
+      final item = SentItem(
+        id: 'x',
+        version: 1,
+        from: eve.ownKeyRecord,
+        profile: _profileOf(ann),
+        text: 'Hello from Ann',
+      );
+      expect(
+        () => openSentItem(ben, encodeSentItem(item, eve.signingKey)),
+        throwsA(isA<NotASentItem>()),
+      );
+      // One without a Profile, as written before Profiles, too.
+      final bare = utf8.decode(sendNote(eve, Notes(eve).capture('x').id));
+      final payload = jsonDecode(bare)['item'] as String;
+      final json = jsonDecode(payload) as Map<String, Object?>;
+      (json['from'] as Map<String, Object?>).remove('profile');
+      expect(SentItem.parse(jsonEncode(json)), isNull);
+      expect(_people(ben), isEmpty);
+    });
+
+    test('comparing the short code verifies it, on accept only', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final annId = ann.ownProfile!.id;
+      final note = Notes(ann).capture('Dentist');
+      final first = openSentItem(ben, sendNote(ann, note.id));
+      expect(ben.verifyPerson(annId, first.code), isFalse, reason: 'not kept');
+      acceptSentItem(ben, first.item, verified: true);
+      expect(ben.personVerified(annId), isTrue);
+      final update = openSentItem(ben, sendNote(ann, note.id));
+      expect(update.trust, SenderTrust.verified);
+
+      // Eve copies Ann's id under a first key of her own: another code,
+      // and nothing of Ann's changes, verified or not.
+      final eve = device(clock, 'Eve');
+      final record = Profile(id: annId, name: 'Ann', version: 9).encode();
+      final copy = SignedProfile(
+        record: record,
+        signer: base64.encode(eve.signingKey.publicKey),
+        sig: eve.signingKey.sign(profileRecordBytes(record)),
+        first: base64.encode(eve.signingKey.publicKey),
+      );
+      final dan = device(clock, 'Dan');
+      final danNote = openSentItem(
+        ben,
+        sendNote(dan, Notes(dan).capture('Hi').id),
+      );
+      acceptSentItem(ben, danNote.item);
+      final danId = dan.ownProfile!.id;
+      expect(
+        ben.verifyPerson(danId, first.code),
+        isFalse,
+        reason: 'wrong code',
+      );
+      expect(ben.personVerified(danId), isFalse);
+      final kept = _people(ben);
+      final fake = openSentItem(
+        ben,
+        encodeSentItem(
+          SentItem(
+            id: 'fake',
+            version: 1,
+            from: eve.ownKeyRecord,
+            profile: copy,
+            text: 'Hello',
+          ),
+          eve.signingKey,
+        ),
+      );
+      expect(fake.trust, SenderTrust.unknown);
+      expect(fake.code, isNot(first.code));
+      acceptSentItem(ben, fake.item, verified: true);
+      expect(_people(ben), kept);
+      expect(ben.personVerified(annId), isTrue);
+      expect(ben.personShown(annId).version, 1);
+    });
+
+    test('an update or cancellation brings a newer Profile, kept verified', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final annId = ann.ownProfile!.id;
+      final note = Notes(ann).capture('Dentist');
+      final first = openSentItem(ben, sendNote(ann, note.id));
+      final accepted = acceptSentItem(ben, first.item, verified: true)!;
+
+      ann.renameOwnProfile('Ann Lee');
+      final update = openSentItem(ben, sendNote(ann, note.id));
+      expect(update.sender.name, 'Ann Lee');
+      expect(update.trust, SenderTrust.verified);
+      expect(ben.personShown(annId).name, 'Ann', reason: 'not accepted yet');
+      acceptSentItem(ben, update.item);
+      expect(ben.personShown(annId).name, 'Ann Lee');
+      expect(ben.personVerified(annId), isTrue);
+      expect(ben.authorOf(accepted)?.name, 'Ann Lee');
+
+      ann.renameOwnProfile('Ann L.');
+      final cancel = openSentItem(ben, sendNote(ann, note.id, cancel: true));
+      expect(cancel.state, SentItemState.cancel);
+      acceptSentItem(ben, cancel.item);
+      expect(ben.personShown(annId).name, 'Ann L.');
+      expect(ben.personVerified(annId), isTrue);
     });
   });
 }

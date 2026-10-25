@@ -8,6 +8,7 @@ import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'profile.dart';
 import 'schedule_text.dart';
 
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
@@ -188,24 +189,70 @@ List<int> _small(String path) {
 /// Whether the file at [path] is a Sent Item rather than a bundle.
 bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
 
-/// The preview of a Sent Item: who sent it, verified or not with their
-/// key's code, whether it came encrypted, its text, Sections and
-/// Routines and Reminders with their times. Accept takes it into
-/// Unsorted with its alarms on; for an update it shows what changes,
-/// "Tue 10:00 → Wed 14:00", and applies it to the Note accepted before;
-/// a cancellation moves that Note to the trash. Decline keeps nothing;
-/// one already up to date, or with nothing to cancel, only closes.
-class SentItemScreen extends StatelessWidget {
+/// The preview of a Sent Item: who sent it, with their Profile's picture
+/// and name, verified or not with its short code, whether it came
+/// encrypted, its text, Sections and Routines and Reminders with their
+/// times. "Compare codes" asks the user to compare the code with the
+/// sender in person; a match marks the Profile verified when the item is
+/// accepted (ADR 0017, #51). Accept takes it into Unsorted with its
+/// alarms on and keeps the sender's Profile; for an update it shows what
+/// changes, "Tue 10:00 → Wed 14:00", and applies it to the Note accepted
+/// before; a cancellation moves that Note to the trash. Decline keeps
+/// nothing; one already up to date, or with nothing to cancel, only
+/// closes.
+class SentItemScreen extends StatefulWidget {
   final Store store;
   final OpenedSentItem opened;
 
   const SentItemScreen({super.key, required this.store, required this.opened});
 
+  @override
+  State<SentItemScreen> createState() => _SentItemScreenState();
+}
+
+/// What comparing the short code came to.
+enum _Compared { not, match, differ }
+
+class _SentItemScreenState extends State<SentItemScreen> {
+  var _compared = _Compared.not;
+
+  Store get store => widget.store;
+  OpenedSentItem get opened => widget.opened;
+
+  Future<void> _compare(String name) async {
+    final t = context.t;
+    final match = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.sentItemCompare),
+        content: Text(t.sentItemCompareHint(name, opened.code)),
+        actions: [
+          TextButton(
+            key: const ValueKey('codes-differ'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.sentItemCodesDiffer),
+          ),
+          TextButton(
+            key: const ValueKey('codes-match'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.sentItemCodesMatch),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || match == null) return;
+    setState(() => _compared = match ? _Compared.match : _Compared.differ);
+  }
+
   void _accept(BuildContext context) {
     final announcements = AnnouncementsScope.of(context);
     final t = context.t;
     try {
-      acceptSentItem(store, opened.item);
+      acceptSentItem(
+        store,
+        opened.item,
+        verified: _compared == _Compared.match,
+      );
       announcements?.announce(switch (opened.state) {
         SentItemState.update => t.sentItemApplied,
         SentItemState.cancel => t.sentItemTrashed,
@@ -229,9 +276,12 @@ class SentItemScreen extends StatelessWidget {
     final locale = Localizations.localeOf(context).toString();
     final when = DateFormat.yMd(locale).add_Hm();
     final item = opened.item;
-    final code = item.from.code;
-    final name = item.name.trim().isEmpty ? t.sentItemSomeone : item.name;
-    final (trustIcon, trustText) = switch (opened.trust) {
+    final code = opened.code;
+    final name = profileDisplayName(t, opened.sender.name);
+    final trust = _compared == _Compared.match
+        ? SenderTrust.verified
+        : opened.trust;
+    final (trustIcon, trustText) = switch (trust) {
       SenderTrust.verified => (Icons.verified_user, t.sentItemVerified(code)),
       SenderTrust.known => (Icons.gpp_maybe_outlined, t.sentItemKnown(code)),
       SenderTrust.unknown => (
@@ -257,9 +307,45 @@ class SentItemScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.sentItemFrom(name), style: text.titleMedium),
+                Row(
+                  children: [
+                    ProfileAvatar(
+                      key: const ValueKey('sent-from-picture'),
+                      profile: opened.sender,
+                      size: 48,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        t.sentItemFrom(name),
+                        style: text.titleMedium,
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 8),
                 _Line(icon: trustIcon, text: trustText),
+                if (_compared == _Compared.match &&
+                    opened.trust != SenderTrust.verified)
+                  _Line(
+                    icon: Icons.info_outline,
+                    text: t.sentItemVerifiedOnAccept,
+                  ),
+                if (_compared == _Compared.differ)
+                  _Line(
+                    icon: Icons.warning_amber,
+                    text: t.sentItemCodesDiffered,
+                  ),
+                if (accept != null && trust != SenderTrust.verified)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      key: const ValueKey('compare-codes'),
+                      onPressed: () => _compare(name),
+                      icon: const Icon(Icons.compare_arrows),
+                      label: Text(t.sentItemCompare),
+                    ),
+                  ),
                 _Line(
                   icon: opened.encrypted ? Icons.lock_outline : Icons.lock_open,
                   text: opened.encrypted

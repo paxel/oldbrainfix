@@ -129,17 +129,30 @@ fn load(ui: &Ui, profile: &Profile) -> Option<TextureHandle> {
     ))
 }
 
-/// Other people's pictures as textures, by Profile id and version, made
-/// once each.
+/// Other people's pictures as textures, made once each. Keyed by the
+/// Profile id and version and by the picture itself: a Sent Item's
+/// preview draws a Profile that is not kept, and a copied id and version
+/// with another picture must not take the place of the one kept (#51).
 #[derive(Default)]
 pub struct Pictures {
-    textures: std::collections::HashMap<(String, i64), Option<TextureHandle>>,
+    textures: std::collections::HashMap<PictureKey, Option<TextureHandle>>,
+}
+
+/// What a picture is cached by: the Profile id and version, and a hash of
+/// the picture's bytes.
+type PictureKey = (String, i64, u64);
+
+fn picture_key(profile: &Profile) -> PictureKey {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    profile.picture.hash(&mut hasher);
+    (profile.id.clone(), profile.version, hasher.finish())
 }
 
 impl Pictures {
     fn texture(&mut self, ui: &Ui, profile: &Profile) -> Option<TextureHandle> {
         self.textures
-            .entry((profile.id.clone(), profile.version))
+            .entry(picture_key(profile))
             .or_insert_with(|| load(ui, profile))
             .clone()
     }
@@ -439,4 +452,21 @@ pub fn square_page(ui: &mut Ui, t: &L10n, square: &mut Square, actions: &mut Vec
             actions.push(ProfileAction::CancelSquare);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_copied_id_and_version_with_another_picture_is_another_texture() {
+        let profile = |picture: &[u8]| Profile {
+            id: "ann".into(),
+            name: "Ann".into(),
+            picture: Some(picture.to_vec()),
+            version: 1,
+        };
+        assert_eq!(picture_key(&profile(b"one")), picture_key(&profile(b"one")));
+        assert_ne!(picture_key(&profile(b"one")), picture_key(&profile(b"two")));
+    }
 }

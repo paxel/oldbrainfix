@@ -1,0 +1,14 @@
+[
+  [
+    "profile",
+    "{\"id\":\"00000000000000000000000000000005\",\"name\":\"Ada\",\"version\":1}"
+  ],
+  [
+    "profile:first",
+    "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ="
+  ],
+  [
+    "profile:signed",
+    "{\"sig\":\"fapqa9Q5wA+CmQzyqXqCsK+uRuN6ZJbk4VqCjbb/4IGHXdb3SM2ZcptOQw4hCeNQynPPL6ktlwMJ3h66H3EfAA==\",\"signer\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\"}"
+  ]
+]

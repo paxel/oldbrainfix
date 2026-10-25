@@ -1783,22 +1783,41 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get sentItemSomeone => 'Jemand';
-
-  @override
   String sentItemVerified(String code) {
-    return 'Geprüft: persönlich getroffen. Schlüssel $code';
+    return 'Geprüft: Code persönlich verglichen. Code $code';
   }
 
   @override
   String sentItemKnown(String code) {
-    return 'Nicht geprüft: vom Synchronisieren bekannt, nie persönlich getroffen. Schlüssel $code';
+    return 'Nicht geprüft: hier bekannt, Code noch nicht verglichen. Code $code';
   }
 
   @override
   String sentItemUnknown(String code) {
-    return 'Nicht geprüft: nie getroffen. Schlüssel $code';
+    return 'Nicht geprüft: Dieses Profil ist hier neu. Code $code';
   }
+
+  @override
+  String get sentItemCompare => 'Codes vergleichen';
+
+  @override
+  String sentItemCompareHint(String name, String code) {
+    return 'Bitte $name persönlich, den Code auf der eigenen Profilseite vorzulesen. Er muss $code lauten.';
+  }
+
+  @override
+  String get sentItemCodesMatch => 'Codes stimmen überein';
+
+  @override
+  String get sentItemCodesDiffer => 'Codes weichen ab';
+
+  @override
+  String get sentItemVerifiedOnAccept =>
+      'Wird beim Übernehmen als geprüft vermerkt.';
+
+  @override
+  String get sentItemCodesDiffered =>
+      'Die Codes weichen ab: Diese Datei kommt vielleicht nicht von der Person, die sie nennt.';
 
   @override
   String get sentItemEncrypted => 'Sie kam verschlüsselt an dieses Gerät.';

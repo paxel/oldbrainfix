@@ -250,8 +250,12 @@ enum Dialog {
         update: bool,
         cancel: bool,
     },
-    /// The preview of a Sent Item opened here.
-    SentItem(Box<Opened>),
+    /// The preview of a Sent Item opened here, with what comparing its
+    /// sender's short code came to.
+    SentItem {
+        opened: Box<Opened>,
+        compared: Compared,
+    },
     /// The people of the Shared Area `area`.
     People {
         area: String,
@@ -265,6 +269,16 @@ enum Dialog {
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
+}
+
+/// Where comparing the short code of a Sent Item's sender stands
+/// (ADR 0017, #51): a match marks their Profile verified on accept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Compared {
+    Not,
+    Asking,
+    Match,
+    Differ,
 }
 
 /// The question before an Area or Topic is deleted.
@@ -358,6 +372,10 @@ enum Action {
     /// Accepts the Sent Item previewed, or declines it.
     AcceptSent,
     DeclineSent,
+    /// Asks to compare the sender's short code in person, and what that
+    /// came to: whether the codes match.
+    CompareCodes,
+    CodesCompared(bool),
     /// Asks how the Area is to be shared.
     Share(String),
     /// Shares the Area of the Share dialog and hosts its invite.
@@ -797,7 +815,7 @@ impl App {
 
     /// Whether a Sent Item's preview shows.
     pub fn previewing(&self) -> bool {
-        matches!(self.dialog, Some(Dialog::SentItem(_)))
+        matches!(self.dialog, Some(Dialog::SentItem { .. }))
     }
 
     /// What a bundle saved or imported did, as announced.
@@ -855,7 +873,12 @@ impl App {
             return;
         }
         match self.store.open_sent_item(&bytes) {
-            Ok(Ok(opened)) => self.dialog = Some(Dialog::SentItem(Box::new(opened))),
+            Ok(Ok(opened)) => {
+                self.dialog = Some(Dialog::SentItem {
+                    opened: Box::new(opened),
+                    compared: Compared::Not,
+                });
+            }
             Ok(Err(OpenError::NotForUs)) => {
                 self.notice = Some(self.t.sent_item_not_for_us().to_string());
             }
@@ -1647,9 +1670,10 @@ impl App {
             }
             Action::SendNote => self.send_note()?,
             Action::AcceptSent => {
-                if let Some(Dialog::SentItem(opened)) = self.dialog.take() {
+                if let Some(Dialog::SentItem { opened, compared }) = self.dialog.take() {
                     // The alerts plan its alarms once the action is done.
-                    self.store.accept_sent_item(&opened.item)?;
+                    self.store
+                        .accept_sent_item(&opened.item, compared == Compared::Match)?;
                     let said = match opened.state {
                         SentItemState::Update => self.t.sent_item_applied(),
                         SentItemState::Cancel => self.t.sent_item_trashed(),
@@ -1659,11 +1683,24 @@ impl App {
                 }
             }
             Action::DeclineSent => {
-                let previewed =
-                    matches!(&self.dialog, Some(Dialog::SentItem(o)) if acceptable(o.state));
+                let previewed = matches!(&self.dialog, Some(Dialog::SentItem { opened, .. }) if acceptable(opened.state));
                 self.dialog = None;
                 if previewed {
                     self.notice = Some(self.t.sent_item_declined().to_string());
+                }
+            }
+            Action::CompareCodes => {
+                if let Some(Dialog::SentItem { compared, .. }) = &mut self.dialog {
+                    *compared = Compared::Asking;
+                }
+            }
+            Action::CodesCompared(matched) => {
+                if let Some(Dialog::SentItem { compared, .. }) = &mut self.dialog {
+                    *compared = if matched {
+                        Compared::Match
+                    } else {
+                        Compared::Differ
+                    };
                 }
             }
             Action::Share(area) => {
@@ -2678,6 +2715,7 @@ impl App {
         let t = self.t;
         let view = &self.view;
         let (own_view, question_view) = (&mut self.profile_view, &mut self.question_view);
+        let pictures = &mut self.pictures;
         let frame = Frame::NONE
             .fill(tones.card)
             .corner_radius(theme::CARD_RADIUS)
@@ -2743,7 +2781,9 @@ impl App {
                         cancel,
                         ..
                     } => send_form(ui, &t, recipients, (picked, *update, cancel), actions),
-                    Dialog::SentItem(opened) => sent_item_form(ui, &t, tones, opened, actions),
+                    Dialog::SentItem { opened, compared } => {
+                        sent_item_form(ui, &t, tones, (opened, *compared, pictures), actions);
+                    }
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
@@ -3444,29 +3484,82 @@ fn acceptable(state: SentItemState) -> bool {
     )
 }
 
-/// The preview of a Sent Item: who sent it, verified or not with their
-/// key's code, whether it came encrypted, its text, Routines and
-/// Reminders with their times and Sections; Accept or Decline. An update
-/// shows what changes, "Tue 10:00 → Wed 14:00", and Apply; a
-/// cancellation what it cancels; one already up to date or with nothing
-/// to cancel only closes.
-fn sent_item_form(ui: &mut Ui, t: &L10n, tones: Tones, opened: &Opened, actions: &mut Vec<Action>) {
+/// The preview of a Sent Item: who sent it, with their Profile's picture
+/// and name, verified or not with its short code, whether it came
+/// encrypted, its text, Routines and Reminders with their times and
+/// Sections; Accept or Decline. "Compare codes" asks the user to compare
+/// the code with the sender in person; a match marks the Profile verified
+/// on accept (ADR 0017, #51). An update shows what changes, "Tue 10:00 →
+/// Wed 14:00", and Apply; a cancellation what it cancels; one already up
+/// to date or with nothing to cancel only closes.
+fn sent_item_form(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (opened, compared, pictures): (&Opened, Compared, &mut profile_view::Pictures),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let item = &opened.item;
-    let name = if item.name.trim().is_empty() {
-        t.sent_item_someone().to_string()
+    let name = profile_view::display_name(t, &opened.sender.name).to_string();
+    ui.horizontal(|ui| {
+        profile_view::person_picture(ui, pictures, &opened.sender, 40.0, &name);
+        ui.add_space(8.0);
+        title(ui, &t.sent_item_from(&name));
+    });
+    let code = &opened.code;
+    let trust = if compared == Compared::Match {
+        SenderTrust::Verified
     } else {
-        item.name.clone()
+        opened.trust
     };
-    title(ui, &t.sent_item_from(&name));
-    let code = item.from.code();
-    let trust = match opened.trust {
-        SenderTrust::Verified => t.sent_item_verified(&code),
-        SenderTrust::Known => t.sent_item_known(&code),
-        SenderTrust::Unknown => t.sent_item_unknown(&code),
+    let said = match trust {
+        SenderTrust::Verified => t.sent_item_verified(code),
+        SenderTrust::Known => t.sent_item_known(code),
+        SenderTrust::Unknown => t.sent_item_unknown(code),
     };
-    ui.label(RichText::new(trust).color(text));
+    ui.label(RichText::new(said).color(text));
+    let acceptable = acceptable(opened.state);
+    match compared {
+        Compared::Match if opened.trust != SenderTrust::Verified => {
+            ui.label(
+                RichText::new(t.sent_item_verified_on_accept())
+                    .small()
+                    .color(weak),
+            );
+        }
+        Compared::Differ => {
+            ui.label(RichText::new(t.sent_item_codes_differed()).color(tones.accent));
+        }
+        Compared::Asking => {
+            ui.label(RichText::new(t.sent_item_compare_hint(&name, code)).color(text));
+            ui.horizontal(|ui| {
+                if ui
+                    .button(RichText::new(t.sent_item_codes_match()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::CodesCompared(true));
+                }
+                if ui
+                    .button(RichText::new(t.sent_item_codes_differ()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::CodesCompared(false));
+                }
+            });
+        }
+        _ => {}
+    }
+    if acceptable
+        && trust != SenderTrust::Verified
+        && compared != Compared::Asking
+        && ui
+            .button(RichText::new(t.sent_item_compare()).color(text))
+            .clicked()
+    {
+        actions.push(Action::CompareCodes);
+    }
     let sealed = if opened.encrypted {
         t.sent_item_encrypted()
     } else {

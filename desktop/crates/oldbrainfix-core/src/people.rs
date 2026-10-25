@@ -6,7 +6,9 @@
 //! `{"profile":…,"seen":…,"shown":…}`, the signed Profile, when it was
 //! first seen here, and its picture made again for the screen. On first
 //! sight an id is bound to the keys that came with it; later a record
-//! counts only when one of them signed it.
+//! counts only when one of them signed it. `"verified":true` says the
+//! user compared its short code in person (#51); it stays on this
+//! Device and is kept through every newer record.
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
@@ -18,8 +20,8 @@ use serde_json::{Value, json};
 use crate::Result;
 use crate::entry::dart_iso;
 use crate::profile::{
-    ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SignedProfile,
-    chain, check, is_key, replaces, short_code,
+    ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SentProfile,
+    SignedProfile, chain, check, is_key, replaces, short_code,
 };
 use crate::signing::device_id_from_key;
 use crate::store::Store;
@@ -66,6 +68,8 @@ pub(crate) struct Held {
     profile: Profile,
     bound: HashSet<String>,
     seen: String,
+    /// Whether the user compared its short code in person.
+    verified: bool,
 }
 
 /// Every kept Profile by id, and the ids they replaced.
@@ -98,6 +102,7 @@ fn read_held(raw: &str) -> Option<Held> {
         profile,
         bound,
         seen,
+        verified: json.get("verified") == Some(&Value::Bool(true)),
     })
 }
 
@@ -325,6 +330,7 @@ impl Store {
                 },
                 checked.shown.as_deref(),
                 &dart_iso(self.now()),
+                false,
             )?;
             return Ok(PersonTaken::Added);
         };
@@ -373,11 +379,17 @@ impl Store {
             held.profile.picture.clone()
         };
         let seen = held.seen.clone();
-        self.keep_person(&next, shown.as_deref(), &seen)?;
+        self.keep_person(&next, shown.as_deref(), &seen, held.verified)?;
         Ok(PersonTaken::Updated)
     }
 
-    fn keep_person(&self, sent: &SignedProfile, shown: Option<&[u8]>, seen: &str) -> Result<()> {
+    fn keep_person(
+        &self,
+        sent: &SignedProfile,
+        shown: Option<&[u8]>,
+        seen: &str,
+        verified: bool,
+    ) -> Result<()> {
         let Some(id) = Profile::parse(&sent.record).map(|p| p.id) else {
             return Ok(());
         };
@@ -385,9 +397,103 @@ impl Store {
         if let Some(shown) = shown {
             value["shown"] = json!(BASE64.encode(shown));
         }
+        if verified {
+            value["verified"] = json!(true);
+        }
         self.set_local_setting(&format!("{PREFIX}{id}"), &value.to_string())?;
         *self.people.lock() = None;
         Ok(())
+    }
+
+    /// Whether the user compared the short code of the person `id`'s
+    /// Profile in person; the own Profile counts as verified.
+    pub fn person_verified(&self, id: &str) -> Result<bool> {
+        if self.is_own_person(id)? {
+            return Ok(true);
+        }
+        let resolved = self.resolve_person(id)?;
+        Ok(self
+            .people_index()?
+            .by_id
+            .get(&resolved)
+            .is_some_and(|h| h.verified))
+    }
+
+    /// Marks the Profile of the person `id` kept here as verified, when
+    /// its short code is `code`, the one the user compared in person: a
+    /// copied id with another first key has another code and stays as it
+    /// is. Returns whether it is verified now.
+    pub fn verify_person(&self, id: &str, code: &str) -> Result<bool> {
+        if self.is_own_person(id)? {
+            return Ok(true);
+        }
+        let resolved = self.resolve_person(id)?;
+        let index = self.people_index()?;
+        let Some(held) = index.by_id.get(&resolved) else {
+            return Ok(false);
+        };
+        if self.person_code(&held.profile.id)?.as_deref() != Some(code) {
+            return Ok(false);
+        }
+        if !held.verified {
+            self.keep_person(
+                &held.sent,
+                held.profile.picture.as_deref(),
+                &held.seen,
+                true,
+            )?;
+        }
+        Ok(true)
+    }
+
+    /// The Profile `json` a Sent Item carries, signed with `key`, as its
+    /// preview shows it (#51): its signatures hold and its binding holds
+    /// `key`, its name sanitised and its picture made again, with its
+    /// short code; whether it is kept here already, bound to `key`, and
+    /// verified. None when any of it fails: the file is then no Sent
+    /// Item.
+    pub fn sent_item_profile(&self, json: &Value, key: &[u8]) -> Result<Option<SentProfile>> {
+        let Some(sent) = SignedProfile::from_json(json) else {
+            return Ok(None);
+        };
+        let Some(checked) = check(&sent) else {
+            return Ok(None);
+        };
+        let p = &checked.profile;
+        let signer = BASE64.encode(key);
+        if !chain(&p.id, &sent.first, &[], &sent.keys)
+            .0
+            .contains(&signer)
+        {
+            return Ok(None);
+        }
+        let Ok(first) = BASE64.decode(&sent.first) else {
+            return Ok(None);
+        };
+        let code = short_code(&p.id, &first);
+        let (mut kept, mut verified) = (false, false);
+        if self.is_own_person(&p.id)? {
+            kept = OwnProfile::new(self).code()?.as_deref() == Some(code.as_str());
+            verified = kept;
+        } else if let Some(held) = self.people_index()?.by_id.get(&p.id)
+            && held.sent.first == sent.first
+        {
+            kept = chain(&p.id, &held.sent.first, &held.sent.keys, &sent.keys)
+                .0
+                .contains(&signer);
+            verified = kept && held.verified;
+        }
+        Ok(Some(SentProfile {
+            profile: Profile {
+                id: p.id.clone(),
+                name: p.name.clone(),
+                picture: checked.shown.clone(),
+                version: p.version,
+            },
+            code,
+            kept,
+            verified,
+        }))
     }
 
     /// The signed Profiles that go out with a sync, as JSON, sorted by id.
@@ -467,8 +573,15 @@ impl Store {
     /// through its aliases. In a Shared Area the grant of that Device
     /// names whose Profile it must be; until that Profile arrives, its
     /// placeholder. None for the user's own and for a Note whose writer
-    /// is not known.
+    /// is not known. A Note accepted from a Sent Item shows its sender,
+    /// through the key and the Profile id it keeps (#51).
     pub fn author_of(&self, entity: &str) -> Result<Option<Profile>> {
+        if let Some((key, person)) = self.received_from(entity)? {
+            if self.own_keys()?.bound.contains(&key) || self.is_own_person(&person)? {
+                return Ok(None);
+            }
+            return self.shown_for(Some(&key), Some(person));
+        }
         let Some(device) = self
             .history(entity)?
             .into_iter()
@@ -499,8 +612,35 @@ impl Store {
         {
             return Ok(None);
         }
+        self.shown_for(key.as_deref(), named)
+    }
+
+    /// The sender's key and Profile id the Note `entity` keeps from the
+    /// Sent Item it was accepted from; none for any other.
+    fn received_from(&self, entity: &str) -> Result<Option<(String, String)>> {
+        let Some(raw) = self.current(entity, "received")? else {
+            return Ok(None);
+        };
+        let Ok(link) = serde_json::from_str::<Value>(&raw) else {
+            return Ok(None);
+        };
+        Ok(
+            match (
+                link.get("from").and_then(Value::as_str),
+                link.get("profile").and_then(Value::as_str),
+            ) {
+                (Some(key), Some(person)) => Some((key.to_string(), person.to_string())),
+                _ => None,
+            },
+        )
+    }
+
+    /// The Profile shown for a writer with the key `key`: the one `named`
+    /// stands for among those bound to it, or its placeholder; without
+    /// `named`, the Profile first seen with the key.
+    fn shown_for(&self, key: Option<&str>, named: Option<String>) -> Result<Option<Profile>> {
         let index = self.people_index()?;
-        let mut candidates: Vec<&Held> = match &key {
+        let mut candidates: Vec<&Held> = match key {
             Some(key) => index
                 .by_id
                 .values()

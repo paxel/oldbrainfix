@@ -661,6 +661,18 @@ pub struct ProfileChoice {
     pub code: String,
 }
 
+/// The sender's Profile a Sent Item carries, as its preview shows it,
+/// the Dart core's `SentProfile`: the record with the picture made
+/// again, its short code, whether it is kept here already, and whether
+/// its code was compared in person.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SentProfile {
+    pub profile: Profile,
+    pub code: String,
+    pub kept: bool,
+    pub verified: bool,
+}
+
 // ------------------------------------------------------- own Profile
 
 pub(crate) const RECORD: &str = "profile";

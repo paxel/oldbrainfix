@@ -2864,29 +2864,59 @@ abstract class AppLocalizations {
   /// **'From {name}'**
   String sentItemFrom(String name);
 
-  /// No description provided for @sentItemSomeone.
-  ///
-  /// In en, this message translates to:
-  /// **'Someone'**
-  String get sentItemSomeone;
-
   /// No description provided for @sentItemVerified.
   ///
   /// In en, this message translates to:
-  /// **'Verified: met in person. Key {code}'**
+  /// **'Verified: code compared in person. Code {code}'**
   String sentItemVerified(String code);
 
   /// No description provided for @sentItemKnown.
   ///
   /// In en, this message translates to:
-  /// **'Not verified: known from syncing, never met in person. Key {code}'**
+  /// **'Not verified: known here, code not compared yet. Code {code}'**
   String sentItemKnown(String code);
 
   /// No description provided for @sentItemUnknown.
   ///
   /// In en, this message translates to:
-  /// **'Not verified: never met. Key {code}'**
+  /// **'Not verified: this Profile is new here. Code {code}'**
   String sentItemUnknown(String code);
+
+  /// No description provided for @sentItemCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare codes'**
+  String get sentItemCompare;
+
+  /// No description provided for @sentItemCompareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask {name}, in person, to read out the code on their Profile page. It must be {code}.'**
+  String sentItemCompareHint(String name, String code);
+
+  /// No description provided for @sentItemCodesMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Codes match'**
+  String get sentItemCodesMatch;
+
+  /// No description provided for @sentItemCodesDiffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Codes differ'**
+  String get sentItemCodesDiffer;
+
+  /// No description provided for @sentItemVerifiedOnAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as verified when you accept.'**
+  String get sentItemVerifiedOnAccept;
+
+  /// No description provided for @sentItemCodesDiffered.
+  ///
+  /// In en, this message translates to:
+  /// **'The codes differ: this file may not come from the person it names.'**
+  String get sentItemCodesDiffered;
 
   /// No description provided for @sentItemEncrypted.
   ///

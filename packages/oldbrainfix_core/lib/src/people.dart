@@ -7,7 +7,9 @@ part of 'profiles.dart';
 /// `{"profile":…,"seen":…,"shown":…}`, the signed Profile, when it was
 /// first seen here, and its picture made again for the screen. On first
 /// sight an id is bound to the keys that came with it; later a record
-/// counts only when one of them signed it.
+/// counts only when one of them signed it. `"verified":true` says the
+/// user compared its short code in person (#51); it stays on this
+/// Device and is kept through every newer record.
 
 /// What became of another person's Profile that came in.
 enum PersonTaken {
@@ -34,7 +36,10 @@ class _Held {
   final Set<String> bound;
   final String seen;
 
-  const _Held(this.sent, this.profile, this.bound, this.seen);
+  /// Whether the user compared its short code in person.
+  final bool verified;
+
+  const _Held(this.sent, this.profile, this.bound, this.seen, this.verified);
 
   String get id => profile.id;
 }
@@ -101,6 +106,7 @@ extension People on Store {
           ),
           _chain(profile.id, signed.first, signed.keys).$1,
           seen,
+          json['verified'] == true,
         );
       }
     } on FormatException {
@@ -283,14 +289,24 @@ extension People on Store {
     if (jsonEncode(next.toJson()) == jsonEncode(held.sent.toJson())) {
       return PersonTaken.unchanged;
     }
-    _keepPerson(next, newer ? checked.shown : held.profile.picture, held.seen);
+    _keepPerson(
+      next,
+      newer ? checked.shown : held.profile.picture,
+      held.seen,
+      verified: held.verified,
+    );
     return PersonTaken.updated;
   }
 
   static List<ProfileAlias> _sortedAliases(Iterable<ProfileAlias> aliases) =>
       aliases.toList()..sort((a, b) => _compareUtf8(a.alias, b.alias));
 
-  void _keepPerson(SignedProfile sent, Uint8List? shown, String seen) {
+  void _keepPerson(
+    SignedProfile sent,
+    Uint8List? shown,
+    String seen, {
+    bool verified = false,
+  }) {
     final id = Profile.parse(sent.record)?.id;
     if (id == null) return;
     setLocalSetting(
@@ -299,9 +315,69 @@ extension People on Store {
         'profile': sent.toJson(),
         'seen': seen,
         if (shown != null) 'shown': base64.encode(shown),
+        if (verified) 'verified': true,
       }),
     );
     _peopleIndex[this] = null;
+  }
+
+  /// Whether the user compared the short code of the person [id]'s
+  /// Profile in person; the own Profile counts as verified.
+  bool personVerified(String id) =>
+      isOwnPerson(id) || (_people.byId[resolvePerson(id)]?.verified ?? false);
+
+  /// Marks the Profile of the person [id] kept here as verified, when its
+  /// short code is [code], the one the user compared in person: a copied
+  /// id with another first key has another code and stays as it is.
+  /// Returns whether it is verified now.
+  bool verifyPerson(String id, String code) {
+    if (isOwnPerson(id)) return true;
+    final held = _people.byId[resolvePerson(id)];
+    if (held == null || personCode(held.id) != code) return false;
+    if (held.verified) return true;
+    _keepPerson(held.sent, held.profile.picture, held.seen, verified: true);
+    profileChanged();
+    return true;
+  }
+
+  /// The Profile [json] a Sent Item carries, signed with [key], as its
+  /// preview shows it (#51): its signatures hold and its binding holds
+  /// [key], its name sanitised and its picture made again, with its
+  /// short code; whether it is kept here already, bound to [key], and
+  /// verified. Null when any of it fails: the file is then no Sent Item.
+  SentProfile? sentItemProfile(Object? json, List<int> key) {
+    final sent = SignedProfile.fromJson(json);
+    final checked = sent == null ? null : _check(sent);
+    if (sent == null || checked == null) return null;
+    final p = checked.profile;
+    final signer = base64.encode(key);
+    if (!_chain(p.id, sent.first, sent.keys).$1.contains(signer)) return null;
+    final code = profileShortCode(p.id, base64.decode(sent.first));
+    var kept = false;
+    var verified = false;
+    if (isOwnPerson(p.id)) {
+      kept = verified = ownProfileCode == code;
+    } else if (_people.byId[p.id] case final held?
+        when held.sent.first == sent.first) {
+      kept = _chain(
+        p.id,
+        held.sent.first,
+        sent.keys,
+        held: held.sent.keys,
+      ).$1.contains(signer);
+      verified = kept && held.verified;
+    }
+    return (
+      profile: Profile(
+        id: p.id,
+        name: p.name,
+        picture: checked.shown,
+        version: p.version,
+      ),
+      code: code,
+      kept: kept,
+      verified: verified,
+    );
   }
 
   /// The signed Profiles that go out with a sync, as JSON, sorted by id.
@@ -379,8 +455,14 @@ extension People on Store {
   /// that claims somebody else's key shows nobody's Notes; until that
   /// Profile arrives, its placeholder. Null for the user's own: written
   /// on this Device, one of its own group, or a Device bound to the own
-  /// Profile; and for a Note whose writer is not known.
+  /// Profile; and for a Note whose writer is not known. A Note accepted
+  /// from a Sent Item shows its sender, through the key and the Profile
+  /// id it keeps (#51).
   Profile? authorOf(String entity) {
+    if (_receivedFrom(entity) case (:final key, :final person)) {
+      if (_own.bound.contains(key) || isOwnPerson(person)) return null;
+      return _shownFor(key, person);
+    }
     String? device;
     for (final e in history(entity)) {
       if (e.field == r'$type') {
@@ -397,6 +479,31 @@ extension People on Store {
     final area = areaOf(entity);
     final named = area == null ? null : grantsOf(area)?.personOf(device);
     if (named != null && isOwnPerson(named)) return null;
+    return _shownFor(key, named);
+  }
+
+  /// The sender's key and Profile id the Note [entity] keeps from the
+  /// Sent Item it was accepted from; null for any other.
+  ({String key, String person})? _receivedFrom(String entity) {
+    final raw = current(entity, 'received');
+    if (raw == null) return null;
+    try {
+      if (jsonDecode(raw) case {
+        'from': final String key,
+        'profile': final String person,
+      }) {
+        return (key: key, person: person);
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
+  }
+
+  /// The Profile shown for a writer with the key [key]: the one [named]
+  /// stands for among those bound to it, or its placeholder; without
+  /// [named], the Profile first seen with the key.
+  Profile? _shownFor(String? key, String? named) {
     final candidates =
         [
           if (key != null)

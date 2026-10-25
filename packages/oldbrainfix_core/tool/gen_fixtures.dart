@@ -1776,6 +1776,16 @@ void _sentFixture(Directory root) {
       ),
     );
     _write(File('${out.path}/sender.jsonl'), _log(ada));
+    // Her Profile, as the app makes it at its first start, travels in
+    // every file she sends (#51).
+    ada.applyProfileDefaults(name: 'Ada');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert([
+        for (final (key, value) in ada.localSettingsWithPrefix('profile')) [key, value],
+      ])}\n',
+    );
+    final adaId = ada.ownProfile!.id;
 
     var ids = 0x300;
     Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
@@ -1818,6 +1828,8 @@ void _sentFixture(Directory root) {
       ],
     };
     final acceptedAgain = openSentItem(ben, signed);
+    final keptFirst = _personSettings(ben);
+    final authorFirst = ben.authorOf(accepted)?.id;
 
     // Ben makes it his own: his text, an Amend, an Area, an Importance,
     // a Done mark and a Reminder of his.
@@ -1863,6 +1875,8 @@ void _sentFixture(Directory root) {
       ),
     );
     _writeAfter(ada, mark, File('${out.path}/changed.jsonl'));
+    // She renames herself: the update brings her newer Profile.
+    ada.renameOwnProfile('Ada Lovelace');
     _held = DateTime.utc(2026, 1, 6, 11);
     mark = ada.currentSeq();
     final update = encodeSentItem(sentItemOf(ada, note.id), ada.signingKey);
@@ -1876,7 +1890,9 @@ void _sentFixture(Directory root) {
     final changes =
         toUpdate.changes ?? (throw StateError('Ben sees no update'));
     mark = ben.currentSeq();
-    acceptSentItem(ben, toUpdate.item);
+    // He compared her short code in person before applying it.
+    acceptSentItem(ben, toUpdate.item, verified: true);
+    final keptUpdated = _personSettings(ben);
     _writeAfter(ben, mark, File('${out.path}/updated.jsonl'));
     final updated = _received(ben, accepted);
     final stale = openSentItem(ben, signed).state.name;
@@ -1893,6 +1909,9 @@ void _sentFixture(Directory root) {
     ids = 0x800;
     _held = DateTime.utc(2026, 1, 8, 12);
     final toCancel = openSentItem(ben, cancel);
+    if (ben.authorOf(accepted)?.name != 'Ada Lovelace') {
+      throw StateError('Ben does not see her newer Profile');
+    }
     mark = ben.currentSeq();
     acceptSentItem(ben, toCancel.item);
     _writeAfter(ben, mark, File('${out.path}/cancelled.jsonl'));
@@ -1901,14 +1920,14 @@ void _sentFixture(Directory root) {
     final eve = Store.inMemory(
       clock: _clock,
       newKey: () => SigningKey.fromSeed(Uint8List(32)..fillRange(0, 32, 9)),
-    );
+    )..applyProfileDefaults(name: 'Eve');
     final forged = encodeSentItem(
       SentItem(
         id: opened.id,
         version: 9,
         cancel: true,
         from: eve.ownKeyRecord,
-        name: 'Ada',
+        profile: SignedProfile.fromJson(eve.ownProfileForOthers)!,
         text: 'Cancelled',
       ),
       eve.signingKey,
@@ -1920,9 +1939,27 @@ void _sentFixture(Directory root) {
     } on SentItemNotFromSender {
       refused = true;
     }
+    // Eve signs a Note of her own with Ada's Profile in it.
+    final impostor = encodeSentItem(
+      SentItem(
+        id: 'f' * 32,
+        version: 1,
+        from: eve.ownKeyRecord,
+        profile: SignedProfile.fromJson(ada.ownProfileForOthers)!,
+        text: 'Hello, it is Ada',
+      ),
+      eve.signingKey,
+    );
+    File('${out.path}/impostor.$sentItemExtension').writeAsBytesSync(impostor);
+    try {
+      openSentItem(ben, impostor);
+      refused = false;
+    } on NotASentItem {
+      // As it must be.
+    }
     final elsewhere = openSentItem(eve, cancel).state.name;
     eve.close();
-    if (!refused) throw StateError('Ben took a forged cancellation');
+    if (!refused) throw StateError('Ben took a forged file');
 
     _write(
       File('${out.path}/expected.json'),
@@ -1932,7 +1969,6 @@ void _sentFixture(Directory root) {
           'id': opened.id,
           'version': opened.version,
           'device': opened.from.device,
-          'name': opened.name,
           'text': opened.text,
           'sections': [
             for (final s in opened.sections) {'text': s.text, 'captured': s.captured.toIso8601String()},
@@ -1946,7 +1982,10 @@ void _sentFixture(Directory root) {
               },
           ],
         },
+        'sender': {'id': adaId, 'name': fromSigned.sender.name, 'code': fromSigned.code},
         'trust': fromSigned.trust.name,
+        'people': keptFirst,
+        'author': authorFirst,
         'state': fromSigned.state.name,
         'accepted': accepted,
         ...first,
@@ -1967,9 +2006,12 @@ void _sentFixture(Directory root) {
             'restores': changes.restores,
           },
           ...updated,
+          'sender': toUpdate.sender.name,
+          'trust': toUpdate.trust.name,
+          'people': keptUpdated,
           'stale': stale,
         },
-        'cancel': {'version': toCancel.item.version, 'state': toCancel.state.name, ..._received(ben, accepted), 'elsewhere': elsewhere, 'forged': 'notFromSender'},
+        'cancel': {'version': toCancel.item.version, 'state': toCancel.state.name, 'trust': toCancel.trust.name, ..._received(ben, accepted), 'elsewhere': elsewhere, 'forged': 'notFromSender', 'impostor': 'notASentItem'},
       })}\n',
     );
   } finally {
@@ -1977,6 +2019,13 @@ void _sentFixture(Directory root) {
     ben.close();
   }
 }
+
+/// The Profiles of other people [store] keeps, as its `person:`
+/// settings.
+List<List<String>> _personSettings(Store store) => [
+  for (final (key, value) in store.localSettingsWithPrefix('person:'))
+    [key, value],
+];
 
 /// What [store] holds of the accepted Note [id]: the Note, its
 /// Sections and every Routine and Reminder of it, those in the trash too.
@@ -3034,18 +3083,22 @@ Future<void> main(List<String> args) async {
     'what both read, which entries the roles leave out and whose Profile '
     'marks each Note (`expected.json`).\n'
     '- `sent/`: Ada sends a Note with a Section, a Routine and a Reminder '
-    'to Ben: her log (`sender.jsonl`), what sending wrote (`sent.jsonl`, '
+    'to Ben: her log (`sender.jsonl`), her Profile\'s settings, which every '
+    'file she sends carries (`settings.json`), what sending wrote (`sent.jsonl`, '
     'ids counted from 0x301, at a held clock), the file signed only '
     '(`signed.$sentItemExtension`) and encrypted to Ben\'s X25519 key '
     '(`sealed.$sentItemExtension`, random bytes counted from 4001 on), '
-    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401); '
-    'then Ben makes it his own (`receiver.jsonl`, from 0x501), Ada changes '
-    'it (`changed.jsonl`, from 0x601) and sends an update '
-    '(`update.jsonl`, `update.$sentItemExtension`), which Ben applies '
-    '(`updated.jsonl`, from 0x701); Ada cancels it (`cancel.jsonl`, '
+    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401), '
+    'keeping her Profile; then Ben makes it his own (`receiver.jsonl`, from '
+    '0x501), Ada changes it (`changed.jsonl`, from 0x601), renames herself '
+    'and sends an update (`update.jsonl`, `update.$sentItemExtension`), '
+    'which Ben applies after comparing her short code (`updated.jsonl`, '
+    'from 0x701); Ada cancels it (`cancel.jsonl`, '
     '`cancel.$sentItemExtension`), Ben accepts that (`cancelled.jsonl`), '
     'and refuses a cancellation another key signed '
-    '(`forged.$sentItemExtension`); what he reads at each step '
+    '(`forged.$sentItemExtension`) and a file whose Profile is not bound to '
+    'the key that signed it (`impostor.$sentItemExtension`); what he reads '
+    'and the Profiles he keeps at each step '
     '(`expected.json`).\n'
     '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
     'recording longer than a chunk, a Routine checked off, a Moment and '

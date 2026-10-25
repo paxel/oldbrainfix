@@ -19,8 +19,10 @@ import 'sync.dart';
 /// Brain Fix user. The file is signed by the sender's Device key and
 /// carries a stable id, so a later file with the same id can be told
 /// apart as an update; it is encrypted to the recipient's Devices when
-/// their keys are known here, else signed only. The receiver previews it
-/// and accepts it into Unsorted, or declines and nothing is kept.
+/// their keys are known here, else signed only. It carries the sender's
+/// signed Profile (ADR 0017, #51). The receiver previews it and accepts
+/// it into Unsorted, keeping the Profile, or declines and nothing is
+/// kept.
 ///
 /// What travels is the Note's text, the texts of its Sections and the
 /// schedules of its Routines and Reminders; never its Capture Context,
@@ -63,15 +65,16 @@ abstract final class SentKeys {
 
   static String sent(String device) => '$sentPrefix$device';
 
-  /// On an accepted Note: `{"from":…,"id":…,"name":…,"version":…}`, the
-  /// sender's key (base64), the Sent Item's id, the sender's name and
-  /// the version accepted; on an accepted Routine: the id the sender's
-  /// Routine has.
+  /// On an accepted Note: `{"from":…,"id":…,"profile":…,"version":…}`,
+  /// the sender's key (base64), the Sent Item's id, the id of the
+  /// sender's Profile and the version accepted; on an accepted Routine:
+  /// the id the sender's Routine has.
   static const received = 'received';
 }
 
 /// A file that is no Sent Item this app can read: no JSON, damaged, too
-/// large, or not signed by the key it names.
+/// large, not signed by the key it names, or carrying a Profile that is
+/// not bound to that key.
 class NotASentItem implements Exception {
   const NotASentItem();
 
@@ -126,9 +129,10 @@ class SentItem {
   /// move it to the trash. It still carries what the Note holds.
   final bool cancel;
 
-  /// The sender's key record and the name the sender goes by.
+  /// The sender's key record and their signed Profile, as it goes to
+  /// other people.
   final KeyRecord from;
-  final String name;
+  final SignedProfile profile;
 
   final String text;
   final List<SentSection> sections;
@@ -138,7 +142,7 @@ class SentItem {
     required this.id,
     required this.version,
     required this.from,
-    required this.name,
+    required this.profile,
     required this.text,
     this.sections = const [],
     this.routines = const [],
@@ -148,7 +152,7 @@ class SentItem {
   /// What is signed: keys sorted, no spaces, the same from both cores. A
   /// Reminder has no rule; only a cancellation says its kind.
   String encode() => jsonEncode({
-    'from': {'key': from.toJson(), 'name': name},
+    'from': {'key': from.toJson(), 'profile': profile.toJson()},
     'id': id,
     if (cancel) 'kind': _cancelKind,
     'note': {
@@ -176,7 +180,7 @@ class SentItem {
       final json = jsonDecode(text);
       if (json
           case {
-            'from': {'key': final Object key, 'name': final String name},
+            'from': {'key': final Object key, 'profile': final Object sender},
             'id': final String id,
             'note': {
               'sections': final List<Object?> sections,
@@ -187,7 +191,8 @@ class SentItem {
           }
           when id.isNotEmpty && version > 0) {
         final from = KeyRecord.fromJson(key);
-        if (from == null) return null;
+        final profile = SignedProfile.fromJson(sender);
+        if (from == null || profile == null) return null;
         final kind = json['kind'];
         if (kind != null && kind != _cancelKind) return null;
         final parts = <SentSection>[];
@@ -225,7 +230,7 @@ class SentItem {
           id: id,
           version: version,
           from: from,
-          name: name,
+          profile: profile,
           text: body,
           sections: parts,
           routines: scheduled,
@@ -293,13 +298,16 @@ List<Recipient> sentItemRecipients(Store store) {
 /// out with from this Device before and the next version, or a new id.
 /// Records the id and version on the Note, so sending it again keeps
 /// them; a Note this Device may not change goes out under a new id each
-/// time. With [cancel] it goes out as the cancellation of that id.
+/// time. With [cancel] it goes out as the cancellation of that id. It
+/// carries the own Profile, which the app makes at its first start.
 SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final notes = Notes(store);
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged) {
     throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
   }
+  final profile = SignedProfile.fromJson(store.ownProfileForOthers);
+  if (profile == null) throw StateError('no own Profile to send with');
   final field = SentKeys.sent(store.deviceId);
   var id = '';
   var version = 1;
@@ -324,7 +332,7 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
     version: version,
     cancel: cancel,
     from: store.ownKeyRecord,
-    name: store.author,
+    profile: profile,
     text: note.text,
     sections: [
       for (final s in notes.sections(noteId))
@@ -411,16 +419,18 @@ Uint8List sendNote(
 bool wasSent(Store store, String noteId) =>
     store.current(noteId, SentKeys.sent(store.deviceId)) != null;
 
-/// Who a Sent Item opened here comes from, as far as this Device knows.
+/// Who a Sent Item opened here comes from, as far as this Device knows
+/// their Profile (ADR 0017, #51).
 enum SenderTrust {
-  /// Their key was met in person, over a session the pair code
-  /// authenticated.
+  /// The user compared their Profile's short code in person, or it is
+  /// the user's own.
   verified,
 
-  /// Their key came along with a sync, never met in person.
+  /// Their Profile is kept here, bound to the key that signed the file,
+  /// its short code not compared.
   known,
 
-  /// Never met.
+  /// Their Profile is not kept here.
   unknown,
 }
 
@@ -505,6 +515,11 @@ class OpenedSentItem {
 
   /// Whether it came encrypted to this Device.
   final bool encrypted;
+
+  /// The sender's Profile as the file carries it, the name sanitised
+  /// and the picture made again, and its short code.
+  final Profile sender;
+  final String code;
   final SenderTrust trust;
 
   /// The Note it was accepted as before, if it was, in the trash too.
@@ -519,6 +534,8 @@ class OpenedSentItem {
   const OpenedSentItem({
     required this.item,
     required this.encrypted,
+    required this.sender,
+    required this.code,
     required this.trust,
     required this.accepted,
     this.state = SentItemState.fresh,
@@ -528,8 +545,9 @@ class OpenedSentItem {
 
 /// Reads the Sent Item in [bytes]: decrypts it when it is encrypted,
 /// checks the signature over it and what accepting it would do here.
-/// Throws [NotASentItem] for a file that is none, damaged, or not signed
-/// by the key it names, [SentItemNotForUs] for one encrypted to other
+/// Throws [NotASentItem] for a file that is none, damaged, not signed by
+/// the key it names or with a Profile not bound to that key,
+/// [SentItemNotForUs] for one encrypted to other
 /// Devices, and [SentItemNotFromSender] for one whose id came here from
 /// another key (ADR 0009).
 OpenedSentItem openSentItem(Store store, List<int> bytes) {
@@ -558,18 +576,23 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
         !verifySignature(item.from.publicKey, _signedBytes(payload), sig)) {
       throw const NotASentItem();
     }
-    final pinned = store.pinnedKey(item.from.device);
-    final own = item.from.device == store.deviceId;
+    final sender = store.sentItemProfile(
+      item.profile.toJson(),
+      item.from.publicKey,
+    );
+    if (sender == null) throw const NotASentItem();
     final held = _held(store, item);
     final (state, changes) = _judge(store, item, held);
     return OpenedSentItem(
       item: item,
       encrypted: encrypted,
-      trust: own || pinned?.trust == KeyTrust.verified
+      sender: sender.profile,
+      code: sender.code,
+      trust: sender.verified
           ? SenderTrust.verified
-          : pinned == null
-          ? SenderTrust.unknown
-          : SenderTrust.known,
+          : sender.kept
+          ? SenderTrust.known
+          : SenderTrust.unknown,
       accepted: held?.note,
       state: state,
       changes: changes,
@@ -601,27 +624,45 @@ String? acceptedNote(Store store, SentItem item) => _held(store, item)?.note;
 /// for a cancellation, that Note moved to the trash with its Routines and
 /// Reminders. The Note and its Routines keep the Sent Item's id, version
 /// and sender's key, and the sender's id for each Routine, so a later
-/// version can be recognised. Returns the Note it is held as; null when
-/// there was nothing to cancel. Throws [SentItemNotFromSender] as
-/// [openSentItem] does.
-String? acceptSentItem(Store store, SentItem item) {
+/// version can be recognised. The sender's Profile is kept and bound to
+/// the key that signed the file, or a newer record of it replaces the
+/// one kept (ADR 0017); with [verified] the user compared its short code
+/// in person ([People.verifyPerson]). Returns the Note it is held as;
+/// null when there was nothing to cancel. Throws [SentItemNotFromSender]
+/// as [openSentItem] does.
+String? acceptSentItem(Store store, SentItem item, {bool verified = false}) {
   final held = _held(store, item);
   final (state, changes) = _judge(store, item, held);
   final now = store.clock().toUtc();
+  final String note;
   switch ((state, held, changes)) {
     case (SentItemState.fresh, _, _):
-      return _acceptNew(store, item);
+      note = _acceptNew(store, item);
     case (SentItemState.update, final held?, final changes?):
       _apply(store, held.note, item, changes, now);
-      return held.note;
+      note = held.note;
     case (SentItemState.cancel, final held?, _):
       _cancel(store, held.note, item, now);
-      return held.note;
+      note = held.note;
     case (SentItemState.upToDate, final held?, _):
       return held.note;
     default:
       return null;
   }
+  _keepSender(store, item, verified: verified);
+  return note;
+}
+
+/// Keeps the sender's Profile [item] carries, through the same path as
+/// the Profiles of a Shared Area, and marks it verified with [verified].
+void _keepSender(Store store, SentItem item, {required bool verified}) {
+  store.takePeople([item.profile.toJson()]);
+  final id = Profile.parse(item.profile.record)?.id;
+  if (!verified || id == null) return;
+  store.verifyPerson(
+    id,
+    profileShortCode(id, base64.decode(item.profile.first)),
+  );
 }
 
 /// The Note a Sent Item was accepted as here and the version it holds.
@@ -765,7 +806,7 @@ bool _sameSchedule(Schedule a, Schedule b) =>
 String _link(SentItem item) => jsonEncode({
   'from': base64.encode(item.from.publicKey),
   'id': item.id,
-  'name': item.name,
+  'profile': Profile.parse(item.profile.record)?.id ?? '',
   'version': item.version,
 });
 

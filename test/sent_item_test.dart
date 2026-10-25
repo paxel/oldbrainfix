@@ -10,6 +10,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
+import 'fake_profile.dart' show halvesPng;
 
 void main() {
   final now = DateTime.utc(2026, 10, 24, 9);
@@ -24,8 +25,13 @@ void main() {
     phone = Store.inMemory(clock: () => now)
       ..starterSetOffered = true
       ..alarmSetupDone = true
-      ..setLocalSetting('author', 'Ben');
-    ann = Store.inMemory(clock: () => now)..setLocalSetting('author', 'Ann');
+      ..setLocalSetting('author', 'Ben')
+      ..applyProfileDefaults(name: 'Ben')
+      ..renameOwnProfile('Ben');
+    ann = Store.inMemory(clock: () => now)
+      ..setLocalSetting('author', 'Ann')
+      ..applyProfileDefaults(name: 'Ann')
+      ..setOwnProfilePicture(squareProfilePicture(halvesPng));
     dir = Directory.systemTemp.createTempSync('sent_widget_');
     files = FakeBundles(dir);
     announcements = Announcements();
@@ -127,7 +133,7 @@ void main() {
       final opened = openSentItem(ann, File(sent).readAsBytesSync());
       expect(opened.encrypted, isFalse);
       expect(opened.item.text, 'Dentist on Friday');
-      expect(opened.item.name, 'Ben');
+      expect(opened.sender.name, 'Ben');
     });
 
     testWidgets('to a person met: encrypted to them', (tester) async {
@@ -210,8 +216,17 @@ void main() {
 
       expect(find.byType(SentItemScreen), findsOneWidget);
       expect(find.text('From Ann'), findsOneWidget);
+      // Her picture, not the placeholder.
+      final picture = find.byKey(const ValueKey('sent-from-picture'));
       expect(
-        find.text('Not verified: never met. Key ${ann.signingKey.code}'),
+        find.descendant(of: picture, matching: find.byType(Image)),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Not verified: this Profile is new here. '
+          'Code ${ann.ownProfileCode}',
+        ),
         findsOneWidget,
       );
       expect(find.textContaining('came unencrypted'), findsOneWidget);
@@ -228,25 +243,100 @@ void main() {
       expect(Routines(phone).ofNote(got.id).single.schedule.times, [
         ClockTime(9, 30),
       ]);
+      // Her Profile is kept, and her Note shows her picture.
+      final annId = ann.ownProfile!.id;
+      expect(phone.keptPeople.map((p) => p.id), [annId]);
+      expect(phone.personVerified(annId), isFalse);
+      for (final step in ['Search and browse', 'All Notes']) {
+        await tester.tap(find.byTooltip(step));
+        await tester.pumpAndSettle();
+      }
+      final author = find.byKey(const ValueKey('author'));
+      expect(author, findsOneWidget);
+      expect(
+        find.descendant(of: author, matching: find.byType(Image)),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp('Ann')), findsWidgets);
     });
 
-    testWidgets('declining keeps nothing; a verified sender shows so', (
+    testWidgets('declining keeps nothing, not even codes compared', (
       tester,
     ) async {
-      meet(phone, ann, 'Ann');
       meet(ann, phone, 'Ben');
-      final note = Notes(ann).capture('Secret');
       final to = sentItemRecipients(ann).single;
       await app(tester);
-      files.open(fileFrom(note, to: to));
+      files.open(fileFrom(Notes(ann).capture('Secret'), to: to));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Verified: met in person'), findsOneWidget);
       expect(find.text('It came encrypted to this Device.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('compare-codes')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('codes-match')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('decline-sent')));
       await tester.pumpAndSettle();
       expect(announcements.visible, 'Declined: nothing was kept.');
       expect(Notes(phone).all(), isEmpty);
+      expect(phone.localSettingsWithPrefix('person:'), isEmpty);
       expect(dir.listSync().whereType<File>(), isEmpty, reason: 'copy gone');
+
+      // Her Profile kept before stays as it was.
+      acceptedFromAnn();
+      final kept = phone.localSettingsWithPrefix('person:').toList();
+      announcements.dismiss();
+      files.open(fileFrom(Notes(ann).capture('Party')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Not verified: known here'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('compare-codes')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('codes-match')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('decline-sent')));
+      await tester.pumpAndSettle();
+      expect(phone.localSettingsWithPrefix('person:').toList(), kept);
+      expect(phone.personVerified(ann.ownProfile!.id), isFalse);
+    });
+
+    testWidgets('codes compared in person verify the Profile on accept', (
+      tester,
+    ) async {
+      final code = ann.ownProfileCode!;
+      files.waiting.add(fileFrom(Notes(ann).capture('Dentist')));
+      await app(tester);
+      await tester.tap(find.byKey(const ValueKey('compare-codes')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Ask Ann, in person, to read out the code on their Profile page. '
+          'It must be $code.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('codes-differ')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('The codes differ'), findsOneWidget);
+      expect(find.textContaining('Not verified'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('compare-codes')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('codes-match')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Verified: code compared in person. Code $code'),
+        findsOneWidget,
+      );
+      expect(find.text('Marked as verified when you accept.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('compare-codes')), findsNothing);
+      expect(phone.localSettingsWithPrefix('person:'), isEmpty);
+      await tester.tap(find.byKey(const ValueKey('accept-sent')));
+      await tester.pumpAndSettle();
+      expect(phone.personVerified(ann.ownProfile!.id), isTrue);
+
+      // The next one from her says so, with nothing left to compare.
+      files.open(fileFrom(Notes(ann).capture('Party')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Verified: code compared'), findsOneWidget);
+      expect(find.byKey(const ValueKey('compare-codes')), findsNothing);
     });
 
     testWidgets('a file for someone else or a damaged one is said', (
@@ -358,7 +448,8 @@ void main() {
 
     testWidgets('a change signed by another key is refused', (tester) async {
       final (note, _) = acceptedFromAnn();
-      final eve = Store.inMemory(clock: () => now);
+      final eve = Store.inMemory(clock: () => now)
+        ..applyProfileDefaults(name: 'Eve');
       addTearDown(eve.close);
       final id = openSentItem(phone, sendNote(ann, note.id)).item.id;
       final forged = encodeSentItem(
@@ -367,7 +458,7 @@ void main() {
           version: 9,
           cancel: true,
           from: eve.ownKeyRecord,
-          name: 'Ann',
+          profile: SignedProfile.fromJson(eve.ownProfileForOthers)!,
           text: 'Dentist',
         ),
         eve.signingKey,

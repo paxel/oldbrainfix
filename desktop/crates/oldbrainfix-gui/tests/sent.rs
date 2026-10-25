@@ -4,14 +4,18 @@
 //! Accept takes it into Unsorted with its Routines while Decline keeps
 //! nothing. A Note sent before goes as an update or a cancellation; an
 //! update shows what changes and applies it, a cancellation trashes the
-//! Note, and one signed by another key is refused.
+//! Note, and one signed by another key is refused. The preview shows
+//! the sender's Profile; accepting keeps it, its picture shows on the
+//! Note, and comparing its short code marks it verified (#51).
 
 use std::sync::{Arc, Mutex};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use oldbrainfix_core::profile::{self, SignedProfile};
 use oldbrainfix_core::{
-    ClockTime, Day, ImportReport, Notes, PairedDevice, Routines, Schedule, SigningKey, Store,
+    ClockTime, Day, ImportReport, Notes, OwnProfile, PairedDevice, Routines, Schedule, SigningKey,
+    Store,
 };
 use oldbrainfix_gui::schedule_text::schedule_text;
 use oldbrainfix_gui::{App, Selection};
@@ -23,7 +27,27 @@ fn store(seed: u8, author: &str) -> Result<Store, Box<dyn std::error::Error>> {
         Ok(SigningKey::from_seed([seed; 32]))
     })?;
     store.set_local_setting("author", author)?;
+    OwnProfile::new(&store).apply_defaults(author, None)?;
     Ok(store)
+}
+
+/// A PNG of `width` × `height`, red on the left half, blue on the right.
+fn halves(width: u32, height: u32) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let image = image::RgbImage::from_fn(width, height, |x, _| {
+        if x < width / 2 {
+            image::Rgb([255, 0, 0])
+        } else {
+            image::Rgb([0, 0, 255])
+        }
+    });
+    let mut out = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(image).write_to(&mut out, image::ImageFormat::Png)?;
+    Ok(out.into_inner())
+}
+
+/// The short code of `store`'s own Profile.
+fn code(store: &Store) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(OwnProfile::new(store).code()?.ok_or("code")?)
 }
 
 /// `other` is another person's Device paired by invite with `store`, its
@@ -153,7 +177,10 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     assert!(shows(&harness, "From Ann"));
     assert!(shows(
         &harness,
-        &format!("Not verified: never met. Key {}", ann.signing_key()?.code())
+        &format!(
+            "Not verified: this Profile is new here. Code {}",
+            code(&ann)?
+        )
     ));
     assert!(shows(&harness, "came unencrypted"));
     assert!(shows(&harness, "Blood test"));
@@ -163,6 +190,7 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     assert!(!harness.state().previewing());
     assert!(shows(&harness, "Declined: nothing was kept."));
     assert!(Notes::new(harness.state().store()).all()?.is_empty());
+    assert!(harness.state().store().kept_people()?.is_empty());
 
     // Handed over by `oldbrainfix open`: shown at the next frame.
     if let Ok(mut held) = handed.lock() {
@@ -181,6 +209,12 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     let routines = Routines::new(held).of_note(&got[0].id)?;
     assert_eq!(routines.len(), 1);
     assert_eq!(routines[0].schedule, schedule);
+    // Her Profile is kept, and her Note shows her picture.
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("profile")?.id;
+    assert_eq!(held.person_shown(&ann_id)?.name, "Ann");
+    harness.state_mut().select(Selection::Unsorted);
+    harness.run();
+    assert!(shows(&harness, "Written by Ann"));
 
     // Opened again: accepted before, nothing new.
     drop_file(&mut harness, &file);
@@ -263,7 +297,9 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
     let first = desk
         .open_sent_item(&ann.send_note(&note.id, None, false)?)?
         .map_err(|_| "first")?;
-    let got = desk.accept_sent_item(&first.item)?.ok_or("accepted")?;
+    let got = desk
+        .accept_sent_item(&first.item, false)?
+        .ok_or("accepted")?;
     Notes::new(&desk).amend(&got, "Ask about the bill")?;
 
     let wednesday = Schedule::new(
@@ -314,6 +350,11 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
             version: 9,
             cancel: true,
             from: eve.own_key_record()?,
+            profile: eve
+                .own_profile_for_others()?
+                .as_ref()
+                .and_then(SignedProfile::from_json)
+                .ok_or("Eve's Profile")?,
             ..first.item.clone()
         },
         &eve.signing_key()?,
@@ -341,5 +382,68 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
     // Again: nothing more to do.
     drop_file(&mut harness, &cancel);
     assert!(shows(&harness, "Already up to date"));
+    Ok(())
+}
+
+#[test]
+fn comparing_the_short_code_marks_the_senders_profile_verified_on_accept() -> TestResult {
+    let ann = store(3, "Ann")?;
+    let picture = profile::square_picture(&halves(60, 40)?).ok_or("picture")?;
+    OwnProfile::new(&ann).set_picture(Some(picture))?;
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("profile")?.id;
+    let dir = tempfile::tempdir()?;
+    let first = dir.path().join("first.oldbrain");
+    let dentist = Notes::new(&ann).capture("Dentist", None, None)?;
+    std::fs::write(&first, ann.send_note(&dentist.id, None, false)?)?;
+    let second = dir.path().join("second.oldbrain");
+    let party = Notes::new(&ann).capture("Party", None, None)?;
+    std::fs::write(&second, ann.send_note(&party.id, None, false)?)?;
+
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &first);
+    assert!(shows(&harness, "From Ann"));
+    let hint = format!(
+        "Ask Ann, in person, to read out the code on their Profile page. It must be {}.",
+        code(&ann)?
+    );
+    assert!(!shows(&harness, &hint));
+
+    // Codes that differ say so and verify nothing; declining after a
+    // match keeps nothing either.
+    harness.get_by_label("Compare codes").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, &hint));
+    harness.get_by_label("Codes differ").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "The codes differ"));
+    harness.get_by_label("Compare codes").click_accesskit();
+    harness.run();
+    harness.get_by_label("Codes match").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Verified: code compared in person."));
+    assert!(shows(&harness, "Marked as verified when you accept."));
+    harness.get_by_label("Decline").click_accesskit();
+    harness.run();
+    assert!(harness.state().store().kept_people()?.is_empty());
+
+    // Matched and accepted: kept and verified, with her picture.
+    drop_file(&mut harness, &first);
+    assert!(shows(&harness, "Not verified: this Profile is new here."));
+    harness.get_by_label("Compare codes").click_accesskit();
+    harness.run();
+    harness.get_by_label("Codes match").click_accesskit();
+    harness.run();
+    harness.get_by_label("Accept").click_accesskit();
+    harness.run();
+    let held = harness.state().store();
+    assert!(held.person_verified(&ann_id)?);
+    assert!(held.person_shown(&ann_id)?.picture.is_some());
+
+    // The next one from her says so, with nothing left to compare.
+    drop_file(&mut harness, &second);
+    assert!(shows(&harness, "Verified: code compared in person."));
+    assert!(harness.query_by_label("Compare codes").is_none());
     Ok(())
 }

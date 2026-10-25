@@ -1894,6 +1894,14 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     for line in lines_of(&dir.join("sender.jsonl"))? {
         ada.insert(&serde_json::from_str(&line)?)?;
     }
+    // Her Profile, which every file she sends carries.
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings.as_array().ok_or("settings")? {
+        ada.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
     counted_ids(&mut ada, 0x300);
     let note = ada
         .entities_of_type("note")?
@@ -1938,7 +1946,10 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     assert_eq!(got.id, want["id"].as_str().ok_or("id")?);
     assert_eq!(got.version, want["version"].as_i64().ok_or("version")?);
     assert_eq!(got.from.device, want["device"].as_str().ok_or("device")?);
-    assert_eq!(got.name, want["name"].as_str().ok_or("name")?);
+    let sender = &expected["sender"];
+    assert_eq!(plain.sender.id, sender["id"].as_str().ok_or("id")?);
+    assert_eq!(plain.sender.name, sender["name"].as_str().ok_or("name")?);
+    assert_eq!(plain.code, sender["code"].as_str().ok_or("code")?);
     assert_eq!(got.text, want["text"].as_str().ok_or("text")?);
     let sections: Vec<Value> = got
         .sections
@@ -1964,11 +1975,19 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     counted_ids(&mut ben, 0x400);
     let mark = ben.current_seq()?;
     assert_eq!(plain.state.name(), expected["state"]);
-    let accepted = ben.accept_sent_item(&opened.item)?.ok_or("accepted")?;
+    let accepted = ben
+        .accept_sent_item(&opened.item, false)?
+        .ok_or("accepted")?;
     assert_eq!(accepted, expected["accepted"].as_str().ok_or("accepted")?);
     assert_eq!(
         lines_after(&ben, mark)?,
         lines_of(&dir.join("accepted.jsonl"))?
+    );
+    // Her Profile is kept as the Dart core keeps it, and the Note shows her.
+    assert_eq!(person_settings(&ben)?, expected["people"]);
+    assert_eq!(
+        ben.author_of(&accepted)?.map(|p| p.id).as_deref(),
+        expected["author"].as_str()
     );
     let note = Notes::new(&ben).by_id(&accepted)?.ok_or("the Note")?;
     assert_eq!(note_json(&note), expected["note"]);
@@ -1987,6 +2006,7 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     // same entry and file byte for byte.
     insert_lines(&ben, &dir.join("receiver.jsonl"))?;
     insert_lines(&ada, &dir.join("changed.jsonl"))?;
+    oldbrainfix_core::OwnProfile::new(&ada).rename("Ada Lovelace")?;
     at("2026-01-06T11:00:00.000Z")?;
     let mark = ada.current_seq()?;
     let item = ada.sent_item_of(&sent_note, false)?;
@@ -2007,14 +2027,17 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         want["version"].as_i64().ok_or("version")?
     );
     assert_eq!(opened.state.name(), want["state"]);
+    assert_eq!(opened.trust.name(), want["trust"]);
+    assert_eq!(opened.sender.name, want["sender"].as_str().ok_or("sender")?);
     let changes = opened.changes.as_ref().ok_or("changes")?;
     assert_eq!(changes_json(changes), want["changes"]);
     let mark = ben.current_seq()?;
-    ben.accept_sent_item(&opened.item)?;
+    ben.accept_sent_item(&opened.item, true)?;
     assert_eq!(
         lines_after(&ben, mark)?,
         lines_of(&dir.join("updated.jsonl"))?
     );
+    assert_eq!(person_settings(&ben)?, want["people"]);
     assert_held(&ben, &accepted, want)?;
     let stale = ben.open_sent_item(&signed)?.map_err(|_| "stale")?;
     assert_eq!(stale.state.name(), want["stale"]);
@@ -2039,8 +2062,9 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         want["version"].as_i64().ok_or("version")?
     );
     assert_eq!(opened.state.name(), want["state"]);
+    assert_eq!(opened.trust.name(), want["trust"]);
     let mark = ben.current_seq()?;
-    ben.accept_sent_item(&opened.item)?;
+    ben.accept_sent_item(&opened.item, false)?;
     assert_eq!(
         lines_after(&ben, mark)?,
         lines_of(&dir.join("cancelled.jsonl"))?
@@ -2064,7 +2088,23 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         ben.open_sent_item(&forged)?.err(),
         Some(OpenError::NotFromSender)
     );
+    let impostor = std::fs::read(dir.join("impostor.oldbrain"))?;
+    assert_eq!(
+        ben.open_sent_item(&impostor)?.err(),
+        Some(OpenError::NotASentItem)
+    );
     Ok(())
+}
+
+/// The `person:` settings of `store`, as the generator lists them.
+fn person_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(json!(
+        store
+            .local_settings_with_prefix("person:")?
+            .into_iter()
+            .map(|(key, value)| json!([key, value]))
+            .collect::<Vec<_>>()
+    ))
 }
 
 /// What an update changes, as the Dart core writes it.
