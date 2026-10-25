@@ -1156,6 +1156,147 @@ Store _store() {
   return store;
 }
 
+/// The second Device's fixed key seed: bytes 33 to 64.
+final _joinerSeed = Uint8List.fromList(List<int>.generate(32, (i) => 33 + i));
+
+/// The settings of [store] that a sync reads: the keys it holds.
+List<List<String>> _keySettings(Store store) => [
+  for (final (key, value) in store.localSettingsWithPrefix('key:'))
+    [key, value],
+];
+
+/// Writes [store]'s log and its blobs under [dir]/[name].
+void _writeDevice(Store store, Directory dir, String name) {
+  final log = StringBuffer();
+  for (final entry in store.allEntries()) {
+    log.writeln(jsonEncode(entry.toJson()));
+  }
+  _write(File('${dir.path}/$name.jsonl'), log.toString());
+  _writeBlobs(store, Directory('${dir.path}/$name'));
+}
+
+/// Two Devices that met once and wrote more since, then one more LAN
+/// session between them: the logs and keys before it, the joiner's
+/// request, the host's answer, and what both read after it.
+void _sync(Directory root) {
+  final out = Directory('${root.path}/sync');
+  final host = _store();
+  final joiner = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    // Met once: both planted some of the Starter Set, the joiner a Note
+    // with a voice recording, the host one with a photo.
+    Places(host).plantStarterSet({'work', 'meetings'});
+    Places(joiner).plantStarterSet({'work', 'health', 'doctor'});
+    final milk = Notes(joiner).capture('Buy milk', recordings: [_recording(2)]);
+    final dentist = Notes(host).capture(
+      'Call the dentist',
+      photos: [_photo(5)],
+      place: Places.starterId(PlaceKeys.typeTopic, 'meetings'),
+    );
+    void meet(Store a, Store b) {
+      final done = answerSync(
+        b,
+        syncRequest(a, b.versionVector(), name: 'Phone'),
+        name: 'Desk',
+      )!;
+      applyAnswer(a, done.answer);
+      for (final ref in a.missingBlobs()) {
+        final (kind, hash) = splitBlobRef(ref);
+        if (b.blob(kind, hash) case final bytes?) a.putBlob(kind, hash, bytes);
+      }
+      for (final ref in (done.answer['wantBlobs'] as List).cast<String>()) {
+        final (kind, hash) = splitBlobRef(ref);
+        if (a.blob(kind, hash) case final bytes?) b.putBlob(kind, hash, bytes);
+      }
+    }
+
+    meet(joiner, host);
+    // Since then: edits on both sides, one of them on the same field.
+    Notes(joiner).edit(milk.id, 'Buy oat milk');
+    Notes(host).edit(milk.id, 'Buy milk and eggs');
+    Places(joiner)
+        .rename(Places.starterId(PlaceKeys.typeArea, 'work'), 'Office');
+    Notes(joiner).capture('Pills at eight', photos: [_photo(6)]);
+    Notes(host).amend(dentist.id, 'Tuesday works');
+
+    _writeDevice(host, out, 'host');
+    _writeDevice(joiner, out, 'joiner');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'host': _keySettings(host), 'joiner': _keySettings(joiner)})}\n',
+    );
+    final hostVector = host.versionVector();
+    final request = syncRequest(
+      joiner,
+      hostVector,
+      name: 'Phone',
+      hostDevice: host.deviceId,
+      pin: '246810',
+    );
+    final done = answerSync(host, request, name: 'Desk')!;
+    _write(File('${out.path}/vector.json'), '${_json.convert(hostVector)}\n');
+    _write(File('${out.path}/request.json'), '${_json.convert(request)}\n');
+    _write(File('${out.path}/answer.json'), '${_json.convert(done.answer)}\n');
+    applyAnswer(joiner, done.answer);
+    _held = _tick.add(const Duration(days: 1));
+    final expected = _expected(host)..remove('device');
+    final joined = _expected(joiner)..remove('device');
+    if (jsonEncode(expected) != jsonEncode(joined)) {
+      throw StateError('the two Devices of the sync fixture disagree');
+    }
+    _write(File('${out.path}/expected.json'), '${_json.convert(expected)}\n');
+  } finally {
+    host.close();
+    joiner.close();
+  }
+}
+
+/// Pair codes the desktop must write and read the same.
+Map<String, Object?> _pairCodes() {
+  final fp = [for (var i = 0; i < 32; i++) (i * 7 + 3) & 0xff];
+  final codes = [
+    for (final (host, port, pin) in [
+      ('192.168.1.23', 45231, '042817'),
+      ('10.0.0.5', 8080, '999999'),
+      ('172.16.4.200', 1, '000000'),
+    ])
+      {
+        'host': host,
+        'port': port,
+        'pin': pin,
+        'fingerprint': hex(fp),
+        'full': encodePairCode(host, port, pin, fp),
+        'typed': encodePairCode(host, port, pin, fp, typed: true),
+      },
+  ];
+  return {
+    'codes': codes,
+    'typedAs': {
+      'R2M02 5XGNW 0AEG8 3188H G7S65 MTO': 'r2m02_5xgnw_0aeg8_3188h_g7s65_mt0',
+    },
+    'invalid': ['nope', '', 'r2m02_5xgnw_0aeg8'],
+  };
+}
+
+/// The writer's key record, as it travels.
+Map<String, Object?> _keys() {
+  final key = SigningKey.fromSeed(_seed);
+  final record = KeyRecord.make(key);
+  final other = KeyRecord.make(SigningKey.fromSeed(_joinerSeed));
+  return {
+    'record': record.toJson(),
+    // Another key claiming the writer's device: not valid.
+    'claimed': KeyRecord(
+      record.device,
+      other.publicKey,
+      other.signature,
+    ).toJson(),
+  };
+}
+
 const _json = JsonEncoder.withIndent('  ');
 
 void _write(File file, String text) {
@@ -1294,7 +1435,16 @@ void main(List<String> args) {
     'wall-clock times around daylight-saving switches in Central Europe.\n'
     '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
     'Nudge of the `routines` log at held moments with this Device\'s '
-    'settings, on the same clock.\n',
+    'settings, on the same clock.\n'
+    '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
+    'typed, and what is no code.\n'
+    '- `keys.json`: the writer\'s key record, and another key claiming its '
+    'device.\n'
+    '- `sync/`: two Devices that met once and wrote more since: their logs '
+    '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
+    'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
+    'request (with its proof for the PIN 246810), the host\'s answer, and what both read after the joiner took '
+    'it in (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -1311,6 +1461,12 @@ void main(List<String> args) {
     File('${root.path}/schedules.json'),
     '${_json.convert(_schedules())}\n',
   );
+  _write(
+    File('${root.path}/pair_codes.json'),
+    '${_json.convert(_pairCodes())}\n',
+  );
+  _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
+  _sync(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

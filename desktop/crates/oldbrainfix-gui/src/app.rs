@@ -58,6 +58,7 @@ use crate::names::{area_name, topic_name};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
 use crate::speech::{SpeechModel, Status as SpeechStatus};
+use crate::sync_view::{SyncAction, SyncHost, device_name};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -68,6 +69,9 @@ pub enum Selection {
     Agenda,
     /// This Device's settings, reached from the Agenda's gear.
     Settings,
+    /// The LAN sync this Device hosts while it shows, reached from the
+    /// Settings.
+    Sync,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -256,6 +260,7 @@ enum Action {
     TrashNote(bool),
     RestoreRoutine(String),
     Setting(Setting),
+    Sync(SyncAction),
 }
 
 /// A change in the Settings.
@@ -339,6 +344,10 @@ pub struct App {
     photos: PhotoCache,
     /// What the Notes shown are searched for.
     query: String,
+    /// The LAN session hosted while the Sync view shows, and the name
+    /// this computer goes by in it.
+    sync: SyncHost,
+    sync_name: String,
 }
 
 impl App {
@@ -384,6 +393,8 @@ impl App {
             model_path: String::new(),
             photos: PhotoCache::default(),
             query: String::new(),
+            sync: SyncHost::default(),
+            sync_name: device_name(),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -396,6 +407,18 @@ impl App {
     pub fn set_wall_clock(&mut self, wall: Wall) {
         self.wall = wall;
         self.refresh();
+    }
+
+    /// Hosts the Sync view on `bind` instead of the LAN address, as this
+    /// computer named `name`; tests use the loopback.
+    pub fn set_sync_host(&mut self, bind: Option<std::net::IpAddr>, name: &str) {
+        self.sync.bind = bind;
+        self.sync_name = name.to_string();
+    }
+
+    /// The LAN session the Sync view hosts.
+    pub fn sync_host(&self) -> &SyncHost {
+        &self.sync
     }
 
     /// Reads the log again whenever `changes` moves on.
@@ -587,7 +610,7 @@ impl App {
         let routines = Routines::new(&self.store);
         let search = Search::new(&self.store);
         let shown = match &self.selection {
-            Selection::Agenda | Selection::Settings => Vec::new(),
+            Selection::Agenda | Selection::Settings | Selection::Sync => Vec::new(),
             Selection::All => search.notes(&self.query, None)?,
             Selection::Unsorted => notes.unsorted()?,
             Selection::Place(id) => search.notes(&self.query, Some(id))?,
@@ -672,6 +695,14 @@ impl App {
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
         let done = self.act(action);
+        // The session runs exactly while the Sync view shows.
+        if (self.selection == Selection::Sync) != self.sync.hosting() {
+            if self.sync.hosting() {
+                self.sync.stop();
+            } else {
+                self.sync.start(&self.store);
+            }
+        }
         self.refresh();
         if let Err(e) = done {
             self.error = Some(e.to_string());
@@ -958,6 +989,13 @@ impl App {
             }
             Action::RestoreRoutine(id) => Routines::new(&self.store).restore(&id)?,
             Action::Setting(setting) => self.set(setting)?,
+            Action::Sync(SyncAction::Trust(trust)) => {
+                if self.sync.answer(&self.store, trust, &self.sync_name) {
+                    // A Moment and the new entries: read again below.
+                    self.refresh();
+                }
+            }
+            Action::Sync(SyncAction::Forget(id)) => self.store.forget_device(&id)?,
         }
         Ok(())
     }
@@ -1067,6 +1105,7 @@ impl App {
         match &self.selection {
             Selection::All | Selection::Agenda => None,
             Selection::Settings => Some(Selection::Agenda),
+            Selection::Sync => Some(Selection::Settings),
             Selection::Place(id) => Some(match self.view.topic(id) {
                 Some(topic) => Selection::Place(topic.area_id.clone()),
                 None => Selection::All,
@@ -1156,6 +1195,21 @@ impl App {
         }
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_secs(30));
+        // A phone's requests are answered while the Sync view shows.
+        if self.sync.hosting() {
+            let asked = self.sync.asking().is_some();
+            if self.sync.poll(&self.store, &self.sync_name) {
+                self.refresh();
+                if let Some(wake) = &self.wake {
+                    drop(wake.send(Event::Wake));
+                }
+            }
+            if asked != self.sync.asking().is_some() {
+                ui.ctx().request_repaint();
+            }
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(100));
+        }
         // The speech model came: what waited is transcribed now.
         let ready = self
             .speech
@@ -1314,6 +1368,7 @@ impl App {
         match &self.selection {
             Selection::Agenda => self.t.agenda_title().to_string(),
             Selection::Settings => self.t.settings_title().to_string(),
+            Selection::Sync => self.t.sync_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -1412,6 +1467,13 @@ impl App {
         match self.selection {
             Selection::Agenda => return self.agenda_pane(ui, tones, actions),
             Selection::Settings => return self.settings_pane(ui, tones, actions),
+            Selection::Sync => {
+                let wall = self.wall.clone();
+                if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
+                    actions.push(Action::Sync(asked));
+                }
+                return;
+            }
             _ => {}
         }
         let text = ui.visuals().text_color();
@@ -1970,6 +2032,16 @@ impl App {
                         actions.push(Action::Setting(Setting::Autostart(on)));
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.sync_title()).strong().color(text));
+                    if ui
+                        .button(RichText::new(t.sync_settings_entry()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::Select(Selection::Sync));
+                    }
+                    ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
                 });
                 embossed(ui, tones, false, None, |ui| {
                     quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);

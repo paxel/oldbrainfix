@@ -2263,6 +2263,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Private Reminder'**
   String get maskedReminder;
+
+  /// No description provided for @syncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get syncTitle;
+
+  /// No description provided for @syncSettingsEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with another Device'**
+  String get syncSettingsEntry;
+
+  /// No description provided for @syncSettingsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair once by code; both then hold the same Notes, Areas and Routines.'**
+  String get syncSettingsDetail;
+
+  /// No description provided for @syncJoinIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Sync on the computer. Scan the code it shows, or type it in.'**
+  String get syncJoinIntro;
+
+  /// No description provided for @syncScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the code'**
+  String get syncScan;
+
+  /// No description provided for @syncCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair code'**
+  String get syncCodeLabel;
+
+  /// No description provided for @syncJoin.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncJoin;
+
+  /// No description provided for @syncSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get syncSyncing;
+
+  /// No description provided for @syncInvalidCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a pair code. Check it against the computer\'s screen.'**
+  String get syncInvalidCode;
+
+  /// No description provided for @syncNoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'No code found in the photo. Try again a little closer, or type the code.'**
+  String get syncNoCode;
+
+  /// No description provided for @syncCameIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced with {name}: {count, plural, =0{nothing new came in} =1{1 change came in} other{{count} changes came in}}.'**
+  String syncCameIn(String name, int count);
+
+  /// No description provided for @syncRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 change was refused: its signature did not match.} other{{count} changes were refused: their signatures did not match.}}'**
+  String syncRefused(int count);
+
+  /// No description provided for @syncFailNotPrivate.
+  ///
+  /// In en, this message translates to:
+  /// **'This code points outside your home network. Only Devices on the same network can sync.'**
+  String get syncFailNotPrivate;
+
+  /// No description provided for @syncFailUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?'**
+  String get syncFailUnreachable;
+
+  /// No description provided for @syncFailWrongHost.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not the computer the code belongs to.'**
+  String get syncFailWrongHost;
+
+  /// No description provided for @syncFailWrongPin.
+  ///
+  /// In en, this message translates to:
+  /// **'The PIN does not match. Type the code again.'**
+  String get syncFailWrongPin;
+
+  /// No description provided for @syncFailLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong tries. Open Sync on the computer again for a new code.'**
+  String get syncFailLocked;
+
+  /// No description provided for @syncFailDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'The computer said no to this Device.'**
+  String get syncFailDeclined;
+
+  /// No description provided for @syncFailFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'The other Device runs another version of Old Brain Fix. Update both.'**
+  String get syncFailFormat;
+
+  /// No description provided for @syncFailFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync broke off. Nothing was lost; try again.'**
+  String get syncFailFailed;
+
+  /// No description provided for @pairedDevicesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paired Devices'**
+  String get pairedDevicesTitle;
+
+  /// No description provided for @pairedNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No paired Devices yet.'**
+  String get pairedNone;
+
+  /// No description provided for @pairedLastSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced {when}'**
+  String pairedLastSync(String when);
+
+  /// No description provided for @forgetDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get forgetDevice;
+
+  /// No description provided for @syncSettingsStay.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings stay on each Device and are never synced.'**
+  String get syncSettingsStay;
 }
 
 class _AppLocalizationsDelegate

@@ -1,0 +1,112 @@
+import 'dart:convert';
+
+import 'store.dart';
+
+/// A Device this one has synced with in person (CONTEXT.md, Pairing),
+/// kept as a local setting of this Device: what automatic sync needs to
+/// find it again and know it is the same one.
+class PairedDevice {
+  /// Its device id.
+  final String id;
+
+  /// The name it goes by, as it said.
+  final String name;
+
+  /// The SHA-256 fingerprint of the certificate it hosts with, hex;
+  /// empty for a Device that only ever joined.
+  final String fingerprint;
+
+  /// Where it was hosting last, if it hosted.
+  final String? host;
+  final int? port;
+
+  /// When the last sync with it ended.
+  final DateTime lastSync;
+
+  const PairedDevice({
+    required this.id,
+    required this.name,
+    required this.fingerprint,
+    required this.host,
+    required this.port,
+    required this.lastSync,
+  });
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'fingerprint': fingerprint,
+    'host': host,
+    'port': port,
+    'lastSync': lastSync.toUtc().toIso8601String(),
+  };
+
+  static PairedDevice? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final id = json['id'];
+    final name = json['name'];
+    final fingerprint = json['fingerprint'];
+    final host = json['host'];
+    final port = json['port'];
+    final lastSync = DateTime.tryParse('${json['lastSync']}');
+    if (id is! String ||
+        name is! String ||
+        fingerprint is! String ||
+        lastSync == null) {
+      return null;
+    }
+    return PairedDevice(
+      id: id,
+      name: name,
+      fingerprint: fingerprint,
+      host: host is String ? host : null,
+      port: port is int ? port : null,
+      lastSync: lastSync,
+    );
+  }
+}
+
+/// The paired Devices of this Device, never synced (ADR 0008).
+extension Pairing on Store {
+  static const _prefix = 'paired:';
+
+  /// Every paired Device, by name.
+  List<PairedDevice> pairedDevices() =>
+      [for (final (_, raw) in localSettingsWithPrefix(_prefix)) ?_read(raw)]
+        ..sort((a, b) => a.name.compareTo(b.name));
+
+  /// The paired Device [id], or null.
+  PairedDevice? pairedDevice(String id) {
+    final raw = localSetting('$_prefix$id');
+    return raw == null ? null : _read(raw);
+  }
+
+  /// Remembers [device], or what changed about it. A Device that only
+  /// joined keeps the fingerprint and address it had when it hosted.
+  void rememberDevice(PairedDevice device) {
+    final held = pairedDevice(device.id);
+    final kept = held == null || device.fingerprint.isNotEmpty
+        ? device
+        : PairedDevice(
+            id: device.id,
+            name: device.name,
+            fingerprint: held.fingerprint,
+            host: held.host,
+            port: held.port,
+            lastSync: device.lastSync,
+          );
+    setLocalSetting('$_prefix${device.id}', jsonEncode(kept.toJson()));
+  }
+
+  /// Forgets the paired Device [id]. Its key stays: the entries it wrote
+  /// are still checked against it.
+  void forgetDevice(String id) => removeLocalSetting('$_prefix$id');
+
+  static PairedDevice? _read(String raw) {
+    try {
+      return PairedDevice.fromJson(jsonDecode(raw));
+    } on FormatException {
+      return null;
+    }
+  }
+}

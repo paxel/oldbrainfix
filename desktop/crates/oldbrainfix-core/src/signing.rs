@@ -129,6 +129,136 @@ pub fn entry_bytes(
     .into_bytes()
 }
 
+/// How far a pinned key is trusted: met in a payload some other Device
+/// carried, or met in person over a session the pair code authenticated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyTrust {
+    Tofu,
+    Verified,
+}
+
+impl KeyTrust {
+    pub fn name(self) -> &'static str {
+        match self {
+            KeyTrust::Tofu => "tofu",
+            KeyTrust::Verified => "verified",
+        }
+    }
+}
+
+/// A Device's public key as it travels with the entries, as the Dart
+/// core's `KeyRecord`: it signs itself, and the device id is the key's
+/// own fingerprint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyRecord {
+    pub device: String,
+    pub public_key: Vec<u8>,
+    pub signature: String,
+}
+
+impl KeyRecord {
+    fn bytes(device: &str, public_key: &[u8]) -> Vec<u8> {
+        serde_json::json!([device, BASE64.encode(public_key)])
+            .to_string()
+            .into_bytes()
+    }
+
+    /// The record of the Device whose key is `key`.
+    pub fn make(key: &SigningKey) -> KeyRecord {
+        let public_key = key.public_key();
+        let device = device_id_from_key(&public_key);
+        let signature = key.sign(&Self::bytes(&device, &public_key));
+        KeyRecord {
+            device,
+            public_key: public_key.to_vec(),
+            signature,
+        }
+    }
+
+    /// True when the record names the device its key belongs to and was
+    /// signed by that key.
+    pub fn valid(&self) -> bool {
+        self.public_key.len() == 32
+            && device_id_from_key(&self.public_key) == self.device
+            && verify_signature(
+                &self.public_key,
+                &Self::bytes(&self.device, &self.public_key),
+                Some(&self.signature),
+            )
+    }
+
+    /// What the UI shows for the key.
+    pub fn code(&self) -> String {
+        key_code(&self.public_key)
+    }
+
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "device": self.device,
+            "key": BASE64.encode(&self.public_key),
+            "sig": self.signature,
+        })
+    }
+
+    /// The record in `json`, or none when it is not one.
+    pub fn from_json(json: &serde_json::Value) -> Option<KeyRecord> {
+        Some(KeyRecord {
+            device: json.get("device")?.as_str()?.to_string(),
+            public_key: BASE64.decode(json.get("key")?.as_str()?).ok()?,
+            signature: json.get("sig")?.as_str()?.to_string(),
+        })
+    }
+}
+
+/// A key this Device holds for another Device.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinnedKey {
+    pub record: KeyRecord,
+    pub trust: KeyTrust,
+}
+
+impl PinnedKey {
+    pub fn to_json(&self) -> serde_json::Value {
+        let mut json = self.record.to_json();
+        if let Some(map) = json.as_object_mut() {
+            map.insert("trust".into(), self.trust.name().into());
+        }
+        json
+    }
+
+    pub fn from_json(json: &serde_json::Value) -> Option<PinnedKey> {
+        let trust = match json.get("trust").and_then(|t| t.as_str()) {
+            Some("verified") => KeyTrust::Verified,
+            _ => KeyTrust::Tofu,
+        };
+        Some(PinnedKey {
+            record: KeyRecord::from_json(json)?,
+            trust,
+        })
+    }
+}
+
+/// What an import found out: the entries it refused for a missing or
+/// wrong signature, by (author, device), and the keys it met first.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ImportReport {
+    pub refused: std::collections::BTreeMap<(String, String), usize>,
+    pub new_keys: Vec<PinnedKey>,
+}
+
+impl ImportReport {
+    pub fn refused_count(&self) -> usize {
+        self.refused.values().sum()
+    }
+
+    pub fn refuse(&mut self, author: &str, device: &str) {
+        *self
+            .refused
+            .entry((author.to_string(), device.to_string()))
+            .or_insert(0) += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

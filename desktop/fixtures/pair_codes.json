@@ -1,0 +1,36 @@
+{
+  "codes": [
+    {
+      "host": "192.168.1.23",
+      "port": 45231,
+      "pin": "042817",
+      "fingerprint": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "full": "r2m02_5xgnw_0aeg8_3188h_g7s65_mt3pg_j9a1b_nwsbc_edx83_24fjt_et9ax_jq70c_fkpnv_g",
+      "typed": "r2m02_5xgnw_0aeg8_3188h_g7s65_mt0"
+    },
+    {
+      "host": "10.0.0.5",
+      "port": 8080,
+      "pin": "999999",
+      "fingerprint": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "full": "18000_18zj0_7m4fr_3188h_g7s65_mt3pg_j9a1b_nwsbc_edx83_24fjt_et9ax_jq70c_fkpnv_g",
+      "typed": "18000_18zj0_7m4fr_3188h_g7s65_mt0"
+    },
+    {
+      "host": "172.16.4.200",
+      "port": 1,
+      "pin": "000000",
+      "fingerprint": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "full": "ng809_j0004_00000_3188h_g7s65_mt3pg_j9a1b_nwsbc_edx83_24fjt_et9ax_jq70c_fkpnv_g",
+      "typed": "ng809_j0004_00000_3188h_g7s65_mt0"
+    }
+  ],
+  "typedAs": {
+    "R2M02 5XGNW 0AEG8 3188H G7S65 MTO": "r2m02_5xgnw_0aeg8_3188h_g7s65_mt0"
+  },
+  "invalid": [
+    "nope",
+    "",
+    "r2m02_5xgnw_0aeg8"
+  ]
+}

@@ -1063,3 +1063,137 @@ fn rules_schedules_and_instants_come_out_as_the_dart_core_has_them() -> TestResu
     }
     Ok(())
 }
+
+// ------------------------------------------------------------ LAN sync
+
+#[test]
+fn pair_codes_are_written_and_read_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::lan::{decode_pair_code, encode_pair_code};
+    let fixture = read_json(&fixtures().join("pair_codes.json"))?;
+    for code in fixture["codes"].as_array().ok_or("codes")? {
+        let s = |k: &str| code[k].as_str().ok_or(format!("{k} is text"));
+        let host: std::net::Ipv4Addr = s("host")?.parse()?;
+        let port = u16::try_from(code["port"].as_u64().ok_or("port")?)?;
+        let fingerprint = hex::decode(s("fingerprint")?)?;
+        assert_eq!(
+            encode_pair_code(host, port, s("pin")?, &fingerprint, false),
+            s("full")?
+        );
+        assert_eq!(
+            encode_pair_code(host, port, s("pin")?, &fingerprint, true),
+            s("typed")?
+        );
+        let full = decode_pair_code(s("full")?).ok_or("a code")?;
+        assert_eq!(
+            (full.host.as_str(), full.port, full.pin.as_str()),
+            (s("host")?, port, s("pin")?)
+        );
+        assert_eq!(full.fingerprint, fingerprint);
+        let typed = decode_pair_code(s("typed")?).ok_or("a code")?;
+        assert_eq!(typed.fingerprint, fingerprint[..8]);
+    }
+    for (typed, code) in fixture["typedAs"].as_object().ok_or("typedAs")? {
+        assert_eq!(
+            decode_pair_code(typed),
+            decode_pair_code(code.as_str().ok_or("a code")?)
+        );
+    }
+    for invalid in fixture["invalid"].as_array().ok_or("invalid")? {
+        assert_eq!(decode_pair_code(invalid.as_str().ok_or("text")?), None);
+    }
+    Ok(())
+}
+
+#[test]
+fn key_records_travel_as_the_dart_core_writes_them() -> TestResult {
+    use oldbrainfix_core::KeyRecord;
+    let fixture = read_json(&fixtures().join("keys.json"))?;
+    let record = KeyRecord::make(&writer_key());
+    assert_eq!(record.to_json(), fixture["record"]);
+    assert!(KeyRecord::from_json(&fixture["record"]).is_some_and(|r| r.valid()));
+    assert!(KeyRecord::from_json(&fixture["claimed"]).is_some_and(|r| !r.valid()));
+    Ok(())
+}
+
+/// The joiner's key: seed bytes 33 to 64.
+fn joiner_key() -> SigningKey {
+    let mut seed = [0u8; 32];
+    for (i, b) in seed.iter_mut().enumerate() {
+        *b = i as u8 + 33;
+    }
+    SigningKey::from_seed(seed)
+}
+
+/// One Device of the sync fixture: its log, the keys it holds and its
+/// blobs, the clock held at `now`.
+fn sync_device(
+    name: &str,
+    key: fn() -> SigningKey,
+    now: &str,
+) -> Result<Store, Box<dyn std::error::Error>> {
+    let dir = fixtures().join("sync");
+    let now = parse_time(now)?;
+    let store = Store::in_memory(Box::new(move || now), move || Ok(key()))?;
+    store.set_local_setting("author", "Ada")?;
+    let text = std::fs::read_to_string(dir.join(format!("{name}.jsonl")))?;
+    for line in text.lines().filter(|l| !l.is_empty()) {
+        store.insert(&serde_json::from_str(line)?)?;
+    }
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings[name].as_array().ok_or("settings")? {
+        store.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    for kind in ["photo", "audio"] {
+        let sub = if kind == "photo" { "photos" } else { "audio" };
+        for (hash, bytes) in files(&dir.join(name).join(sub))? {
+            assert!(store.put_blob(kind, &hash, &bytes)?, "{name} {hash}");
+        }
+    }
+    Ok(store)
+}
+
+#[test]
+fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
+    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    let dir = fixtures().join("sync");
+    let mut expected = read_json(&dir.join("expected.json"))?;
+    let now = expected["now"].as_str().ok_or("now")?.to_string();
+    let host = sync_device("host", writer_key, &now)?;
+    let joiner = sync_device("joiner", joiner_key, &now)?;
+    let vector: std::collections::HashMap<String, i64> =
+        serde_json::from_value(read_json(&dir.join("vector.json"))?)?;
+    assert_eq!(serde_json::to_value(host.version_vector()?)?, json!(vector));
+
+    // The joiner asks as the phone asks.
+    let request = read_json(&dir.join("request.json"))?;
+    assert_eq!(
+        sync_request(&joiner, &vector, "Phone", &host.device_id()?, "246810")?,
+        request
+    );
+
+    // The host answers as the Dart core answers.
+    let (answer, session) = answer_sync(&host, &request, "Desk")?.ok_or("an answer")?;
+    assert_eq!(answer, read_json(&dir.join("answer.json"))?);
+    assert_eq!(session.name, "Phone");
+    assert!(session.moment.is_some());
+    assert_eq!(session.report.refused_count(), 0);
+
+    // Both end up reading the same.
+    let back = apply_answer(&joiner, &answer)?;
+    assert_eq!(back.name, "Desk");
+    assert!(!back.applied.is_empty());
+    if let Some(map) = expected.as_object_mut() {
+        map.remove("device");
+    }
+    for (side, store) in [("host", &host), ("joiner", &joiner)] {
+        let mut actual = read(store)?;
+        if let Some(map) = actual.as_object_mut() {
+            map.remove("device");
+        }
+        assert_eq!(actual, expected, "{side}");
+    }
+    Ok(())
+}

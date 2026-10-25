@@ -52,5 +52,14 @@
   "speechModelUseFile": "Diese Datei verwenden",
   "pastePhoto": "Bild einfügen",
   "pasteNoPicture": "In der Zwischenablage ist kein Bild.",
-  "photosHint": "Ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz."
+  "photosHint": "Ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz.",
+  "syncHostIntro": "Zeig das deinem Telefon: Öffne dort in den Einstellungen „Synchronisieren“ und scanne den Code oder tippe ihn ein. Die Synchronisierung bleibt offen, solange diese Seite zu sehen ist.",
+  "syncPin": "PIN {pin}",
+  "syncNoNetwork": "Kein Netz gefunden. Verbinde diesen Computer mit demselben WLAN wie dein Telefon.",
+  "syncLockedOut": "Zu viele falsche PINs. Verlasse „Synchronisieren“ und öffne es neu, um einen neuen Code zu bekommen.",
+  "syncTrustQuestion": "{name} möchte sich mit diesem Computer synchronisieren. Vertrauen?",
+  "syncTrust": "Vertrauen",
+  "syncRefuse": "Ablehnen",
+  "syncCopyCode": "Code kopieren",
+  "unnamedDevice": "Unbenanntes Gerät"
 }

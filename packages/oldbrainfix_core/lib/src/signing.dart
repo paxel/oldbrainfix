@@ -110,3 +110,102 @@ Uint8List entryBytes({
     ]),
   ),
 );
+
+/// How far a pinned key is trusted: met in a payload some other Device
+/// carried (trusted on first use), or met in person over a session the
+/// pair code authenticated.
+enum KeyTrust { tofu, verified }
+
+/// A Device's public key as it travels with the entries, so a Device can
+/// check the signatures of Devices it never met directly. The record
+/// signs itself, and the device id is the key's own fingerprint
+/// ([deviceIdFromKey]): nobody can publish a key for a device id they do
+/// not hold the key of. Copied from Catlog and narrowed: every entry here
+/// is signed from the first one, so there is no "signed since".
+class KeyRecord {
+  final String device;
+  final Uint8List publicKey;
+  final String signature;
+
+  const KeyRecord(this.device, this.publicKey, this.signature);
+
+  static Uint8List _bytes(String device, List<int> publicKey) =>
+      Uint8List.fromList(
+        utf8.encode(jsonEncode([device, base64.encode(publicKey)])),
+      );
+
+  /// This Device's record, signed by its [key].
+  factory KeyRecord.make(SigningKey key) {
+    final device = deviceIdFromKey(key.publicKey);
+    return KeyRecord(
+      device,
+      key.publicKey,
+      key.sign(_bytes(device, key.publicKey)),
+    );
+  }
+
+  /// True when the record names the device its key belongs to and was
+  /// signed by that key.
+  bool get valid =>
+      publicKey.length == 32 &&
+      deviceIdFromKey(publicKey) == device &&
+      verifySignature(publicKey, _bytes(device, publicKey), signature);
+
+  /// What the UI shows for the key: `7f3a-c21e`.
+  String get code => keyCode(publicKey);
+
+  Map<String, dynamic> toJson() => {
+    'device': device,
+    'key': base64.encode(publicKey),
+    'sig': signature,
+  };
+
+  /// The record in [json], or null when it is not one.
+  static KeyRecord? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final device = json['device'];
+    final key = json['key'];
+    final sig = json['sig'];
+    if (device is! String || key is! String || sig is! String) return null;
+    try {
+      return KeyRecord(device, base64.decode(key), sig);
+    } on FormatException {
+      return null;
+    }
+  }
+}
+
+/// A key this Device holds for another Device, with how far it is
+/// trusted.
+class PinnedKey {
+  final KeyRecord record;
+  final KeyTrust trust;
+
+  const PinnedKey(this.record, this.trust);
+
+  Map<String, dynamic> toJson() => {...record.toJson(), 'trust': trust.name};
+
+  static PinnedKey? fromJson(Object? json) {
+    final record = KeyRecord.fromJson(json);
+    if (record == null || json is! Map) return null;
+    return PinnedKey(
+      record,
+      KeyTrust.values.asNameMap()[json['trust']] ?? KeyTrust.tofu,
+    );
+  }
+}
+
+/// What an import found out: the entries it refused for a missing or
+/// wrong signature, and the keys it met for the first time.
+class ImportReport {
+  /// Refused entries by (author, device): how many.
+  final Map<(String author, String device), int> refused = {};
+
+  /// Keys pinned by this import.
+  final List<PinnedKey> newKeys = [];
+
+  int get refusedCount => refused.values.fold(0, (a, b) => a + b);
+
+  void refuse(String author, String device) =>
+      refused.update((author, device), (n) => n + 1, ifAbsent: () => 1);
+}

@@ -1,0 +1,171 @@
+{
+  "now": "2026-01-02T10:00:45.000Z",
+  "areas": [
+    {
+      "id": "area:starter-health",
+      "name": "Health",
+      "starter": "health",
+      "colour": null,
+      "icon": null,
+      "topics": [
+        {
+          "id": "topic:starter-doctor",
+          "areaId": "area:starter-health",
+          "name": "Doctor",
+          "starter": "doctor"
+        }
+      ]
+    },
+    {
+      "id": "area:starter-work",
+      "name": "Office",
+      "starter": "work",
+      "colour": null,
+      "icon": null,
+      "topics": [
+        {
+          "id": "topic:starter-meetings",
+          "areaId": "area:starter-work",
+          "name": "Meetings",
+          "starter": "meetings"
+        }
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Buy milk and eggs",
+      "captured": "2026-01-01T10:00:18.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd"
+      ],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "Call the dentist",
+      "captured": "2026-01-01T10:00:23.000Z",
+      "place": "topic:starter-meetings",
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Pills at eight",
+      "captured": "2026-01-01T10:00:34.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "ec6f9f0e691fcbfd4c1143567ef396e2cad71100efbd8ec89752fea3d2fdbcec"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000001",
+    "note:00000000000000000000000000000003"
+  ],
+  "trashed": [],
+  "inside": {
+    "area:starter-health": [],
+    "topic:starter-doctor": [],
+    "area:starter-work": [
+      "note:00000000000000000000000000000002"
+    ],
+    "topic:starter-meetings": [
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "sections": {
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000002": [
+      {
+        "id": "section:00000000000000000000000000000004",
+        "noteId": "note:00000000000000000000000000000002",
+        "text": "Tuesday works",
+        "captured": "2026-01-01T10:00:39.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [
+    {
+      "noteId": "note:00000000000000000000000000000001",
+      "hash": "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd"
+    }
+  ],
+  "unreadPhotos": [
+    {
+      "noteId": "note:00000000000000000000000000000003",
+      "hash": "ec6f9f0e691fcbfd4c1143567ef396e2cad71100efbd8ec89752fea3d2fdbcec"
+    },
+    {
+      "noteId": "note:00000000000000000000000000000002",
+      "hash": "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+    }
+  ],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000001"
+    ],
+    "receipt": [],
+    "dentist": [
+      "note:00000000000000000000000000000002"
+    ],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ]
+  },
+  "searchWithin": {
+    "area:starter-health": [],
+    "topic:starter-doctor": [],
+    "area:starter-work": [
+      "note:00000000000000000000000000000002"
+    ],
+    "topic:starter-meetings": [
+      "note:00000000000000000000000000000002"
+    ]
+  }
+}

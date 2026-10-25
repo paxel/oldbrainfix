@@ -19,6 +19,7 @@ import 'schedule_text.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
+import 'sync_screen.dart';
 
 /// Opens Settings; returns once the user left them.
 Future<void> openSettings(
@@ -40,7 +41,7 @@ Future<void> openSettings(
 /// gear: the theme; the alarm setup and the default Re-nag interval; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; the calendar mirror; the App Lock and
-/// the Area Locks; whether Streaks show; and About. Each is a local setting, never synced, and applies at
+/// the Area Locks; whether Streaks show; Sync; and About. Each is a local setting, never synced, and applies at
 /// once; the alarms are armed again after each change.
 class SettingsScreen extends StatefulWidget {
   final Store store;
@@ -226,6 +227,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: _setStreaks,
                   title: Text(t.showStreaks),
                   subtitle: Text(t.showStreaksDetail),
+                ),
+              ],
+            ),
+            _Heading(t.syncTitle),
+            _Section(
+              children: [
+                ListTile(
+                  key: const ValueKey('sync'),
+                  leading: const Icon(Icons.sync),
+                  title: Text(t.syncSettingsEntry),
+                  subtitle: Text(t.syncSettingsDetail),
+                  onTap: () => _push(SyncScreen(store: widget.store)),
                 ),
               ],
             ),

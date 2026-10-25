@@ -15,6 +15,7 @@ import 'src/drafts.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
+import 'src/pairing_platform.dart';
 import 'src/photo_platform.dart';
 import 'src/speech_platform.dart';
 import 'src/voice_platform.dart';
@@ -39,6 +40,7 @@ Future<void> main() async {
       calendar: const AndroidCalendar(),
       mirror: const AndroidMirror(),
       lock: const AndroidBiometrics(),
+      pairing: const AndroidPairing(),
     ),
   );
 }

@@ -52,6 +52,13 @@ const SCHEMA: &str = "
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS moments (
+        id    INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq   INTEGER NOT NULL,
+        cause TEXT NOT NULL,
+        label TEXT,
+        at    TEXT NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_device_dseq
         ON entries (device, dseq);
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
@@ -76,6 +83,17 @@ impl Fields {
     pub fn iter(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
         self.0.iter().map(|(k, v)| (k.as_str(), v.as_deref()))
     }
+}
+
+/// A Moment as the store keeps it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MomentRow {
+    pub id: i64,
+    pub seq: i64,
+    pub cause: String,
+    pub label: Option<String>,
+    /// When, as stored.
+    pub at: String,
 }
 
 pub struct Store {
@@ -200,6 +218,26 @@ impl Store {
         Ok(())
     }
 
+    pub fn remove_local_setting(&self, key: &str) -> Result<()> {
+        self.db
+            .lock()
+            .execute("DELETE FROM local_settings WHERE key = ?", [key])?;
+        Ok(())
+    }
+
+    /// Every setting of this Device whose key starts with `prefix`, as
+    /// (key, value), by key.
+    pub fn local_settings_with_prefix(&self, prefix: &str) -> Result<Vec<(String, String)>> {
+        let db = self.db.lock();
+        let mut stmt = db.prepare(
+            "SELECT key, value FROM local_settings WHERE substr(key, 1, ?) = ? ORDER BY key",
+        )?;
+        let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
     // ------------------------------------------------------------ photos
 
     /// Keeps the photo `bytes` without their metadata
@@ -231,6 +269,30 @@ impl Store {
     /// not here.
     pub fn audio(&self, hash: &str) -> Option<Vec<u8>> {
         self.audio.get(hash)
+    }
+
+    /// The bytes of the `kind` (`photo` or `audio`) blob `hash`.
+    pub fn blob(&self, kind: &str, hash: &str) -> Option<Vec<u8>> {
+        match kind {
+            "photo" => self.photos.get(hash),
+            "audio" => self.audio.get(hash),
+            _ => None,
+        }
+    }
+
+    /// Keeps `bytes` another Device holds under `hash`, as they are.
+    /// Bytes whose SHA-256 is not `hash`, or of an unknown `kind`, are
+    /// not kept; returns whether they were.
+    pub fn put_blob(&self, kind: &str, hash: &str, bytes: &[u8]) -> Result<bool> {
+        if hex::encode(Sha256::digest(bytes)) != hash {
+            return Ok(false);
+        }
+        match kind {
+            "photo" => self.photos.put(hash, bytes)?,
+            "audio" => self.audio.put(hash, bytes)?,
+            _ => return Ok(false),
+        }
+        Ok(true)
     }
 
     // --------------------------------------------------------------- log
@@ -303,6 +365,106 @@ impl Store {
             ],
         )?;
         Ok(changed > 0)
+    }
+
+    /// Whether the entry (device, dseq) is held.
+    pub fn holds(&self, device: &str, dseq: i64) -> Result<bool> {
+        Ok(self
+            .db
+            .lock()
+            .query_row(
+                "SELECT 1 FROM entries WHERE device = ? AND dseq = ?",
+                params![device, dseq],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some())
+    }
+
+    /// Every entry a Device holding `vector` lacks, by (device, dseq).
+    pub fn entries_since(&self, vector: &HashMap<String, i64>) -> Result<Vec<Entry>> {
+        Ok(self
+            .entries("SELECT * FROM entries ORDER BY device, dseq", params![])?
+            .into_iter()
+            .filter(|e| e.dseq > vector.get(&e.device).copied().unwrap_or(0))
+            .collect())
+    }
+
+    /// The (entity, field) pairs whose field starts with `prefix`, by
+    /// entity and field.
+    pub fn fields_with_prefix(&self, prefix: &str) -> Result<Vec<(String, String)>> {
+        let db = self.db.lock();
+        let mut stmt = db.prepare(
+            "SELECT DISTINCT entity, field FROM entries WHERE substr(field, 1, ?) = ? \
+             ORDER BY entity, field",
+        )?;
+        let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Whether any entry ever wrote `field`.
+    pub fn mentions(&self, field: &str) -> Result<bool> {
+        Ok(self
+            .db
+            .lock()
+            .query_row(
+                "SELECT 1 FROM entries WHERE field = ? LIMIT 1",
+                [field],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some())
+    }
+
+    /// The log's high-water mark: the local handle of the newest entry, 0
+    /// for an empty log.
+    pub fn current_seq(&self) -> Result<i64> {
+        Ok(self
+            .db
+            .lock()
+            .query_row("SELECT COALESCE(MAX(seq), 0) FROM entries", [], |r| {
+                r.get(0)
+            })?)
+    }
+
+    /// Every entry written after the mark `seq`, in log order.
+    pub fn entries_after(&self, seq: i64) -> Result<Vec<Entry>> {
+        self.entries(
+            "SELECT * FROM entries WHERE seq > ? ORDER BY seq",
+            params![seq],
+        )
+    }
+
+    // ----------------------------------------------------------- moments
+
+    /// Records a Moment at the mark `seq`, at the store's now. Returns
+    /// its id.
+    pub fn add_moment(&self, seq: i64, cause: &str, label: Option<&str>) -> Result<i64> {
+        let db = self.db.lock();
+        db.execute(
+            "INSERT INTO moments (seq, cause, label, at) VALUES (?, ?, ?, ?)",
+            params![seq, cause, label, dart_iso(self.now())],
+        )?;
+        Ok(db.last_insert_rowid())
+    }
+
+    /// Every Moment as stored, newest first.
+    pub fn moment_rows(&self) -> Result<Vec<MomentRow>> {
+        let db = self.db.lock();
+        let mut stmt =
+            db.prepare("SELECT id, seq, cause, label, at FROM moments ORDER BY seq DESC, id DESC")?;
+        let rows = stmt.query_map([], |r| {
+            Ok(MomentRow {
+                id: r.get(0)?,
+                seq: r.get(1)?,
+                cause: r.get(2)?,
+                label: r.get(3)?,
+                at: r.get(4)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// The newest dseq held from each Device.

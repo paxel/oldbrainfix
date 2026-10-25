@@ -197,6 +197,18 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PAIRING_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "readQr" -> {
+                        val photo = call.arguments as? ByteArray
+                            ?: return@setMethodCallHandler result.success(null)
+                        inBackground(result) { Pairing.readQr(photo) }
+                    }
+                    "deviceName" -> result.success(Pairing.deviceName())
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -547,6 +559,7 @@ class MainActivity : FlutterActivity() {
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
+        private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         private const val REQUEST_LOCATION = 1
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3

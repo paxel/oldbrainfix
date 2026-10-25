@@ -1365,4 +1365,111 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get maskedReminder => 'Private Erinnerung';
+
+  @override
+  String get syncTitle => 'Synchronisieren';
+
+  @override
+  String get syncSettingsEntry => 'Mit einem anderen Gerät synchronisieren';
+
+  @override
+  String get syncSettingsDetail =>
+      'Einmal per Code koppeln; danach haben beide dieselben Notizen, Bereiche und Routinen.';
+
+  @override
+  String get syncJoinIntro =>
+      'Öffne am Computer „Synchronisieren“. Scanne den angezeigten Code oder tippe ihn ein.';
+
+  @override
+  String get syncScan => 'Code scannen';
+
+  @override
+  String get syncCodeLabel => 'Kopplungscode';
+
+  @override
+  String get syncJoin => 'Jetzt synchronisieren';
+
+  @override
+  String get syncSyncing => 'Wird synchronisiert …';
+
+  @override
+  String get syncInvalidCode =>
+      'Das ist kein Kopplungscode. Vergleiche ihn mit dem Bildschirm des Computers.';
+
+  @override
+  String get syncNoCode =>
+      'Auf dem Foto ist kein Code zu finden. Versuch es etwas näher oder tippe den Code ein.';
+
+  @override
+  String syncCameIn(String name, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen angekommen',
+      one: '1 Änderung angekommen',
+      zero: 'nichts Neues angekommen',
+    );
+    return 'Mit $name synchronisiert: $_temp0.';
+  }
+
+  @override
+  String syncRefused(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Änderungen wurden abgelehnt: Ihre Signaturen passten nicht.',
+      one: '1 Änderung wurde abgelehnt: Ihre Signatur passte nicht.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailNotPrivate =>
+      'Dieser Code zeigt aus deinem Heimnetz hinaus. Nur Geräte im selben Netz können sich synchronisieren.';
+
+  @override
+  String get syncFailUnreachable =>
+      'Der Computer hat nicht geantwortet. Ist dort „Synchronisieren“ offen, und sind beide im selben WLAN?';
+
+  @override
+  String get syncFailWrongHost =>
+      'Das ist nicht der Computer, zu dem der Code gehört.';
+
+  @override
+  String get syncFailWrongPin =>
+      'Die PIN passt nicht. Tippe den Code noch einmal ein.';
+
+  @override
+  String get syncFailLocked =>
+      'Zu viele falsche Versuche. Öffne „Synchronisieren“ am Computer neu, um einen neuen Code zu bekommen.';
+
+  @override
+  String get syncFailDeclined => 'Der Computer hat dieses Gerät abgelehnt.';
+
+  @override
+  String get syncFailFormat =>
+      'Das andere Gerät hat eine andere Version von Old Brain Fix. Aktualisiere beide.';
+
+  @override
+  String get syncFailFailed =>
+      'Die Synchronisierung brach ab. Nichts ging verloren; versuch es noch einmal.';
+
+  @override
+  String get pairedDevicesTitle => 'Gekoppelte Geräte';
+
+  @override
+  String get pairedNone => 'Noch keine gekoppelten Geräte.';
+
+  @override
+  String pairedLastSync(String when) {
+    return 'Zuletzt synchronisiert $when';
+  }
+
+  @override
+  String get forgetDevice => 'Vergessen';
+
+  @override
+  String get syncSettingsStay =>
+      'Einstellungen bleiben auf jedem Gerät und werden nie synchronisiert.';
 }

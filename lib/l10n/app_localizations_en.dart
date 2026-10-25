@@ -1357,4 +1357,108 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get maskedReminder => 'Private Reminder';
+
+  @override
+  String get syncTitle => 'Sync';
+
+  @override
+  String get syncSettingsEntry => 'Sync with another Device';
+
+  @override
+  String get syncSettingsDetail =>
+      'Pair once by code; both then hold the same Notes, Areas and Routines.';
+
+  @override
+  String get syncJoinIntro =>
+      'Open Sync on the computer. Scan the code it shows, or type it in.';
+
+  @override
+  String get syncScan => 'Scan the code';
+
+  @override
+  String get syncCodeLabel => 'Pair code';
+
+  @override
+  String get syncJoin => 'Sync now';
+
+  @override
+  String get syncSyncing => 'Syncing…';
+
+  @override
+  String get syncInvalidCode =>
+      'That is not a pair code. Check it against the computer\'s screen.';
+
+  @override
+  String get syncNoCode =>
+      'No code found in the photo. Try again a little closer, or type the code.';
+
+  @override
+  String syncCameIn(String name, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes came in',
+      one: '1 change came in',
+      zero: 'nothing new came in',
+    );
+    return 'Synced with $name: $_temp0.';
+  }
+
+  @override
+  String syncRefused(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes were refused: their signatures did not match.',
+      one: '1 change was refused: its signature did not match.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get syncFailNotPrivate =>
+      'This code points outside your home network. Only Devices on the same network can sync.';
+
+  @override
+  String get syncFailUnreachable =>
+      'The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?';
+
+  @override
+  String get syncFailWrongHost =>
+      'This is not the computer the code belongs to.';
+
+  @override
+  String get syncFailWrongPin => 'The PIN does not match. Type the code again.';
+
+  @override
+  String get syncFailLocked =>
+      'Too many wrong tries. Open Sync on the computer again for a new code.';
+
+  @override
+  String get syncFailDeclined => 'The computer said no to this Device.';
+
+  @override
+  String get syncFailFormat =>
+      'The other Device runs another version of Old Brain Fix. Update both.';
+
+  @override
+  String get syncFailFailed => 'Sync broke off. Nothing was lost; try again.';
+
+  @override
+  String get pairedDevicesTitle => 'Paired Devices';
+
+  @override
+  String get pairedNone => 'No paired Devices yet.';
+
+  @override
+  String pairedLastSync(String when) {
+    return 'Last synced $when';
+  }
+
+  @override
+  String get forgetDevice => 'Forget';
+
+  @override
+  String get syncSettingsStay =>
+      'Settings stay on each Device and are never synced.';
 }

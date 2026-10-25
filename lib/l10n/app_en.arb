@@ -792,5 +792,54 @@
       }
     }
   },
-  "maskedReminder": "Private Reminder"
+  "maskedReminder": "Private Reminder",
+  "syncTitle": "Sync",
+  "syncSettingsEntry": "Sync with another Device",
+  "syncSettingsDetail": "Pair once by code; both then hold the same Notes, Areas and Routines.",
+  "syncJoinIntro": "Open Sync on the computer. Scan the code it shows, or type it in.",
+  "syncScan": "Scan the code",
+  "syncCodeLabel": "Pair code",
+  "syncJoin": "Sync now",
+  "syncSyncing": "Syncing…",
+  "syncInvalidCode": "That is not a pair code. Check it against the computer's screen.",
+  "syncNoCode": "No code found in the photo. Try again a little closer, or type the code.",
+  "syncCameIn": "Synced with {name}: {count, plural, =0{nothing new came in} =1{1 change came in} other{{count} changes came in}}.",
+  "@syncCameIn": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncRefused": "{count, plural, =1{1 change was refused: its signature did not match.} other{{count} changes were refused: their signatures did not match.}}",
+  "@syncRefused": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "syncFailNotPrivate": "This code points outside your home network. Only Devices on the same network can sync.",
+  "syncFailUnreachable": "The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?",
+  "syncFailWrongHost": "This is not the computer the code belongs to.",
+  "syncFailWrongPin": "The PIN does not match. Type the code again.",
+  "syncFailLocked": "Too many wrong tries. Open Sync on the computer again for a new code.",
+  "syncFailDeclined": "The computer said no to this Device.",
+  "syncFailFormat": "The other Device runs another version of Old Brain Fix. Update both.",
+  "syncFailFailed": "Sync broke off. Nothing was lost; try again.",
+  "pairedDevicesTitle": "Paired Devices",
+  "pairedNone": "No paired Devices yet.",
+  "pairedLastSync": "Last synced {when}",
+  "@pairedLastSync": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "forgetDevice": "Forget",
+  "syncSettingsStay": "Settings stay on each Device and are never synced."
 }

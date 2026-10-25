@@ -1,3 +1,4 @@
+import 'device_settings.dart';
 import 'notes.dart';
 import 'store.dart';
 
@@ -263,17 +264,47 @@ class Places {
 
   /// Plants the Starter Set entries whose slugs are in [picked]. A Topic
   /// is planted only together with its Area.
+  ///
+  /// Every Device plants a starter Area or Topic under the same id
+  /// ([starterId]) and dated [starterDate]: two Devices that both planted
+  /// it hold one place after a sync, not two, and whatever the user did
+  /// to it on any Device (a rename, a colour, deleting it) is dated later
+  /// and wins over any planting.
   void plantStarterSet(Set<String> picked) {
     store.batch(() {
       for (final area in starterSet) {
         if (!picked.contains(area.slug)) continue;
-        final areaId = _appendArea(area.name, area.slug);
+        final areaId = starterId(PlaceKeys.typeArea, area.slug);
+        _plant(areaId, PlaceKeys.typeArea, area.name, area.slug);
         for (final topic in area.topics) {
           if (!picked.contains(topic.slug)) continue;
-          _appendTopic(areaId, topic.name, topic.slug);
+          final topicId = starterId(PlaceKeys.typeTopic, topic.slug);
+          if (_plant(topicId, PlaceKeys.typeTopic, topic.name, topic.slug)) {
+            store.append(topicId, PlaceKeys.area, areaId, date: starterDate);
+          }
         }
       }
     });
+  }
+
+  /// Whether the Starter Set is still to be offered: this Device never
+  /// offered it, and no Areas arrived from another Device meanwhile.
+  bool get starterSetDue => !store.starterSetOffered && areas().isEmpty;
+
+  /// The id every Device plants the starter place [slug] of [type] under.
+  static String starterId(String type, String slug) => '$type:starter-$slug';
+
+  /// The date of every planting: before anything a user does.
+  static final starterDate = DateTime.utc(2000);
+
+  /// Writes the starter place [id] unless this Device holds it already,
+  /// planted here or arrived by sync; returns whether it wrote it.
+  bool _plant(String id, String type, String name, String slug) {
+    if (store.history(id).isNotEmpty) return false;
+    store.append(id, PlaceKeys.type, type, date: starterDate);
+    store.append(id, PlaceKeys.name, name, date: starterDate);
+    store.append(id, PlaceKeys.starter, slug, date: starterDate);
+    return true;
   }
 
   /// Whether [id] is an Area or a Topic that exists.

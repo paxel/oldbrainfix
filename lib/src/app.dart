@@ -23,6 +23,7 @@ import 'lock_screen.dart';
 import 'look.dart';
 import 'nudge_screen.dart';
 import 'ocr_platform.dart';
+import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'question_mark_background.dart';
 import 'ring_screen.dart';
@@ -85,6 +86,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// none when not given, and the PIN unlocks.
   final LockPlatform lock;
 
+  /// Reads the pair code in a photo for Sync; typing it always works.
+  final PairingPlatform pairing;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -102,6 +106,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.mirror = const NoMirror(),
     this.mirrorDelay = CalendarMirror.defaultDelay,
     this.lock = const NoBiometrics(),
+    this.pairing = const NoPairing(),
   });
 
   @override
@@ -208,7 +213,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                             drafts: _drafts,
                             child: LockScope(
                               lock: _lock,
-                              child: child ?? const SizedBox.shrink(),
+                              child: PairingScope(
+                                pairing: widget.pairing,
+                                child: child ?? const SizedBox.shrink(),
+                              ),
                             ),
                           ),
                         ),
@@ -314,7 +322,9 @@ class _Home extends StatefulWidget {
 }
 
 class _HomeState extends State<_Home> {
-  late bool _starterSetOffered = widget.store.starterSetOffered;
+  /// Not offered once Areas arrived from another Device, which planted
+  /// its own (ADR 0008: the flag is this Device's).
+  late bool _starterSetOffered = !widget.places.starterSetDue;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;

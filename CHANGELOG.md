@@ -47,6 +47,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Export all or picked Routines and Reminders as a shareable calendar file with their repeat rules and alarms.
 - Optionally keep all Routines and Reminders in a device calendar of your choice, updated as they change and removed when turned off.
 - Settings that belong to each phone and are never synced.
+- Sync the phone with the desktop over the home network by scanning or typing the code the desktop shows; the two stay paired.
 - An optional App Lock with a PIN, fingerprint or screen lock that guards your Notes while capturing and alarms stay open.
 - Optional Area Locks that keep single Areas and their Notes hidden until unlocked, with their alarms, Agenda rows, widget and calendar entries shown as "Private Routine" or in full, still checkable.
 - An About page with the version, documentation, source, licences, a way to report problems or write to the developer, and a donation link.

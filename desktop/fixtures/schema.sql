@@ -18,3 +18,10 @@ CREATE TABLE local_settings (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+CREATE TABLE moments (
+        id    INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq   INTEGER NOT NULL,
+        cause TEXT NOT NULL,
+        label TEXT,
+        at    TEXT NOT NULL
+      );

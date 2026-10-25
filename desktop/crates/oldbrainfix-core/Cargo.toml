@@ -22,6 +22,10 @@ ed25519-dalek = "2"
 base64 = "0.22"
 # Shares one store between the window and the alerts, one writer at a time.
 parking_lot = "0.12"
+# LAN sync: the desktop hosts over TLS with its own self-signed
+# certificate, as Catlog's desk does.
+rcgen = "0.13"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.
@@ -29,3 +33,5 @@ chrono-tz = "0.10"
 # Reads the fixtures' doubles back bit for bit.
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 tempfile = "3.10"
+# Joins the host in the tests as the phone does.
+ureq = { version = "3", default-features = false, features = ["rustls"] }

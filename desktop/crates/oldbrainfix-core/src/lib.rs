@@ -5,7 +5,8 @@
 //! the Missed Summary, this Device's settings, and the question marks of
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
-//! them. The Dart core
+//! them; and the LAN sync between Devices with its pair codes, keys and
+//! paired Devices. The Dart core
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
@@ -13,8 +14,10 @@ pub mod alarms;
 pub mod blobs;
 pub mod entry;
 pub mod error;
+pub mod lan;
 pub mod notes;
 pub mod nudges;
+pub mod pairing;
 pub mod photos;
 pub mod places;
 pub mod question_marks;
@@ -24,12 +27,14 @@ pub mod search;
 pub mod settings;
 pub mod signing;
 pub mod store;
+pub mod sync;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
 pub use notes::{Blob, Importance, Note, Notes, Section};
 pub use nudges::{PlannedNudge, QuietHours};
+pub use pairing::PairedDevice;
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
 pub use schedule::{
@@ -38,8 +43,9 @@ pub use schedule::{
 };
 pub use search::Search;
 pub use settings::DeviceSettings;
-pub use signing::SigningKey;
-pub use store::{Clock, Fields, IdMaker, Store};
+pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
+pub use store::{Clock, Fields, IdMaker, MomentRow, Store};
+pub use sync::Moment;
 
 /// The app's name, as the window title shows it.
 pub const APP_NAME: &str = "Old Brain Fix";

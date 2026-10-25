@@ -1,6 +1,8 @@
 //! Areas and Topics as the Dart core's `Places` reads and writes them:
 //! exactly two levels.
 
+use chrono::{DateTime, Utc};
+
 use crate::notes::{Notes, keys as note_keys};
 use crate::store::{Store, utf16_cmp};
 use crate::{Error, Result};
@@ -27,6 +29,16 @@ pub const AREA_ICONS: [&str; 14] = [
     "home", "work", "car", "health", "school", "kids", "kitchen", "garden", "shopping", "money",
     "pets", "sport", "travel", "star",
 ];
+
+/// The id every Device plants the starter place `slug` of `ty` under.
+pub fn starter_id(ty: &str, slug: &str) -> String {
+    format!("{ty}:starter-{slug}")
+}
+
+/// The date of every planting, 2000-01-01: before anything a user does.
+pub fn starter_date() -> DateTime<Utc> {
+    DateTime::<Utc>::from_timestamp(946_684_800, 0).unwrap_or_default()
+}
 
 /// Where a deleted place's Notes go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,21 +263,49 @@ impl<'a> Places<'a> {
 
     /// Plants the Starter Set entries whose slugs are in `picked`. A
     /// Topic is planted only together with its Area.
+    ///
+    /// Every Device plants a starter Area or Topic under the same id
+    /// ([`starter_id`]) and dated [`starter_date`], as the Dart core does:
+    /// two Devices that both planted it hold one place after a sync, and
+    /// whatever the user did to it is dated later and wins.
     pub fn plant_starter_set(&self, picked: &[&str]) -> Result<()> {
         self.store.batch(|| {
             for (area, topics) in STARTER_SET {
                 if !picked.contains(&area.slug) {
                     continue;
                 }
-                let area_id = self.append_area(area.name, Some(area.slug))?;
+                let area_id = starter_id(keys::TYPE_AREA, area.slug);
+                self.plant(&area_id, keys::TYPE_AREA, area.name, area.slug)?;
                 for topic in topics {
-                    if picked.contains(&topic.slug) {
-                        self.append_topic(&area_id, topic.name, Some(topic.slug))?;
+                    if !picked.contains(&topic.slug) {
+                        continue;
+                    }
+                    let topic_id = starter_id(keys::TYPE_TOPIC, topic.slug);
+                    if self.plant(&topic_id, keys::TYPE_TOPIC, topic.name, topic.slug)? {
+                        self.store.append(
+                            &topic_id,
+                            keys::AREA,
+                            Some(&area_id),
+                            Some(starter_date()),
+                        )?;
                     }
                 }
             }
             Ok(())
         })
+    }
+
+    /// Writes the starter place `id` unless it is held already; returns
+    /// whether it wrote it.
+    fn plant(&self, id: &str, ty: &str, name: &str, slug: &str) -> Result<bool> {
+        if !self.store.history(id)?.is_empty() {
+            return Ok(false);
+        }
+        let date = Some(starter_date());
+        self.store.append(id, keys::TYPE, Some(ty), date)?;
+        self.store.append(id, keys::NAME, Some(name), date)?;
+        self.store.append(id, keys::STARTER, Some(slug), date)?;
+        Ok(true)
     }
 
     /// Sends the Notes inside `id` where `notes_go` says; `area_id` is

@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "deviceId": "65b60673d6ed884bf01c2c222d82ada0",
+  "name": "Desk",
+  "entries": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 13,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "text",
+      "value": "Buy milk and eggs",
+      "date": "2026-01-01T10:00:32.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:32.000Z",
+      "sig": "JyRz/+7bLT92dD+Nds2NZwbZptE3q5x05dEwh5HFC/fIAOEnTZZRQKRpbveU7jVnpYVPV5tHntn9Xf9B3IxQAg=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 14,
+      "entity": "section:00000000000000000000000000000004",
+      "field": "$type",
+      "value": "section",
+      "date": "2026-01-01T10:00:39.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:40.000Z",
+      "sig": "W+EiyEJ4wmJVsOcxCUR5ATm1kA6GSN9srGMLyhgMDaKiRD8WrrAmKYLYL7cCzijEy7Fh8zfBw0Yy2/8Sg35PAw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 15,
+      "entity": "section:00000000000000000000000000000004",
+      "field": "note",
+      "value": "note:00000000000000000000000000000002",
+      "date": "2026-01-01T10:00:39.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:41.000Z",
+      "sig": "qz3fE9FZWfRGAhDep9NkWP0R5JuQqvWc/UaV2xuhYg0A1ZTInwr1glyxHMGgXLxNoINAhPKz2EJEDF9hxE0ICw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 16,
+      "entity": "section:00000000000000000000000000000004",
+      "field": "captured",
+      "value": "2026-01-01T10:00:39.000Z",
+      "date": "2026-01-01T10:00:39.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:42.000Z",
+      "sig": "V2u8kENtdruo7fbhP7Dpp7sFMmNK3/CL3KWs8lNsrPs7HGKXRsFfyZ3dWNQsPNG1PNbV4jLuMEiqfkJHlcZLAw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 17,
+      "entity": "section:00000000000000000000000000000004",
+      "field": "text",
+      "value": "Tuesday works",
+      "date": "2026-01-01T10:00:39.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:00:43.000Z",
+      "sig": "2imDuQE3CM5BZieAf1fiDlYyZG6pTjHMZ5T32dkfGZz5+Nthw9Hx573JArEyrKxLKDLhaMIkKL2p6oWmvox1Dw=="
+    }
+  ],
+  "wantBlobs": [
+    "photo/ec6f9f0e691fcbfd4c1143567ef396e2cad71100efbd8ec89752fea3d2fdbcec"
+  ],
+  "keys": [
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "key": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+      "sig": "A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
+      "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
+    }
+  ]
+}

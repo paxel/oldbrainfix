@@ -163,5 +163,8 @@ dependencies {
     // FileProvider for the camera app; already part of Flutter's own
     // dependencies, named here because the app uses it directly.
     implementation("androidx.core:core:1.13.1")
+    // The pair code's QR read from a photo: zxing's pure-Java reader,
+    // no Google service and no dependencies of its own.
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
 }

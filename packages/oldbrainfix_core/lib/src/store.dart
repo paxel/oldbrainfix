@@ -96,6 +96,13 @@ class Store {
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS moments (
+        id    INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq   INTEGER NOT NULL,
+        cause TEXT NOT NULL,
+        label TEXT,
+        at    TEXT NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_entries_device_dseq
         ON entries (device, dseq);
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
@@ -139,6 +146,20 @@ class Store {
     [key, value],
   );
 
+  void removeLocalSetting(String key) =>
+      _db.execute('DELETE FROM local_settings WHERE key = ?', [key]);
+
+  /// Every setting of this Device whose key starts with [prefix], as
+  /// (key, value), by key.
+  List<(String, String)> localSettingsWithPrefix(String prefix) => [
+    for (final r in _db.select(
+      'SELECT key, value FROM local_settings WHERE substr(key, 1, ?) = ? '
+      'ORDER BY key',
+      [prefix.length, prefix],
+    ))
+      (r['key'] as String, r['value'] as String),
+  ];
+
   // -------------------------------------------------------------- photos
 
   /// Keeps the photo [bytes] without their metadata ([stripJpegMetadata])
@@ -167,6 +188,30 @@ class Store {
   /// The bytes of the voice recording [hash], or null when they are not
   /// here.
   Uint8List? audio(String hash) => _audio.get(hash);
+
+  /// The bytes of the [kind] (`photo` or `audio`) blob [hash], or null.
+  Uint8List? blob(String kind, String hash) => switch (kind) {
+    'photo' => _photos.get(hash),
+    'audio' => _audio.get(hash),
+    _ => null,
+  };
+
+  /// Keeps [bytes] another Device holds under [hash], as they are: they
+  /// were made the way this Device makes them over there. Bytes whose
+  /// SHA-256 is not [hash], or of an unknown [kind], are not kept;
+  /// returns whether they were.
+  bool putBlob(String kind, String hash, Uint8List bytes) {
+    if (sha256.convert(bytes).toString() != hash) return false;
+    switch (kind) {
+      case 'photo':
+        _photos.put(hash, bytes);
+      case 'audio':
+        _audio.put(hash, bytes);
+      default:
+        return false;
+    }
+    return true;
+  }
 
   // ----------------------------------------------------------------- log
 
@@ -200,6 +245,98 @@ class Store {
       dseq,
     ]).single;
   }
+
+  /// Takes in an entry another Device wrote, as it is; one already held
+  /// by (device, dseq) is skipped. Returns whether it was new. The caller
+  /// checks its signature first.
+  bool insert(Entry e) {
+    _db.execute(
+      'INSERT OR IGNORE INTO entries (device, dseq, entity, field, value, date, author, recorded, sig) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        e.device,
+        e.dseq,
+        e.entity,
+        e.field,
+        e.value,
+        e.date.toUtc().toIso8601String(),
+        e.author,
+        e.recorded.toUtc().toIso8601String(),
+        e.sig,
+      ],
+    );
+    final added = _db.updatedRows > 0;
+    if (added) _changed();
+    return added;
+  }
+
+  /// Whether the entry (device, dseq) is held.
+  bool holds(String device, int dseq) => _db.select(
+    'SELECT 1 FROM entries WHERE device = ? AND dseq = ?',
+    [device, dseq],
+  ).isNotEmpty;
+
+  /// Every entry a Device holding [vector] lacks, by (device, dseq).
+  List<Entry> entriesSince(Map<String, int> vector) => [
+    for (final e in _entries('SELECT * FROM entries ORDER BY device, dseq'))
+      if (e.dseq > (vector[e.device] ?? 0)) e,
+  ];
+
+  /// The (entity, field) pairs whose field starts with [prefix], by
+  /// entity and field.
+  List<(String, String)> fieldsWithPrefix(String prefix) => [
+    for (final r in _db.select(
+      'SELECT DISTINCT entity, field FROM entries WHERE substr(field, 1, ?) = ? '
+      'ORDER BY entity, field',
+      [prefix.length, prefix],
+    ))
+      (r['entity'] as String, r['field'] as String),
+  ];
+
+  /// Whether any entry ever wrote [field].
+  bool mentions(String field) => _db.select(
+    'SELECT 1 FROM entries WHERE field = ? LIMIT 1',
+    [field],
+  ).isNotEmpty;
+
+  /// The log's high-water mark: the local handle of the newest entry, 0
+  /// for an empty log. `seq` is AUTOINCREMENT, so a mark keeps meaning
+  /// the same moment.
+  int currentSeq() =>
+      _db.select('SELECT COALESCE(MAX(seq), 0) AS n FROM entries').first['n']
+          as int;
+
+  // ------------------------------------------------------------ moments
+
+  /// Records a Moment at the mark [seq], at the store's now: why
+  /// ([cause]) and with whom or what ([label]). Returns its id.
+  int addMoment({required int seq, required String cause, String? label}) {
+    _db.execute(
+      'INSERT INTO moments (seq, cause, label, at) VALUES (?, ?, ?, ?)',
+      [seq, cause, label, clock().toUtc().toIso8601String()],
+    );
+    return _db.lastInsertRowId;
+  }
+
+  /// Every Moment as stored, newest first.
+  List<({int id, int seq, String cause, String? label, DateTime at})>
+  momentRows() => [
+    for (final r in _db.select(
+      'SELECT id, seq, cause, label, at FROM moments ORDER BY seq DESC, id DESC',
+    ))
+      (
+        id: r['id'] as int,
+        seq: r['seq'] as int,
+        cause: r['cause'] as String,
+        label: r['label'] as String?,
+        at: DateTime.parse(r['at'] as String),
+      ),
+  ];
+
+  /// Every entry written after the mark [seq], in log order: what a
+  /// Moment at [seq] is the state before.
+  List<Entry> entriesAfter(int seq) =>
+      _entries('SELECT * FROM entries WHERE seq > ? ORDER BY seq', [seq]);
 
   /// Runs [body] in one transaction.
   T batch<T>(T Function() body) {

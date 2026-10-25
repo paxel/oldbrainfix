@@ -95,5 +95,18 @@
   "pasteNoPicture": "There is no picture on the clipboard.",
   "@pasteNoPicture": {"description": "Announced when Paste a picture finds none."},
   "photosHint": "A pasted picture becomes a photo Note, with what is typed.",
-  "@photosHint": {"description": "Under the desktop's Paste a picture button."}
+  "@photosHint": {"description": "Under the desktop's Paste a picture button."},
+  "syncHostIntro": "Show this to your phone: in its Settings, open Sync and scan the code, or type it in. Sync stays open while this page shows.",
+  "@syncHostIntro": {"description": "The desktop's Sync view while it hosts."},
+  "syncPin": "PIN {pin}",
+  "@syncPin": {"placeholders": {"pin": {"type": "String"}}},
+  "syncNoNetwork": "No network found. Connect this computer to the same Wi-Fi as your phone.",
+  "syncLockedOut": "Too many wrong PINs. Leave Sync and open it again for a new code.",
+  "syncTrustQuestion": "{name} wants to sync with this computer. Trust it?",
+  "@syncTrustQuestion": {"placeholders": {"name": {"type": "String"}}},
+  "syncTrust": "Trust",
+  "syncRefuse": "Refuse",
+  "syncCopyCode": "Copy the code",
+  "unnamedDevice": "Unnamed Device",
+  "@unnamedDevice": {"description": "A paired Device that did not say its name."}
 }
