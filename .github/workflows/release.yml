@@ -1,0 +1,294 @@
+# The Android release pipeline, copied from cat(a)log's and adapted. A
+# `v*` tag (or the manual dispatch button) runs it:
+#
+#   gate           — analyze fatal-infos, all Dart tests, the OCR library's
+#                    tests, tag = pubspec version
+#   build-android  — signed per-ABI + universal APKs and the Play bundle,
+#                    the Kotlin unit tests,
+#                    refused when signed with the debug key; the bundle
+#                    goes to Google Play's internal track
+#   fdroid         — the arm64 APK and the store listing into paxel/fdroid
+#   release        — GitHub Release, notes = the CHANGELOG section for the tag
+#
+# The Whisper model is not part of any of this: the app downloads it from
+# the separate `whisper-model-v1` release, which no tag here touches.
+#
+# Publishing (Play, F-Droid, the Release) happens on a tag, or on a manual
+# dispatch that says publish=true. A dispatch without it is the dry run:
+# every artifact is built and uploaded, nothing leaves GitHub.
+#
+# One-time setup (repository secrets):
+#   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD — upload keystore,
+#                 key alias `oldbrainfix`
+#   PLAY_SERVICE_ACCOUNT_JSON — Play Console service account
+#   CHANNEL_PAT — PAT with push access to paxel/fdroid
+#   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
+#                 the same one cat(a)log and Chaos Alert use
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Releasing from the Actions UI: Run workflow → type the tag. `gh release
+  # create` makes the tag at HEAD when it doesn't exist yet, so the button
+  # alone can cut a release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+      publish:
+        description: "Publish (release, Play, F-Droid); off = dry run"
+        type: boolean
+        default: false
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  # Every publishing step asks this; the artifacts are built regardless.
+  PUBLISH: ${{ github.ref_type == 'tag' || github.event.inputs.publish == 'true' }}
+
+jobs:
+  gate:
+    name: Gate (tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag and pubspec version agree
+        run: |
+          ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')
+          tag=${RELEASE_TAG#v}
+          [ "$ver" = "$tag" ] || { echo "tag v$tag != pubspec version $ver" >&2; exit 1; }
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Core — analyze and test
+        working-directory: packages/oldbrainfix_core
+        run: |
+          dart pub get
+          dart analyze --fatal-infos
+          dart test
+      - name: App — analyze and test
+        run: |
+          flutter pub get
+          flutter analyze --fatal-infos
+          flutter test
+      - name: No untranslated strings
+        run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: OCR library — unit tests
+        working-directory: android/ocr
+        run: cargo test --locked
+      - name: What's-new tool — unit tests
+        working-directory: tool
+        run: python3 -m unittest test_whats_new
+
+  build-android:
+    name: Android APKs and bundle
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # The keystore must be readable by this Java: one made with Java 25's
+      # keytool (PBMAC1) reads as "keystore password was incorrect" here.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # ocrs for Photo Texts is Rust, cross-built by the APK build.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, armv7-linux-androideabi
+      - run: cargo install cargo-ndk --locked --version 4.1.2
+      # The password never passes through the shell or key.properties:
+      # Gradle reads it from the environment as it is.
+      - name: Write signing config from secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          printf 'storeFile=%s\nkeyAlias=oldbrainfix\n' "$RUNNER_TEMP/upload.jks" > android/key.properties
+      - run: flutter pub get
+      # Whisper and ocrs are built for the two phone ABIs only, so no
+      # x86_64 APK: it would ship without transcription and text reading.
+      # $GITHUB_RUN_NUMBER of this workflow is the version code.
+      - name: Build release APKs and the Play app bundle
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64 --build-number=$GITHUB_RUN_NUMBER
+          flutter build apk --release --target-platform android-arm,android-arm64 --build-number=$GITHUB_RUN_NUMBER
+          flutter build appbundle --release --target-platform android-arm,android-arm64 --build-number=$GITHUB_RUN_NUMBER
+      # After the builds, as in CI: they set up what the Gradle project
+      # needs. Still before anything is published.
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest
+      # Gradle already refuses a release build without key.properties;
+      # this checks what actually came out. An APK signed with the debug
+      # key would lock F-Droid clients to it for good.
+      - name: Refuse anything signed with the debug key
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          for apk in build/app/outputs/flutter-apk/app-*release.apk; do
+            "$apksigner" verify --print-certs "$apk" > certs.txt
+            if grep -q "CN=Android Debug" certs.txt; then
+              echo "$apk is signed with the debug key" >&2
+              exit 1
+            fi
+          done
+          aab=build/app/outputs/bundle/release/app-release.aab
+          keytool -printcert -jarfile "$aab" > certs.txt
+          grep -q "Owner:" certs.txt || { echo "$aab is not signed" >&2; exit 1; }
+          if grep -q "CN=Android Debug" certs.txt; then
+            echo "$aab is signed with the debug key" >&2
+            exit 1
+          fi
+      - name: Rename artifacts
+        run: |
+          v="${RELEASE_TAG#v}"
+          d=build/app/outputs/flutter-apk
+          mkdir -p dist
+          mv "$d/app-arm64-v8a-release.apk"   "dist/oldbrainfix-$v-android-arm64-v8a.apk"
+          mv "$d/app-armeabi-v7a-release.apk" "dist/oldbrainfix-$v-android-armeabi-v7a.apk"
+          mv "$d/app-release.apk"             "dist/oldbrainfix-$v-android-universal.apk"
+          mv build/app/outputs/bundle/release/app-release.aab "dist/oldbrainfix-$v-android-playstore.aab"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: android
+          path: dist/*
+      # `status: completed` is the whole point: `draft` parks the release
+      # in the Console and waits for a human to press Start rollout.
+      - name: Publish to Google Play
+        if: env.PUBLISH == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: io.github.paxel.oldbrainfix
+          # Glob, not the tag: the file is named without the leading "v"
+          # and a `with:` value cannot strip it.
+          releaseFiles: dist/*-android-playstore.aab
+          # Internal testing only. Promoting to closed testing is a
+          # decision, taken in the Console after the build was tried.
+          track: internal
+          status: completed
+
+  fdroid:
+    name: F-Droid repo
+    needs: build-android
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # The listing (texts, F-Droid fields) and the changelog.
+      - uses: actions/checkout@v5
+        with:
+          path: app
+      # Channel-repo pattern: the index and APK live in paxel/fdroid (own
+      # Pages), not in this repo's history.
+      - uses: actions/download-artifact@v7
+        with:
+          name: android
+          path: apks
+      - name: Install fdroidserver
+        run: pip install --quiet fdroidserver
+      - name: Publish to the shared channel repo
+        env:
+          GH_TOKEN: ${{ secrets.CHANNEL_PAT }}
+          KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+        run: |
+          v="${RELEASE_TAG#v}"
+          git config --global user.name "oldbrainfix-release-bot"
+          git config --global user.email "taum@tuta.io"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/paxel/fdroid.git" channel
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/fdroid.p12"
+          cd channel
+          mkdir -p repo
+          # F-Droid gets the 64-bit APK only: Flutter numbers split APKs
+          # ABI x 1000 + build, which F-Droid's archiving would sort wrongly.
+          # The main repository keeps the newest version and F-Droid moves
+          # the one before into the archive, which keeps three: make room.
+          mkdir -p archive
+          ls archive/oldbrainfix-*-android-arm64-v8a.apk 2>/dev/null | sort -V | head -n -2 | xargs -r rm -f
+          cp "$GITHUB_WORKSPACE/apks/oldbrainfix-$v-android-arm64-v8a.apk" repo/
+          # The store listing travels with the app: only this app's files
+          # are replaced, the other apps' stay untouched. No store graphics
+          # or screenshots yet: F-Droid takes the icon from the APK.
+          id=io.github.paxel.oldbrainfix
+          app="$GITHUB_WORKSPACE/app"
+          mkdir -p metadata
+          cp "$app/fdroid/metadata.yml" "metadata/$id.yml"
+          rm -rf "metadata/$id" "repo/$id"
+          mkdir -p "metadata/$id"
+          cp -r "$app/fastlane/metadata/android/." "metadata/$id/"
+          en="metadata/$id/en-US"
+          mkdir -p "$en/changelogs"
+          # What's new: this version's CHANGELOG entries, cut to F-Droid's limit.
+          python3 "$app/tool/whats_new.py" "$v" "$app/CHANGELOG.md" > "$en/changelogs/default.txt"
+          # Must stay word for word the same as cat(a)log's and Chaos
+          # Alert's release workflows, or each release renames the repository.
+          cat > config.yml <<EOF
+          repo_url: https://paxel.github.io/fdroid/repo
+          repo_name: paxel's apps
+          repo_description: Releases of paxel's Android apps.
+          repo_keyalias: repokey
+          keystore: $RUNNER_TEMP/fdroid.p12
+          keystorepass: $KEYSTORE_PASS
+          keypass: $KEYSTORE_PASS
+          archive_older: 1
+          archive_name: paxel's apps (archive)
+          archive_description: Older versions of paxel's Android apps.
+          EOF
+          # fdroidserver links each icon and feature graphic to a copy named
+          # after its hash. Git keeps no hard links, so on the next run the
+          # copies look stale and get deleted while the index still points
+          # at them. Removing every app's copies first makes fdroidserver
+          # create them all again.
+          find repo -path 'repo/*/*' -regextype posix-extended \
+            -regex '.*/(icon|featureGraphic|promoGraphic|tvBanner)_[A-Za-z0-9_=-]+\.(png|jpe?g)' -delete
+          fdroid update --create-metadata
+          rm config.yml
+          git add -A
+          git commit -m "oldbrainfix $v"
+          git push
+
+  release:
+    name: GitHub Release
+    needs: build-android
+    if: github.ref_type == 'tag' || github.event.inputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release notes from the CHANGELOG section
+        run: |
+          ver=${RELEASE_TAG#v}
+          awk -v ver="$ver" '
+            $0 ~ "^## \\[" ver "\\]" { grab = 1; next }
+            grab && (/^## \[/ || /^---/) { exit }
+            grab { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Release $ver." > notes.md
+      - name: Create release (idempotent — a rerun updates instead of dying)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "Old Brain Fix $RELEASE_TAG" --notes-file notes.md
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "Old Brain Fix $RELEASE_TAG" \
+              --notes-file notes.md \
+              dist/*
+          fi

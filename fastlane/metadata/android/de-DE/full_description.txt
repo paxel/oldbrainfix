@@ -1,0 +1,29 @@
+<b>Old Brain Fix ist eine Gedächtnisstütze für alle, die Dinge vergessen.</b> Einen Gedanken festzuhalten kostet einen Tipp. Danach hakt die App nach, bis jede Notiz in einen Bereich und ein Thema einsortiert ist – oder zu einer Routine oder Erinnerung geworden ist, die klingelt, bis sie erledigt ist.
+
+Gebaut für Köpfe, denen Dinge entgleiten: die Idee unter der Dusche, die Tabletten um acht, das Formular, das am Freitag fällig ist, das, was du jemandem sagen wolltest. Nichts muss in dem Moment einsortiert werden, in dem es dir einfällt, und nichts geht verloren, weil du es nicht getan hast.
+
+<b>FESTHALTEN</b>
+• <b>Ein Tipp.</b> Text, ein Foto oder eine Sprachnotiz – über den +-Knopf, ein Widget, eine Schnelleinstellung, eine App-Verknüpfung oder eine Hardwaretaste. Was du aus anderen Apps teilst, wird ebenfalls zur Notiz.
+• <b>Zusammenhang, der später noch Sinn ergibt.</b> Jede Notiz merkt sich, wann und wo sie entstand („Zuhause“ oder „Arbeit“ statt Koordinaten), den laufenden Kalendertermin und das verbundene Bluetooth-Gerät – damit „mehr Soße kaufen“ auch Tage später noch etwas bedeutet.
+• <b>Sprache und Fotos werden durchsuchbar.</b> Sprachnotizen schreibt Whisper auf dem Handy mit, auf Deutsch oder Englisch, und Text in Fotos und Screenshots liest ocrs auf dem Handy. Dafür wird nichts irgendwohin gesendet.
+
+<b>EINSORTIERT ODER ERLEDIGT</b>
+• <b>Unsortiert, bis du dich darum kümmerst.</b> Eine neue Notiz wartet in Unsortiert, und die App erinnert dich daran, bis keine mehr übrig ist. Ruhezeiten halten das nachts zurück.
+• <b>Eigene Bereiche und Themen,</b> zwei Ebenen tief, mit Farbe und Symbol, und eine Startauswahl zum Aussuchen.
+• <b>Routinen und Erinnerungen aus jeder Notiz:</b> von einmalig bis zu jeder Wiederholungsregel, mehrmals am Tag, mit minutengenauen Alarmen, auch auf dem Sperrbildschirm und nach einem Neustart.
+• <b>Erneut erinnern:</b> ein unbeachteter Alarm klingelt wieder, bis er erledigt, verschoben oder verpasst ist; auf Wunsch wird daraus ein Vollbild-Alarm mit Ton.
+• <b>Die Agenda</b> als Startseite: die Routinen und Erinnerungen von heute, was verpasst wurde und wie viele Notizen noch unsortiert sind – auch als Widget zum Abhaken.
+• Ein Verlauf pro Routine mit Serie und Einhaltung, und deine Routinen in deiner Kalender-App, wenn du sie dort haben willst.
+
+<b>DEINS, UND PRIVAT</b>
+• <b>Kein Konto, kein Server, kein Tracking, keine Werbung.</b> Alles bleibt auf deinen Geräten.
+• <b>Handy und Desktop gleichen sich direkt ab,</b> Ende-zu-Ende-verschlüsselt, im Heimnetz, über einen Ordner, den du ohnehin teilst (Syncthing, Nextcloud, USB-Stick), oder als Datei über jeden Messenger.
+• <b>Teile einen einzelnen Bereich</b> mit einer anderen Person; alle anderen Bereiche bleiben privat. Schicke jemandem eine Notiz mit ihren Erinnerungen, und er entscheidet, ob er sie annimmt.
+• Eine optionale App-Sperre und Bereichssperren, die einzelne Bereiche verbergen, während Festhalten und Alarme weiter funktionieren.
+• Verschlüsselte Sicherungen mit einem druckbaren Wiederherstellungsblatt.
+
+<b>AUSSERDEM</b>
+• Ein Papierkorb, der Gelöschtes 30 Tage aufbewahrt.
+• Deutsch und Englisch. Helles und dunkles Design.
+• Eine Desktop-App im selben Look.
+• Kostenlos und quelloffen (Apache-2.0 / MIT).
