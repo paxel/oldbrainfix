@@ -466,7 +466,7 @@ impl<'a> Routines<'a> {
     }
 
     /// Writes the fields of `schedule` that differ from what is there.
-    fn write_schedule(&self, id: &str, schedule: &Schedule) -> Result<()> {
+    pub(crate) fn write_schedule(&self, id: &str, schedule: &Schedule) -> Result<()> {
         let current = self.store.current_fields(id)?;
         let write = |field: &str, value: Option<&str>| -> Result<()> {
             let held = current.iter().find(|(k, _)| *k == field);

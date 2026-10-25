@@ -1830,7 +1830,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemAlready =>
-      'Das hast du schon angenommen; es ist bei deinen Notizen.';
+      'Schon aktuell: Diese oder eine neuere Fassung hast du schon angenommen.';
 
   @override
   String get sentItemUnreadable =>
@@ -1839,4 +1839,100 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get sentItemNotForUs =>
       'Diese Datei ist für jemand anderen verschlüsselt.';
+
+  @override
+  String get sendUpdate => 'Eine Aktualisierung senden';
+
+  @override
+  String get sendCancel => 'Stattdessen eine Absage senden';
+
+  @override
+  String get sendCancelHint =>
+      'Dann kann die andere Person sie mit ausgeschalteten Alarmen in den Papierkorb legen.';
+
+  @override
+  String get sentItemUpdate =>
+      'Eine Aktualisierung einer Notiz, die du schon angenommen hast.';
+
+  @override
+  String get sentItemChanges => 'Was sich ändert';
+
+  @override
+  String sentItemTextWas(String text) {
+    return 'Text bisher: $text';
+  }
+
+  @override
+  String sentItemTextNow(String text) {
+    return 'Neuer Text: $text';
+  }
+
+  @override
+  String get sentItemTextYours =>
+      'Du hast diesen Text selbst geändert; die Aktualisierung ersetzt deine Fassung.';
+
+  @override
+  String sentItemSectionAdded(String text) {
+    return 'Hinzugefügt: $text';
+  }
+
+  @override
+  String sentItemRescheduled(String before, String after) {
+    return '$before → $after';
+  }
+
+  @override
+  String sentItemRoutineAdded(String schedule) {
+    return 'Neu: $schedule';
+  }
+
+  @override
+  String sentItemRoutineRemoved(String schedule) {
+    return 'Entfernt: $schedule';
+  }
+
+  @override
+  String get sentItemNoChanges => 'Nichts hat sich geändert.';
+
+  @override
+  String get sentItemRestores =>
+      'Sie liegt in deinem Papierkorb; die Aktualisierung holt sie zurück.';
+
+  @override
+  String get sentItemKeeps =>
+      'Deine eigenen Abschnitte, Routinen und Erinnerungen, Erledigt-Haken, die Wichtigkeit und wo du sie abgelegt hast, bleiben, wie sie sind.';
+
+  @override
+  String get sentItemApply => 'Aktualisieren';
+
+  @override
+  String get sentItemApplied =>
+      'Aktualisiert. Deine eigenen Ergänzungen sind geblieben.';
+
+  @override
+  String sentItemCancelled(String text) {
+    return 'Abgesagt: $text';
+  }
+
+  @override
+  String get sentItemCancelDetail =>
+      'Annehmen legt sie mit ihren Routinen und Erinnerungen in den Papierkorb, die Alarme aus. Von dort kannst du sie zurückholen.';
+
+  @override
+  String get sentItemAcceptCancel => 'In den Papierkorb';
+
+  @override
+  String get sentItemTrashed =>
+      'In den Papierkorb gelegt, die Alarme aus. Von dort kannst du sie zurückholen.';
+
+  @override
+  String get sentItemNothingToCancel =>
+      'Nichts abzusagen: Diese Notiz ist nicht unter deinen Notizen oder schon im Papierkorb.';
+
+  @override
+  String get sentItemNotFromSender =>
+      'Abgewiesen: Diese Datei würde eine Notiz ändern, die dir jemand gesendet hat, ist aber nicht von dieser Person signiert.';
+
+  @override
+  String get sentItemClose => 'Schließen';
 }

@@ -1798,8 +1798,13 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     use oldbrainfix_core::sent::{self, OpenError};
     let dir = fixtures().join("sent");
     let expected = read_json(&dir.join("expected.json"))?;
-    let send_at = parse_time("2026-01-03T12:00:00.000Z")?;
-    let mut ada = Store::in_memory(Box::new(move || send_at), || Ok(writer_key()))?;
+    let clock = held_clock("2026-01-03T12:00:00.000Z")?;
+    let at = |time: &str| -> TestResult {
+        *clock.lock() = parse_time(time)?;
+        Ok(())
+    };
+    let held = clock.clone();
+    let mut ada = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
     ada.set_local_setting("author", "Ada")?;
     for line in lines_of(&dir.join("sender.jsonl"))? {
         ada.insert(&serde_json::from_str(&line)?)?;
@@ -1810,10 +1815,11 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         .into_iter()
         .next()
         .ok_or("note")?;
+    let sent_note = note.clone();
 
     // Sending writes the same entry and the same files, byte for byte.
     let mark = ada.current_seq()?;
-    let item = ada.sent_item_of(&note)?;
+    let item = ada.sent_item_of(&note, false)?;
     assert_eq!(lines_after(&ada, mark)?, lines_of(&dir.join("sent.jsonl"))?);
     let signed = std::fs::read(dir.join("signed.oldbrain"))?;
     let sealed = std::fs::read(dir.join("sealed.oldbrain"))?;
@@ -1829,8 +1835,9 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     assert!(sent::encode(&item, &key, &[to], &mut counted_after(4000))? == sealed);
 
     // Ben reads both the same, and accepting writes the same entries.
-    let accept_at = parse_time("2026-01-04T18:00:00.000Z")?;
-    let mut ben = Store::in_memory(Box::new(move || accept_at), || Ok(joiner_key()))?;
+    at("2026-01-04T18:00:00.000Z")?;
+    let held = clock.clone();
+    let mut ben = Store::in_memory(Box::new(move || *held.lock()), || Ok(joiner_key()))?;
     ben.set_local_setting("author", "Ben")?;
     let plain = ben.open_sent_item(&signed)?.map_err(|_| "signed")?;
     let opened = ben.open_sent_item(&sealed)?.map_err(|_| "sealed")?;
@@ -1871,7 +1878,8 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
 
     counted_ids(&mut ben, 0x400);
     let mark = ben.current_seq()?;
-    let accepted = ben.accept_sent_item(&opened.item)?;
+    assert_eq!(plain.state.name(), expected["state"]);
+    let accepted = ben.accept_sent_item(&opened.item)?.ok_or("accepted")?;
     assert_eq!(accepted, expected["accepted"].as_str().ok_or("accepted")?);
     assert_eq!(
         lines_after(&ben, mark)?,
@@ -1888,15 +1896,138 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         again.accepted.as_deref(),
         expected["acceptedAgain"].as_str()
     );
+    assert_eq!(again.state.name(), expected["stateAgain"]);
 
-    // Somebody else holds no key to it.
-    let eve = Store::in_memory(Box::new(move || accept_at), || {
+    // Ben makes it his own; Ada changes it and sends the update, the
+    // same entry and file byte for byte.
+    insert_lines(&ben, &dir.join("receiver.jsonl"))?;
+    insert_lines(&ada, &dir.join("changed.jsonl"))?;
+    at("2026-01-06T11:00:00.000Z")?;
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&sent_note, false)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("update.jsonl"))?
+    );
+    let update = std::fs::read(dir.join("update.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == update);
+
+    // Ben sees what changes and applies it as the Dart core does.
+    let want = &expected["update"];
+    counted_ids(&mut ben, 0x700);
+    at("2026-01-07T08:00:00.000Z")?;
+    let opened = ben.open_sent_item(&update)?.map_err(|_| "update")?;
+    assert_eq!(
+        opened.item.version,
+        want["version"].as_i64().ok_or("version")?
+    );
+    assert_eq!(opened.state.name(), want["state"]);
+    let changes = opened.changes.as_ref().ok_or("changes")?;
+    assert_eq!(changes_json(changes), want["changes"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("updated.jsonl"))?
+    );
+    assert_held(&ben, &accepted, want)?;
+    let stale = ben.open_sent_item(&signed)?.map_err(|_| "stale")?;
+    assert_eq!(stale.state.name(), want["stale"]);
+
+    // Ada cancels it; Ben accepts that.
+    let want = &expected["cancel"];
+    at("2026-01-08T07:00:00.000Z")?;
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&sent_note, true)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("cancel.jsonl"))?
+    );
+    let cancel = std::fs::read(dir.join("cancel.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == cancel);
+    counted_ids(&mut ben, 0x800);
+    at("2026-01-08T12:00:00.000Z")?;
+    let opened = ben.open_sent_item(&cancel)?.map_err(|_| "cancel")?;
+    assert!(opened.item.cancel);
+    assert_eq!(
+        opened.item.version,
+        want["version"].as_i64().ok_or("version")?
+    );
+    assert_eq!(opened.state.name(), want["state"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("cancelled.jsonl"))?
+    );
+    assert_held(&ben, &accepted, want)?;
+
+    // Somebody else holds no key to it, nor anything to cancel; and
+    // a cancellation signed by another key is refused.
+    let held = clock.clone();
+    let eve = Store::in_memory(Box::new(move || *held.lock()), || {
         Ok(SigningKey::from_seed([9; 32]))
     })?;
     assert_eq!(
         eve.open_sent_item(&sealed)?.err(),
         Some(OpenError::NotForUs)
     );
+    let elsewhere = eve.open_sent_item(&cancel)?.map_err(|_| "elsewhere")?;
+    assert_eq!(elsewhere.state.name(), want["elsewhere"]);
+    let forged = std::fs::read(dir.join("forged.oldbrain"))?;
+    assert_eq!(
+        ben.open_sent_item(&forged)?.err(),
+        Some(OpenError::NotFromSender)
+    );
+    Ok(())
+}
+
+/// What an update changes, as the Dart core writes it.
+fn changes_json(c: &oldbrainfix_core::sent::SentItemChanges) -> Value {
+    let schedule = |s: &Schedule| {
+        json!({
+            "start": s.start.to_string(),
+            "times": s.times.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            "rule": s.rule.as_ref().map(Recurrence::format),
+        })
+    };
+    json!({
+        "textBefore": c.text_before,
+        "textEdited": c.text_edited,
+        "sectionsAdded": c.sections_added.iter().map(|s| s.text.clone()).collect::<Vec<_>>(),
+        "rescheduled": c.rescheduled.iter().map(|r| json!({
+            "routine": r.routine,
+            "before": schedule(&r.before),
+            "after": schedule(&r.after),
+        })).collect::<Vec<_>>(),
+        "routinesAdded": c.routines_added.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        "routinesRemoved": c.routines_removed.iter().map(|r| r.id.clone()).collect::<Vec<_>>(),
+        "restores": c.restores,
+    })
+}
+
+/// That `store` holds the accepted Note `id` as `want` says: the Note,
+/// its Sections and every Routine and Reminder of it, trashed too.
+fn assert_held(store: &Store, id: &str, want: &Value) -> TestResult {
+    let note = Notes::new(store).by_id(id)?.ok_or("the Note")?;
+    assert_eq!(note_json(&note), want["note"]);
+    let sections: Vec<Value> = Notes::new(store)
+        .sections(id)?
+        .iter()
+        .map(section_json)
+        .collect();
+    assert_eq!(json!(sections), want["sections"]);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut routines = Vec::new();
+    for r in ids {
+        if let Some(routine) = Routines::new(store).by_id(&r)?
+            && routine.note_id == id
+        {
+            routines.push(routine_json(&routine));
+        }
+    }
+    assert_eq!(json!(routines), want["routines"]);
     Ok(())
 }
 

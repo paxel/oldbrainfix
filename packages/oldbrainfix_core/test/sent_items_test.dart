@@ -269,7 +269,7 @@ void main() {
       final opened = openSentItem(ben, file);
       expect(ben.allEntries(), hasLength(before), reason: 'preview only');
 
-      final id = acceptSentItem(ben, opened.item);
+      final id = acceptSentItem(ben, opened.item)!;
       final got = Notes(ben).byId(id)!;
       expect(got.text, 'Dentist');
       expect(got.isUnsorted, isTrue);
@@ -289,13 +289,20 @@ void main() {
       expect(Routines(ben).all(), hasLength(1), reason: 'alarms come from it');
 
       final count = ben.allEntries().length;
-      final reopened = openSentItem(ben, sendNote(ann, note.id));
+      final reopened = openSentItem(ben, file);
       expect(reopened.accepted, id);
+      expect(reopened.state, SentItemState.upToDate);
       expect(acceptSentItem(ben, reopened.item), id);
       expect(ben.allEntries(), hasLength(count));
+      // Sent again unchanged: only the version moves on.
+      final resent = openSentItem(ben, sendNote(ann, note.id));
+      expect(resent.state, SentItemState.update);
+      expect(resent.changes!.isEmpty, isTrue);
+      expect(acceptSentItem(ben, resent.item), id);
+      expect(ben.allEntries(), hasLength(count + 1));
     });
 
-    test('the same id from another key is another Sent Item', () {
+    test('the same id from another key is refused', () {
       final clock = ticking();
       final ann = device(clock, 'Ann');
       final eve = device(clock, 'Eve');
@@ -304,17 +311,252 @@ void main() {
         ben,
         sendNote(ann, Notes(ann).capture('Real').id),
       ).item;
-      final first = acceptSentItem(ben, item);
-      final copy = SentItem(
-        id: item.id,
-        version: 2,
-        from: eve.ownKeyRecord,
-        name: 'Ann',
-        text: 'Fake',
+      acceptSentItem(ben, item);
+      final count = ben.allEntries().length;
+      for (final cancel in [false, true]) {
+        final copy = SentItem(
+          id: item.id,
+          version: 2,
+          cancel: cancel,
+          from: eve.ownKeyRecord,
+          name: 'Ann',
+          text: 'Fake',
+        );
+        expect(
+          () => openSentItem(ben, encodeSentItem(copy, eve.signingKey)),
+          throwsA(isA<SentItemNotFromSender>()),
+        );
+        expect(
+          () => acceptSentItem(ben, copy),
+          throwsA(isA<SentItemNotFromSender>()),
+        );
+      }
+      expect(ben.allEntries(), hasLength(count));
+    });
+  });
+
+  group('updates and cancellations', () {
+    /// Ann's Note with a Reminder on Tuesday at 10:00 and a daily
+    /// Routine, sent to Ben, who accepted it.
+    ({Store ann, Store ben, String sent, String got}) accepted() {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final note = Notes(ann).capture('Dentist');
+      Routines(ann).spawn(
+        note.id,
+        Schedule(start: Day(2026, 3, 3), times: [ClockTime(10, 0)]),
       );
-      final opened = openSentItem(ben, encodeSentItem(copy, eve.signingKey));
+      Routines(ann).spawn(
+        note.id,
+        Schedule(
+          start: Day(2026, 3, 1),
+          times: [ClockTime(8, 0)],
+          rule: Recurrence.parse('FREQ=DAILY'),
+        ),
+      );
+      final got = acceptSentItem(
+        ben,
+        openSentItem(ben, sendNote(ann, note.id)).item,
+      )!;
+      return (ann: ann, ben: ben, sent: note.id, got: got);
+    }
+
+    test('an update shows what changes and keeps what the receiver added', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      expect(wasSent(ann, sent), isTrue);
+      expect(wasSent(ann, Notes(ann).capture('Other').id), isFalse);
+      // Ben's own additions.
+      Notes(ben).amend(got, 'Ask about the bill');
+      final area = Places(ben).addArea('Health');
+      Notes(ben).file(got, area.id);
+      Notes(ben).setImportance(got, Importance.important);
+      final daily = Routines(ben).ofNote(got).firstWhere((r) => !r.isReminder);
+      final tuesday = Routines(ben).ofNote(got).firstWhere((r) => r.isReminder);
+      Routines(ben)
+          .markDone(tuesday.id, Occurrence(Day(2026, 3, 3), ClockTime(10, 0)));
+      Routines(ben)
+          .markDone(daily.id, Occurrence(Day(2026, 3, 1), ClockTime(8, 0)));
+      final own = Routines(
+        ben,
+      ).spawn(got, Schedule(start: Day(2026, 3, 2), times: [ClockTime(18, 0)]));
+      // Ann's changes: text, a Section, the Reminder moved to Wednesday
+      // 14:00, the daily Routine taken away, a weekly one added.
+      Notes(ann).edit(sent, 'Dentist, room 3');
+      Notes(ann).amend(sent, 'Bring the card');
+      final annRoutines = Routines(ann).ofNote(sent);
+      final reminder = annRoutines.firstWhere((r) => r.isReminder);
+      Routines(ann).reschedule(
+        reminder.id,
+        Schedule(start: Day(2026, 3, 4), times: [ClockTime(14, 0)]),
+      );
+      Routines(ann).trash(annRoutines.firstWhere((r) => !r.isReminder).id);
+      Routines(ann).spawn(
+        sent,
+        Schedule(
+          start: Day(2026, 3, 6),
+          times: [ClockTime(9, 0)],
+          rule: Recurrence.parse('FREQ=WEEKLY'),
+        ),
+      );
+
+      final file = sendNote(ann, sent);
+      final count = ben.allEntries().length;
+      final opened = openSentItem(ben, file);
+      expect(ben.allEntries(), hasLength(count), reason: 'preview only');
+      expect(opened.state, SentItemState.update);
+      expect(opened.accepted, got);
+      final changes = opened.changes!;
+      expect(changes.textBefore, 'Dentist');
+      expect(changes.textEdited, isFalse);
+      expect(
+        [for (final s in changes.sectionsAdded) s.text],
+        ['Bring the card'],
+      );
+      expect(changes.rescheduled, hasLength(1));
+      expect(changes.rescheduled.single.before.start, Day(2026, 3, 3));
+      expect(changes.rescheduled.single.after.start, Day(2026, 3, 4));
+      expect(changes.rescheduled.single.after.times, [ClockTime(14, 0)]);
+      expect(
+        [for (final r in changes.routinesAdded) r.schedule.rule?.format()],
+        ['FREQ=WEEKLY'],
+      );
+      expect([for (final r in changes.routinesRemoved) r.id], [daily.id]);
+      expect(changes.restores, isFalse);
+      expect(changes.isEmpty, isFalse);
+
+      expect(acceptSentItem(ben, opened.item), got);
+      final note = Notes(ben).byId(got)!;
+      expect(note.text, 'Dentist, room 3');
+      expect(note.place, area.id, reason: 'filing kept');
+      expect(note.importance, Importance.important);
+      expect(
+        [for (final s in Notes(ben).sections(got)) s.text],
+        ['Ask about the bill', 'Bring the card'],
+      );
+      final now = Routines(ben).ofNote(got);
+      expect(now, hasLength(3));
+      expect(now.map((r) => r.id), contains(own.id), reason: 'his own stays');
+      final moved = now.firstWhere((r) => r.isReminder && r.id != own.id);
+      expect(moved.schedule.start, Day(2026, 3, 4));
+      expect(moved.schedule.times, [ClockTime(14, 0)]);
+      expect(moved.id, tuesday.id);
+      expect(moved.done, isNotEmpty, reason: 'Done marks kept');
+      final gone = Routines(ben).byId(daily.id)!;
+      expect(gone.isTrashed, isTrue, reason: 'restorable');
+      expect(gone.done, isNotEmpty, reason: 'Done marks kept');
+      final link = jsonDecode(ben.current(got, SentKeys.received)!);
+      expect(link['version'], 2);
+
+      // The same file again, or an older one, changes nothing.
+      final after = ben.allEntries().length;
+      final again = openSentItem(ben, file);
+      expect(again.state, SentItemState.upToDate);
+      expect(acceptSentItem(ben, again.item), got);
+      expect(ben.allEntries(), hasLength(after));
+    });
+
+    test('a text the receiver changed stays unless the sender changes it', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      Notes(ben).edit(got, 'Dentist (my words)');
+      final same = openSentItem(ben, sendNote(ann, sent));
+      expect(same.state, SentItemState.update);
+      expect(same.changes!.textBefore, isNull);
+      expect(same.changes!.isEmpty, isTrue);
+      acceptSentItem(ben, same.item);
+      expect(Notes(ben).byId(got)!.text, 'Dentist (my words)');
+
+      Notes(ann).edit(sent, 'Dentist moved');
+      final changed = openSentItem(ben, sendNote(ann, sent));
+      expect(changed.changes!.textBefore, 'Dentist (my words)');
+      expect(changed.changes!.textEdited, isTrue);
+      acceptSentItem(ben, changed.item);
+      expect(Notes(ben).byId(got)!.text, 'Dentist moved');
+      // Taken from the sender: no edit of his any more.
+      Notes(ann).edit(sent, 'Dentist moved again');
+      final next = openSentItem(ben, sendNote(ann, sent));
+      expect(next.changes!.textEdited, isFalse);
+    });
+
+    test('an older version is ignored', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      final second = sendNote(ann, sent);
+      final third = sendNote(ann, sent);
+      acceptSentItem(ben, openSentItem(ben, third).item);
+      final count = ben.allEntries().length;
+      final old = openSentItem(ben, second);
+      expect(old.state, SentItemState.upToDate);
+      expect(old.accepted, got);
+      expect(acceptSentItem(ben, old.item), got);
+      expect(ben.allEntries(), hasLength(count));
+    });
+
+    test('a cancellation trashes the Note with its alarms, restorable', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      final own = Routines(
+        ben,
+      ).spawn(got, Schedule(start: Day(2026, 3, 2), times: [ClockTime(18, 0)]));
+      final file = sendNote(ann, sent, cancel: true);
+      final opened = openSentItem(ben, file);
+      expect(opened.item.cancel, isTrue);
+      expect(opened.item.text, 'Dentist');
+      expect(opened.state, SentItemState.cancel);
+      expect(opened.changes, isNull);
+      expect(acceptSentItem(ben, opened.item), got);
+      expect(Notes(ben).byId(got)!.isTrashed, isTrue);
+      expect(Routines(ben).all(), isEmpty, reason: 'alarms off');
+
+      final again = openSentItem(ben, file);
+      expect(again.state, SentItemState.upToDate);
+
+      Routines(ben).restoreNote(got);
+      expect(Notes(ben).byId(got)!.isTrashed, isFalse);
+      expect(Routines(ben).ofNote(got), hasLength(3));
+      expect(Routines(ben).byId(own.id)!.isTrashed, isFalse);
+    });
+
+    test('a cancellation reaches a Note merged into another', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      final mine = Notes(ben).capture('My dentist notes');
+      Notes(ben).merge(got, mine.id);
+      final opened = openSentItem(ben, sendNote(ann, sent, cancel: true));
+      expect(opened.state, SentItemState.cancel);
+      acceptSentItem(ben, opened.item);
+      for (final r in ben.entitiesOfType(RoutineKeys.typeRoutine)) {
+        expect(Routines(ben).byId(r)!.isTrashed, isTrue);
+      }
+      expect(Routines(ben).all(), isEmpty, reason: 'alarms off');
+    });
+
+    test('an update to a Note in the trash brings it back', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      Routines(ben).trashNote(got, withRoutines: true);
+      final cancel = openSentItem(ben, sendNote(ann, sent, cancel: true));
+      expect(cancel.state, SentItemState.nothingToCancel);
+      expect(acceptSentItem(ben, cancel.item), isNull);
+      Notes(ann).edit(sent, 'Dentist after all');
+      final update = openSentItem(ben, sendNote(ann, sent));
+      expect(update.state, SentItemState.update);
+      expect(update.changes!.restores, isTrue);
+      expect(update.changes!.textBefore, 'Dentist');
+      acceptSentItem(ben, update.item);
+      expect(Notes(ben).byId(got)!.isTrashed, isFalse);
+      expect(Notes(ben).byId(got)!.text, 'Dentist after all');
+      expect(Routines(ben).ofNote(got), hasLength(2));
+    });
+
+    test('a cancellation of something never accepted cancels nothing', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final note = Notes(ann).capture('Party');
+      sendNote(ann, note.id);
+      final count = ben.allEntries().length;
+      final opened = openSentItem(ben, sendNote(ann, note.id, cancel: true));
+      expect(opened.state, SentItemState.nothingToCancel);
       expect(opened.accepted, isNull);
-      expect(acceptSentItem(ben, opened.item), isNot(first));
+      expect(acceptSentItem(ben, opened.item), isNull);
+      expect(ben.allEntries(), hasLength(count));
     });
   });
 }

@@ -43,7 +43,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, Sense, TextEdit,
     Ui, WidgetInfo, WidgetType,
 };
-use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust};
+use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, SentItemState};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
     Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, Person, Places,
@@ -226,11 +226,14 @@ enum Dialog {
         role: AreaRole,
     },
     /// Sending the Note `note`: to one of `recipients`, encrypted, or to
-    /// anyone (`None`), signed only.
+    /// anyone (`None`), signed only. One sent before (`update`) goes as
+    /// an update, or as its cancellation with `cancel`.
     Send {
         note: String,
         recipients: Vec<Recipient>,
         picked: Option<usize>,
+        update: bool,
+        cancel: bool,
     },
     /// The preview of a Sent Item opened here.
     SentItem(Box<Opened>),
@@ -652,6 +655,9 @@ impl App {
             Ok(Err(OpenError::NotASentItem)) => {
                 self.notice = Some(self.t.sent_item_unreadable().to_string());
             }
+            Ok(Err(OpenError::NotFromSender)) => {
+                self.notice = Some(self.t.sent_item_not_from_sender().to_string());
+            }
             Err(e) => self.notice = Some(format!("{} ({e})", self.t.sent_item_unreadable())),
         }
     }
@@ -663,6 +669,8 @@ impl App {
             note,
             recipients,
             picked,
+            cancel,
+            ..
         }) = self.dialog.take()
         else {
             return Ok(());
@@ -677,7 +685,7 @@ impl App {
             path.set_extension(sent::EXTENSION);
         }
         let to = picked.and_then(|i| recipients.get(i));
-        let bytes = self.store.send_note(&note, to)?;
+        let bytes = self.store.send_note(&note, to, cancel)?;
         self.notice = Some(match std::fs::write(&path, bytes) {
             Ok(()) => self.t.sent_saved().to_string(),
             Err(e) => format!("{} ({e})", self.t.send_failed()),
@@ -1390,10 +1398,13 @@ impl App {
                 self.save_text()?;
                 let recipients = self.store.sent_item_recipients()?;
                 let picked = (!recipients.is_empty()).then_some(0);
+                let update = self.store.was_sent(&selected)?;
                 self.dialog = Some(Dialog::Send {
                     note: selected,
                     recipients,
                     picked,
+                    update,
+                    cancel: false,
                 });
             }
             Action::SendNote => self.send_note()?,
@@ -1401,12 +1412,17 @@ impl App {
                 if let Some(Dialog::SentItem(opened)) = self.dialog.take() {
                     // The alerts plan its alarms once the action is done.
                     self.store.accept_sent_item(&opened.item)?;
-                    self.notice = Some(self.t.sent_item_accepted().to_string());
+                    let said = match opened.state {
+                        SentItemState::Update => self.t.sent_item_applied(),
+                        SentItemState::Cancel => self.t.sent_item_trashed(),
+                        _ => self.t.sent_item_accepted(),
+                    };
+                    self.notice = Some(said.to_string());
                 }
             }
             Action::DeclineSent => {
                 let previewed =
-                    matches!(&self.dialog, Some(Dialog::SentItem(o)) if o.accepted.is_none());
+                    matches!(&self.dialog, Some(Dialog::SentItem(o)) if acceptable(o.state));
                 self.dialog = None;
                 if previewed {
                     self.notice = Some(self.t.sent_item_declined().to_string());
@@ -2478,8 +2494,12 @@ impl App {
                         share_form(ui, &t, &shown, (own, their, role), focus, actions);
                     }
                     Dialog::Send {
-                        recipients, picked, ..
-                    } => send_form(ui, &t, recipients, picked, actions),
+                        recipients,
+                        picked,
+                        update,
+                        cancel,
+                        ..
+                    } => send_form(ui, &t, recipients, (picked, *update, cancel), actions),
                     Dialog::SentItem(opened) => sent_item_form(ui, &t, tones, opened, actions),
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
@@ -2990,12 +3010,19 @@ fn send_form(
     ui: &mut Ui,
     t: &L10n,
     recipients: &[Recipient],
-    picked: &mut Option<usize>,
+    (picked, update, cancelling): (&mut Option<usize>, bool, &mut bool),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    title(ui, t.send_title());
+    title(
+        ui,
+        if update {
+            t.send_update()
+        } else {
+            t.send_title()
+        },
+    );
     ui.label(RichText::new(t.send_who()).color(text));
     for (i, r) in recipients.iter().enumerate() {
         ui.radio_value(
@@ -3007,6 +3034,10 @@ fn send_form(
     ui.radio_value(picked, None, RichText::new(t.send_anyone()).color(text));
     if picked.is_none() {
         ui.label(RichText::new(t.send_plain_hint()).color(text));
+    }
+    if update {
+        ui.checkbox(cancelling, RichText::new(t.send_cancel()).color(text));
+        ui.label(RichText::new(t.send_cancel_hint()).small().color(weak));
     }
     ui.label(RichText::new(t.send_what()).small().color(weak));
     ui.horizontal(|ui| {
@@ -3020,9 +3051,21 @@ fn send_form(
     });
 }
 
+/// Whether accepting a Sent Item in `state` does anything: a new one,
+/// an update or a cancellation.
+fn acceptable(state: SentItemState) -> bool {
+    matches!(
+        state,
+        SentItemState::Fresh | SentItemState::Update | SentItemState::Cancel
+    )
+}
+
 /// The preview of a Sent Item: who sent it, verified or not with their
 /// key's code, whether it came encrypted, its text, Routines and
-/// Reminders with their times and Sections; Accept or Decline.
+/// Reminders with their times and Sections; Accept or Decline. An update
+/// shows what changes, "Tue 10:00 → Wed 14:00", and Apply; a
+/// cancellation what it cancels; one already up to date or with nothing
+/// to cancel only closes.
 fn sent_item_form(ui: &mut Ui, t: &L10n, tones: Tones, opened: &Opened, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -3046,18 +3089,41 @@ fn sent_item_form(ui: &mut Ui, t: &L10n, tones: Tones, opened: &Opened, actions:
         t.sent_item_plain()
     };
     ui.label(RichText::new(sealed).small().color(weak));
-    if opened.accepted.is_some() {
-        ui.label(RichText::new(t.sent_item_already()).color(tones.accent));
+    match opened.state {
+        SentItemState::Fresh => {}
+        SentItemState::Update => {
+            ui.label(RichText::new(t.sent_item_update()).color(tones.accent));
+        }
+        SentItemState::Cancel => {
+            ui.label(
+                RichText::new(t.sent_item_cancelled(&item.text))
+                    .strong()
+                    .color(tones.accent),
+            );
+            ui.label(RichText::new(t.sent_item_cancel_detail()).color(text));
+        }
+        SentItemState::UpToDate => {
+            ui.label(RichText::new(t.sent_item_already()).color(tones.accent));
+        }
+        SentItemState::NothingToCancel => {
+            ui.label(RichText::new(t.sent_item_nothing_to_cancel()).color(tones.accent));
+        }
     }
+    let accept = match opened.state {
+        SentItemState::Fresh => Some(t.sent_item_accept()),
+        SentItemState::Update => Some(t.sent_item_apply()),
+        SentItemState::Cancel => Some(t.sent_item_accept_cancel()),
+        SentItemState::UpToDate | SentItemState::NothingToCancel => None,
+    };
     ui.horizontal(|ui| {
-        if opened.accepted.is_none()
+        if let Some(accept) = accept
             && ui
-                .button(RichText::new(t.sent_item_accept()).strong().color(text))
+                .button(RichText::new(accept).strong().color(text))
                 .clicked()
         {
             actions.push(Action::AcceptSent);
         }
-        let decline = if opened.accepted.is_none() {
+        let decline = if accept.is_some() {
             t.sent_item_decline()
         } else {
             t.close()
@@ -3066,11 +3132,51 @@ fn sent_item_form(ui: &mut Ui, t: &L10n, tones: Tones, opened: &Opened, actions:
             actions.push(Action::DeclineSent);
         }
     });
+    let full = matches!(opened.state, SentItemState::Fresh | SentItemState::Update);
     egui::ScrollArea::vertical()
         .id_salt("sent item")
         .max_height(360.0)
         .show(ui, |ui| {
+            if let Some(changes) = &opened.changes {
+                ui.label(RichText::new(t.sent_item_changes()).strong().color(text));
+                let mut line = |said: String| {
+                    ui.label(RichText::new(said).color(text));
+                };
+                if changes.restores {
+                    line(t.sent_item_restores().to_string());
+                }
+                if let Some(before) = &changes.text_before {
+                    line(t.sent_item_text_was(before));
+                    line(t.sent_item_text_now(&item.text));
+                    if changes.text_edited {
+                        line(t.sent_item_text_yours().to_string());
+                    }
+                }
+                for s in &changes.sections_added {
+                    line(t.sent_item_section_added(&s.text));
+                }
+                for r in &changes.rescheduled {
+                    line(t.sent_item_rescheduled(
+                        &schedule_text(t, &r.before),
+                        &schedule_text(t, &r.after),
+                    ));
+                }
+                for r in &changes.routines_added {
+                    line(t.sent_item_routine_added(&schedule_text(t, &r.schedule)));
+                }
+                for r in &changes.routines_removed {
+                    line(t.sent_item_routine_removed(&schedule_text(t, &r.schedule)));
+                }
+                if changes.is_empty() {
+                    line(t.sent_item_no_changes().to_string());
+                }
+                ui.label(RichText::new(t.sent_item_keeps()).small().color(weak));
+                ui.separator();
+            }
             ui.label(RichText::new(&item.text).color(text));
+            if !full {
+                return;
+            }
             if !item.routines.is_empty() {
                 ui.label(RichText::new(t.routines_heading()).strong().color(text));
                 for r in &item.routines {

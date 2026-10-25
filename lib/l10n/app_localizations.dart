@@ -2945,7 +2945,7 @@ abstract class AppLocalizations {
   /// No description provided for @sentItemAlready.
   ///
   /// In en, this message translates to:
-  /// **'You accepted this before; it is among your Notes.'**
+  /// **'Already up to date: you accepted this version or a newer one before.'**
   String get sentItemAlready;
 
   /// No description provided for @sentItemUnreadable.
@@ -2959,6 +2959,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This file is encrypted for someone else.'**
   String get sentItemNotForUs;
+
+  /// No description provided for @sendUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Send an update'**
+  String get sendUpdate;
+
+  /// No description provided for @sendCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a cancellation instead'**
+  String get sendCancel;
+
+  /// No description provided for @sendCancelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'They can then move it to their trash, with its alarms off.'**
+  String get sendCancelHint;
+
+  /// No description provided for @sentItemUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'An update to a Note you accepted before.'**
+  String get sentItemUpdate;
+
+  /// No description provided for @sentItemChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'What changes'**
+  String get sentItemChanges;
+
+  /// No description provided for @sentItemTextWas.
+  ///
+  /// In en, this message translates to:
+  /// **'Text so far: {text}'**
+  String sentItemTextWas(String text);
+
+  /// No description provided for @sentItemTextNow.
+  ///
+  /// In en, this message translates to:
+  /// **'New text: {text}'**
+  String sentItemTextNow(String text);
+
+  /// No description provided for @sentItemTextYours.
+  ///
+  /// In en, this message translates to:
+  /// **'You changed this text yourself; the update replaces your version.'**
+  String get sentItemTextYours;
+
+  /// No description provided for @sentItemSectionAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added: {text}'**
+  String sentItemSectionAdded(String text);
+
+  /// No description provided for @sentItemRescheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'{before} → {after}'**
+  String sentItemRescheduled(String before, String after);
+
+  /// No description provided for @sentItemRoutineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'New: {schedule}'**
+  String sentItemRoutineAdded(String schedule);
+
+  /// No description provided for @sentItemRoutineRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed: {schedule}'**
+  String sentItemRoutineRemoved(String schedule);
+
+  /// No description provided for @sentItemNoChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changed.'**
+  String get sentItemNoChanges;
+
+  /// No description provided for @sentItemRestores.
+  ///
+  /// In en, this message translates to:
+  /// **'It is in your trash; the update brings it back.'**
+  String get sentItemRestores;
+
+  /// No description provided for @sentItemKeeps.
+  ///
+  /// In en, this message translates to:
+  /// **'Your own Sections, Routines and Reminders, Done marks, Importance and where you filed it stay as they are.'**
+  String get sentItemKeeps;
+
+  /// No description provided for @sentItemApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply update'**
+  String get sentItemApply;
+
+  /// No description provided for @sentItemApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated. Your own additions stayed.'**
+  String get sentItemApplied;
+
+  /// No description provided for @sentItemCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled: {text}'**
+  String sentItemCancelled(String text);
+
+  /// No description provided for @sentItemCancelDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepting moves it and its Routines and Reminders to the trash, alarms off. You can restore it from there.'**
+  String get sentItemCancelDetail;
+
+  /// No description provided for @sentItemAcceptCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to the trash'**
+  String get sentItemAcceptCancel;
+
+  /// No description provided for @sentItemTrashed.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to the trash with its alarms off. You can restore it from there.'**
+  String get sentItemTrashed;
+
+  /// No description provided for @sentItemNothingToCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to cancel: this Note is not among yours, or is in the trash already.'**
+  String get sentItemNothingToCancel;
+
+  /// No description provided for @sentItemNotFromSender.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: this file would change a Note someone sent you, but it is not signed by them.'**
+  String get sentItemNotFromSender;
+
+  /// No description provided for @sentItemClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get sentItemClose;
 }
 
 class _AppLocalizationsDelegate

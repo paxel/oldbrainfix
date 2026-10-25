@@ -1818,7 +1818,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sentItemAlready =>
-      'You accepted this before; it is among your Notes.';
+      'Already up to date: you accepted this version or a newer one before.';
 
   @override
   String get sentItemUnreadable =>
@@ -1826,4 +1826,98 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sentItemNotForUs => 'This file is encrypted for someone else.';
+
+  @override
+  String get sendUpdate => 'Send an update';
+
+  @override
+  String get sendCancel => 'Send a cancellation instead';
+
+  @override
+  String get sendCancelHint =>
+      'They can then move it to their trash, with its alarms off.';
+
+  @override
+  String get sentItemUpdate => 'An update to a Note you accepted before.';
+
+  @override
+  String get sentItemChanges => 'What changes';
+
+  @override
+  String sentItemTextWas(String text) {
+    return 'Text so far: $text';
+  }
+
+  @override
+  String sentItemTextNow(String text) {
+    return 'New text: $text';
+  }
+
+  @override
+  String get sentItemTextYours =>
+      'You changed this text yourself; the update replaces your version.';
+
+  @override
+  String sentItemSectionAdded(String text) {
+    return 'Added: $text';
+  }
+
+  @override
+  String sentItemRescheduled(String before, String after) {
+    return '$before → $after';
+  }
+
+  @override
+  String sentItemRoutineAdded(String schedule) {
+    return 'New: $schedule';
+  }
+
+  @override
+  String sentItemRoutineRemoved(String schedule) {
+    return 'Removed: $schedule';
+  }
+
+  @override
+  String get sentItemNoChanges => 'Nothing changed.';
+
+  @override
+  String get sentItemRestores =>
+      'It is in your trash; the update brings it back.';
+
+  @override
+  String get sentItemKeeps =>
+      'Your own Sections, Routines and Reminders, Done marks, Importance and where you filed it stay as they are.';
+
+  @override
+  String get sentItemApply => 'Apply update';
+
+  @override
+  String get sentItemApplied => 'Updated. Your own additions stayed.';
+
+  @override
+  String sentItemCancelled(String text) {
+    return 'Cancelled: $text';
+  }
+
+  @override
+  String get sentItemCancelDetail =>
+      'Accepting moves it and its Routines and Reminders to the trash, alarms off. You can restore it from there.';
+
+  @override
+  String get sentItemAcceptCancel => 'Move to the trash';
+
+  @override
+  String get sentItemTrashed =>
+      'Moved to the trash with its alarms off. You can restore it from there.';
+
+  @override
+  String get sentItemNothingToCancel =>
+      'Nothing to cancel: this Note is not among yours, or is in the trash already.';
+
+  @override
+  String get sentItemNotFromSender =>
+      'Refused: this file would change a Note someone sent you, but it is not signed by them.';
+
+  @override
+  String get sentItemClose => 'Close';
 }

@@ -2,7 +2,9 @@
 //! editor, encrypted to a person met or signed only with a hint; a Sent
 //! Item dropped onto the window or handed over shows its preview, and
 //! Accept takes it into Unsorted with its Routines while Decline keeps
-//! nothing.
+//! nothing. A Note sent before goes as an update or a cancellation; an
+//! update shows what changes and applies it, a cancellation trashes the
+//! Note, and one signed by another key is refused.
 
 use std::sync::{Arc, Mutex};
 
@@ -11,6 +13,7 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
     ClockTime, Day, ImportReport, Notes, PairedDevice, Routines, Schedule, SigningKey, Store,
 };
+use oldbrainfix_gui::schedule_text::schedule_text;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -136,7 +139,7 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     Routines::new(&ann).spawn(&note.id, &schedule)?;
     let dir = tempfile::tempdir()?;
     let file = dir.path().join("from-ann.oldbrain");
-    std::fs::write(&file, ann.send_note(&note.id, None)?)?;
+    std::fs::write(&file, ann.send_note(&note.id, None, false)?)?;
 
     let desk = store(1, "Ada")?;
     let mut app = App::new(desk, "en");
@@ -181,7 +184,7 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
 
     // Opened again: accepted before, nothing new.
     drop_file(&mut harness, &file);
-    assert!(shows(&harness, "You accepted this before"));
+    assert!(shows(&harness, "Already up to date"));
     harness.get_by_label("Close").click_accesskit();
     harness.run();
     assert_eq!(Notes::new(harness.state().store()).all()?.len(), 1);
@@ -191,12 +194,152 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     meet(&ann, &ben, "Ben")?;
     let to = ann.sent_item_recipients()?;
     let other = dir.path().join("for-ben.oldbrain");
-    std::fs::write(&other, ann.send_note(&note.id, to.first())?)?;
+    std::fs::write(&other, ann.send_note(&note.id, to.first(), false)?)?;
     drop_file(&mut harness, &other);
     assert!(shows(&harness, "encrypted for someone else"));
     let damaged = dir.path().join("damaged.oldbrain");
     std::fs::write(&damaged, b"{\"format\":1}")?;
     drop_file(&mut harness, &damaged);
     assert!(shows(&harness, "cannot be read"));
+    Ok(())
+}
+
+#[test]
+fn a_note_sent_before_goes_as_an_update_or_a_cancellation() -> TestResult {
+    let desk = store(1, "Ada")?;
+    let ben = store(2, "Ben")?;
+    let note = Notes::new(&desk).capture("Dentist", None, None)?;
+    desk.send_note(&note.id, None, false)?;
+    let dir = tempfile::tempdir()?;
+    let saved = dir.path().join("update.oldbrain");
+    let mut app = App::new(desk, "en");
+    app.select(Selection::All);
+    app.select_note(&note.id);
+    {
+        let save = saved.clone();
+        app.set_item_saver(Box::new(move |_, _| Some(save.clone())));
+    }
+    let mut harness = window(app);
+
+    harness.get_by_label("Send…").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Send an update"));
+    harness.get_by_label("Send").click_accesskit();
+    harness.run();
+    let update = ben
+        .open_sent_item(&std::fs::read(&saved)?)?
+        .map_err(|_| "update")?;
+    assert_eq!(update.item.version, 2);
+    assert!(!update.item.cancel);
+
+    harness.get_by_label("Send…").click_accesskit();
+    harness.run();
+    harness
+        .get_by_label("Send a cancellation instead")
+        .click_accesskit();
+    harness.run();
+    harness.get_by_label("Send").click_accesskit();
+    harness.run();
+    let cancel = ben
+        .open_sent_item(&std::fs::read(&saved)?)?
+        .map_err(|_| "cancel")?;
+    assert_eq!(cancel.item.version, 3);
+    assert!(cancel.item.cancel);
+    Ok(())
+}
+
+#[test]
+fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestResult {
+    let ann = store(3, "Ann")?;
+    let note = Notes::new(&ann).capture("Dentist", None, None)?;
+    let tuesday = Schedule::new(
+        Day::new(2026, 11, 3),
+        &[ClockTime::new(10, 0).ok_or("time")?],
+        None,
+    )
+    .ok_or("schedule")?;
+    let routine = Routines::new(&ann).spawn(&note.id, &tuesday)?;
+    let desk = store(1, "Ada")?;
+    let first = desk
+        .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+        .map_err(|_| "first")?;
+    let got = desk.accept_sent_item(&first.item)?.ok_or("accepted")?;
+    Notes::new(&desk).amend(&got, "Ask about the bill")?;
+
+    let wednesday = Schedule::new(
+        Day::new(2026, 11, 4),
+        &[ClockTime::new(14, 0).ok_or("time")?],
+        None,
+    )
+    .ok_or("schedule")?;
+    Routines::new(&ann).reschedule(&routine.id, &wednesday)?;
+    Notes::new(&ann).edit(&note.id, "Dentist, room 3")?;
+    let dir = tempfile::tempdir()?;
+    let update = dir.path().join("update.oldbrain");
+    std::fs::write(&update, ann.send_note(&note.id, None, false)?)?;
+
+    let mut app = App::new(desk, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &update);
+    assert!(harness.state().previewing());
+    assert!(shows(&harness, "An update to a Note you accepted before."));
+    assert!(shows(&harness, "Text so far: Dentist"));
+    assert!(shows(&harness, "New text: Dentist, room 3"));
+    let t = oldbrainfix_gui::l10n::L10n::new("en");
+    let moved = format!(
+        "{} → {}",
+        schedule_text(&t, &tuesday),
+        schedule_text(&t, &wednesday)
+    );
+    assert!(
+        moved.contains("10:00") && moved.contains("14:00"),
+        "{moved}"
+    );
+    assert!(shows(&harness, &moved));
+    harness.get_by_label("Apply update").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Updated. Your own additions stayed."));
+    let held = harness.state().store();
+    let now = Notes::new(held).by_id(&got)?.ok_or("note")?;
+    assert_eq!(now.text, "Dentist, room 3");
+    let sections = Notes::new(held).sections(&got)?;
+    assert_eq!(sections.len(), 1, "his Amend stays");
+    assert_eq!(Routines::new(held).of_note(&got)?[0].schedule, wednesday);
+
+    // Another key's cancellation is refused.
+    let eve = store(9, "Eve")?;
+    let forged = oldbrainfix_core::sent::encode(
+        &oldbrainfix_core::sent::SentItem {
+            version: 9,
+            cancel: true,
+            from: eve.own_key_record()?,
+            ..first.item.clone()
+        },
+        &eve.signing_key()?,
+        &[],
+        &mut |n| Ok(vec![0; n]),
+    )?;
+    let forged_file = dir.path().join("forged.oldbrain");
+    std::fs::write(&forged_file, forged)?;
+    drop_file(&mut harness, &forged_file);
+    assert!(!harness.state().previewing());
+    assert!(shows(&harness, "Refused:"));
+
+    // Ann's own cancellation trashes it, its alarms with it.
+    let cancel = dir.path().join("cancel.oldbrain");
+    std::fs::write(&cancel, ann.send_note(&note.id, None, true)?)?;
+    drop_file(&mut harness, &cancel);
+    assert!(shows(&harness, "Cancelled: Dentist, room 3"));
+    harness.get_by_label("Move to the trash").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Moved to the trash"));
+    let held = harness.state().store();
+    assert!(Notes::new(held).by_id(&got)?.ok_or("note")?.is_trashed());
+    assert!(Routines::new(held).all()?.is_empty());
+
+    // Again: nothing more to do.
+    drop_file(&mut harness, &cancel);
+    assert!(shows(&harness, "Already up to date"));
     Ok(())
 }

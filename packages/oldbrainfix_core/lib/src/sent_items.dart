@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'area_keys.dart';
 import 'box_keys.dart';
+import 'entry.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'routines.dart';
@@ -50,6 +51,9 @@ abstract final class SentAs {
   static const key = 'oldbrainfix:sent-key';
 }
 
+/// The kind a cancellation says it is; an item says none.
+const _cancelKind = 'cancel';
+
 /// Field keys a Sent Item leaves in the log.
 abstract final class SentKeys {
   /// On the sender's Note, one per sending Device: `sent:<device>` =
@@ -72,6 +76,15 @@ class NotASentItem implements Exception {
 
   @override
   String toString() => 'NotASentItem';
+}
+
+/// A Sent Item whose id came here from another key: only its sender may
+/// update or cancel it (ADR 0009).
+class SentItemNotFromSender implements Exception {
+  const SentItemNotFromSender();
+
+  @override
+  String toString() => 'SentItemNotFromSender';
 }
 
 /// A Sent Item encrypted to other Devices, not to this one.
@@ -108,6 +121,10 @@ class SentItem {
   /// How often it was sent, counting from 1.
   final int version;
 
+  /// Whether it cancels the Sent Item of this id: the receiver may then
+  /// move it to the trash. It still carries what the Note holds.
+  final bool cancel;
+
   /// The sender's key record and the name the sender goes by.
   final KeyRecord from;
   final String name;
@@ -124,13 +141,15 @@ class SentItem {
     required this.text,
     this.sections = const [],
     this.routines = const [],
+    this.cancel = false,
   });
 
   /// What is signed: keys sorted, no spaces, the same from both cores. A
-  /// Reminder has no rule.
+  /// Reminder has no rule; only a cancellation says its kind.
   String encode() => jsonEncode({
     'from': {'key': from.toJson(), 'name': name},
     'id': id,
+    if (cancel) 'kind': _cancelKind,
     'note': {
       'sections': [
         for (final s in sections)
@@ -153,7 +172,8 @@ class SentItem {
   /// The item [text] holds; null when it is none.
   static SentItem? parse(String text) {
     try {
-      if (jsonDecode(text)
+      final json = jsonDecode(text);
+      if (json
           case {
             'from': {'key': final Object key, 'name': final String name},
             'id': final String id,
@@ -167,6 +187,8 @@ class SentItem {
           when id.isNotEmpty && version > 0) {
         final from = KeyRecord.fromJson(key);
         if (from == null) return null;
+        final kind = json['kind'];
+        if (kind != null && kind != _cancelKind) return null;
         final parts = <SentSection>[];
         for (final s in sections) {
           if (s case {'captured': final String at, 'text': final String text}) {
@@ -206,6 +228,7 @@ class SentItem {
           text: body,
           sections: parts,
           routines: scheduled,
+          cancel: kind == _cancelKind,
         );
       }
     } on FormatException {
@@ -269,8 +292,8 @@ List<Recipient> sentItemRecipients(Store store) {
 /// out with from this Device before and the next version, or a new id.
 /// Records the id and version on the Note, so sending it again keeps
 /// them; a Note this Device may not change goes out under a new id each
-/// time.
-SentItem sentItemOf(Store store, String noteId) {
+/// time. With [cancel] it goes out as the cancellation of that id.
+SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final notes = Notes(store);
   final note = notes.byId(noteId);
   if (note == null || note.isTrashed || note.isMerged) {
@@ -298,6 +321,7 @@ SentItem sentItemOf(Store store, String noteId) {
   return SentItem(
     id: id,
     version: version,
+    cancel: cancel,
     from: store.ownKeyRecord,
     name: store.author,
     text: note.text,
@@ -368,13 +392,23 @@ Uint8List encodeSentItem(
 }
 
 /// Writes the file the Note [noteId] goes out as ([sentItemOf],
-/// [encodeSentItem]): encrypted to the keys of [to], else signed only.
-Uint8List sendNote(Store store, String noteId, {Recipient? to}) =>
-    encodeSentItem(
-      sentItemOf(store, noteId),
-      store.signingKey,
-      to: to?.keys ?? const [],
-    );
+/// [encodeSentItem]): encrypted to the keys of [to], else signed only;
+/// with [cancel] as its cancellation.
+Uint8List sendNote(
+  Store store,
+  String noteId, {
+  Recipient? to,
+  bool cancel = false,
+}) => encodeSentItem(
+  sentItemOf(store, noteId, cancel: cancel),
+  store.signingKey,
+  to: to?.keys ?? const [],
+);
+
+/// Whether this Device sent the Note [noteId] before, so sending it
+/// again sends an update, or a cancellation.
+bool wasSent(Store store, String noteId) =>
+    store.current(noteId, SentKeys.sent(store.deviceId)) != null;
 
 /// Who a Sent Item opened here comes from, as far as this Device knows.
 enum SenderTrust {
@@ -389,6 +423,81 @@ enum SenderTrust {
   unknown,
 }
 
+/// What accepting a Sent Item opened here comes to.
+enum SentItemState {
+  /// Never accepted here: accepting makes a new Note in Unsorted.
+  fresh,
+
+  /// A newer version of one accepted here: accepting applies its
+  /// [SentItemChanges] to that Note, wherever it is filed.
+  update,
+
+  /// The cancellation of one accepted here: accepting moves that Note to
+  /// the trash with its Routines and Reminders, alarms off.
+  cancel,
+
+  /// This version or a newer one was accepted here: nothing to do.
+  upToDate,
+
+  /// The cancellation of nothing accepted here, or of a Note already in
+  /// the trash: nothing to do.
+  nothingToCancel,
+}
+
+/// A Routine or Reminder an update gives another schedule: the one
+/// here, its schedule now and the one it gets.
+class SentReschedule {
+  final String routine;
+  final Schedule before;
+  final Schedule after;
+
+  const SentReschedule(this.routine, this.before, this.after);
+}
+
+/// What applying an update changes on the Note accepted before. What the
+/// receiver added stays: their Sections, Routines and Reminders, Done
+/// marks, Importance and where the Note is filed.
+class SentItemChanges {
+  /// The Note's text here, when the update replaces it: only when the
+  /// sender changed theirs since.
+  final String? textBefore;
+
+  /// Whether the text here was changed here since it came, so the
+  /// update replaces the receiver's own change.
+  final bool textEdited;
+
+  /// Sections the sender added since; none is ever taken away.
+  final List<SentSection> sectionsAdded;
+  final List<SentReschedule> rescheduled;
+  final List<SentRoutine> routinesAdded;
+
+  /// The sender's Routines and Reminders here that they took away: they
+  /// go to the trash, restorable.
+  final List<Routine> routinesRemoved;
+
+  /// Whether the Note is in the trash here: applying brings it back.
+  final bool restores;
+
+  const SentItemChanges({
+    this.textBefore,
+    this.textEdited = false,
+    this.sectionsAdded = const [],
+    this.rescheduled = const [],
+    this.routinesAdded = const [],
+    this.routinesRemoved = const [],
+    this.restores = false,
+  });
+
+  /// Whether nothing but the version changes.
+  bool get isEmpty =>
+      textBefore == null &&
+      sectionsAdded.isEmpty &&
+      rescheduled.isEmpty &&
+      routinesAdded.isEmpty &&
+      routinesRemoved.isEmpty &&
+      !restores;
+}
+
 /// A Sent Item opened here, to preview.
 class OpenedSentItem {
   final SentItem item;
@@ -397,21 +506,31 @@ class OpenedSentItem {
   final bool encrypted;
   final SenderTrust trust;
 
-  /// The Note it was accepted as before, if it was.
+  /// The Note it was accepted as before, if it was, in the trash too.
   final String? accepted;
+
+  /// What accepting it comes to.
+  final SentItemState state;
+
+  /// What an update changes; null for anything else.
+  final SentItemChanges? changes;
 
   const OpenedSentItem({
     required this.item,
     required this.encrypted,
     required this.trust,
     required this.accepted,
+    this.state = SentItemState.fresh,
+    this.changes,
   });
 }
 
-/// Reads the Sent Item in [bytes]: decrypts it when it is encrypted and
-/// checks the signature over it. Throws [NotASentItem] for a file that
-/// is none, damaged, or not signed by the key it names, and
-/// [SentItemNotForUs] for one encrypted to other Devices.
+/// Reads the Sent Item in [bytes]: decrypts it when it is encrypted,
+/// checks the signature over it and what accepting it would do here.
+/// Throws [NotASentItem] for a file that is none, damaged, or not signed
+/// by the key it names, [SentItemNotForUs] for one encrypted to other
+/// Devices, and [SentItemNotFromSender] for one whose id came here from
+/// another key (ADR 0009).
 OpenedSentItem openSentItem(Store store, List<int> bytes) {
   if (bytes.length > maxSentItemBytes) throw const NotASentItem();
   final outer = _json(bytes);
@@ -440,6 +559,8 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
     }
     final pinned = store.pinnedKey(item.from.device);
     final own = item.from.device == store.deviceId;
+    final held = _held(store, item);
+    final (state, changes) = _judge(store, item, held);
     return OpenedSentItem(
       item: item,
       encrypted: encrypted,
@@ -448,7 +569,9 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
           : pinned == null
           ? SenderTrust.unknown
           : SenderTrust.known,
-      accepted: acceptedNote(store, item),
+      accepted: held?.note,
+      state: state,
+      changes: changes,
     );
   }
   throw const NotASentItem();
@@ -464,69 +587,312 @@ bool looksLikeSentItem(List<int> bytes) {
   return false;
 }
 
-/// The Note [item] was accepted as here before, from the same key: the
-/// newest of them not in the trash; null when there is none.
-String? acceptedNote(Store store, SentItem item) {
+/// The Note [item] was accepted as here before, from the same key, in
+/// the trash or merged too: the newest of them; null when there is none.
+/// Throws [SentItemNotFromSender] when its id came here from another key
+/// only.
+String? acceptedNote(Store store, SentItem item) => _held(store, item)?.note;
+
+/// Accepts [item] as [openSentItem] judged it ([SentItemState]): a new
+/// Note of this Device's in Unsorted, captured now, with the Sections and
+/// the Routines and Reminders it holds, their alarms on; for an update,
+/// its changes applied to the Note accepted before ([SentItemChanges]);
+/// for a cancellation, that Note moved to the trash with its Routines and
+/// Reminders. The Note and its Routines keep the Sent Item's id, version
+/// and sender's key, and the sender's id for each Routine, so a later
+/// version can be recognised. Returns the Note it is held as; null when
+/// there was nothing to cancel. Throws [SentItemNotFromSender] as
+/// [openSentItem] does.
+String? acceptSentItem(Store store, SentItem item) {
+  final held = _held(store, item);
+  final (state, changes) = _judge(store, item, held);
+  final now = store.clock().toUtc();
+  switch ((state, held, changes)) {
+    case (SentItemState.fresh, _, _):
+      return _acceptNew(store, item);
+    case (SentItemState.update, final held?, final changes?):
+      _apply(store, held.note, item, changes, now);
+      return held.note;
+    case (SentItemState.cancel, final held?, _):
+      _cancel(store, held.note, item, now);
+      return held.note;
+    case (SentItemState.upToDate, final held?, _):
+      return held.note;
+    default:
+      return null;
+  }
+}
+
+/// The Note a Sent Item was accepted as here and the version it holds.
+typedef _Held = ({String note, int version});
+
+/// The Note [item] was accepted as here from the same key, in the trash
+/// or merged too, the newest of them, with the version it holds. Throws
+/// [SentItemNotFromSender] when only another key's Sent Item has its id.
+_Held? _held(Store store, SentItem item) {
   final from = base64.encode(item.from.publicKey);
   final notes = Notes(store);
-  String? found;
+  _Held? found;
   DateTime? newest;
+  var foreign = false;
   for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
     final link = _received(store.current(id, SentKeys.received));
-    if (link == null || link.from != from || link.id != item.id) continue;
+    if (link == null || link.id != item.id) continue;
+    if (link.from != from) {
+      foreign = true;
+      continue;
+    }
     final note = notes.byId(id);
-    if (note == null || note.isTrashed || note.isMerged) continue;
+    if (note == null) continue;
     if (newest == null || note.captured.isAfter(newest)) {
       newest = note.captured;
-      found = id;
+      found = (note: id, version: link.version);
     }
   }
+  if (found == null && foreign) throw const SentItemNotFromSender();
   return found;
 }
 
-/// Accepts [item]: a new Note of this Device's in Unsorted, captured
-/// now, with the Sections and the Routines and Reminders it holds, their
-/// alarms on. The Note and its Routines keep the Sent Item's id, version
-/// and sender's key, and the sender's id for each Routine, so a later
-/// version can be recognised. An item accepted before is not taken
-/// again: returns the Note it was accepted as.
-String acceptSentItem(Store store, SentItem item) {
-  if (acceptedNote(store, item) case final held?) return held;
+/// What accepting [item] comes to, with the Note it was accepted as
+/// before [held], and for an update what it changes.
+(SentItemState, SentItemChanges?) _judge(
+  Store store,
+  SentItem item,
+  _Held? held,
+) {
+  if (held == null) {
+    return (
+      item.cancel ? SentItemState.nothingToCancel : SentItemState.fresh,
+      null,
+    );
+  }
+  if (item.version <= held.version) return (SentItemState.upToDate, null);
+  final trashed = Notes(store).byId(held.note)?.isTrashed ?? false;
+  if (item.cancel) {
+    return (
+      trashed ? SentItemState.nothingToCancel : SentItemState.cancel,
+      null,
+    );
+  }
+  return (SentItemState.update, _changes(store, held.note, item, trashed));
+}
+
+/// What the update [item] changes on the Note [noteId]: its text when the
+/// sender changed theirs, the Sections not here yet (by when they were
+/// captured), and the sender's Routines and Reminders, known by the
+/// sender's id for each, rescheduled, added or taken away. Those the
+/// receiver put in the trash on their own stay there, untouched; when
+/// the Note is in the trash ([restores]) those that went with it count.
+SentItemChanges _changes(
+  Store store,
+  String noteId,
+  SentItem item,
+  bool restores,
+) {
+  final notes = Notes(store);
+  final text = notes.byId(noteId)?.text ?? '';
+  final sent = _lastSentText(store, noteId);
+  final changed = item.text != text && (sent == null || item.text != sent);
+  final here = {
+    for (final s in notes.sections(noteId))
+      s.context.captured.toUtc().microsecondsSinceEpoch,
+  };
+  final routines = Routines(store);
+  final theirs = <String, Routine>{};
+  for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
+    if (store.current(id, RoutineKeys.note) != noteId) continue;
+    final from = store.current(id, SentKeys.received);
+    final routine = routines.byId(id);
+    if (from == null || routine == null) continue;
+    theirs.putIfAbsent(from, () => routine);
+  }
+  bool live(Routine r) => !r.isTrashed || (restores && r.trashedWith == noteId);
+  final rescheduled = <SentReschedule>[];
+  final added = <SentRoutine>[];
+  for (final r in item.routines) {
+    final held = theirs[r.id];
+    if (held == null) {
+      added.add(r);
+    } else if (live(held) && !_sameSchedule(held.schedule, r.schedule)) {
+      rescheduled.add(SentReschedule(held.id, held.schedule, r.schedule));
+    }
+  }
+  final kept = {for (final r in item.routines) r.id};
+  return SentItemChanges(
+    textBefore: changed ? text : null,
+    textEdited: changed && sent != null && text != sent,
+    sectionsAdded: [
+      for (final s in item.sections)
+        if (!here.contains(s.captured.toUtc().microsecondsSinceEpoch)) s,
+    ],
+    rescheduled: rescheduled,
+    routinesAdded: added,
+    routinesRemoved: [
+      for (final MapEntry(key: from, value: r) in theirs.entries)
+        if (!kept.contains(from) && live(r)) r,
+    ],
+    restores: restores,
+  );
+}
+
+/// The text the sender last sent for the Note [noteId]: the newest text
+/// written with its link, as accepting and applying write both at once;
+/// null when there is none.
+String? _lastSentText(Store store, String noteId) {
+  final history = store.history(noteId);
+  final linked = {
+    for (final e in history)
+      if (e.field == SentKeys.received) e.date.microsecondsSinceEpoch,
+  };
+  Entry? last;
+  for (final e in history) {
+    if (e.field != NoteKeys.text ||
+        !linked.contains(e.date.microsecondsSinceEpoch)) {
+      continue;
+    }
+    if (last == null || !e.date.isBefore(last.date)) last = e;
+  }
+  return last?.value;
+}
+
+bool _sameSchedule(Schedule a, Schedule b) =>
+    a.start == b.start &&
+    a.times.join(',') == b.times.join(',') &&
+    a.rule?.format() == b.rule?.format();
+
+/// The link an accepted Note keeps to [item].
+String _link(SentItem item) => jsonEncode({
+  'from': base64.encode(item.from.publicKey),
+  'id': item.id,
+  'name': item.name,
+  'version': item.version,
+});
+
+/// A new Note of this Device's in Unsorted for [item], captured now.
+String _acceptNew(Store store, SentItem item) {
   final id = 'note:${Store.newId()}';
   final now = store.clock().toUtc();
-  final link = jsonEncode({
-    'from': base64.encode(item.from.publicKey),
-    'id': item.id,
-    'name': item.name,
-    'version': item.version,
-  });
   store.batch(() {
     store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
     store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
     store.append(id, NoteKeys.text, item.text, date: now);
-    store.append(id, SentKeys.received, link, date: now);
+    store.append(id, SentKeys.received, _link(item), date: now);
     for (final s in item.sections) {
-      final section = 'section:${Store.newId()}';
-      final captured = s.captured.toUtc().toIso8601String();
-      store.append(section, SectionKeys.type, SectionKeys.typeSection);
-      store.append(section, SectionKeys.note, id);
-      store.append(section, SectionKeys.captured, captured);
-      store.append(section, SectionKeys.text, s.text);
+      _writeSection(store, id, s);
     }
     // Written as they are, not spawned: the Note stays in Unsorted.
     for (final r in item.routines) {
-      final routine = 'routine:${Store.newId()}';
-      store.append(routine, RoutineKeys.type, RoutineKeys.typeRoutine);
-      store.append(routine, RoutineKeys.note, id);
-      store.append(routine, RoutineKeys.start, r.schedule.start.toString());
-      store.append(routine, RoutineKeys.times, r.schedule.times.join(','));
-      if (r.schedule.rule case final rule?) {
-        store.append(routine, RoutineKeys.rule, rule.format());
-      }
-      store.append(routine, SentKeys.received, r.id);
+      _writeRoutine(store, id, r);
     }
   });
   return id;
+}
+
+/// Applies the update [item] to the Note [noteId] as [changes] says, at
+/// [now], in one go: back from the trash first when it is there, then
+/// its text, its link, the Sections added, the Routines and Reminders
+/// rescheduled, added and taken away.
+void _apply(
+  Store store,
+  String noteId,
+  SentItem item,
+  SentItemChanges changes,
+  DateTime now,
+) {
+  final at = now.toIso8601String();
+  final routines = Routines(store);
+  store.batch(() {
+    if (changes.restores) {
+      store.append(noteId, NoteKeys.trashed, null);
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
+        final routine = routines.byId(id);
+        if (routine == null || routine.trashedWith != noteId) continue;
+        store.append(id, RoutineKeys.trashed, null);
+        store.append(id, RoutineKeys.trashedWith, null);
+      }
+    }
+    if (changes.textBefore != null) {
+      store.append(noteId, NoteKeys.text, item.text, date: now);
+    }
+    store.append(noteId, SentKeys.received, _link(item), date: now);
+    for (final s in changes.sectionsAdded) {
+      _writeSection(store, noteId, s);
+    }
+    for (final r in changes.rescheduled) {
+      _writeSchedule(store, r.routine, r.after);
+    }
+    for (final r in changes.routinesAdded) {
+      _writeRoutine(store, noteId, r);
+    }
+    for (final r in changes.routinesRemoved) {
+      store.append(r.id, RoutineKeys.trashed, at);
+    }
+  });
+}
+
+/// Moves the Note [noteId] to the trash for the cancellation [item], at
+/// [now], with its Routines and Reminders: they come back with it. Those
+/// of its own count even when the receiver merged it into another Note.
+void _cancel(Store store, String noteId, SentItem item, DateTime now) {
+  final at = now.toIso8601String();
+  final routines = Routines(store);
+  final ids = {
+    for (final r in routines.ofNote(noteId)) r.id,
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine))
+      if (routines.byId(id) case final r?
+          when r.noteId == noteId && !r.isTrashed)
+        id,
+  }.toList()..sort();
+  store.batch(() {
+    store.append(noteId, NoteKeys.trashed, at);
+    for (final id in ids) {
+      store.append(id, RoutineKeys.trashed, at);
+      store.append(id, RoutineKeys.trashedWith, noteId);
+    }
+    store.append(noteId, SentKeys.received, _link(item), date: now);
+  });
+}
+
+/// A Section of the Note [noteId] holding [section].
+void _writeSection(Store store, String noteId, SentSection section) {
+  final id = 'section:${Store.newId()}';
+  store.append(id, SectionKeys.type, SectionKeys.typeSection);
+  store.append(id, SectionKeys.note, noteId);
+  store.append(
+    id,
+    SectionKeys.captured,
+    section.captured.toUtc().toIso8601String(),
+  );
+  store.append(id, SectionKeys.text, section.text);
+}
+
+/// A Routine or Reminder of the Note [noteId] as [routine] is, knowing
+/// the sender's id for it; written, not spawned.
+void _writeRoutine(Store store, String noteId, SentRoutine routine) {
+  final id = 'routine:${Store.newId()}';
+  final schedule = routine.schedule;
+  store.append(id, RoutineKeys.type, RoutineKeys.typeRoutine);
+  store.append(id, RoutineKeys.note, noteId);
+  store.append(id, RoutineKeys.start, schedule.start.toString());
+  store.append(id, RoutineKeys.times, schedule.times.join(','));
+  if (schedule.rule case final rule?) {
+    store.append(id, RoutineKeys.rule, rule.format());
+  }
+  store.append(id, SentKeys.received, routine.id);
+}
+
+/// Gives the Routine [id] [schedule], writing only what changes, so what
+/// was Done stays Done (as [Routines.reschedule], inside a batch).
+void _writeSchedule(Store store, String id, Schedule schedule) {
+  final current = store.currentFields(id);
+  void write(String field, String? value) {
+    if (current.containsKey(field) && current[field] == value) return;
+    store.append(id, field, value);
+  }
+
+  write(RoutineKeys.start, schedule.start.toString());
+  write(RoutineKeys.times, schedule.times.join(','));
+  write(RoutineKeys.rule, schedule.rule?.format());
 }
 
 /// What a signature over [payload] covers.
@@ -582,15 +948,17 @@ Object? _json(List<int> bytes) {
   }
 }
 
-/// The link [raw] on an accepted Note holds.
-({String from, String id})? _received(String? raw) {
+/// The link [raw] on an accepted Note holds: the sender's key, the Sent
+/// Item's id and the version accepted.
+({String from, String id, int version})? _received(String? raw) {
   if (raw == null) return null;
   try {
     if (jsonDecode(raw) case {
       'from': final String from,
       'id': final String id,
+      'version': final int version,
     }) {
-      return (from: from, id: id);
+      return (from: from, id: id, version: version);
     }
   } on FormatException {
     return null;

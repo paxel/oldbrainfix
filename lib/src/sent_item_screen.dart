@@ -12,7 +12,8 @@ import 'schedule_text.dart';
 
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
-/// and offers it to the app the user picks.
+/// and offers it to the app the user picks. A Note sent before goes as
+/// an update, or as its cancellation.
 Future<void> sendNoteFile(
   BuildContext context,
   Store store,
@@ -23,7 +24,10 @@ Future<void> sendNoteFile(
   final files = BundleScope.of(context);
   final picked = await showDialog<_Pick>(
     context: context,
-    builder: (_) => SendNoteDialog(recipients: sentItemRecipients(store)),
+    builder: (_) => SendNoteDialog(
+      recipients: sentItemRecipients(store),
+      update: wasSent(store, noteId),
+    ),
   );
   if (picked == null) return;
   final path = await files.exportPath(sentItemFileName(store.clock()));
@@ -31,22 +35,31 @@ Future<void> sendNoteFile(
     announcements?.announce(t.sendNoApp);
     return;
   }
-  File(path).writeAsBytesSync(sendNote(store, noteId, to: picked.to));
+  File(path).writeAsBytesSync(
+    sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
+  );
   if (!await files.share(path, type: sentItemMimeType)) {
     announcements?.announce(t.sendNoApp);
   }
 }
 
-/// Who a Sent Item goes to: a known person, or anyone (null).
-typedef _Pick = ({Recipient? to});
+/// Who a Sent Item goes to: a known person, or anyone (null); and
+/// whether it is a cancellation.
+typedef _Pick = ({Recipient? to, bool cancel});
 
 /// Asks who gets a Note: anyone, signed only, with a hint that whoever
 /// holds the file can read it, or one of the people whose keys are
-/// known here, encrypted to them.
+/// known here, encrypted to them. For a Note sent before ([update]) it
+/// sends an update, or a cancellation instead.
 class SendNoteDialog extends StatefulWidget {
   final List<Recipient> recipients;
+  final bool update;
 
-  const SendNoteDialog({super.key, required this.recipients});
+  const SendNoteDialog({
+    super.key,
+    required this.recipients,
+    this.update = false,
+  });
 
   @override
   State<SendNoteDialog> createState() => _SendNoteDialogState();
@@ -55,13 +68,14 @@ class SendNoteDialog extends StatefulWidget {
 class _SendNoteDialogState extends State<SendNoteDialog> {
   /// The index of the person picked; -1 for anyone.
   late var _picked = widget.recipients.isEmpty ? -1 : 0;
+  var _cancel = false;
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final recipients = widget.recipients;
     return AlertDialog(
-      title: Text(t.sendTitle),
+      title: Text(widget.update ? t.sendUpdate : t.sendTitle),
       content: SingleChildScrollView(
         child: RadioGroup<int>(
           groupValue: _picked,
@@ -87,6 +101,15 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
                 secondary: const Icon(Icons.lock_open),
               ),
               if (_picked < 0) Text(t.sendPlainHint),
+              if (widget.update)
+                CheckboxListTile(
+                  key: const ValueKey('send-cancel'),
+                  contentPadding: EdgeInsets.zero,
+                  value: _cancel,
+                  onChanged: (on) => setState(() => _cancel = on ?? false),
+                  title: Text(t.sendCancel),
+                  subtitle: Text(t.sendCancelHint),
+                ),
               const SizedBox(height: 8),
               Text(t.sendWhat, style: Theme.of(context).textTheme.bodySmall),
             ],
@@ -100,9 +123,10 @@ class _SendNoteDialogState extends State<SendNoteDialog> {
         ),
         TextButton(
           key: const ValueKey('send-note'),
-          onPressed: () =>
-              Navigator.of(context)
-                  .pop<_Pick>((to: _picked < 0 ? null : recipients[_picked])),
+          onPressed: () => Navigator.of(context).pop<_Pick>((
+            to: _picked < 0 ? null : recipients[_picked],
+            cancel: _cancel,
+          )),
           child: Text(t.sendAction),
         ),
       ],
@@ -142,6 +166,8 @@ Future<int> openReceivedFile(
     announcements?.announce(t.sentItemUnreadable);
   } on SentItemNotForUs {
     announcements?.announce(t.sentItemNotForUs);
+  } on SentItemNotFromSender {
+    announcements?.announce(t.sentItemNotFromSender);
   }
   return 0;
 }
@@ -165,7 +191,10 @@ bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
 /// The preview of a Sent Item: who sent it, verified or not with their
 /// key's code, whether it came encrypted, its text, Sections and
 /// Routines and Reminders with their times. Accept takes it into
-/// Unsorted with its alarms on; Decline keeps nothing.
+/// Unsorted with its alarms on; for an update it shows what changes,
+/// "Tue 10:00 → Wed 14:00", and applies it to the Note accepted before;
+/// a cancellation moves that Note to the trash. Decline keeps nothing;
+/// one already up to date, or with nothing to cancel, only closes.
 class SentItemScreen extends StatelessWidget {
   final Store store;
   final OpenedSentItem opened;
@@ -175,8 +204,16 @@ class SentItemScreen extends StatelessWidget {
   void _accept(BuildContext context) {
     final announcements = AnnouncementsScope.of(context);
     final t = context.t;
-    acceptSentItem(store, opened.item);
-    announcements?.announce(t.sentItemAccepted);
+    try {
+      acceptSentItem(store, opened.item);
+      announcements?.announce(switch (opened.state) {
+        SentItemState.update => t.sentItemApplied,
+        SentItemState.cancel => t.sentItemTrashed,
+        _ => t.sentItemAccepted,
+      });
+    } on SentItemNotFromSender {
+      announcements?.announce(t.sentItemNotFromSender);
+    }
     Navigator.of(context).pop();
   }
 
@@ -202,7 +239,15 @@ class SentItemScreen extends StatelessWidget {
         t.sentItemUnknown(code),
       ),
     };
-    final already = opened.accepted != null;
+    final state = opened.state;
+    final accept = switch (state) {
+      SentItemState.fresh => t.sentItemAccept,
+      SentItemState.update => t.sentItemApply,
+      SentItemState.cancel => t.sentItemAcceptCancel,
+      SentItemState.upToDate || SentItemState.nothingToCancel => null,
+    };
+    final full = state == SentItemState.fresh || state == SentItemState.update;
+    String schedule(Schedule s) => scheduleText(t, locale, s);
     return Scaffold(
       appBar: AppBar(title: Text(t.sentItemTitle)),
       body: ListView(
@@ -221,37 +266,113 @@ class SentItemScreen extends StatelessWidget {
                       ? t.sentItemEncrypted
                       : t.sentItemPlain,
                 ),
-                if (already) _Line(icon: Icons.check, text: t.sentItemAlready),
+                ...switch (state) {
+                  SentItemState.fresh => const <Widget>[],
+                  SentItemState.update => [
+                    _Line(icon: Icons.update, text: t.sentItemUpdate),
+                  ],
+                  SentItemState.cancel => [
+                    _Line(
+                      icon: Icons.event_busy,
+                      text: t.sentItemCancelled(item.text),
+                    ),
+                    _Line(
+                      icon: Icons.delete_outline,
+                      text: t.sentItemCancelDetail,
+                    ),
+                  ],
+                  SentItemState.upToDate => [
+                    _Line(icon: Icons.check, text: t.sentItemAlready),
+                  ],
+                  SentItemState.nothingToCancel => [
+                    _Line(
+                      icon: Icons.info_outline,
+                      text: t.sentItemNothingToCancel,
+                    ),
+                  ],
+                },
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    if (!already)
+                    if (accept != null)
                       FilledButton.icon(
                         key: const ValueKey('accept-sent'),
                         onPressed: () => _accept(context),
                         icon: const Icon(Icons.check),
-                        label: Text(t.sentItemAccept),
+                        label: Text(accept),
                       ),
                     OutlinedButton.icon(
                       key: const ValueKey('decline-sent'),
-                      onPressed: () => already
+                      onPressed: () => accept == null
                           ? Navigator.of(context).pop()
                           : _decline(context),
                       icon: const Icon(Icons.close),
-                      label: Text(t.sentItemDecline),
+                      label: Text(
+                        accept == null ? t.sentItemClose : t.sentItemDecline,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
+          if (opened.changes case final changes?)
+            EditorPanel(
+              heading: t.sentItemChanges,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (changes.restores)
+                    _Line(icon: Icons.restore, text: t.sentItemRestores),
+                  if (changes.textBefore case final before?) ...[
+                    _Line(icon: Icons.notes, text: t.sentItemTextWas(before)),
+                    _Line(
+                      icon: Icons.edit_note,
+                      text: t.sentItemTextNow(item.text),
+                    ),
+                    if (changes.textEdited)
+                      _Line(
+                        icon: Icons.warning_amber,
+                        text: t.sentItemTextYours,
+                      ),
+                  ],
+                  for (final s in changes.sectionsAdded)
+                    _Line(
+                      icon: Icons.add,
+                      text: t.sentItemSectionAdded(s.text),
+                    ),
+                  for (final r in changes.rescheduled)
+                    _Line(
+                      icon: Icons.schedule,
+                      text: t.sentItemRescheduled(
+                        schedule(r.before),
+                        schedule(r.after),
+                      ),
+                    ),
+                  for (final r in changes.routinesAdded)
+                    _Line(
+                      icon: Icons.alarm_add,
+                      text: t.sentItemRoutineAdded(schedule(r.schedule)),
+                    ),
+                  for (final r in changes.routinesRemoved)
+                    _Line(
+                      icon: Icons.alarm_off,
+                      text: t.sentItemRoutineRemoved(schedule(r.schedule)),
+                    ),
+                  if (changes.isEmpty)
+                    _Line(icon: Icons.check, text: t.sentItemNoChanges),
+                  const SizedBox(height: 4),
+                  Text(t.sentItemKeeps, style: text.bodySmall),
+                ],
+              ),
+            ),
           EditorPanel(
             heading: t.noteTitle,
             child: Text(item.text, style: text.bodyLarge),
           ),
-          if (item.routines.isNotEmpty)
+          if (full && item.routines.isNotEmpty)
             EditorPanel(
               heading: t.routinesHeading,
               child: Column(
@@ -262,25 +383,26 @@ class SentItemScreen extends StatelessWidget {
                       icon: r.schedule.once
                           ? Icons.notifications_outlined
                           : Icons.repeat,
-                      text: scheduleText(t, locale, r.schedule),
+                      text: schedule(r.schedule),
                     ),
                 ],
               ),
             ),
-          for (final section in item.sections)
-            EditorPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(section.text, style: text.bodyLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    when.format(section.captured.toLocal()),
-                    style: text.labelMedium,
-                  ),
-                ],
+          if (full)
+            for (final section in item.sections)
+              EditorPanel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(section.text, style: text.bodyLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      when.format(section.captured.toLocal()),
+                      style: text.labelMedium,
+                    ),
+                  ],
+                ),
               ),
-            ),
         ],
       ),
     );

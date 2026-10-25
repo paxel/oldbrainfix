@@ -20,3 +20,7 @@ Accepting makes a new Note of the receiver's, captured then and Unsorted, with t
 - Key records grew two fields, so every fixture carrying them changed; Devices paired before need one more sync before files to them can be encrypted.
 - Sign-then-encrypt lets the recipient pass the signed inner file on, in the sender's name; it says only what the sender sent.
 - A Sent Item from another Device of the sender's comes as a new one, not an update.
+
+## Updates and cancellations
+
+A later file with the same ID and a higher version is an update; a file carrying `"kind":"cancel"` is a cancellation (no `kind` means a normal item, any other kind is unreadable, so files from before stay byte-identical). Both are accepted only when signed by the same key as the item first accepted under that ID; a version at or below the one held writes nothing.

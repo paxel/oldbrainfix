@@ -22,7 +22,7 @@ use crate::notes::keys as note_keys;
 use crate::routines::keys as routine_keys;
 use crate::signing::{KeyRecord, KeyTrust, SigningKey, verify_signature};
 use crate::store::{Fields, Store};
-use crate::{Error, Notes, Result, Routines, Schedule};
+use crate::{Error, Notes, Result, Routine, Routines, Schedule};
 
 /// The file ending of a Sent Item.
 pub const EXTENSION: &str = "oldbrain";
@@ -35,6 +35,9 @@ pub const FORMAT: i64 = 1;
 
 /// A file larger than this is no Sent Item: it holds only texts.
 pub const MAX_BYTES: usize = 1 << 20;
+
+/// The kind a cancellation says it is; an item says none.
+const CANCEL_KIND: &str = "cancel";
 
 /// What the signature covers before the payload.
 const SIGNED_PREFIX: &str = "oldbrainfix:sent:";
@@ -83,6 +86,9 @@ pub struct SentRoutine {
 pub struct SentItem {
     pub id: String,
     pub version: i64,
+    /// Whether it cancels the Sent Item of this id: the receiver may then
+    /// move it to the trash. It still carries what the Note holds.
+    pub cancel: bool,
     pub from: KeyRecord,
     pub name: String,
     pub text: String,
@@ -101,7 +107,8 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
 }
 
 impl SentItem {
-    /// What is signed: keys sorted, no spaces, as the Dart core writes it.
+    /// What is signed: keys sorted, no spaces, as the Dart core writes it;
+    /// only a cancellation says its kind.
     pub fn encode(&self) -> String {
         let sections: Vec<Value> = self
             .sections
@@ -126,7 +133,7 @@ impl SentItem {
                 object(pairs)
             })
             .collect();
-        object(vec![
+        let mut pairs = vec![
             (
                 "from",
                 object(vec![
@@ -135,6 +142,11 @@ impl SentItem {
                 ]),
             ),
             ("id", json!(self.id)),
+        ];
+        if self.cancel {
+            pairs.push(("kind", json!(CANCEL_KIND)));
+        }
+        pairs.extend([
             (
                 "note",
                 object(vec![
@@ -144,8 +156,8 @@ impl SentItem {
             ),
             ("routines", Value::Array(routines)),
             ("version", json!(self.version)),
-        ])
-        .to_string()
+        ]);
+        object(pairs).to_string()
     }
 
     /// The item `text` holds; none when it is none.
@@ -158,6 +170,11 @@ impl SentItem {
         if id.is_empty() || version < 1 {
             return None;
         }
+        let cancel = match json.get("kind") {
+            None => false,
+            Some(kind) if kind.as_str() == Some(CANCEL_KIND) => true,
+            Some(_) => return None,
+        };
         let mut sections = Vec::new();
         for s in note.get("sections")?.as_array()? {
             sections.push(SentSection {
@@ -192,6 +209,7 @@ impl SentItem {
         Some(SentItem {
             id: id.to_string(),
             version,
+            cancel,
             from: KeyRecord::from_json(from.get("key")?)?,
             name: from.get("name")?.as_str()?.to_string(),
             text: note.get("text")?.as_str()?.to_string(),
@@ -281,7 +299,8 @@ impl Store {
     /// The Sent Item the Note `note_id` goes out as now, under the id it
     /// went out with from this Device before and the next version, or a
     /// new id; records both on the Note when this Device may change it.
-    pub fn sent_item_of(&self, note_id: &str) -> Result<SentItem> {
+    /// With `cancel` it goes out as the cancellation of that id.
+    pub fn sent_item_of(&self, note_id: &str, cancel: bool) -> Result<SentItem> {
         let notes = Notes::new(self);
         let note = notes
             .by_id(note_id)?
@@ -309,6 +328,7 @@ impl Store {
         Ok(SentItem {
             id,
             version,
+            cancel,
             from: self.own_key_record()?,
             name: self.author()?,
             text: note.text,
@@ -331,10 +351,23 @@ impl Store {
         })
     }
 
+    /// Whether this Device sent the Note `note_id` before, so sending it
+    /// again sends an update, or a cancellation.
+    pub fn was_sent(&self, note_id: &str) -> Result<bool> {
+        Ok(self
+            .current(note_id, &keys::sent(&self.device_id()?))?
+            .is_some())
+    }
+
     /// Writes the file the Note `note_id` goes out as: encrypted to the
-    /// keys of `to`, else signed only.
-    pub fn send_note(&self, note_id: &str, to: Option<&Recipient>) -> Result<Vec<u8>> {
-        let item = self.sent_item_of(note_id)?;
+    /// keys of `to`, else signed only; with `cancel` as its cancellation.
+    pub fn send_note(
+        &self,
+        note_id: &str,
+        to: Option<&Recipient>,
+        cancel: bool,
+    ) -> Result<Vec<u8>> {
+        let item = self.sent_item_of(note_id, cancel)?;
         let keys = to.map(|r| r.keys.clone()).unwrap_or_default();
         encode(&item, &self.signing_key()?, &keys, &mut |n| {
             let mut out = vec![0u8; n];
@@ -343,12 +376,52 @@ impl Store {
         })
     }
 
-    /// The Note `item` was accepted as before, from the same key: the
-    /// newest not in the trash.
+    /// The Note `item` was accepted as before, from the same key, in the
+    /// trash or merged too: the newest of them.
     pub fn accepted_note(&self, item: &SentItem) -> Result<Option<String>> {
+        Ok(self.held(item)?.0.map(|h| h.note))
+    }
+
+    /// Accepts `item` as [`Store::open_sent_item`] judged it
+    /// ([`SentItemState`]): a new Note in Unsorted, captured now, with its
+    /// Sections and its Routines and Reminders, alarms on, linked to the
+    /// Sent Item; for an update, its changes applied to the Note accepted
+    /// before ([`SentItemChanges`]); for a cancellation, that Note moved
+    /// to the trash with its Routines and Reminders. Returns the Note it
+    /// is held as; `None` when there was nothing to cancel. One whose id
+    /// came here from another key only is refused.
+    pub fn accept_sent_item(&self, item: &SentItem) -> Result<Option<String>> {
+        let (held, foreign) = self.held(item)?;
+        if held.is_none() && foreign {
+            return Err(Error::Invalid(
+                "a Sent Item of this id came from another key".into(),
+            ));
+        }
+        let (state, changes) = self.judge(item, held.as_ref())?;
+        let now = self.now();
+        match (state, held, changes) {
+            (SentItemState::Fresh, _, _) => self.accept_new(item).map(Some),
+            (SentItemState::Update, Some(held), Some(changes)) => {
+                self.apply(&held.note, item, &changes, now)?;
+                Ok(Some(held.note))
+            }
+            (SentItemState::Cancel, Some(held), _) => {
+                self.cancel(&held.note, item, now)?;
+                Ok(Some(held.note))
+            }
+            (SentItemState::UpToDate, Some(held), _) => Ok(Some(held.note)),
+            _ => Ok(None),
+        }
+    }
+
+    /// The Note `item` was accepted as here from the same key, in the
+    /// trash or merged too, the newest of them, with the version it holds;
+    /// and whether another key's Sent Item has its id.
+    fn held(&self, item: &SentItem) -> Result<(Option<Held>, bool)> {
         let from = BASE64.encode(&item.from.public_key);
         let notes = Notes::new(self);
-        let mut found: Option<(DateTime<Utc>, String)> = None;
+        let mut found: Option<(DateTime<Utc>, Held)> = None;
+        let mut foreign = false;
         for id in self.entities_of_type(note_keys::TYPE_NOTE)? {
             let Some(link) = self
                 .current(&id, keys::RECEIVED)?
@@ -356,93 +429,393 @@ impl Store {
             else {
                 continue;
             };
-            if link.get("from").and_then(Value::as_str) != Some(from.as_str())
-                || link.get("id").and_then(Value::as_str) != Some(item.id.as_str())
-            {
+            let (Some(link_from), Some(link_id), Some(version)) = (
+                link.get("from").and_then(Value::as_str),
+                link.get("id").and_then(Value::as_str),
+                link.get("version").and_then(Value::as_i64),
+            ) else {
+                continue;
+            };
+            if link_id != item.id {
+                continue;
+            }
+            if link_from != from {
+                foreign = true;
                 continue;
             }
             let Some(note) = notes.by_id(&id)? else {
                 continue;
             };
-            if note.is_trashed() || note.is_merged() {
-                continue;
-            }
             if found.as_ref().is_none_or(|(at, _)| note.captured > *at) {
-                found = Some((note.captured, id));
+                found = Some((note.captured, Held { note: id, version }));
             }
         }
-        Ok(found.map(|(_, id)| id))
+        Ok((found.map(|(_, held)| held), foreign))
     }
 
-    /// Accepts `item`: a new Note in Unsorted, captured now, with its
-    /// Sections and its Routines and Reminders, alarms on, linked to the
-    /// Sent Item. One accepted before is not taken again.
-    pub fn accept_sent_item(&self, item: &SentItem) -> Result<String> {
-        if let Some(held) = self.accepted_note(item)? {
-            return Ok(held);
+    /// What accepting `item` comes to, with the Note it was accepted as
+    /// before, and for an update what it changes.
+    fn judge(
+        &self,
+        item: &SentItem,
+        held: Option<&Held>,
+    ) -> Result<(SentItemState, Option<SentItemChanges>)> {
+        let Some(held) = held else {
+            let state = if item.cancel {
+                SentItemState::NothingToCancel
+            } else {
+                SentItemState::Fresh
+            };
+            return Ok((state, None));
+        };
+        if item.version <= held.version {
+            return Ok((SentItemState::UpToDate, None));
         }
+        let trashed = Notes::new(self)
+            .by_id(&held.note)?
+            .is_some_and(|n| n.is_trashed());
+        if item.cancel {
+            let state = if trashed {
+                SentItemState::NothingToCancel
+            } else {
+                SentItemState::Cancel
+            };
+            return Ok((state, None));
+        }
+        let changes = self.changes(&held.note, item, trashed)?;
+        Ok((SentItemState::Update, Some(changes)))
+    }
+
+    /// What the update `item` changes on the Note `note_id`, as the Dart
+    /// core works it out: its text when the sender changed theirs, the
+    /// Sections not here yet (by when they were captured), and the
+    /// sender's Routines and Reminders, known by the sender's id for each,
+    /// rescheduled, added or taken away. Those the receiver put in the
+    /// trash on their own stay there; when the Note is in the trash
+    /// (`restores`) those that went with it count.
+    fn changes(&self, note_id: &str, item: &SentItem, restores: bool) -> Result<SentItemChanges> {
+        let notes = Notes::new(self);
+        let text = notes.by_id(note_id)?.map(|n| n.text).unwrap_or_default();
+        let sent = self.last_sent_text(note_id)?;
+        let changed = item.text != text && sent.as_ref().is_none_or(|s| item.text != *s);
+        let here: std::collections::HashSet<DateTime<Utc>> = notes
+            .sections(note_id)?
+            .into_iter()
+            .map(|s| s.captured)
+            .collect();
+        let routines = Routines::new(self);
+        let mut theirs: Vec<(String, Routine)> = Vec::new();
+        let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
+        ids.sort();
+        for id in ids {
+            let Some(routine) = routines.by_id(&id)? else {
+                continue;
+            };
+            if routine.note_id != note_id {
+                continue;
+            }
+            let Some(from) = self.current(&id, keys::RECEIVED)? else {
+                continue;
+            };
+            if !theirs.iter().any(|(f, _)| *f == from) {
+                theirs.push((from, routine));
+            }
+        }
+        let live = |r: &Routine| {
+            !r.is_trashed() || (restores && r.trashed_with.as_deref() == Some(note_id))
+        };
+        let mut rescheduled = Vec::new();
+        let mut routines_added = Vec::new();
+        for r in &item.routines {
+            match theirs.iter().find(|(f, _)| *f == r.id) {
+                None => routines_added.push(r.clone()),
+                Some((_, held)) if live(held) && !same_schedule(&held.schedule, &r.schedule) => {
+                    rescheduled.push(SentReschedule {
+                        routine: held.id.clone(),
+                        before: held.schedule.clone(),
+                        after: r.schedule.clone(),
+                    });
+                }
+                Some(_) => {}
+            }
+        }
+        let routines_removed = theirs
+            .into_iter()
+            .filter(|(from, r)| !item.routines.iter().any(|s| s.id == *from) && live(r))
+            .map(|(_, r)| r)
+            .collect();
+        Ok(SentItemChanges {
+            text_before: changed.then_some(text.clone()),
+            text_edited: changed && sent.as_ref().is_some_and(|s| *s != text),
+            sections_added: item
+                .sections
+                .iter()
+                .filter(|s| !here.contains(&s.captured))
+                .cloned()
+                .collect(),
+            rescheduled,
+            routines_added,
+            routines_removed,
+            restores,
+        })
+    }
+
+    /// The text the sender last sent for the Note `note_id`: the newest
+    /// text written with its link, as accepting and applying write both
+    /// at once.
+    fn last_sent_text(&self, note_id: &str) -> Result<Option<String>> {
+        let history = self.history(note_id)?;
+        let linked: std::collections::HashSet<DateTime<Utc>> = history
+            .iter()
+            .filter(|e| e.field == keys::RECEIVED)
+            .map(|e| e.date_at)
+            .collect();
+        let mut last: Option<&crate::Entry> = None;
+        for e in &history {
+            if e.field != note_keys::TEXT || !linked.contains(&e.date_at) {
+                continue;
+            }
+            if last.is_none_or(|l| e.date_at >= l.date_at) {
+                last = Some(e);
+            }
+        }
+        Ok(last.and_then(|e| e.value.clone()))
+    }
+
+    /// A new Note in Unsorted for `item`, captured now.
+    fn accept_new(&self, item: &SentItem) -> Result<String> {
         let id = format!("note:{}", self.new_id()?);
         let now = self.now();
         let at = Some(now);
-        let link = object(vec![
-            ("from", json!(BASE64.encode(&item.from.public_key))),
-            ("id", json!(item.id)),
-            ("name", json!(item.name)),
-            ("version", json!(item.version)),
-        ])
-        .to_string();
         self.batch(|| {
             self.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
             self.append(&id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
             self.append(&id, note_keys::TEXT, Some(&item.text), at)?;
-            self.append(&id, keys::RECEIVED, Some(&link), at)?;
+            self.append(&id, keys::RECEIVED, Some(&link(item)), at)?;
             for s in &item.sections {
-                let section = format!("section:{}", self.new_id()?);
-                self.append(
-                    &section,
-                    note_keys::TYPE,
-                    Some(note_keys::TYPE_SECTION),
-                    None,
-                )?;
-                self.append(&section, note_keys::NOTE, Some(&id), None)?;
-                self.append(
-                    &section,
-                    note_keys::CAPTURED,
-                    Some(&dart_iso(s.captured)),
-                    None,
-                )?;
-                self.append(&section, note_keys::TEXT, Some(&s.text), None)?;
+                self.write_section(&id, s)?;
             }
             // Written as they are, not spawned: the Note stays in Unsorted.
             for r in &item.routines {
-                let routine = format!("routine:{}", self.new_id()?);
-                self.append(
-                    &routine,
-                    routine_keys::TYPE,
-                    Some(routine_keys::TYPE_ROUTINE),
-                    None,
-                )?;
-                self.append(&routine, routine_keys::NOTE, Some(&id), None)?;
-                self.append(
-                    &routine,
-                    routine_keys::START,
-                    Some(&r.schedule.start.to_string()),
-                    None,
-                )?;
-                self.append(
-                    &routine,
-                    routine_keys::TIMES,
-                    Some(&times(&r.schedule)),
-                    None,
-                )?;
-                if let Some(rule) = &r.schedule.rule {
-                    self.append(&routine, routine_keys::RULE, Some(&rule.format()), None)?;
-                }
-                self.append(&routine, keys::RECEIVED, Some(&r.id), None)?;
+                self.write_routine(&id, r)?;
             }
             Ok(())
         })?;
         Ok(id)
+    }
+
+    /// Applies the update `item` to the Note `note_id` as `changes` says,
+    /// at `now`, in one go, in the Dart core's order.
+    fn apply(
+        &self,
+        note_id: &str,
+        item: &SentItem,
+        changes: &SentItemChanges,
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        let at = dart_iso(now);
+        let routines = Routines::new(self);
+        self.batch(|| {
+            if changes.restores {
+                self.append(note_id, note_keys::TRASHED, None, None)?;
+                let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
+                ids.sort();
+                for id in ids {
+                    if routines
+                        .by_id(&id)?
+                        .is_some_and(|r| r.trashed_with.as_deref() == Some(note_id))
+                    {
+                        self.append(&id, routine_keys::TRASHED, None, None)?;
+                        self.append(&id, routine_keys::TRASHED_WITH, None, None)?;
+                    }
+                }
+            }
+            if changes.text_before.is_some() {
+                self.append(note_id, note_keys::TEXT, Some(&item.text), Some(now))?;
+            }
+            self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
+            for s in &changes.sections_added {
+                self.write_section(note_id, s)?;
+            }
+            for r in &changes.rescheduled {
+                routines.write_schedule(&r.routine, &r.after)?;
+            }
+            for r in &changes.routines_added {
+                self.write_routine(note_id, r)?;
+            }
+            for r in &changes.routines_removed {
+                self.append(&r.id, routine_keys::TRASHED, Some(&at), None)?;
+            }
+            Ok(())
+        })
+    }
+
+    /// Moves the Note `note_id` to the trash for the cancellation `item`,
+    /// at `now`, with its Routines and Reminders: they come back with it.
+    /// Those of its own count even when the receiver merged it into
+    /// another Note.
+    fn cancel(&self, note_id: &str, item: &SentItem, now: DateTime<Utc>) -> Result<()> {
+        let at = dart_iso(now);
+        let routines = Routines::new(self);
+        let mut ids: std::collections::BTreeSet<String> = routines
+            .of_note(note_id)?
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        for id in self.entities_of_type(routine_keys::TYPE_ROUTINE)? {
+            if routines
+                .by_id(&id)?
+                .is_some_and(|r| r.note_id == note_id && !r.is_trashed())
+            {
+                ids.insert(id);
+            }
+        }
+        self.batch(|| {
+            self.append(note_id, note_keys::TRASHED, Some(&at), None)?;
+            for id in &ids {
+                self.append(id, routine_keys::TRASHED, Some(&at), None)?;
+                self.append(id, routine_keys::TRASHED_WITH, Some(note_id), None)?;
+            }
+            self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
+            Ok(())
+        })
+    }
+
+    /// A Section of the Note `note_id` holding `section`.
+    fn write_section(&self, note_id: &str, section: &SentSection) -> Result<()> {
+        let id = format!("section:{}", self.new_id()?);
+        self.append(&id, note_keys::TYPE, Some(note_keys::TYPE_SECTION), None)?;
+        self.append(&id, note_keys::NOTE, Some(note_id), None)?;
+        self.append(
+            &id,
+            note_keys::CAPTURED,
+            Some(&dart_iso(section.captured)),
+            None,
+        )?;
+        self.append(&id, note_keys::TEXT, Some(&section.text), None)?;
+        Ok(())
+    }
+
+    /// A Routine or Reminder of the Note `note_id` as `routine` is,
+    /// knowing the sender's id for it; written, not spawned.
+    fn write_routine(&self, note_id: &str, routine: &SentRoutine) -> Result<()> {
+        let id = format!("routine:{}", self.new_id()?);
+        let schedule = &routine.schedule;
+        self.append(
+            &id,
+            routine_keys::TYPE,
+            Some(routine_keys::TYPE_ROUTINE),
+            None,
+        )?;
+        self.append(&id, routine_keys::NOTE, Some(note_id), None)?;
+        self.append(
+            &id,
+            routine_keys::START,
+            Some(&schedule.start.to_string()),
+            None,
+        )?;
+        self.append(&id, routine_keys::TIMES, Some(&times(schedule)), None)?;
+        if let Some(rule) = &schedule.rule {
+            self.append(&id, routine_keys::RULE, Some(&rule.format()), None)?;
+        }
+        self.append(&id, keys::RECEIVED, Some(&routine.id), None)?;
+        Ok(())
+    }
+}
+
+/// The Note a Sent Item was accepted as here and the version it holds.
+struct Held {
+    note: String,
+    version: i64,
+}
+
+fn same_schedule(a: &Schedule, b: &Schedule) -> bool {
+    a.start == b.start
+        && times(a) == times(b)
+        && a.rule.as_ref().map(|r| r.format()) == b.rule.as_ref().map(|r| r.format())
+}
+
+/// The link an accepted Note keeps to `item`.
+fn link(item: &SentItem) -> String {
+    object(vec![
+        ("from", json!(BASE64.encode(&item.from.public_key))),
+        ("id", json!(item.id)),
+        ("name", json!(item.name)),
+        ("version", json!(item.version)),
+    ])
+    .to_string()
+}
+
+/// What accepting a Sent Item opened here comes to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SentItemState {
+    /// Never accepted here: accepting makes a new Note in Unsorted.
+    Fresh,
+    /// A newer version of one accepted here: accepting applies its
+    /// [`SentItemChanges`] to that Note, wherever it is filed.
+    Update,
+    /// The cancellation of one accepted here: accepting moves that Note
+    /// to the trash with its Routines and Reminders, alarms off.
+    Cancel,
+    /// This version or a newer one was accepted here: nothing to do.
+    UpToDate,
+    /// The cancellation of nothing accepted here, or of a Note already in
+    /// the trash: nothing to do.
+    NothingToCancel,
+}
+
+impl SentItemState {
+    /// The name the Dart core gives it.
+    pub fn name(self) -> &'static str {
+        match self {
+            SentItemState::Fresh => "fresh",
+            SentItemState::Update => "update",
+            SentItemState::Cancel => "cancel",
+            SentItemState::UpToDate => "upToDate",
+            SentItemState::NothingToCancel => "nothingToCancel",
+        }
+    }
+}
+
+/// A Routine or Reminder an update gives another schedule: the one here,
+/// its schedule now and the one it gets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SentReschedule {
+    pub routine: String,
+    pub before: Schedule,
+    pub after: Schedule,
+}
+
+/// What applying an update changes on the Note accepted before. What the
+/// receiver added stays: their Sections, Routines and Reminders, Done
+/// marks, Importance and where the Note is filed.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SentItemChanges {
+    /// The Note's text here, when the update replaces it: only when the
+    /// sender changed theirs since.
+    pub text_before: Option<String>,
+    /// Whether the text here was changed here since it came.
+    pub text_edited: bool,
+    /// Sections the sender added since; none is ever taken away.
+    pub sections_added: Vec<SentSection>,
+    pub rescheduled: Vec<SentReschedule>,
+    pub routines_added: Vec<SentRoutine>,
+    /// The sender's Routines and Reminders here that they took away: they
+    /// go to the trash, restorable.
+    pub routines_removed: Vec<Routine>,
+    /// Whether the Note is in the trash here: applying brings it back.
+    pub restores: bool,
+}
+
+impl SentItemChanges {
+    /// Whether nothing but the version changes.
+    pub fn is_empty(&self) -> bool {
+        self.text_before.is_none()
+            && self.sections_added.is_empty()
+            && self.rescheduled.is_empty()
+            && self.routines_added.is_empty()
+            && self.routines_removed.is_empty()
+            && !self.restores
     }
 }
 
@@ -535,8 +908,12 @@ pub struct Opened {
     /// Whether it came encrypted to this Device.
     pub encrypted: bool,
     pub trust: SenderTrust,
-    /// The Note it was accepted as before, if it was.
+    /// The Note it was accepted as before, if it was, in the trash too.
     pub accepted: Option<String>,
+    /// What accepting it comes to.
+    pub state: SentItemState,
+    /// What an update changes; `None` for anything else.
+    pub changes: Option<SentItemChanges>,
 }
 
 /// Why a file could not be opened.
@@ -547,6 +924,9 @@ pub enum OpenError {
     NotASentItem,
     /// Encrypted to other Devices, not to this one.
     NotForUs,
+    /// Its id came here from another key: only its sender may update or
+    /// cancel it (ADR 0009).
+    NotFromSender,
 }
 
 /// Whether `bytes` look like a Sent Item rather than a bundle: a JSON
@@ -559,8 +939,8 @@ pub fn looks_like_sent_item(bytes: &[u8]) -> bool {
 }
 
 impl Store {
-    /// Reads the Sent Item in `bytes`: decrypts it when it is encrypted
-    /// and checks the signature over it.
+    /// Reads the Sent Item in `bytes`: decrypts it when it is encrypted,
+    /// checks the signature over it and what accepting it would do here.
     pub fn open_sent_item(&self, bytes: &[u8]) -> Result<std::result::Result<Opened, OpenError>> {
         if bytes.len() > MAX_BYTES {
             return Ok(Err(OpenError::NotASentItem));
@@ -611,12 +991,18 @@ impl Store {
             Some(_) => SenderTrust::Known,
             None => SenderTrust::Unknown,
         };
-        let accepted = self.accepted_note(&item)?;
+        let (held, foreign) = self.held(&item)?;
+        if held.is_none() && foreign {
+            return Ok(Err(OpenError::NotFromSender));
+        }
+        let (state, changes) = self.judge(&item, held.as_ref())?;
         Ok(Ok(Opened {
             item,
             encrypted,
             trust,
-            accepted,
+            accepted: held.map(|h| h.note),
+            state,
+            changes,
         }))
     }
 
@@ -703,7 +1089,7 @@ mod tests {
         .ok_or("schedule")?;
         let sent = Routines::new(&ann).spawn(&note.id, &schedule)?;
 
-        let file = ann.send_note(&note.id, None)?;
+        let file = ann.send_note(&note.id, None, false)?;
         assert!(looks_like_sent_item(&file));
         let opened = ben.open_sent_item(&file)?.map_err(|_| "opened")?;
         assert!(!opened.encrypted);
@@ -711,12 +1097,12 @@ mod tests {
         assert_eq!(opened.item.name, "Ann");
         assert_eq!(opened.item.version, 1);
         let again = ben
-            .open_sent_item(&ann.send_note(&note.id, None)?)?
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
             .map_err(|_| "again")?;
         assert_eq!(again.item.id, opened.item.id);
         assert_eq!(again.item.version, 2);
 
-        let id = ben.accept_sent_item(&opened.item)?;
+        let id = ben.accept_sent_item(&opened.item)?.ok_or("accepted")?;
         let got = Notes::new(&ben).by_id(&id)?.ok_or("note")?;
         assert!(got.is_unsorted());
         assert_eq!(got.text, "Dentist");
@@ -727,7 +1113,25 @@ mod tests {
             ben.current(&routines[0].id, keys::RECEIVED)?.as_deref(),
             Some(sent.id.as_str())
         );
-        assert_eq!(ben.accept_sent_item(&again.item)?, id);
+        assert_eq!(
+            ben.open_sent_item(&file)?.map(|o| o.state),
+            Ok(SentItemState::UpToDate)
+        );
+        // Sent again unchanged: only the version moves on.
+        let resent = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "resent")?;
+        assert_eq!(resent.state, SentItemState::Update);
+        assert!(
+            resent
+                .changes
+                .as_ref()
+                .is_some_and(SentItemChanges::is_empty)
+        );
+        assert_eq!(
+            ben.accept_sent_item(&resent.item)?.as_deref(),
+            Some(id.as_str())
+        );
 
         let mut changed = String::from_utf8(file)?;
         changed = changed.replacen("Dentist", "Dentlst", 1);
@@ -743,6 +1147,71 @@ mod tests {
     }
 
     #[test]
+    fn an_update_keeps_the_receivers_text_and_brings_a_trashed_note_back() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let notes = Notes::new(&ann);
+        let note = notes.capture("Dentist", None, None)?;
+        let schedule = Schedule::new(
+            Day::parse("2026-03-03").ok_or("day")?,
+            &[ClockTime::parse("10:00").ok_or("time")?],
+            None,
+        )
+        .ok_or("schedule")?;
+        Routines::new(&ann).spawn(&note.id, &schedule)?;
+        let first = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "first")?;
+        let got = ben.accept_sent_item(&first.item)?.ok_or("accepted")?;
+        assert!(ann.was_sent(&note.id)?);
+
+        // His own words stay while hers do not change.
+        Notes::new(&ben).edit(&got, "Dentist (mine)")?;
+        let same = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "same")?;
+        let changes = same.changes.clone().ok_or("changes")?;
+        assert_eq!(changes.text_before, None);
+        ben.accept_sent_item(&same.item)?;
+        assert_eq!(
+            Notes::new(&ben).by_id(&got)?.ok_or("note")?.text,
+            "Dentist (mine)"
+        );
+
+        // In his trash: the cancellation finds nothing, an update brings
+        // it back, its Reminder with it.
+        Routines::new(&ben).trash_note(&got, true)?;
+        let cancel = ben
+            .open_sent_item(&ann.send_note(&note.id, None, true)?)?
+            .map_err(|_| "cancel")?;
+        assert_eq!(cancel.state, SentItemState::NothingToCancel);
+        assert_eq!(ben.accept_sent_item(&cancel.item)?, None);
+        notes.edit(&note.id, "Dentist moved")?;
+        let update = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "update")?;
+        let changes = update.changes.clone().ok_or("changes")?;
+        assert!(changes.restores);
+        assert!(changes.text_edited);
+        assert_eq!(changes.text_before.as_deref(), Some("Dentist (mine)"));
+        ben.accept_sent_item(&update.item)?;
+        let back = Notes::new(&ben).by_id(&got)?.ok_or("note")?;
+        assert!(!back.is_trashed());
+        assert_eq!(back.text, "Dentist moved");
+        assert_eq!(Routines::new(&ben).of_note(&got)?.len(), 1);
+
+        // Cancelled for real: in the trash, alarms off.
+        let cancel = ben
+            .open_sent_item(&ann.send_note(&note.id, None, true)?)?
+            .map_err(|_| "cancel")?;
+        assert_eq!(cancel.state, SentItemState::Cancel);
+        ben.accept_sent_item(&cancel.item)?;
+        assert!(Notes::new(&ben).by_id(&got)?.ok_or("note")?.is_trashed());
+        assert!(Routines::new(&ben).all()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn a_person_met_gets_it_encrypted_and_nobody_else_reads_it() -> TestResult {
         let ann = device(1);
         let ben = device(2);
@@ -752,7 +1221,7 @@ mod tests {
         assert_eq!(to.len(), 1);
         assert_eq!(to[0].name, "Ben");
         let note = Notes::new(&ann).capture("Secret plan", None, None)?;
-        let file = ann.send_note(&note.id, Some(&to[0]))?;
+        let file = ann.send_note(&note.id, Some(&to[0]), false)?;
         assert!(!String::from_utf8_lossy(&file).contains("Secret"));
         let opened = ben.open_sent_item(&file)?.map_err(|_| "opened")?;
         assert!(opened.encrypted);

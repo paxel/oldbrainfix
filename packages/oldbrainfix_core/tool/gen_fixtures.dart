@@ -1599,9 +1599,127 @@ void _sentFixture(Directory root) {
     ids = 0x400;
     _held = DateTime.utc(2026, 1, 4, 18);
     mark = ben.currentSeq();
-    final accepted = acceptSentItem(ben, fromSealed.item);
+    final accepted =
+        acceptSentItem(ben, fromSealed.item) ??
+        (throw StateError('Ben did not accept it'));
     _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
     final opened = fromSigned.item;
+    final first = {
+      'note': _note(Notes(ben).byId(accepted)!),
+      'routines': [
+        for (final r in Routines(
+          ben,
+        ).ofNote(accepted)..sort((a, b) => a.id.compareTo(b.id)))
+          _routine(r),
+      ],
+    };
+    final acceptedAgain = openSentItem(ben, signed);
+
+    // Ben makes it his own: his text, an Amend, an Area, an Importance,
+    // a Done mark and a Reminder of his.
+    ids = 0x500;
+    _held = DateTime.utc(2026, 1, 5, 9);
+    mark = ben.currentSeq();
+    Notes(ben).edit(accepted, 'Dentist on Friday (Dr. Müller)');
+    Notes(ben).amend(accepted, 'Ask about the bill');
+    final health = Places(ben).addArea('Health');
+    Notes(ben).file(accepted, health.id);
+    Notes(ben).setImportance(accepted, Importance.important);
+    final weekly = Routines(ben)
+        .ofNote(accepted)
+        .firstWhere((r) => !r.isReminder);
+    Routines(ben)
+        .markDone(weekly.id, Occurrence(Day(2026, 1, 5), ClockTime(8, 0)));
+    Routines(ben).spawn(
+      accepted,
+      Schedule(start: Day(2026, 1, 7), times: [ClockTime(18, 0)]),
+    );
+    _writeAfter(ben, mark, File('${out.path}/receiver.jsonl'));
+
+    // Ada changes the text, amends, moves the Reminder from Friday 09:30
+    // to Thursday 14:00, takes the weekly Routine away and adds a daily
+    // one, then sends the update, signed only.
+    ids = 0x600;
+    _held = DateTime.utc(2026, 1, 6, 10);
+    mark = ada.currentSeq();
+    Notes(ada).edit(note.id, 'Dentist on Thursday, "Dr. Müller"');
+    Notes(ada).amend(note.id, 'Room 3 now');
+    final adaRoutines = Routines(ada).ofNote(note.id);
+    Routines(ada).reschedule(
+      adaRoutines.firstWhere((r) => r.isReminder).id,
+      Schedule(start: Day(2026, 1, 8), times: [ClockTime(14, 0)]),
+    );
+    Routines(ada).trash(adaRoutines.firstWhere((r) => !r.isReminder).id);
+    Routines(ada).spawn(
+      note.id,
+      Schedule(
+        start: Day(2026, 1, 6),
+        times: [ClockTime(7, 30)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    _writeAfter(ada, mark, File('${out.path}/changed.jsonl'));
+    _held = DateTime.utc(2026, 1, 6, 11);
+    mark = ada.currentSeq();
+    final update = encodeSentItem(sentItemOf(ada, note.id), ada.signingKey);
+    _writeAfter(ada, mark, File('${out.path}/update.jsonl'));
+    File('${out.path}/update.$sentItemExtension').writeAsBytesSync(update);
+
+    // Ben applies it.
+    ids = 0x700;
+    _held = DateTime.utc(2026, 1, 7, 8);
+    final toUpdate = openSentItem(ben, update);
+    final changes =
+        toUpdate.changes ?? (throw StateError('Ben sees no update'));
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toUpdate.item);
+    _writeAfter(ben, mark, File('${out.path}/updated.jsonl'));
+    final updated = _received(ben, accepted);
+    final stale = openSentItem(ben, signed).state.name;
+
+    // Ada cancels it; Ben accepts the cancellation.
+    _held = DateTime.utc(2026, 1, 8, 7);
+    mark = ada.currentSeq();
+    final cancel = encodeSentItem(
+      sentItemOf(ada, note.id, cancel: true),
+      ada.signingKey,
+    );
+    _writeAfter(ada, mark, File('${out.path}/cancel.jsonl'));
+    File('${out.path}/cancel.$sentItemExtension').writeAsBytesSync(cancel);
+    ids = 0x800;
+    _held = DateTime.utc(2026, 1, 8, 12);
+    final toCancel = openSentItem(ben, cancel);
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toCancel.item);
+    _writeAfter(ben, mark, File('${out.path}/cancelled.jsonl'));
+
+    // Eve signs a cancellation of Ada's id with her own key.
+    final eve = Store.inMemory(
+      clock: _clock,
+      newKey: () => SigningKey.fromSeed(Uint8List(32)..fillRange(0, 32, 9)),
+    );
+    final forged = encodeSentItem(
+      SentItem(
+        id: opened.id,
+        version: 9,
+        cancel: true,
+        from: eve.ownKeyRecord,
+        name: 'Ada',
+        text: 'Cancelled',
+      ),
+      eve.signingKey,
+    );
+    File('${out.path}/forged.$sentItemExtension').writeAsBytesSync(forged);
+    var refused = false;
+    try {
+      openSentItem(ben, forged);
+    } on SentItemNotFromSender {
+      refused = true;
+    }
+    final elsewhere = openSentItem(eve, cancel).state.name;
+    eve.close();
+    if (!refused) throw StateError('Ben took a forged cancellation');
+
     _write(
       File('${out.path}/expected.json'),
       '${_json.convert({
@@ -1625,10 +1743,29 @@ void _sentFixture(Directory root) {
           ],
         },
         'trust': fromSigned.trust.name,
+        'state': fromSigned.state.name,
         'accepted': accepted,
-        'note': _note(Notes(ben).byId(accepted)!),
-        'routines': [for (final r in Routines(ben).ofNote(accepted)..sort((a, b) => a.id.compareTo(b.id))) _routine(r)],
-        'acceptedAgain': openSentItem(ben, signed).accepted,
+        ...first,
+        'acceptedAgain': acceptedAgain.accepted,
+        'stateAgain': acceptedAgain.state.name,
+        'update': {
+          'version': toUpdate.item.version,
+          'state': toUpdate.state.name,
+          'changes': {
+            'textBefore': changes.textBefore,
+            'textEdited': changes.textEdited,
+            'sectionsAdded': [for (final s in changes.sectionsAdded) s.text],
+            'rescheduled': [
+              for (final r in changes.rescheduled) {'routine': r.routine, 'before': _schedule(r.before), 'after': _schedule(r.after)},
+            ],
+            'routinesAdded': [for (final r in changes.routinesAdded) r.id],
+            'routinesRemoved': [for (final r in changes.routinesRemoved) r.id],
+            'restores': changes.restores,
+          },
+          ...updated,
+          'stale': stale,
+        },
+        'cancel': {'version': toCancel.item.version, 'state': toCancel.state.name, ..._received(ben, accepted), 'elsewhere': elsewhere, 'forged': 'notFromSender'},
       })}\n',
     );
   } finally {
@@ -1636,6 +1773,24 @@ void _sentFixture(Directory root) {
     ben.close();
   }
 }
+
+/// What [store] holds of the accepted Note [id]: the Note, its
+/// Sections and every Routine and Reminder of it, those in the trash too.
+Map<String, Object?> _received(Store store, String id) => {
+  'note': _note(Notes(store).byId(id)!),
+  'sections': [for (final s in Notes(store).sections(id)) _section(s)],
+  'routines': [
+    for (final r in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+      if (Routines(store).byId(r) case final routine? when routine.noteId == id)
+        _routine(routine),
+  ],
+};
+
+Map<String, Object?> _schedule(Schedule s) => {
+  'start': '${s.start}',
+  'times': [for (final t in s.times) '$t'],
+  'rule': s.rule?.format(),
+};
 
 /// What the roles of [area] come to on [store]: this Device's access,
 /// the people, what it may change and every entry no role allows.
@@ -2209,8 +2364,15 @@ Future<void> main(List<String> args) async {
     'ids counted from 0x301, at a held clock), the file signed only '
     '(`signed.$sentItemExtension`) and encrypted to Ben\'s X25519 key '
     '(`sealed.$sentItemExtension`, random bytes counted from 4001 on), '
-    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401) '
-    'and what he reads (`expected.json`).\n',
+    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401); '
+    'then Ben makes it his own (`receiver.jsonl`, from 0x501), Ada changes '
+    'it (`changed.jsonl`, from 0x601) and sends an update '
+    '(`update.jsonl`, `update.$sentItemExtension`), which Ben applies '
+    '(`updated.jsonl`, from 0x701); Ada cancels it (`cancel.jsonl`, '
+    '`cancel.$sentItemExtension`), Ben accepts that (`cancelled.jsonl`), '
+    'and refuses a cancellation another key signed '
+    '(`forged.$sentItemExtension`); what he reads at each step '
+    '(`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {

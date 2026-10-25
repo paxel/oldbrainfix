@@ -18,6 +18,7 @@ void main() {
   late Directory dir;
   late FakeBundles files;
   late Announcements announcements;
+  late FakeAlarms alarms;
 
   setUp(() {
     phone = Store.inMemory(clock: () => now)
@@ -28,6 +29,7 @@ void main() {
     dir = Directory.systemTemp.createTempSync('sent_widget_');
     files = FakeBundles(dir);
     announcements = Announcements();
+    alarms = FakeAlarms();
   });
   tearDown(() {
     phone.close();
@@ -60,7 +62,7 @@ void main() {
     await tester.pumpWidget(
       OldBrainFixApp(
         store: phone,
-        alarms: FakeAlarms(),
+        alarms: alarms,
         announcements: announcements,
         bundles: files,
       ),
@@ -82,11 +84,30 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
-  /// A Sent Item from Ann, as a file other apps hand over.
-  String fileFrom(Note note, {Recipient? to}) {
+  /// [bytes] as a file other apps hand over.
+  String fileOf(List<int> bytes) {
     final path = '${dir.path}/in-${DateTime.now().microsecondsSinceEpoch}';
-    File(path).writeAsBytesSync(sendNote(ann, note.id, to: to));
+    File(path).writeAsBytesSync(bytes);
     return path;
+  }
+
+  /// A Sent Item from Ann, as a file other apps hand over.
+  String fileFrom(Note note, {Recipient? to, bool cancel = false}) =>
+      fileOf(sendNote(ann, note.id, to: to, cancel: cancel));
+
+  /// Ann's Note with a Reminder on Tuesday 3 November at 10:00, which
+  /// the phone accepted.
+  (Note, String) acceptedFromAnn() {
+    final note = Notes(ann).capture('Dentist');
+    Routines(ann).spawn(
+      note.id,
+      Schedule(start: Day(2026, 11, 3), times: [ClockTime(10, 0)]),
+    );
+    final got = acceptSentItem(
+      phone,
+      openSentItem(phone, sendNote(ann, note.id)).item,
+    )!;
+    return (note, got);
   }
 
   group('sending', () {
@@ -122,6 +143,46 @@ void main() {
       final bytes = File(files.shared.single).readAsBytesSync();
       expect(String.fromCharCodes(bytes), isNot(contains('Surprise')));
       expect(openSentItem(ann, bytes).encrypted, isTrue);
+    });
+
+    testWidgets('sent before: an update, or a cancellation instead', (
+      tester,
+    ) async {
+      final note = Notes(phone).capture('Dentist on Friday');
+      sendNote(phone, note.id);
+      await edit(tester, note);
+      await tester.tap(find.byTooltip('Send this Note'));
+      await tester.pumpAndSettle();
+      expect(find.text('Send an update'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('send-note')));
+      await tester.pumpAndSettle();
+      final update = openSentItem(
+        ann,
+        File(files.shared.last).readAsBytesSync(),
+      );
+      expect(update.item.version, 2);
+      expect(update.item.cancel, isFalse);
+
+      await tester.tap(find.byTooltip('Send this Note'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('send-cancel')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('send-note')));
+      await tester.pumpAndSettle();
+      final cancel = openSentItem(
+        ann,
+        File(files.shared.last).readAsBytesSync(),
+      );
+      expect(cancel.item.version, 3);
+      expect(cancel.item.cancel, isTrue);
+    });
+
+    testWidgets('a Note never sent offers no cancellation', (tester) async {
+      final note = Notes(phone).capture('Milk');
+      await edit(tester, note);
+      await tester.tap(find.byTooltip('Send this Note'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('send-cancel')), findsNothing);
     });
 
     testWidgets('no app to take it is said', (tester) async {
@@ -207,6 +268,116 @@ void main() {
       await tester.pumpAndSettle();
       expect(announcements.visible, contains('cannot be read'));
       expect(find.byType(SentItemScreen), findsNothing);
+    });
+
+    testWidgets('an update shows what changes; applying keeps the own '
+        'additions', (tester) async {
+      final (note, got) = acceptedFromAnn();
+      Notes(phone).amend(got, 'Ask about the bill');
+      Notes(phone).setImportance(got, Importance.important);
+      Notes(ann).edit(note.id, 'Dentist, room 3');
+      Routines(ann).reschedule(
+        Routines(ann).ofNote(note.id).single.id,
+        Schedule(start: Day(2026, 11, 4), times: [ClockTime(14, 0)]),
+      );
+      files.waiting.add(fileFrom(note));
+      await app(tester);
+
+      expect(
+        find.text('An update to a Note you accepted before.'),
+        findsOneWidget,
+      );
+      expect(find.text('Text so far: Dentist'), findsOneWidget);
+      expect(find.text('New text: Dentist, room 3'), findsOneWidget);
+      final moved = find.textContaining('→');
+      expect(moved, findsOneWidget);
+      final line = tester.widget<Text>(moved).data!;
+      expect(line, allOf(contains('10:00'), contains('14:00')));
+      expect(line.indexOf('10:00'), lessThan(line.indexOf('14:00')));
+      expect(find.text('Apply update'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('accept-sent')));
+      await tester.pumpAndSettle();
+      expect(announcements.visible, 'Updated. Your own additions stayed.');
+      final held = Notes(phone).byId(got)!;
+      expect(held.text, 'Dentist, room 3');
+      expect(held.importance, Importance.important);
+      expect(
+        [for (final s in Notes(phone).sections(got)) s.text],
+        ['Ask about the bill'],
+      );
+      expect(
+        Routines(phone).ofNote(got).single.schedule.start,
+        Day(2026, 11, 4),
+      );
+      expect(Notes(phone).all(), hasLength(1), reason: 'no second Note');
+    });
+
+    testWidgets('a cancellation trashes the Note and its alarms', (
+      tester,
+    ) async {
+      final (note, got) = acceptedFromAnn();
+      final routine = Routines(phone).ofNote(got).single.id;
+      files.waiting.add(fileFrom(note, cancel: true));
+      await app(tester);
+      expect(alarms.armed.map((a) => a.alarm.routineId), contains(routine));
+
+      expect(find.text('Cancelled: Dentist'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('accept-sent')));
+      await tester.pumpAndSettle();
+      expect(announcements.visible, contains('Moved to the trash'));
+      expect(Notes(phone).byId(got)!.isTrashed, isTrue);
+      expect(Routines(phone).all(), isEmpty);
+      expect(
+        alarms.armed.map((a) => a.alarm.routineId),
+        isNot(contains(routine)),
+      );
+    });
+
+    testWidgets('an old version or nothing to cancel only closes', (
+      tester,
+    ) async {
+      final (note, _) = acceptedFromAnn();
+      final older = sendNote(ann, note.id);
+      acceptSentItem(phone, openSentItem(phone, sendNote(ann, note.id)).item);
+      final after = phone.allEntries().length;
+      files.waiting.add(fileOf(older));
+      await app(tester);
+      expect(find.textContaining('Already up to date'), findsOneWidget);
+      expect(find.byKey(const ValueKey('accept-sent')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('decline-sent')));
+      await tester.pumpAndSettle();
+      expect(find.byType(SentItemScreen), findsNothing);
+      expect(phone.allEntries(), hasLength(after));
+
+      files.open(fileFrom(Notes(ann).capture('Party'), cancel: true));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Nothing to cancel'), findsOneWidget);
+      expect(find.text('Close'), findsOneWidget);
+    });
+
+    testWidgets('a change signed by another key is refused', (tester) async {
+      final (note, _) = acceptedFromAnn();
+      final eve = Store.inMemory(clock: () => now);
+      addTearDown(eve.close);
+      final id = openSentItem(phone, sendNote(ann, note.id)).item.id;
+      final forged = encodeSentItem(
+        SentItem(
+          id: id,
+          version: 9,
+          cancel: true,
+          from: eve.ownKeyRecord,
+          name: 'Ann',
+          text: 'Dentist',
+        ),
+        eve.signingKey,
+      );
+      await app(tester);
+      files.open(fileOf(forged));
+      await tester.pumpAndSettle();
+      expect(announcements.visible, startsWith('Refused:'));
+      expect(find.byType(SentItemScreen), findsNothing);
+      expect(Notes(phone).all().single.isTrashed, isFalse);
     });
 
     testWidgets('behind the App Lock the preview waits for the unlock', (
