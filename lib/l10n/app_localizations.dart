@@ -2815,6 +2815,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Another person\'s Device'**
   String get pairedPerson;
+
+  /// No description provided for @sendNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this Note'**
+  String get sendNote;
+
+  /// No description provided for @sendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this Note'**
+  String get sendTitle;
+
+  /// No description provided for @sendWho.
+  ///
+  /// In en, this message translates to:
+  /// **'Who gets it?'**
+  String get sendWho;
+
+  /// No description provided for @sendAnyone.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone, not encrypted'**
+  String get sendAnyone;
+
+  /// No description provided for @sendEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, encrypted'**
+  String sendEncrypted(String name);
+
+  /// No description provided for @sendPlainHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Not encrypted: whoever gets the file can read it. To encrypt it, share an Area with the person or pair with their Device first.'**
+  String get sendPlainHint;
+
+  /// No description provided for @sendWhat.
+  ///
+  /// In en, this message translates to:
+  /// **'It carries the text, the Sections and the Routines and Reminders; no photos, recordings or where it was captured. Sending it again later sends it as an update.'**
+  String get sendWhat;
+
+  /// No description provided for @sendAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get sendAction;
+
+  /// No description provided for @sendNoApp.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the file.'**
+  String get sendNoApp;
+
+  /// No description provided for @sentItemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent to you'**
+  String get sentItemTitle;
+
+  /// No description provided for @sentItemFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From {name}'**
+  String sentItemFrom(String name);
+
+  /// No description provided for @sentItemSomeone.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone'**
+  String get sentItemSomeone;
+
+  /// No description provided for @sentItemVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified: met in person. Key {code}'**
+  String sentItemVerified(String code);
+
+  /// No description provided for @sentItemKnown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified: known from syncing, never met in person. Key {code}'**
+  String sentItemKnown(String code);
+
+  /// No description provided for @sentItemUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified: never met. Key {code}'**
+  String sentItemUnknown(String code);
+
+  /// No description provided for @sentItemEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'It came encrypted to this Device.'**
+  String get sentItemEncrypted;
+
+  /// No description provided for @sentItemPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'It came unencrypted: others may have read it on the way.'**
+  String get sentItemPlain;
+
+  /// No description provided for @sentItemAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get sentItemAccept;
+
+  /// No description provided for @sentItemDecline.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get sentItemDecline;
+
+  /// No description provided for @sentItemAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to Unsorted, with its alarms on.'**
+  String get sentItemAccepted;
+
+  /// No description provided for @sentItemDeclined.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined: nothing was kept.'**
+  String get sentItemDeclined;
+
+  /// No description provided for @sentItemAlready.
+  ///
+  /// In en, this message translates to:
+  /// **'You accepted this before; it is among your Notes.'**
+  String get sentItemAlready;
+
+  /// No description provided for @sentItemUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'This file cannot be read: it is damaged, or not signed by the key it names.'**
+  String get sentItemUnreadable;
+
+  /// No description provided for @sentItemNotForUs.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is encrypted for someone else.'**
+  String get sentItemNotForUs;
 }
 
 class _AppLocalizationsDelegate

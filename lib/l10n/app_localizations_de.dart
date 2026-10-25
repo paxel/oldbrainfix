@@ -1751,4 +1751,92 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get pairedPerson => 'Gerät einer anderen Person';
+
+  @override
+  String get sendNote => 'Diese Notiz senden';
+
+  @override
+  String get sendTitle => 'Diese Notiz senden';
+
+  @override
+  String get sendWho => 'Wer bekommt sie?';
+
+  @override
+  String get sendAnyone => 'Irgendwer, unverschlüsselt';
+
+  @override
+  String sendEncrypted(String name) {
+    return '$name, verschlüsselt';
+  }
+
+  @override
+  String get sendPlainHint =>
+      'Nicht verschlüsselt: Wer die Datei bekommt, kann sie lesen. Zum Verschlüsseln teile zuerst einen Bereich mit der Person oder kopple dich mit ihrem Gerät.';
+
+  @override
+  String get sendWhat =>
+      'Sie enthält den Text, die Abschnitte und die Routinen und Erinnerungen; keine Fotos, Aufnahmen und nicht, wo sie erfasst wurde. Sendest du sie später noch einmal, kommt sie als Aktualisierung an.';
+
+  @override
+  String get sendAction => 'Senden';
+
+  @override
+  String get sendNoApp => 'Keine App hier kann die Datei annehmen.';
+
+  @override
+  String get sentItemTitle => 'An dich gesendet';
+
+  @override
+  String sentItemFrom(String name) {
+    return 'Von $name';
+  }
+
+  @override
+  String get sentItemSomeone => 'Jemand';
+
+  @override
+  String sentItemVerified(String code) {
+    return 'Geprüft: persönlich getroffen. Schlüssel $code';
+  }
+
+  @override
+  String sentItemKnown(String code) {
+    return 'Nicht geprüft: vom Synchronisieren bekannt, nie persönlich getroffen. Schlüssel $code';
+  }
+
+  @override
+  String sentItemUnknown(String code) {
+    return 'Nicht geprüft: nie getroffen. Schlüssel $code';
+  }
+
+  @override
+  String get sentItemEncrypted => 'Sie kam verschlüsselt an dieses Gerät.';
+
+  @override
+  String get sentItemPlain =>
+      'Sie kam unverschlüsselt: Andere könnten sie unterwegs gelesen haben.';
+
+  @override
+  String get sentItemAccept => 'Annehmen';
+
+  @override
+  String get sentItemDecline => 'Ablehnen';
+
+  @override
+  String get sentItemAccepted => 'In Unsortiert abgelegt, mit ihren Alarmen.';
+
+  @override
+  String get sentItemDeclined => 'Abgelehnt: Nichts wurde behalten.';
+
+  @override
+  String get sentItemAlready =>
+      'Das hast du schon angenommen; es ist bei deinen Notizen.';
+
+  @override
+  String get sentItemUnreadable =>
+      'Diese Datei lässt sich nicht lesen: Sie ist beschädigt oder nicht mit dem Schlüssel signiert, den sie nennt.';
+
+  @override
+  String get sentItemNotForUs =>
+      'Diese Datei ist für jemand anderen verschlüsselt.';
 }

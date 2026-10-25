@@ -32,6 +32,7 @@ import 'photo_platform.dart';
 import 'question_mark_background.dart';
 import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
+import 'sent_item_screen.dart';
 import 'setup_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
@@ -390,6 +391,9 @@ class _HomeState extends State<_Home> {
 
   late final StreamSubscription<void> _bundlesOpened;
 
+  /// Sent Items other apps opened with this one while it was locked.
+  final _openedWaiting = <String>[];
+
   @override
   void initState() {
     super.initState();
@@ -493,13 +497,21 @@ class _HomeState extends State<_Home> {
 
   /// Imports the bundles other apps opened with this one, announcing
   /// what each brought; Conflicts as an automatic sync's, not past the
-  /// App Lock.
+  /// App Lock. A Sent Item among them opens its preview, behind the App
+  /// Lock once it is unlocked.
   Future<void> _importOpened() async {
-    final paths = await widget.bundles.takeOpened();
+    _openedWaiting.addAll(await widget.bundles.takeOpened());
+    final paths = [..._openedWaiting];
+    _openedWaiting.clear();
     var conflicts = 0;
     for (final path in paths) {
       if (!mounted) return;
-      conflicts += await importBundleFile(context, widget.store, path);
+      // A Sent Item shows what is in it: not past the App Lock.
+      if (widget.lock.locked && isSentItemFile(path)) {
+        _openedWaiting.add(path);
+        continue;
+      }
+      conflicts += await openReceivedFile(context, widget.store, path);
     }
     if (!mounted || conflicts == 0) return;
     if (widget.lock.locked) {
@@ -543,6 +555,7 @@ class _HomeState extends State<_Home> {
     }
     if (_nudgeWaiting) _openNudge();
     if (_conflictsWaiting) _announceConflicts();
+    if (_openedWaiting.isNotEmpty) unawaited(_importOpened());
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));

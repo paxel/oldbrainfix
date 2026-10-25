@@ -76,7 +76,7 @@
   "@hotkeyUnavailable": {"description": "Under the hotkey field where neither the app nor the desktop can provide one."},
   "captureCommand": "Launchers, key-binding tools and macro pads can run “oldbrainfix capture” to open the popup, or “oldbrainfix capture buy milk” to keep a text at once.",
   "@captureCommand": {"description": "In the desktop settings' quick capture card."},
-  "cliUsage": "Usage:\n  oldbrainfix               open the window\n  oldbrainfix capture       open the capture popup\n  oldbrainfix capture TEXT  capture TEXT as a Note with a Nudge in 1 h\n  oldbrainfix capture -     capture what comes in on stdin\n  oldbrainfix import FILE   import the sync bundle FILE\n\nExit codes: 0 done, 1 could not be kept or imported, 2 wrong arguments or nothing to capture.",
+  "cliUsage": "Usage:\n  oldbrainfix               open the window\n  oldbrainfix capture       open the capture popup\n  oldbrainfix capture TEXT  capture TEXT as a Note with a Nudge in 1 h\n  oldbrainfix capture -     capture what comes in on stdin\n  oldbrainfix import FILE   import the sync bundle FILE\n  oldbrainfix open FILE     show the Sent Item FILE to accept or decline\n\nExit codes: 0 done, 1 could not be kept or imported, 2 wrong arguments or nothing to capture.",
   "@cliUsage": {"description": "The desktop's command-line help."},
   "cliNothing": "Nothing to capture.",
   "@cliNothing": {"description": "Printed when `oldbrainfix capture` gets a blank text."},
@@ -122,10 +122,10 @@
   "@bundleSave": {"description": "Opens the save dialog for a sync bundle."},
   "bundleOpen": "Import bundle…",
   "bundleSaveTitle": "Save the sync bundle",
-  "bundleOpenTitle": "Import a sync bundle",
+  "bundleOpenTitle": "Open a bundle or a sent Note",
   "bundleSaved": "{count, plural, =1{Bundle saved with 1 change. Send it to the other Device and import it there.} other{Bundle saved with {count} changes. Send it to the other Device and import it there.}}",
   "@bundleSaved": {"placeholders": {"count": {"type": "int"}}},
-  "bundleDrop": "Or drop a bundle file onto the window.",
+  "bundleDrop": "Or drop a bundle or a sent Note onto the window.",
   "aboutSettingsDetail": "The version, the source code and every third-party component with its license.",
   "@aboutSettingsDetail": {"description": "Under the About button in the desktop Settings."},
   "aboutVersion": "Version {version}",
@@ -139,5 +139,10 @@
   "invitingBanner": "Inviting {name} to {area} as {role}. The code below is for them.",
   "@invitingBanner": {"description": "Above the pair code in the Sync view while it invites someone to a Shared Area.", "placeholders": {"name": {"type": "String"}, "area": {"type": "String"}, "role": {"type": "String"}}},
   "stopInviting": "Stop inviting",
-  "@stopInviting": {"description": "Ends the invite in the Sync view; hosting goes on with a fresh code."}
+  "@stopInviting": {"description": "Ends the invite in the Sync view; hosting goes on with a fresh code."},
+  "sendButton": "Send…",
+  "@sendButton": {"description": "Opens the dialog sending the selected Note as a Sent Item."},
+  "sendSaveTitle": "Save the Note to send",
+  "sentSaved": "Saved. Send the file to them through any messenger or mail.",
+  "sendFailed": "The file could not be written. Nothing was lost; try again."
 }

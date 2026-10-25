@@ -19,6 +19,7 @@ import 'photo_views.dart';
 import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'sent_item_screen.dart';
 import 'speech_platform.dart';
 import 'voice_platform.dart';
 
@@ -47,8 +48,9 @@ Future<void> openNote(
 /// its Routines and Reminders, and its Sections, each with its own
 /// Capture Context. "Add to Note" amends it; "Routine" and "Reminder"
 /// spawn one from it; the calendar button adds it, or its Routines and
-/// Reminders, to the calendar; "merge into…" merges it into another
-/// Note; the trash button deletes it.
+/// Reminders, to the calendar; the send button sends it as a Sent Item;
+/// "merge into…" merges it into another Note; the trash button deletes
+/// it.
 ///
 /// Typed text survives the app being killed: it goes to the log when the
 /// app goes to the background, and a [Draft] of it is kept after every
@@ -327,6 +329,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         appBar: AppBar(
           title: Text(t.noteTitle),
           actions: [
+            IconButton(
+              key: const ValueKey('send-note-file'),
+              tooltip: t.sendNote,
+              onPressed: () {
+                _saveText();
+                unawaited(
+                  sendNoteFile(context, widget.notes.store, widget.noteId),
+                );
+              },
+              icon: const Icon(Icons.send_outlined),
+            ),
             CalendarButton(choices: _calendarChoices),
             if (changes) ...[
               IconButton(

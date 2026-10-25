@@ -13,11 +13,12 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Sync bundle files (ADR 0003) on the phone's side: each bundle another
- * app opened with this one, or the user picked, is copied at once, while
- * the permission to read it lasts, into the app's cache; the app imports
- * the copy and removes it. A bundle to share is written into the
- * exports the FileProvider serves.
+ * Sync bundle files (ADR 0003) and Sent Items (ADR 0009) on the phone's
+ * side: each file another app opened with this one, or the user picked,
+ * is copied at once, while the permission to read it lasts, into the
+ * app's cache; the app imports the copy, or previews a Sent Item, and
+ * removes it. A file to share is written into the exports the
+ * FileProvider serves.
  */
 object Bundles {
     private val waiting = ArrayDeque<String>()
@@ -84,9 +85,9 @@ object Bundles {
 }
 
 /**
- * Where other apps open or share a sync bundle with this one. No screen
- * of its own: it keeps a copy and hands over to the app's one running
- * [MainActivity], which imports it.
+ * Where other apps open or share a sync bundle or a Sent Item with this
+ * one. No screen of its own: it keeps a copy and hands over to the app's
+ * one running [MainActivity], which imports or previews it.
  */
 class BundleActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {

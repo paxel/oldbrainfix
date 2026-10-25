@@ -5,7 +5,9 @@
 //! - `oldbrainfix capture` opens the capture popup,
 //! - `oldbrainfix capture buy milk` captures "buy milk" without a window,
 //! - `oldbrainfix capture -` captures what comes in on stdin,
-//! - `oldbrainfix import FILE` imports the sync bundle FILE.
+//! - `oldbrainfix import FILE` imports the sync bundle FILE,
+//! - `oldbrainfix open FILE` shows the Sent Item FILE in the window, to
+//!   accept or decline.
 //!
 //! A capture without a window prints nothing when it worked; an import
 //! prints what came in. The exit codes are [`OK`], [`FAILED`] and
@@ -28,6 +30,9 @@ pub const CAPTURE: &str = "capture";
 /// The subcommand that imports a bundle.
 pub const IMPORT: &str = "import";
 
+/// The subcommand that opens a Sent Item.
+pub const OPEN: &str = "open";
+
 /// What a start asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Launch {
@@ -43,6 +48,8 @@ pub enum Launch {
     Stdin,
     /// Imports the bundle at this path, without a window.
     Import(String),
+    /// Shows the Sent Item at this path in the window.
+    Open(String),
     /// Prints the usage.
     Help,
 }
@@ -68,9 +75,10 @@ pub fn parse(args: &[String]) -> Result<Launch, Usage> {
             [first, ..] if first.starts_with('-') => Err(Usage),
             text => words(text),
         },
-        IMPORT => match rest {
+        IMPORT | OPEN => match rest {
             [one] if one == "-h" || one == "--help" => Ok(Launch::Help),
-            [path] if !path.is_empty() => Ok(Launch::Import(path.clone())),
+            [path] if !path.is_empty() && first == IMPORT => Ok(Launch::Import(path.clone())),
+            [path] if !path.is_empty() => Ok(Launch::Open(path.clone())),
             _ => Err(Usage),
         },
         _ => Err(Usage),
@@ -140,6 +148,17 @@ mod tests {
         assert_eq!(parse_of(&["import", "--help"]), Ok(Launch::Help));
         assert_eq!(parse_of(&["import"]), Err(Usage));
         assert_eq!(parse_of(&["import", "a", "b"]), Err(Usage));
+    }
+
+    #[test]
+    fn open_takes_one_file() {
+        assert_eq!(
+            parse_of(&["open", "a.oldbrain"]),
+            Ok(Launch::Open("a.oldbrain".into()))
+        );
+        assert_eq!(parse_of(&["open", "--help"]), Ok(Launch::Help));
+        assert_eq!(parse_of(&["open"]), Err(Usage));
+        assert_eq!(parse_of(&["open", "a", "b"]), Err(Usage));
     }
 
     #[test]

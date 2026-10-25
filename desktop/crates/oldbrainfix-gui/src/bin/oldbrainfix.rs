@@ -10,8 +10,9 @@
 //! capture popup: over the window while it is open, else on its own.
 //! `oldbrainfix capture TEXT` keeps TEXT without any window, through the
 //! running app when there is one, and `oldbrainfix import FILE` imports
-//! the sync bundle FILE the same way. On Windows it is built without a
-//! console window.
+//! the sync bundle FILE the same way. `oldbrainfix open FILE` shows the
+//! Sent Item FILE in the window, the running app's or a new one. On
+//! Windows it is built without a console window.
 //!
 //! Transcripts and Photo Texts are made on threads of their own for as
 //! long as the app runs, the Transcripts once the speech model in the
@@ -181,6 +182,8 @@ struct Shell {
     reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
+    /// Files for the window to open.
+    handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
 }
 
 impl Shell {
@@ -218,6 +221,7 @@ impl Shell {
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
+        app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
         app.set_hotkey(Some(hotkey));
@@ -333,6 +337,8 @@ fn run() -> Result<i32, String> {
     let dir = oldbrainfix_gui::data_dir().ok_or("no data directory for this user")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let socket = dir.join("instance.sock");
+    // Files for the window to open: from `open`, and later starts.
+    let handed: Arc<Mutex<Vec<std::path::PathBuf>>> = Arc::default();
     let first = match launch {
         Launch::Text(text) => return Ok(capture_text(&dir, &socket, &t, &text)),
         Launch::Stdin => {
@@ -344,6 +350,17 @@ fn run() -> Result<i32, String> {
             return Ok(capture_text(&dir, &socket, &t, &text));
         }
         Launch::Import(file) => return Ok(import_file(&dir, &socket, &t, &file)),
+        Launch::Open(file) => {
+            // The running app has a working directory of its own.
+            let path = std::path::absolute(&file).unwrap_or_else(|_| file.into());
+            if instance::hand_over_file(&socket, &path) {
+                return Ok(cli::OK);
+            }
+            if let Ok(mut held) = handed.lock() {
+                held.push(path);
+            }
+            Some(Command::Open)
+        }
         Launch::Window | Launch::Help => Some(Command::Open),
         Launch::Popup => Some(Command::Capture),
         // A login start adds nothing to a running app.
@@ -505,7 +522,20 @@ fn run() -> Result<i32, String> {
             said
         })
     };
-    if let Err(e) = instance::listen(&socket, command_tx.clone(), waker(&window), capture, import) {
+    let open_file: instance::OpenFile = {
+        let handed = handed.clone();
+        Box::new(move |path| {
+            if let Ok(mut held) = handed.lock() {
+                held.push(path.to_path_buf());
+            }
+        })
+    };
+    if let Err(e) = instance::listen(
+        &socket,
+        command_tx.clone(),
+        waker(&window),
+        (capture, import, open_file),
+    ) {
         eprintln!("oldbrainfix: {e}");
     }
     let labels = tray::Labels {
@@ -548,6 +578,7 @@ fn run() -> Result<i32, String> {
         reader,
         speech,
         folder_wanted,
+        handed,
     };
     // A login start stays in the tray; without one it shows the window.
     let mut next = first.or(tray.is_none().then_some(Command::Open));

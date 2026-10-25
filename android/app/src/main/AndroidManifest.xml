@@ -97,11 +97,13 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
-        <!-- Sync bundles (ADR 0003) opened with the app or shared to it
-             from a messenger or a file manager. Messengers rarely keep
-             the bundle's own type, so files and zips are taken too; one
-             that is no bundle is announced as such. It only copies the
-             file and hands over to MainActivity, which imports it. -->
+        <!-- Sync bundles (ADR 0003) and Sent Items (ADR 0009) opened with
+             the app or shared to it from a messenger or a file manager.
+             Messengers rarely keep their own types, so files and zips are
+             taken too; the app tells them apart by what is in them, and
+             one that is neither is announced as such. It only copies the
+             file and hands over to MainActivity, which imports a bundle
+             and shows a Sent Item's preview. -->
         <activity
             android:name=".BundleActivity"
             android:exported="true"
@@ -114,6 +116,7 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/vnd.oldbrainfix.sync" />
+                <data android:mimeType="application/vnd.oldbrainfix.item" />
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="application/zip" />
                 <data android:mimeType="application/x-zip-compressed" />

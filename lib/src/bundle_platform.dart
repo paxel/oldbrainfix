@@ -14,7 +14,8 @@ import 'l10n.dart';
 /// bundle is written before it is shared, handing it to the app the user
 /// picks, picking one to import, and the bundles other apps opened with
 /// this one. Every bundle to import is a copy of the app's own, removed
-/// once imported. Widget tests hand in a fake.
+/// once imported. Sent Items go in and out the same way, told apart by
+/// what is in them. Widget tests hand in a fake.
 abstract interface class BundlePlatform {
   /// Whether bundles can be shared and imported here.
   bool get available;
@@ -22,9 +23,9 @@ abstract interface class BundlePlatform {
   /// Where a bundle named [name] is written to be shared.
   Future<String?> exportPath(String name);
 
-  /// Offers the bundle at [path] to the app the user picks; false when
-  /// no app can take it.
-  Future<bool> share(String path);
+  /// Offers the file at [path], a bundle unless [type] says otherwise,
+  /// to the app the user picks; false when no app can take it.
+  Future<bool> share(String path, {String type = bundleMimeType});
 
   /// Opens the system's file picker; the copy of the file picked, or
   /// null when the user backed out.
@@ -49,7 +50,8 @@ class NoBundles implements BundlePlatform {
   Future<String?> exportPath(String name) async => null;
 
   @override
-  Future<bool> share(String path) async => false;
+  Future<bool> share(String path, {String type = bundleMimeType}) async =>
+      false;
 
   @override
   Future<String?> pick() async => null;
@@ -82,9 +84,8 @@ class AndroidBundles implements BundlePlatform {
       _ask<String>('exportPath', {'name': name});
 
   @override
-  Future<bool> share(String path) async =>
-      await _ask<bool>('share', {'path': path, 'type': bundleMimeType}) ??
-      false;
+  Future<bool> share(String path, {String type = bundleMimeType}) async =>
+      await _ask<bool>('share', {'path': path, 'type': type}) ?? false;
 
   @override
   Future<String?> pick() => _ask<String>('pick', null);

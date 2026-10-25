@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
+import 'box_keys.dart';
+
 /// Signed entries (ADR 0002): every Device signs what it writes with an
 /// Ed25519 key made once per install and bound to its device id, so
 /// nobody can write in someone else's name from a hand-made file.
@@ -126,25 +128,48 @@ enum KeyTrust { tofu, verified }
 /// ([deviceIdFromKey]): nobody can publish a key for a device id they do
 /// not hold the key of. Copied from Catlog and narrowed: every entry here
 /// is signed from the first one, so there is no "signed since".
+///
+/// The record carries the Device's X25519 key too, which Sent Items are
+/// encrypted to (ADR 0015), signed by the same key on its own so the
+/// record's first signature stays what it always was.
 class KeyRecord {
   final String device;
   final Uint8List publicKey;
   final String signature;
 
-  const KeyRecord(this.device, this.publicKey, this.signature);
+  /// The Device's X25519 key and the signature over it; null in a record
+  /// made without one.
+  final Uint8List? box;
+  final String? boxSignature;
+
+  const KeyRecord(
+    this.device,
+    this.publicKey,
+    this.signature, {
+    this.box,
+    this.boxSignature,
+  });
 
   static Uint8List _bytes(String device, List<int> publicKey) =>
       Uint8List.fromList(
         utf8.encode(jsonEncode([device, base64.encode(publicKey)])),
       );
 
+  static Uint8List _boxBytes(String device, List<int> box) =>
+      Uint8List.fromList(
+        utf8.encode(jsonEncode(['box', device, base64.encode(box)])),
+      );
+
   /// This Device's record, signed by its [key].
   factory KeyRecord.make(SigningKey key) {
     final device = deviceIdFromKey(key.publicKey);
+    final box = boxPublicOf(boxSecretOf(key.seed));
     return KeyRecord(
       device,
       key.publicKey,
       key.sign(_bytes(device, key.publicKey)),
+      box: box,
+      boxSignature: key.sign(_boxBytes(device, box)),
     );
   }
 
@@ -155,24 +180,56 @@ class KeyRecord {
       deviceIdFromKey(publicKey) == device &&
       verifySignature(publicKey, _bytes(device, publicKey), signature);
 
+  /// The X25519 key to encrypt to this Device, when the record is valid
+  /// and its key signed it; else null.
+  Uint8List? get boxKey {
+    final box = this.box;
+    if (box == null || box.length != boxKeyBytes || !valid) return null;
+    return verifySignature(publicKey, _boxBytes(device, box), boxSignature)
+        ? box
+        : null;
+  }
+
   /// What the UI shows for the key: `7f3a-c21e`.
   String get code => keyCode(publicKey);
 
+  /// Keys in sorted order, as the desktop core writes them.
   Map<String, dynamic> toJson() => {
+    if (box case final box?) 'box': base64.encode(box),
+    'boxSig': ?boxSignature,
     'device': device,
     'key': base64.encode(publicKey),
     'sig': signature,
   };
 
-  /// The record in [json], or null when it is not one.
+  /// The record in [json], or null when it is not one. A box key that is
+  /// not base64 is left out.
   static KeyRecord? fromJson(Object? json) {
     if (json is! Map) return null;
     final device = json['device'];
     final key = json['key'];
     final sig = json['sig'];
     if (device is! String || key is! String || sig is! String) return null;
+    final box = json['box'];
+    final boxSig = json['boxSig'];
+    Uint8List? boxKey;
+    String? boxSignature;
+    if (box is String && boxSig is String) {
+      try {
+        boxKey = base64.decode(box);
+        boxSignature = boxSig;
+      } on FormatException {
+        boxKey = null;
+      }
+    }
     try {
-      return KeyRecord(device, base64.decode(key), sig);
+      return KeyRecord(
+        device,
+        base64.decode(key),
+        sig,
+        box: boxKey,
+        boxSignature: boxSignature,
+      );
     } on FormatException {
       return null;
     }

@@ -9,6 +9,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
+import 'sent_item_screen.dart';
 import 'conflicts_screen.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
@@ -314,7 +315,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final path = await BundleScope.of(context).pick();
     if (!mounted || path == null) return;
     setState(() => _bundleBusy = true);
-    final conflicts = await importBundleFile(context, widget.store, path);
+    final conflicts = await openReceivedFile(context, widget.store, path);
     if (!mounted) return;
     if (conflicts > 0) {
       // The root navigator outlives this screen: the announcement may be

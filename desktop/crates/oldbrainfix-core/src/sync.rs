@@ -93,7 +93,9 @@ impl Store {
 
     /// Takes in the keys a payload carried. A record that is not valid is
     /// ignored; the first key of a Device is pinned on trust, the one of
-    /// `verified_device` as verified.
+    /// `verified_device` as verified. A key held without the X25519 key
+    /// Sent Items are encrypted to (ADR 0015) takes it from a record that
+    /// carries it, the trust kept.
     pub fn learn_keys(
         &self,
         keys: &[KeyRecord],
@@ -118,6 +120,17 @@ impl Store {
                         record: record.clone(),
                         trust,
                     });
+                }
+                Some(held)
+                    if held.record.verified_box_key().is_none()
+                        && record.verified_box_key().is_some() =>
+                {
+                    let trust = if verified {
+                        KeyTrust::Verified
+                    } else {
+                        held.trust
+                    };
+                    self.pin(record, trust)?;
                 }
                 Some(held) if verified && held.trust == KeyTrust::Tofu => {
                     self.pin(&held.record, KeyTrust::Verified)?;

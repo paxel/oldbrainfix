@@ -34,8 +34,11 @@ mdns-sd = { version = "0.21", default-features = false }
 # End-to-end encryption per Area (ADR 0003, 0012), as the Dart core's
 # `cryptography` seals: XChaCha20-Poly1305, nonces from getrandom above.
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
-# Blob names in the shared folder.
+# Blob names in the shared folder, and HKDF for Sent Items.
 hmac = "0.12"
+# Sent Items (ADR 0015) are encrypted to X25519 keys, as the Dart core's
+# `cryptography` computes them; already under ed25519-dalek.
+curve25519-dalek = { version = "4.1", default-features = false }
 # The bundle file (ADR 0003): a zip of stored files only, as the Dart
 # core's `archive` writes it; no compression, no encryption of its own.
 zip = { version = "=8.6.0", default-features = false }

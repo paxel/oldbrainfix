@@ -2,7 +2,7 @@
   "host": [
     [
       "key:c945cbf2a5602002141e2fb9d17054d6",
-      "{\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+      "{\"box\":\"NpiOI37NKcQmhuv9Zt92gze8GE9ERdBaZWk8gmVJvjc=\",\"boxSig\":\"CR+HkKAeMw4FvMzO+UZTDRPI/4qFAzqiJLCQxk5OXcOsuKJM+lwr++fmMLvm8ixSoYdd10bAj/tiG0iqe6+VDw==\",\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
     ],
     [
       "areakey:2b038b02f23b2ce7",
@@ -24,7 +24,7 @@
   "joiner": [
     [
       "key:65b60673d6ed884bf01c2c222d82ada0",
-      "{\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
+      "{\"box\":\"IFL4kek96jMZf0W5Z/CN+CJY5WudNp3/VqCqF+w21gU=\",\"boxSig\":\"fZkgUlocFs99Q6B2R/OlJhZ8ydDSUGwCKMisqawVbCJOXEzRGpsdf6tezn4hLsBgtXlG9EQP43Cl2g49LXyIDQ==\",\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
     ],
     [
       "areakey:2b038b02f23b2ce7",

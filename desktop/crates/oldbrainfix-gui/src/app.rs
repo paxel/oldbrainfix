@@ -24,7 +24,10 @@
 //! Nudge times (UI laws, "Capture"). A picture pasted from the clipboard
 //! or dropped onto the window (where the system hands drops over: not on
 //! Wayland) becomes a photo Note, with what is typed; a sync bundle
-//! dropped there is imported, what came in announced at the top.
+//! dropped there is imported, what came in announced at the top; a
+//! Sent Item dropped there, opened or handed over by `oldbrainfix open`
+//! shows its preview to accept or decline. A Note is sent from its
+//! editor, saved where the user says.
 //! The editor shows a Note's photos and plays its recordings, with their
 //! Transcripts. Transcripts and Photo Texts are made in the background
 //! and found by the search over All Notes, an Area or a Topic.
@@ -40,6 +43,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, Sense, TextEdit,
     Ui, WidgetInfo, WidgetType,
 };
+use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
     Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, Person, Places,
@@ -221,6 +225,15 @@ enum Dialog {
         their: String,
         role: AreaRole,
     },
+    /// Sending the Note `note`: to one of `recipients`, encrypted, or to
+    /// anyone (`None`), signed only.
+    Send {
+        note: String,
+        recipients: Vec<Recipient>,
+        picked: Option<usize>,
+    },
+    /// The preview of a Sent Item opened here.
+    SentItem(Box<Opened>),
     /// The people of the Shared Area `area`.
     People {
         area: String,
@@ -314,8 +327,16 @@ enum Action {
     RestoreRoutine(String),
     Setting(Setting),
     Sync(SyncAction),
-    /// Imports the bundle file dropped onto the window.
-    ImportBundle(std::path::PathBuf),
+    /// Imports the bundle file dropped onto the window or handed over,
+    /// or shows the preview of the Sent Item.
+    OpenFile(std::path::PathBuf),
+    /// Asks whom the selected Note is sent to.
+    StartSend,
+    /// Saves the Note of the send dialog as a Sent Item.
+    SendNote,
+    /// Accepts the Sent Item previewed, or declines it.
+    AcceptSent,
+    DeclineSent,
     /// Asks how the Area is to be shared.
     Share(String),
     /// Shares the Area of the Share dialog and hosts its invite.
@@ -433,6 +454,10 @@ pub struct App {
     /// import.
     bundle_saver: FileSaver,
     bundle_opener: FolderPicker,
+    /// Asks where to save a Sent Item.
+    item_saver: FileSaver,
+    /// Files handed over from outside the window, to open.
+    handed: Option<Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>>,
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
@@ -445,11 +470,19 @@ pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
 /// proposes.
 pub type FileSaver = Box<dyn Fn(&str, &str) -> Option<std::path::PathBuf>>;
 
-/// The dialogs' filter for bundle files.
+/// The dialogs' filter for bundle files, and Sent Items to open.
 fn bundle_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new().set_title(title).add_filter(
+        oldbrainfix_core::APP_NAME,
+        &[bundle::EXTENSION, sent::EXTENSION],
+    )
+}
+
+/// The save dialog's filter for a Sent Item.
+fn item_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
-        .add_filter(oldbrainfix_core::APP_NAME, &[bundle::EXTENSION])
+        .add_filter(oldbrainfix_core::APP_NAME, &[sent::EXTENSION])
 }
 
 impl App {
@@ -504,6 +537,8 @@ impl App {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
             bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
+            item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
+            handed: None,
             notice: None,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
@@ -537,6 +572,22 @@ impl App {
     pub fn set_bundle_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.bundle_saver = saver;
         self.bundle_opener = opener;
+    }
+
+    /// Hands in the dialog asking where to save a Sent Item.
+    pub fn set_item_saver(&mut self, saver: FileSaver) {
+        self.item_saver = saver;
+    }
+
+    /// Opens the files put into `handed` from outside the window, as
+    /// `oldbrainfix open` does, at the next frame.
+    pub fn set_handed_files(&mut self, handed: Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>) {
+        self.handed = Some(handed);
+    }
+
+    /// Whether a Sent Item's preview shows.
+    pub fn previewing(&self) -> bool {
+        matches!(self.dialog, Some(Dialog::SentItem(_)))
     }
 
     /// What a bundle saved or imported did, as announced.
@@ -577,6 +628,60 @@ impl App {
                 Err(e) => format!("{} ({e})", self.t.bundle_failed()),
             },
         );
+        Ok(())
+    }
+
+    /// Opens the file at `path`: a Sent Item shows its preview, anything
+    /// else is imported as a bundle.
+    fn open_file(&mut self, path: &std::path::Path) {
+        let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= sent::MAX_BYTES as u64);
+        let bytes = if small {
+            std::fs::read(path).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if !sent::looks_like_sent_item(&bytes) {
+            self.import_bundle(path);
+            return;
+        }
+        match self.store.open_sent_item(&bytes) {
+            Ok(Ok(opened)) => self.dialog = Some(Dialog::SentItem(Box::new(opened))),
+            Ok(Err(OpenError::NotForUs)) => {
+                self.notice = Some(self.t.sent_item_not_for_us().to_string());
+            }
+            Ok(Err(OpenError::NotASentItem)) => {
+                self.notice = Some(self.t.sent_item_unreadable().to_string());
+            }
+            Err(e) => self.notice = Some(format!("{} ({e})", self.t.sent_item_unreadable())),
+        }
+    }
+
+    /// Saves the Note of the send dialog as a Sent Item where the user
+    /// says: encrypted to the person picked, else signed only.
+    fn send_note(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::Send {
+            note,
+            recipients,
+            picked,
+        }) = self.dialog.take()
+        else {
+            return Ok(());
+        };
+        let day = (self.wall)(self.store.now()).date().format("%Y-%m-%d");
+        let Some(mut path) =
+            (self.item_saver)(self.t.send_save_title(), &sent::file_name(&day.to_string()))
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != sent::EXTENSION) {
+            path.set_extension(sent::EXTENSION);
+        }
+        let to = picked.and_then(|i| recipients.get(i));
+        let bytes = self.store.send_note(&note, to)?;
+        self.notice = Some(match std::fs::write(&path, bytes) {
+            Ok(()) => self.t.sent_saved().to_string(),
+            Err(e) => format!("{} ({e})", self.t.send_failed()),
+        });
         Ok(())
     }
 
@@ -1277,10 +1382,36 @@ impl App {
             Action::Sync(SyncAction::SaveBundle(device)) => self.save_bundle(device)?,
             Action::Sync(SyncAction::OpenBundle) => {
                 if let Some(path) = (self.bundle_opener)(self.t.bundle_open_title()) {
-                    self.import_bundle(&path);
+                    self.open_file(&path);
                 }
             }
-            Action::ImportBundle(path) => self.import_bundle(&path),
+            Action::OpenFile(path) => self.open_file(&path),
+            Action::StartSend => {
+                self.save_text()?;
+                let recipients = self.store.sent_item_recipients()?;
+                let picked = (!recipients.is_empty()).then_some(0);
+                self.dialog = Some(Dialog::Send {
+                    note: selected,
+                    recipients,
+                    picked,
+                });
+            }
+            Action::SendNote => self.send_note()?,
+            Action::AcceptSent => {
+                if let Some(Dialog::SentItem(opened)) = self.dialog.take() {
+                    // The alerts plan its alarms once the action is done.
+                    self.store.accept_sent_item(&opened.item)?;
+                    self.notice = Some(self.t.sent_item_accepted().to_string());
+                }
+            }
+            Action::DeclineSent => {
+                let previewed =
+                    matches!(&self.dialog, Some(Dialog::SentItem(o)) if o.accepted.is_none());
+                self.dialog = None;
+                if previewed {
+                    self.notice = Some(self.t.sent_item_declined().to_string());
+                }
+            }
             Action::Share(area) => {
                 self.dialog = Some(Dialog::Share {
                     area,
@@ -1583,17 +1714,27 @@ impl App {
             }
         }
         // Pictures dropped onto the window become a photo Note; a bundle
-        // file is imported.
+        // file is imported, a Sent Item previewed, as are the files
+        // handed over from outside.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
-        let (bundles, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
-            file.path
-                .as_ref()
-                .is_some_and(|p| p.extension().is_some_and(|e| e == bundle::EXTENSION))
+        let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
+            file.path.as_ref().is_some_and(|p| {
+                p.extension()
+                    .is_some_and(|e| e == bundle::EXTENSION || e == sent::EXTENSION)
+            })
         });
-        for file in bundles {
+        for file in files {
             if let Some(path) = file.path {
-                actions.push(Action::ImportBundle(path));
+                actions.push(Action::OpenFile(path));
             }
+        }
+        if let Some(handed) = &self.handed
+            && let Ok(mut handed) = handed.lock()
+            && !handed.is_empty()
+        {
+            actions.extend(handed.drain(..).map(Action::OpenFile));
+            // Nothing else stirs the window: what it opened shows at once.
+            ui.ctx().request_repaint();
         }
         let photos: Vec<Vec<u8>> = dropped
             .iter()
@@ -2238,6 +2379,13 @@ impl App {
                         actions.push(Action::Amend);
                     }
                 });
+                if ui
+                    .button(RichText::new(t.send_button()).color(text))
+                    .on_hover_text(t.send_note())
+                    .clicked()
+                {
+                    actions.push(Action::StartSend);
+                }
                 if !may.changes {
                     return;
                 }
@@ -2329,6 +2477,10 @@ impl App {
                             .unwrap_or_default();
                         share_form(ui, &t, &shown, (own, their, role), focus, actions);
                     }
+                    Dialog::Send {
+                        recipients, picked, ..
+                    } => send_form(ui, &t, recipients, picked, actions),
+                    Dialog::SentItem(opened) => sent_item_form(ui, &t, tones, opened, actions),
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
@@ -2829,6 +2981,107 @@ fn share_form(
             actions.push(Action::StartInvite);
         }
     });
+}
+
+/// Asks whom a Note is sent to: one of the people whose keys are known
+/// here, encrypted to them, or anyone, signed only, with a hint that
+/// whoever holds the file can read it.
+fn send_form(
+    ui: &mut Ui,
+    t: &L10n,
+    recipients: &[Recipient],
+    picked: &mut Option<usize>,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, t.send_title());
+    ui.label(RichText::new(t.send_who()).color(text));
+    for (i, r) in recipients.iter().enumerate() {
+        ui.radio_value(
+            picked,
+            Some(i),
+            RichText::new(t.send_encrypted(&r.name)).color(text),
+        );
+    }
+    ui.radio_value(picked, None, RichText::new(t.send_anyone()).color(text));
+    if picked.is_none() {
+        ui.label(RichText::new(t.send_plain_hint()).color(text));
+    }
+    ui.label(RichText::new(t.send_what()).small().color(weak));
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if ui
+            .button(RichText::new(t.send_action()).color(text))
+            .clicked()
+        {
+            actions.push(Action::SendNote);
+        }
+    });
+}
+
+/// The preview of a Sent Item: who sent it, verified or not with their
+/// key's code, whether it came encrypted, its text, Routines and
+/// Reminders with their times and Sections; Accept or Decline.
+fn sent_item_form(ui: &mut Ui, t: &L10n, tones: Tones, opened: &Opened, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let item = &opened.item;
+    let name = if item.name.trim().is_empty() {
+        t.sent_item_someone().to_string()
+    } else {
+        item.name.clone()
+    };
+    title(ui, &t.sent_item_from(&name));
+    let code = item.from.code();
+    let trust = match opened.trust {
+        SenderTrust::Verified => t.sent_item_verified(&code),
+        SenderTrust::Known => t.sent_item_known(&code),
+        SenderTrust::Unknown => t.sent_item_unknown(&code),
+    };
+    ui.label(RichText::new(trust).color(text));
+    let sealed = if opened.encrypted {
+        t.sent_item_encrypted()
+    } else {
+        t.sent_item_plain()
+    };
+    ui.label(RichText::new(sealed).small().color(weak));
+    if opened.accepted.is_some() {
+        ui.label(RichText::new(t.sent_item_already()).color(tones.accent));
+    }
+    ui.horizontal(|ui| {
+        if opened.accepted.is_none()
+            && ui
+                .button(RichText::new(t.sent_item_accept()).strong().color(text))
+                .clicked()
+        {
+            actions.push(Action::AcceptSent);
+        }
+        let decline = if opened.accepted.is_none() {
+            t.sent_item_decline()
+        } else {
+            t.close()
+        };
+        if ui.button(RichText::new(decline).color(text)).clicked() {
+            actions.push(Action::DeclineSent);
+        }
+    });
+    egui::ScrollArea::vertical()
+        .id_salt("sent item")
+        .max_height(360.0)
+        .show(ui, |ui| {
+            ui.label(RichText::new(&item.text).color(text));
+            if !item.routines.is_empty() {
+                ui.label(RichText::new(t.routines_heading()).strong().color(text));
+                for r in &item.routines {
+                    ui.label(RichText::new(schedule_text(t, &r.schedule)).color(text));
+                }
+            }
+            for section in &item.sections {
+                ui.separator();
+                ui.label(RichText::new(&section.text).color(text));
+            }
+        });
 }
 
 /// The people of a Shared Area with their roles; a Manager changes them

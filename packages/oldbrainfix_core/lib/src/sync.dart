@@ -51,7 +51,9 @@ extension Sync on Store {
   /// Takes in the keys a payload carried. A record that is not valid is
   /// ignored; the first key of a Device is pinned on trust, the one of
   /// [verifiedDevice], met over a session the pair code authenticated,
-  /// as verified.
+  /// as verified. A key held without the X25519 key Sent Items are
+  /// encrypted to (ADR 0015) takes it from a record that carries it, the
+  /// same key signed: the trust stays as it was.
   void learnKeys(
     Iterable<KeyRecord> keys, {
     String? verifiedDevice,
@@ -66,6 +68,8 @@ extension Sync on Store {
         final trust = verified ? KeyTrust.verified : KeyTrust.tofu;
         _pin(record, trust);
         report?.newKeys.add(PinnedKey(record, trust));
+      } else if (held.record.boxKey == null && record.boxKey != null) {
+        _pin(record, verified ? KeyTrust.verified : held.trust);
       } else if (verified && held.trust == KeyTrust.tofu) {
         _pin(held.record, KeyTrust.verified);
       }

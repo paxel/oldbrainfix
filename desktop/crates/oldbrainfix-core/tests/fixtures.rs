@@ -1770,3 +1770,139 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     assert_eq!(roles_json(&ann, &area, &ids)?, expected["removed"]);
     Ok(())
 }
+
+// ----------------------------------------------------------- Sent Items
+
+/// Random bytes as the generator's `_counted` hands them out.
+fn counted_after(start: u64) -> impl FnMut(usize) -> oldbrainfix_core::Result<Vec<u8>> {
+    let mut n: u64 = start;
+    move |length| {
+        n += 1;
+        Ok((0..length as u64)
+            .map(|i| ((n * 37 + i) & 0xff) as u8)
+            .collect())
+    }
+}
+
+/// Counted ids from `after` on.
+fn counted_ids(store: &mut Store, after: u64) {
+    let ids = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(after));
+    store.set_id_maker(Box::new(move || {
+        let n = ids.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+        Ok(format!("{n:032x}"))
+    }));
+}
+
+#[test]
+fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
+    use oldbrainfix_core::sent::{self, OpenError};
+    let dir = fixtures().join("sent");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let send_at = parse_time("2026-01-03T12:00:00.000Z")?;
+    let mut ada = Store::in_memory(Box::new(move || send_at), || Ok(writer_key()))?;
+    ada.set_local_setting("author", "Ada")?;
+    for line in lines_of(&dir.join("sender.jsonl"))? {
+        ada.insert(&serde_json::from_str(&line)?)?;
+    }
+    counted_ids(&mut ada, 0x300);
+    let note = ada
+        .entities_of_type("note")?
+        .into_iter()
+        .next()
+        .ok_or("note")?;
+
+    // Sending writes the same entry and the same files, byte for byte.
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&note)?;
+    assert_eq!(lines_after(&ada, mark)?, lines_of(&dir.join("sent.jsonl"))?);
+    let signed = std::fs::read(dir.join("signed.oldbrain"))?;
+    let sealed = std::fs::read(dir.join("sealed.oldbrain"))?;
+    let key = writer_key();
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == signed);
+    let mut to = [0u8; 32];
+    to.copy_from_slice(&BASE64.decode(expected["box"].as_str().ok_or("box")?)?);
+    assert_eq!(
+        joiner_key_record_box()?,
+        to,
+        "Ben's X25519 key, as the Dart core derives it"
+    );
+    assert!(sent::encode(&item, &key, &[to], &mut counted_after(4000))? == sealed);
+
+    // Ben reads both the same, and accepting writes the same entries.
+    let accept_at = parse_time("2026-01-04T18:00:00.000Z")?;
+    let mut ben = Store::in_memory(Box::new(move || accept_at), || Ok(joiner_key()))?;
+    ben.set_local_setting("author", "Ben")?;
+    let plain = ben.open_sent_item(&signed)?.map_err(|_| "signed")?;
+    let opened = ben.open_sent_item(&sealed)?.map_err(|_| "sealed")?;
+    assert!(!plain.encrypted);
+    assert!(opened.encrypted);
+    assert_eq!(opened.item, plain.item);
+    assert_eq!(
+        plain.trust.name(),
+        expected["trust"].as_str().ok_or("trust")?
+    );
+    let got = &plain.item;
+    let want = &expected["item"];
+    assert_eq!(got.id, want["id"].as_str().ok_or("id")?);
+    assert_eq!(got.version, want["version"].as_i64().ok_or("version")?);
+    assert_eq!(got.from.device, want["device"].as_str().ok_or("device")?);
+    assert_eq!(got.name, want["name"].as_str().ok_or("name")?);
+    assert_eq!(got.text, want["text"].as_str().ok_or("text")?);
+    let sections: Vec<Value> = got
+        .sections
+        .iter()
+        .map(|s| json!({"text": s.text, "captured": dart_iso(s.captured)}))
+        .collect();
+    assert_eq!(json!(sections), want["sections"]);
+    let routines: Vec<Value> = got
+        .routines
+        .iter()
+        .map(|r| {
+            json!({
+                "id": r.id,
+                "start": r.schedule.start.to_string(),
+                "times": r.schedule.times.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                "rule": r.schedule.rule.as_ref().map(Recurrence::format),
+            })
+        })
+        .collect();
+    assert_eq!(json!(routines), want["routines"]);
+    assert_eq!(got.encode(), item.encode());
+
+    counted_ids(&mut ben, 0x400);
+    let mark = ben.current_seq()?;
+    let accepted = ben.accept_sent_item(&opened.item)?;
+    assert_eq!(accepted, expected["accepted"].as_str().ok_or("accepted")?);
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("accepted.jsonl"))?
+    );
+    let note = Notes::new(&ben).by_id(&accepted)?.ok_or("the Note")?;
+    assert_eq!(note_json(&note), expected["note"]);
+    let mut routines = Routines::new(&ben).of_note(&accepted)?;
+    routines.sort_by(|a, b| a.id.cmp(&b.id));
+    let routines: Vec<Value> = routines.iter().map(routine_json).collect();
+    assert_eq!(json!(routines), expected["routines"]);
+    let again = ben.open_sent_item(&signed)?.map_err(|_| "again")?;
+    assert_eq!(
+        again.accepted.as_deref(),
+        expected["acceptedAgain"].as_str()
+    );
+
+    // Somebody else holds no key to it.
+    let eve = Store::in_memory(Box::new(move || accept_at), || {
+        Ok(SigningKey::from_seed([9; 32]))
+    })?;
+    assert_eq!(
+        eve.open_sent_item(&sealed)?.err(),
+        Some(OpenError::NotForUs)
+    );
+    Ok(())
+}
+
+/// Ben's X25519 key, from his key record.
+fn joiner_key_record_box() -> Result<[u8; 32], Box<dyn std::error::Error>> {
+    Ok(oldbrainfix_core::KeyRecord::make(&joiner_key())
+        .verified_box_key()
+        .ok_or("a box key")?)
+}

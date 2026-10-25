@@ -7,6 +7,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use ed25519_dalek::{Signature, Signer, SigningKey as DalekKey, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 
+use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of};
 use crate::{Error, Result};
 
 /// A Device's own key.
@@ -41,6 +42,11 @@ impl SigningKey {
 
     pub fn seed_hex(&self) -> String {
         hex::encode(self.seed)
+    }
+
+    /// The seed, which the X25519 key is derived from.
+    pub fn seed(&self) -> &[u8; 32] {
+        &self.seed
     }
 
     pub fn public_key(&self) -> [u8; 32] {
@@ -152,12 +158,17 @@ impl KeyTrust {
 
 /// A Device's public key as it travels with the entries, as the Dart
 /// core's `KeyRecord`: it signs itself, and the device id is the key's
-/// own fingerprint.
+/// own fingerprint. It carries the Device's X25519 key too, which Sent
+/// Items are encrypted to (ADR 0015), signed by the same key on its own.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyRecord {
     pub device: String,
     pub public_key: Vec<u8>,
     pub signature: String,
+    /// The X25519 key and the signature over it; none in a record made
+    /// without one.
+    pub box_key: Option<Vec<u8>>,
+    pub box_signature: Option<String>,
 }
 
 impl KeyRecord {
@@ -167,15 +178,34 @@ impl KeyRecord {
             .into_bytes()
     }
 
+    fn box_bytes(device: &str, box_key: &[u8]) -> Vec<u8> {
+        serde_json::json!(["box", device, BASE64.encode(box_key)])
+            .to_string()
+            .into_bytes()
+    }
+
     /// The record of the Device whose key is `key`.
     pub fn make(key: &SigningKey) -> KeyRecord {
         let public_key = key.public_key();
         let device = device_id_from_key(&public_key);
         let signature = key.sign(&Self::bytes(&device, &public_key));
+        let box_key = box_public_of(&box_secret_of(key.seed()));
+        let box_signature = key.sign(&Self::box_bytes(&device, &box_key));
         KeyRecord {
             device,
             public_key: public_key.to_vec(),
             signature,
+            box_key: Some(box_key.to_vec()),
+            box_signature: Some(box_signature),
+        }
+    }
+
+    /// A record without an X25519 key, as a build before them made it.
+    pub fn bare(&self) -> KeyRecord {
+        KeyRecord {
+            box_key: None,
+            box_signature: None,
+            ..self.clone()
         }
     }
 
@@ -191,25 +221,58 @@ impl KeyRecord {
             )
     }
 
+    /// The X25519 key to encrypt to this Device, when the record is
+    /// valid and its key signed it.
+    pub fn verified_box_key(&self) -> Option<[u8; BOX_KEY_BYTES]> {
+        let key: [u8; BOX_KEY_BYTES] = self.box_key.as_deref()?.try_into().ok()?;
+        (self.valid()
+            && verify_signature(
+                &self.public_key,
+                &Self::box_bytes(&self.device, &key),
+                self.box_signature.as_deref(),
+            ))
+        .then_some(key)
+    }
+
     /// What the UI shows for the key.
     pub fn code(&self) -> String {
         key_code(&self.public_key)
     }
 
+    /// The record as it travels, keys sorted as the Dart core writes them.
     pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "device": self.device,
-            "key": BASE64.encode(&self.public_key),
-            "sig": self.signature,
-        })
+        let mut map = serde_json::Map::new();
+        if let (Some(key), Some(sig)) = (&self.box_key, &self.box_signature) {
+            map.insert("box".into(), BASE64.encode(key).into());
+            map.insert("boxSig".into(), sig.clone().into());
+        }
+        map.insert("device".into(), self.device.clone().into());
+        map.insert("key".into(), BASE64.encode(&self.public_key).into());
+        map.insert("sig".into(), self.signature.clone().into());
+        serde_json::Value::Object(map)
     }
 
-    /// The record in `json`, or none when it is not one.
+    /// The record in `json`, or none when it is not one. A box key that
+    /// is not base64 is left out.
     pub fn from_json(json: &serde_json::Value) -> Option<KeyRecord> {
+        let box_key = json
+            .get("box")
+            .and_then(|b| b.as_str())
+            .and_then(|b| BASE64.decode(b).ok());
+        let box_signature = json
+            .get("boxSig")
+            .and_then(|s| s.as_str())
+            .map(str::to_string);
+        let (box_key, box_signature) = match (box_key, box_signature) {
+            (Some(key), Some(sig)) => (Some(key), Some(sig)),
+            _ => (None, None),
+        };
         Some(KeyRecord {
             device: json.get("device")?.as_str()?.to_string(),
             public_key: BASE64.decode(json.get("key")?.as_str()?).ok()?,
             signature: json.get("sig")?.as_str()?.to_string(),
+            box_key,
+            box_signature,
         })
     }
 }

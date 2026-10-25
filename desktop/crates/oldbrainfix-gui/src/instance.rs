@@ -2,15 +2,18 @@
 //! window, open the capture popup, or nothing for a login start) to the
 //! running one over a local socket and ends, so reminders never come
 //! twice. `oldbrainfix capture <text>` hands its text over the same way,
-//! and `oldbrainfix import <file>` the bundle's path, so only the running
-//! app writes to the log. On systems without Unix sockets every start
-//! runs on its own.
+//! `oldbrainfix import <file>` the bundle's path, so only the running
+//! app writes to the log, and `oldbrainfix open <file>` the path of a
+//! Sent Item for the window to show. On systems without Unix sockets
+//! every start runs on its own.
 //!
 //! The protocol: one line with a word (`open`, `capture`, `quit`,
 //! `none`), and nothing back; or the line `text`, then the text to the
 //! end of the stream, answered by `ok` or by `error` and what went wrong;
 //! or the line `import`, then the path to the end of the stream,
-//! answered by `ok` and what came in, or by `error` and what went wrong.
+//! answered by `ok` and what came in, or by `error` and what went wrong;
+//! or the line `file`, then the path to the end of the stream, and
+//! nothing back: the window opens with it.
 
 use std::path::Path;
 use std::sync::mpsc::Sender;
@@ -21,6 +24,8 @@ use crate::tray::Command;
 const TEXT: &str = "text";
 /// The word before the path of a bundle to import.
 const IMPORT: &str = "import";
+/// The word before the path of a file for the window to open.
+const FILE: &str = "file";
 const OK: &str = "ok";
 const ERROR: &str = "error";
 
@@ -30,6 +35,9 @@ pub type Capture = Box<dyn Fn(&str) -> Result<(), String> + Send>;
 /// Imports the bundle at a path handed over; what came in, or what went
 /// wrong.
 pub type Import = Box<dyn Fn(&Path) -> Result<String, String> + Send>;
+
+/// Takes the path of a file for the window to open.
+pub type OpenFile = Box<dyn Fn(&Path) + Send>;
 
 /// What a second start says.
 fn word(command: Option<Command>) -> &'static str {
@@ -83,6 +91,25 @@ pub fn hand_over_import(socket: &Path, path: &Path) -> Option<Result<String, Str
     ask(socket, IMPORT, &path.to_string_lossy())
 }
 
+/// Hands the file at `path` to the app running at `socket`, for its
+/// window to open; false when none runs.
+#[cfg(unix)]
+pub fn hand_over_file(socket: &Path, path: &Path) -> bool {
+    use std::io::Write;
+    match std::os::unix::net::UnixStream::connect(socket) {
+        Ok(mut stream) => {
+            drop(write!(stream, "{FILE}\n{}", path.to_string_lossy()));
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(unix))]
+pub fn hand_over_file(_socket: &Path, _path: &Path) -> bool {
+    false
+}
+
 /// Sends `word` and `payload` to the app running at `socket` and reads
 /// its answer: what follows `ok`, or what follows `error`.
 #[cfg(unix)]
@@ -125,14 +152,14 @@ pub fn hand_over_import(_socket: &Path, _path: &Path) -> Option<Result<String, S
 
 /// Listens at `socket` for later starts and passes their wishes to
 /// `commands`, calling `wake` after each; texts go to `capture`, the
-/// paths of bundles to `import`.
+/// paths of bundles to `import`, the paths of files to open to `open`,
+/// with the window opened.
 #[cfg(unix)]
 pub fn listen(
     socket: &Path,
     commands: Sender<Command>,
     wake: Box<dyn Fn() + Send>,
-    capture: Capture,
-    import: Import,
+    (capture, import, open): (Capture, Import, OpenFile),
 ) -> std::io::Result<()> {
     use std::io::{BufRead, Read, Write};
     // One left behind by a crash answers nobody.
@@ -161,6 +188,13 @@ pub fn listen(
                     Err(e) => format!("{ERROR} {e}"),
                 };
                 drop(writeln!(reader.get_mut(), "{answer}"));
+            } else if word == FILE {
+                let mut path = String::new();
+                if reader.read_to_string(&mut path).is_ok() && !path.is_empty() {
+                    open(Path::new(&path));
+                    let _ = commands.send(Command::Open);
+                    wake();
+                }
             } else if let Some(c) = command(&line) {
                 let _ = commands.send(c);
                 wake();
@@ -175,8 +209,7 @@ pub fn listen(
     _socket: &Path,
     _commands: Sender<Command>,
     _wake: Box<dyn Fn() + Send>,
-    _capture: Capture,
-    _import: Import,
+    _: (Capture, Import, OpenFile),
 ) -> std::io::Result<()> {
     Ok(())
 }
@@ -197,8 +230,11 @@ mod tests {
             &socket,
             tx,
             Box::new(|| {}),
-            Box::new(|_| Ok(())),
-            Box::new(|_| Ok(String::new())),
+            (
+                Box::new(|_| Ok(())),
+                Box::new(|_| Ok(String::new())),
+                Box::new(|_| {}),
+            ),
         )?;
         assert!(hand_over(&socket, Some(Command::Open)));
         assert!(hand_over(&socket, None));
@@ -228,8 +264,7 @@ mod tests {
             &socket,
             tx,
             Box::new(|| {}),
-            capture,
-            Box::new(|_| Ok(String::new())),
+            (capture, Box::new(|_| Ok(String::new())), Box::new(|_| {})),
         )?;
         assert_eq!(hand_over_text(&socket, "buy milk"), Some(Ok(())));
         // Lines and blanks come through as given; a word is no command.
@@ -258,7 +293,12 @@ mod tests {
                 Err("no sync bundle".into())
             }
         });
-        listen(&socket, tx, Box::new(|| {}), Box::new(|_| Ok(())), import)?;
+        listen(
+            &socket,
+            tx,
+            Box::new(|| {}),
+            (Box::new(|_| Ok(())), import, Box::new(|_| {})),
+        )?;
         assert_eq!(
             hand_over_import(&socket, &file),
             Some(Ok("3 changes came in.\nAnd more.".into()))
@@ -267,6 +307,37 @@ mod tests {
             hand_over_import(&socket, &dir.path().join("other")),
             Some(Err("no sync bundle".into()))
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_to_open_goes_to_the_running_window() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("instance.sock");
+        let file = dir.path().join("a note.oldbrain");
+        assert!(!hand_over_file(&socket, &file));
+        let opened = Arc::new(Mutex::new(Vec::new()));
+        let into = opened.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        listen(
+            &socket,
+            tx,
+            Box::new(|| {}),
+            (
+                Box::new(|_| Ok(())),
+                Box::new(|_| Ok(String::new())),
+                Box::new(move |path| {
+                    if let Ok(mut held) = into.lock() {
+                        held.push(path.to_path_buf());
+                    }
+                }),
+            ),
+        )?;
+        assert!(hand_over_file(&socket, &file));
+        let wait = std::time::Duration::from_secs(5);
+        assert_eq!(rx.recv_timeout(wait).ok(), Some(Command::Open));
+        let opened = opened.lock().map(|o| o.clone()).unwrap_or_default();
+        assert_eq!(opened, [file]);
         Ok(())
     }
 }

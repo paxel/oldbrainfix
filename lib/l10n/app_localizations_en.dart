@@ -1739,4 +1739,91 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairedPerson => 'Another person\'s Device';
+
+  @override
+  String get sendNote => 'Send this Note';
+
+  @override
+  String get sendTitle => 'Send this Note';
+
+  @override
+  String get sendWho => 'Who gets it?';
+
+  @override
+  String get sendAnyone => 'Anyone, not encrypted';
+
+  @override
+  String sendEncrypted(String name) {
+    return '$name, encrypted';
+  }
+
+  @override
+  String get sendPlainHint =>
+      'Not encrypted: whoever gets the file can read it. To encrypt it, share an Area with the person or pair with their Device first.';
+
+  @override
+  String get sendWhat =>
+      'It carries the text, the Sections and the Routines and Reminders; no photos, recordings or where it was captured. Sending it again later sends it as an update.';
+
+  @override
+  String get sendAction => 'Send';
+
+  @override
+  String get sendNoApp => 'No app here can take the file.';
+
+  @override
+  String get sentItemTitle => 'Sent to you';
+
+  @override
+  String sentItemFrom(String name) {
+    return 'From $name';
+  }
+
+  @override
+  String get sentItemSomeone => 'Someone';
+
+  @override
+  String sentItemVerified(String code) {
+    return 'Verified: met in person. Key $code';
+  }
+
+  @override
+  String sentItemKnown(String code) {
+    return 'Not verified: known from syncing, never met in person. Key $code';
+  }
+
+  @override
+  String sentItemUnknown(String code) {
+    return 'Not verified: never met. Key $code';
+  }
+
+  @override
+  String get sentItemEncrypted => 'It came encrypted to this Device.';
+
+  @override
+  String get sentItemPlain =>
+      'It came unencrypted: others may have read it on the way.';
+
+  @override
+  String get sentItemAccept => 'Accept';
+
+  @override
+  String get sentItemDecline => 'Decline';
+
+  @override
+  String get sentItemAccepted => 'Added to Unsorted, with its alarms on.';
+
+  @override
+  String get sentItemDeclined => 'Declined: nothing was kept.';
+
+  @override
+  String get sentItemAlready =>
+      'You accepted this before; it is among your Notes.';
+
+  @override
+  String get sentItemUnreadable =>
+      'This file cannot be read: it is damaged, or not signed by the key it names.';
+
+  @override
+  String get sentItemNotForUs => 'This file is encrypted for someone else.';
 }

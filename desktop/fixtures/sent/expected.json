@@ -1,0 +1,87 @@
+{
+  "box": "NpiOI37NKcQmhuv9Zt92gze8GE9ERdBaZWk8gmVJvjc=",
+  "item": {
+    "id": "00000000000000000000000000000301",
+    "version": 1,
+    "device": "65b60673d6ed884bf01c2c222d82ada0",
+    "name": "Ada",
+    "text": "Dentist on Friday, \"Dr. Müller\"",
+    "sections": [
+      {
+        "text": "Bring the card\nand the form",
+        "captured": "2026-01-01T10:00:05.000Z"
+      }
+    ],
+    "routines": [
+      {
+        "id": "routine:00000000000000000000000000000003",
+        "start": "2026-01-09",
+        "times": [
+          "09:30"
+        ],
+        "rule": null
+      },
+      {
+        "id": "routine:00000000000000000000000000000004",
+        "start": "2026-01-02",
+        "times": [
+          "08:00",
+          "20:00"
+        ],
+        "rule": "FREQ=WEEKLY;BYDAY=MO,TH"
+      }
+    ]
+  },
+  "trust": "unknown",
+  "accepted": "note:00000000000000000000000000000401",
+  "note": {
+    "id": "note:00000000000000000000000000000401",
+    "text": "Dentist on Friday, \"Dr. Müller\"",
+    "captured": "2026-01-04T18:00:00.000Z",
+    "place": null,
+    "importance": "normal",
+    "trashed": null,
+    "mergedInto": null,
+    "spawned": false,
+    "photos": [],
+    "recordings": [],
+    "transcripts": {},
+    "photoTexts": {}
+  },
+  "routines": [
+    {
+      "id": "routine:00000000000000000000000000000403",
+      "noteId": "note:00000000000000000000000000000401",
+      "start": "2026-01-09",
+      "times": [
+        "09:30"
+      ],
+      "rule": null,
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-04T18:00:00.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000404",
+      "noteId": "note:00000000000000000000000000000401",
+      "start": "2026-01-02",
+      "times": [
+        "08:00",
+        "20:00"
+      ],
+      "rule": "FREQ=WEEKLY;BYDAY=MO,TH",
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-04T18:00:00.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    }
+  ],
+  "acceptedAgain": "note:00000000000000000000000000000401"
+}

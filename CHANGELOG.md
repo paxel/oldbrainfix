@@ -53,6 +53,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Phone and desktop also sync through a shared folder such as Syncthing, Nextcloud or a USB stick, on their own and in the background, with everything in it end-to-end encrypted per Area.
 - Send what is new as an encrypted sync bundle file through any messenger and import it on the other paired Device.
 - Share a single Area with another person as Manager or Member; every other Area stays private.
+- Send a Note with its Routines and Reminders as a signed file to another Old Brain Fix user, encrypted when you know them, who previews it and accepts it into Unsorted with its alarms on.
 - An optional App Lock with a PIN, fingerprint or screen lock that guards your Notes while capturing and alarms stay open.
 - Optional Area Locks that keep single Areas and their Notes hidden until unlocked, with their alarms, Agenda rows, widget and calendar entries shown as "Private Routine" or in full, still checkable.
 - An About page with the version, documentation, source, a way to report problems or write to the developer, and a donation link; it and the desktop's About list every third-party component and its licence.

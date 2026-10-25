@@ -559,7 +559,7 @@ fn a_bundle_is_imported_and_one_saved_in_the_sync_view() -> TestResult {
                 Some(save.clone())
             }),
             Box::new(move |title| {
-                assert_eq!(title, "Import a sync bundle");
+                assert_eq!(title, "Open a bundle or a sent Note");
                 Some(open.clone())
             }),
         );

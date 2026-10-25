@@ -1544,6 +1544,99 @@ Future<void> _bundle(Directory root) async {
   }
 }
 
+/// Ada sends a Note with a Section, a Routine and a Reminder to Ben,
+/// once signed only and once encrypted to his X25519 key, with counted
+/// random bytes; Ben opens both and accepts. The send and the accept
+/// are at a held clock with counted ids, so the desktop core writes the
+/// same entries and files.
+void _sentFixture(Directory root) {
+  final out = Directory('${root.path}/sent')..createSync(recursive: true);
+  final ada = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ben');
+  try {
+    final note = Notes(ada).capture('Dentist on Friday, "Dr. Müller"');
+    Notes(ada).amend(note.id, 'Bring the card\nand the form');
+    Routines(ada).spawn(
+      note.id,
+      Schedule(start: Day(2026, 1, 9), times: [ClockTime(9, 30)]),
+    );
+    Routines(ada).spawn(
+      note.id,
+      Schedule(
+        start: Day(2026, 1, 2),
+        times: [ClockTime(8, 0), ClockTime(20, 0)],
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,TH'),
+      ),
+    );
+    _write(File('${out.path}/sender.jsonl'), _log(ada));
+
+    var ids = 0x300;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    _held = DateTime.utc(2026, 1, 3, 12);
+    var mark = ada.currentSeq();
+    final item = sentItemOf(ada, note.id);
+    _writeAfter(ada, mark, File('${out.path}/sent.jsonl'));
+    final signed = encodeSentItem(item, ada.signingKey);
+    final box = ben.ownKeyRecord.boxKey!;
+    final sealed = encodeSentItem(
+      item,
+      ada.signingKey,
+      to: [box],
+      random: _counted(4000),
+    );
+    File('${out.path}/signed.$sentItemExtension').writeAsBytesSync(signed);
+    File('${out.path}/sealed.$sentItemExtension').writeAsBytesSync(sealed);
+
+    final fromSigned = openSentItem(ben, signed);
+    final fromSealed = openSentItem(ben, sealed);
+    if (!fromSealed.encrypted ||
+        fromSealed.item.encode() != fromSigned.item.encode()) {
+      throw StateError('Ben did not read the same Sent Item twice');
+    }
+    ids = 0x400;
+    _held = DateTime.utc(2026, 1, 4, 18);
+    mark = ben.currentSeq();
+    final accepted = acceptSentItem(ben, fromSealed.item);
+    _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
+    final opened = fromSigned.item;
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'box': base64.encode(box),
+        'item': {
+          'id': opened.id,
+          'version': opened.version,
+          'device': opened.from.device,
+          'name': opened.name,
+          'text': opened.text,
+          'sections': [
+            for (final s in opened.sections) {'text': s.text, 'captured': s.captured.toIso8601String()},
+          ],
+          'routines': [
+            for (final r in opened.routines) {
+                'id': r.id,
+                'start': '${r.schedule.start}',
+                'times': [for (final t in r.schedule.times) '$t'],
+                'rule': r.schedule.rule?.format(),
+              },
+          ],
+        },
+        'trust': fromSigned.trust.name,
+        'accepted': accepted,
+        'note': _note(Notes(ben).byId(accepted)!),
+        'routines': [for (final r in Routines(ben).ofNote(accepted)..sort((a, b) => a.id.compareTo(b.id))) _routine(r)],
+        'acceptedAgain': openSentItem(ben, signed).accepted,
+      })}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+  }
+}
+
 /// What the roles of [area] come to on [store]: this Device's access,
 /// the people, what it may change and every entry no role allows.
 Map<String, Object?> _roles(Store store, String area, List<String> ids) => {
@@ -2110,7 +2203,14 @@ Future<void> main(List<String> args) async {
     '(`manager.jsonl`), then removed '
     '(`remove.jsonl`) with the answer he gets then (`answer3.json`), and '
     'what both read and which entries the roles leave out '
-    '(`expected.json`).\n',
+    '(`expected.json`).\n'
+    '- `sent/`: Ada sends a Note with a Section, a Routine and a Reminder '
+    'to Ben: her log (`sender.jsonl`), what sending wrote (`sent.jsonl`, '
+    'ids counted from 0x301, at a held clock), the file signed only '
+    '(`signed.$sentItemExtension`) and encrypted to Ben\'s X25519 key '
+    '(`sealed.$sentItemExtension`, random bytes counted from 4001 on), '
+    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401) '
+    'and what he reads (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -2138,6 +2238,7 @@ Future<void> main(List<String> args) async {
   await _folder(root);
   await _bundle(root);
   _sharedFixture(root);
+  _sentFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

@@ -19,6 +19,7 @@ import 'fake_photos.dart';
 class FakeBundles implements BundlePlatform {
   final Directory dir;
   final shared = <String>[];
+  final types = <String>[];
   var shares = true;
 
   /// What the picker answers; null backs out.
@@ -35,8 +36,9 @@ class FakeBundles implements BundlePlatform {
   Future<String?> exportPath(String name) async => '${dir.path}/$name';
 
   @override
-  Future<bool> share(String path) async {
+  Future<bool> share(String path, {String type = bundleMimeType}) async {
     shared.add(path);
+    types.add(type);
     return shares;
   }
 
