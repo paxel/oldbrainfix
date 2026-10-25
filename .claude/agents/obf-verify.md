@@ -7,7 +7,7 @@ effort: low
 ---
 You run checks and report. You change no files, fix nothing and make no git or gh writes.
 
-Run only the checks the task names; without a list, run this order, one at a time, each prefixed with `nice -n 19`, stopping at the first failure:
+Run only the checks the task names. The default before a commit is the compile gate: format, `dart analyze --fatal-infos` (core), the fixture check, `flutter analyze --fatal-infos` with the untranslated check, and `cargo fmt --all -- --check` plus `cargo check --workspace --all-targets --locked -j 2`. The full list below runs only when the task asks for full suites; one at a time, each prefixed with `nice -n 19`, stopping at the first failure:
 
 1. `dart format --output=none --set-exit-if-changed lib test packages/oldbrainfix_core/lib packages/oldbrainfix_core/test packages/oldbrainfix_core/tool`
 2. In `packages/oldbrainfix_core`: `dart analyze --fatal-infos`, then `dart test --concurrency=1`.

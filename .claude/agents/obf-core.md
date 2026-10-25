@@ -30,8 +30,8 @@ You implement core changes of Old Brain Fix. The Dart core and the Rust core are
 ## Resource limits (the host has hit the OOM killer)
 
 - Exactly one heavy command at a time, in the foreground, never in the background, all prefixed with `nice -n 19`.
-- Dart: `dart test --concurrency=1`. Flutter: single test files while iterating; the full `flutter test --concurrency=1` once, at the end.
-- Cargo: `pkill -x rust-analyzer` first, then `nice -n 19 env CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 cargo … -j 2`; `-p <crate> --test <file>` while iterating; the full workspace once, at the end.
+- Tests: run only the tests of the files you touched or added (`dart test --concurrency=1 test/<file>`, `flutter test test/<file>`, `cargo test -p <crate> --test <file>` or a name filter). Never run the full suites; CI runs them after the push. Analyze, `cargo fmt --all` and clippy on the touched crates are required.
+- Cargo: `pkill -x rust-analyzer` first, then `nice -n 19 env CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 cargo … -j 2`.
 - Gradle: only when Kotlin, the manifest, Gradle files or native dependencies changed; `./gradlew --no-daemon`, then `./gradlew --stop`. Keep the memory caps in `android/gradle.properties`.
 - If the task names environment scripts (JDK for Android builds, ALSA/cmake for the desktop build), source them before the matching build.
 
