@@ -30,11 +30,11 @@
       "dseq": 27,
       "entity": "note:00000000000000000000000000000004",
       "field": "text",
-      "value": "Fix the tap",
+      "value": "{\"format\":\"plain\",\"text\":\"Fix the tap\"}",
       "date": "2026-01-01T10:00:28.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:31.000Z",
-      "sig": "9U5nEm4dAYNzYQHLMcdPZc2Wt8abWJWEe1UohATMAMhkObE1BwsDeM0q3pkFdPYyhc+/zBayMzXVaUEgHMByCA=="
+      "sig": "zTFeutTMcs4iFMKn5Bimr6cQTprzdItyKWTH3krSW7trtOmBvqAlTGg7702wwWGIyd2IbRMhXRT0W0N4ZLuiAg=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
@@ -74,11 +74,11 @@
       "dseq": 31,
       "entity": "section:00000000000000000000000000000005",
       "field": "text",
-      "value": "The hot one",
+      "value": "{\"format\":\"plain\",\"text\":\"The hot one\"}",
       "date": "2026-01-01T10:00:32.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:36.000Z",
-      "sig": "dh8cXHI8HhANg21QmHFTJde7CxvnMoaIZI0ti1qQ8jqklpSGuuVeZQ2RdGdVgYVWZutS3NAc61HuT+/5kmnuDw=="
+      "sig": "AqGQgXYyjNgQQmxRcko0jCtFb1u/FhDt99un4udnWddLRuWRdVzN/8IBbkSh5pIITF1DkAURrAi7dEegt3d2CQ=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",

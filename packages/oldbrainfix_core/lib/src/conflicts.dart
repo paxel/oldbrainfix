@@ -4,6 +4,7 @@ import 'notes.dart';
 import 'places.dart';
 import 'routines.dart';
 import 'store.dart';
+import 'text_format.dart';
 
 /// Concurrent edits (ADR 0002, Catlog's conflicts adapted): two Devices
 /// changed the same thing without either having seen the other's
@@ -25,6 +26,10 @@ import 'store.dart';
 /// Routine's start, times and rule conflict together as its schedule.
 /// Done marks merge, and trash, restore, filing, Importance, colours and
 /// icons go by latest wins.
+///
+/// A text carries its format in the same value (ADR 0018), so text and
+/// format conflict as one; a Conflict one of whose versions is in a
+/// format this version does not know is left for a Device that knows it.
 
 /// The unit a Routine's schedule fields conflict as.
 const scheduleUnit = 'schedule';
@@ -96,6 +101,9 @@ class ConflictVersion {
 
   /// The value of a unit of one field.
   String? get value => values.values.firstOrNull;
+
+  /// The text and format of a text unit's [value].
+  StoredText get text => StoredText.read(value);
 }
 
 /// Concurrent edits to one unit of one entity.
@@ -118,6 +126,12 @@ class Conflict {
     required this.type,
     required this.versions,
   });
+
+  /// Whether this version may pick one: not when a version is a text in a
+  /// format it does not know, which picking another would overwrite and
+  /// keeping could not show as it is (ADR 0018).
+  bool get resolvable =>
+      unit != NoteKeys.text || versions.every((v) => v.text.editable);
 }
 
 extension Conflicts on Store {
@@ -182,8 +196,12 @@ extension Conflicts on Store {
         }
         values[field] = newest?.value;
       }
+      // A text written before its format was recorded is the same as
+      // that text marked plain.
       final same = versions.any(
-        (v) => fields.every((f) => v.values[f] == values[f]),
+        (v) => unit == NoteKeys.text
+            ? v.text == StoredText.read(values[unit])
+            : fields.every((f) => v.values[f] == values[f]),
       );
       if (!same) versions.add(ConflictVersion(head, values));
     }
@@ -194,8 +212,15 @@ extension Conflicts on Store {
   /// Keeps [kept]: writes every field of the unit again as it holds
   /// them, having seen every version, so the Conflict ends wherever this
   /// reaches. Dated after every edit of the unit, so a Device whose clock
-  /// ran ahead cannot keep showing its value.
+  /// ran ahead cannot keep showing its value. A Conflict that is not
+  /// [Conflict.resolvable] here is refused.
   void resolveConflict(Conflict conflict, ConflictVersion kept) {
+    if (!conflict.resolvable) {
+      throw StateError(
+        'a version of ${conflict.entity} is in a format not '
+        'known here',
+      );
+    }
     final fields = conflictUnitFields(conflict.unit);
     var date = clock().toUtc();
     for (final e in history(conflict.entity)) {

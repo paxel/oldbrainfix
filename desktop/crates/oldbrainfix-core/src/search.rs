@@ -1,13 +1,15 @@
 //! Finding Notes by what they say, as the Dart core's `Search` finds
 //! them: their text, the Transcripts of their voice recordings, the Photo
 //! Texts of their photos and the same of their Sections (Amends and
-//! merged Notes).
+//! merged Notes). A text in a format not known here counts as its source
+//! text.
 
 use std::collections::HashMap;
 
 use crate::Result;
 use crate::notes::{Note, Notes, keys};
 use crate::store::Store;
+use crate::text_format::StoredText;
 
 pub struct Search<'a> {
     store: &'a Store,
@@ -75,7 +77,7 @@ impl<'a> Search<'a> {
             texts
                 .entry(shown_under)
                 .or_default()
-                .push(fields.get(keys::TEXT).unwrap_or_default().to_string());
+                .push(StoredText::read(fields.get(keys::TEXT)).text);
         }
         Ok(texts)
     }

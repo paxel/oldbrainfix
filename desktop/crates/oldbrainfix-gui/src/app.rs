@@ -1901,7 +1901,11 @@ impl App {
             return Ok(());
         };
         let note = &placed.note;
-        if self.text_of.as_deref() != Some(note.id.as_str()) || note.is_trashed() {
+        // A text in a format not known here is never overwritten.
+        if self.text_of.as_deref() != Some(note.id.as_str())
+            || note.is_trashed()
+            || !note.text_editable
+        {
             return Ok(());
         }
         let text = self.text.trim();
@@ -2636,8 +2640,13 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 embossed(ui, tones, false, None, |ui| {
-                    // A Member reads someone else's Note (ADR 0013).
-                    if trashed || !may.changes {
+                    // A Member reads someone else's Note (ADR 0013); a text
+                    // in a format not known here shows as it is stored
+                    // (ADR 0018).
+                    if !note.text_editable {
+                        ui.label(RichText::new(t.text_newer_format()).color(weak));
+                    }
+                    if trashed || !may.changes || !note.text_editable {
                         ui.label(RichText::new(&note.text).size(18.0).color(text));
                         return;
                     }
@@ -2757,6 +2766,9 @@ impl App {
                 });
                 for section in sections {
                     embossed(ui, tones, false, None, |ui| {
+                        if !section.text_editable {
+                            ui.label(RichText::new(t.text_newer_format()).color(weak));
+                        }
                         if !section.text.is_empty() {
                             ui.label(RichText::new(&section.text).color(text));
                         }

@@ -56,6 +56,10 @@ Future<void> openNote(
 /// app goes to the background, and a [Draft] of it is kept after every
 /// [draftPause] of typing until it does. A draft newer than the Note's
 /// text comes back into the field when the Note is opened again.
+///
+/// A text in a format this version does not know shows as it is stored,
+/// read-only, with a note that a newer version of the app is needed to
+/// change it (ADR 0018); nothing here writes it.
 class NoteEditorScreen extends StatefulWidget {
   /// How long typing rests before the draft is written.
   static const draftPause = Duration(seconds: 1);
@@ -124,7 +128,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Keeps the text as typed in a draft while it differs from the Note's.
   void _writeDraft() {
     final note = _placed?.note;
-    if (note == null) return;
+    if (note == null || !note.textEditable) return;
     final text = _text.text;
     if (text.trim().isEmpty || text.trim() == note.text) {
       unawaited(widget.drafts.delete(note.id));
@@ -145,7 +149,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (!mounted || draft == null) return;
     final note = _placed?.note;
     final setAt = widget.notes.textSetAt(widget.noteId);
-    if (note == null || setAt == null) return;
+    if (note == null || setAt == null || !note.textEditable) return;
     if (draft.saved.isAfter(setAt) && draft.text.trim() != note.text) {
       if (_text.text == note.text) _text.text = draft.text;
     } else {
@@ -170,6 +174,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = _placed?.note;
     if (note == null || !(_placed?.changes ?? false)) return;
     unawaited(widget.drafts.delete(note.id));
+    // A text in a format not known here is never overwritten.
+    if (!note.textEditable) return;
     final text = _text.text.trim();
     if (text.isEmpty || text == note.text) return;
     widget.notes.edit(note.id, text);
@@ -358,13 +364,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (!note.textEditable) ...[
+              const NewerFormatNote(key: ValueKey('note-newer-format')),
+              const SizedBox(height: 8),
+            ],
             Embossed(
               strong: note.importance == Importance.important,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
                   controller: _text,
-                  readOnly: !changes,
+                  readOnly: !changes || !note.textEditable,
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
                   style: Theme.of(context).textTheme.bodyLarge,
@@ -510,6 +520,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (!section.textEditable) ...[
+                      NewerFormatNote(key: ValueKey('newer:${section.id}')),
+                      const SizedBox(height: 8),
+                    ],
                     if (section.text.isNotEmpty)
                       Text(
                         section.text,
@@ -622,6 +636,30 @@ class CaptureContextLines extends StatelessWidget {
             ],
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// Says that a text is in a format this version does not know and shows
+/// as it is stored: a newer version of the app is needed to change it.
+class NewerFormatNote extends StatelessWidget {
+  const NewerFormatNote({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.info_outline, size: 20, color: muted),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            context.t.textNewerFormat,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ),
       ],
     );
   }

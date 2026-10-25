@@ -404,6 +404,8 @@
   "conflictSchedule": "Plan einer Routine",
   "conflictOther": "Änderung",
   "conflictEmpty": "(leer)",
+  "conflictNewerFormat": "Eine Fassung wurde mit einer neueren Version von Old Brain Fix geschrieben. Aktualisiere die App, um eine zu wählen.",
+  "textNewerFormat": "Dieser Text wurde mit einer neueren Version von Old Brain Fix geschrieben. Aktualisiere die App, um ihn zu ändern.",
   "conflictOnThisDevice": "Auf diesem Gerät, {when}",
   "conflictOnDevice": "Auf {device}, {when}",
   "conflictOnUnnamed": "Auf einem Gerät ohne Namen, {when}",

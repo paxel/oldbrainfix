@@ -6,6 +6,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "Buy more sauce",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
       "place": null,
       "importance": "important",
@@ -20,6 +22,8 @@
     {
       "id": "note:00000000000000000000000000000002",
       "text": "Needs more sauce",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:06.000Z",
       "place": null,
       "importance": "normal",
@@ -34,6 +38,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Maybe paint the shed",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:11.000Z",
       "place": null,
       "importance": "unimportant",
@@ -48,6 +54,8 @@
     {
       "id": "note:00000000000000000000000000000004",
       "text": "First text",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:18.000Z",
       "place": null,
       "importance": "normal",
@@ -62,6 +70,8 @@
     {
       "id": "note:00000000000000000000000000000005",
       "text": "Half a millisecond later",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:23.000Z",
       "place": null,
       "importance": "normal",
@@ -76,6 +86,8 @@
     {
       "id": "note:00000000000000000000000000000006",
       "text": "Quote \" backslash \\ slash / newline \n tab \t bell \u0001 umlaut ü emoji 🧠",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:29.000Z",
       "place": null,
       "importance": "normal",
@@ -143,7 +155,9 @@
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002",
       "note:00000000000000000000000000000001"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {},
   "conflicts": []

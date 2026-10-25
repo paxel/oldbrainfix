@@ -28,3 +28,7 @@ A later file with the same ID and a higher version is an update; a file carrying
 ## Profiles (ADR 0017)
 
 Amended by ADR 0017: a Sent Item carries the sender's signed Profile instead of a name of its own; the preview shows it, and it is stored and bound to the sender's key only when the item is accepted. "Verified" moves from the sender's key to the Profile, set by comparing the Profile's short code in person (#51): a key met by pair code no longer makes a sender verified. An update or cancellation brings the sender's Profile again, and a newer record of it replaces the one kept, as any other does.
+
+## Text formats (ADR 0018)
+
+Amended by ADR 0018 (#58): the Note's text and every Section's text carry their format, `"format":"plain"` from this version; a file without one reads as plain. Accepting writes each text in its format, and an update never replaces a text in a format the receiver does not know unless it is the text the sender sent last.

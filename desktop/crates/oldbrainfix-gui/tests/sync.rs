@@ -8,7 +8,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::thread::JoinHandle;
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{DEVICE_HEADER, PIN_HEADER, apply_answer, sync_request};
 use oldbrainfix_core::{Notes, SigningKey, Store};
 use oldbrainfix_gui::{App, Selection};
@@ -242,6 +242,56 @@ fn the_sync_view_lists_the_conflicts_and_keeps_the_version_clicked() -> TestResu
     // The pick reaches the phone: nothing is open there either.
     send(desk, &phone)?;
     assert!(phone.conflicts()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_conflict_with_a_text_in_an_unknown_format_cannot_be_picked_here() -> TestResult {
+    const FUTURE: &str = r##"{"format":"x-future","text":"# Oat milk"}"##;
+    let desk = store(1)?;
+    let phone = store(2)?;
+    let note = Notes::new(&desk).capture("Milk", None, None)?;
+    send(&desk, &phone)?;
+    phone.append(&note.id, "text", Some(FUTURE), None)?;
+    Notes::new(&desk).edit(&note.id, "Oat milk")?;
+    send(&phone, &desk)?;
+    assert_eq!(desk.conflicts()?.len(), 1);
+
+    let mut app = App::new(desk, "en");
+    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
+    app.select(Selection::Sync);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    step_until(&mut harness, |app| app.sync_host().hosting())?;
+    harness.step();
+    assert!(shows(
+        &harness,
+        "A version was written with a newer version of Old Brain Fix. Update the app to pick one."
+    ));
+    let mine = harness
+        .query_all_by_label_contains("Oat milk\nOn this Device")
+        .next()
+        .ok_or("this Device's version")?;
+    assert!(mine.accesskit_node().is_disabled());
+    mine.click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(
+        harness
+            .query_all_by_label_contains("# Oat milk")
+            .next()
+            .is_some(),
+        "the source text shows"
+    );
+    let desk = harness.state().store();
+    assert_eq!(desk.conflicts()?.len(), 1);
     Ok(())
 }
 

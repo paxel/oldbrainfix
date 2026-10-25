@@ -114,7 +114,7 @@ void main() {
       expect(
         [
           for (final e in store.history(note.id))
-            if (e.field == NoteKeys.text) e.value,
+            if (e.field == NoteKeys.text) StoredText.read(e.value).text,
         ],
         ['nees mor sauce', 'need more sauce'],
       );

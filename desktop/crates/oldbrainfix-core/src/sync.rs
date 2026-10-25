@@ -295,7 +295,8 @@ mod tests {
         assert_eq!(applied.len(), entries.len() - 2);
         assert_eq!(report.refused_count(), 2);
         assert_eq!(report.new_keys.len(), 1);
-        assert_eq!(b.current(&note.id, "text")?.as_deref(), Some("Real"));
+        let real = crate::Notes::new(&b).by_id(&note.id)?.map(|n| n.text);
+        assert_eq!(real.as_deref(), Some("Real"));
         // Taken twice, nothing is new.
         let again = b.apply_entries(&entries, &[], None, &mut ImportReport::default())?;
         assert!(again.is_empty());

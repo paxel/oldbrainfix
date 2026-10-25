@@ -102,6 +102,8 @@
       {
         "id": "note:00000000000000000000000000000002",
         "text": "Buy milk",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:03.000Z",
         "place": "area:00000000000000000000000000000001",
         "importance": "normal",
@@ -120,6 +122,8 @@
       {
         "id": "note:00000000000000000000000000000004",
         "text": "Pills",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:16.000Z",
         "place": null,
         "importance": "normal",
@@ -151,6 +155,8 @@
           "id": "section:00000000000000000000000000000003",
           "noteId": "note:00000000000000000000000000000002",
           "text": "Oat milk, \"the green one\"",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:11.000Z",
           "photos": [],
           "recordings": [],
@@ -188,7 +194,9 @@
       "loop": [],
       " e ": [
         "note:00000000000000000000000000000002"
-      ]
+      ],
+      "heading": [],
+      "format": []
     },
     "searchWithin": {
       "area:00000000000000000000000000000006": [],

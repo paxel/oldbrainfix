@@ -15,6 +15,8 @@
     {
       "id": "note:0000000000000000000000000000000a",
       "text": "Call the plumber",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:33.000Z",
       "place": "area:00000000000000000000000000000001",
       "importance": "normal",
@@ -29,6 +31,8 @@
     {
       "id": "note:0000000000000000000000000000000b",
       "text": "Water the plants",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:38.000Z",
       "place": null,
       "importance": "normal",
@@ -43,6 +47,8 @@
     {
       "id": "note:0000000000000000000000000000000c",
       "text": "Renew the passport",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:43.000Z",
       "place": null,
       "importance": "normal",
@@ -57,6 +63,8 @@
     {
       "id": "note:0000000000000000000000000000000d",
       "text": "Pay the rent",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:48.000Z",
       "place": "area:00000000000000000000000000000001",
       "importance": "normal",
@@ -71,6 +79,8 @@
     {
       "id": "note:0000000000000000000000000000000e",
       "text": "Old flyer",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:54.000Z",
       "place": null,
       "importance": "normal",
@@ -85,6 +95,8 @@
     {
       "id": "note:0000000000000000000000000000000f",
       "text": "Buy stamps",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:00.000Z",
       "place": null,
       "importance": "normal",
@@ -99,6 +111,8 @@
     {
       "id": "note:00000000000000000000000000000010",
       "text": "Return the drill",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:06.000Z",
       "place": null,
       "importance": "normal",
@@ -113,6 +127,8 @@
     {
       "id": "note:00000000000000000000000000000011",
       "text": "Oil the saw",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:12.000Z",
       "place": null,
       "importance": "normal",
@@ -127,6 +143,8 @@
     {
       "id": "note:00000000000000000000000000000012",
       "text": "Sweep the floor",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:18.000Z",
       "place": null,
       "importance": "normal",
@@ -201,7 +219,9 @@
       "note:0000000000000000000000000000000c",
       "note:0000000000000000000000000000000b",
       "note:0000000000000000000000000000000a"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {
     "area:00000000000000000000000000000001": [

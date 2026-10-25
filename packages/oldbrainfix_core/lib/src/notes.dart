@@ -5,11 +5,14 @@ import 'named_places.dart';
 import 'places.dart';
 import 'shared_areas.dart';
 import 'store.dart';
+import 'text_format.dart';
 
 /// Field keys of a Note.
 abstract final class NoteKeys {
   static const type = r'$type';
   static const typeNote = 'note';
+
+  /// The Note's text with its format, as [StoredText.encode] writes it.
   static const text = 'text';
   static const captured = 'captured';
 
@@ -93,6 +96,8 @@ abstract final class SectionKeys {
 
   /// The Note the Section belongs to.
   static const note = 'note';
+
+  /// The Section's text with its format, as for [NoteKeys.text].
   static const text = 'text';
   static const captured = 'captured';
 
@@ -197,7 +202,16 @@ class CaptureContext {
 class Note {
   /// Entity id, `note:<id>`.
   final String id;
+
+  /// The text, the source text when its format is not known here.
   final String text;
+
+  /// The format [text] is in ([TextFormats]).
+  final String textFormat;
+
+  /// Whether this version may change [text]: never one in a format it
+  /// does not know, which it shows as its source text (ADR 0018).
+  final bool textEditable;
   final CaptureContext context;
 
   /// The Area or Topic the Note is filed in, or null when it has none.
@@ -235,6 +249,8 @@ class Note {
     required this.id,
     required this.text,
     required this.context,
+    this.textFormat = TextFormats.plain,
+    this.textEditable = true,
     this.place,
     this.importance = Importance.normal,
     this.trashed,
@@ -269,7 +285,14 @@ class Section {
   /// `note:<id>` for a Merge.
   final String id;
   final String noteId;
+
+  /// The text, the source text when its format is not known here.
   final String text;
+
+  /// The format [text] is in, and whether this version may change it,
+  /// as for [Note.textFormat] and [Note.textEditable].
+  final String textFormat;
+  final bool textEditable;
   final CaptureContext context;
 
   /// The hashes of its photos: a merged Note's photos travel with it.
@@ -292,6 +315,8 @@ class Section {
     required this.noteId,
     required this.text,
     required this.context,
+    this.textFormat = TextFormats.plain,
+    this.textEditable = true,
     this.photos = const [],
     this.recordings = const [],
     this.transcripts = const {},
@@ -370,7 +395,12 @@ class Notes {
     store.batch(() {
       store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
       store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
-      store.append(id, NoteKeys.text, text, date: now);
+      store.append(
+        id,
+        NoteKeys.text,
+        StoredText.plain(text).encode(),
+        date: now,
+      );
       if (place != null) store.append(id, NoteKeys.place, place, date: now);
       if (nudgeIn != null) {
         final due = now.add(nudgeIn).toIso8601String();
@@ -494,10 +524,17 @@ class Notes {
   }
 
   /// Fixes the text of the Note [noteId] in place. The old text stays in
-  /// the log only.
+  /// the log only. A text in a format this version does not know is
+  /// never overwritten (ADR 0018).
   void edit(String noteId, String text) {
-    _requireNote(noteId);
-    store.append(noteId, NoteKeys.text, _text(text));
+    final note = byId(noteId);
+    if (note == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note');
+    }
+    if (!note.textEditable) {
+      throw StateError('the text of $noteId is in a format not known here');
+    }
+    store.append(noteId, NoteKeys.text, StoredText.plain(_text(text)).encode());
   }
 
   /// When the text of the Note [noteId] was last set, by capture or edit;
@@ -525,7 +562,12 @@ class Notes {
       store.append(id, SectionKeys.type, SectionKeys.typeSection, date: now);
       store.append(id, SectionKeys.note, noteId, date: now);
       store.append(id, SectionKeys.captured, now.toIso8601String(), date: now);
-      store.append(id, SectionKeys.text, trimmed, date: now);
+      store.append(
+        id,
+        SectionKeys.text,
+        StoredText.plain(trimmed).encode(),
+        date: now,
+      );
     });
     return _section(id)!;
   }
@@ -566,6 +608,8 @@ class Notes {
             id: id,
             noteId: noteId,
             text: note.text,
+            textFormat: note.textFormat,
+            textEditable: note.textEditable,
             context: note.context,
             photos: note.photos,
             recordings: note.recordings,
@@ -691,9 +735,12 @@ class Notes {
     // A place that is gone leaves the Note Unsorted.
     final place = fields[NoteKeys.place];
     final trashed = fields[NoteKeys.trashed];
+    final text = StoredText.read(fields[NoteKeys.text]);
     return Note(
       id: id,
-      text: fields[NoteKeys.text] ?? '',
+      text: text.text,
+      textFormat: text.format,
+      textEditable: text.editable,
       context: _context(captured, fields),
       place: place != null && Places(store).isPlace(place) ? place : null,
       importance:
@@ -791,10 +838,13 @@ class Notes {
     final owner = fields[SectionKeys.note];
     final captured = fields[SectionKeys.captured];
     if (owner == null || captured == null) return null;
+    final text = StoredText.read(fields[SectionKeys.text]);
     return Section(
       id: id,
       noteId: noteId ?? owner,
-      text: fields[SectionKeys.text] ?? '',
+      text: text.text,
+      textFormat: text.format,
+      textEditable: text.editable,
       context: _context(captured, fields),
     );
   }

@@ -226,7 +226,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
       if (text.isNotEmpty) _create(text, nudgeIn: nudgeIn);
       return;
     }
-    if (text.isNotEmpty && widget.notes.byId(captured.noteId)?.text != text) {
+    final note = widget.notes.byId(captured.noteId);
+    if (text.isNotEmpty &&
+        note != null &&
+        note.textEditable &&
+        note.text != text) {
       widget.notes.edit(captured.noteId, text);
     }
     if (nudgeIn != null) widget.notes.setNudge(captured.noteId, nudgeIn);

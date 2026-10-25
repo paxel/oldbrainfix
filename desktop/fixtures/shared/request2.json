@@ -35,11 +35,11 @@
       "dseq": 6,
       "entity": "note:00000000000000000000000000000103",
       "field": "text",
-      "value": "Ben buys bread",
+      "value": "{\"format\":\"plain\",\"text\":\"Ben buys bread\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "SwTjHmy19fuukuGLUqSo5A9i6QtTH/UB2qjmGWenMtOfRDftuAD1ohHhpZCb7gOdH3vyGcQkl8YJQIoV8MsTBw=="
+      "sig": "tqqn8lscUKZlIkkMGZsRxIKhqX6kRjY8UVx6q6vOo4QbeeCAMpSX1xRTTUsk7FTdI57D2j4ScTX52TKFpdOeBw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -57,12 +57,12 @@
       "dseq": 8,
       "entity": "note:00000000000000000000000000000103",
       "field": "text",
-      "value": "Ben buys rye bread",
+      "value": "{\"format\":\"plain\",\"text\":\"Ben buys rye bread\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "",
-      "sig": "8l3UVei5DL77oDxYZrj0H9w1DLl+eXvGtjcwh5AH6KFcZsMQVokivom+bR/fw7HUolxGT/BuF1IzZGxLMtqPCw=="
+      "sig": "tRhVaBHlaKUTuk5IRiR3Ne5lffDEvJWeInu3de7+YvSRbwHs6jCQOqYNZEZokcL8fvqepL0xitp422DbSks1AQ=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -102,11 +102,11 @@
       "dseq": 12,
       "entity": "section:00000000000000000000000000000104",
       "field": "text",
-      "value": "Oat milk please",
+      "value": "{\"format\":\"plain\",\"text\":\"Oat milk please\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "1uIZISh4tuiIPDSgdIzan8sqI5ZSrjmo5CxFKQj4ngctRGD2/Qs9t0AuLzixT0ycJ14gMrBuf6Z+UvCVHPfDDg=="
+      "sig": "LR7qARSqfPwAPpD/RXr3GrPn0/SH8QU2RwXEhSR98PfUpPVLFeyYPaQc23FrA8V9DGANsa9qYd24+1CaGukfCg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -124,12 +124,12 @@
       "dseq": 14,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy beer",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy beer\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
-      "sig": "HRR6TO/Fu9LrWhTRuWmDHD4qiDfFzezyU3TOsMRFMIZCAsMiVcn3dLMOFKrqEFlP92OtloCQyUQY0uIPmYM3BA=="
+      "sig": "BePm2aCgwHVBr3vvofVkemnbj27yS2EKpehFFIxeyMo4AZSC9qju8YdYkdMDOPQoXpJ0cscY0eMZRZwNIgrWBQ=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",

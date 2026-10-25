@@ -32,7 +32,8 @@ Store device(DateTime Function() clock) => Store.inMemory(clock: clock);
 
 /// The values of every version of [conflict], newest first.
 List<String?> values(Conflict conflict) => [
-  for (final v in conflict.versions) v.value,
+  for (final v in conflict.versions)
+    conflict.unit == NoteKeys.text ? v.text.text : v.value,
 ];
 
 void main() {
@@ -320,7 +321,7 @@ void main() {
       Notes(desk).edit(note.id, 'Call mum at seven');
       exchange(phone, desk);
       final conflict = desk.conflicts().firstWhere((c) => c.entity == note.id);
-      expect(conflict.versions.first.value, 'Call mum at seven');
+      expect(conflict.versions.first.text.text, 'Call mum at seven');
       desk.resolveConflict(conflict, conflict.versions.first);
       // The winner and the pick arrive at the third Device in one go.
       final (_, joinerSide) = exchange(third, desk);
@@ -339,7 +340,9 @@ void main() {
       Notes(phone).edit(noteId, 'From now');
       exchange(ahead, phone);
       final conflict = phone.conflicts().single;
-      final now = conflict.versions.firstWhere((v) => v.value == 'From now');
+      final now = conflict.versions.firstWhere(
+        (v) => v.text.text == 'From now',
+      );
       phone.resolveConflict(conflict, now);
       expect(phone.conflicts(), isEmpty);
       expect(Notes(phone).byId(noteId)?.text, 'From now');

@@ -1,9 +1,11 @@
 import 'notes.dart';
 import 'store.dart';
+import 'text_format.dart';
 
 /// Finding Notes by what they say: their text, the Transcripts of their
 /// voice recordings, the Photo Texts of their photos and the same of
 /// their Sections (Amends and merged Notes). Capture Context joins later.
+/// A text in a format not known here counts as its source text.
 class Search {
   final Store store;
 
@@ -56,7 +58,9 @@ class Search {
       final owner = fields[SectionKeys.note];
       if (owner == null) continue;
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
-      (texts[shownUnder] ??= []).add(fields[SectionKeys.text] ?? '');
+      (texts[shownUnder] ??= []).add(
+        StoredText.read(fields[SectionKeys.text]).text,
+      );
     }
     return texts;
   }

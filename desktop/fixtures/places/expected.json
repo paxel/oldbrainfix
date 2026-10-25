@@ -105,6 +105,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Descale the kettle",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:57.000Z",
       "place": "topic:starter-kitchen",
       "importance": "normal",
@@ -119,6 +121,8 @@
     {
       "id": "note:00000000000000000000000000000004",
       "text": "Sort the cellar",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:02.000Z",
       "place": "area:starter-household",
       "importance": "normal",
@@ -133,6 +137,8 @@
     {
       "id": "note:00000000000000000000000000000005",
       "text": "Parents evening",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:07.000Z",
       "place": null,
       "importance": "normal",
@@ -147,6 +153,8 @@
     {
       "id": "note:00000000000000000000000000000006",
       "text": "New tyres",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:12.000Z",
       "place": "area:starter-car",
       "importance": "normal",
@@ -161,6 +169,8 @@
     {
       "id": "note:00000000000000000000000000000007",
       "text": "Where did this go?",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:17.000Z",
       "place": null,
       "importance": "important",
@@ -175,6 +185,8 @@
     {
       "id": "note:00000000000000000000000000000008",
       "text": "Still Unsorted",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:23.000Z",
       "place": null,
       "importance": "normal",
@@ -258,7 +270,9 @@
       "note:00000000000000000000000000000005",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000003"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {
     "area:starter-car": [

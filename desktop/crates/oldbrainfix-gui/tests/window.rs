@@ -374,6 +374,112 @@ fn a_notes_text_is_fixed_in_place() -> TestResult {
 }
 
 #[test]
+fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> TestResult {
+    const NEWER: &str =
+        "This text was written with a newer version of Old Brain Fix. Update the app to change it.";
+    let mut harness = harness("formats", "en")?;
+    assert!(!shows(&harness, NEWER));
+    harness
+        .query_all_by_label_contains("# Heading")
+        .next()
+        .ok_or("the card")?
+        .click();
+    harness.run();
+    let id = harness
+        .state()
+        .selected_note()
+        .ok_or("selected")?
+        .to_string();
+    let note = Notes::new(harness.state().store())
+        .by_id(&id)?
+        .ok_or("note")?;
+    assert_eq!(note.text, "# Heading\n**bold** ü");
+    assert!(!note.text_editable);
+    let stored = |h: &Harness<'_, App>| h.state().store().current(&id, "text");
+    let before = stored(&harness)?;
+    assert!(shows(&harness, NEWER));
+    assert!(
+        harness
+            .query_by(|n| n.role() == Role::MultilineTextInput
+                && n.value().is_some_and(|v| v.contains("Heading")))
+            .is_none(),
+        "no field to type into"
+    );
+    harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    harness.run();
+    // Amend adds a Section and leaves the text as it is.
+    field(&harness, "What's new?").click();
+    harness.run();
+    typing(&harness).type_text("Oat milk too");
+    harness.run();
+    harness.get_by_label("Add to Note").click();
+    harness.run();
+    let sections = Notes::new(harness.state().store()).sections(&id)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(stored(&harness)?, before);
+    // Written before the format was recorded, it reads as plain.
+    card(&harness, r#"{"format":"plain"}"#).click();
+    harness.run();
+    assert_eq!(stored(&harness)?, before);
+    // A plain Note says nothing of it.
+    assert_ne!(harness.state().selected_note(), Some(id.as_str()));
+    assert!(!shows(&harness, NEWER));
+    Ok(())
+}
+
+#[test]
+fn a_note_in_an_unknown_format_is_merged_with_its_text_as_it_is() -> TestResult {
+    let mut harness = harness("formats", "en")?;
+    harness
+        .query_all_by_label_contains("# Heading")
+        .next()
+        .ok_or("the card")?
+        .click();
+    harness.run();
+    let id = harness
+        .state()
+        .selected_note()
+        .ok_or("selected")?
+        .to_string();
+    let before = harness.state().store().current(&id, "text")?;
+    harness.get_by_label("Merge into…").click();
+    harness.run();
+    // The picker's search has the keyboard; the list behind has one too.
+    typing(&harness).type_text("OAT");
+    harness.run();
+    // The list behind shows the card too; the picker is drawn last.
+    harness
+        .get_all_by_label("Plain oat milk")
+        .last()
+        .ok_or("the pick")?
+        .click();
+    harness.run();
+    let merged = Notes::new(harness.state().store())
+        .by_id(&id)?
+        .ok_or("note")?;
+    assert!(merged.merged_into.is_some());
+    assert_eq!(harness.state().store().current(&id, "text")?, before);
+    Ok(())
+}
+
+#[test]
+fn a_section_in_an_unknown_format_says_so() -> TestResult {
+    let mut harness = harness("formats", "en")?;
+    card(&harness, "Plain host").click();
+    harness.run();
+    let newer = harness
+        .query_all_by_label(
+            "This text was written with a newer version of Old Brain Fix. Update the app to change it.",
+        )
+        .count();
+    // The merged Note and its Amend, both formatted later.
+    assert_eq!(newer, 2);
+    // The host's own text is plain and stays a field to type into.
+    holding(&harness, "Plain host");
+    Ok(())
+}
+
+#[test]
 fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     let mut harness = harness("places", "en")?;
     harness.get_by_label("Kitchen").click();

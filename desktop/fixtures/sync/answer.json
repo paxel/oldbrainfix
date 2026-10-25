@@ -8,12 +8,12 @@
       "dseq": 13,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy milk and eggs",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}",
       "date": "2026-01-01T10:00:32.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:32.000Z",
       "ctx": "c945cbf2a5602002141e2fb9d17054d6:14",
-      "sig": "eeIER2MTHsYYX8v/frO8MdxNagm6KzNPBcYz9zFk/gPbILc7OFcrl0LNxw3XdD5yJh0M2nzUegHGx8bamAY/CA=="
+      "sig": "tOihUMOtkmaklG+A0ZAGQeTN1+tVLU7AcT3np7o3X40HKGxvrY5chsvZpLasUYWNfPqceKzOp37+1dsD0M2zCQ=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
@@ -53,11 +53,11 @@
       "dseq": 17,
       "entity": "section:00000000000000000000000000000004",
       "field": "text",
-      "value": "Tuesday works",
+      "value": "{\"format\":\"plain\",\"text\":\"Tuesday works\"}",
       "date": "2026-01-01T10:00:39.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:43.000Z",
-      "sig": "2imDuQE3CM5BZieAf1fiDlYyZG6pTjHMZ5T32dkfGZz5+Nthw9Hx573JArEyrKxLKDLhaMIkKL2p6oWmvox1Dw=="
+      "sig": "BaAXZb2zZTOIsB+dFyJYVoDXrr8vYK3Q4iegAUxAxK2xY6TxBFxZFm4j5ethH6KllTnVvFSJfGwxF8pmK8PmCA=="
     }
   ],
   "wantBlobs": [

@@ -24,6 +24,7 @@ use crate::profile::{Profile, SignedProfile, short_code};
 use crate::routines::keys as routine_keys;
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
 use crate::store::{Fields, Store};
+use crate::text_format::{self, StoredText};
 use crate::{Error, Notes, Result, Routine, Routines, Schedule};
 
 /// The file ending of a Sent Item.
@@ -68,11 +69,13 @@ pub fn file_name(day: &str) -> String {
     format!("oldbrainfix-note-{day}.{EXTENSION}")
 }
 
-/// A Section of a Sent Item.
+/// A Section of a Sent Item: its text, the format it is in (ADR 0018)
+/// and when it was captured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SentSection {
     pub text: String,
     pub captured: DateTime<Utc>,
+    pub format: String,
 }
 
 /// A Routine or Reminder of a Sent Item: the sender's id and its
@@ -96,6 +99,8 @@ pub struct SentItem {
     pub from: KeyRecord,
     pub profile: SignedProfile,
     pub text: String,
+    /// The format `text` is in (ADR 0018).
+    pub text_format: String,
     pub sections: Vec<SentSection>,
     pub routines: Vec<SentRoutine>,
 }
@@ -112,7 +117,8 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
 
 impl SentItem {
     /// What is signed: keys sorted, no spaces, as the Dart core writes it;
-    /// only a cancellation says its kind.
+    /// only a cancellation says its kind. Every text says its format; a
+    /// file without one is read as plain.
     pub fn encode(&self) -> String {
         let sections: Vec<Value> = self
             .sections
@@ -120,6 +126,7 @@ impl SentItem {
             .map(|s| {
                 object(vec![
                     ("captured", json!(dart_iso(s.captured))),
+                    ("format", json!(s.format)),
                     ("text", json!(s.text)),
                 ])
             })
@@ -154,6 +161,7 @@ impl SentItem {
             (
                 "note",
                 object(vec![
+                    ("format", json!(self.text_format)),
                     ("sections", Value::Array(sections)),
                     ("text", json!(self.text)),
                 ]),
@@ -184,6 +192,7 @@ impl SentItem {
             sections.push(SentSection {
                 text: s.get("text")?.as_str()?.to_string(),
                 captured: parse_time(s.get("captured")?.as_str()?).ok()?,
+                format: text_format_of(s)?,
             });
         }
         let mut routines = Vec::new();
@@ -217,10 +226,27 @@ impl SentItem {
             from: KeyRecord::from_json(from.get("key")?)?,
             profile: SignedProfile::from_json(from.get("profile")?)?,
             text: note.get("text")?.as_str()?.to_string(),
+            text_format: text_format_of(note)?,
             sections,
             routines,
         })
     }
+}
+
+/// The format a text of `json` says it is in: plain when it says none,
+/// `None` when it is no text.
+fn text_format_of(json: &Value) -> Option<String> {
+    match json.get("format") {
+        None => Some(text_format::PLAIN.to_string()),
+        Some(Value::String(format)) => Some(format.clone()),
+        Some(_) => None,
+    }
+}
+
+/// The Note text of `item` as it is stored: in the format it came in, so
+/// a text in a format this version does not know arrives whole.
+fn stored(item: &SentItem) -> String {
+    StoredText::of(&item.text_format, &item.text).encode()
 }
 
 fn times(schedule: &Schedule) -> String {
@@ -344,6 +370,7 @@ impl Store {
             from: self.own_key_record()?,
             profile,
             text: note.text,
+            text_format: note.text_format,
             sections: notes
                 .sections(note_id)?
                 .into_iter()
@@ -351,6 +378,7 @@ impl Store {
                 .map(|s| SentSection {
                     text: s.text,
                     captured: s.captured,
+                    format: s.text_format,
                 })
                 .collect(),
             routines: routines
@@ -529,9 +557,15 @@ impl Store {
     /// (`restores`) those that went with it count.
     fn changes(&self, note_id: &str, item: &SentItem, restores: bool) -> Result<SentItemChanges> {
         let notes = Notes::new(self);
-        let text = notes.by_id(note_id)?.map(|n| n.text).unwrap_or_default();
+        let text = StoredText::read(self.current(note_id, note_keys::TEXT)?.as_deref());
+        let incoming = StoredText::of(&item.text_format, &item.text);
         let sent = self.last_sent_text(note_id)?;
-        let changed = item.text != text && sent.as_ref().is_none_or(|s| item.text != *s);
+        let edited = sent.as_ref().is_none_or(|s| *s != text);
+        // A text here in a format this version does not know, other than
+        // the one the sender sent last, is never overwritten (ADR 0018).
+        let changed = incoming != text
+            && sent.as_ref().is_none_or(|s| incoming != *s)
+            && (text.editable || !edited);
         let here: std::collections::HashSet<DateTime<Utc>> = notes
             .sections(note_id)?
             .into_iter()
@@ -579,7 +613,7 @@ impl Store {
             .map(|(_, r)| r)
             .collect();
         Ok(SentItemChanges {
-            text_before: changed.then_some(text.clone()),
+            text_before: changed.then(|| text.text.clone()),
             text_edited: changed && sent.as_ref().is_some_and(|s| *s != text),
             sections_added: item
                 .sections
@@ -597,7 +631,7 @@ impl Store {
     /// The text the sender last sent for the Note `note_id`: the newest
     /// text written with its link, as accepting and applying write both
     /// at once.
-    fn last_sent_text(&self, note_id: &str) -> Result<Option<String>> {
+    fn last_sent_text(&self, note_id: &str) -> Result<Option<StoredText>> {
         let history = self.history(note_id)?;
         let linked: std::collections::HashSet<DateTime<Utc>> = history
             .iter()
@@ -613,7 +647,7 @@ impl Store {
                 last = Some(e);
             }
         }
-        Ok(last.and_then(|e| e.value.clone()))
+        Ok(last.map(|e| StoredText::read(e.value.as_deref())))
     }
 
     /// A new Note in Unsorted for `item`, captured now.
@@ -624,7 +658,7 @@ impl Store {
         self.batch(|| {
             self.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
             self.append(&id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            self.append(&id, note_keys::TEXT, Some(&item.text), at)?;
+            self.append(&id, note_keys::TEXT, Some(&stored(item)), at)?;
             self.append(&id, keys::RECEIVED, Some(&link(item)), at)?;
             for s in &item.sections {
                 self.write_section(&id, s)?;
@@ -665,7 +699,7 @@ impl Store {
                 }
             }
             if changes.text_before.is_some() {
-                self.append(note_id, note_keys::TEXT, Some(&item.text), Some(now))?;
+                self.append(note_id, note_keys::TEXT, Some(&stored(item)), Some(now))?;
             }
             self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
             for s in &changes.sections_added {
@@ -726,7 +760,8 @@ impl Store {
             Some(&dart_iso(section.captured)),
             None,
         )?;
-        self.append(&id, note_keys::TEXT, Some(&section.text), None)?;
+        let text = StoredText::of(&section.format, &section.text).encode();
+        self.append(&id, note_keys::TEXT, Some(&text), None)?;
         Ok(())
     }
 
@@ -1227,6 +1262,63 @@ mod tests {
     }
 
     #[test]
+    fn every_text_travels_in_its_format_and_one_made_here_is_never_overwritten() -> TestResult {
+        const FUTURE: &str = r##"{"format":"x-future","text":"# Heading"}"##;
+        let ann = device(1);
+        let ben = device(2);
+        let note = Notes::new(&ann).capture("x", None, None)?;
+        ann.append(&note.id, note_keys::TEXT, Some(FUTURE), None)?;
+        Notes::new(&ann).amend(&note.id, "Room 3")?;
+        let opened = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "opened")?;
+        assert_eq!(opened.item.text, "# Heading");
+        assert_eq!(opened.item.text_format, "x-future");
+        assert_eq!(opened.item.sections[0].format, text_format::PLAIN);
+        let payload = opened.item.encode();
+        assert!(payload.contains(r#""note":{"format":"x-future","sections":["#));
+        assert!(payload.contains(r#","format":"plain","text":"Room 3"}"#));
+        let got = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        assert_eq!(ben.current(&got, note_keys::TEXT)?.as_deref(), Some(FUTURE));
+        // Without formats, a file reads as plain.
+        let bare =
+            SentItem::parse(&payload.replace(r#""format":"x-future","#, "")).ok_or("bare")?;
+        assert_eq!(bare.text_format, text_format::PLAIN);
+        assert!(
+            SentItem::parse(&payload.replace(r#""format":"plain""#, r#""format":1"#)).is_none()
+        );
+
+        // The sender's own formatted text follows her update.
+        let moved = r##"{"format":"x-future","text":"# Moved"}"##;
+        ann.append(&note.id, note_keys::TEXT, Some(moved), None)?;
+        let update = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "update")?;
+        let changes = update.changes.clone().ok_or("changes")?;
+        assert_eq!(changes.text_before.as_deref(), Some("# Heading"));
+        ben.accept_sent_item(&update.item, false)?;
+        assert_eq!(ben.current(&got, note_keys::TEXT)?.as_deref(), Some(moved));
+
+        // One a later version made here stays.
+        ben.append(&got, note_keys::TEXT, Some(FUTURE), None)?;
+        ann.append(
+            &note.id,
+            note_keys::TEXT,
+            Some(r#"{"format":"plain","text":"Plain again"}"#),
+            None,
+        )?;
+        let next = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "next")?;
+        assert_eq!(next.changes.clone().ok_or("changes")?.text_before, None);
+        ben.accept_sent_item(&next.item, false)?;
+        assert_eq!(ben.current(&got, note_keys::TEXT)?.as_deref(), Some(FUTURE));
+        Ok(())
+    }
+
+    #[test]
     fn an_update_keeps_the_receivers_text_and_brings_a_trashed_note_back() -> TestResult {
         let ann = device(1);
         let ben = device(2);
@@ -1379,6 +1471,7 @@ mod tests {
             from: eve.own_key_record()?,
             profile: profile_of(&ann)?,
             text: "Hello from Ann".into(),
+            text_format: text_format::PLAIN.into(),
             sections: Vec::new(),
             routines: Vec::new(),
         };
@@ -1453,6 +1546,7 @@ mod tests {
             from: eve.own_key_record()?,
             profile: copy,
             text: "Hello".into(),
+            text_format: text_format::PLAIN.into(),
             sections: Vec::new(),
             routines: Vec::new(),
         };

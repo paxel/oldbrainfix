@@ -48,6 +48,8 @@
       {
         "id": "note:00000000000000000000000000000003",
         "text": "Buy milk",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:06.000Z",
         "place": "topic:00000000000000000000000000000002",
         "importance": "normal",
@@ -62,6 +64,8 @@
       {
         "id": "note:00000000000000000000000000000004",
         "text": "Call mum",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:11.000Z",
         "place": null,
         "importance": "normal",
@@ -76,6 +80,8 @@
       {
         "id": "note:00000000000000000000000000000008",
         "text": "Blood test on Friday",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:19.000Z",
         "place": "area:00000000000000000000000000000007",
         "importance": "normal",
@@ -92,6 +98,8 @@
       {
         "id": "note:0000000000000000000000000000000a",
         "text": "Needs more sauce",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:30.000Z",
         "place": "topic:00000000000000000000000000000002",
         "importance": "normal",
@@ -108,6 +116,8 @@
       {
         "id": "note:0000000000000000000000000000000b",
         "text": "Unsorted thought",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:37.000Z",
         "place": null,
         "importance": "normal",
@@ -122,6 +132,8 @@
       {
         "id": "note:0000000000000000000000000000000c",
         "text": "Pills",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:41.000Z",
         "place": null,
         "importance": "normal",
@@ -169,6 +181,8 @@
           "id": "section:00000000000000000000000000000009",
           "noteId": "note:00000000000000000000000000000008",
           "text": "Fasting from midnight",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:25.000Z",
           "photos": [],
           "recordings": [],
@@ -216,7 +230,9 @@
         "note:0000000000000000000000000000000b",
         "note:0000000000000000000000000000000a",
         "note:00000000000000000000000000000008"
-      ]
+      ],
+      "heading": [],
+      "format": []
     },
     "searchWithin": {
       "area:00000000000000000000000000000007": [

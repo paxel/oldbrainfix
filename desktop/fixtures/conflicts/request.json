@@ -13,12 +13,12 @@
       "dseq": 4,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy oat milk",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy oat milk\"}",
       "date": "2026-01-01T10:00:27.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:27.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:17",
-      "sig": "Dudae8KQvKvTwExQlh5nXbshQeuCOOCM5MoweAB1RTUn//yT19OZUk0VuAaelqNHvx0pXaKRiE97WOt7bdEaAA=="
+      "sig": "FZTUt93fiF4TfGcrCQMXOGvthMbHVZ0JYEaaXOkLiOMX0O/Rve1Ob6LO5m75CkPeyvfSC7l0Kx/DTUuSEa32BA=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -49,12 +49,12 @@
       "dseq": 7,
       "entity": "note:00000000000000000000000000000002",
       "field": "text",
-      "value": "Call mum tonight",
+      "value": "{\"format\":\"plain\",\"text\":\"Call mum tonight\"}",
       "date": "2026-01-01T10:00:34.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:34.000Z",
       "ctx": "",
-      "sig": "H/zrMgNVhOuOJpemwJQnT90o5Uxwjikr72L8q1jupeN5B73ZV1NBnWBWhfvWcIbNfyVlA6ZDqRFxwggDJ3n+DA=="
+      "sig": "0+KtNkXvKJIIVYxY2qSqRQNA7balkwqMyoJhgmr8VLF8CleBTnXvd/wnEqgraZvvCoyWYgxW45w1cDJqLrtZBg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",

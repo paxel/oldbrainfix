@@ -15,18 +15,22 @@
 //! A Note's or Section's text, the name of an Area, a Topic or a Named
 //! Place and a Named Place's radius each conflict on their own; a
 //! Routine's start, times and rule conflict together as its schedule.
+//! A text carries its format in the same value (ADR 0018), so text and
+//! format conflict as one; a Conflict one of whose versions is in a
+//! format this version does not know is left for a Device that knows it.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::Duration;
 
-use crate::Result;
 use crate::entry::{Entry, WireEntry};
 use crate::notes::keys as note_keys;
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
 use crate::store::{Store, utf16_cmp};
+use crate::text_format::StoredText;
+use crate::{Error, Result};
 
 /// The unit a Routine's schedule fields conflict as.
 pub const SCHEDULE_UNIT: &str = "schedule";
@@ -136,6 +140,11 @@ impl ConflictVersion {
             .find(|(k, _)| k == field)
             .and_then(|(_, v)| v.as_deref())
     }
+
+    /// The text and format of a text unit's value.
+    pub fn text(&self) -> StoredText {
+        StoredText::read(self.value())
+    }
 }
 
 /// Concurrent edits to one unit of one entity.
@@ -148,6 +157,15 @@ pub struct Conflict {
     pub entity_type: String,
     /// At least two, the newest by latest wins first.
     pub versions: Vec<ConflictVersion>,
+}
+
+impl Conflict {
+    /// Whether this version may pick one: not when a version is a text in
+    /// a format it does not know, which picking another would overwrite
+    /// and keeping could not show as it is (ADR 0018).
+    pub fn resolvable(&self) -> bool {
+        self.unit != note_keys::TEXT || self.versions.iter().all(|v| v.text().editable)
+    }
 }
 
 impl Store {
@@ -238,7 +256,16 @@ impl Store {
                     (field.to_string(), newest.and_then(|e| e.value.clone()))
                 })
                 .collect();
-            if !versions.iter().any(|v| v.values == values) {
+            // A text written before its format was recorded is the same
+            // as that text marked plain.
+            let same = |v: &ConflictVersion| {
+                if unit == note_keys::TEXT {
+                    v.text() == StoredText::read(values.first().and_then(|(_, v)| v.as_deref()))
+                } else {
+                    v.values == values
+                }
+            };
+            if !versions.iter().any(same) {
                 versions.push(ConflictVersion {
                     entry: head.clone(),
                     values,
@@ -260,7 +287,14 @@ impl Store {
     /// them, having seen every version, so the Conflict ends wherever
     /// this reaches. Dated after every edit of the unit, so a Device
     /// whose clock ran ahead cannot keep showing its value.
+    /// A Conflict that is not [`Conflict::resolvable`] here is refused.
     pub fn resolve_conflict(&self, conflict: &Conflict, kept: &ConflictVersion) -> Result<()> {
+        if !conflict.resolvable() {
+            return Err(Error::Invalid(format!(
+                "a version of {} is in a format not known here",
+                conflict.entity
+            )));
+        }
         let fields = conflict_unit_fields(&conflict.unit);
         let mut date = self.now();
         for e in self.history(&conflict.entity)? {
@@ -330,13 +364,14 @@ mod tests {
         for store in [&a, &b] {
             let conflicts = store.conflicts()?;
             assert_eq!(conflicts.len(), 1);
-            let values: Vec<_> = conflicts[0].versions.iter().map(|v| v.value()).collect();
+            let values: Vec<_> = conflicts[0]
+                .versions
+                .iter()
+                .map(|v| v.text().text)
+                .collect();
             // Each store has its own clock: the first Device's edit is
             // the later one.
-            assert_eq!(
-                values,
-                [Some("Needs more sauce"), Some("Needs more hot sauce")]
-            );
+            assert_eq!(values, ["Needs more sauce", "Needs more hot sauce"]);
         }
         let conflict = a.conflicts()?.remove(0);
         a.resolve_conflict(&conflict, &conflict.versions[1])?;
@@ -345,9 +380,47 @@ mod tests {
         assert!(b.conflicts_among(&came)?.is_empty());
         assert!(b.conflicts()?.is_empty());
         assert_eq!(
-            b.current(&note.id, note_keys::TEXT)?.as_deref(),
+            Notes::new(&b).by_id(&note.id)?.map(|n| n.text).as_deref(),
             Some("Needs more hot sauce")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_and_its_format_conflict_as_one_left_for_a_device_that_knows_it() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let note = Notes::new(&a).capture("Milk", None, None)?;
+        send(&a, &b)?;
+        Notes::new(&a).edit(&note.id, "Oat milk")?;
+        b.append(
+            &note.id,
+            note_keys::TEXT,
+            Some(r#"{"format":"x-future","text":"Oat milk"}"#),
+            None,
+        )?;
+        send(&b, &a)?;
+        let conflict = a.conflicts()?.remove(0);
+        let formats: Vec<String> = conflict.versions.iter().map(|v| v.text().format).collect();
+        assert_eq!(formats, ["plain", "x-future"]);
+        assert!(!conflict.resolvable());
+        for kept in &conflict.versions {
+            assert!(a.resolve_conflict(&conflict, kept).is_err());
+        }
+        assert_eq!(a.conflicts()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_written_before_its_format_is_the_same_as_it_marked_plain() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let note = Notes::new(&a).capture("Milk", None, None)?;
+        send(&a, &b)?;
+        Notes::new(&a).edit(&note.id, "Oat milk")?;
+        b.append(&note.id, note_keys::TEXT, Some("Oat milk"), None)?;
+        send(&b, &a)?;
+        assert!(a.conflicts()?.is_empty());
         Ok(())
     }
 

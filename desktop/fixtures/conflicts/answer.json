@@ -8,12 +8,12 @@
       "dseq": 18,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy milk and eggs",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}",
       "date": "2026-01-01T10:00:28.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:28.000Z",
       "ctx": "",
-      "sig": "YzZOpNy9ezgJ37+sHcZbkpZ90Bf+kUz1/SiwIRG+2f3scBhyYVVx9cHLTQGnK7ZC3kxabAgeqXj5jQyNh7hPCA=="
+      "sig": "PmYce9OQm1ODMULGXLm0Dm/0hVey7PUZmTJNV5PKJQlOMrpvU/LZQIlR4mmA0Qb7G5wkoV62lDgReeo/mZ5DAQ=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
@@ -44,12 +44,12 @@
       "dseq": 21,
       "entity": "note:00000000000000000000000000000002",
       "field": "text",
-      "value": "Call mum tonight",
+      "value": "{\"format\":\"plain\",\"text\":\"Call mum tonight\"}",
       "date": "2026-01-01T10:00:33.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:33.000Z",
       "ctx": "c945cbf2a5602002141e2fb9d17054d6:3",
-      "sig": "SqZJR4PHWPEcqPPiNNENeayOl3mlTFn+iWHOY2U2nwUe5nKRbbib8PoQkx4Z105kf8JSY3lnKST/w4SqVDY+Bg=="
+      "sig": "twRWAxqctGCKLX/ZbRImWgY6oN5sZu9CfS/P1OoIg7Rheae5Uo5HplbnjlEATDdDXODh6WkC0OQepVi1Ife6CQ=="
     }
   ],
   "wantBlobs": [],

@@ -9,7 +9,8 @@ import 'schedule_text.dart';
 
 /// The Conflicts (Catlog's conflicts screen adapted): what two Devices
 /// changed apart, each with every version, the Device it came from and
-/// when. Tapping a version keeps it; the Conflict ends here at once and
+/// when. Tapping a version keeps it, unless a version is a text in a
+/// format this version does not know (ADR 0018); the Conflict ends here at once and
 /// on the other Devices once they sync. Reached from Sync in Settings
 /// and from the announcement after a sync that found some. What closed
 /// locked Areas hide stays out ([visibleConflicts]).
@@ -40,10 +41,12 @@ class _ConflictsScreenState extends State<ConflictsScreen> {
       LockScope.of(context),
       widget.store.conflicts(),
     );
-    // In a Shared Area only who may change a thing picks for it.
+    // In a Shared Area only who may change a thing picks for it; a text
+    // in a format not known here waits for a newer version.
     _picks = {
       for (final c in _conflicts)
-        if (widget.store.mayResolve(c.entity, c.type)) (c.entity, c.unit),
+        if (c.resolvable && widget.store.mayResolve(c.entity, c.type))
+          (c.entity, c.unit),
     };
   }
 
@@ -111,7 +114,10 @@ class _ConflictCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             if (note != null) Text(note),
-            if (onKeep == null) Text(t.onlyManagers),
+            if (!conflict.resolvable)
+              Text(t.conflictNewerFormat)
+            else if (onKeep == null)
+              Text(t.onlyManagers),
             for (final version in conflict.versions)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -214,7 +220,10 @@ String conflictValue(
         ? t.conflictEmpty
         : scheduleText(t, locale, schedule);
   }
-  final value = version.value;
+  // A text shows as its source text, whatever its format.
+  final value = conflict.unit == NoteKeys.text
+      ? version.text.text
+      : version.value;
   if (value == null || value.isEmpty) return t.conflictEmpty;
   if (conflict.unit == NamedPlaceKeys.radius) {
     final metres = double.tryParse(value);

@@ -13,6 +13,7 @@ import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'text_format.dart';
 
 /// Sent Items (CONTEXT.md, ADR 0009, 0015): one Note with its Routines
 /// and Reminders, sent as a file through any messenger to another Old
@@ -99,12 +100,18 @@ class SentItemNotForUs implements Exception {
   String toString() => 'SentItemNotForUs';
 }
 
-/// A Section of a Sent Item: its text and when it was captured.
+/// A Section of a Sent Item: its text, the format it is in (ADR 0018)
+/// and when it was captured.
 class SentSection {
   final String text;
   final DateTime captured;
+  final String format;
 
-  const SentSection(this.text, this.captured);
+  const SentSection(
+    this.text,
+    this.captured, {
+    this.format = TextFormats.plain,
+  });
 }
 
 /// A Routine or Reminder of a Sent Item: the sender's id for it and its
@@ -135,6 +142,9 @@ class SentItem {
   final SignedProfile profile;
 
   final String text;
+
+  /// The format [text] is in (ADR 0018).
+  final String textFormat;
   final List<SentSection> sections;
   final List<SentRoutine> routines;
 
@@ -144,21 +154,28 @@ class SentItem {
     required this.from,
     required this.profile,
     required this.text,
+    this.textFormat = TextFormats.plain,
     this.sections = const [],
     this.routines = const [],
     this.cancel = false,
   });
 
   /// What is signed: keys sorted, no spaces, the same from both cores. A
-  /// Reminder has no rule; only a cancellation says its kind.
+  /// Reminder has no rule; only a cancellation says its kind. Every text
+  /// says its format; a file without one is read as plain.
   String encode() => jsonEncode({
     'from': {'key': from.toJson(), 'profile': profile.toJson()},
     'id': id,
     if (cancel) 'kind': _cancelKind,
     'note': {
+      'format': textFormat,
       'sections': [
         for (final s in sections)
-          {'captured': s.captured.toUtc().toIso8601String(), 'text': s.text},
+          {
+            'captured': s.captured.toUtc().toIso8601String(),
+            'format': s.format,
+            'text': s.text,
+          },
       ],
       'text': text,
     },
@@ -195,12 +212,15 @@ class SentItem {
         if (from == null || profile == null) return null;
         final kind = json['kind'];
         if (kind != null && kind != _cancelKind) return null;
+        final noteFormat = _format(json['note']);
+        if (noteFormat == null) return null;
         final parts = <SentSection>[];
         for (final s in sections) {
           if (s case {'captured': final String at, 'text': final String text}) {
             final captured = DateTime.tryParse(at);
-            if (captured == null) return null;
-            parts.add(SentSection(text, captured.toUtc()));
+            final format = _format(s);
+            if (captured == null || format == null) return null;
+            parts.add(SentSection(text, captured.toUtc(), format: format));
           } else {
             return null;
           }
@@ -232,6 +252,7 @@ class SentItem {
           from: from,
           profile: profile,
           text: body,
+          textFormat: noteFormat,
           sections: parts,
           routines: scheduled,
           cancel: kind == _cancelKind,
@@ -242,6 +263,14 @@ class SentItem {
     }
     return null;
   }
+
+  /// The format a text of [json] says it is in: plain when it says none,
+  /// null when it is no text.
+  static String? _format(Object? json) => switch (json) {
+    {'format': final String format} => format,
+    {'format': _} => null,
+    _ => TextFormats.plain,
+  };
 }
 
 /// Someone a Sent Item can be encrypted to: another person met through
@@ -334,9 +363,11 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
     from: store.ownKeyRecord,
     profile: profile,
     text: note.text,
+    textFormat: note.textFormat,
     sections: [
       for (final s in notes.sections(noteId))
-        if (s.text.trim().isNotEmpty) SentSection(s.text, s.context.captured),
+        if (s.text.trim().isNotEmpty)
+          SentSection(s.text, s.context.captured, format: s.textFormat),
     ],
     routines: [for (final r in routines) SentRoutine(r.id, r.schedule)],
   );
@@ -732,9 +763,16 @@ SentItemChanges _changes(
   bool restores,
 ) {
   final notes = Notes(store);
-  final text = notes.byId(noteId)?.text ?? '';
+  final text = StoredText.read(store.current(noteId, NoteKeys.text));
+  final incoming = StoredText.of(item.textFormat, item.text);
   final sent = _lastSentText(store, noteId);
-  final changed = item.text != text && (sent == null || item.text != sent);
+  final edited = sent == null || text != sent;
+  // A text here in a format this version does not know, other than the
+  // one the sender sent last, is never overwritten (ADR 0018).
+  final changed =
+      incoming != text &&
+      (sent == null || incoming != sent) &&
+      (text.editable || !edited);
   final here = {
     for (final s in notes.sections(noteId))
       s.context.captured.toUtc().microsecondsSinceEpoch,
@@ -761,7 +799,7 @@ SentItemChanges _changes(
   }
   final kept = {for (final r in item.routines) r.id};
   return SentItemChanges(
-    textBefore: changed ? text : null,
+    textBefore: changed ? text.text : null,
     textEdited: changed && sent != null && text != sent,
     sectionsAdded: [
       for (final s in item.sections)
@@ -780,7 +818,7 @@ SentItemChanges _changes(
 /// The text the sender last sent for the Note [noteId]: the newest text
 /// written with its link, as accepting and applying write both at once;
 /// null when there is none.
-String? _lastSentText(Store store, String noteId) {
+StoredText? _lastSentText(Store store, String noteId) {
   final history = store.history(noteId);
   final linked = {
     for (final e in history)
@@ -794,7 +832,7 @@ String? _lastSentText(Store store, String noteId) {
     }
     if (last == null || !e.date.isBefore(last.date)) last = e;
   }
-  return last?.value;
+  return last == null ? null : StoredText.read(last.value);
 }
 
 bool _sameSchedule(Schedule a, Schedule b) =>
@@ -817,7 +855,7 @@ String _acceptNew(Store store, SentItem item) {
   store.batch(() {
     store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
     store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
-    store.append(id, NoteKeys.text, item.text, date: now);
+    store.append(id, NoteKeys.text, _stored(item), date: now);
     store.append(id, SentKeys.received, _link(item), date: now);
     for (final s in item.sections) {
       _writeSection(store, id, s);
@@ -854,7 +892,7 @@ void _apply(
       }
     }
     if (changes.textBefore != null) {
-      store.append(noteId, NoteKeys.text, item.text, date: now);
+      store.append(noteId, NoteKeys.text, _stored(item), date: now);
     }
     store.append(noteId, SentKeys.received, _link(item), date: now);
     for (final s in changes.sectionsAdded) {
@@ -905,8 +943,17 @@ void _writeSection(Store store, String noteId, SentSection section) {
     SectionKeys.captured,
     section.captured.toUtc().toIso8601String(),
   );
-  store.append(id, SectionKeys.text, section.text);
+  store.append(
+    id,
+    SectionKeys.text,
+    StoredText.of(section.format, section.text).encode(),
+  );
 }
+
+/// The Note text of [item] as it is stored: in the format it came in, so
+/// a text in a format this version does not know arrives whole.
+String _stored(SentItem item) =>
+    StoredText.of(item.textFormat, item.text).encode();
 
 /// A Routine or Reminder of the Note [noteId] as [routine] is, knowing
 /// the sender's id for it; written, not spawned.

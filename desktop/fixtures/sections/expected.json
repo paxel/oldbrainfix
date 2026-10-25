@@ -6,6 +6,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "Dentist on Tuesday",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
       "place": null,
       "importance": "normal",
@@ -20,6 +22,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Ask about the crown",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:10.000Z",
       "place": null,
       "importance": "normal",
@@ -34,6 +38,8 @@
     {
       "id": "note:00000000000000000000000000000005",
       "text": "Dentist number",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:19.000Z",
       "place": null,
       "importance": "normal",
@@ -48,6 +54,8 @@
     {
       "id": "note:00000000000000000000000000000007",
       "text": "Loop one",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:30.000Z",
       "place": null,
       "importance": "normal",
@@ -62,6 +70,8 @@
     {
       "id": "note:00000000000000000000000000000008",
       "text": "Loop two",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:34.000Z",
       "place": null,
       "importance": "normal",
@@ -76,6 +86,8 @@
     {
       "id": "note:00000000000000000000000000000009",
       "text": "Merged into a stranger",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:40.000Z",
       "place": null,
       "importance": "normal",
@@ -107,6 +119,8 @@
         "id": "note:00000000000000000000000000000008",
         "noteId": "note:00000000000000000000000000000007",
         "text": "Loop two",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:34.000Z",
         "photos": [],
         "recordings": [],
@@ -119,6 +133,8 @@
         "id": "note:00000000000000000000000000000001",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Dentist on Tuesday",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
         "photos": [],
         "recordings": [],
@@ -129,6 +145,8 @@
         "id": "section:00000000000000000000000000000002",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Moved to Wednesday",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
         "photos": [],
         "recordings": [],
@@ -139,6 +157,8 @@
         "id": "note:00000000000000000000000000000003",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Ask about the crown",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:10.000Z",
         "photos": [],
         "recordings": [],
@@ -149,6 +169,8 @@
         "id": "section:00000000000000000000000000000004",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Bring the old X-ray",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:14.000Z",
         "photos": [],
         "recordings": [],
@@ -159,6 +181,8 @@
         "id": "section:00000000000000000000000000000006",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Called, all set",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:25.000Z",
         "photos": [],
         "recordings": [],
@@ -195,7 +219,9 @@
       "note:00000000000000000000000000000009",
       "note:00000000000000000000000000000007",
       "note:00000000000000000000000000000005"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {},
   "conflicts": []

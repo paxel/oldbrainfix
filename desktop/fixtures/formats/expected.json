@@ -1,0 +1,165 @@
+{
+  "now": "2026-01-02T10:00:32.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Plain oat milk",
+      "textFormat": "plain",
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "{\"format\":\"plain\"}",
+      "textFormat": "plain",
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:06.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "# Heading\n**bold** ü",
+      "textFormat": "x-future",
+      "textEditable": false,
+      "captured": "2026-01-01T10:00:12.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000005",
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000005",
+      "text": "Plain host",
+      "textFormat": "plain",
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:23.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "# Heading\n**bold** ü",
+      "textFormat": "x-future",
+      "textEditable": false,
+      "captured": "2026-01-01T10:00:28.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {}
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000001",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000005",
+    "note:00000000000000000000000000000006"
+  ],
+  "trashed": [],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000005": [
+      {
+        "id": "note:00000000000000000000000000000003",
+        "noteId": "note:00000000000000000000000000000005",
+        "text": "# Heading\n**bold** ü",
+        "textFormat": "x-future",
+        "textEditable": false,
+        "captured": "2026-01-01T10:00:12.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "section:00000000000000000000000000000004",
+        "noteId": "note:00000000000000000000000000000005",
+        "text": "# Heading\n**bold** ü",
+        "textFormat": "x-future",
+        "textEditable": false,
+        "captured": "2026-01-01T10:00:17.000Z",
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "note:00000000000000000000000000000002": [],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "search": {
+    "": [
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000001"
+    ],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005"
+    ],
+    "heading": [
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000005"
+    ],
+    "format": [
+      "note:00000000000000000000000000000002"
+    ]
+  },
+  "searchWithin": {},
+  "conflicts": []
+}

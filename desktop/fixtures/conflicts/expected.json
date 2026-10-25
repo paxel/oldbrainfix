@@ -5,6 +5,7 @@
       "entity": "area:00000000000000000000000000000003",
       "unit": "name",
       "type": "area",
+      "resolvable": true,
       "versions": [
         {
           "entry": "c945cbf2a5602002141e2fb9d17054d6:5",
@@ -28,13 +29,14 @@
       "entity": "note:00000000000000000000000000000001",
       "unit": "text",
       "type": "note",
+      "resolvable": true,
       "versions": [
         {
           "entry": "65b60673d6ed884bf01c2c222d82ada0:18",
           "device": "65b60673d6ed884bf01c2c222d82ada0",
           "recorded": "2026-01-01T10:00:28.000Z",
           "values": {
-            "text": "Buy milk and eggs"
+            "text": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}"
           }
         },
         {
@@ -42,7 +44,7 @@
           "device": "c945cbf2a5602002141e2fb9d17054d6",
           "recorded": "2026-01-01T10:00:27.000Z",
           "values": {
-            "text": "Buy oat milk"
+            "text": "{\"format\":\"plain\",\"text\":\"Buy oat milk\"}"
           }
         }
       ]
@@ -51,6 +53,7 @@
       "entity": "routine:00000000000000000000000000000006",
       "unit": "schedule",
       "type": "routine",
+      "resolvable": true,
       "versions": [
         {
           "entry": "c945cbf2a5602002141e2fb9d17054d6:6",
@@ -115,6 +118,8 @@
       {
         "id": "note:00000000000000000000000000000001",
         "text": "Buy oat milk",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
         "place": null,
         "importance": "normal",
@@ -129,6 +134,8 @@
       {
         "id": "note:00000000000000000000000000000002",
         "text": "Call mum tonight",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
         "place": null,
         "importance": "normal",
@@ -143,6 +150,8 @@
       {
         "id": "note:00000000000000000000000000000005",
         "text": "Pills",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:14.000Z",
         "place": null,
         "importance": "normal",
@@ -192,7 +201,9 @@
       "müller": [],
       "called": [],
       "loop": [],
-      " e ": []
+      " e ": [],
+      "heading": [],
+      "format": []
     },
     "searchWithin": {
       "area:00000000000000000000000000000003": [],

@@ -6,6 +6,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "Old shopping list",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
       "place": null,
       "importance": "normal",
@@ -20,6 +22,8 @@
     {
       "id": "note:00000000000000000000000000000002",
       "text": "Not so old after all",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:07.000Z",
       "place": null,
       "importance": "normal",
@@ -34,6 +38,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Long gone",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:14.000Z",
       "place": null,
       "importance": "normal",
@@ -48,6 +54,8 @@
     {
       "id": "note:00000000000000000000000000000004",
       "text": "Into the bin with the other",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:19.000Z",
       "place": null,
       "importance": "normal",
@@ -62,6 +70,8 @@
     {
       "id": "note:00000000000000000000000000000005",
       "text": "The other",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:23.000Z",
       "place": null,
       "importance": "normal",
@@ -92,6 +102,8 @@
         "id": "note:00000000000000000000000000000004",
         "noteId": "note:00000000000000000000000000000005",
         "text": "Into the bin with the other",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:19.000Z",
         "photos": [],
         "recordings": [],
@@ -117,7 +129,9 @@
     "loop": [],
     " e ": [
       "note:00000000000000000000000000000002"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {},
   "conflicts": []

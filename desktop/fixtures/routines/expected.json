@@ -6,6 +6,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "Take the pills",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
       "place": null,
       "importance": "normal",
@@ -20,6 +22,8 @@
     {
       "id": "note:00000000000000000000000000000004",
       "text": "Water the plants",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:19.000Z",
       "place": null,
       "importance": "normal",
@@ -34,6 +38,8 @@
     {
       "id": "note:00000000000000000000000000000006",
       "text": "Dentist",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:31.000Z",
       "place": null,
       "importance": "normal",
@@ -48,6 +54,8 @@
     {
       "id": "note:00000000000000000000000000000009",
       "text": "Night meds",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:47.000Z",
       "place": null,
       "importance": "normal",
@@ -62,6 +70,8 @@
     {
       "id": "note:0000000000000000000000000000000b",
       "text": "Pay the rent",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:00.000Z",
       "place": null,
       "importance": "normal",
@@ -76,6 +86,8 @@
     {
       "id": "note:0000000000000000000000000000000d",
       "text": "Old habit",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:20.000Z",
       "place": null,
       "importance": "normal",
@@ -90,6 +102,8 @@
     {
       "id": "note:0000000000000000000000000000000f",
       "text": "Stretch",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:33.000Z",
       "place": null,
       "importance": "normal",
@@ -104,6 +118,8 @@
     {
       "id": "note:00000000000000000000000000000011",
       "text": "Walk the dog",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:01:47.000Z",
       "place": null,
       "importance": "normal",
@@ -118,6 +134,8 @@
     {
       "id": "note:00000000000000000000000000000013",
       "text": "Flyer for the fair",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:02:05.000Z",
       "place": null,
       "importance": "normal",
@@ -132,6 +150,8 @@
     {
       "id": "note:00000000000000000000000000000015",
       "text": "Car inspection",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:02:18.000Z",
       "place": null,
       "importance": "normal",
@@ -146,6 +166,8 @@
     {
       "id": "note:00000000000000000000000000000017",
       "text": "Unsorted thought",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:02:33.000Z",
       "place": null,
       "importance": "normal",
@@ -160,6 +182,8 @@
     {
       "id": "note:00000000000000000000000000000018",
       "text": "Another thought",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:02:38.000Z",
       "place": null,
       "importance": "normal",
@@ -242,7 +266,9 @@
       "note:00000000000000000000000000000006",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000001"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {},
   "conflicts": []

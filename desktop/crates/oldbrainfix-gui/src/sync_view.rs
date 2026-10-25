@@ -22,7 +22,7 @@ use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::{
     AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, ProfileChoice,
-    Routines, Store,
+    Routines, Store, StoredText,
 };
 
 use crate::app::{Wall, embossed};
@@ -479,11 +479,17 @@ impl SyncHost {
                         if let Some(note) = routine_note(store, conflict) {
                             ui.label(RichText::new(note).color(text));
                         }
-                        // In a Shared Area only who may change it picks.
-                        let picks = store
-                            .may_resolve(&conflict.entity, &conflict.entity_type)
-                            .unwrap_or(false);
-                        if !picks {
+                        // In a Shared Area only who may change it picks; a
+                        // text in a format not known here waits for a newer
+                        // version (ADR 0018).
+                        let resolvable = conflict.resolvable();
+                        let picks = resolvable
+                            && store
+                                .may_resolve(&conflict.entity, &conflict.entity_type)
+                                .unwrap_or(false);
+                        if !resolvable {
+                            ui.label(RichText::new(t.conflict_newer_format()).color(weak));
+                        } else if !picks {
                             ui.label(RichText::new(t.only_managers()).color(weak));
                         }
                         for (index, version) in conflict.versions.iter().enumerate() {
@@ -785,6 +791,12 @@ pub fn conflict_value(
         .first()
         .and_then(|(_, v)| v.as_deref())
         .unwrap_or_default();
+    // A text shows as its source text, whatever its format.
+    let value = if conflict.unit == note_keys::TEXT {
+        StoredText::read(Some(value)).text
+    } else {
+        value.to_string()
+    };
     if value.is_empty() {
         return t.conflict_empty().to_string();
     }
@@ -793,7 +805,7 @@ pub fn conflict_value(
     {
         return t.radius_metres(metres.round() as i64);
     }
-    value.to_string()
+    value
 }
 
 /// Where and when `entry` was written: this Device, a paired Device by

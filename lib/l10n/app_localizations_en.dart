@@ -1538,6 +1538,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conflictEmpty => '(empty)';
 
   @override
+  String get conflictNewerFormat =>
+      'A version was written with a newer version of Old Brain Fix. Update the app to pick one.';
+
+  @override
+  String get textNewerFormat =>
+      'This text was written with a newer version of Old Brain Fix. Update the app to change it.';
+
+  @override
   String conflictOnThisDevice(String when) {
     return 'On this Device, $when';
   }

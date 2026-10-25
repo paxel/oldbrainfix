@@ -96,6 +96,8 @@
         {
           "id": "note:00000000000000000000000000000001",
           "text": "Buy milk",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:11.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -110,6 +112,8 @@
         {
           "id": "note:00000000000000000000000000000003",
           "text": "Blood results",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:23.000Z",
           "place": "area:starter-health",
           "importance": "normal",
@@ -124,6 +128,8 @@
         {
           "id": "note:00000000000000000000000000000004",
           "text": "Fix the tap",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:28.000Z",
           "place": null,
           "importance": "normal",
@@ -162,6 +168,8 @@
             "id": "section:00000000000000000000000000000005",
             "noteId": "note:00000000000000000000000000000004",
             "text": "The hot one",
+            "textFormat": "plain",
+            "textEditable": true,
             "captured": "2026-01-01T10:00:32.000Z",
             "photos": [],
             "recordings": [],
@@ -193,7 +201,9 @@
         " e ": [
           "note:00000000000000000000000000000004",
           "note:00000000000000000000000000000003"
-        ]
+        ],
+        "heading": [],
+        "format": []
       },
       "searchWithin": {
         "area:starter-health": [
@@ -227,6 +237,8 @@
         {
           "id": "note:00000000000000000000000000000001",
           "text": "Buy milk",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:11.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -241,6 +253,8 @@
         {
           "id": "note:00000000000000000000000000000006",
           "text": "Ben private",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:37.000Z",
           "place": null,
           "importance": "normal",
@@ -292,7 +306,9 @@
         "loop": [],
         " e ": [
           "note:00000000000000000000000000000006"
-        ]
+        ],
+        "heading": [],
+        "format": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000101": [],
@@ -353,6 +369,8 @@
         {
           "id": "note:00000000000000000000000000000001",
           "text": "Buy milk",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:11.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -367,6 +385,8 @@
         {
           "id": "note:00000000000000000000000000000003",
           "text": "Blood results",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:23.000Z",
           "place": "area:starter-health",
           "importance": "normal",
@@ -381,6 +401,8 @@
         {
           "id": "note:00000000000000000000000000000004",
           "text": "Fix the tap",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:28.000Z",
           "place": "area:00000000000000000000000000000101",
           "importance": "normal",
@@ -395,6 +417,8 @@
         {
           "id": "note:00000000000000000000000000000103",
           "text": "Ben buys rye bread",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-02-01T11:00:00.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -409,6 +433,8 @@
         {
           "id": "note:00000000000000000000000000000105",
           "text": "Still private",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-02-01T11:30:00.000Z",
           "place": null,
           "importance": "normal",
@@ -454,6 +480,8 @@
             "id": "section:00000000000000000000000000000005",
             "noteId": "note:00000000000000000000000000000004",
             "text": "The hot one",
+            "textFormat": "plain",
+            "textEditable": true,
             "captured": "2026-01-01T10:00:32.000Z",
             "photos": [],
             "recordings": [],
@@ -467,6 +495,8 @@
             "id": "section:00000000000000000000000000000104",
             "noteId": "note:00000000000000000000000000000001",
             "text": "Oat milk please",
+            "textFormat": "plain",
+            "textEditable": true,
             "captured": "2026-02-01T11:00:00.000Z",
             "photos": [],
             "recordings": [],
@@ -501,7 +531,9 @@
           "note:00000000000000000000000000000004",
           "note:00000000000000000000000000000003",
           "note:00000000000000000000000000000001"
-        ]
+        ],
+        "heading": [],
+        "format": []
       },
       "searchWithin": {
         "area:starter-health": [
@@ -542,6 +574,8 @@
         {
           "id": "note:00000000000000000000000000000001",
           "text": "Buy milk",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:11.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -556,6 +590,8 @@
         {
           "id": "note:00000000000000000000000000000004",
           "text": "Fix the tap",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:28.000Z",
           "place": "area:00000000000000000000000000000101",
           "importance": "normal",
@@ -570,6 +606,8 @@
         {
           "id": "note:00000000000000000000000000000006",
           "text": "Ben private",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-01-01T10:00:37.000Z",
           "place": null,
           "importance": "normal",
@@ -584,6 +622,8 @@
         {
           "id": "note:00000000000000000000000000000103",
           "text": "Ben buys rye bread",
+          "textFormat": "plain",
+          "textEditable": true,
           "captured": "2026-02-01T11:00:00.000Z",
           "place": "topic:00000000000000000000000000000102",
           "importance": "normal",
@@ -625,6 +665,8 @@
             "id": "section:00000000000000000000000000000005",
             "noteId": "note:00000000000000000000000000000004",
             "text": "The hot one",
+            "textFormat": "plain",
+            "textEditable": true,
             "captured": "2026-01-01T10:00:32.000Z",
             "photos": [],
             "recordings": [],
@@ -637,6 +679,8 @@
             "id": "section:00000000000000000000000000000104",
             "noteId": "note:00000000000000000000000000000001",
             "text": "Oat milk please",
+            "textFormat": "plain",
+            "textEditable": true,
             "captured": "2026-02-01T11:00:00.000Z",
             "photos": [],
             "recordings": [],
@@ -669,7 +713,9 @@
           "note:00000000000000000000000000000006",
           "note:00000000000000000000000000000004",
           "note:00000000000000000000000000000001"
-        ]
+        ],
+        "heading": [],
+        "format": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000101": [

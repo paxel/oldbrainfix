@@ -877,6 +877,10 @@
   "conflictSchedule": "Routine schedule",
   "conflictOther": "Change",
   "conflictEmpty": "(empty)",
+  "conflictNewerFormat": "A version was written with a newer version of Old Brain Fix. Update the app to pick one.",
+  "@conflictNewerFormat": {"description": "On a Conflict about a text when one of its versions is in a text format this version of the app does not know."},
+  "textNewerFormat": "This text was written with a newer version of Old Brain Fix. Update the app to change it.",
+  "@textNewerFormat": {"description": "Above a Note's or Section's text in the editor when the text is in a format this version of the app does not know; the text then shows as it is stored and cannot be changed."},
   "conflictOnThisDevice": "On this Device, {when}",
   "@conflictOnThisDevice": {
     "placeholders": {

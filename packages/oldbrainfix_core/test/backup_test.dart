@@ -257,6 +257,26 @@ void main() {
       expect(result.entries, old.allEntries().length);
     });
 
+    test('a text in a format not known here comes back as it was', () async {
+      final old = fullDevice(dir);
+      addTearDown(old.close);
+      const future = '{"format":"x-future","text":"# Pills"}';
+      final note = Notes(old).all().single;
+      old.append(note.id, NoteKeys.text, future);
+      final code = await setUpBackups(old, passphrase, kdf: cheap);
+      final path = '${dir.path}/b.$backupExtension';
+      await writeBackup(old, path);
+      final key = await unlockBackup(
+        readBackupHeader(path)!,
+        recoveryCode: code,
+      );
+      final store = fresh('b');
+      addTearDown(store.close);
+      await restoreBackup(store, path, key!);
+      expect(store.current(note.id, NoteKeys.text), future);
+      expect(Notes(store).byId(note.id)?.textEditable, isFalse);
+    });
+
     test('a wrong passphrase or recovery key opens nothing', () async {
       final (old, _, path) = await backedUp();
       addTearDown(old.close);

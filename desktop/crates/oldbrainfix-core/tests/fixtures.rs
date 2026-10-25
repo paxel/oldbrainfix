@@ -26,14 +26,19 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 7] = [
-    "edits", "media", "notes", "places", "routines", "sections", "trash",
+const SCENARIOS: [&str; 8] = [
+    "edits", "formats", "media", "notes", "places", "routines", "sections", "trash",
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
-const QUERIES: [&str; 10] = [
+const QUERIES: [&str; 12] = [
     "", "sauce", "MILK", "receipt", "dentist", "x-ray", "müller", "called", "loop", " e ",
+    "heading", "format",
 ];
+
+/// A text in a format this version does not know, as the generator's
+/// `_future` stores it.
+const FUTURE: &str = r##"{"format":"x-future","text":"# Heading\n**bold** \u00fc","x":1}"##;
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
@@ -113,6 +118,8 @@ fn note_json(note: &Note) -> Value {
     json!({
         "id": note.id,
         "text": note.text,
+        "textFormat": note.text_format,
+        "textEditable": note.text_editable,
         "captured": dart_iso(note.captured),
         "place": note.place,
         "importance": note.importance.name(),
@@ -131,6 +138,8 @@ fn section_json(section: &Section) -> Value {
         "id": section.id,
         "noteId": section.note_id,
         "text": section.text,
+        "textFormat": section.text_format,
+        "textEditable": section.text_editable,
         "captured": dart_iso(section.captured),
         "photos": section.photos,
         "recordings": section.recordings,
@@ -241,6 +250,7 @@ fn conflicts_json(conflicts: &[Conflict]) -> Value {
                 "entity": c.entity,
                 "unit": c.unit,
                 "type": c.entity_type,
+                "resolvable": c.resolvable(),
                 "versions": c.versions.iter().map(|v| json!({
                     "entry": v.entry.id(),
                     "device": v.entry.device,
@@ -520,6 +530,30 @@ fn write_sections(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `formats` scenario.
+fn write_formats(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let a = notes.capture("Plain milk", None, None)?;
+    notes.edit(&a.id, "Plain oat milk")?;
+    let b = notes.capture("Before the format", None, None)?;
+    store.append(
+        &b.id,
+        note_keys::TEXT,
+        Some("Written before the format"),
+        None,
+    )?;
+    store.append(&b.id, note_keys::TEXT, Some(r#"{"format":"plain"}"#), None)?;
+    let f = notes.capture("Formatted later", None, None)?;
+    store.append(&f.id, note_keys::TEXT, Some(FUTURE), None)?;
+    let s = notes.amend(&f.id, "Amended here")?;
+    store.append(&s.id, note_keys::TEXT, Some(FUTURE), None)?;
+    let host = notes.capture("Plain host", None, None)?;
+    notes.merge(&f.id, &host.id)?;
+    let g = notes.capture("Formatted, standing alone", None, None)?;
+    store.append(&g.id, note_keys::TEXT, Some(FUTURE), None)?;
+    Ok(())
+}
+
 /// The generator's `places` scenario.
 fn write_places(store: &Store) -> Built {
     let places = Places::new(store);
@@ -732,8 +766,9 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 7] = [
+    let writers: [(&str, Writer); 8] = [
         ("edits", write_edits),
+        ("formats", write_formats),
         ("media", write_media),
         ("notes", write_notes),
         ("places", write_places),

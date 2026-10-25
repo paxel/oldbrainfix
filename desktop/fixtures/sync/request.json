@@ -13,12 +13,12 @@
       "dseq": 15,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy oat milk",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy oat milk\"}",
       "date": "2026-01-01T10:00:31.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:31.000Z",
       "ctx": "",
-      "sig": "FoGrEUzbur00uvvbEjLd3qoneZglwgqDNjrHQoICqr7QsNWy7vo1sadudyF0LkkzKImTs0OO+57dHasKkMt+Dw=="
+      "sig": "q1xqD+pRhBqJgeIFdNnxWQ0pfp+CiOSDJS7FN0FOaT+jLOtsBQDwdCqZ+jH8hor+CuiGjoDXoWxzBLfv9NkFBw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
@@ -59,11 +59,11 @@
       "dseq": 19,
       "entity": "note:00000000000000000000000000000003",
       "field": "text",
-      "value": "Pills at eight",
+      "value": "{\"format\":\"plain\",\"text\":\"Pills at eight\"}",
       "date": "2026-01-01T10:00:34.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:37.000Z",
-      "sig": "zzwXsxECSOo1yvl0ZNCxuSjRa/+xTKwDNhooKk+2IYDVWOdVoCBndpl/g9wOQRrN8uIt/15XdMzuLcfdcTubDA=="
+      "sig": "X76vP10y6emcBp6iprnQJq3iCAU3JDrXIuOO2bNHyHOIVtKmuAwr4qAzBJKPlNieLS+BLcAWxNW4RsAy9hSOAg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",

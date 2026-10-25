@@ -36,6 +36,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "Buy milk and eggs",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:18.000Z",
       "place": null,
       "importance": "normal",
@@ -52,6 +54,8 @@
     {
       "id": "note:00000000000000000000000000000002",
       "text": "Call the dentist",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:23.000Z",
       "place": "topic:starter-meetings",
       "importance": "normal",
@@ -68,6 +72,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Pills at eight",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:34.000Z",
       "place": null,
       "importance": "normal",
@@ -109,6 +115,8 @@
         "id": "section:00000000000000000000000000000004",
         "noteId": "note:00000000000000000000000000000002",
         "text": "Tuesday works",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:39.000Z",
         "photos": [],
         "recordings": [],
@@ -156,7 +164,9 @@
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002",
       "note:00000000000000000000000000000001"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {
     "area:starter-health": [],
@@ -173,13 +183,14 @@
       "entity": "note:00000000000000000000000000000001",
       "unit": "text",
       "type": "note",
+      "resolvable": true,
       "versions": [
         {
           "entry": "65b60673d6ed884bf01c2c222d82ada0:13",
           "device": "65b60673d6ed884bf01c2c222d82ada0",
           "recorded": "2026-01-01T10:00:32.000Z",
           "values": {
-            "text": "Buy milk and eggs"
+            "text": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}"
           }
         },
         {
@@ -187,7 +198,7 @@
           "device": "c945cbf2a5602002141e2fb9d17054d6",
           "recorded": "2026-01-01T10:00:31.000Z",
           "values": {
-            "text": "Buy oat milk"
+            "text": "{\"format\":\"plain\",\"text\":\"Buy oat milk\"}"
           }
         }
       ]

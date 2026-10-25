@@ -30,11 +30,11 @@
       "dseq": 13,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
-      "value": "Buy milk",
+      "value": "{\"format\":\"plain\",\"text\":\"Buy milk\"}",
       "date": "2026-01-01T10:00:11.000Z",
       "author": "Ada",
       "recorded": "2026-01-01T10:00:14.000Z",
-      "sig": "Ko3q2+NcF3JUqzCmAJ19YJHkYGUMaBjFI4V0thk63dGteREgUK8NrnRPl/BOeThGnAJWro2LSc2igos34jKTAg=="
+      "sig": "kCh0NULG88xidFSog3gb7GCbKdpt15rtAsUXpxGBrJ7FpMOBPXKw03Hyuhu0j9DOfEFH4XLLspHOQjhNjt0/Dg=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",

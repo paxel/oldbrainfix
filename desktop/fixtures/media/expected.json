@@ -6,6 +6,8 @@
     {
       "id": "note:00000000000000000000000000000001",
       "text": "",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
       "place": null,
       "importance": "normal",
@@ -24,6 +26,8 @@
     {
       "id": "note:00000000000000000000000000000002",
       "text": "Groceries",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:07.000Z",
       "place": null,
       "importance": "normal",
@@ -44,6 +48,8 @@
     {
       "id": "note:00000000000000000000000000000003",
       "text": "Shed",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:15.000Z",
       "place": null,
       "importance": "normal",
@@ -69,6 +75,8 @@
     {
       "id": "note:00000000000000000000000000000004",
       "text": "Dentist",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:26.000Z",
       "place": null,
       "importance": "normal",
@@ -85,6 +93,8 @@
     {
       "id": "note:00000000000000000000000000000005",
       "text": "",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:30.000Z",
       "place": null,
       "importance": "normal",
@@ -103,6 +113,8 @@
     {
       "id": "note:00000000000000000000000000000006",
       "text": "",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:37.000Z",
       "place": null,
       "importance": "normal",
@@ -119,6 +131,8 @@
     {
       "id": "note:00000000000000000000000000000007",
       "text": "Old flyer",
+      "textFormat": "plain",
+      "textEditable": true,
       "captured": "2026-01-01T10:00:43.000Z",
       "place": null,
       "importance": "normal",
@@ -157,6 +171,8 @@
         "id": "note:00000000000000000000000000000005",
         "noteId": "note:00000000000000000000000000000004",
         "text": "",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:30.000Z",
         "photos": [
           "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
@@ -171,6 +187,8 @@
         "id": "note:00000000000000000000000000000006",
         "noteId": "note:00000000000000000000000000000004",
         "text": "",
+        "textFormat": "plain",
+        "textEditable": true,
         "captured": "2026-01-01T10:00:37.000Z",
         "photos": [],
         "recordings": [
@@ -241,7 +259,9 @@
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002",
       "note:00000000000000000000000000000001"
-    ]
+    ],
+    "heading": [],
+    "format": []
   },
   "searchWithin": {},
   "conflicts": []

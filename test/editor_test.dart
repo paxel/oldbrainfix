@@ -105,7 +105,7 @@ void main() {
         store
             .history(note.id)
             .where((e) => e.field == NoteKeys.text)
-            .map((e) => e.value),
+            .map((e) => StoredText.read(e.value).text),
         ['nees mor sauce', 'need more sauce'],
       );
     });

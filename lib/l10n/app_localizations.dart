@@ -2522,6 +2522,18 @@ abstract class AppLocalizations {
   /// **'(empty)'**
   String get conflictEmpty;
 
+  /// On a Conflict about a text when one of its versions is in a text format this version of the app does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'A version was written with a newer version of Old Brain Fix. Update the app to pick one.'**
+  String get conflictNewerFormat;
+
+  /// Above a Note's or Section's text in the editor when the text is in a format this version of the app does not know; the text then shows as it is stored and cannot be changed.
+  ///
+  /// In en, this message translates to:
+  /// **'This text was written with a newer version of Old Brain Fix. Update the app to change it.'**
+  String get textNewerFormat;
+
   /// No description provided for @conflictOnThisDevice.
   ///
   /// In en, this message translates to:

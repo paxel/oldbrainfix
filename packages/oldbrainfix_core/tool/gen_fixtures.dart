@@ -127,6 +127,29 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'formats',
+    about:
+        'Texts written with their format, plain; texts written before '
+        'their format was recorded, one looking like a marked text; a Note '
+        'and a Section in a format this version does not know, amended '
+        'and merged into a plain Note.',
+    build: (store) {
+      final notes = Notes(store);
+      final a = notes.capture('Plain milk');
+      notes.edit(a.id, 'Plain oat milk');
+      final b = notes.capture('Before the format');
+      store.append(b.id, NoteKeys.text, 'Written before the format');
+      store.append(b.id, NoteKeys.text, '{"format":"plain"}');
+      final f = notes.capture('Formatted later');
+      store.append(f.id, NoteKeys.text, _future);
+      final s = notes.amend(f.id, 'Amended here');
+      store.append(s.id, SectionKeys.text, _future);
+      notes.merge(f.id, notes.capture('Plain host').id);
+      final g = notes.capture('Formatted, standing alone');
+      store.append(g.id, NoteKeys.text, _future);
+    },
+  ),
+  (
     name: 'places',
     about:
         'The whole Starter Set planted, one starter Area renamed; an Area '
@@ -488,7 +511,14 @@ const _queries = [
   'called',
   'loop',
   ' e ',
+  'heading',
+  'format',
 ];
+
+/// A text in a format this version does not know, as a later version
+/// would store it.
+const _future =
+    '{"format":"x-future","text":"# Heading\\n**bold** \\u00fc","x":1}';
 
 /// A value that tests how the signed bytes escape text.
 const _awkward =
@@ -498,6 +528,8 @@ const _awkward =
 Map<String, Object?> _note(Note note) => {
   'id': note.id,
   'text': note.text,
+  'textFormat': note.textFormat,
+  'textEditable': note.textEditable,
   'captured': note.captured.toUtc().toIso8601String(),
   'place': note.place,
   'importance': note.importance.name,
@@ -514,6 +546,8 @@ Map<String, Object?> _section(Section section) => {
   'id': section.id,
   'noteId': section.noteId,
   'text': section.text,
+  'textFormat': section.textFormat,
+  'textEditable': section.textEditable,
   'captured': section.context.captured.toUtc().toIso8601String(),
   'photos': section.photos,
   'recordings': section.recordings,
@@ -596,6 +630,7 @@ List<Map<String, Object?>> _conflicts(List<Conflict> conflicts) => [
       'entity': c.entity,
       'unit': c.unit,
       'type': c.type,
+      'resolvable': c.resolvable,
       'versions': [
         for (final v in c.versions)
           {

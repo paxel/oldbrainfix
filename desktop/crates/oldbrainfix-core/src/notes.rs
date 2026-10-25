@@ -12,6 +12,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::entry::{dart_iso, parse_time};
 use crate::places::Places;
 use crate::store::{Fields, Store};
+use crate::text_format::StoredText;
 use crate::{Error, Result};
 
 /// Field keys of a Note.
@@ -107,7 +108,13 @@ impl Importance {
 pub struct Note {
     /// Entity id, `note:<id>`.
     pub id: String,
+    /// The text, the source text when its format is not known here.
     pub text: String,
+    /// The format `text` is in ([`crate::text_format`]).
+    pub text_format: String,
+    /// Whether this version may change `text`: never one in a format it
+    /// does not know, which it shows as its source text (ADR 0018).
+    pub text_editable: bool,
     pub captured: DateTime<Utc>,
     /// The Area or Topic the Note is filed in, or `None` when it has
     /// none or that place is gone.
@@ -162,7 +169,12 @@ pub struct Section {
     /// Merge.
     pub id: String,
     pub note_id: String,
+    /// The text, the source text when its format is not known here.
     pub text: String,
+    /// The format `text` is in, and whether this version may change it,
+    /// as for [`Note::text_format`] and [`Note::text_editable`].
+    pub text_format: String,
+    pub text_editable: bool,
     pub captured: DateTime<Utc>,
     /// A merged Note's photos and recordings travel with it, with their
     /// Photo Texts and Transcripts; an Amend has none.
@@ -251,7 +263,8 @@ impl<'a> Notes<'a> {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
             s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            s.append(&id, keys::TEXT, Some(text), at)?;
+            let text = StoredText::plain(text).encode();
+            s.append(&id, keys::TEXT, Some(&text), at)?;
             if let Some(place) = place {
                 s.append(&id, keys::PLACE, Some(place), at)?;
             }
@@ -393,12 +406,20 @@ impl<'a> Notes<'a> {
     }
 
     /// Fixes the text of the Note `note_id` in place. The old text stays
-    /// in the log only.
+    /// in the log only. A text in a format this version does not know is
+    /// never overwritten (ADR 0018).
     pub fn edit(&self, note_id: &str, text: &str) -> Result<()> {
-        self.require_note(note_id)?;
-        let text = Self::text(text)?;
+        let Some(note) = self.by_id(note_id)? else {
+            return Err(Error::Invalid(format!("not a Note: {note_id}")));
+        };
+        if !note.text_editable {
+            return Err(Error::Invalid(format!(
+                "the text of {note_id} is in a format not known here"
+            )));
+        }
+        let text = StoredText::plain(Self::text(text)?).encode();
         self.store
-            .append(note_id, keys::TEXT, Some(text), None)
+            .append(note_id, keys::TEXT, Some(&text), None)
             .map(drop)
     }
 
@@ -411,7 +432,7 @@ impl<'a> Notes<'a> {
                 "no role in the Shared Area of {note_id}"
             )));
         }
-        let text = Self::text(text)?;
+        let text = StoredText::plain(Self::text(text)?).encode();
         let id = format!("section:{}", self.store.new_id()?);
         let now = self.store.now();
         let at = Some(now);
@@ -420,7 +441,7 @@ impl<'a> Notes<'a> {
             s.append(&id, keys::TYPE, Some(keys::TYPE_SECTION), at)?;
             s.append(&id, keys::NOTE, Some(note_id), at)?;
             s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            s.append(&id, keys::TEXT, Some(text), at)?;
+            s.append(&id, keys::TEXT, Some(&text), at)?;
             Ok(())
         })?;
         let fields = self.store.current_fields(&id)?;
@@ -508,9 +529,12 @@ impl<'a> Notes<'a> {
             Some(p) if Places::new(self.store).is_place(p)? => Some(p.to_string()),
             _ => None,
         };
+        let text = StoredText::read(fields.get(keys::TEXT));
         Ok(Some(Note {
             id: id.to_string(),
-            text: fields.get(keys::TEXT).unwrap_or_default().to_string(),
+            text: text.text,
+            text_format: text.format,
+            text_editable: text.editable,
             captured: parse_time(captured)?,
             place,
             importance: Importance::from_name(fields.get(keys::IMPORTANCE)),
@@ -606,6 +630,8 @@ impl<'a> Notes<'a> {
                     id: id.clone(),
                     note_id: note_id.to_string(),
                     text: note.text,
+                    text_format: note.text_format,
+                    text_editable: note.text_editable,
                     captured: note.captured,
                     photos: note.photos,
                     recordings: note.recordings,
@@ -636,10 +662,13 @@ impl<'a> Notes<'a> {
         let (Some(_), Some(captured)) = (fields.get(keys::NOTE), fields.get(keys::CAPTURED)) else {
             return Ok(None);
         };
+        let text = StoredText::read(fields.get(keys::TEXT));
         Ok(Some(Section {
             id: id.to_string(),
             note_id: note_id.to_string(),
-            text: fields.get(keys::TEXT).unwrap_or_default().to_string(),
+            text: text.text,
+            text_format: text.format,
+            text_editable: text.editable,
             captured: parse_time(captured)?,
             photos: Vec::new(),
             recordings: Vec::new(),
@@ -738,6 +767,42 @@ mod tests {
         assert_eq!(
             store.current(&b.id, keys::NUDGE)?.as_deref(),
             Some("2026-01-01T10:10:06.000Z")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_text_in_an_unknown_format_is_never_overwritten_here() -> Result<()> {
+        const FUTURE: &str = r##"{"format":"x-future","text":"# Heading"}"##;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let a = notes.capture("x", None, None)?;
+        assert_eq!(
+            store.current(&a.id, keys::TEXT)?.as_deref(),
+            Some(r#"{"format":"plain","text":"x"}"#)
+        );
+        store.append(&a.id, keys::TEXT, Some("Old milk"), None)?;
+        let old = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
+        assert_eq!((old.text.as_str(), old.text_editable), ("Old milk", true));
+        store.append(&a.id, keys::TEXT, Some(FUTURE), None)?;
+        let other = notes.capture("Other", None, None)?;
+        let note = notes.by_id(&a.id)?.ok_or(Error::Invalid("note".into()))?;
+        assert_eq!(note.text, "# Heading");
+        assert_eq!(note.text_format, "x-future");
+        assert!(!note.text_editable);
+        assert!(notes.edit(&a.id, "Plain now").is_err());
+        // Amend adds a Section; Merge points at the other Note.
+        let section = notes.amend(&a.id, "Amended")?;
+        assert!(section.text_editable);
+        notes.merge(&a.id, &other.id)?;
+        assert_eq!(store.current(&a.id, keys::TEXT)?.as_deref(), Some(FUTURE));
+        store.append(&section.id, keys::TEXT, Some(FUTURE), None)?;
+        let shown = notes.sections(&other.id)?;
+        assert_eq!(shown.len(), 2);
+        assert!(
+            shown
+                .iter()
+                .all(|s| !s.text_editable && s.text == "# Heading")
         );
         Ok(())
     }

@@ -5,3 +5,7 @@ Unlike Catlog, which writes a `$conflict:<field>` entry when an import detects c
 ## Considered Options
 
 - Catlog's `$conflict` marker entries (rejected: a Device that imports late writes markers of its own, and clearing them needs more entries).
+
+## Text formats (ADR 0018)
+
+Amended by ADR 0018 (#58): a Note's or Section's text carries its format in the same value, so text and format conflict as one unit. A text written before its format was recorded counts as the same text marked plain. A Conflict one of whose versions is in a format the Device does not know is not resolved there.

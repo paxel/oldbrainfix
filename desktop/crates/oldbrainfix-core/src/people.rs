@@ -1372,6 +1372,7 @@ mod tests {
                     from: eve.own_key_record()?,
                     profile: copy,
                     text: format!("Hello from {name}"),
+                    text_format: crate::text_format::PLAIN.into(),
                     sections: Vec::new(),
                     routines: Vec::new(),
                 };
