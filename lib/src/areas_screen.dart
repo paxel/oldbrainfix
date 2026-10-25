@@ -50,6 +50,7 @@ class _AreasScreenState extends State<AreasScreen> {
   /// The name each person's Profile shows, by Profile id.
   Map<String, String> _names = const {};
   List<PlacedNote> _hits = const [];
+  PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
   @override
@@ -87,8 +88,18 @@ class _AreasScreenState extends State<AreasScreen> {
       for (final people in _people.values)
         for (final p in people) p.id: store.personShown(p.id).name,
     };
-    _hits = _search(widget.places, _query.text, lock: LockScope.of(context));
+    _hits = _search(
+      widget.places,
+      _query.text,
+      lock: LockScope.of(context),
+      people: _filter,
+    );
   }
+
+  void _filtered(PersonFilter people) => setState(() {
+    _filter = people;
+    _load();
+  });
 
   void _reload() => setState(_load);
 
@@ -279,6 +290,13 @@ class _AreasScreenState extends State<AreasScreen> {
       appBar: AppBar(
         title: Text(t.areasTitle),
         actions: [
+          // Only the search's hits are Notes on this level.
+          if (searching)
+            PersonFilterButton(
+              store: widget.places.store,
+              filter: _filter,
+              onChanged: _filtered,
+            ),
           IconButton(
             tooltip: t.allNotesTitle,
             onPressed: _openAllNotes,
@@ -300,6 +318,12 @@ class _AreasScreenState extends State<AreasScreen> {
               hint: t.searchAllHint,
               onChanged: (_) => _reload(),
             ),
+            if (searching)
+              PersonFilterChips(
+                store: widget.places.store,
+                filter: _filter,
+                onChanged: _filtered,
+              ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -361,6 +385,7 @@ class _AreaScreenState extends State<AreaScreen> {
   List<PlacedNote> _diary = const [];
   DiaryOrder _order = DiaryOrder.time;
   bool _hideUnimportant = false;
+  PersonFilter _filter = PersonFilter.everyone;
   bool _loaded = false;
 
   /// Whether this Device may change the Area and its Topics, and write
@@ -403,10 +428,16 @@ class _AreaScreenState extends State<AreaScreen> {
       lock: LockScope.of(context),
       order: _order,
       hideUnimportant: _hideUnimportant,
+      people: _filter,
     );
   }
 
   void _reload() => setState(_load);
+
+  void _filtered(PersonFilter people) => setState(() {
+    _filter = people;
+    _load();
+  });
 
   void _reloadIfMounted() {
     if (mounted) _reload();
@@ -581,19 +612,26 @@ class _AreaScreenState extends State<AreaScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(areaName(t, area)),
-        actions: diaryActions(
-          context,
-          order: _order,
-          hideUnimportant: _hideUnimportant,
-          onOrder: (order) => setState(() {
-            _order = order;
-            _load();
-          }),
-          onHideUnimportant: (hide) => setState(() {
-            _hideUnimportant = hide;
-            _load();
-          }),
-        ),
+        actions: [
+          PersonFilterButton(
+            store: widget.places.store,
+            filter: _filter,
+            onChanged: _filtered,
+          ),
+          ...diaryActions(
+            context,
+            order: _order,
+            hideUnimportant: _hideUnimportant,
+            onOrder: (order) => setState(() {
+              _order = order;
+              _load();
+            }),
+            onHideUnimportant: (hide) => setState(() {
+              _hideUnimportant = hide;
+              _load();
+            }),
+          ),
+        ],
       ),
       body: BrowserSwipes(
         onForward: _forward,
@@ -603,6 +641,11 @@ class _AreaScreenState extends State<AreaScreen> {
               controller: _query,
               hint: t.searchAreaHint,
               onChanged: (_) => _reload(),
+            ),
+            PersonFilterChips(
+              store: widget.places.store,
+              filter: _filter,
+              onChanged: _filtered,
             ),
             Expanded(
               child: ListView(
@@ -659,6 +702,7 @@ class _TopicScreenState extends State<TopicScreen> {
   late List<PlacedNote> _diary;
   DiaryOrder _order = DiaryOrder.time;
   bool _hideUnimportant = false;
+  PersonFilter _filter = PersonFilter.everyone;
 
   @override
   void initState() {
@@ -685,10 +729,16 @@ class _TopicScreenState extends State<TopicScreen> {
       lock: LockScope.of(context),
       order: _order,
       hideUnimportant: _hideUnimportant,
+      people: _filter,
     );
   }
 
   void _reload() => setState(_load);
+
+  void _filtered(PersonFilter people) => setState(() {
+    _filter = people;
+    _load();
+  });
 
   Future<void> _add() async {
     await captureNote(
@@ -744,19 +794,26 @@ class _TopicScreenState extends State<TopicScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(topicName(t, topic)),
-        actions: diaryActions(
-          context,
-          order: _order,
-          hideUnimportant: _hideUnimportant,
-          onOrder: (order) => setState(() {
-            _order = order;
-            _load();
-          }),
-          onHideUnimportant: (hide) => setState(() {
-            _hideUnimportant = hide;
-            _load();
-          }),
-        ),
+        actions: [
+          PersonFilterButton(
+            store: widget.places.store,
+            filter: _filter,
+            onChanged: _filtered,
+          ),
+          ...diaryActions(
+            context,
+            order: _order,
+            hideUnimportant: _hideUnimportant,
+            onOrder: (order) => setState(() {
+              _order = order;
+              _load();
+            }),
+            onHideUnimportant: (hide) => setState(() {
+              _hideUnimportant = hide;
+              _load();
+            }),
+          ),
+        ],
       ),
       body: BrowserSwipes(
         child: Column(
@@ -765,6 +822,11 @@ class _TopicScreenState extends State<TopicScreen> {
               controller: _query,
               hint: t.searchTopicHint,
               onChanged: (_) => _reload(),
+            ),
+            PersonFilterChips(
+              store: widget.places.store,
+              filter: _filter,
+              onChanged: _filtered,
             ),
             Expanded(
               child: ListView(
@@ -779,7 +841,13 @@ class _TopicScreenState extends State<TopicScreen> {
                         _schedule,
                       )
                     : _diary.isEmpty
-                    ? [BrowserEmpty(text: t.noNotesHere)]
+                    ? [
+                        BrowserEmpty(
+                          text: _filter.isEveryone
+                              ? t.noNotesHere
+                              : t.nothingFound,
+                        ),
+                      ]
                     : diaryCards(
                         context,
                         _diary,
@@ -804,8 +872,9 @@ class _TopicScreenState extends State<TopicScreen> {
   }
 }
 
-/// The Notes matching [query] as a diary in [order], with where they
-/// are filed; those of closed locked Areas stay out.
+/// The Notes matching [query] by the people [people] as a diary in
+/// [order], with where they are filed; those of closed locked Areas stay
+/// out.
 List<PlacedNote> _search(
   Places places,
   String query, {
@@ -813,9 +882,13 @@ List<PlacedNote> _search(
   AppLock? lock,
   DiaryOrder order = DiaryOrder.time,
   bool hideUnimportant = false,
+  PersonFilter people = PersonFilter.everyone,
 }) => [
   for (final note in diary(
-    Search(places.store).notes(query, within: within),
+    places.store.notesBy(
+      Search(places.store).notes(query, within: within),
+      people,
+    ),
     order: order,
     hideUnimportant: hideUnimportant,
   ))

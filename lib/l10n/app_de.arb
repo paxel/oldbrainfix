@@ -604,5 +604,10 @@
   "personForMeName": "Name für mich",
   "personForMePicture": "Bild für mich ändern",
   "personTheirPicture": "Ihr eigenes Bild verwenden",
-  "profilePeopleEmpty": "Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst."
+  "profilePeopleEmpty": "Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.",
+  "personFilter": "Notizen zeigen von…",
+  "personFilterMe": "Mir",
+  "personFilterEveryone": "Allen",
+  "personFilterShowing": "Nur Notizen von",
+  "personTheirNotes": "Notizen dieser Person"
 }

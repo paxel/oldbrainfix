@@ -89,5 +89,6 @@
   "restoreOpenTitle": "Sicherungsdatei wählen",
   "welcomeTitle": "Willkommen bei Old Brain Fix",
   "welcomeFresh": "Neu anfangen",
-  "personOpen": "Profil von {name} öffnen"
+  "personOpen": "Profil von {name} öffnen",
+  "personFilterRemove": "{name} aus dem Filter nehmen"
 }

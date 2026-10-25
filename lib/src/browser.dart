@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'profile.dart';
 
 /// Where swipe left leads in the notes browser: the last selected Area
 /// and Topic (UI laws, "Navigation"). Lives as long as the app, so the
@@ -164,6 +165,126 @@ List<Widget> diaryActions(
       selectedIcon: const Icon(Icons.visibility_off_outlined),
     ),
   ];
+}
+
+/// The app bar button of the person filter (#53): a menu at the button
+/// with "Me", every person of People and, while it filters, "Everyone";
+/// each choice puts that person in or out. It shows as selected while
+/// it filters.
+class PersonFilterButton extends StatelessWidget {
+  final Store store;
+  final PersonFilter filter;
+  final ValueChanged<PersonFilter> onChanged;
+
+  const PersonFilterButton({
+    super.key,
+    required this.store,
+    required this.filter,
+    required this.onChanged,
+  });
+
+  Future<void> _open(BuildContext button) async {
+    final t = button.t;
+    final box = button.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(button).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null) return;
+    final picked = await showMenu<PersonFilter>(
+      context: button,
+      position: RelativeRect.fromRect(
+        box.localToGlobal(Offset.zero, ancestor: overlay) & box.size,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        // The heading the choices continue: "Show Notes by…" "Me".
+        PopupMenuItem(enabled: false, child: Text(t.personFilter)),
+        CheckedPopupMenuItem(
+          key: const ValueKey('personFilter-me'),
+          value: filter.toggledMe(),
+          checked: filter.me,
+          child: Text(t.personFilterMe),
+        ),
+        for (final person in store.peopleShown)
+          CheckedPopupMenuItem(
+            key: ValueKey('personFilter-${person.id}'),
+            value: filter.toggled(person.id),
+            checked: filter.people.contains(person.id),
+            child: Row(
+              children: [
+                ProfileAvatar(profile: person, size: 24),
+                const SizedBox(width: 8),
+                Flexible(child: Text(profileDisplayName(t, person.name))),
+              ],
+            ),
+          ),
+        if (!filter.isEveryone)
+          PopupMenuItem(
+            key: const ValueKey('personFilter-everyone'),
+            value: PersonFilter.everyone,
+            child: Text(t.personFilterEveryone),
+          ),
+      ],
+    );
+    if (picked != null) onChanged(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) => Builder(
+    builder: (button) => IconButton(
+      key: const ValueKey('personFilter'),
+      tooltip: context.t.personFilter,
+      isSelected: !filter.isEveryone,
+      onPressed: () => _open(button),
+      icon: const Icon(Icons.people_outline),
+      selectedIcon: const Icon(Icons.people),
+    ),
+  );
+}
+
+/// Who the person filter keeps, as chips under the search field, each
+/// with ✕ to take that person out; nothing while it keeps everyone, so
+/// Notes never leave the list unseen.
+class PersonFilterChips extends StatelessWidget {
+  final Store store;
+  final PersonFilter filter;
+  final ValueChanged<PersonFilter> onChanged;
+
+  const PersonFilterChips({
+    super.key,
+    required this.store,
+    required this.filter,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (filter.isEveryone) return const SizedBox.shrink();
+    final t = context.t;
+    final people = filter.people.toList()..sort();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(t.personFilterShowing),
+          if (filter.me)
+            InputChip(
+              key: const ValueKey('personChip-me'),
+              label: Text(t.personFilterMe),
+              onDeleted: () => onChanged(filter.toggledMe()),
+            ),
+          for (final id in people)
+            InputChip(
+              key: ValueKey('personChip-$id'),
+              avatar: ProfileAvatar(profile: store.personShown(id), size: 24),
+              label: Text(profileDisplayName(t, store.personShown(id).name)),
+              onDeleted: () => onChanged(filter.toggled(id)),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// A line of text on an embossed panel, for a level with nothing to show.

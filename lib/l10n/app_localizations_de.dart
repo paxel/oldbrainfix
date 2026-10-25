@@ -2312,4 +2312,19 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get profilePeopleEmpty =>
       'Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
+
+  @override
+  String get personFilter => 'Notizen zeigen von…';
+
+  @override
+  String get personFilterMe => 'Mir';
+
+  @override
+  String get personFilterEveryone => 'Allen';
+
+  @override
+  String get personFilterShowing => 'Nur Notizen von';
+
+  @override
+  String get personTheirNotes => 'Notizen dieser Person';
 }

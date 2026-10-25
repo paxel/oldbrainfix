@@ -103,23 +103,49 @@ class UnsortedScreen extends StatefulWidget {
 }
 
 class _UnsortedScreenState extends State<UnsortedScreen> {
-  late List<Note> _unsorted = widget.notes.unsorted();
+  PersonFilter _filter = PersonFilter.everyone;
+  late List<Note> _unsorted = _load();
+
+  /// The Unsorted Notes of the people the filter keeps (#53).
+  List<Note> _load() =>
+      widget.notes.store.notesBy(widget.notes.unsorted(), _filter);
 
   void _reload() {
     if (!mounted) return;
-    setState(() => _unsorted = widget.notes.unsorted());
+    setState(() => _unsorted = _load());
   }
+
+  void _filtered(PersonFilter people) => setState(() {
+    _filter = people;
+    _unsorted = _load();
+  });
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     return Scaffold(
-      appBar: AppBar(title: Text(t.unsorted)),
+      appBar: AppBar(
+        title: Text(t.unsorted),
+        actions: [
+          PersonFilterButton(
+            store: widget.notes.store,
+            filter: _filter,
+            onChanged: _filtered,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          PersonFilterChips(
+            store: widget.notes.store,
+            filter: _filter,
+            onChanged: _filtered,
+          ),
           if (_unsorted.isEmpty)
-            BrowserEmpty(text: t.noUnsorted)
+            BrowserEmpty(
+              text: _filter.isEveryone ? t.noUnsorted : t.nothingFound,
+            )
           else
             ..._sortingCards(
               context,

@@ -19,8 +19,8 @@ use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Importance, Note, Notes, NotesGo,
-    Occurrence, Places, Recurrence, Routine, Routines, STARTER_SET, Schedule, Search, Section,
-    SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
+    Occurrence, PersonFilter, Places, Recurrence, Routine, Routines, STARTER_SET, Schedule, Search,
+    Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
@@ -2010,6 +2010,14 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
         ben.author_of(&accepted)?.map(|p| p.id).as_deref(),
         expected["author"].as_str()
     );
+    // The person filter counts it as hers, not Ben's own (#53).
+    let author = expected["author"].as_str().ok_or("author")?;
+    assert!(ben.wrote_by(&accepted, &PersonFilter::person(author))?);
+    let me = PersonFilter {
+        me: true,
+        ..PersonFilter::default()
+    };
+    assert!(!ben.wrote_by(&accepted, &me)?);
     let note = Notes::new(&ben).by_id(&accepted)?.ok_or("the Note")?;
     assert_eq!(note_json(&note), expected["note"]);
     let mut routines = Routines::new(&ben).of_note(&accepted)?;

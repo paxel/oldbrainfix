@@ -10,7 +10,7 @@
 //! user compared its short code in person (#51); it stays on this
 //! Device and is kept through every newer record.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
 
 use base64::Engine;
@@ -19,6 +19,7 @@ use serde_json::{Value, json};
 
 use crate::Result;
 use crate::entry::dart_iso;
+use crate::notes::Note;
 use crate::profile::{
     ALIASES, FIRST, KEYS, OwnProfile, Profile, ProfileAlias, ProfileChoice, RECORD, SentProfile,
     SignedProfile, chain, check, is_key, replaces, short_code,
@@ -77,6 +78,50 @@ pub(crate) struct Held {
 pub struct PeopleIndex {
     by_id: BTreeMap<String, Held>,
     alias_to: BTreeMap<String, String>,
+}
+
+/// Who wrote a Note: the user, another person, or nobody known.
+enum Writer {
+    Own,
+    Theirs(Profile),
+    Unknown,
+}
+
+impl Writer {
+    fn theirs(author: Option<Profile>) -> Writer {
+        author.map_or(Writer::Unknown, Writer::Theirs)
+    }
+}
+
+/// Which people's Notes the notes browser shows (#53), the Dart core's
+/// `PersonFilter`: the user's own with `me`, and those of `people`, by
+/// Profile id; everybody's when neither is set.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PersonFilter {
+    pub me: bool,
+    pub people: BTreeSet<String>,
+}
+
+impl PersonFilter {
+    /// Every Note, whoever wrote it.
+    pub fn is_everyone(&self) -> bool {
+        !self.me && self.people.is_empty()
+    }
+
+    /// Only the Notes of the person `id`.
+    pub fn person(id: &str) -> PersonFilter {
+        PersonFilter {
+            me: false,
+            people: BTreeSet::from([id.to_string()]),
+        }
+    }
+
+    /// Puts the person `id` in, or out again.
+    pub fn toggle(&mut self, id: &str) {
+        if !self.people.remove(id) {
+            self.people.insert(id.to_string());
+        }
+    }
 }
 
 /// The own Profile's ids and keys, with what they were read from.
@@ -601,18 +646,68 @@ impl Store {
     /// is not known. A Note accepted from a Sent Item shows its sender,
     /// through the key and the Profile id it keeps (#51).
     pub fn author_of(&self, entity: &str) -> Result<Option<Profile>> {
-        match self.author_theirs(entity)? {
-            Some(author) => Ok(Some(self.with_override(author)?)),
-            None => Ok(None),
+        match self.writer_of(entity)? {
+            Writer::Theirs(author) => Ok(Some(self.with_override(author)?)),
+            Writer::Own | Writer::Unknown => Ok(None),
         }
     }
 
-    fn author_theirs(&self, entity: &str) -> Result<Option<Profile>> {
+    /// Whether the person filter of the browser keeps the Note or
+    /// Section `entity` (#53), as the Dart core's `wroteBy`: with
+    /// `filter.me`, the user's own, written on any of their Devices or
+    /// under any of their Profile's ids; with its people, those of each
+    /// of them, matched through the aliases from either side. A Note
+    /// whose writer is not known is nobody's; with an empty filter every
+    /// Note is kept.
+    pub fn wrote_by(&self, entity: &str, filter: &PersonFilter) -> Result<bool> {
+        if filter.is_everyone() {
+            return Ok(true);
+        }
+        match self.writer_of(entity)? {
+            Writer::Own => {
+                if filter.me {
+                    return Ok(true);
+                }
+                for id in &filter.people {
+                    if self.is_own_person(id)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Writer::Theirs(author) => {
+                let writer = self.resolve_person(&author.id)?;
+                for id in &filter.people {
+                    if !self.is_own_person(id)? && self.resolve_person(id)? == writer {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            Writer::Unknown => Ok(false),
+        }
+    }
+
+    /// The Notes of `notes` that `filter` keeps, in their order
+    /// ([`Store::wrote_by`]).
+    pub fn notes_by(&self, notes: Vec<Note>, filter: &PersonFilter) -> Result<Vec<Note>> {
+        let mut kept = Vec::with_capacity(notes.len());
+        for note in notes {
+            if self.wrote_by(&note.id, filter)? {
+                kept.push(note);
+            }
+        }
+        Ok(kept)
+    }
+
+    /// Who wrote the Note or Section `entity`: the user, another person
+    /// as their Profile shows without the Override, or nobody known.
+    fn writer_of(&self, entity: &str) -> Result<Writer> {
         if let Some((key, person)) = self.received_from(entity)? {
             if self.own_keys()?.bound.contains(&key) || self.is_own_person(&person)? {
-                return Ok(None);
+                return Ok(Writer::Own);
             }
-            return self.shown_for(Some(&key), Some(person));
+            return Ok(Writer::theirs(self.shown_for(Some(&key), Some(person))?));
         }
         let Some(device) = self
             .history(entity)?
@@ -620,10 +715,10 @@ impl Store {
             .find(|e| e.field == "$type")
             .map(|e| e.device)
         else {
-            return Ok(None);
+            return Ok(Writer::Unknown);
         };
         if device == self.device_id()? || self.is_own_device(&device)? {
-            return Ok(None);
+            return Ok(Writer::Own);
         }
         let key = self
             .pinned_key(&device)?
@@ -631,7 +726,7 @@ impl Store {
         if let Some(key) = &key
             && self.own_keys()?.bound.contains(key)
         {
-            return Ok(None);
+            return Ok(Writer::Own);
         }
         let named = match self.area_of(entity)? {
             Some(area) => self
@@ -642,9 +737,9 @@ impl Store {
         if let Some(named) = &named
             && self.is_own_person(named)?
         {
-            return Ok(None);
+            return Ok(Writer::Own);
         }
-        self.shown_for(key.as_deref(), named)
+        Ok(Writer::theirs(self.shown_for(key.as_deref(), named)?))
     }
 
     /// The sender's key and Profile id the Note `entity` keeps from the
@@ -936,6 +1031,111 @@ mod tests {
         Ok(())
     }
 
+    fn ids(notes: &[Note]) -> Vec<String> {
+        notes.iter().map(|n| n.id.clone()).collect()
+    }
+
+    fn me() -> PersonFilter {
+        PersonFilter {
+            me: true,
+            people: BTreeSet::new(),
+        }
+    }
+
+    #[test]
+    fn the_person_filter_keeps_me_them_or_both_with_the_search() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let area = household(&ann, &ben)?;
+        let notes = Notes::new(&ann);
+        let mine = notes.capture("Milk and eggs", Some(&area), None)?;
+        let unsorted = notes.capture("Eggs for the cake", None, None)?;
+        let theirs = Notes::new(&ben).capture("Eggs", Some(&area), None)?;
+        let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
+        let (answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+        apply_answer_as(&ben, &answer, true, None)?;
+        let all = notes.all()?;
+        let ben_only = PersonFilter::person(&own_id(&ben)?);
+        assert_eq!(
+            ids(&ann.notes_by(all.clone(), &PersonFilter::default())?),
+            ids(&all)
+        );
+        assert_eq!(
+            ids(&ann.notes_by(all.clone(), &me())?),
+            vec![unsorted.id.clone(), mine.id.clone()]
+        );
+        assert_eq!(
+            ids(&ann.notes_by(all.clone(), &ben_only)?),
+            vec![theirs.id.clone()]
+        );
+        let mut both = me();
+        both.toggle(&own_id(&ben)?);
+        assert_eq!(ids(&ann.notes_by(all.clone(), &both)?), ids(&all));
+        // The own Profile's id among the people counts as "Me".
+        assert_eq!(
+            ids(&ann.notes_by(all.clone(), &PersonFilter::person(&own_id(&ann)?))?),
+            vec![unsorted.id.clone(), mine.id.clone()]
+        );
+        // Ben sees it the other way round.
+        let on_ben = Notes::new(&ben).all()?;
+        assert_eq!(
+            ids(&ben.notes_by(on_ben.clone(), &me())?),
+            vec![theirs.id.clone()]
+        );
+        assert_eq!(
+            ids(&ben.notes_by(on_ben, &PersonFilter::person(&own_id(&ann)?))?),
+            vec![mine.id.clone()]
+        );
+        // With the search over the Area.
+        let found = crate::Search::new(&ann).notes("eggs", Some(&area))?;
+        assert_eq!(found.len(), 2);
+        assert_eq!(ids(&ann.notes_by(found.clone(), &me())?), vec![mine.id]);
+        assert_eq!(ids(&ann.notes_by(found, &ben_only)?), vec![theirs.id]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_whose_writer_is_not_known_is_nobodys() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let area = household(&ann, &ben)?;
+        let theirs = Notes::new(&ben).capture("Eggs", Some(&area), None)?;
+        let moved = Notes::new(&ben).capture("Flour", Some(&area), None)?;
+        let request = sync_request(&ben, &ann.version_vector()?, "Phone", &ann.device_id()?, "")?;
+        answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+        // Ann takes one of Ben's Notes into an Area of her own.
+        let baking = Places::new(&ann).add_area("Baking")?;
+        Notes::new(&ann).file(&moved.id, &baking.id)?;
+        let ben_id = own_id(&ben)?;
+        assert_eq!(
+            ann.author_of(&moved.id)?.map(|p| p.id),
+            Some(ben_id.clone())
+        );
+        // Another Device of Ann's, met without the Profiles.
+        let pad = device(3, "Ann on the pad")?;
+        let request = sync_request(&pad, &ann.version_vector()?, "Pad", &ann.device_id()?, "")?;
+        let (mut answer, _) = answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
+        answer
+            .as_object_mut()
+            .ok_or("an object")?
+            .remove("profiles");
+        crate::lan::apply_answer(&pad, &answer)?;
+        assert!(pad.kept_people()?.is_empty());
+        let ben_only = PersonFilter::person(&ben_id);
+        // In the Area its grant names Ben, before his Profile arrives.
+        assert!(!pad.wrote_by(&theirs.id, &me())?);
+        assert!(pad.wrote_by(&theirs.id, &ben_only)?);
+        // Outside it no grant names him and no Profile binds his key here.
+        assert_eq!(pad.author_of(&moved.id)?, None);
+        assert!(!pad.wrote_by(&moved.id, &me())?);
+        assert!(!pad.wrote_by(&moved.id, &ben_only)?);
+        // Nothing in the log says who wrote it.
+        let nothing = "0".repeat(32);
+        assert!(!pad.wrote_by(&nothing, &me())?);
+        assert!(!pad.wrote_by(&nothing, &ben_only)?);
+        Ok(())
+    }
+
     /// Ann's Household shared with Ben's desk, invited on its own under
     /// its own Profile, which wrote a Note there.
     fn desk_with_a_note(
@@ -972,6 +1172,15 @@ mod tests {
         answer_sync(&ann, &request, "Desk")?.ok_or("an answer")?;
         assert_eq!(ann.resolve_person(&desk_id)?, own_id(&ben)?);
         assert_eq!(ann.author_of(&note)?.map(|p| p.name), Some("Ben".into()));
+        // The person filter finds it through the old id and the new.
+        assert!(ann.wrote_by(&note, &PersonFilter::person(&desk_id))?);
+        assert!(ann.wrote_by(&note, &PersonFilter::person(&own_id(&ben)?))?);
+        // On Ben's phone it is his own, under his old id too.
+        let request = sync_request(&ben, &desk.version_vector()?, "Phone", "", "")?;
+        let (answer, _) = answer_sync(&desk, &request, "Desk")?.ok_or("an answer")?;
+        crate::lan::apply_answer(&ben, &answer)?;
+        assert!(ben.wrote_by(&note, &me())?);
+        assert!(ben.wrote_by(&note, &PersonFilter::person(&desk_id))?);
         Ok(())
     }
 

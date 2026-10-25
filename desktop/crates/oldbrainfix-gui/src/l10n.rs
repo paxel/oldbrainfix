@@ -57,6 +57,10 @@ mod tests {
         }
         assert_ne!(en.sync_conflicts_below(2), de.sync_conflicts_below(2));
         assert_ne!(en.bundle_saved(2), de.bundle_saved(2));
+        assert_ne!(
+            en.person_filter_remove("Ben"),
+            de.person_filter_remove("Ben")
+        );
         assert!(en.cli_usage().contains("oldbrainfix import FILE"));
         assert_eq!(de.close(), "Schließen");
     }

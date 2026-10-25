@@ -372,6 +372,124 @@ void main() {
     });
   });
 
+  group('person filter', () {
+    List<String> ids(List<Note> notes) => [for (final n in notes) n.id];
+
+    test('"Me" keeps the Notes of every own Device, a person theirs, and '
+        'both together both', () {
+      final area = household();
+      final mine = Notes(ann).capture('Milk', place: area);
+      final desk = Notes(annDesk).capture('Bread', place: area);
+      final unsorted = Notes(ann).capture('Call the bank');
+      exchange(annDesk, ann);
+      final theirs = Notes(ben).capture('Eggs', place: area);
+      exchange(ben, ann);
+      final all = Notes(ann).all();
+      const me = PersonFilter(me: true);
+      final benOnly = PersonFilter(people: {idOf(ben)});
+      expect(ann.notesBy(all, PersonFilter.everyone), all);
+      expect(ids(ann.notesBy(all, me)), [unsorted.id, desk.id, mine.id]);
+      expect(ids(ann.notesBy(all, benOnly)), [theirs.id]);
+      expect(ids(ann.notesBy(all, me.toggled(idOf(ben)))), ids(all));
+      // The own Profile's id among the people counts as "Me".
+      expect(
+        ids(ann.notesBy(all, PersonFilter(people: {idOf(ann)}))),
+        ids(ann.notesBy(all, me)),
+      );
+      // Ben sees it the other way round, Ann's desk as Ann.
+      final onBen = Notes(ben).all();
+      expect(ids(ben.notesBy(onBen, me)), [theirs.id]);
+      expect(ids(ben.notesBy(onBen, PersonFilter(people: {idOf(ann)}))), [
+        desk.id,
+        mine.id,
+      ]);
+    });
+
+    test('the filter combines with the search and an Area', () {
+      final area = household();
+      Notes(ann).capture('Milk', place: area);
+      final eggs = Notes(ann).capture('Eggs', place: area);
+      Notes(ann).capture('Eggs for the cake');
+      final theirs = Notes(ben).capture('Eggs and milk', place: area);
+      exchange(ben, ann);
+      final found = Search(ann).notes('eggs', within: area);
+      expect(ids(found), [theirs.id, eggs.id]);
+      expect(ids(ann.notesBy(found, const PersonFilter(me: true))), [eggs.id]);
+      expect(ids(ann.notesBy(found, PersonFilter(people: {idOf(ben)}))), [
+        theirs.id,
+      ]);
+    });
+
+    test('a person is found through the aliases of their Profile, from '
+        'either side', () {
+      final area = household();
+      final benDesk = device(clock, 'Ben at the desk');
+      final deskId = idOf(benDesk);
+      exchange(benDesk, ann, inviting: Invite(area, role: AreaRole.member));
+      final note = Notes(benDesk).capture('Fix the tap', place: area);
+      exchange(benDesk, ann);
+      ben.renameOwnProfile('Ben');
+      exchange(ben, benDesk);
+      exchange(ben, benDesk);
+      exchange(benDesk, ann);
+      final all = Notes(ann).all();
+      expect(ids(ann.notesBy(all, PersonFilter(people: {deskId}))), [note.id]);
+      expect(ids(ann.notesBy(all, PersonFilter(people: {idOf(ben)}))), [
+        note.id,
+      ]);
+      // On Ben's phone the desk's Note is his own, under his old id too.
+      exchange(ben, benDesk);
+      expect(ben.wroteBy(note.id, const PersonFilter(me: true)), isTrue);
+      expect(ben.wroteBy(note.id, PersonFilter(people: {deskId})), isTrue);
+    });
+
+    test('a Note whose writer is not known is nobody\'s; one whose Profile '
+        'has not arrived is the person\'s the Area names', () {
+      final area = household();
+      final theirs = Notes(ben).capture('Eggs', place: area);
+      final moved = Notes(ben).capture('Flour', place: area);
+      exchange(ben, ann);
+      // Ann takes one of Ben's Notes into an Area of her own.
+      Notes(ann).file(moved.id, Places(ann).addArea('Baking').id);
+      expect(ann.authorOf(moved.id)?.id, idOf(ben));
+      final pad = device(clock, 'Ann on the pad');
+      final request = syncRequest(
+        pad,
+        ann.versionVector(),
+        name: 'Pad',
+        hostDevice: ann.deviceId,
+      );
+      final done = answerSync(
+        ann,
+        jsonDecode(jsonEncode(request)) as Map<String, Object?>,
+        name: 'Desk',
+      )!;
+      applyAnswer(
+        pad,
+        jsonDecode(jsonEncode(done.answer..remove('profiles')))
+            as Map<String, Object?>,
+      );
+      expect(pad.keptPeople, isEmpty);
+      expect(pad.wroteBy(theirs.id, const PersonFilter(me: true)), isFalse);
+      expect(pad.wroteBy(theirs.id, PersonFilter(people: {idOf(ben)})), isTrue);
+      // Outside the Area no grant names him, and no Profile binds his key
+      // here.
+      expect(pad.authorOf(moved.id), isNull);
+      expect(pad.wroteBy(moved.id, const PersonFilter(me: true)), isFalse);
+      expect(pad.wroteBy(moved.id, PersonFilter(people: {idOf(ben)})), isFalse);
+      // Nothing in the log says who wrote it.
+      expect(pad.wroteBy('0' * 32, const PersonFilter(me: true)), isFalse);
+      expect(pad.wroteBy('0' * 32, PersonFilter(people: {idOf(ben)})), isFalse);
+    });
+
+    test('a Note accepted from a Sent Item is its sender\'s', () {
+      final file = sendNote(ann, Notes(ann).capture('Dentist').id);
+      final note = acceptSentItem(ben, openSentItem(ben, file).item)!;
+      expect(ben.wroteBy(note, PersonFilter(people: {idOf(ann)})), isTrue);
+      expect(ben.wroteBy(note, const PersonFilter(me: true)), isFalse);
+    });
+  });
+
   group('the shared folder and bundles', () {
     test('the people\'s Profiles go sealed under the Area\'s key', () async {
       final area = household();

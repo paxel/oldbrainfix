@@ -2292,4 +2292,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get profilePeopleEmpty =>
       'Nobody yet. The people you share an Area with or accept Sent Items from show here.';
+
+  @override
+  String get personFilter => 'Show Notes by…';
+
+  @override
+  String get personFilterMe => 'Me';
+
+  @override
+  String get personFilterEveryone => 'Everyone';
+
+  @override
+  String get personFilterShowing => 'Only Notes by';
+
+  @override
+  String get personTheirNotes => 'Their Notes';
 }

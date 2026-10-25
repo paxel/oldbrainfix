@@ -151,5 +151,7 @@
   "welcomeFresh": "Start fresh",
   "@welcomeFresh": {"description": "On the desktop's first start: skips restoring and starts with an empty log."},
   "personOpen": "Open the Profile of {name}",
-  "@personOpen": {"description": "Another person's picture on a card, read out and on hover: it opens their Profile.", "placeholders": {"name": {"type": "String"}}}
+  "@personOpen": {"description": "Another person's picture on a card, read out and on hover: it opens their Profile.", "placeholders": {"name": {"type": "String"}}},
+  "personFilterRemove": "Take {name} out of the filter",
+  "@personFilterRemove": {"description": "On hover over a person kept by the browser's person filter: clicking takes them out.", "placeholders": {"name": {"type": "String"}}}
 }

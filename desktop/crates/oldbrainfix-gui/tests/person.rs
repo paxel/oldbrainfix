@@ -16,7 +16,8 @@ use oldbrainfix_core::lan::{
     Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
 };
 use oldbrainfix_core::{
-    AreaRole, Invite, Notes, OwnProfile, PairedDevice, Places, SigningKey, Store, profile,
+    AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonFilter, Places, SigningKey, Store,
+    profile,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -300,5 +301,95 @@ fn a_sent_items_sender_opens_their_profile_once_kept() -> TestResult {
     alone.run();
     assert!(shows(&alone, "From Ben"));
     assert!(alone.query_by_label("Open the Profile of Ben").is_none());
+    Ok(())
+}
+
+/// Clicks the widget with the role `role` labelled `label`.
+fn press(harness: &mut Harness<'_, App>, role: Role, label: &str) {
+    harness.get_by_role_and_label(role, label).click();
+    harness.run();
+}
+
+/// Ben's Note as Ann's window shows it, and one of Ann's own beside it.
+fn two_notes(shared: &Shared) -> Result<(String, String), Box<dyn std::error::Error>> {
+    let mine = Notes::new(&shared.ann).capture("Ann buys milk", Some(&shared.area), None)?;
+    let theirs = Notes::new(&shared.ann)
+        .all()?
+        .into_iter()
+        .find(|n| n.text == "Ben buys bread")
+        .ok_or("Ben's Note")?;
+    Ok((mine.id, theirs.id))
+}
+
+#[test]
+fn their_notes_on_a_profile_shows_all_notes_with_only_theirs() -> TestResult {
+    let shared = shared()?;
+    let (mine, theirs) = two_notes(&shared)?;
+    let Shared {
+        ann, area, ben_id, ..
+    } = shared;
+    let mut harness = window(app(ann, Selection::Place(area)));
+    press(&mut harness, Role::Button, "Open the Profile of Ben");
+    press(&mut harness, Role::Button, "Their Notes");
+    assert!(!shows(&harness, "Name and picture for me"));
+    assert_eq!(harness.state().selection(), &Selection::All);
+    assert_eq!(
+        harness.state().people_filter(),
+        &PersonFilter::person(&ben_id)
+    );
+    assert_eq!(harness.state().shown_notes(), vec![theirs.clone()]);
+    assert!(shows(&harness, "Only Notes by"));
+    // Taking Ben out shows everybody's again.
+    press(&mut harness, Role::Button, "Ben");
+    assert!(harness.state().people_filter().is_everyone());
+    assert!(!shows(&harness, "Only Notes by"));
+    let mut shown = harness.state().shown_notes();
+    shown.sort();
+    let mut both = vec![mine, theirs];
+    both.sort();
+    assert_eq!(shown, both);
+    Ok(())
+}
+
+#[test]
+fn the_person_filter_ticks_me_and_people_and_combines_with_the_search() -> TestResult {
+    let shared = shared()?;
+    let (mine, theirs) = two_notes(&shared)?;
+    let unsorted = Notes::new(&shared.ann)
+        .capture("Call the bank", None, None)?
+        .id;
+    let mut harness = window(app(shared.ann, Selection::Place(shared.area.clone())));
+    press(&mut harness, Role::Button, "Show Notes by…");
+    press(&mut harness, Role::CheckBox, "Me");
+    assert_eq!(harness.state().shown_notes(), vec![mine.clone()]);
+    // The menu stays open while people are ticked.
+    press(&mut harness, Role::CheckBox, "Ben");
+    assert_eq!(harness.state().shown_notes().len(), 2);
+    press(&mut harness, Role::CheckBox, "Me");
+    assert_eq!(harness.state().shown_notes(), vec![theirs.clone()]);
+    harness.state_mut().set_query("milk");
+    harness.run();
+    assert!(harness.state().shown_notes().is_empty());
+    harness.state_mut().set_query("bread");
+    harness.run();
+    assert_eq!(harness.state().shown_notes(), vec![theirs]);
+    // Still open; "Everyone" closes it.
+    press(&mut harness, Role::Button, "Everyone");
+    assert!(harness.query_by_label("Everyone").is_none());
+    assert!(harness.state().people_filter().is_everyone());
+    // Each view has a filter of its own: Unsorted starts with everyone's.
+    press(&mut harness, Role::Button, "Show Notes by…");
+    press(&mut harness, Role::CheckBox, "Ben");
+    assert!(!harness.state().people_filter().is_everyone());
+    harness.state_mut().select(Selection::Unsorted);
+    harness.run();
+    assert!(harness.state().people_filter().is_everyone());
+    assert_eq!(harness.state().shown_notes(), vec![unsorted.clone()]);
+    press(&mut harness, Role::Button, "Show Notes by…");
+    press(&mut harness, Role::CheckBox, "Ben");
+    assert!(harness.state().shown_notes().is_empty());
+    press(&mut harness, Role::CheckBox, "Ben");
+    press(&mut harness, Role::CheckBox, "Me");
+    assert_eq!(harness.state().shown_notes(), vec![unsorted]);
     Ok(())
 }

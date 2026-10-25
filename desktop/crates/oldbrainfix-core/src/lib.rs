@@ -50,7 +50,7 @@ pub use notes::{Blob, Importance, Note, Notes, Section};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
 pub use pairing::PairedDevice;
-pub use people::PersonTaken;
+pub use people::{PersonFilter, PersonTaken};
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};

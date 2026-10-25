@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 
 import 'backup.dart';
 import 'entry.dart';
+import 'notes.dart';
 import 'photos.dart';
 import 'shared_areas.dart';
 import 'signing.dart';

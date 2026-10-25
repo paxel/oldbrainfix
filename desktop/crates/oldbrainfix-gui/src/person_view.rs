@@ -1,7 +1,8 @@
 //! Another person's Profile on the desktop's screen (ADR 0017, #52):
 //! their own picture and name, their short code and whether the user
-//! compared it in person, with "Compare codes"; then "Name and picture
-//! for me", the Override only the user sees, on their own Devices.
+//! compared it in person, with "Compare codes"; "Their Notes" (#53);
+//! then "Name and picture for me", the Override only the user sees, on
+//! their own Devices.
 
 use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Profile, Store};
@@ -24,6 +25,8 @@ pub enum PersonAction {
     /// Ask to compare their short code in person, and what that came to.
     CompareCodes,
     CodesCompared(bool),
+    /// Show All Notes with only theirs (#53).
+    TheirNotes,
 }
 
 /// Where comparing a person's short code stands.
@@ -126,6 +129,12 @@ pub fn form(
                 }
             }
         }
+    }
+    if ui
+        .button(RichText::new(t.person_their_notes()).color(text))
+        .clicked()
+    {
+        actions.push(PersonAction::TheirNotes);
     }
     ui.separator();
     ui.label(RichText::new(t.person_for_me()).strong().color(text));

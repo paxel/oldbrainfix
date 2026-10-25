@@ -1252,5 +1252,16 @@
   "personForMeName": "Name for me",
   "personForMePicture": "Change the picture for me",
   "personTheirPicture": "Use their own picture",
-  "profilePeopleEmpty": "Nobody yet. The people you share an Area with or accept Sent Items from show here."
+  "profilePeopleEmpty": "Nobody yet. The people you share an Area with or accept Sent Items from show here.",
+  "personFilter": "Show Notes by…",
+  "@personFilter": {
+    "description": "The browser's button for the person filter: a menu of \"Me\" and every person, each one put in or out."
+  },
+  "personFilterMe": "Me",
+  "personFilterEveryone": "Everyone",
+  "personFilterShowing": "Only Notes by",
+  "personTheirNotes": "Their Notes",
+  "@personTheirNotes": {
+    "description": "On another person's Profile: opens All Notes with only the Notes this person wrote."
+  }
 }

@@ -6,6 +6,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
 import 'l10n.dart';
+import 'notes_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
 import 'profile_platform.dart';
@@ -63,8 +64,8 @@ Future<void> openPerson(BuildContext context, String id) async {
 
 /// Another person's Profile (ADR 0017, #52): their own picture and name,
 /// their short code and whether the user compared it in person, with
-/// "Compare codes"; then "Name and picture for me", the Override only
-/// the user sees, on their own Devices.
+/// "Compare codes"; "Their Notes" (#53); then "Name and picture for
+/// me", the Override only the user sees, on their own Devices.
 class PersonScreen extends StatefulWidget {
   final Store store;
   final ProfilePlatform platform;
@@ -159,6 +160,20 @@ class _PersonScreenState extends State<PersonScreen> {
     }
     widget.store.verifyPerson(widget.id, code);
     setState(() {});
+  }
+
+  /// Opens All Notes with only this person's Notes (#53).
+  Future<void> _theirNotes() async {
+    final store = widget.store;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AllNotesScreen(
+          notes: Notes(store),
+          places: Places(store),
+          people: PersonFilter(people: {widget.id}),
+        ),
+      ),
+    );
   }
 
   /// Offers where the picture for the user comes from, where the finger
@@ -275,6 +290,13 @@ class _PersonScreenState extends State<PersonScreen> {
                     ),
                   ),
                 ),
+              ListTile(
+                key: const ValueKey('theirNotes'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.notes),
+                title: Text(t.personTheirNotes),
+                onTap: _theirNotes,
+              ),
               SettingsHeading(t.personForMe),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),

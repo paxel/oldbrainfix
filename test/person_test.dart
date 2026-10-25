@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/notes_screen.dart';
+import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/profile_screen.dart';
 import 'package:oldbrainfix/src/sent_item_screen.dart';
@@ -311,5 +313,119 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Name und Bild für mich'), findsOneWidget);
     expect(find.text('Codes vergleichen'), findsOneWidget);
+  });
+
+  group('person filter', () {
+    Finder chip(String id) => find.byKey(ValueKey('personChip-$id'));
+
+    Future<void> pick(WidgetTester tester, String item) async {
+      await tap(tester, find.byKey(const ValueKey('personFilter')).first);
+      await tap(tester, find.byKey(ValueKey('personFilter-$item')));
+    }
+
+    testWidgets('"Their Notes" on a Profile opens All Notes with only that '
+        'person\'s, until their chip is taken away', (tester) async {
+      Notes(ann).capture('Ann buys milk', place: area);
+      Notes(ben).capture('Ben buys bread', place: area);
+      sync();
+      await page(tester, person());
+      await tap(tester, find.byKey(const ValueKey('theirNotes')));
+      expect(find.byType(AllNotesScreen), findsOneWidget);
+      expect(find.text('Ben buys bread'), findsOneWidget);
+      expect(find.text('Ann buys milk'), findsNothing);
+      expect(chip(benId), findsOneWidget);
+      expect(find.text('Only Notes by'), findsOneWidget);
+      await tap(
+        tester,
+        find.descendant(of: chip(benId), matching: find.byTooltip('Delete')),
+      );
+      expect(chip(benId), findsNothing);
+      expect(find.text('Ben buys bread'), findsOneWidget);
+      expect(find.text('Ann buys milk'), findsOneWidget);
+    });
+
+    testWidgets('in an Area "Me" and a person add up, and the filter '
+        'combines with the search', (tester) async {
+      Notes(ann).capture('Ann buys milk', place: area);
+      Notes(ann).capture('Ann bakes bread', place: area);
+      Notes(ben).capture('Ben buys bread', place: area);
+      sync();
+      await tester.pumpWidget(
+        OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.byIcon(Icons.search));
+      await tap(tester, find.text('Household'));
+      expect(find.byType(NoteCard), findsNWidgets(3));
+      await pick(tester, 'me');
+      expect(chip('me'), findsOneWidget);
+      expect(find.text('Ben buys bread'), findsNothing);
+      expect(find.byType(NoteCard), findsNWidgets(2));
+      await pick(tester, benId);
+      expect(find.byType(NoteCard), findsNWidgets(3));
+      await pick(tester, 'me');
+      expect(chip('me'), findsNothing);
+      expect(find.byType(NoteCard), findsOneWidget);
+      expect(find.text('Ben buys bread'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'milk');
+      await tester.pumpAndSettle();
+      expect(find.text('No Note matches.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'bread');
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteCard), findsOneWidget);
+      expect(find.text('Ben buys bread'), findsOneWidget);
+      await pick(tester, 'everyone');
+      expect(chip(benId), findsNothing);
+      expect(find.byType(NoteCard), findsNWidgets(2));
+    });
+
+    testWidgets('the search over every Note offers the filter while it '
+        'searches', (tester) async {
+      Notes(ann).capture('Ann buys bread', place: area);
+      Notes(ben).capture('Ben buys bread', place: area);
+      sync();
+      await tester.pumpWidget(
+        OldBrainFixApp(store: ann, alarms: FakeAlarms(), profile: platform),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.byIcon(Icons.search));
+      expect(find.byKey(const ValueKey('personFilter')), findsNothing);
+      await tester.enterText(find.byType(TextField), 'bread');
+      await tester.pumpAndSettle();
+      expect(find.byType(NoteCard), findsNWidgets(2));
+      await pick(tester, benId);
+      expect(find.byType(NoteCard), findsOneWidget);
+      expect(find.text('Ben buys bread'), findsOneWidget);
+    });
+
+    testWidgets('Unsorted keeps only the own Notes with "Me"', (tester) async {
+      Notes(ann).capture('Call the bank');
+      await page(
+        tester,
+        UnsortedScreen(notes: Notes(ann), places: Places(ann)),
+      );
+      expect(find.text('Call the bank'), findsOneWidget);
+      await pick(tester, 'me');
+      expect(find.text('Call the bank'), findsOneWidget);
+      await pick(tester, benId);
+      await pick(tester, 'me');
+      expect(find.text('Call the bank'), findsNothing);
+      expect(find.text('No Note matches.'), findsOneWidget);
+    });
+
+    testWidgets('fits a phone in German', (tester) async {
+      tester.view.physicalSize = const Size(720, 1280);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      Notes(ben).capture('Ben kauft Brot', place: area);
+      sync();
+      await page(tester, person(), locale: const Locale('de'));
+      await tap(tester, find.byKey(const ValueKey('theirNotes')));
+      expect(tester.takeException(), isNull);
+      expect(find.text('Nur Notizen von'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('personFilter')));
+      expect(find.text('Mir'), findsOneWidget);
+      expect(find.text('Allen'), findsOneWidget);
+    });
   });
 }

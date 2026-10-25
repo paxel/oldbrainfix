@@ -3727,6 +3727,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Nobody yet. The people you share an Area with or accept Sent Items from show here.'**
   String get profilePeopleEmpty;
+
+  /// The browser's button for the person filter: a menu of "Me" and every person, each one put in or out.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Notes by…'**
+  String get personFilter;
+
+  /// No description provided for @personFilterMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Me'**
+  String get personFilterMe;
+
+  /// No description provided for @personFilterEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone'**
+  String get personFilterEveryone;
+
+  /// No description provided for @personFilterShowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Only Notes by'**
+  String get personFilterShowing;
+
+  /// On another person's Profile: opens All Notes with only the Notes this person wrote.
+  ///
+  /// In en, this message translates to:
+  /// **'Their Notes'**
+  String get personTheirNotes;
 }
 
 class _AppLocalizationsDelegate

@@ -39,9 +39,10 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
+use egui::containers::menu::{MenuButton, MenuConfig};
 use egui::{
-    Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, Sense, TextEdit,
-    Ui, WidgetInfo, WidgetType,
+    Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, PopupCloseBehavior,
+    RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::backup;
 use oldbrainfix_core::profile::ProfileChoice;
@@ -49,7 +50,8 @@ use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, Se
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
     Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
-    Places, Profile, QuietHours, Routine, Routines, Search, Section, Store, Topic, bundle,
+    PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search, Section, Store, Topic,
+    bundle,
 };
 
 use crate::about_view;
@@ -326,6 +328,8 @@ enum Action {
     Photos(Vec<Vec<u8>>),
     /// The search over the Notes shown changed.
     Search,
+    /// Shows only the Notes of these people (#53).
+    FilterPeople(PersonFilter),
     Speech(Speech),
     /// Keeps the selected Note's edited text.
     SaveText,
@@ -504,6 +508,8 @@ pub struct App {
     pictures: profile_view::Pictures,
     /// What the Notes shown are searched for.
     query: String,
+    /// Whose Notes show (#53); each view has its own, as its search.
+    people: PersonFilter,
     /// The LAN session hosted while the Sync view shows, and the name
     /// this computer goes by in it.
     sync: SyncHost,
@@ -635,6 +641,7 @@ impl App {
             photos: PhotoCache::default(),
             pictures: profile_view::Pictures::default(),
             query: String::new(),
+            people: PersonFilter::default(),
             sync: SyncHost::default(),
             sync_name: device_name(),
             arrived: 0,
@@ -1042,6 +1049,11 @@ impl App {
         self.refresh();
     }
 
+    /// Whose Notes the middle shows (#53).
+    pub fn people_filter(&self) -> &PersonFilter {
+        &self.people
+    }
+
     /// The Notes shown in the middle, by id.
     pub fn shown_notes(&self) -> Vec<String> {
         self.view.notes.iter().map(|p| p.note.id.clone()).collect()
@@ -1231,9 +1243,13 @@ impl App {
             | Selection::Sync
             | Selection::About
             | Selection::Licences => Vec::new(),
-            Selection::All => search.notes(&self.query, None)?,
-            Selection::Unsorted => notes.unsorted()?,
-            Selection::Place(id) => search.notes(&self.query, Some(id))?,
+            Selection::All => self
+                .store
+                .notes_by(search.notes(&self.query, None)?, &self.people)?,
+            Selection::Unsorted => self.store.notes_by(notes.unsorted()?, &self.people)?,
+            Selection::Place(id) => self
+                .store
+                .notes_by(search.notes(&self.query, Some(id))?, &self.people)?,
             Selection::Trash => notes.trashed()?,
         };
         let store = &self.store;
@@ -1378,9 +1394,11 @@ impl App {
         match action {
             Action::Select(selection) => {
                 self.save_text()?;
-                // Every level has a search of its own, as on the phone.
+                // Every level has a search and a person filter of its
+                // own, as on the phone.
                 if selection != self.selection {
                     self.query.clear();
+                    self.people = PersonFilter::default();
                 }
                 if let Selection::Place(id) = &selection {
                     if let Some(topic) = self.view.topic(id) {
@@ -1447,6 +1465,7 @@ impl App {
                 self.capture_note(Notes::default_nudge(), &photos, &[])?;
             }
             Action::Search => {}
+            Action::FilterPeople(people) => self.people = people,
             Action::Speech(asked) => {
                 if let Some(speech) = &self.speech {
                     match asked {
@@ -2399,7 +2418,13 @@ impl App {
             {
                 actions.push(Action::NewTopic(id.clone()));
             }
+            if self.selection != Selection::Trash {
+                self.person_filter_menu(ui, actions);
+            }
         });
+        if self.selection != Selection::Trash {
+            self.person_filter_chips(ui, tones, actions);
+        }
         ui.add_space(8.0);
         let hint = match &self.selection {
             Selection::All => Some(self.t.search_all_hint()),
@@ -2483,6 +2508,98 @@ impl App {
             self.scrolled = output.state.offset.y;
             ui.ctx().request_repaint();
         }
+    }
+
+    /// The person filter's menu (#53): "Me", every person of People and,
+    /// while it filters, "Everyone"; it stays open while people are
+    /// ticked.
+    fn person_filter_menu(&self, ui: &mut Ui, actions: &mut Vec<Action>) {
+        let t = &self.t;
+        let text = ui.visuals().text_color();
+        let filter = &self.people;
+        let label = if filter.is_everyone() {
+            RichText::new(t.person_filter()).color(text)
+        } else {
+            RichText::new(t.person_filter()).strong().color(text)
+        };
+        MenuButton::new(label)
+            .config(MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside))
+            .ui(ui, |ui| {
+                let mut me = filter.me;
+                if ui
+                    .checkbox(&mut me, RichText::new(t.person_filter_me()).color(text))
+                    .changed()
+                {
+                    let mut next = filter.clone();
+                    next.me = me;
+                    actions.push(Action::FilterPeople(next));
+                }
+                for person in &self.view.people_shown {
+                    let mut on = filter.people.contains(&person.id);
+                    let name = profile_view::display_name(t, &person.name);
+                    if ui
+                        .checkbox(&mut on, RichText::new(name).color(text))
+                        .changed()
+                    {
+                        let mut next = filter.clone();
+                        next.toggle(&person.id);
+                        actions.push(Action::FilterPeople(next));
+                    }
+                }
+                if !filter.is_everyone()
+                    && ui
+                        .button(RichText::new(t.person_filter_everyone()).color(text))
+                        .clicked()
+                {
+                    actions.push(Action::FilterPeople(PersonFilter::default()));
+                    ui.close();
+                }
+            });
+    }
+
+    /// Who the person filter keeps, each with ✕ to take them out; nothing
+    /// while it keeps everyone, so Notes never leave the list unseen.
+    fn person_filter_chips(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let filter = &self.people;
+        if filter.is_everyone() {
+            return;
+        }
+        let t = &self.t;
+        let text = ui.visuals().text_color();
+        let mut kept: Vec<(Option<String>, String)> = Vec::new();
+        if filter.me {
+            kept.push((None, t.person_filter_me().to_string()));
+        }
+        for id in &filter.people {
+            let name = self
+                .view
+                .people_shown
+                .iter()
+                .find(|p| p.id == *id)
+                .map(|p| p.name.clone())
+                .or_else(|| self.view.names.get(id).cloned())
+                .unwrap_or_default();
+            kept.push((
+                Some(id.clone()),
+                profile_view::display_name(t, &name).to_string(),
+            ));
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(t.person_filter_showing()).color(text));
+            for (id, name) in kept {
+                if pill(ui, tones, true, &name)
+                    .on_hover_text(t.person_filter_remove(&name))
+                    .clicked()
+                {
+                    let mut next = filter.clone();
+                    match id {
+                        Some(id) => next.toggle(&id),
+                        None => next.me = false,
+                    }
+                    actions.push(Action::FilterPeople(next));
+                }
+            }
+        });
     }
 
     /// The selected Note's editor (UI laws, "Desktop").
@@ -3163,6 +3280,7 @@ impl App {
         match asked {
             PersonAction::UseSquare => return self.person_square_done(true),
             PersonAction::CancelSquare => return self.person_square_done(false),
+            PersonAction::TheirNotes => return self.their_notes(),
             _ => {}
         }
         let Some(Dialog::Person {
@@ -3196,7 +3314,7 @@ impl App {
                     None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
                 }
             }
-            PersonAction::UseSquare | PersonAction::CancelSquare => {}
+            PersonAction::UseSquare | PersonAction::CancelSquare | PersonAction::TheirNotes => {}
             PersonAction::CompareCodes => *comparing = Comparing::Asking,
             PersonAction::CodesCompared(false) => *comparing = Comparing::Differ,
             PersonAction::CodesCompared(true) => {
@@ -3206,6 +3324,21 @@ impl App {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// "Their Notes" (#53): closes the person's Profile, keeping the name
+    /// typed last, and every dialog under it, and shows All Notes with
+    /// only theirs.
+    fn their_notes(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::Person { id, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        let id = id.clone();
+        self.close_dialog()?;
+        self.dialog = None;
+        self.act(Action::Select(Selection::All))?;
+        self.people = PersonFilter::person(&id);
         Ok(())
     }
 

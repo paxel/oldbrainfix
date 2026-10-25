@@ -52,6 +52,59 @@ class _PeopleIndex {
   const _PeopleIndex(this.byId, this.aliasTo);
 }
 
+/// Who wrote a Note: the user, another person, or nobody known.
+sealed class _Writer {
+  const _Writer();
+}
+
+class _Own extends _Writer {
+  const _Own();
+}
+
+class _Theirs extends _Writer {
+  final Profile author;
+
+  const _Theirs(this.author);
+}
+
+class _Unknown extends _Writer {
+  const _Unknown();
+}
+
+/// Which people's Notes the notes browser shows (#53): the user's own
+/// with [me], and those of [people], by Profile id; everybody's when
+/// neither is set.
+class PersonFilter {
+  final bool me;
+  final Set<String> people;
+
+  const PersonFilter({this.me = false, this.people = const {}});
+
+  /// Every Note, whoever wrote it.
+  static const everyone = PersonFilter();
+
+  bool get isEveryone => !me && people.isEmpty;
+
+  /// The same filter with the user's own Notes in, or out again.
+  PersonFilter toggledMe() => PersonFilter(me: !me, people: people);
+
+  /// The same filter with the person [id] in, or out again.
+  PersonFilter toggled(String id) => PersonFilter(
+    me: me,
+    people: people.contains(id) ? ({...people}..remove(id)) : {...people, id},
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is PersonFilter &&
+      other.me == me &&
+      other.people.length == people.length &&
+      other.people.containsAll(people);
+
+  @override
+  int get hashCode => Object.hash(me, Object.hashAllUnordered(people));
+}
+
 /// The own Profile's ids and keys, with what they were read from.
 typedef _OwnKeys = ({String stamp, Set<String> ids, Set<String> bound});
 
@@ -471,14 +524,46 @@ extension People on Store {
   /// from a Sent Item shows its sender, through the key and the Profile
   /// id it keeps (#51).
   Profile? authorOf(String entity) {
-    final author = _authorOf(entity);
-    return author == null ? null : _withOverride(author);
+    if (_writerOf(entity) case _Theirs(:final author)) {
+      return _withOverride(author);
+    }
+    return null;
   }
 
-  Profile? _authorOf(String entity) {
+  /// Whether the person filter of the browser keeps the Note or Section
+  /// [entity] (#53): with [filter]'s `me`, the user's own, written on any
+  /// of their Devices or under any of their Profile's ids; with its
+  /// people, those of each of them, matched through the aliases from
+  /// either side. A Note whose writer is not known is nobody's; with an
+  /// empty filter every Note is kept.
+  bool wroteBy(String entity, PersonFilter filter) {
+    if (filter.isEveryone) return true;
+    switch (_writerOf(entity)) {
+      case _Own():
+        return filter.me || filter.people.any(isOwnPerson);
+      case _Theirs(:final author):
+        final writer = resolvePerson(author.id);
+        return filter.people.any(
+          (id) => !isOwnPerson(id) && resolvePerson(id) == writer,
+        );
+      case _Unknown():
+        return false;
+    }
+  }
+
+  /// The Notes of [notes] that [filter] keeps, in their order
+  /// ([wroteBy]).
+  List<Note> notesBy(Iterable<Note> notes, PersonFilter filter) => [
+    for (final note in notes)
+      if (wroteBy(note.id, filter)) note,
+  ];
+
+  /// Who wrote the Note or Section [entity]: the user, another person
+  /// as their Profile shows without the Override, or nobody known.
+  _Writer _writerOf(String entity) {
     if (_receivedFrom(entity) case (:final key, :final person)) {
-      if (_own.bound.contains(key) || isOwnPerson(person)) return null;
-      return _shownFor(key, person);
+      if (_own.bound.contains(key) || isOwnPerson(person)) return const _Own();
+      return _theirs(_shownFor(key, person));
     }
     String? device;
     for (final e in history(entity)) {
@@ -487,17 +572,19 @@ extension People on Store {
         break;
       }
     }
-    if (device == null || device == deviceId || isOwnDevice(device)) {
-      return null;
-    }
+    if (device == null) return const _Unknown();
+    if (device == deviceId || isOwnDevice(device)) return const _Own();
     final keyBytes = pinnedKey(device)?.record.publicKey;
     final key = keyBytes == null ? null : base64.encode(keyBytes);
-    if (key != null && _own.bound.contains(key)) return null;
+    if (key != null && _own.bound.contains(key)) return const _Own();
     final area = areaOf(entity);
     final named = area == null ? null : grantsOf(area)?.personOf(device);
-    if (named != null && isOwnPerson(named)) return null;
-    return _shownFor(key, named);
+    if (named != null && isOwnPerson(named)) return const _Own();
+    return _theirs(_shownFor(key, named));
   }
+
+  static _Writer _theirs(Profile? author) =>
+      author == null ? const _Unknown() : _Theirs(author);
 
   /// The sender's key and Profile id the Note [entity] keeps from the
   /// Sent Item it was accepted from; null for any other.
