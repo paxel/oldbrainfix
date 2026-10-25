@@ -900,5 +900,38 @@
       }
     }
   },
-  "conflictKeep": "Keep this version"
+  "conflictKeep": "Keep this version",
+  "folderTitle": "Shared folder",
+  "folderIntro": "Syncs through a folder that Syncthing, Nextcloud or a USB stick carries between your Devices, wherever they are. Everything in it is encrypted: only Devices paired with this one can read it.",
+  "folderPick": "Choose folder",
+  "folderForget": "Forget",
+  "@folderForget": {"description": "Stops syncing through the shared folder; the folder itself stays as it is."},
+  "folderNotYet": "Not synced yet",
+  "folderSynced": "Last synced {when}: {count, plural, =0{nothing new} =1{1 change came in} other{{count} changes came in}}",
+  "@folderSynced": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "folderUnreachable": "The folder could not be reached at {when}. It is tried again later.",
+  "@folderUnreachable": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "folderUnreadable": "{count, plural, =1{1 file is from a Device this one is not paired with. Pair them first.} other{{count} files are from Devices this one is not paired with. Pair them first.}}",
+  "@folderUnreadable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

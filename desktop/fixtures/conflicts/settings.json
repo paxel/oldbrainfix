@@ -3,12 +3,28 @@
     [
       "key:c945cbf2a5602002141e2fb9d17054d6",
       "{\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:91147225b97def1a",
+      "{\"key\":\"lJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrM=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:97d8752167bfebb2",
+      "{\"key\":\"ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19g=\",\"scope\":\"area:00000000000000000000000000000003\"}"
     ]
   ],
   "joiner": [
     [
       "key:65b60673d6ed884bf01c2c222d82ada0",
       "{\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:91147225b97def1a",
+      "{\"key\":\"lJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrM=\",\"scope\":\"personal\"}"
+    ],
+    [
+      "areakey:97d8752167bfebb2",
+      "{\"key\":\"ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19g=\",\"scope\":\"area:00000000000000000000000000000003\"}"
     ]
   ]
 }

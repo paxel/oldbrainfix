@@ -51,6 +51,9 @@ class MainActivity : FlutterActivity() {
 
     private var syncChannel: MethodChannel? = null
 
+    /** The answer to the shared folder's "pickTree", until the picker comes back. */
+    private var folderAnswer: MethodChannel.Result? = null
+
     /** Paired hosts on the network while the app shows, told to the app as they come. */
     private val discovery by lazy {
         Discovery(this) { found -> syncChannel?.invokeMethod("found", found.toMap()) }
@@ -226,13 +229,22 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "background" -> {
-                        SyncWork.schedule(this@MainActivity, call.arguments == true)
+                        val args = call.arguments as? Map<*, *>
+                        SyncWork.schedule(this@MainActivity, args?.get("on") == true, args?.get("folder") == true)
                         result.success(null)
                     }
+                    "localNetwork" -> result.success(SyncWork.onLocalNetwork(this@MainActivity))
                     else -> result.notImplemented()
                 }
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FolderChannel.CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when {
+                    call.method == "pickTree" -> pickFolder(result)
+                    !FolderChannel.handle(this, call, result) -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, OCR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -383,9 +395,45 @@ class MainActivity : FlutterActivity() {
         modelAnswer = result
     }
 
+    /** Opens the system's folder picker for the shared folder; the answer comes in [onActivityResult]. */
+    private fun pickFolder(result: MethodChannel.Result) {
+        folderAnswer?.success(null)
+        folderAnswer = result
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION,
+        )
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_FOLDER)
+        } catch (_: ActivityNotFoundException) {
+            folderAnswer = null
+            result.success(null)
+        }
+    }
+
     @Deprecated("The Flutter activity has no Activity Result API.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_FOLDER) {
+            val answer = folderAnswer ?: return
+            folderAnswer = null
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
+            if (uri != null) {
+                try {
+                    // Kept across restarts, for the background sync too.
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                } catch (_: SecurityException) {
+                    // A provider granting nothing persistable: the folder
+                    // works while the app runs.
+                }
+            }
+            return answer.success(uri?.toString())
+        }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
             modelAnswer = null
@@ -519,6 +567,7 @@ class MainActivity : FlutterActivity() {
         // Not 2: Permissions.REQUEST_NOTIFICATIONS.
         private const val REQUEST_PHOTO = 3
         private const val REQUEST_MODEL = 4
+        private const val REQUEST_FOLDER = 5
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12

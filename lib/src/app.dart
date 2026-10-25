@@ -18,6 +18,7 @@ import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'folder_platform.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'lock_platform.dart';
@@ -99,6 +100,9 @@ class OldBrainFixApp extends StatefulWidget {
   /// How an automatic sync is run; tests hand in a fake.
   final PairedJoin autoJoin;
 
+  /// The shared folder to sync through; none when not given.
+  final FolderPlatform folders;
+
   const OldBrainFixApp({
     super.key,
     required this.store,
@@ -119,6 +123,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.pairing = const NoPairing(),
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
+    this.folders = const NoFolders(),
   });
 
   @override
@@ -153,6 +158,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     platform: widget.sync,
     deviceName: widget.pairing.deviceName,
     join: widget.autoJoin,
+    folders: widget.folders,
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;
@@ -236,7 +242,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                 pairing: widget.pairing,
                                 child: AutoSyncScope(
                                   sync: _autoSync,
-                                  child: child ?? const SizedBox.shrink(),
+                                  child: FolderScope(
+                                    folders: widget.folders,
+                                    child: child ?? const SizedBox.shrink(),
+                                  ),
                                 ),
                               ),
                             ),

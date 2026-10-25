@@ -15,8 +15,9 @@
 //! Transcripts and Photo Texts are made on threads of their own for as
 //! long as the app runs, the Transcripts once the speech model in the
 //! data directory's `whisper` folder is checked. So are the alerts, and
-//! the host paired Devices sync with on their own; after such a sync
-//! the alerts plan again and the window reads the log again.
+//! the host paired Devices sync with on their own and the shared folder's
+//! sync; after such a sync the alerts plan again and the window reads the
+//! log again.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 use std::cell::{Cell, RefCell};
@@ -33,6 +34,7 @@ use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::cli::{self, Launch};
 use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
+use oldbrainfix_gui::folder_sync;
 use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
@@ -177,6 +179,7 @@ struct Shell {
     transcriber: Enricher,
     reader: Enricher,
     speech: SpeechModel,
+    folder_wanted: Arc<AtomicBool>,
 }
 
 impl Shell {
@@ -213,6 +216,7 @@ impl Shell {
         let mut app = App::new(self.store.clone(), self.locale);
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
+        app.set_folder_wanted(self.folder_wanted.clone());
         app.set_autostart(self.autostart.clone());
         let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
         app.set_hotkey(Some(hotkey));
@@ -387,6 +391,26 @@ fn run() -> Result<i32, String> {
             });
         })
     };
+    // The shared folder syncs every half minute while the app runs, at
+    // once when the Sync view asks; after a round the alerts plan again
+    // and the window reads the log and the status again.
+    let folder_wanted = Arc::new(AtomicBool::new(false));
+    let folder_sync = {
+        let (store, changes, events) = (store.clone(), changes.clone(), events_tx.clone());
+        let (stop, wanted, wake_window) =
+            (auto_stop.clone(), folder_wanted.clone(), waker(&window));
+        std::thread::spawn(move || {
+            folder_sync::run(&store, &stop, &wanted, |result| {
+                // Photos and recordings come on their own too, after
+                // the entries naming them.
+                if !result.applied.is_empty() || result.blobs_in > 0 {
+                    changes.fetch_add(1, Ordering::SeqCst);
+                    let _ = events.send(Event::Wake);
+                }
+                wake_window();
+            });
+        })
+    };
     // Transcripts and Photo Texts, each kept one tells the window.
     let enriched = {
         let (changes, window) = (changes.clone(), window.clone());
@@ -491,6 +515,7 @@ fn run() -> Result<i32, String> {
         transcriber,
         reader,
         speech,
+        folder_wanted,
     };
     // A login start stays in the tray; without one it shows the window.
     let mut next = first.or(tray.is_none().then_some(Command::Open));
@@ -528,6 +553,7 @@ fn run() -> Result<i32, String> {
     // The mDNS record says goodbye before the app ends.
     auto_stop.store(true, Ordering::SeqCst);
     let _ = auto_sync.join();
+    let _ = folder_sync.join();
     let _ = std::fs::remove_file(&socket);
     Ok(cli::OK)
 }

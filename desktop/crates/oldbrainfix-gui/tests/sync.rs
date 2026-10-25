@@ -369,3 +369,148 @@ fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestR
     assert_eq!(harness.state().arrived_conflicts(), 0);
     Ok(())
 }
+
+/// The phone writes `text` into a shared folder at `dir`, after a
+/// Pairing with `desk` when `paired`.
+fn phone_folder(desk: &Store, dir: &std::path::Path, text: &str, paired: bool) -> TestResult {
+    use oldbrainfix_core::folder::{LocalFolder, folder_sync, random_nonce};
+    use oldbrainfix_core::lan::answer_sync;
+    let phone = store(2)?;
+    if paired {
+        let request = sync_request(&phone, &desk.version_vector()?, "Pixel", "", "")?;
+        let (answer, _) = answer_sync(desk, &request, "Desk")?.ok_or("an answer")?;
+        apply_answer(&phone, &answer)?;
+    }
+    Notes::new(&phone).capture(text, None, None)?;
+    folder_sync(&phone, &mut LocalFolder::new(dir), &mut random_nonce)?;
+    Ok(())
+}
+
+fn sync_view(
+    desk: Store,
+    dir: &std::path::Path,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    let mut app = App::new(desk, "en");
+    app.set_sync_host(Some(IpAddr::V4(Ipv4Addr::LOCALHOST)), "Desk");
+    let path = dir.to_path_buf();
+    app.set_folder_picker(Box::new(move |title| {
+        assert_eq!(title, "Choose the shared folder");
+        Some(path.clone())
+    }));
+    app.select(Selection::Sync);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1400.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    step_until(&mut harness, |app| app.sync_host().hosting())?;
+    harness.step();
+    Ok(harness)
+}
+
+#[test]
+fn the_shared_folder_is_chosen_synced_and_forgotten() -> TestResult {
+    let desk = store(1)?;
+    let dir = tempfile::tempdir()?;
+    phone_folder(&desk, dir.path(), "From the phone's folder", true)?;
+    let mut harness = sync_view(desk, dir.path())?;
+    assert!(shows(&harness, "Shared folder"));
+    harness.get_by_label("Choose folder").click_accesskit();
+    harness.step();
+    harness.step();
+    let desk = harness.state().store();
+    assert_eq!(
+        desk.sync_folder()?.as_deref(),
+        Some(dir.path().to_string_lossy().as_ref())
+    );
+    let texts: Vec<String> = Notes::new(desk)
+        .all()?
+        .into_iter()
+        .map(|n| n.text)
+        .collect();
+    assert_eq!(texts, vec!["From the phone's folder"]);
+    assert!(shows(&harness, "Last synced"));
+    assert!(shows(&harness, "came in"));
+    // The desk's own files are there too, for the phone.
+    let manifest = dir
+        .path()
+        .join("oldbrainfix-sync")
+        .join(format!("{}.manifest", desk.device_id()?));
+    assert!(manifest.is_file());
+
+    harness.get_by_label("Sync now").click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(shows(&harness, "nothing new"));
+
+    harness.get_by_label("Forget").click_accesskit();
+    harness.step();
+    harness.step();
+    assert_eq!(harness.state().store().sync_folder()?, None);
+    assert!(shows(&harness, "Choose folder"));
+    assert!(manifest.is_file(), "the folder itself stays");
+    Ok(())
+}
+
+#[test]
+fn a_shared_folder_of_devices_never_paired_reads_as_nothing() -> TestResult {
+    let desk = store(1)?;
+    let dir = tempfile::tempdir()?;
+    phone_folder(&desk, dir.path(), "Private", false)?;
+    let mut harness = sync_view(desk, dir.path())?;
+    harness.get_by_label("Choose folder").click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(Notes::new(harness.state().store()).all()?.is_empty());
+    assert!(shows(&harness, "not paired with"));
+    Ok(())
+}
+
+#[test]
+fn the_folder_thread_syncs_at_once_and_on_its_own() -> TestResult {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    let desk = Arc::new(store(1)?);
+    let dir = tempfile::tempdir()?;
+    phone_folder(&desk, dir.path(), "Through the folder", true)?;
+    desk.choose_sync_folder(&dir.path().to_string_lossy())?;
+    let (stop, wanted) = (
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let rounds = Arc::new(AtomicUsize::new(0));
+    let thread = {
+        let (desk, stop, wanted, rounds) =
+            (desk.clone(), stop.clone(), wanted.clone(), rounds.clone());
+        std::thread::spawn(move || {
+            oldbrainfix_gui::folder_sync::run(&desk, &stop, &wanted, |_| {
+                rounds.fetch_add(1, Ordering::SeqCst);
+            });
+        })
+    };
+    let wait = |n: usize| {
+        for _ in 0..400 {
+            if rounds.load(Ordering::SeqCst) >= n {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        false
+    };
+    assert!(wait(1), "the first round comes at once");
+    let texts: Vec<String> = Notes::new(&desk)
+        .all()?
+        .into_iter()
+        .map(|n| n.text)
+        .collect();
+    assert_eq!(texts, vec!["Through the folder"]);
+    wanted.store(true, Ordering::SeqCst);
+    assert!(wait(2), "asked for, another comes before the half minute");
+    stop.store(true, Ordering::SeqCst);
+    thread.join().map_err(|_| "the thread")?;
+    Ok(())
+}

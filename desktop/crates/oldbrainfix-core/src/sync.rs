@@ -16,7 +16,7 @@ use crate::store::Store;
 const KEY_PREFIX: &str = "key:";
 
 /// The blob kinds and the field prefixes naming them.
-const BLOB_KINDS: [(&str, &str); 2] = [
+pub const BLOB_KINDS: [(&str, &str); 2] = [
     ("photo", note_keys::PHOTO_PREFIX),
     ("audio", note_keys::AUDIO_PREFIX),
 ];
@@ -29,6 +29,8 @@ pub fn split_blob_ref(reference: &str) -> (&str, &str) {
 /// Why a Moment was recorded.
 pub mod cause {
     pub const SYNC: &str = "sync";
+    /// A folder sync brought it.
+    pub const FOLDER: &str = "folder";
 }
 
 /// A state of the log a Device can be returned to: the log's high-water

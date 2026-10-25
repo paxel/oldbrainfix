@@ -1,0 +1,220 @@
+{
+  "entriesOut": 45,
+  "blobsOut": 2,
+  "applied": 33,
+  "blobsIn": 2,
+  "read": {
+    "now": "2026-01-02T10:00:55.000Z",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000005",
+        "name": "Doctor",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      },
+      {
+        "id": "area:00000000000000000000000000000001",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": [
+          {
+            "id": "topic:00000000000000000000000000000002",
+            "areaId": "area:00000000000000000000000000000001",
+            "name": "Kitchen",
+            "starter": null
+          }
+        ]
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000003",
+        "text": "Buy milk",
+        "captured": "2026-01-01T10:00:06.000Z",
+        "place": "topic:00000000000000000000000000000002",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000004",
+        "text": "Call mum",
+        "captured": "2026-01-01T10:00:11.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000006",
+        "text": "Blood test on Friday",
+        "captured": "2026-01-01T10:00:19.000Z",
+        "place": "area:00000000000000000000000000000005",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [
+          "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
+        ],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000008",
+        "text": "Needs more sauce",
+        "captured": "2026-01-01T10:00:30.000Z",
+        "place": "topic:00000000000000000000000000000002",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [
+          "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
+        ],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:00000000000000000000000000000009",
+        "text": "Unsorted thought",
+        "captured": "2026-01-01T10:00:37.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      },
+      {
+        "id": "note:0000000000000000000000000000000a",
+        "text": "Pills",
+        "captured": "2026-01-01T10:00:41.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {}
+      }
+    ],
+    "all": [
+      "note:0000000000000000000000000000000a",
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000008",
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000009"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000005": [
+        "note:00000000000000000000000000000006"
+      ],
+      "area:00000000000000000000000000000001": [
+        "note:00000000000000000000000000000008",
+        "note:00000000000000000000000000000003"
+      ],
+      "topic:00000000000000000000000000000002": [
+        "note:00000000000000000000000000000008",
+        "note:00000000000000000000000000000003"
+      ]
+    },
+    "sections": {
+      "note:0000000000000000000000000000000a": [],
+      "note:00000000000000000000000000000009": [],
+      "note:00000000000000000000000000000008": [],
+      "note:00000000000000000000000000000006": [
+        {
+          "id": "section:00000000000000000000000000000007",
+          "noteId": "note:00000000000000000000000000000006",
+          "text": "Fasting from midnight",
+          "captured": "2026-01-01T10:00:25.000Z",
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {}
+        }
+      ],
+      "note:00000000000000000000000000000004": [],
+      "note:00000000000000000000000000000003": []
+    },
+    "untranscribed": [
+      {
+        "noteId": "note:00000000000000000000000000000008",
+        "hash": "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
+      }
+    ],
+    "unreadPhotos": [
+      {
+        "noteId": "note:00000000000000000000000000000006",
+        "hash": "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
+      }
+    ],
+    "search": {
+      "": [
+        "note:0000000000000000000000000000000a",
+        "note:00000000000000000000000000000009",
+        "note:00000000000000000000000000000008",
+        "note:00000000000000000000000000000006",
+        "note:00000000000000000000000000000004",
+        "note:00000000000000000000000000000003"
+      ],
+      "sauce": [
+        "note:00000000000000000000000000000008"
+      ],
+      "MILK": [
+        "note:00000000000000000000000000000003"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000009",
+        "note:00000000000000000000000000000008",
+        "note:00000000000000000000000000000006"
+      ]
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000005": [
+        "note:00000000000000000000000000000006"
+      ],
+      "area:00000000000000000000000000000001": [
+        "note:00000000000000000000000000000008"
+      ],
+      "topic:00000000000000000000000000000002": [
+        "note:00000000000000000000000000000008"
+      ]
+    },
+    "conflicts": []
+  }
+}

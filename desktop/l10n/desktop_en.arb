@@ -114,5 +114,8 @@
   "syncConflictsArrived": "{count, plural, =1{A sync found 1 thing changed on both Devices. Click to pick which version stays.} other{A sync found {count} things changed on both Devices. Click to pick which versions stay.}}",
   "@syncConflictsArrived": {"description": "Announced at the top after an automatic sync found Conflicts; a click opens Sync.", "placeholders": {"count": {"type": "int"}}},
   "syncConflictsBelow": "{count, plural, =1{1 thing was changed on both Devices. Pick below which version stays.} other{{count} things were changed on both Devices. Pick below which versions stay.}}",
-  "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}}
+  "@syncConflictsBelow": {"description": "The desktop's Sync view after a session that found Conflicts; they are listed below it.", "placeholders": {"count": {"type": "int"}}},
+  "folderSyncNow": "Sync now",
+  "@folderSyncNow": {"description": "Syncs through the shared folder at once instead of within half a minute."},
+  "folderPickTitle": "Choose the shared folder"
 }

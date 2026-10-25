@@ -16,6 +16,7 @@ import 'src/calendar_platform.dart';
 import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
 import 'src/drafts.dart';
+import 'src/folder_platform.dart';
 import 'src/location.dart';
 import 'src/lock_platform.dart';
 import 'src/ocr_platform.dart';
@@ -48,12 +49,14 @@ Future<void> main() async {
       lock: const AndroidBiometrics(),
       pairing: const AndroidPairing(),
       sync: AndroidSync(),
+      folders: const AndroidFolders(),
     ),
   );
 }
 
 /// The background sync the periodic work starts in an engine of its own
-/// while the app is closed (android/…/SyncWorker.kt): the same store,
+/// while the app is closed (android/…/SyncWorker.kt): paired Devices and
+/// the shared folder, the same store,
 /// the alarms armed with the texts in the Device's language, and the
 /// work told when it is over.
 @pragma('vm:entry-point')
@@ -79,6 +82,7 @@ Future<void> backgroundSyncMain() async {
         platform: sync,
         alarms: alarms,
         name: await const AndroidPairing().deviceName(),
+        folders: const AndroidFolders(),
       );
     } finally {
       alarms.dispose();

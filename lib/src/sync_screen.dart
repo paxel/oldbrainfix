@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -7,6 +9,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'conflicts_screen.dart';
+import 'folder_platform.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
@@ -22,8 +25,10 @@ typedef Join = Future<SyncResult> Function(
 /// names, scanned from a photo of its screen or typed in, leads to the
 /// Conflicts, and lists the paired Devices with when they last synced,
 /// each of which can be forgotten, and those that host kept from syncing
-/// on their own. What a sync did, or why it did not, is announced at the
-/// top; Conflicts it found are announced with a way to them.
+/// on their own. The shared folder is picked and forgotten here too,
+/// with how its last sync went. What a sync did, or why it did not, is
+/// announced at the top; Conflicts it found are announced with a way to
+/// them.
 class SyncScreen extends StatefulWidget {
   final Store store;
   final Join join;
@@ -40,10 +45,73 @@ class _SyncScreenState extends State<SyncScreen> {
   late var _paired = widget.store.pairedDevices();
   var _conflicts = 0;
 
+  /// The shared folder's name for people, once known.
+  String? _folderName;
+  var _folderBusy = false;
+  var _named = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _countConflicts();
+    if (!_named) {
+      _named = true;
+      unawaited(_nameFolder());
+    }
+  }
+
+  Future<void> _nameFolder() async {
+    final folder = widget.store.syncFolder;
+    if (folder == null) return;
+    final name = await FolderScope.of(context).displayName(folder);
+    if (!mounted) return;
+    setState(() => _folderName = name);
+  }
+
+  /// Picks the shared folder and syncs through it at once.
+  Future<void> _pickFolder() async {
+    final folders = FolderScope.of(context);
+    final picked = await folders.pick();
+    if (!mounted || picked == null) return;
+    widget.store.chooseSyncFolder(picked);
+    final name = await folders.displayName(picked);
+    if (!mounted) return;
+    final auto = AutoSyncScope.of(context);
+    setState(() {
+      _folderName = name;
+      _folderBusy = true;
+    });
+    auto?.devicesChanged();
+    try {
+      await (auto?.syncFolder() ??
+          folderRound(widget.store, folders.open(picked)));
+    } on Object {
+      // Kept as the status; the next round tries again.
+    }
+    if (!mounted) return;
+    setState(() {
+      _folderBusy = false;
+      _countConflicts();
+    });
+  }
+
+  void _forgetFolder() {
+    widget.store.forgetSyncFolder();
+    setState(() => _folderName = null);
+    AutoSyncScope.of(context)?.devicesChanged();
+  }
+
+  /// How the shared folder's last sync went, in words.
+  String _folderStatus(AppLocalizations t, DateFormat when) {
+    final status = widget.store.folderStatus;
+    if (_folderBusy) return t.syncSyncing;
+    if (status == null) return t.folderNotYet;
+    final at = when.format(status.at.toLocal());
+    if (status.failed) return t.folderUnreachable(at);
+    final synced = t.folderSynced(at, status.entriesIn);
+    return status.unreadable == 0
+        ? synced
+        : '$synced\n${t.folderUnreadable(status.unreadable)}';
   }
 
   /// The Conflicts the list shows, as many as it shows.
@@ -150,6 +218,43 @@ class _SyncScreenState extends State<SyncScreen> {
     widget.store.setAutoSync(device.id, on);
     setState(() {});
     AutoSyncScope.of(context)?.devicesChanged();
+  }
+
+  /// The shared folder: picked or not, how its last sync went, and the
+  /// way to forget it.
+  List<Widget> _folder(AppLocalizations t, DateFormat when) {
+    final folder = widget.store.syncFolder;
+    return [
+      const SizedBox(height: 16),
+      Text(t.folderTitle, style: Theme.of(context).textTheme.titleSmall),
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(t.folderIntro),
+      ),
+      if (folder == null)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.tonalIcon(
+            key: const ValueKey('pick-folder'),
+            onPressed: _pickFolder,
+            icon: const Icon(Icons.folder_open),
+            label: Text(t.folderPick),
+          ),
+        )
+      else
+        ListTile(
+          key: const ValueKey('folder'),
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.folder_shared_outlined),
+          title: Text(_folderName ?? ''),
+          subtitle: Text(_folderStatus(t, when)),
+          trailing: TextButton(
+            key: const ValueKey('forget-folder'),
+            onPressed: _folderBusy ? null : _forgetFolder,
+            child: Text(t.folderForget),
+          ),
+        ),
+    ];
   }
 
   static String _failure(AppLocalizations t, SyncFailure failure) =>
@@ -260,6 +365,7 @@ class _SyncScreenState extends State<SyncScreen> {
                 onChanged: (on) => _setAuto(device, on),
               ),
           ],
+          if (FolderScope.of(context).available) ..._folder(t, when),
           const SizedBox(height: 16),
           Text(t.syncSettingsStay),
         ],

@@ -1292,3 +1292,146 @@ fn conflicts_are_found_and_picked_as_the_dart_core_does() -> TestResult {
     }
     Ok(())
 }
+
+// --------------------------------------------------------- Folder sync
+
+#[test]
+fn messages_seal_key_ids_and_blob_names_come_out_as_the_dart_core_has_them() -> TestResult {
+    use oldbrainfix_core::keys::{area_key_id, blob_name, seal, unseal};
+    let fixture = read_json(&fixtures().join("crypto.json"))?;
+    for case in fixture["sealed"].as_array().ok_or("sealed")? {
+        let key: [u8; 32] = hex::decode(case["key"].as_str().ok_or("key")?)?
+            .try_into()
+            .map_err(|_| "a 32-byte key")?;
+        let nonce: [u8; 24] = hex::decode(case["nonce"].as_str().ok_or("nonce")?)?
+            .try_into()
+            .map_err(|_| "a 24-byte nonce")?;
+        let aad = case["aad"].as_str().ok_or("aad")?;
+        let plain = case["plain"].as_str().ok_or("plain")?;
+        let sealed = hex::decode(case["sealed"].as_str().ok_or("sealed")?)?;
+        assert_eq!(seal(&key, plain.as_bytes(), aad, &nonce)?, sealed, "{aad}");
+        assert_eq!(
+            unseal(&key, &sealed, aad).as_deref(),
+            Some(plain.as_bytes())
+        );
+    }
+    let id = &fixture["keyId"];
+    assert_eq!(
+        area_key_id(&hex::decode(id["key"].as_str().ok_or("key")?)?),
+        id["id"].as_str().ok_or("id")?
+    );
+    let name = &fixture["blobName"];
+    assert_eq!(
+        blob_name(
+            &hex::decode(name["key"].as_str().ok_or("key")?)?,
+            name["ref"].as_str().ok_or("ref")?
+        ),
+        name["name"].as_str().ok_or("name")?
+    );
+    Ok(())
+}
+
+/// Copies the folder the Dart core wrote into `to`, file for file.
+fn copy_folder(from: &Path, to: &Path) -> TestResult {
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            copy_folder(&path, &to.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(&path, to.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Every file under `dir` with its bytes, by path.
+fn tree(dir: &Path) -> Result<Vec<Named>, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+            for (sub, bytes) in tree(&path)? {
+                out.push((format!("{}/{sub}", name.clone().unwrap_or_default()), bytes));
+            }
+        } else {
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+            out.push((name.unwrap_or_default(), std::fs::read(&path)?));
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
+/// The nonces the generator counted from 1001 on.
+fn counted_nonces() -> impl FnMut() -> oldbrainfix_core::Result<[u8; 24]> {
+    let mut n: u64 = 1000;
+    move || {
+        n += 1;
+        Ok(std::array::from_fn(|i| ((n * 37 + i as u64) & 0xff) as u8))
+    }
+}
+
+#[test]
+fn the_folder_the_dart_core_wrote_is_read_here_and_written_the_same() -> TestResult {
+    use oldbrainfix_core::folder::{LocalFolder, ROOT, folder_sync, random_nonce};
+    let dir = fixtures().join("folder");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let mut read_back = expected["read"].clone();
+    let now = read_back["now"].as_str().ok_or("now")?.to_string();
+
+    // The joiner holds the keys handed over at Pairing and reads what the
+    // host put in the folder.
+    let joiner = fixture_device("folder", "joiner", joiner_key, &now)?;
+    let work = tempfile::tempdir()?;
+    copy_folder(&dir.join(ROOT), &work.path().join(ROOT))?;
+    let result = folder_sync(
+        &joiner,
+        &mut LocalFolder::new(work.path()),
+        &mut random_nonce,
+    )?;
+    assert_eq!(
+        result.applied.len() as u64,
+        expected["applied"].as_u64().ok_or("applied")?
+    );
+    assert_eq!(
+        result.blobs_in as u64,
+        expected["blobsIn"].as_u64().ok_or("blobsIn")?
+    );
+    assert_eq!(result.unreadable, 0);
+    assert_eq!(result.report.refused_count(), 0);
+    let mut actual = read(&joiner)?;
+    if let Some(map) = actual.as_object_mut() {
+        map.remove("device");
+    }
+    if let Some(map) = read_back.as_object_mut() {
+        map.remove("device");
+    }
+    assert_eq!(actual, read_back);
+
+    // The host writes the very same folder here, nonce for nonce.
+    let host = fixture_device("folder", "host", writer_key, &now)?;
+    let ours = tempfile::tempdir()?;
+    let mut nonces = counted_nonces();
+    let wrote = folder_sync(&host, &mut LocalFolder::new(ours.path()), &mut nonces)?;
+    assert_eq!(
+        wrote.entries_out as u64,
+        expected["entriesOut"].as_u64().ok_or("entriesOut")?
+    );
+    assert_eq!(
+        wrote.blobs_out as u64,
+        expected["blobsOut"].as_u64().ok_or("blobsOut")?
+    );
+    let theirs = tree(&dir.join(ROOT))?;
+    let mine = tree(&ours.path().join(ROOT))?;
+    assert_eq!(
+        mine.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
+        theirs.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>()
+    );
+    for ((name, a), (_, b)) in mine.iter().zip(&theirs) {
+        assert!(a == b, "{name} differs");
+    }
+    Ok(())
+}

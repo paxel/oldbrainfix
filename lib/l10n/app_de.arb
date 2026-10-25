@@ -405,5 +405,13 @@
   "conflictOnThisDevice": "Auf diesem Gerät, {when}",
   "conflictOnDevice": "Auf {device}, {when}",
   "conflictOnUnnamed": "Auf einem Gerät ohne Namen, {when}",
-  "conflictKeep": "Diese Fassung behalten"
+  "conflictKeep": "Diese Fassung behalten",
+  "folderTitle": "Geteilter Ordner",
+  "folderIntro": "Synchronisiert über einen Ordner, den Syncthing, Nextcloud oder ein USB-Stick zwischen deinen Geräten trägt, wo immer sie sind. Alles darin ist verschlüsselt: Nur Geräte, die mit diesem gekoppelt sind, können es lesen.",
+  "folderPick": "Ordner wählen",
+  "folderForget": "Vergessen",
+  "folderNotYet": "Noch nicht synchronisiert",
+  "folderSynced": "Zuletzt synchronisiert {when}: {count, plural, =0{nichts Neues} =1{1 Änderung angekommen} other{{count} Änderungen angekommen}}",
+  "folderUnreachable": "Der Ordner war nicht erreichbar ({when}). Es wird später wieder versucht.",
+  "folderUnreadable": "{count, plural, =1{1 Datei stammt von einem Gerät, das nicht mit diesem gekoppelt ist. Kopple sie zuerst.} other{{count} Dateien stammen von Geräten, die nicht mit diesem gekoppelt sind. Kopple sie zuerst.}}"
 }

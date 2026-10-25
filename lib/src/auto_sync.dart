@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'alarm_sync.dart';
+import 'folder_platform.dart';
 import 'sync_platform.dart';
 
 /// How an automatic sync with a paired Device is run; the app passes
@@ -34,17 +35,23 @@ Future<SyncResult> quickPairedSync(
 );
 
 /// Automatic sync while the app is open (ADR 0003): with every paired
-/// Device that syncs on its own, at once when the app shows, when the
-/// periodic work comes due meanwhile and when a Device shows up on the
-/// network, 5 s after the last change made here, and every minute while
-/// it stays open ([AutoSyncSchedule]). One sync at a time; failures stay
-/// quiet, the next try comes anyway. Tells its listeners when a sync
-/// brought Conflicts, or a background sync did while the app was
-/// closed, for the announcement at the top.
+/// Device that syncs on its own and through the shared folder, at once
+/// when the app shows, when the periodic work comes due meanwhile and
+/// when a Device shows up on the network, 5 s after the last change made
+/// here, and every minute while it stays open ([AutoSyncSchedule]). One
+/// sync at a time; failures stay quiet, the next try comes anyway. Tells
+/// its listeners when a sync brought Conflicts, or a background sync did
+/// while the app was closed, for the announcement at the top.
 class AutoSync extends ChangeNotifier {
   final Store store;
   final SyncPlatform platform;
   final PairedJoin join;
+
+  /// The shared folder, when one is chosen.
+  final FolderPlatform folders;
+
+  /// The shared folder's place among the Devices of the schedule.
+  static const folderId = '\u0000folder';
 
   /// The name this Device goes by in a sync.
   final Future<String> Function() deviceName;
@@ -74,6 +81,7 @@ class AutoSync extends ChangeNotifier {
     required this.platform,
     required this.deviceName,
     this.join = quickPairedSync,
+    this.folders = const NoFolders(),
     this.clock = DateTime.now,
   }) {
     _own = _ownSeq();
@@ -87,7 +95,31 @@ class AutoSync extends ChangeNotifier {
 
   List<String> get _devices => [
     for (final device in store.autoSyncDevices()) device.id,
+    if (store.syncFolder != null) folderId,
   ];
+
+  /// Folder syncs one after the other, never two at once.
+  Future<void> _folderQueue = Future.value();
+
+  /// Syncs through the shared folder now, after one still running; null
+  /// without a folder or when it could not be reached.
+  Future<FolderSyncResult?> syncFolder() {
+    final setting = store.syncFolder;
+    if (setting == null || _disposed) return Future.value();
+    final run = _folderQueue.then(
+      (_) => folderRound(store, folders.open(setting)),
+    );
+    _folderQueue = run.then((_) {}, onError: (Object _) {});
+    return run.then((result) {
+      if (result == null || _disposed) return result;
+      _schedule.succeeded(folderId, clock());
+      if (result.conflicts.isNotEmpty) {
+        _conflicts += result.conflicts.length;
+        notifyListeners();
+      }
+      return result;
+    });
+  }
 
   /// The app shows: discovery runs, every Device is synced at once, and
   /// what a background sync brought is announced.
@@ -119,7 +151,12 @@ class AutoSync extends ChangeNotifier {
   /// while one syncs on its own.
   void devicesChanged() {
     if (_disposed) return;
-    unawaited(platform.setBackground(_devices.isNotEmpty));
+    unawaited(
+      platform.setBackground(
+        _devices.isNotEmpty,
+        folder: store.syncFolder != null,
+      ),
+    );
     _arm();
   }
 
@@ -171,8 +208,16 @@ class AutoSync extends ChangeNotifier {
     try {
       while (!_disposed) {
         final devices = store.autoSyncDevices();
-        final due = _schedule.take([for (final d in devices) d.id], clock());
+        final due = _schedule.take(_devices, clock());
         if (due.isEmpty) break;
+        if (due.contains(folderId)) {
+          try {
+            await syncFolder();
+          } on Object {
+            // Not now: tried again on the next occasion.
+          }
+        }
+        if (!devices.any((d) => due.contains(d.id))) continue;
         final name = await deviceName();
         for (final device in devices) {
           if (_disposed) return;
@@ -219,10 +264,11 @@ class AutoSync extends ChangeNotifier {
 
 /// One background sync, as the platform's periodic work runs it while
 /// the app is closed: what was tapped on notifications meanwhile is
-/// applied first, so a Done here goes out with it; every paired Device
-/// that syncs on its own is looked for for [look] and synced where it
-/// answers; Conflicts it brought are kept to be announced when the app
-/// opens; and the alarms are armed anew, so a Done on another Device
+/// applied first, so a Done here goes out with it; on a local network
+/// every paired Device that syncs on its own is looked for for [look]
+/// and synced where it answers; then the shared folder, wherever the
+/// Device is; Conflicts they brought are kept to be announced when the
+/// app opens; and the alarms are armed anew, so a Done on another Device
 /// silences the alarm here. [alarms] has its texts already.
 Future<void> backgroundSync({
   required Store store,
@@ -230,11 +276,35 @@ Future<void> backgroundSync({
   required AlarmSync alarms,
   required String name,
   PairedJoin join = quickPairedSync,
+  FolderPlatform folders = const NoFolders(),
   Duration look = const Duration(seconds: 8),
 }) async {
   await alarms.refresh();
   final devices = store.autoSyncDevices();
-  if (devices.isEmpty) return;
+  if (devices.isNotEmpty && await platform.onLocalNetwork()) {
+    await _lanInBackground(store, platform, devices, name, join, look);
+  }
+  if (store.syncFolder case final folder?) {
+    try {
+      final result = await folderRound(store, folders.open(folder));
+      if (result != null && result.conflicts.isNotEmpty) {
+        store.conflictsArrived = true;
+      }
+    } on Object {
+      // Not now: the next run tries again.
+    }
+  }
+  await alarms.refresh();
+}
+
+Future<void> _lanInBackground(
+  Store store,
+  SyncPlatform platform,
+  List<PairedDevice> devices,
+  String name,
+  PairedJoin join,
+  Duration look,
+) async {
   final found = {for (final f in await platform.discover(look)) f.device: f};
   for (final device in devices) {
     final host = found[device.id]?.host ?? device.host;
@@ -253,7 +323,6 @@ Future<void> backgroundSync({
       // Not there now: the next run tries again.
     }
   }
-  await alarms.refresh();
 }
 
 /// Hands the app's [AutoSync] down to the Sync page.

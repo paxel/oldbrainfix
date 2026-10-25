@@ -125,7 +125,7 @@ extension Sync on Store {
   /// `photo/<hash>` and `audio/<hash>`, sorted.
   List<String> missingBlobs() {
     final missing = <String>{};
-    for (final (kind, prefix) in _blobKinds) {
+    for (final (kind, prefix) in blobKinds) {
       for (final (entity, field) in fieldsWithPrefix(prefix)) {
         final hash = field.substring(prefix.length);
         if (current(entity, field) == null) continue;
@@ -140,13 +140,14 @@ extension Sync on Store {
   /// else would be storage filled by whoever holds the PIN.
   bool knowsBlob(String ref) {
     final (kind, hash) = splitBlobRef(ref);
-    for (final (k, prefix) in _blobKinds) {
+    for (final (k, prefix) in blobKinds) {
       if (k == kind) return mentions('$prefix$hash');
     }
     return false;
   }
 
-  static const _blobKinds = [
+  /// The blob kinds and the field prefixes naming them.
+  static const blobKinds = [
     ('photo', NoteKeys.photoPrefix),
     ('audio', NoteKeys.audioPrefix),
   ];
@@ -162,6 +163,9 @@ extension Sync on Store {
 /// Why a Moment was recorded.
 abstract final class MomentCause {
   static const sync = 'sync';
+
+  /// A folder sync brought it.
+  static const folder = 'folder';
 }
 
 /// A state of the log a Device can be returned to (Catlog's ADR 0009):

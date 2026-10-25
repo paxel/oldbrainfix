@@ -169,5 +169,8 @@ dependencies {
     // The background sync's periodic work. WorkManager alone: no
     // Google Play services (not work-gcm).
     implementation("androidx.work:work-runtime:2.10.1")
+    // The shared sync folder through the document tree the picker
+    // grants (Storage Access Framework); AndroidX only.
+    implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
 }

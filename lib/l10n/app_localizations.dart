@@ -2533,6 +2533,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep this version'**
   String get conflictKeep;
+
+  /// No description provided for @folderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared folder'**
+  String get folderTitle;
+
+  /// No description provided for @folderIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncs through a folder that Syncthing, Nextcloud or a USB stick carries between your Devices, wherever they are. Everything in it is encrypted: only Devices paired with this one can read it.'**
+  String get folderIntro;
+
+  /// No description provided for @folderPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose folder'**
+  String get folderPick;
+
+  /// Stops syncing through the shared folder; the folder itself stays as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get folderForget;
+
+  /// No description provided for @folderNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not synced yet'**
+  String get folderNotYet;
+
+  /// No description provided for @folderSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced {when}: {count, plural, =0{nothing new} =1{1 change came in} other{{count} changes came in}}'**
+  String folderSynced(String when, int count);
+
+  /// No description provided for @folderUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The folder could not be reached at {when}. It is tried again later.'**
+  String folderUnreachable(String when);
+
+  /// No description provided for @folderUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file is from a Device this one is not paired with. Pair them first.} other{{count} files are from Devices this one is not paired with. Pair them first.}}'**
+  String folderUnreadable(int count);
 }
 
 class _AppLocalizationsDelegate

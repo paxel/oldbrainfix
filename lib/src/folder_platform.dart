@@ -1,0 +1,149 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+
+/// The platform seam for the shared folder (android/…/FolderChannel.kt):
+/// picking it, its name for people, and the folder itself. Widget tests
+/// hand in a fake.
+abstract interface class FolderPlatform {
+  /// Whether a folder can be picked here.
+  bool get available;
+
+  /// Opens the system's folder picker; the folder as it is kept, or null
+  /// when the user backed out.
+  Future<String?> pick();
+
+  /// The folder's own name, for the screen.
+  Future<String> displayName(String folder);
+
+  /// The [folder] kept by [pick], as the sync reads and writes it.
+  SyncFolder open(String folder);
+}
+
+/// No shared folder: the default where none is handed in.
+class NoFolders implements FolderPlatform {
+  const NoFolders();
+
+  @override
+  bool get available => false;
+
+  @override
+  Future<String?> pick() async => null;
+
+  @override
+  Future<String> displayName(String folder) async => folder;
+
+  @override
+  SyncFolder open(String folder) => LocalSyncFolder(folder);
+}
+
+/// Android's folder picker and the document tree it grants (Storage
+/// Access Framework), in Kotlin behind the app's method channel: good for
+/// shared storage, a USB stick and cloud providers alike, none of which
+/// is a path an app may read.
+class AndroidFolders implements FolderPlatform {
+  static const channel = MethodChannel('io.github.paxel.oldbrainfix/folder');
+
+  const AndroidFolders();
+
+  @override
+  bool get available => true;
+
+  @override
+  Future<String?> pick() async {
+    try {
+      return await channel.invokeMethod<String>('pickTree');
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  @override
+  Future<String> displayName(String folder) async {
+    try {
+      final name = await channel.invokeMethod<String>('name', {'tree': folder});
+      if (name != null && name.isNotEmpty) return name;
+    } on PlatformException {
+      // Named from the URI below.
+    }
+    // The last segment reads `primary:Sync`; the part after the colon is
+    // the folder.
+    final last = Uri.decodeComponent(folder.split('/').last);
+    return last.contains(':') ? last.substring(last.indexOf(':') + 1) : last;
+  }
+
+  @override
+  SyncFolder open(String folder) => SafSyncFolder(folder);
+}
+
+/// The shared folder through the document tree the picker granted: every
+/// call goes to the platform, which lists, reads and writes the documents
+/// by name inside `oldbrainfix-sync`. A platform error becomes a
+/// [FileSystemException], what a vanished drive raises elsewhere.
+class SafSyncFolder implements SyncFolder {
+  /// The tree URI the picker returned.
+  final String tree;
+
+  const SafSyncFolder(this.tree);
+
+  Map<String, Object> _args(String dir, [String? name]) => {
+    'tree': tree,
+    'root': syncFolderRoot,
+    'dir': dir,
+    'name': ?name,
+  };
+
+  Future<T?> _call<T>(String method, Map<String, Object> args) async {
+    try {
+      return await AndroidFolders.channel.invokeMethod<T>(method, args);
+    } on PlatformException catch (e) {
+      throw FileSystemException(e.message ?? method, tree);
+    } on MissingPluginException {
+      throw FileSystemException('No folder access here', tree);
+    }
+  }
+
+  @override
+  Future<List<String>> list(String dir) async {
+    final names = await _call<List<Object?>>('list', _args(dir));
+    return [
+      for (final n in names ?? const [])
+        if (n is String) n,
+    ]..sort();
+  }
+
+  @override
+  Future<Uint8List?> read(String dir, String name) =>
+      _call<Uint8List>('read', _args(dir, name));
+
+  @override
+  Future<void> write(String dir, String name, List<int> bytes) => _call<void>(
+    'write',
+    {..._args(dir, name), 'bytes': Uint8List.fromList(bytes)},
+  );
+
+  @override
+  Future<void> delete(String dir, String name) =>
+      _call<void>('delete', _args(dir, name));
+
+  @override
+  Future<void> ensure(String dir) => _call<void>('ensure', _args(dir));
+}
+
+/// Hands the app's [FolderPlatform] down to the Sync page.
+class FolderScope extends InheritedWidget {
+  final FolderPlatform folders;
+
+  const FolderScope({super.key, required this.folders, required super.child});
+
+  /// The app's [FolderPlatform]; read once, so it does not listen.
+  static FolderPlatform of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<FolderScope>()?.folders ??
+      const NoFolders();
+
+  @override
+  bool updateShouldNotify(FolderScope oldWidget) =>
+      folders != oldWidget.folders;
+}

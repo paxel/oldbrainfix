@@ -41,6 +41,9 @@ ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
 rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
 # The pair code as a QR in the Sync view.
 qrcode = { version = "0.14", default-features = false }
+# The shared folder picked in the Sync view with the system's own
+# dialog, as Catlog's desktop picks it: the desktop portal on Linux.
+rfd = "0.17"
 
 # The tray as a StatusNotifierItem over D-Bus, without GTK.
 [target.'cfg(target_os = "linux")'.dependencies]

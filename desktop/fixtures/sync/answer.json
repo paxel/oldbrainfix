@@ -74,5 +74,19 @@
       "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
       "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
     }
+  ],
+  "areaKeys": [
+    {
+      "key": "b3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY4=",
+      "scope": "area:starter-work"
+    },
+    {
+      "key": "SktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGk=",
+      "scope": "area:starter-health"
+    },
+    {
+      "key": "JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=",
+      "scope": "personal"
+    }
   ]
 }

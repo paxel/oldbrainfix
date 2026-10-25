@@ -41,8 +41,13 @@ abstract interface class SyncPlatform {
   /// sync.
   Future<List<FoundHost>> discover(Duration within);
 
-  /// Turns the periodic background sync on or off.
-  Future<void> setBackground(bool on);
+  /// Turns the periodic background sync on or off; with a shared
+  /// [folder] it runs without a local network too.
+  Future<void> setBackground(bool on, {bool folder = false});
+
+  /// Whether the Device is on a local network now (Wi-Fi or Ethernet),
+  /// where paired Devices can be.
+  Future<bool> onLocalNetwork();
 }
 
 /// No discovery and no background work: the default where none is
@@ -66,7 +71,10 @@ class NoSync implements SyncPlatform {
   Future<List<FoundHost>> discover(Duration within) async => const [];
 
   @override
-  Future<void> setBackground(bool on) async {}
+  Future<void> setBackground(bool on, {bool folder = false}) async {}
+
+  @override
+  Future<bool> onLocalNetwork() async => true;
 }
 
 /// Android's NsdManager and WorkManager in Kotlin, behind the app's
@@ -122,7 +130,19 @@ class AndroidSync implements SyncPlatform {
   }
 
   @override
-  Future<void> setBackground(bool on) => _call('background', on);
+  Future<void> setBackground(bool on, {bool folder = false}) =>
+      _call('background', {'on': on, 'folder': folder});
+
+  @override
+  Future<bool> onLocalNetwork() async {
+    try {
+      return await _channel.invokeMethod<bool>('localNetwork') ?? true;
+    } on PlatformException {
+      return true;
+    } on MissingPluginException {
+      return true;
+    }
+  }
 
   /// Tells the periodic work that this background sync is over.
   Future<void> finished() => _call('finished');

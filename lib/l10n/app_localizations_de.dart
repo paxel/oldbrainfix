@@ -1558,4 +1558,49 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get conflictKeep => 'Diese Fassung behalten';
+
+  @override
+  String get folderTitle => 'Geteilter Ordner';
+
+  @override
+  String get folderIntro =>
+      'Synchronisiert über einen Ordner, den Syncthing, Nextcloud oder ein USB-Stick zwischen deinen Geräten trägt, wo immer sie sind. Alles darin ist verschlüsselt: Nur Geräte, die mit diesem gekoppelt sind, können es lesen.';
+
+  @override
+  String get folderPick => 'Ordner wählen';
+
+  @override
+  String get folderForget => 'Vergessen';
+
+  @override
+  String get folderNotYet => 'Noch nicht synchronisiert';
+
+  @override
+  String folderSynced(String when, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Änderungen angekommen',
+      one: '1 Änderung angekommen',
+      zero: 'nichts Neues',
+    );
+    return 'Zuletzt synchronisiert $when: $_temp0';
+  }
+
+  @override
+  String folderUnreachable(String when) {
+    return 'Der Ordner war nicht erreichbar ($when). Es wird später wieder versucht.';
+  }
+
+  @override
+  String folderUnreadable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count Dateien stammen von Geräten, die nicht mit diesem gekoppelt sind. Kopple sie zuerst.',
+      one: '1 Datei stammt von einem Gerät, das nicht mit diesem gekoppelt ist. Kopple sie zuerst.',
+    );
+    return '$_temp0';
+  }
 }

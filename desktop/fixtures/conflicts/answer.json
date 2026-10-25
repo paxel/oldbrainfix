@@ -64,5 +64,15 @@
       "key": "5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=",
       "sig": "2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA=="
     }
+  ],
+  "areaKeys": [
+    {
+      "key": "lJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrM=",
+      "scope": "personal"
+    },
+    {
+      "key": "ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19g=",
+      "scope": "area:00000000000000000000000000000003"
+    }
   ]
 }

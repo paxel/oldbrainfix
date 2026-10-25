@@ -38,6 +38,7 @@ use sha2::{Digest, Sha256};
 
 use crate::conflicts::Conflict;
 use crate::entry::WireEntry;
+use crate::keys::{AreaKey, area_keys_of};
 use crate::pairing::PairedDevice;
 use crate::signing::{ImportReport, KeyRecord};
 use crate::store::Store;
@@ -953,8 +954,19 @@ fn keys_json(store: &Store) -> Result<Value> {
     ))
 }
 
+/// The Area keys, as they travel over an authenticated session only.
+fn area_keys_json(store: &Store) -> Result<Value> {
+    Ok(json!(
+        store
+            .area_keys()?
+            .iter()
+            .map(AreaKey::to_json)
+            .collect::<Vec<_>>()
+    ))
+}
+
 /// The joiner's `POST /sync` body, as the Dart core's `syncRequest`,
-/// with its proof over `host_device` and `pin`.
+/// with its proof over `host_device` and `pin` and the Area keys.
 pub fn sync_request(
     store: &Store,
     host_vector: &HashMap<String, i64>,
@@ -962,6 +974,7 @@ pub fn sync_request(
     host_device: &str,
     pin: &str,
 ) -> Result<Value> {
+    store.ensure_area_keys()?;
     Ok(json!({
         "format": SYNC_FORMAT,
         "deviceId": store.device_id()?,
@@ -970,6 +983,7 @@ pub fn sync_request(
         "vector": store.version_vector()?,
         "entries": wire(&store.entries_since(host_vector)?),
         "keys": keys_json(store)?,
+        "areaKeys": area_keys_json(store)?,
     }))
 }
 
@@ -983,12 +997,14 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
     let peer_name = text_of(body, "name");
     let mut report = ImportReport::default();
     let before = store.current_seq()?;
+    store.learn_area_keys(&area_keys_of(body.get("areaKeys")))?;
     let applied = store.apply_entries(
         &entries_of(body.get("entries")),
         &keys_of(body.get("keys")),
         (!peer.is_empty()).then_some(peer.as_str()),
         &mut report,
     )?;
+    store.ensure_area_keys()?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::SYNC, Some(&peer_name))?;
     let answer = json!({
         "format": SYNC_FORMAT,
@@ -997,6 +1013,7 @@ pub fn answer_sync(store: &Store, body: &Value, name: &str) -> Result<Option<(Va
         "entries": wire(&store.entries_since(&vector_of(body.get("vector")))?),
         "wantBlobs": store.missing_blobs()?,
         "keys": keys_json(store)?,
+        "areaKeys": area_keys_json(store)?,
     });
     let conflicts = store.conflicts_among(&applied)?;
     Ok(Some((
@@ -1019,6 +1036,7 @@ pub fn apply_answer(store: &Store, answer: &Value) -> Result<Session> {
     let name = text_of(answer, "name");
     let mut report = ImportReport::default();
     let before = store.current_seq()?;
+    store.learn_area_keys(&area_keys_of(answer.get("areaKeys")))?;
     let applied = store.apply_entries(
         &entries_of(answer.get("entries")),
         &keys_of(answer.get("keys")),

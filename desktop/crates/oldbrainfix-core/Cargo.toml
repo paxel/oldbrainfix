@@ -29,6 +29,11 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # Paired Devices find the desktop's host on the network (mDNS/DNS-SD);
 # no async runtime, no logging.
 mdns-sd = { version = "0.21", default-features = false }
+# End-to-end encryption per Area (ADR 0003, 0012), as the Dart core's
+# `cryptography` seals: XChaCha20-Poly1305, nonces from getrandom above.
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+# Blob names in the shared folder.
+hmac = "0.12"
 
 [dev-dependencies]
 # A real zone for the fixtures' daylight-saving cases.

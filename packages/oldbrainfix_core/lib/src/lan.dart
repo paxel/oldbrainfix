@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
+import 'area_keys.dart';
 import 'conflicts.dart';
 import 'entry.dart';
 import 'pair_code.dart';
@@ -130,22 +131,28 @@ bool trustsPairedJoiner(
 /// The joiner's `POST /sync` body: what a host holding [hostVector]
 /// lacks, with this Device's vector, id, [name] and keys, and its proof
 /// over [hostDevice] and [pin] that it holds its own key: a host that
-/// paired with it before lets it in without asking only then.
+/// paired with it before lets it in without asking only then. The
+/// Area keys travel along (ADR 0012): only over this session, which the
+/// pair code or the pinned certificate authenticated.
 Map<String, Object?> syncRequest(
   Store store,
   Map<String, int> hostVector, {
   required String name,
   String hostDevice = '',
   String pin = '',
-}) => {
-  'format': syncFormat,
-  'deviceId': store.deviceId,
-  'name': name,
-  'proof': store.signingKey.sign(pairingProofBytes(hostDevice, pin)),
-  'vector': store.versionVector(),
-  'entries': [for (final e in store.entriesSince(hostVector)) e.toJson()],
-  'keys': [for (final k in store.keyRecords()) k.toJson()],
-};
+}) {
+  store.ensureAreaKeys();
+  return {
+    'format': syncFormat,
+    'deviceId': store.deviceId,
+    'name': name,
+    'proof': store.signingKey.sign(pairingProofBytes(hostDevice, pin)),
+    'vector': store.versionVector(),
+    'entries': [for (final e in store.entriesSince(hostVector)) e.toJson()],
+    'keys': [for (final k in store.keyRecords()) k.toJson()],
+    'areaKeys': [for (final k in store.areaKeys()) k.toJson()],
+  };
+}
 
 /// Takes in a joiner's `POST /sync` [body] (applied as one batch, with
 /// a Moment before it when anything was new) and answers with what the
@@ -163,12 +170,14 @@ Map<String, Object?> syncRequest(
   final peerName = body['name'] is String ? body['name'] as String : '';
   final report = ImportReport();
   final before = store.currentSeq();
+  store.learnAreaKeys(areaKeysOf(body['areaKeys']));
   final applied = store.applyEntries(
     _entries(body['entries']),
     keys: _keys(body['keys']),
     verifiedDevice: peer.isEmpty ? null : peer,
     report: report,
   );
+  store.ensureAreaKeys();
   final moment = store.momentFor(
     before: before,
     changed: applied.isNotEmpty,
@@ -185,6 +194,7 @@ Map<String, Object?> syncRequest(
       ],
       'wantBlobs': store.missingBlobs(),
       'keys': [for (final k in store.keyRecords()) k.toJson()],
+      'areaKeys': [for (final k in store.areaKeys()) k.toJson()],
     },
     session: SyncSession(
       peer: peer,
@@ -204,6 +214,7 @@ SyncSession applyAnswer(Store store, Map<String, Object?> answer) {
   final name = answer['name'] is String ? answer['name'] as String : '';
   final report = ImportReport();
   final before = store.currentSeq();
+  store.learnAreaKeys(areaKeysOf(answer['areaKeys']));
   final applied = store.applyEntries(
     _entries(answer['entries']),
     keys: _keys(answer['keys']),

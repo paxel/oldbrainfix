@@ -1180,10 +1180,12 @@ Store _store() {
 /// The second Device's fixed key seed: bytes 33 to 64.
 final _joinerSeed = Uint8List.fromList(List<int>.generate(32, (i) => 33 + i));
 
-/// The settings of [store] that a sync reads: the keys it holds.
+/// The settings of [store] that a sync reads: the keys it holds, its
+/// Devices' and its Areas'.
 List<List<String>> _keySettings(Store store) => [
-  for (final (key, value) in store.localSettingsWithPrefix('key:'))
-    [key, value],
+  for (final prefix in ['key:', 'areakey:'])
+    for (final (key, value) in store.localSettingsWithPrefix(prefix))
+      [key, value],
 ];
 
 /// Writes [store]'s log and its blobs under [dir]/[name].
@@ -1381,6 +1383,131 @@ void _sync(Directory root) {
   }
 }
 
+/// Counted bytes for keys and nonces, so the folder comes out the same
+/// on every run: the [n]th call gives `n, n+1, …` from a start of its
+/// own.
+Uint8List Function(int) _counted(int start) {
+  var n = start;
+  return (length) {
+    n++;
+    return Uint8List.fromList([
+      for (var i = 0; i < length; i++) (n * 37 + i) & 0xff,
+    ]);
+  };
+}
+
+/// Writes [folder] as it is under [out], one file per file.
+void _writeFolder(MemorySyncFolder folder, Directory out) {
+  for (final MapEntry(key: dir, value: files) in folder.dirs.entries) {
+    for (final MapEntry(key: name, value: bytes) in files.entries) {
+      final file = File('${out.path}/${dir.isEmpty ? '' : '$dir/'}$name');
+      file.parent.createSync(recursive: true);
+      file.writeAsBytesSync(bytes);
+    }
+  }
+}
+
+/// Two Devices that met once over LAN, so the joiner holds the host's
+/// keys; the host writes more, a new Area among it, and syncs through
+/// the shared folder: the logs and keys before, the folder the host
+/// wrote with counted nonces, and what the joiner reads from it.
+Future<void> _folder(Directory root) async {
+  final out = Directory('${root.path}/folder');
+  final keep = secretBytes;
+  secretBytes = _counted(100);
+  final host = _store();
+  final joiner = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    final house = Places(host).addArea('Household');
+    final kitchen = Places(host).addTopic(house.id, 'Kitchen');
+    Notes(host).capture('Buy milk', place: kitchen.id);
+    Notes(joiner).capture('Call mum');
+    _meet(joiner, host);
+    // Since: a new Area whose key goes only through the folder, Notes
+    // in and out of Areas, a photo and a recording, a Note moved, an
+    // Amend, a Routine and a Named Place.
+    final doctor = Places(host).addArea('Doctor');
+    final blood = Notes(host)
+        .capture('Blood test on Friday', place: doctor.id, photos: [_photo(7)]);
+    Notes(host).amend(blood.id, 'Fasting from midnight');
+    final loose = Notes(host)
+        .capture('nees mor sauce', recordings: [_recording(3)]);
+    Notes(host).file(loose.id, kitchen.id);
+    Notes(host).edit(loose.id, 'Needs more sauce');
+    Notes(host).capture('Unsorted thought');
+    Routines(host).create(
+      'Pills',
+      Schedule(start: Day(2026, 1, 5), times: [ClockTime(8, 0)]),
+    );
+    NamedPlaces(host).add('Home', Coordinates(52.52, 13.405), radius: 150);
+    host.ensureAreaKeys();
+
+    _writeDevice(host, out, 'host');
+    _writeDevice(joiner, out, 'joiner');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'host': _keySettings(host), 'joiner': _keySettings(joiner)})}\n',
+    );
+    final folder = MemorySyncFolder();
+    final nonces = _counted(1000);
+    final wrote = await folderSync(
+      host,
+      folder,
+      nonce: () => nonces(sealNonceBytes),
+    );
+    _writeFolder(folder, Directory('${out.path}/$syncFolderRoot'));
+    _held = _tick.add(const Duration(days: 1));
+    final read = await folderSync(joiner, folder);
+    final expected = _expected(joiner)..remove('device');
+    final written = _expected(host)..remove('device');
+    if (jsonEncode(expected) != jsonEncode(written) || read.unreadable != 0) {
+      throw StateError('the joiner of the folder fixture did not read it all');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({'entriesOut': wrote.entriesOut, 'blobsOut': wrote.blobsOut, 'applied': read.applied.length, 'blobsIn': read.blobsIn, 'read': expected})}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    host.close();
+    joiner.close();
+  }
+}
+
+/// Sealed messages, key ids and blob names the desktop core must make
+/// the same.
+Map<String, Object?> _crypto() {
+  final bytes = _counted(500);
+  final sealed = [
+    for (final (aad, plain) in [
+      (SealedAs.entry, 'Pills at eight'),
+      (SealedAs.keys('device'), ''),
+      (SealedAs.blob('photo/ab'), 'Grüße, "quotes" \\ and 🧠'),
+    ])
+      () {
+        final key = bytes(32);
+        final nonce = bytes(24);
+        return {
+          'key': hex(key),
+          'nonce': hex(nonce),
+          'aad': aad,
+          'plain': plain,
+          'sealed': hex(seal(key, utf8.encode(plain), aad: aad, nonce: nonce)),
+        };
+      }(),
+  ];
+  final key = bytes(32);
+  final ref = 'photo/${'0f' * 32}';
+  return {
+    'sealed': sealed,
+    'keyId': {'key': hex(key), 'id': areaKeyId(key)},
+    'blobName': {'key': hex(key), 'ref': ref, 'name': blobName(key, ref)},
+  };
+}
+
 /// Pair codes the desktop must write and read the same.
 Map<String, Object?> _pairCodes() {
   final fp = [for (var i = 0; i < 32; i++) (i * 7 + 3) & 0xff];
@@ -1569,12 +1696,14 @@ Map<String, Object?> _questionMarks() => {
   ],
 };
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   if (args.length != 1) {
     stderr.writeln('usage: dart run tool/gen_fixtures.dart <fixtures dir>');
     exit(2);
   }
   final root = Directory(args[0])..createSync(recursive: true);
+  // The Area keys every LAN session hands over, counted too.
+  secretBytes = _counted(0);
   // A scenario dropped from the list leaves no folder behind.
   for (final old in root.listSync().whereType<Directory>()) {
     old.deleteSync(recursive: true);
@@ -1602,14 +1731,24 @@ void main(List<String> args) {
     '- `sync/`: two Devices that met once and wrote more since: their logs '
     '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
     'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
-    'request (with its proof for the PIN 246810), the host\'s answer, and what both read after the joiner took '
-    'it in (`expected.json`).\n'
+    'request (with its proof for the PIN 246810) and the host\'s answer, '
+    'both with the Area keys they hand over, and what both read after the '
+    'joiner took it in (`expected.json`).\n'
     '- `conflicts/`: two Devices that met once, then edited the same Note '
     'text, Area name and Routine schedule apart, wrote the same value on '
     'both sides and renamed a Topic on one side only: their logs, the '
     'session between them, the Conflicts both find (`expected.json`), the '
     'host keeping the older version of each (`picks.jsonl`, at the '
-    'held clock), and what both read after a second session.\n',
+    'held clock), and what both read after a second session.\n'
+    '- `crypto.json`: messages sealed with XChaCha20-Poly1305 under given '
+    'keys, nonces and what they are bound to; a key\'s id; a blob\'s name '
+    'in the shared folder.\n'
+    '- `folder/`: two Devices that met once, so the joiner holds the '
+    'host\'s keys; the host wrote more since, a new Area among it, and '
+    'synced through the shared folder: both logs with their blobs and the '
+    'keys each holds (`settings.json`), the folder the host wrote '
+    '(`$syncFolderRoot/`, nonces counted from 1001 on), and what the '
+    'joiner reads from it (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -1631,8 +1770,10 @@ void main(List<String> args) {
     '${_json.convert(_pairCodes())}\n',
   );
   _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
+  _write(File('${root.path}/crypto.json'), '${_json.convert(_crypto())}\n');
   _sync(root);
   _conflictsFixture(root);
+  await _folder(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

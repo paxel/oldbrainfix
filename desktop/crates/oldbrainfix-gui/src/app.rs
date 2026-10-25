@@ -31,7 +31,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime, Utc};
@@ -49,6 +49,7 @@ use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
 use crate::enrich::Enricher;
+use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::L10n;
@@ -351,7 +352,15 @@ pub struct App {
     /// The Conflicts an automatic sync brought, to be announced at the
     /// top until the Sync view shows them.
     arrived: usize,
+    /// Asks the system's dialog for the shared folder, titled as given.
+    folder_picker: FolderPicker,
+    /// Tells the folder thread to sync now; without one, the window
+    /// syncs itself.
+    folder_wanted: Option<Arc<AtomicBool>>,
 }
+
+/// Asks for a folder, with the dialog's title.
+pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
 
 impl App {
     /// The window over `store`, speaking `locale`, showing the Agenda on
@@ -399,6 +408,8 @@ impl App {
             sync: SyncHost::default(),
             sync_name: device_name(),
             arrived: 0,
+            folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
+            folder_wanted: None,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -418,6 +429,29 @@ impl App {
     pub fn set_sync_host(&mut self, bind: Option<std::net::IpAddr>, name: &str) {
         self.sync.bind = bind;
         self.sync_name = name.to_string();
+    }
+
+    /// Asks `picker` for the shared folder instead of the system's
+    /// dialog; tests hand in a path.
+    pub fn set_folder_picker(&mut self, picker: FolderPicker) {
+        self.folder_picker = picker;
+    }
+
+    /// Leaves folder syncs to the thread that `wanted` wakes.
+    pub fn set_folder_wanted(&mut self, wanted: Arc<AtomicBool>) {
+        self.folder_wanted = Some(wanted);
+    }
+
+    /// Syncs through the shared folder now: on the folder thread, or here
+    /// when there is none.
+    fn folder_now(&mut self) -> oldbrainfix_core::Result<()> {
+        match &self.folder_wanted {
+            Some(wanted) => wanted.store(true, Ordering::SeqCst),
+            None => {
+                folder_sync::round(&self.store)?;
+            }
+        }
+        Ok(())
     }
 
     /// The LAN session the Sync view hosts.
@@ -1029,6 +1063,14 @@ impl App {
                 }
             }
             Action::Sync(SyncAction::Forget(id)) => self.store.forget_device(&id)?,
+            Action::Sync(SyncAction::PickFolder) => {
+                if let Some(path) = (self.folder_picker)(self.t.folder_pick_title()) {
+                    self.store.choose_sync_folder(&path.to_string_lossy())?;
+                    self.folder_now()?;
+                }
+            }
+            Action::Sync(SyncAction::ForgetFolder) => self.store.forget_sync_folder()?,
+            Action::Sync(SyncAction::FolderNow) => self.folder_now()?,
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
             Action::Sync(SyncAction::Keep {
                 entity,

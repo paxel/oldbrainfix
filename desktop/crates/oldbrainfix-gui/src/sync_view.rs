@@ -4,7 +4,8 @@
 //! paired one, proven by its key, syncs straight away. Every session's joiner is remembered
 //! as a paired Device, and the paired Devices can be forgotten here, or
 //! kept from syncing on their own. The Conflicts are listed here too,
-//! each version a button that keeps it.
+//! each version a button that keeps it, and the shared folder is chosen,
+//! synced and forgotten here, with how its last sync went.
 
 use std::net::IpAddr;
 
@@ -37,6 +38,12 @@ pub enum SyncAction {
         unit: String,
         index: usize,
     },
+    /// Choose the shared folder with the system's dialog.
+    PickFolder,
+    /// Stop syncing through the shared folder.
+    ForgetFolder,
+    /// Sync through the shared folder now.
+    FolderNow,
 }
 
 /// The desktop's hosting state.
@@ -328,6 +335,9 @@ impl SyncHost {
                         }
                     }
                 });
+                if let Some(asked) = folder_section(ui, t, tones, store, wall) {
+                    action = Some(asked);
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.paired_devices_title()).strong().color(text));
                     let devices = store.paired_devices().unwrap_or_default();
@@ -375,6 +385,79 @@ impl Drop for SyncHost {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// The shared folder: chosen or not, how its last sync went, and the
+/// ways to choose, forget and sync it now.
+fn folder_section(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    store: &Store,
+    wall: &Wall,
+) -> Option<SyncAction> {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let error = ui.visuals().error_fg_color;
+    let mut action = None;
+    embossed(ui, tones, false, None, |ui| {
+        ui.label(RichText::new(t.folder_title()).strong().color(text));
+        ui.label(RichText::new(t.folder_intro()).small().color(weak));
+        match store.sync_folder().ok().flatten() {
+            None => {
+                if ui
+                    .button(RichText::new(t.folder_pick()).color(text))
+                    .clicked()
+                {
+                    action = Some(SyncAction::PickFolder);
+                }
+            }
+            Some(path) => {
+                ui.label(RichText::new(path).monospace().color(text));
+                for (line, failed) in folder_status_lines(t, store, wall) {
+                    ui.label(RichText::new(line).color(if failed { error } else { weak }));
+                }
+                ui.horizontal(|ui| {
+                    if ui
+                        .button(RichText::new(t.folder_sync_now()).color(text))
+                        .clicked()
+                    {
+                        action = Some(SyncAction::FolderNow);
+                    }
+                    if ui
+                        .button(RichText::new(t.folder_pick()).color(text))
+                        .clicked()
+                    {
+                        action = Some(SyncAction::PickFolder);
+                    }
+                    if ui
+                        .button(RichText::new(t.folder_forget()).color(text))
+                        .clicked()
+                    {
+                        action = Some(SyncAction::ForgetFolder);
+                    }
+                });
+            }
+        }
+    });
+    action
+}
+
+/// How the shared folder's last sync went, in words, each line with
+/// whether it tells of a failure.
+pub fn folder_status_lines(t: &L10n, store: &Store, wall: &Wall) -> Vec<(String, bool)> {
+    let Some(status) = store.folder_status().ok().flatten() else {
+        return vec![(t.folder_not_yet().to_string(), false)];
+    };
+    let when = wall(status.at).format("%Y-%m-%d %H:%M").to_string();
+    if status.failed {
+        return vec![(t.folder_unreachable(&when), true)];
+    }
+    let mut lines = vec![(t.folder_synced(&when, status.entries_in as i64), false)];
+    if status.unreadable > 0 {
+        lines.push((t.folder_unreadable(status.unreadable as i64), true));
+    }
+    lines
 }
 
 /// What `conflict` is about: which field of which kind of thing.

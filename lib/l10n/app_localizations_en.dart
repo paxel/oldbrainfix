@@ -1547,4 +1547,49 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conflictKeep => 'Keep this version';
+
+  @override
+  String get folderTitle => 'Shared folder';
+
+  @override
+  String get folderIntro =>
+      'Syncs through a folder that Syncthing, Nextcloud or a USB stick carries between your Devices, wherever they are. Everything in it is encrypted: only Devices paired with this one can read it.';
+
+  @override
+  String get folderPick => 'Choose folder';
+
+  @override
+  String get folderForget => 'Forget';
+
+  @override
+  String get folderNotYet => 'Not synced yet';
+
+  @override
+  String folderSynced(String when, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count changes came in',
+      one: '1 change came in',
+      zero: 'nothing new',
+    );
+    return 'Last synced $when: $_temp0';
+  }
+
+  @override
+  String folderUnreachable(String when) {
+    return 'The folder could not be reached at $when. It is tried again later.';
+  }
+
+  @override
+  String folderUnreadable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count files are from Devices this one is not paired with. Pair them first.',
+      one: '1 file is from a Device this one is not paired with. Pair them first.',
+    );
+    return '$_temp0';
+  }
 }

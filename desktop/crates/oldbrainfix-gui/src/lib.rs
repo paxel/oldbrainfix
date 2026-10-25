@@ -5,9 +5,9 @@
 //! kittest harness can drive it: the window, the alarm layer behind the
 //! notifications, the tray, the login start, the one-instance rule, the
 //! command line, the capture popup and its hotkey, voice recordings and
-//! photos, the Transcripts and Photo Texts made of them, and the LAN
-//! sync it hosts, for pairing in the Sync view and for paired Devices
-//! on their own.
+//! photos, the Transcripts and Photo Texts made of them, the LAN sync it
+//! hosts, for pairing in the Sync view and for paired Devices on their
+//! own, and the shared folder it syncs through.
 
 pub mod alerts;
 pub mod app;
@@ -16,6 +16,7 @@ pub mod autostart;
 pub mod background;
 pub mod cli;
 pub mod enrich;
+pub mod folder_sync;
 pub mod hotkey;
 pub mod icons;
 pub mod instance;

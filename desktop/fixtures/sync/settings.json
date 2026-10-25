@@ -3,12 +3,36 @@
     [
       "key:c945cbf2a5602002141e2fb9d17054d6",
       "{\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:1d9399d6f20e872b",
+      "{\"key\":\"b3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY4=\",\"scope\":\"area:starter-work\"}"
+    ],
+    [
+      "areakey:336adc7956439f25",
+      "{\"key\":\"SktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGk=\",\"scope\":\"area:starter-health\"}"
+    ],
+    [
+      "areakey:540f38ddbc8623e5",
+      "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
     ]
   ],
   "joiner": [
     [
       "key:65b60673d6ed884bf01c2c222d82ada0",
       "{\"device\":\"65b60673d6ed884bf01c2c222d82ada0\",\"key\":\"ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=\",\"sig\":\"A9PYyaBuz+xA1GyJewH2kc5QfxM4zpTd5rewibjfPn/vArAqZl+vM5wgGvLvdvBoN0NaZ0vzvlgK3pMknBKtAQ==\",\"trust\":\"verified\"}"
+    ],
+    [
+      "areakey:1d9399d6f20e872b",
+      "{\"key\":\"b3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY4=\",\"scope\":\"area:starter-work\"}"
+    ],
+    [
+      "areakey:336adc7956439f25",
+      "{\"key\":\"SktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGk=\",\"scope\":\"area:starter-health\"}"
+    ],
+    [
+      "areakey:540f38ddbc8623e5",
+      "{\"key\":\"JSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0Q=\",\"scope\":\"personal\"}"
     ]
   ]
 }

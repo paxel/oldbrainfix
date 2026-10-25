@@ -50,8 +50,20 @@ class FakeSync implements SyncPlatform {
     return nearby;
   }
 
+  /// Whether the background work runs for a shared folder too.
+  bool? folderBackground;
+
+  /// Whether the Device is on Wi-Fi or Ethernet.
+  var localNetwork = true;
+
   @override
-  Future<void> setBackground(bool on) async => background = on;
+  Future<void> setBackground(bool on, {bool folder = false}) async {
+    background = on;
+    folderBackground = folder;
+  }
+
+  @override
+  Future<bool> onLocalNetwork() async => localNetwork;
 }
 
 void main() {

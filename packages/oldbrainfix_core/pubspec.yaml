@@ -8,6 +8,9 @@ environment:
 
 dependencies:
   crypto: ^3.0.6
+  # End-to-end encryption of what leaves a Device (ADR 0003, 0012):
+  # XChaCha20-Poly1305, pure Dart.
+  cryptography: ^2.9.0
   ed25519_edwards: ^0.3.2
   sqlite3: ^3.0.0
 

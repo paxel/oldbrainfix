@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
  * are Dart's, so the worker starts a Flutter engine of its own without
  * any screen and runs `backgroundSyncMain` (lib/main.dart) in it, which
  * applies what was tapped on notifications, finds the paired hosts here
- * ([Discovery]), syncs and arms the alarms anew. The engine is gone when
+ * ([Discovery]), syncs with them and through the shared folder
+ * ([FolderChannel]) and arms the alarms anew. The engine is gone when
  * Dart says it finished, or after [LIMIT_MINUTES] at the latest. While
  * the app is open it syncs itself instead.
  */
@@ -28,7 +29,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
     private var discovery: Discovery? = null
 
     override fun doWork(): Result {
-        if (!SyncWork.onLocalNetwork(applicationContext) || MainActivity.syncInApp()) return Result.success()
+        val context = applicationContext
+        if (!SyncWork.folderOn(context) && !SyncWork.onLocalNetwork(context)) return Result.success()
+        if (MainActivity.syncInApp()) return Result.success()
         main.post { start() }
         over.await(LIMIT_MINUTES, TimeUnit.MINUTES)
         main.post { finish() }
@@ -56,6 +59,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
                     result.success(null)
                     finish()
                 }
+                "localNetwork" -> result.success(SyncWork.onLocalNetwork(context))
                 "start", "stop", "background" -> result.success(null)
                 else -> result.notImplemented()
             }
@@ -66,6 +70,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
                 "nudgeOpened", "unsortedOpened" -> result.success(false)
                 else -> if (!AlarmChannel.handle(context, call, result)) result.notImplemented()
             }
+        }
+        MethodChannel(messenger, FolderChannel.CHANNEL).setMethodCallHandler { call, result ->
+            if (!FolderChannel.handle(context, call, result)) result.notImplemented()
         }
         MethodChannel(messenger, PAIRING_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "deviceName") result.success(Pairing.deviceName()) else result.notImplemented()

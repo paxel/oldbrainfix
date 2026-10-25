@@ -3,12 +3,14 @@
 library;
 
 export 'src/alarms.dart';
+export 'src/area_keys.dart';
 export 'src/auto_sync.dart';
 export 'src/blobs.dart';
 export 'src/calendar_mirror.dart';
 export 'src/conflicts.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
+export 'src/folder_sync.dart';
 export 'src/history.dart';
 export 'src/ics.dart';
 export 'src/lan.dart';

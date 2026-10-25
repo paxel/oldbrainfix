@@ -64,5 +64,7 @@
   "unnamedDevice": "Unbenanntes Gerät",
   "syncAutoIntro": "Gekoppelte Geräte im selben Netz synchronisieren sich von selbst, solange diese App läuft, auch im Infobereich.",
   "syncConflictsArrived": "{count, plural, =1{Eine Synchronisierung hat 1 Sache gefunden, die auf beiden Geräten geändert wurde. Klicke, um zu wählen, welche Fassung bleibt.} other{Eine Synchronisierung hat {count} Sachen gefunden, die auf beiden Geräten geändert wurden. Klicke, um zu wählen, welche Fassungen bleiben.}}",
-  "syncConflictsBelow": "{count, plural, =1{1 Sache wurde auf beiden Geräten geändert. Wähle unten, welche Fassung bleibt.} other{{count} Sachen wurden auf beiden Geräten geändert. Wähle unten, welche Fassungen bleiben.}}"
+  "syncConflictsBelow": "{count, plural, =1{1 Sache wurde auf beiden Geräten geändert. Wähle unten, welche Fassung bleibt.} other{{count} Sachen wurden auf beiden Geräten geändert. Wähle unten, welche Fassungen bleiben.}}",
+  "folderSyncNow": "Jetzt synchronisieren",
+  "folderPickTitle": "Geteilten Ordner wählen"
 }
