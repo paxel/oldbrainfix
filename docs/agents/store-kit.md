@@ -19,7 +19,9 @@ every release.
 
 - Listing texts: `fastlane/metadata/android/<locale>/` (`title.txt`,
   `short_description.txt`, `full_description.txt`).
-- Release notes record: `docs/release-notes-<version>.md`.
+- Release notes record: `docs/release-notes-<version>.md`. The tag pipeline
+  takes What's new for Google Play and F-Droid from its `play_notes_en` and
+  `play_notes_de` blocks, word for word, and refuses a tag without them.
 - Privacy policy: https://paxel.github.io/oldbrainfix/en/reference/privacy-policy.html
   and https://paxel.github.io/oldbrainfix/de/reference/privacy-policy.html.
 

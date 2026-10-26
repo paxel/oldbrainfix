@@ -7,7 +7,8 @@
 #   build-android  — signed per-ABI + universal APKs and the Play bundle,
 #                    the Kotlin unit tests,
 #                    refused when signed with the debug key; the bundle
-#                    goes to Google Play's internal track
+#                    goes to Google Play's internal track with What's new
+#                    from docs/release-notes-<version>.md
 #   build-linux    — Rust desktop: tar.gz, .deb and AppImage per arch
 #   build-flatpak  — the Flatpak per arch, built from source
 #   screenshots    — desktop screenshots, drawn by kittest from demo data,
@@ -16,7 +17,8 @@
 #   build-macos    — Rust desktop: ad-hoc signed app in a .dmg, per arch
 #   render-channels — Homebrew cask + formula and Scoop manifest rendered from
 #                    the artifacts, uploaded as an artifact on every run
-#   fdroid         — the arm64 APK and the store listing into paxel/fdroid
+#   fdroid         — the arm64 APK, the store listing and the same What's
+#                    new into paxel/fdroid
 #   release        — GitHub Release, notes = the CHANGELOG section for the tag
 #   channels       — the rendered files pushed to the tap and the bucket, after
 #                    the Release, when publishing
@@ -75,6 +77,13 @@ jobs:
           tag=${RELEASE_TAG#v}
           [ "$ver" = "$tag" ] || { echo "tag v$tag != pubspec version $ver" >&2; exit 1; }
           [ "$cargo_ver" = "$tag" ] || { echo "tag v$tag != desktop Cargo version $cargo_ver" >&2; exit 1; }
+      # Play and F-Droid take What's new from the store kit's record; a
+      # tag without it would ship with none.
+      - name: What's new for Play and F-Droid exists
+        run: |
+          for lang in en de; do
+            python3 tool/whats_new.py "docs/release-notes-${RELEASE_TAG#v}.md" "$lang" > /dev/null
+          done
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -191,6 +200,13 @@ jobs:
         with:
           name: android
           path: dist/*
+      - name: What's new for Google Play
+        if: env.PUBLISH == 'true'
+        run: |
+          mkdir -p whatsnew
+          notes="docs/release-notes-${RELEASE_TAG#v}.md"
+          python3 tool/whats_new.py "$notes" en > whatsnew/whatsnew-en-US
+          python3 tool/whats_new.py "$notes" de > whatsnew/whatsnew-de-DE
       # `status: completed` is the whole point: `draft` parks the release
       # in the Console and waits for a human to press Start rollout.
       - name: Publish to Google Play
@@ -206,6 +222,7 @@ jobs:
           # decision, taken in the Console after the build was tried.
           track: internal
           status: completed
+          whatsNewDirectory: whatsnew
 
   build-linux:
     name: Linux desktop (${{ matrix.arch }})
@@ -420,10 +437,12 @@ jobs:
           rm -rf "metadata/$id" "repo/$id"
           mkdir -p "metadata/$id"
           cp -r "$app/fastlane/metadata/android/." "metadata/$id/"
-          en="metadata/$id/en-US"
-          mkdir -p "$en/changelogs"
-          # What's new: this version's CHANGELOG entries, cut to F-Droid's limit.
-          python3 "$app/tool/whats_new.py" "$v" "$app/CHANGELOG.md" > "$en/changelogs/default.txt"
+          # What's new: the same text as on Google Play.
+          for pair in en:en-US de:de-DE; do
+            mkdir -p "metadata/$id/${pair#*:}/changelogs"
+            python3 "$app/tool/whats_new.py" "$app/docs/release-notes-$v.md" "${pair%%:*}" \
+              > "metadata/$id/${pair#*:}/changelogs/default.txt"
+          done
           # Must stay word for word the same as cat(a)log's and Chaos
           # Alert's release workflows, or each release renames the repository.
           cat > config.yml <<EOF
