@@ -15,7 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, an Area lists only its Notes without a Topic; a search in the Area still finds the Notes of its Topics.
 - The phone's Capture page has large Photo and Voice buttons above the reminder choices instead of icons in the top bar.
 - On the phone, every single choice is a column of radio buttons, and every switch, button or list sits on its own line below its text.
-- A Note card on the phone shows, top to bottom, the Profile of another person who wrote it, the date with the location, the Note, and one row of icons for File into, Routine or Reminder, Merge and ⋮, which holds Importance, Send to a person, the calendar, Add to Note and Delete.
+- A Note card on the phone shows, top to bottom, the Profile of another person who wrote it, the date with the location, its Area and Topic or Unsorted where the screen does not already name them, the Note, and one row of icons for File into, Routine or Reminder, Merge and ⋮, which holds Importance, Send to a person, the calendar, Add to Note and Delete.
 
 ### Fixed
 - With three-button navigation, the end of the phone's pages no longer lies under the navigation bar.

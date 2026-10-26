@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/browser.dart';
 import 'package:oldbrainfix/src/note_card.dart';
+import 'package:oldbrainfix/src/nudge_screen.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -133,6 +135,76 @@ void main() {
       await open(tester, 'Kitchen');
       await search(tester, 'sauce');
       expect(cardTexts(tester), ['sauce in the kitchen']);
+    });
+  });
+
+  group('where a card says it is filed', () {
+    /// The place lines on the cards shown, by Note text.
+    Map<String, bool> placeShown(WidgetTester tester) => {
+      for (final card in tester.widgetList<NoteCard>(find.byType(NoteCard)))
+        card.note.text: card.showPlace,
+    };
+
+    Finder onCard(String text) =>
+        find.descendant(of: find.byType(NoteCard), matching: find.text(text));
+
+    testWidgets('a search across every Area names each hit\'s place', (
+      tester,
+    ) async {
+      capture('sauce in the kitchen', kitchen.id);
+      capture('sauce at work', work.id);
+      capture('nees mor sauce');
+      await openBrowser(tester);
+
+      await search(tester, 'sauce');
+      expect(placeShown(tester), {
+        'nees mor sauce': true,
+        'sauce at work': true,
+        'sauce in the kitchen': true,
+      });
+      expect(onCard('Household / Kitchen'), findsOneWidget);
+      expect(onCard('Work'), findsOneWidget);
+      expect(onCard('Unsorted'), findsOneWidget);
+    });
+
+    testWidgets('an Area, a Topic and Unsorted name no place on the cards', (
+      tester,
+    ) async {
+      capture('in the Area', home.id);
+      capture('in the kitchen', kitchen.id);
+      capture('not filed');
+      await openBrowser(tester);
+      await open(tester, 'Household');
+      expect(placeShown(tester), {'in the Area': false});
+      expect(onCard('Household'), findsNothing);
+
+      // A search inside the Area names the Topic of a Topic's hit only.
+      await search(tester, 'in the');
+      expect(placeShown(tester), {
+        'in the kitchen': true,
+        'in the Area': false,
+      });
+      expect(onCard('Household / Kitchen'), findsOneWidget);
+      expect(onCard('Household'), findsNothing);
+
+      await tester.tap(find.byTooltip('Clear search'));
+      await tester.pumpAndSettle();
+      await open(tester, 'Kitchen');
+      expect(placeShown(tester), {'in the kitchen': false});
+      expect(onCard('Household / Kitchen'), findsNothing);
+      await search(tester, 'kitchen');
+      expect(placeShown(tester), {'in the kitchen': false});
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: UnsortedScreen(notes: notes, places: places),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(placeShown(tester), {'not filed': false});
+      expect(onCard('Unsorted'), findsNothing);
     });
   });
 

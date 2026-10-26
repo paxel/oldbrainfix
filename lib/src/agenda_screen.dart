@@ -519,6 +519,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
               when: DateFormat.yMd(locale).add_Hm(),
               area: captured.area,
               topic: captured.topic,
+              showPlace: true,
               onFile: () => _file(captured.note),
               onMerge: () => _merge(captured.note),
               onSchedule: (reminder) => _schedule(captured.note, reminder),

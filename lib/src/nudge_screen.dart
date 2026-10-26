@@ -189,6 +189,8 @@ List<Widget> _sortingCards(
     (note) => then(openNote(context, notes, places, note)),
     notes: notes,
     onChanged: changed,
+    // The screen is Unsorted.
+    showPlace: (_) => false,
     onSchedule: (note, reminder) =>
         then(spawnFromNote(context, notes, places, note, reminder: reminder)),
   );

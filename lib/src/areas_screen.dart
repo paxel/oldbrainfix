@@ -341,6 +341,8 @@ class _AreasScreenState extends State<AreasScreen> {
                         _schedule,
                         widget.notes,
                         _reload,
+                        // Hits from every Area.
+                        (_) => true,
                       )
                     : _areaRows(t),
               ),
@@ -615,6 +617,8 @@ class _AreaScreenState extends State<AreaScreen> {
         _openNote,
         notes: widget.notes,
         onChanged: _reload,
+        // The Area's own Notes, under its title.
+        showPlace: (_) => false,
         onSchedule: _schedule,
       ),
     ];
@@ -680,6 +684,8 @@ class _AreaScreenState extends State<AreaScreen> {
                         _schedule,
                         widget.notes,
                         _reload,
+                        // A hit in one of the Topics names it.
+                        (placed) => placed.note.place != widget.areaId,
                       )
                     : _browsing(t, area),
               ),
@@ -866,6 +872,8 @@ class _TopicScreenState extends State<TopicScreen> {
                         _schedule,
                         widget.notes,
                         _reload,
+                        // Every hit is in the Topic of the title.
+                        (_) => false,
                       )
                     : _diary.isEmpty
                     ? [
@@ -883,6 +891,7 @@ class _TopicScreenState extends State<TopicScreen> {
                         _openNote,
                         notes: widget.notes,
                         onChanged: _reload,
+                        showPlace: (_) => false,
                         onSchedule: _schedule,
                       ),
               ),
@@ -934,6 +943,7 @@ List<Widget> _hitCards(
   void Function(Note note, bool reminder) onSchedule,
   Notes notes,
   VoidCallback onChanged,
+  bool Function(PlacedNote placed) showPlace,
 ) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -944,6 +954,7 @@ List<Widget> _hitCards(
         onOpen,
         notes: notes,
         onChanged: onChanged,
+        showPlace: showPlace,
         onSchedule: onSchedule,
       );
 

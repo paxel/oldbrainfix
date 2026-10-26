@@ -114,6 +114,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                           area: area,
                           topic: topic,
                           author: author,
+                          showPlace: true,
                           onTap: () => Navigator.of(context).pop(note.id),
                         ),
                     ],

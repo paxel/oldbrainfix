@@ -418,6 +418,14 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('theirNotes')));
       expect(find.byType(AllNotesScreen), findsOneWidget);
       expect(find.text('Ben buys bread'), findsOneWidget);
+      // The screen names no Area, so the card does.
+      expect(
+        find.descendant(
+          of: find.byType(NoteCard),
+          matching: find.text('Household'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Ann buys milk'), findsNothing);
       expect(chip(benId), findsOneWidget);
       expect(find.text('Only Notes by'), findsOneWidget);

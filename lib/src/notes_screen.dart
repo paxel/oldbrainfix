@@ -126,6 +126,8 @@ class _AllNotesScreenState extends State<AllNotesScreen> {
                 _open,
                 notes: widget.notes,
                 onChanged: _reload,
+                // Every Area at once: no screen title names one.
+                showPlace: (_) => true,
                 onSchedule: _schedule,
               ),
           ],

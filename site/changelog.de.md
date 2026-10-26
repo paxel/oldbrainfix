@@ -14,7 +14,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon zeigt ein Bereich nur seine Notizen ohne Thema; eine Suche im Bereich findet weiter die Notizen seiner Themen.
 - Die Erfassen-Seite auf dem Telefon hat große Knöpfe für Foto und Sprache über der Erinnerungsauswahl statt Symbolen in der oberen Leiste.
 - Auf dem Telefon ist jede einzelne Auswahl eine Spalte von Optionsfeldern, und jeder Schalter, Knopf und jede Liste steht in einer eigenen Zeile unter ihrem Text.
-- Eine Notizkarte auf dem Telefon zeigt von oben nach unten das Profil einer anderen Person, die sie geschrieben hat, das Datum mit dem Ort, die Notiz und eine Reihe von Symbolen für Ablegen, Routine oder Erinnerung, Zusammenführen und ⋮ mit Wichtigkeit, An eine Person senden, dem Kalender, Zur Notiz hinzufügen und Löschen.
+- Eine Notizkarte auf dem Telefon zeigt von oben nach unten das Profil einer anderen Person, die sie geschrieben hat, das Datum mit dem Ort, Bereich und Thema oder Unsortiert dort, wo die Seite sie nicht schon nennt, die Notiz und eine Reihe von Symbolen für Ablegen, Routine oder Erinnerung, Zusammenführen und ⋮ mit Wichtigkeit, An eine Person senden, dem Kalender, Zur Notiz hinzufügen und Löschen.
 
 ### Behoben
 - Bei Navigation mit drei Knöpfen liegt das Ende der Seiten auf dem Telefon nicht mehr unter der Navigationsleiste.

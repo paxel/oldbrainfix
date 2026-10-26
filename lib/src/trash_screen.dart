@@ -151,6 +151,7 @@ class _TrashScreenState extends State<TrashScreen> {
                       area: area,
                       topic: topic,
                       author: author,
+                      showPlace: true,
                       // Only who may change it restores it (ADR 0013).
                       footer: changes
                           ? _footer(

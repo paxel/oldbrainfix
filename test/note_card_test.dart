@@ -35,6 +35,9 @@ void main() {
     WidgetTester tester,
     Note note, {
     Profile? author,
+    Area? area,
+    Topic? topic,
+    bool showPlace = false,
     String locale = 'en',
     double width = 800,
   }) async {
@@ -53,6 +56,9 @@ void main() {
                 note: note,
                 when: DateFormat.yMd(locale).add_Hm(),
                 author: author,
+                area: area,
+                topic: topic,
+                showPlace: showPlace,
                 onFile: () {},
                 onMerge: () {},
                 onSchedule: (_) {},
@@ -112,6 +118,53 @@ void main() {
         top(tester, find.text(date)),
         lessThan(top(tester, find.byType(Divider).first)),
       );
+    });
+
+    testWidgets('where it is filed is the third line, when shown', (
+      tester,
+    ) async {
+      final places = Places(store);
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final note = notes.capture('Buy milk', place: kitchen.id);
+      await card(
+        tester,
+        note,
+        author: ann,
+        area: home,
+        topic: kitchen,
+        showPlace: true,
+      );
+
+      final date = DateFormat.yMd('en')
+          .add_Hm()
+          .format(note.captured.toLocal());
+      final order = [
+        top(tester, find.byKey(const ValueKey('author'))),
+        top(tester, find.text(date)),
+        top(tester, find.text('Household / Kitchen')),
+        top(tester, find.byType(Divider).first),
+        top(tester, find.text('Buy milk')),
+      ];
+      for (var i = 1; i < order.length; i++) {
+        expect(order[i], greaterThan(order[i - 1]), reason: 'step $i');
+      }
+    });
+
+    testWidgets('where it is filed stays out unless the screen asks', (
+      tester,
+    ) async {
+      final places = Places(store);
+      final home = places.addArea('Household');
+      final kitchen = places.addTopic(home.id, 'Kitchen');
+      final filed = notes.capture('Buy milk', place: kitchen.id);
+      await card(tester, filed, area: home, topic: kitchen);
+      expect(find.text('Household / Kitchen'), findsNothing);
+
+      await card(tester, notes.capture('Buy bread'));
+      expect(find.text('Unsorted'), findsNothing);
+      await card(tester, notes.capture('Buy eggs'), showPlace: true);
+      expect(find.text('Unsorted'), findsOneWidget);
     });
 
     testWidgets('a card without actions ends with the Note', (tester) async {

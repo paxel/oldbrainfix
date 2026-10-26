@@ -110,6 +110,8 @@ class BrowserSearchField extends StatelessWidget {
 /// with [onSchedule] Routine or Reminder, and ⋮ for the rest the Note
 /// editor offers, as far as this Device may; tapping a card opens it.
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
+/// [showPlace] says which cards name where they are filed: those the
+/// screen does not name already.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
@@ -118,6 +120,7 @@ List<Widget> diaryCards(
   void Function(Note note) onOpen, {
   required Notes notes,
   required VoidCallback onChanged,
+  required bool Function(PlacedNote placed) showPlace,
   void Function(Note note, bool reminder)? onSchedule,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
@@ -139,6 +142,7 @@ List<Widget> diaryCards(
           area: area,
           topic: topic,
           author: author,
+          showPlace: showPlace(placed),
           // What a Member may not do to it is not offered (ADR 0013).
           onFile: changes ? () => onFile(note) : null,
           onMerge: changes ? () => onMerge(note) : null,

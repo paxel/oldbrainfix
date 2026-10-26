@@ -114,14 +114,14 @@ class NoteActions {
 /// the other person who wrote it, picture and name (none on the user's
 /// own, ADR 0017); its capture time with the Named Place or coordinates
 /// it was captured at and an icon when there is more Capture Context;
-/// where it is filed; a separator; its text, thumbnails of its first
-/// [shownPhotos] photos and a play button per voice recording with the
-/// start of its Transcript under it; a separator; and its action row,
-/// icons only: file it, spawn a Routine or Reminder from it, merge it,
-/// and ⋮ for the rest with words. Its Area's colour runs down the left
-/// edge and its icon leads the place line. An important Note gets an
-/// accent marker and a stronger emboss, an unimportant one is dimmed
-/// (UI laws, "Cards").
+/// with [showPlace] where it is filed; a separator; its text, thumbnails
+/// of its first [shownPhotos] photos and a play button per voice
+/// recording with the start of its Transcript under it; a separator; and
+/// its action row, icons only: file it, spawn a Routine or Reminder from
+/// it, merge it, and ⋮ for the rest with words. Its Area's colour runs
+/// down the left edge and its icon leads the place line. An important
+/// Note gets an accent marker and a stronger emboss, an unimportant one
+/// is dimmed (UI laws, "Cards").
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -136,6 +136,10 @@ class NoteCard extends StatelessWidget {
   /// The Profile of the other person who wrote the Note; null for the
   /// user's own, which shows no Profile line.
   final Profile? author;
+
+  /// Whether the card says its Area and Topic, or Unsorted: only where
+  /// the screen around it does not say it already.
+  final bool showPlace;
 
   /// Opens "file into…"; no button when null.
   final VoidCallback? onFile;
@@ -169,6 +173,7 @@ class NoteCard extends StatelessWidget {
     this.area,
     this.topic,
     this.author,
+    this.showPlace = false,
     this.onFile,
     this.onMerge,
     this.onSchedule,
@@ -186,7 +191,9 @@ class NoteCard extends StatelessWidget {
     final topic = this.topic;
     final colour = areaColour(area?.colour);
     // A Note that spawned a Routine is not Unsorted, though not filed.
-    final place = area == null
+    final place = !showPlace
+        ? null
+        : area == null
         ? (note.spawned ? null : t.unsorted)
         : [
             areaName(t, area),
