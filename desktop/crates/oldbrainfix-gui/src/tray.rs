@@ -38,26 +38,22 @@ impl Drop for Tray {
     }
 }
 
-/// The square icon of `size` pixels as ARGB32 rows, big-endian: a teal
-/// disc with a light ring, the app's colours.
+/// The square icon of `size` pixels as ARGB32 rows, big-endian: the
+/// packaged 256 px icon, scaled down. Empty if it does not decode.
 pub fn icon_argb(size: i32) -> Vec<u8> {
-    let mut out = Vec::with_capacity((size * size * 4) as usize);
-    let c = (size as f32 - 1.0) / 2.0;
-    let r = size as f32 / 2.0;
-    for y in 0..size {
-        for x in 0..size {
-            let d = ((x as f32 - c).powi(2) + (y as f32 - c).powi(2)).sqrt();
-            let (a, rgb) = if d > r {
-                (0u8, [0u8, 0, 0])
-            } else if d > r * 0.78 || d < r * 0.22 {
-                (255, [0xF8, 0xFC, 0xFB])
-            } else {
-                (255, [0x00, 0x79, 0x6B])
-            };
-            out.extend_from_slice(&[a, rgb[0], rgb[1], rgb[2]]);
-        }
-    }
-    out
+    let Ok(icon) = image::load_from_memory(crate::launcher::ICON) else {
+        return Vec::new();
+    };
+    let side = size.max(1) as u32;
+    image::imageops::resize(
+        &icon.to_rgba8(),
+        side,
+        side,
+        image::imageops::FilterType::Lanczos3,
+    )
+    .pixels()
+    .flat_map(|p| [p[3], p[0], p[1], p[2]])
+    .collect()
 }
 
 #[cfg(target_os = "linux")]
@@ -163,19 +159,28 @@ pub fn spawn(
 mod tests {
     use super::*;
 
-    #[test]
-    fn the_icon_is_a_disc_in_the_apps_teal() {
-        let icon = icon_argb(32);
-        assert_eq!(icon.len(), 32 * 32 * 4);
-        // The corner is clear, a point between ring and centre is teal.
-        assert_eq!(icon[0], 0);
-        let at = |x: usize, y: usize| &icon[(y * 32 + x) * 4..(y * 32 + x) * 4 + 4];
-        assert_eq!(at(16, 8), &[255, 0x00, 0x79, 0x6B]);
-        assert_eq!(at(16, 16)[0], 255);
+    /// The pixel at `x`, `y` of a square ARGB icon `size` wide.
+    fn at(icon: &[u8], size: usize, x: usize, y: usize) -> &[u8] {
+        &icon[(y * size + x) * 4..(y * size + x) * 4 + 4]
     }
 
     #[test]
-    fn the_packaged_icons_are_the_tray_icon() {
+    fn the_tray_icon_is_the_round_anthracite_app_icon() {
+        for size in [22, 32, 64] {
+            let icon = icon_argb(size);
+            let size = size as usize;
+            assert_eq!(icon.len(), size * size * 4);
+            // The corner is clear, a point inside the disc is anthracite.
+            assert_eq!(at(&icon, size, 0, 0)[0], 0);
+            assert_eq!(
+                at(&icon, size, size / 8, size / 2),
+                &[255, 0x26, 0x29, 0x2C]
+            );
+        }
+    }
+
+    #[test]
+    fn the_packaged_icons_are_the_same_round_icon() {
         // Launcher, .deb, AppImage, Flatpak, macOS and Windows ship these.
         for (size, png) in [
             (
@@ -188,12 +193,12 @@ mod tests {
             ),
         ] {
             let rgba = image::load_from_memory(png).unwrap().to_rgba8();
-            assert_eq!(rgba.dimensions(), (size as u32, size as u32));
-            let argb: Vec<u8> = rgba
-                .pixels()
-                .flat_map(|p| [p[3], p[0], p[1], p[2]])
-                .collect();
-            assert!(argb == icon_argb(size), "{size} px icon differs");
+            assert_eq!(rgba.dimensions(), (size, size));
+            assert_eq!(rgba.get_pixel(0, 0)[3], 0);
+            assert_eq!(
+                rgba.get_pixel(size / 8, size / 2).0,
+                [0x26, 0x29, 0x2C, 255]
+            );
         }
     }
 }

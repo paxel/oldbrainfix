@@ -72,7 +72,7 @@ object Notifications {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return builder
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(alarm.title)
             .setContentText(alarm.body)
             .setCategory(Notification.CATEGORY_ALARM)
@@ -111,7 +111,7 @@ object Notifications {
         context.getSystemService(NotificationManager::class.java).notify(
             CATCH_UP_ID,
             builder(context)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(Scheduler.label(context, "catchUpTitle"))
                 .setContentText(text)
                 .setCategory(Notification.CATEGORY_REMINDER)
@@ -155,7 +155,7 @@ object Notifications {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             Notification.Action.Builder(
-                Icon.createWithResource(context, R.mipmap.ic_launcher),
+                Icon.createWithResource(context, R.drawable.ic_notification),
                 Scheduler.label(context, label),
                 pending,
             ).build()
@@ -163,7 +163,7 @@ object Notifications {
         manager.notify(
             NUDGE_ID,
             builder
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(nudge.title)
                 .setContentText(nudge.body)
                 .setCategory(Notification.CATEGORY_REMINDER)
@@ -193,7 +193,7 @@ object Notifications {
     ) {
         val manager = context.getSystemService(NotificationManager::class.java)
         val notification = (if (urgent) escalatedBuilder(context) else builder(context))
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(alarm.title)
             .setContentText(text)
             .setCategory(if (urgent) Notification.CATEGORY_ALARM else Notification.CATEGORY_REMINDER)
@@ -271,6 +271,6 @@ object Notifications {
             context, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return Notification.Action.Builder(Icon.createWithResource(context, R.mipmap.ic_launcher), label, pending).build()
+        return Notification.Action.Builder(Icon.createWithResource(context, R.drawable.ic_notification), label, pending).build()
     }
 }
