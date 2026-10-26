@@ -34,8 +34,9 @@
 #   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD — upload keystore,
 #                 key alias `oldbrainfix`
 #   PLAY_SERVICE_ACCOUNT_JSON — Play Console service account
-#   CHANNEL_PAT — PAT with push access to paxel/fdroid, paxel/homebrew-tap
-#                 and paxel/scoop-bucket
+#   CHANNEL_PAT — PAT with push access to paxel/homebrew-tap and
+#                 paxel/scoop-bucket
+#   CHANNEL_PAT_FDROID — PAT with push access to paxel/fdroid
 #   FDROID_KEYSTORE_BASE64 / FDROID_KEYSTORE_PASS — the F-Droid repo key,
 #                 the same one cat(a)log and Chaos Alert use
 #
@@ -409,7 +410,7 @@ jobs:
         run: pip install --quiet fdroidserver
       - name: Publish to the shared channel repo
         env:
-          GH_TOKEN: ${{ secrets.CHANNEL_PAT }}
+          GH_TOKEN: ${{ secrets.CHANNEL_PAT_FDROID }}
           KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
         run: |
