@@ -982,6 +982,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'That is not the expected speech model, so it was not kept.';
 
   @override
+  String get speechOfferQuestion => 'Transcribe voice Notes on the phone?';
+
+  @override
+  String speechOfferDetail(int megabytes) {
+    return 'Download the speech model ($megabytes MB) once. It downloads in the background while you go on, and Settings offers it any time later.';
+  }
+
+  @override
+  String speechOfferMobileData(int megabytes) {
+    return 'You are on mobile data. The download uses $megabytes MB of it.';
+  }
+
+  @override
   String get transcribing => 'Transcribing…';
 
   @override

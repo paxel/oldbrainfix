@@ -181,6 +181,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "supported" -> result.success(WhisperNative.loaded)
                     "modelHash" -> inBackground(result) { speech.modelHash() }
+                    "onMobileData" -> result.success(speech.onMobileData())
                     "download" -> {
                         val url = call.arguments as String
                         inBackground(result) {

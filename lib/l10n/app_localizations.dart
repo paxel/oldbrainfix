@@ -1616,6 +1616,24 @@ abstract class AppLocalizations {
   /// **'That is not the expected speech model, so it was not kept.'**
   String get speechModelMismatch;
 
+  /// No description provided for @speechOfferQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe voice Notes on the phone?'**
+  String get speechOfferQuestion;
+
+  /// No description provided for @speechOfferDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the speech model ({megabytes} MB) once. It downloads in the background while you go on, and Settings offers it any time later.'**
+  String speechOfferDetail(int megabytes);
+
+  /// No description provided for @speechOfferMobileData.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on mobile data. The download uses {megabytes} MB of it.'**
+  String speechOfferMobileData(int megabytes);
+
   /// No description provided for @transcribing.
   ///
   /// In en, this message translates to:

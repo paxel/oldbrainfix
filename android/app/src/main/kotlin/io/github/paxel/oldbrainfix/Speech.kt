@@ -5,6 +5,8 @@ import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -60,6 +62,15 @@ class Speech(private val context: Context) {
     /** A model on its way in: downloaded or picked, not yet checked. */
     private val incomingFile: File
         get() = File(dir, "$MODEL_NAME.part")
+
+    /** Whether the phone is online through mobile data now. */
+    fun onMobileData(): Boolean = try {
+        val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+    } catch (e: SecurityException) {
+        false
+    }
 
     /** The SHA-256 of the model in use, or null when there is none. */
     fun modelHash(): String? = modelFile.takeIf { it.isFile }?.inputStream()?.use {

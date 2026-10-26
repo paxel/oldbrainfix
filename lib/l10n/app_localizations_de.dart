@@ -987,6 +987,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Das ist nicht das erwartete Sprachmodell, deshalb wurde es nicht behalten.';
 
   @override
+  String get speechOfferQuestion =>
+      'Sprachnotizen auf dem Telefon transkribieren?';
+
+  @override
+  String speechOfferDetail(int megabytes) {
+    return 'Lade dafür einmal das Sprachmodell herunter ($megabytes MB). Es lädt im Hintergrund, während du weitermachst, und die Einstellungen bieten es jederzeit später an.';
+  }
+
+  @override
+  String speechOfferMobileData(int megabytes) {
+    return 'Du bist mit mobilen Daten online. Der Download verbraucht davon $megabytes MB.';
+  }
+
+  @override
   String get transcribing => 'Wird transkribiert …';
 
   @override

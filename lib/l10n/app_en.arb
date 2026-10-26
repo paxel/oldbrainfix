@@ -554,6 +554,23 @@
   },
   "speechModelFailed": "The download did not finish, and nothing was kept. Try again later.",
   "speechModelMismatch": "That is not the expected speech model, so it was not kept.",
+  "speechOfferQuestion": "Transcribe voice Notes on the phone?",
+  "speechOfferDetail": "Download the speech model ({megabytes} MB) once. It downloads in the background while you go on, and Settings offers it any time later.",
+  "@speechOfferDetail": {
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "speechOfferMobileData": "You are on mobile data. The download uses {megabytes} MB of it.",
+  "@speechOfferMobileData": {
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
   "transcribing": "Transcribing…",
   "noWordsHeard": "No words heard.",
   "historyTitle": "History",

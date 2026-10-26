@@ -9,7 +9,9 @@ import 'package:oldbrainfix/src/areas_screen.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/speech_model_screen.dart';
+import 'package:oldbrainfix/src/speech_offer_screen.dart';
 import 'package:oldbrainfix/src/speech_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -258,6 +260,113 @@ void main() {
         findsOneWidget,
       );
       expect(download, findsNothing);
+    });
+  });
+
+  group('the first-start offer', () {
+    final notNow = find.text('Not now');
+    final mobileHint = find.byKey(const ValueKey('speech-offer-mobile-data'));
+
+    /// A first start up to the Starter Set's Start.
+    Future<void> firstStart(
+      WidgetTester tester, {
+      SpeechPlatform? platform,
+    }) async {
+      store.starterSetOffered = false;
+      await start(tester, platform: platform);
+      expect(find.byType(StarterSetScreen), findsOneWidget);
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      await tap(tester, find.text('Start'));
+    }
+
+    testWidgets('comes after the Starter Set; Not now goes on without the '
+        'model, which Settings still offers', (tester) async {
+      await firstStart(tester);
+      expect(find.byType(SpeechOfferScreen), findsOneWidget);
+      expect(find.text('Transcribe voice Notes on the phone?'), findsOneWidget);
+      expect(find.textContaining('speech model (148 MB)'), findsOneWidget);
+      expect(mobileHint, findsNothing);
+
+      await tap(tester, notNow);
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(speech.downloads, isEmpty);
+
+      await openModel(tester);
+      expect(download, findsOneWidget);
+      expect(pick, findsOneWidget);
+    });
+
+    testWidgets('Download starts the download in the background and the '
+        'setup goes on at once', (tester) async {
+      await firstStart(tester);
+      await tap(tester, download);
+
+      expect(speech.downloads, [WhisperModel.url]);
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(
+        SpeechScope.of(tester.element(find.byType(AgendaScreen)))!.model.status,
+        ModelStatus.fetching,
+      );
+
+      speech.bring(WhisperModel.sha256);
+      await tester.pumpAndSettle();
+      expect(speech.installed, WhisperModel.sha256);
+    });
+
+    testWidgets('a background download that breaks off is announced', (
+      tester,
+    ) async {
+      await firstStart(tester);
+      await tap(tester, download);
+
+      speech.bring(null);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'The download did not finish, and nothing was kept. '
+          'Try again later.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('says so beside the button on mobile data', (tester) async {
+      speech.mobileData = true;
+      await firstStart(tester);
+      expect(mobileHint, findsOneWidget);
+      expect(
+        find.text('You are on mobile data. The download uses 148 MB of it.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('is not shown on a phone that finished setup', (tester) async {
+      await start(tester);
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('is not shown where Whisper does not run', (tester) async {
+      await firstStart(tester, platform: FakeSpeech(runs: false));
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('is not shown where a model is in place', (tester) async {
+      await firstStart(
+        tester,
+        platform: FakeSpeech(installed: WhisperModel.sha256),
+      );
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('is not shown without a speech layer', (tester) async {
+      await firstStart(tester, platform: const NoSpeech());
+      expect(find.byType(SpeechOfferScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
     });
   });
 

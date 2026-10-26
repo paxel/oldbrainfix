@@ -6,6 +6,23 @@ import 'look.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 
+/// Fetches the speech model with [fetch] and announces at the top when
+/// it broke off or was not the pinned one.
+Future<void> fetchSpeechModel(
+  BuildContext context,
+  Future<ModelOutcome> Function() fetch,
+) async {
+  final announcements = AnnouncementsScope.of(context);
+  final t = context.t;
+  final outcome = await fetch();
+  final text = switch (outcome) {
+    ModelOutcome.failed => t.speechModelFailed,
+    ModelOutcome.mismatch => t.speechModelMismatch,
+    ModelOutcome.installed || ModelOutcome.cancelled => null,
+  };
+  if (text != null) announcements?.announce(text);
+}
+
 /// The speech model for Transcripts: what it is for, how big it is and
 /// where it comes from, then a download on request or a file of the
 /// user's own. A model that is not the pinned one is never kept. Opens
@@ -14,21 +31,6 @@ class SpeechModelScreen extends StatelessWidget {
   final SpeechModel model;
 
   const SpeechModelScreen({super.key, required this.model});
-
-  Future<void> _fetch(
-    BuildContext context,
-    Future<ModelOutcome> Function() fetch,
-  ) async {
-    final announcements = AnnouncementsScope.of(context);
-    final t = context.t;
-    final outcome = await fetch();
-    final text = switch (outcome) {
-      ModelOutcome.failed => t.speechModelFailed,
-      ModelOutcome.mismatch => t.speechModelMismatch,
-      ModelOutcome.installed || ModelOutcome.cancelled => null,
-    };
-    if (text != null) announcements?.announce(text);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,13 +95,13 @@ class SpeechModelScreen extends StatelessWidget {
             Text(t.speechModelMissing, style: text.titleMedium),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => _fetch(context, model.download),
+              onPressed: () => fetchSpeechModel(context, model.download),
               icon: const Icon(Icons.download),
               label: Text(t.speechModelDownload(WhisperModel.megabytes)),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: () => _fetch(context, model.pick),
+              onPressed: () => fetchSpeechModel(context, model.pick),
               icon: const Icon(Icons.folder_open),
               label: Text(t.speechModelPick),
             ),

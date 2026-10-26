@@ -16,6 +16,9 @@ class FakeSpeech implements SpeechPlatform {
   /// The SHA-256 of the model on the side; null while there is none.
   String? side;
 
+  /// Whether the Device is on mobile data.
+  bool mobileData = false;
+
   /// What the running download or pick brings, once the test completes
   /// it; null for "nothing".
   Completer<String?>? fetching;
@@ -88,6 +91,9 @@ class FakeSpeech implements SpeechPlatform {
     cancels++;
     bring(null);
   }
+
+  @override
+  Future<bool> onMobileData() async => mobileData;
 
   @override
   Future<bool> install() async {

@@ -39,6 +39,8 @@ import 'ring_screen.dart';
 import 'routine_editor_screen.dart';
 import 'sent_item_screen.dart';
 import 'setup_screen.dart';
+import 'speech_model_screen.dart';
+import 'speech_offer_screen.dart';
 import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
@@ -311,6 +313,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       requests: widget.requests,
       bundles: widget.bundles,
       profile: _profile,
+      speech: _speechModel,
       onThemeChanged: _themeChanged,
     ),
   );
@@ -353,8 +356,9 @@ class RouteStack extends NavigatorObserver {
   }
 }
 
-/// The Starter Set on this Device's first start, then the alarm setup
-/// where there are alarms, the Agenda after them. Keeps the alarms in
+/// The Starter Set on this Device's first start, then the speech model
+/// offer where there is a speech layer, then the alarm setup where there
+/// are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, and the Unsorted list when the Agenda widget's Unsorted
@@ -377,6 +381,7 @@ class _Home extends StatefulWidget {
   final CaptureRequests requests;
   final BundlePlatform bundles;
   final OwnProfileModel profile;
+  final SpeechModel speech;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -392,6 +397,7 @@ class _Home extends StatefulWidget {
     required this.requests,
     required this.bundles,
     required this.profile,
+    required this.speech,
     required this.onThemeChanged,
   });
 
@@ -413,6 +419,11 @@ class _HomeState extends State<_Home> {
   /// on the first start (ADR 0010): opened at once, asking for the
   /// passphrase or the recovery key.
   String? _found;
+
+  /// Whether the speech model is offered now: right after the Starter
+  /// Set or a restore on the first start, and never again, as Settings
+  /// offers it as well.
+  var _speechOfferDue = false;
   late bool _alarmSetupDone =
       widget.store.alarmSetupDone || !widget.alarms.platform.available;
   late final AppLifecycleListener _lifecycle;
@@ -445,6 +456,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.lock.addListener(_lockChanged);
+    widget.speech.addListener(_speechChanged);
     widget.autoSync.addListener(_conflictsSynced);
     widget.autoSync.addListener(_updatesNeeded);
     // Paired Devices sync while the app shows, from the first frame on:
@@ -545,6 +557,7 @@ class _HomeState extends State<_Home> {
     widget.alarms.removeListener(_nudgeOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.lock.removeListener(_lockChanged);
+    widget.speech.removeListener(_speechChanged);
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
     unawaited(_bundlesOpened.cancel());
@@ -676,7 +689,31 @@ class _HomeState extends State<_Home> {
   void _plant(Set<String> picked) {
     widget.places.plantStarterSet(picked);
     widget.store.starterSetOffered = true;
-    setState(() => _starterSetOffered = true);
+    setState(() {
+      _starterSetOffered = true;
+      _speechOfferDue = _speechWanted;
+    });
+  }
+
+  /// Whether the speech model is worth offering: there is a speech layer,
+  /// Whisper may run here, and no model is in place.
+  bool get _speechWanted =>
+      widget.speech.platform.available &&
+      widget.speech.status != ModelStatus.ready &&
+      widget.speech.status != ModelStatus.unsupported;
+
+  /// The offer goes once the check finds a model in place or that Whisper
+  /// does not run here.
+  void _speechChanged() {
+    if (!mounted || !_speechOfferDue || _speechWanted) return;
+    setState(() => _speechOfferDue = false);
+  }
+
+  /// Starts the speech model's download in the background, announced
+  /// at the top should it fail, and goes on with the setup at once.
+  void _downloadSpeech() {
+    unawaited(fetchSpeechModel(context, widget.speech.download));
+    setState(() => _speechOfferDue = false);
   }
 
   /// The platform's backup is told the opt-in this Device keeps, and on
@@ -717,7 +754,10 @@ class _HomeState extends State<_Home> {
       _found = null;
     }
     widget.store.starterSetOffered = true;
-    setState(() => _starterSetOffered = true);
+    setState(() {
+      _starterSetOffered = true;
+      _speechOfferDue = _speechWanted;
+    });
     unawaited(widget.alarms.refresh());
     widget.autoSync.devicesChanged();
   }
@@ -736,6 +776,13 @@ class _HomeState extends State<_Home> {
         onRestore: _restorable || _found != null
             ? () => unawaited(_restore())
             : null,
+      );
+    }
+    if (_speechOfferDue) {
+      return SpeechOfferScreen(
+        model: widget.speech,
+        onDownload: _downloadSpeech,
+        onSkip: () => setState(() => _speechOfferDue = false),
       );
     }
     if (!_alarmSetupDone) {

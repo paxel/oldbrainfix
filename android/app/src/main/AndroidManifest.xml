@@ -8,12 +8,17 @@
          devices. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- The one download of the speech model for Transcripts (ADR 0007),
-         only when the user asks for it on the speech model page, and
+         only when the user asks for it on the speech model page or in
+         the first-start setup, and
          only from Old Brain Fix's own GitHub release; and sync with the
          paired Devices on the local network, found there by mDNS, also
          in the background about every 15 minutes (ADR 0003). Nothing
          else goes online: no analytics, no telemetry, no other host. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Whether the phone is on mobile data, so the first-start setup can
+         say so before the speech model is downloaded; and whether a
+         background sync has a local network. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Capture Context, each only once the user switched it on: the
          calendar event running and the connected Bluetooth device. Read
          at Capture and kept in the Note on the user's own devices. -->

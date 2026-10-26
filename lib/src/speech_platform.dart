@@ -60,6 +60,10 @@ abstract interface class SpeechPlatform {
   /// Stops a download or copy running.
   Future<void> cancel();
 
+  /// Whether the Device is online through mobile data now, where a
+  /// download costs the user's data.
+  Future<bool> onMobileData();
+
   /// Keeps the model on the side as the one in use; whether it did.
   Future<bool> install();
 
@@ -101,6 +105,9 @@ class NoSpeech implements SpeechPlatform {
 
   @override
   Future<void> cancel() async {}
+
+  @override
+  Future<bool> onMobileData() async => false;
 
   @override
   Future<bool> install() async => false;
@@ -156,6 +163,10 @@ class AndroidSpeech implements SpeechPlatform {
 
   @override
   Future<void> cancel() => _ask<void>('cancel');
+
+  @override
+  Future<bool> onMobileData() async =>
+      await _ask<bool>('onMobileData') ?? false;
 
   @override
   Future<bool> install() async => await _ask<bool>('install') ?? false;

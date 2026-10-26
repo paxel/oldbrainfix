@@ -9,7 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Capture a thought as a text Note with one tap on +; leaving by Back or switching apps keeps it.
 - Take a photo as a Note, optionally with a few words; kept photos carry no location data.
 - Record a voice Note that starts at once and ends with one big stop button; the recording is kept to play back.
-- Transcripts of voice Notes, written on the phone by Whisper in English or German, after a one-time speech model download on request or from a file of your own.
+- Transcripts of voice Notes, written on the phone by Whisper in English or German, after a one-time speech model download, offered once after the Starter Set and on request in Settings, or from a file of your own.
 - Text in photos and screenshots is recognised on the phone by ocrs, offline, and kept with the photo.
 - Share images, text and links from other apps into a new Unsorted Note.
 - App shortcuts, Quick Settings tiles and home-screen widgets that open voice, text or photo capture directly, also for hardware buttons.
