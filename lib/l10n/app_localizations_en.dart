@@ -2525,4 +2525,25 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get removeRecordingKeepText => 'Remove recording, keep text';
+
+  @override
+  String get removePhotoKeepText => 'Remove photo, keep text';
+
+  @override
+  String get removeRecordingQuestion =>
+      'Remove this recording and keep its Transcript?';
+
+  @override
+  String get removePhotoQuestion =>
+      'Remove this photo and keep its Photo Text?';
+
+  @override
+  String get removeMediaDetail =>
+      'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.';
+
+  @override
+  String get remove => 'Remove';
 }

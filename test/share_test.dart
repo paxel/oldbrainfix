@@ -174,6 +174,50 @@ void main() {
     expect(find.text('Add to Note'), findsOneWidget);
   });
 
+  testWidgets('a Member may not remove the recording of someone else\'s '
+      'Note', (tester) async {
+    final owner = Notes(ann);
+    final plumber = owner.capture(
+      'Call the plumber',
+      place: area,
+      recordings: [
+        Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]),
+      ],
+    );
+    final hash = plumber.recordings.single;
+    owner.setTranscript(plumber.id, hash, 'Tuesday after five');
+    expect(owner.mayRemoveRecording(plumber.id, hash), isTrue);
+    invite(AreaRole.member);
+    await tester.pumpWidget(OldBrainFixApp(store: ben));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Household'));
+    await tester.pumpAndSettle();
+    final card = find.ancestor(
+      of: find.text('Call the plumber'),
+      matching: find.byType(NoteCard),
+    );
+    await tester.tap(
+      find.descendant(
+        of: card,
+        matching: find.byKey(const ValueKey('note-menu')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Send to a person'), findsOneWidget);
+    expect(find.byKey(ValueKey('note-remove-$hash')), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Call the plumber'));
+    await tester.pumpAndSettle();
+    await reveal(tester, find.text('Tuesday after five'));
+    expect(
+      find.byKey(ValueKey('remove:$hash'), skipOffstage: false),
+      findsNothing,
+    );
+  });
+
   testWidgets('a Manager sees everything as an owner does', (tester) async {
     invite(AreaRole.manager);
     await tester.pumpWidget(OldBrainFixApp(store: ben));

@@ -174,17 +174,20 @@ class PhotoReaderScope extends InheritedWidget {
 /// The Photo Text of the photo [hash] of the Note [noteId], shown under
 /// the photo: [photoText] as read with the Note, and whatever the
 /// [PhotoReader] writes while it shows. A photo without text, or not
-/// read yet, shows nothing.
+/// read yet, shows nothing. [compact], on a card, shows the first three
+/// lines.
 class PhotoText extends StatefulWidget {
   final String noteId;
   final String hash;
   final String? photoText;
+  final bool compact;
 
   const PhotoText({
     super.key,
     required this.noteId,
     required this.hash,
     required this.photoText,
+    this.compact = false,
   });
 
   @override
@@ -232,6 +235,8 @@ class _PhotoTextState extends State<PhotoText> {
       padding: const EdgeInsets.only(top: 8),
       child: Text(
         text,
+        maxLines: widget.compact ? 3 : null,
+        overflow: widget.compact ? TextOverflow.ellipsis : null,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),

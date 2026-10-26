@@ -4027,6 +4027,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}'**
   String deleteNoteWithLinked(int count);
+
+  /// No description provided for @removeRecordingKeepText.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove recording, keep text'**
+  String get removeRecordingKeepText;
+
+  /// No description provided for @removePhotoKeepText.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo, keep text'**
+  String get removePhotoKeepText;
+
+  /// No description provided for @removeRecordingQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this recording and keep its Transcript?'**
+  String get removeRecordingQuestion;
+
+  /// No description provided for @removePhotoQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this photo and keep its Photo Text?'**
+  String get removePhotoQuestion;
+
+  /// No description provided for @removeMediaDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The file goes from all your Devices and from everyone you share the Note\'s Area with. The text stays on the Note.'**
+  String get removeMediaDetail;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
 }
 
 class _AppLocalizationsDelegate

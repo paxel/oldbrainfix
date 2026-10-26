@@ -6,6 +6,7 @@ import 'area_look.dart';
 import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'ocr_platform.dart';
 import 'person_screen.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
@@ -81,6 +82,16 @@ String? whereCaptured(CaptureContext capture) =>
 /// events as one calendar file when there are any.
 typedef NoteCalendar = ({List<CalendarChoice> add, CalendarChoice? file});
 
+/// A photo ([photo]) or voice recording [hash] a card's ⋮ menu offers
+/// to remove while its [text] stays, shown to tell several apart; [run]
+/// asks once and removes it (ADR 0020).
+typedef MediaRemoval = ({
+  bool photo,
+  String hash,
+  String text,
+  VoidCallback run,
+});
+
 /// What a card's ⋮ menu offers beyond filing, scheduling and merging:
 /// the actions the Note editor has. An entry is left out when its
 /// callback is null.
@@ -98,6 +109,10 @@ class NoteActions {
   /// Adds a Section to the Note.
   final VoidCallback? onAmend;
 
+  /// The photos and recordings that may go while their texts stay, read
+  /// as the menu opens.
+  final List<MediaRemoval> Function()? removals;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -106,6 +121,7 @@ class NoteActions {
     this.onSend,
     this.calendar,
     this.onAmend,
+    this.removals,
     this.onDelete,
   });
 }
@@ -115,8 +131,10 @@ class NoteActions {
 /// own, ADR 0017); its capture time with the Named Place or coordinates
 /// it was captured at and an icon when there is more Capture Context;
 /// with [showPlace] where it is filed; a separator; its text, thumbnails
-/// of its first [shownPhotos] photos and a play button per voice
-/// recording with the start of its Transcript under it; a separator; and
+/// of its first [shownPhotos] photos, a play button per voice recording
+/// with the start of its Transcript under it, and the start of each
+/// Transcript and Photo Text whose recording or photo was removed; a
+/// separator; and
 /// its action row, icons only: file it, spawn a Routine or Reminder from
 /// it, merge it, and ⋮ for the rest with words. Its Area's colour runs
 /// down the left edge and its icon leads the place line. An important
@@ -339,6 +357,22 @@ class NoteCard extends StatelessWidget {
                           transcript: note.transcripts[hash],
                         ),
                     ],
+                    // Removed, the file shows no more; its text stays.
+                    for (final hash in note.removedRecordings)
+                      TranscriptText(
+                        key: ValueKey('transcript:$hash'),
+                        noteId: note.id,
+                        hash: hash,
+                        transcript: note.transcripts[hash],
+                      ),
+                    for (final hash in note.removedPhotos)
+                      PhotoText(
+                        key: ValueKey('ocr:$hash'),
+                        noteId: note.id,
+                        hash: hash,
+                        photoText: note.photoTexts[hash],
+                        compact: true,
+                      ),
                     if (acts || footer != null) const Divider(height: 24),
                     // Icons only, so the row stays one line in every
                     // language; the words show on a long press.
@@ -399,7 +433,9 @@ class NoteCard extends StatelessWidget {
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with the Note's Importance as radio buttons, the one it has
-/// marked, then sending, the calendar, adding to the Note and deleting.
+/// marked, then sending, the calendar, adding to the Note, removing a
+/// photo or recording while its text stays, one entry each with the
+/// start of that text under it, and deleting.
 class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
@@ -485,6 +521,45 @@ class _MoreButton extends StatelessWidget {
             ),
           if (actions.onAmend case final amend?)
             item('note-amend', Icons.add, t.amend, amend),
+          for (final removal in actions.removals?.call() ?? <MediaRemoval>[])
+            PopupMenuItem(
+              key: ValueKey('note-remove-${removal.hash}'),
+              value: removal.run,
+              child: Row(
+                children: [
+                  Icon(
+                    removal.photo
+                        ? Icons.hide_image_outlined
+                        : Icons.mic_off_outlined,
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          removal.photo
+                              ? t.removePhotoKeepText
+                              : t.removeRecordingKeepText,
+                        ),
+                        // Which one, when there are several.
+                        Text(
+                          removal.text.trim().split('\n').first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(button).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(button)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (actions.onDelete case final delete?)
             item('note-delete', Icons.delete_outline, t.delete, delete),
         ];

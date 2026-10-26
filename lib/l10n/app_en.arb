@@ -1417,5 +1417,11 @@
   "deleteNoteDetail": "It stays in the trash for 30 days.",
   "deleteNoteOnly": "Delete only the Note",
   "deleteNoteWithLinked": "{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}",
-  "@deleteNoteWithLinked": {"placeholders": {"count": {"type": "int"}}}
+  "@deleteNoteWithLinked": {"placeholders": {"count": {"type": "int"}}},
+  "removeRecordingKeepText": "Remove recording, keep text",
+  "removePhotoKeepText": "Remove photo, keep text",
+  "removeRecordingQuestion": "Remove this recording and keep its Transcript?",
+  "removePhotoQuestion": "Remove this photo and keep its Photo Text?",
+  "removeMediaDetail": "The file goes from all your Devices and from everyone you share the Note's Area with. The text stays on the Note.",
+  "remove": "Remove"
 }

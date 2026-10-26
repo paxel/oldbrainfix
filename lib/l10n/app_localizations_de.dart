@@ -2546,4 +2546,25 @@ class AppLocalizationsDe extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get removeRecordingKeepText => 'Aufnahme entfernen, Text behalten';
+
+  @override
+  String get removePhotoKeepText => 'Foto entfernen, Text behalten';
+
+  @override
+  String get removeRecordingQuestion =>
+      'Diese Aufnahme entfernen und ihr Transkript behalten?';
+
+  @override
+  String get removePhotoQuestion =>
+      'Dieses Foto entfernen und seinen Text behalten?';
+
+  @override
+  String get removeMediaDetail =>
+      'Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Der Text bleibt in der Notiz.';
+
+  @override
+  String get remove => 'Entfernen';
 }

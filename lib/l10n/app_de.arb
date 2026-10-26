@@ -663,5 +663,11 @@
   "deleteNoteQuestion": "Diese Notiz löschen?",
   "deleteNoteDetail": "Sie bleibt 30 Tage im Papierkorb.",
   "deleteNoteOnly": "Nur die Notiz löschen",
-  "deleteNoteWithLinked": "{count, plural, =1{Mit ihrer Routine oder Erinnerung löschen} other{Mit ihren {count} Routinen und Erinnerungen löschen}}"
+  "deleteNoteWithLinked": "{count, plural, =1{Mit ihrer Routine oder Erinnerung löschen} other{Mit ihren {count} Routinen und Erinnerungen löschen}}",
+  "removeRecordingKeepText": "Aufnahme entfernen, Text behalten",
+  "removePhotoKeepText": "Foto entfernen, Text behalten",
+  "removeRecordingQuestion": "Diese Aufnahme entfernen und ihr Transkript behalten?",
+  "removePhotoQuestion": "Dieses Foto entfernen und seinen Text behalten?",
+  "removeMediaDetail": "Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Der Text bleibt in der Notiz.",
+  "remove": "Entfernen"
 }
