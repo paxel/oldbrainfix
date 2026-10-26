@@ -3,7 +3,8 @@
 //! date with its weekday (`yMEd`), and how a schedule repeats.
 
 use oldbrainfix_core::{
-    ClockTime, Day, Occurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,
+    ClockTime, Day, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Schedule,
+    SimpleRepeat,
 };
 
 use crate::l10n::L10n;
@@ -59,10 +60,23 @@ pub fn schedule_text(t: &L10n, schedule: &Schedule) -> String {
     format!("{} · {at}", repeat_text(t, schedule))
 }
 
+/// What the desktop's simple editor shows for `rule`: once, every N
+/// days, weeks, months or years, or chosen weekdays, without an end. The
+/// phone's monthly kinds and ends stay in the advanced mode here, so
+/// nothing of them is dropped on save.
+pub fn desktop_simple(rule: Option<&Recurrence>) -> Option<SimpleRepeat> {
+    SimpleRepeat::of(rule).filter(|simple| {
+        matches!(
+            simple.kind,
+            RepeatKind::Once | RepeatKind::Every | RepeatKind::Weekdays
+        ) && simple.end() == RepeatEnd::Never
+    })
+}
+
 /// How `schedule` repeats, in words, without its times.
 pub fn repeat_text(t: &L10n, schedule: &Schedule) -> String {
     let rule = schedule.rule.as_ref();
-    let Some(simple) = SimpleRepeat::of(rule) else {
+    let Some(simple) = desktop_simple(rule) else {
         return t.rule_summary(&rule.map(|r| r.format()).unwrap_or_default());
     };
     match simple.kind {
@@ -81,13 +95,16 @@ pub fn repeat_text(t: &L10n, schedule: &Schedule) -> String {
                 .collect::<Vec<_>>()
                 .join(", "),
         ),
+        // Not shown simply here; see `desktop_simple`.
+        RepeatKind::MonthDay | RepeatKind::MonthWeekday => {
+            t.rule_summary(&rule.map(|r| r.format()).unwrap_or_default())
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oldbrainfix_core::Recurrence;
 
     #[test]
     fn days_and_schedules_read_in_the_apps_language() {
@@ -111,5 +128,10 @@ mod tests {
         let odd = Schedule::new(day, &[], Recurrence::parse("FREQ=MONTHLY;BYDAY=1MO").ok());
         let Some(odd) = odd else { panic!("a schedule") };
         assert!(repeat_text(&en, &odd).contains("FREQ=MONTHLY;BYDAY=1MO"));
+        let ends = Schedule::new(day, &[], Recurrence::parse("FREQ=DAILY;COUNT=3").ok());
+        let Some(ends) = ends else {
+            panic!("a schedule")
+        };
+        assert!(repeat_text(&en, &ends).contains("FREQ=DAILY;COUNT=3"));
     }
 }

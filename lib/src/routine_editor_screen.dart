@@ -55,8 +55,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 
 /// Makes or changes a Routine or Reminder: the Note it comes from (or a
 /// text for a new Note), and its schedule in a simple editor (once, every
-/// N days, weeks, months or years, chosen weekdays) or as an RRULE in the
-/// advanced mode, with its times of day. The next Occurrences show while
+/// N days, weeks, months or years, chosen weekdays, every N months on a
+/// day or on the Nth or last weekday, each with an end: never, on a day
+/// or after a number of times) or as an RRULE in the advanced mode, with
+/// its times of day. The next Occurrences show while
 /// it is edited. A folded Re-nag section sets how often it rings again
 /// when ignored: its own interval or this Device's default from
 /// Settings. A folded Escalation section below it turns on the
@@ -114,6 +116,23 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   int _every = 1;
   RepeatUnit _unit = RepeatUnit.days;
   Set<int> _weekdays = {};
+
+  /// N in every N months, for the month kinds.
+  int _months = 1;
+
+  /// The day of the month; the start's until one is chosen.
+  int? _monthDay;
+
+  /// 1 to 4 or -1 for the last, and the weekday; the start's position in
+  /// its month until they are chosen.
+  int? _ordinal;
+  int? _nthWeekday;
+
+  RepeatEnd _end = RepeatEnd.never;
+
+  /// The end day and number, kept while another end is chosen.
+  Day? _until;
+  int _count = 10;
   late Day _start;
   List<ClockTime> _times = [];
 
@@ -197,14 +216,65 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       _unit = simple.unit;
     }
     if (simple.kind == RepeatKind.weekdays) _weekdays = {...simple.weekdays};
+    if (simple.kind == RepeatKind.monthDay) {
+      _months = simple.every;
+      _monthDay = simple.monthDay;
+    }
+    if (simple.nth case final nth?
+        when simple.kind == RepeatKind.monthWeekday) {
+      _months = simple.every;
+      _ordinal = nth.ordinal;
+      _nthWeekday = nth.weekday;
+    }
+    _end = simple.end;
+    if (simple.until case final until?) _until = until;
+    if (simple.count case final count?) _count = count;
   }
 
+  /// Where [day] lies in its month: the 1st to 4th of its weekday, or -1
+  /// for a 5th, which is the last.
+  static int _ordinalOf(Day day) {
+    final nth = (day.day - 1) ~/ 7 + 1;
+    return nth > 4 ? -1 : nth;
+  }
+
+  /// An end day not chosen yet: a month after the start.
+  Day get _untilDay => _until ?? Day(_start.year, _start.month + 1, _start.day);
+
   /// The rule the simple editor shows.
-  Recurrence? _simpleRule() => switch (_kind) {
-    RepeatKind.once => null,
-    RepeatKind.every => SimpleRepeat.every(_every, _unit).toRule(),
-    RepeatKind.weekdays => SimpleRepeat.weekdays(_weekdays).toRule(),
-  };
+  Recurrence? _simpleRule() {
+    final count = _end == RepeatEnd.count ? _count : null;
+    final until = _end == RepeatEnd.until ? _untilDay : null;
+    return switch (_kind) {
+      RepeatKind.once => null,
+      RepeatKind.every => SimpleRepeat.every(
+        _every,
+        _unit,
+        count: count,
+        until: until,
+      ).toRule(),
+      RepeatKind.weekdays => SimpleRepeat.weekdays(
+        _weekdays,
+        count: count,
+        until: until,
+      ).toRule(),
+      RepeatKind.monthDay => SimpleRepeat.monthDay(
+        _monthDay ?? _start.day,
+        every: _months,
+        count: count,
+        until: until,
+      ).toRule(),
+      RepeatKind.monthWeekday => SimpleRepeat.monthWeekday(
+        WeekdayRule(
+          _nthWeekday ?? _start.weekday,
+          _ordinal ?? _ordinalOf(_start),
+        ),
+        every: _months,
+        count: count,
+        until: until,
+      ).toRule(),
+    };
+  }
 
   /// Reads the edit into [_schedule] and its coming Occurrences.
   void _update() {
@@ -263,6 +333,17 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     );
     if (!mounted || picked == null) return;
     _change(() => _start = Day.of(picked));
+  }
+
+  Future<void> _pickUntil() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _untilDay.wall,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100, 12, 31),
+    );
+    if (!mounted || picked == null) return;
+    _change(() => _until = Day.of(picked));
   }
 
   Future<void> _addTime() async {
@@ -505,6 +586,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   label: Text(dayText(locale, _start)),
                 ),
               ),
+              if (!_advanced && _kind != RepeatKind.once) ..._endEditor(t),
             ],
           ),
         ),
@@ -665,11 +747,24 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             value: RepeatKind.weekdays,
             title: Text(t.repeatWeekdays),
           ),
+          RadioOption(
+            value: RepeatKind.monthDay,
+            title: Text(t.repeatMonthDay),
+          ),
+          RadioOption(
+            value: RepeatKind.monthWeekday,
+            title: Text(t.repeatMonthWeekday),
+          ),
         ],
         onChanged: (picked) => _change(() {
           _kind = picked;
           if (_kind == RepeatKind.weekdays && _weekdays.isEmpty) {
             _weekdays = {_start.weekday};
+          }
+          if (_kind == RepeatKind.monthDay) _monthDay ??= _start.day;
+          if (_kind == RepeatKind.monthWeekday) {
+            _ordinal ??= _ordinalOf(_start);
+            _nthWeekday ??= _start.weekday;
           }
         }),
       ),
@@ -733,6 +828,126 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           ],
         ),
       ],
+      if (_kind == RepeatKind.monthDay || _kind == RepeatKind.monthWeekday)
+        ..._monthEditor(t, locale),
+    ];
+  }
+
+  /// A number with a minus and a plus button, and its unit after it.
+  Widget _stepper(
+    int value, {
+    required ValueChanged<int> onChanged,
+    int min = 1,
+    int? max,
+    String? unit,
+  }) => Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      IconButton(
+        tooltip: context.t.fewer,
+        onPressed: value > min
+            ? () => _change(() => onChanged(value - 1))
+            : null,
+        icon: const Icon(Icons.remove),
+      ),
+      Text('$value', style: Theme.of(context).textTheme.titleMedium),
+      IconButton(
+        tooltip: context.t.more,
+        onPressed: max == null || value < max
+            ? () => _change(() => onChanged(value + 1))
+            : null,
+        icon: const Icon(Icons.add),
+      ),
+      if (unit != null) Text(unit),
+    ],
+  );
+
+  /// A single choice under its text (UI laws, "Dialogs and pages").
+  Widget _choice<T>(
+    String title,
+    T value,
+    List<RadioOption<T>> options,
+    ValueChanged<T> onChanged,
+  ) => ControlBelow(
+    padding: const EdgeInsets.only(top: 8),
+    title: Text(title),
+    control: RadioColumn<T>(
+      value: value,
+      options: options,
+      onChanged: onChanged,
+    ),
+  );
+
+  /// The controls of the month kinds: every N months, and the day or the
+  /// Nth weekday.
+  List<Widget> _monthEditor(AppLocalizations t, String locale) {
+    final monthDay = _monthDay ?? _start.day;
+    return [
+      const SizedBox(height: 8),
+      ControlBelow(
+        padding: EdgeInsets.zero,
+        title: Text(t.everyLabel),
+        control: _stepper(
+          _months,
+          onChanged: (n) => _months = n,
+          unit: t.unitMonths(_months),
+        ),
+      ),
+      if (_kind == RepeatKind.monthDay)
+        ControlBelow(
+          padding: EdgeInsets.zero,
+          title: Text(t.dayOfMonthLabel),
+          subtitle: monthDay > 28 ? Text(t.monthDaySkipped) : null,
+          control: _stepper(
+            monthDay,
+            max: 31,
+            onChanged: (day) => _monthDay = day,
+          ),
+        )
+      else ...[
+        _choice<int>(t.whichInMonthLabel, _ordinal ?? _ordinalOf(_start), [
+          for (final ordinal in const [1, 2, 3, 4, -1])
+            RadioOption(value: ordinal, title: Text(t.nthOption('$ordinal'))),
+        ], (ordinal) => _change(() => _ordinal = ordinal)),
+        _choice<int>(t.weekdayLabel, _nthWeekday ?? _start.weekday, [
+          for (var day = DateTime.monday; day <= DateTime.sunday; day++)
+            RadioOption(value: day, title: Text(weekdayName(locale, day))),
+        ], (day) => _change(() => _nthWeekday = day)),
+      ],
+    ];
+  }
+
+  /// How a repeat ends: never, on a day, or after a number of times.
+  List<Widget> _endEditor(AppLocalizations t) {
+    final locale = Localizations.localeOf(context).toString();
+    return [
+      _choice<RepeatEnd>(t.endsLabel, _end, [
+        RadioOption(value: RepeatEnd.never, title: Text(t.endNever)),
+        RadioOption(value: RepeatEnd.until, title: Text(t.endOnDay)),
+        RadioOption(value: RepeatEnd.count, title: Text(t.endAfterCount)),
+      ], (end) => _change(() => _end = end)),
+      if (_end == RepeatEnd.until)
+        ControlBelow(
+          padding: EdgeInsets.zero,
+          title: Text(t.endLastDay),
+          control: TextButton.icon(
+            onPressed: _pickUntil,
+            icon: const Icon(Icons.event_busy),
+            label: Text(dayText(locale, _untilDay)),
+          ),
+        ),
+      if (_end == RepeatEnd.count)
+        ControlBelow(
+          padding: EdgeInsets.zero,
+          title: Text(t.endCountLabel),
+          subtitle: Text(t.endCountExplain),
+          control: _stepper(
+            _count,
+            max: 99999,
+            onChanged: (n) => _count = n,
+            unit: t.unitTimes(_count),
+          ),
+        ),
     ];
   }
 

@@ -186,6 +186,35 @@
   "repeatOnce": "Once",
   "repeatEvery": "Every …",
   "repeatWeekdays": "Weekdays",
+  "repeatMonthDay": "Monthly on a day",
+  "repeatMonthWeekday": "Monthly on a weekday",
+  "dayOfMonthLabel": "Day of the month",
+  "monthDaySkipped": "Months without this day are skipped.",
+  "whichInMonthLabel": "Which one in the month",
+  "nthOption": "{which, select, 1{First} 2{Second} 3{Third} 4{Fourth} other{Last}}",
+  "@nthOption": {
+    "placeholders": {
+      "which": {
+        "type": "String"
+      }
+    }
+  },
+  "weekdayLabel": "Weekday",
+  "endsLabel": "Ends",
+  "endNever": "Never",
+  "endOnDay": "On a day",
+  "endAfterCount": "After a number of times",
+  "endLastDay": "Last day",
+  "endCountLabel": "How many times",
+  "endCountExplain": "Each time of day counts separately.",
+  "unitTimes": "{count, plural, =1{time} other{times}}",
+  "@unitTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "everyLabel": "Every",
   "fewer": "Fewer",
   "more": "More",
@@ -301,6 +330,61 @@
   "@ruleSummary": {
     "placeholders": {
       "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "everyMonthOnDay": "{count, plural, =1{Every month on day {day}} other{Every {count} months on day {day}}}",
+  "@everyMonthOnDay": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "everyMonthOnNth": "{count, plural, =1{Every month on the {nth} {weekday}} other{Every {count} months on the {nth} {weekday}}}",
+  "@everyMonthOnNth": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "nth": {
+        "type": "String"
+      },
+      "weekday": {
+        "type": "String"
+      }
+    }
+  },
+  "nthWord": "{which, select, 1{first} 2{second} 3{third} 4{fourth} other{last}}",
+  "@nthWord": {
+    "placeholders": {
+      "which": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatUntil": "{repeat}, until {date}",
+  "@repeatUntil": {
+    "placeholders": {
+      "repeat": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "repeatCount": "{count, plural, =1{{repeat}, once} other{{repeat}, {count} times}}",
+  "@repeatCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "repeat": {
         "type": "String"
       }
     }

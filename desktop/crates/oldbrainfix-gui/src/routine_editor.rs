@@ -19,7 +19,7 @@ use oldbrainfix_core::{
 use crate::app::{embossed, icon_button, pill};
 use crate::icons;
 use crate::l10n::L10n;
-use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_text};
+use crate::schedule_text::{clock_text, day_text, desktop_simple, occurrence_time, weekday_text};
 use crate::theme::Tones;
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
@@ -171,7 +171,7 @@ impl RoutineEditor {
             rule_error: None,
             next: Vec::new(),
         };
-        match SimpleRepeat::of(schedule.rule.as_ref()) {
+        match desktop_simple(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
             None => editor.advanced = true,
         }
@@ -195,6 +195,8 @@ impl RoutineEditor {
             RepeatKind::Once => None,
             RepeatKind::Every => SimpleRepeat::every(self.every, self.unit).to_rule(),
             RepeatKind::Weekdays => SimpleRepeat::weekdays(self.weekdays.clone()).to_rule(),
+            // `desktop_simple` keeps these in the advanced mode.
+            RepeatKind::MonthDay | RepeatKind::MonthWeekday => None,
         }
     }
 
@@ -415,7 +417,7 @@ impl RoutineEditor {
             } else {
                 Recurrence::parse(text)
                     .ok()
-                    .and_then(|rule| SimpleRepeat::of(Some(&rule)))
+                    .and_then(|rule| desktop_simple(Some(&rule)))
             };
             if let Some(simple) = simple {
                 self.take_simple(&simple);

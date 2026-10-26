@@ -812,6 +812,96 @@ abstract class AppLocalizations {
   /// **'Weekdays'**
   String get repeatWeekdays;
 
+  /// No description provided for @repeatMonthDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly on a day'**
+  String get repeatMonthDay;
+
+  /// No description provided for @repeatMonthWeekday.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly on a weekday'**
+  String get repeatMonthWeekday;
+
+  /// No description provided for @dayOfMonthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Day of the month'**
+  String get dayOfMonthLabel;
+
+  /// No description provided for @monthDaySkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Months without this day are skipped.'**
+  String get monthDaySkipped;
+
+  /// No description provided for @whichInMonthLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one in the month'**
+  String get whichInMonthLabel;
+
+  /// No description provided for @nthOption.
+  ///
+  /// In en, this message translates to:
+  /// **'{which, select, 1{First} 2{Second} 3{Third} 4{Fourth} other{Last}}'**
+  String nthOption(String which);
+
+  /// No description provided for @weekdayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekday'**
+  String get weekdayLabel;
+
+  /// No description provided for @endsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends'**
+  String get endsLabel;
+
+  /// No description provided for @endNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get endNever;
+
+  /// No description provided for @endOnDay.
+  ///
+  /// In en, this message translates to:
+  /// **'On a day'**
+  String get endOnDay;
+
+  /// No description provided for @endAfterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'After a number of times'**
+  String get endAfterCount;
+
+  /// No description provided for @endLastDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Last day'**
+  String get endLastDay;
+
+  /// No description provided for @endCountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'How many times'**
+  String get endCountLabel;
+
+  /// No description provided for @endCountExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'Each time of day counts separately.'**
+  String get endCountExplain;
+
+  /// No description provided for @unitTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{time} other{times}}'**
+  String unitTimes(int count);
+
   /// No description provided for @everyLabel.
   ///
   /// In en, this message translates to:
@@ -979,6 +1069,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rule: {rule}'**
   String ruleSummary(String rule);
+
+  /// No description provided for @everyMonthOnDay.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every month on day {day}} other{Every {count} months on day {day}}}'**
+  String everyMonthOnDay(int count, int day);
+
+  /// No description provided for @everyMonthOnNth.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Every month on the {nth} {weekday}} other{Every {count} months on the {nth} {weekday}}}'**
+  String everyMonthOnNth(int count, String nth, String weekday);
+
+  /// No description provided for @nthWord.
+  ///
+  /// In en, this message translates to:
+  /// **'{which, select, 1{first} 2{second} 3{third} 4{fourth} other{last}}'**
+  String nthWord(String which);
+
+  /// No description provided for @repeatUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'{repeat}, until {date}'**
+  String repeatUntil(String repeat, String date);
+
+  /// No description provided for @repeatCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{{repeat}, once} other{{repeat}, {count} times}}'**
+  String repeatCount(int count, String repeat);
 
   /// No description provided for @markDone.
   ///

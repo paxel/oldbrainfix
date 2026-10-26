@@ -414,6 +414,68 @@ class AppLocalizationsDe extends AppLocalizations {
   String get repeatWeekdays => 'Wochentage';
 
   @override
+  String get repeatMonthDay => 'Monatlich an einem Tag';
+
+  @override
+  String get repeatMonthWeekday => 'Monatlich an einem Wochentag';
+
+  @override
+  String get dayOfMonthLabel => 'Tag im Monat';
+
+  @override
+  String get monthDaySkipped => 'Monate ohne diesen Tag werden übersprungen.';
+
+  @override
+  String get whichInMonthLabel => 'Welcher im Monat';
+
+  @override
+  String nthOption(String which) {
+    String _temp0 = intl.Intl.selectLogic(which, {
+      '1': 'Erster',
+      '2': 'Zweiter',
+      '3': 'Dritter',
+      '4': 'Vierter',
+      'other': 'Letzter',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String get weekdayLabel => 'Wochentag';
+
+  @override
+  String get endsLabel => 'Endet';
+
+  @override
+  String get endNever => 'Nie';
+
+  @override
+  String get endOnDay => 'An einem Tag';
+
+  @override
+  String get endAfterCount => 'Nach einer bestimmten Anzahl';
+
+  @override
+  String get endLastDay => 'Letzter Tag';
+
+  @override
+  String get endCountLabel => 'Wie oft';
+
+  @override
+  String get endCountExplain => 'Jede Uhrzeit zählt einzeln.';
+
+  @override
+  String unitTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mal',
+      one: 'Mal',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get everyLabel => 'Alle';
 
   @override
@@ -572,6 +634,56 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String ruleSummary(String rule) {
     return 'Regel: $rule';
+  }
+
+  @override
+  String everyMonthOnDay(int count, int day) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate am $day.',
+      one: 'Jeden Monat am $day.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String everyMonthOnNth(int count, String nth, String weekday) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Alle $count Monate am $nth $weekday',
+      one: 'Jeden Monat am $nth $weekday',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String nthWord(String which) {
+    String _temp0 = intl.Intl.selectLogic(which, {
+      '1': 'ersten',
+      '2': 'zweiten',
+      '3': 'dritten',
+      '4': 'vierten',
+      'other': 'letzten',
+    });
+    return '$_temp0';
+  }
+
+  @override
+  String repeatUntil(String repeat, String date) {
+    return '$repeat, bis $date';
+  }
+
+  @override
+  String repeatCount(int count, String repeat) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$repeat, $count-mal',
+      one: '$repeat, einmal',
+    );
+    return '$_temp0';
   }
 
   @override

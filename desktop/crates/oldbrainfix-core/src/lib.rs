@@ -56,8 +56,8 @@ pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, T
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
 pub use routines::{Agenda, AgendaRow, Routine, Routines};
 pub use schedule::{
-    ClockTime, Day, Occurrence, Recurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,
-    WallClock,
+    ClockTime, Day, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Schedule,
+    SimpleRepeat, WallClock,
 };
 pub use search::Search;
 pub use settings::DeviceSettings;

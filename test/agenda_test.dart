@@ -436,7 +436,7 @@ void main() {
       expect(find.byType(SegmentedButton<bool>), findsNothing);
       expect(find.byType(SegmentedButton<RepeatKind>), findsNothing);
       expect(find.byType(RadioListTile<bool>), findsNWidgets(2));
-      expect(find.byType(RadioListTile<RepeatKind>), findsNWidgets(3));
+      expect(find.byType(RadioListTile<RepeatKind>), findsNWidgets(5));
       // One option per line: each sits below the one before.
       final tops = [
         for (final tile in find.byType(RadioListTile<RepeatKind>).evaluate())
@@ -445,6 +445,7 @@ void main() {
       expect(tops.map((o) => o.dx).toSet(), hasLength(1));
       expect(tops[1].dy, greaterThan(tops[0].dy));
       expect(tops[2].dy, greaterThan(tops[1].dy));
+      expect(tops[4].dy, greaterThan(tops[3].dy));
 
       await tap(
         tester,
@@ -502,20 +503,78 @@ void main() {
       );
       await tester.enterText(
         find.byType(TextField).last,
-        'FREQ=MONTHLY;BYDAY=1MO',
+        'FREQ=MONTHLY;BYDAY=1MO,-1FR',
       );
       await tester.pumpAndSettle();
       expect(find.text('Mon, 11/2/2026  08:00'), findsOneWidget);
       await tap(tester, find.text('Save'));
 
       final routine = routines.all().single;
-      expect(routine.schedule.rule?.format(), 'FREQ=MONTHLY;BYDAY=1MO');
+      expect(routine.schedule.rule?.format(), 'FREQ=MONTHLY;BYDAY=1MO,-1FR');
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
       await tap(tester, find.text('pills'));
-      await tap(tester, find.text('Rule: FREQ=MONTHLY;BYDAY=1MO · 08:00'));
+      await tap(tester, find.text('Rule: FREQ=MONTHLY;BYDAY=1MO,-1FR · 08:00'));
       // A rule the simple editor cannot show opens in the advanced mode.
-      expect(find.text('FREQ=MONTHLY;BYDAY=1MO'), findsOneWidget);
+      expect(find.text('FREQ=MONTHLY;BYDAY=1MO,-1FR'), findsOneWidget);
+    });
+
+    testWidgets('monthly on the last Friday, and it reopens as built', (
+      tester,
+    ) async {
+      await openNew(tester);
+      await tap(tester, find.text('Monthly on a weekday'));
+      // Saturday the 24th is the month's fourth Saturday.
+      await reveal(tester, find.text('Last'));
+      await tap(tester, find.text('Last'));
+      await reveal(tester, find.text('Friday'));
+      await tap(tester, find.text('Friday'));
+      await tester.ensureVisible(find.text('Save'));
+      await tap(tester, find.text('Save'));
+      expect(
+        routines.all().single.schedule.rule?.format(),
+        'FREQ=MONTHLY;BYDAY=-1FR',
+      );
+
+      await tap(tester, find.byTooltip('Search and browse'));
+      await tap(tester, find.byTooltip('All Notes'));
+      await tap(tester, find.text('pills'));
+      await tap(tester, find.text('Every month on the last Friday · 08:00'));
+      // In the simple editor, as it was built.
+      expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsNothing);
+      // Whether the option [text] is the one its radio group holds.
+      bool picked(String text) {
+        final tile = find.ancestor(
+          of: find.text(text),
+          matching: find.byWidgetPredicate((w) => w is RadioListTile),
+        );
+        final group = find.ancestor(
+          of: tile,
+          matching: find.byWidgetPredicate((w) => w is RadioGroup),
+        );
+        return (tester.widget(group.first) as RadioGroup).groupValue ==
+            (tester.widget(tile) as RadioListTile).value;
+      }
+
+      expect(picked('Monthly on a weekday'), isTrue);
+      await reveal(tester, find.text('Friday'));
+      expect(picked('Last'), isTrue);
+      expect(picked('Friday'), isTrue);
+    });
+
+    testWidgets('an end after a number of times', (tester) async {
+      await openNew(tester);
+      await reveal(tester, find.text('After a number of times'));
+      await tap(tester, find.text('After a number of times'));
+      await reveal(tester, find.text('How many times'));
+      await tap(tester, find.byTooltip('More').last);
+      expect(find.text('11'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save'));
+      await tap(tester, find.text('Save'));
+      expect(
+        routines.all().single.schedule.rule?.format(),
+        'FREQ=DAILY;COUNT=11',
+      );
     });
 
     testWidgets('a Routine is trashed after a confirm; its Note stays', (
@@ -550,6 +609,13 @@ void main() {
       await tap(tester, find.byTooltip('Neue Routine oder Erinnerung'));
       await tap(tester, find.text('Alle …'));
       await tap(tester, find.text('Wochentage'));
+      await tap(tester, find.text('Monatlich an einem Wochentag'));
+      await reveal(tester, find.text('Nach einer bestimmten Anzahl'));
+      await tap(tester, find.text('Nach einer bestimmten Anzahl'));
+      expect(tester.takeException(), isNull);
+      // Back to the top, where the mode is chosen.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
+      await tester.pumpAndSettle();
       await tap(tester, find.text('Erweitert'));
       expect(find.text('Wiederholregel (RRULE)'), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -19,8 +19,8 @@ use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Importance, Note, Notes, NotesGo,
-    Occurrence, PersonFilter, Places, Recurrence, Routine, Routines, STARTER_SET, Schedule, Search,
-    Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
+    Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines, STARTER_SET,
+    Schedule, Search, Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 
@@ -1082,10 +1082,21 @@ fn rules_schedules_and_instants_come_out_as_the_dart_core_has_them() -> TestResu
     let fixture = read_json(&fixtures().join("schedules.json"))?;
     let simple_json = |s: Option<SimpleRepeat>| {
         json!(s.map(|s| json!({
-            "kind": format!("{:?}", s.kind).to_lowercase(),
+            "kind": match s.kind {
+                RepeatKind::Once => "once",
+                RepeatKind::Every => "every",
+                RepeatKind::Weekdays => "weekdays",
+                RepeatKind::MonthDay => "monthDay",
+                RepeatKind::MonthWeekday => "monthWeekday",
+            },
             "every": s.every,
             "unit": format!("{:?}", s.unit).to_lowercase(),
             "weekdays": s.weekdays.iter().collect::<Vec<_>>(),
+            "monthDay": s.month_day,
+            "nth": s.nth.map(|n| n.to_string()),
+            "end": format!("{:?}", s.end()).to_lowercase(),
+            "count": s.count,
+            "until": s.until.map(|d| d.to_string()),
             "rule": s.to_rule().map(|r| r.format()),
         })))
     };

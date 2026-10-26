@@ -34,24 +34,41 @@ String scheduleText(AppLocalizations t, String locale, Schedule schedule) {
   ].join(' · ');
 }
 
-/// How [schedule] repeats, in words, without its times.
+/// The full name of [weekday], `DateTime.monday` to `DateTime.sunday`.
+String weekdayName(String locale, int weekday) =>
+    DateFormat.EEEE(locale).format(DateTime(2026, 10, 25 + weekday));
+
+/// How [schedule] repeats, in words, without its times, with its end.
 String repeatText(AppLocalizations t, String locale, Schedule schedule) {
   final rule = schedule.rule;
   final simple = SimpleRepeat.of(rule, schedule.start);
-  return switch (simple?.kind) {
+  if (simple == null) return t.ruleSummary(rule?.format() ?? '');
+  final repeat = switch (simple.kind) {
     RepeatKind.once => t.onceOn(dayText(locale, schedule.start)),
-    RepeatKind.every => switch (simple?.unit) {
-      RepeatUnit.weeks => t.everyNWeeks(simple?.every ?? 1),
-      RepeatUnit.months => t.everyNMonths(simple?.every ?? 1),
-      RepeatUnit.years => t.everyNYears(simple?.every ?? 1),
-      _ => t.everyNDays(simple?.every ?? 1),
+    RepeatKind.every => switch (simple.unit) {
+      RepeatUnit.days => t.everyNDays(simple.every),
+      RepeatUnit.weeks => t.everyNWeeks(simple.every),
+      RepeatUnit.months => t.everyNMonths(simple.every),
+      RepeatUnit.years => t.everyNYears(simple.every),
     },
     RepeatKind.weekdays => t.onWeekdays(
-      [
-        for (final d in (simple?.weekdays.toList() ?? <int>[])..sort())
-          weekdayText(locale, d),
-      ].join(', '),
+      [for (final d in simple.weekdays.toList()..sort()) weekdayText(locale, d)]
+          .join(', '),
     ),
-    null => t.ruleSummary(rule?.format() ?? ''),
+    RepeatKind.monthDay => t.everyMonthOnDay(
+      simple.every,
+      simple.monthDay ?? schedule.start.day,
+    ),
+    RepeatKind.monthWeekday => t.everyMonthOnNth(
+      simple.every,
+      // `1` to `4`; anything else is the last.
+      t.nthWord('${simple.nth?.ordinal ?? -1}'),
+      weekdayName(locale, simple.nth?.weekday ?? schedule.start.weekday),
+    ),
   };
+  if (simple.count case final count?) return t.repeatCount(count, repeat);
+  if (simple.until case final until?) {
+    return t.repeatUntil(repeat, dayText(locale, until));
+  }
+  return repeat;
 }

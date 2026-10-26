@@ -31,7 +31,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Named Places that show "Home" or "Work" instead of coordinates, matched offline.
 - The Agenda as home screen: today's Routines and Reminders, then, dimmed, tomorrow's and those of the five days after, each further day under its weekday and date.
 - Routines and Reminders made from any Note, each linking back to it.
-- Schedules from once to iCalendar repeat rules, with several times per day, fixed across early or late ticks and daylight-saving changes.
+- Schedules from once to iCalendar repeat rules, built without typing for every N days, weeks, months or years, chosen weekdays, a day of the month or the first to fourth or last weekday of the month, each ending never, on a day or after a number of times, with several times per day, fixed across early or late ticks and daylight-saving changes.
 - Alarms on the minute with Done and Snooze (10 min, 30 min, 1 h), even from the lock screen and after a restart.
 - A step-by-step permission setup and a red Agenda banner while a needed permission is missing.
 - Re-nag: an ignored alarm rings again at an interval, per phone or per Routine, until Done, snoozed or Missed.

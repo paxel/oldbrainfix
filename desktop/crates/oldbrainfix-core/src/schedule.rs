@@ -968,6 +968,10 @@ pub enum RepeatKind {
     Every,
     /// On chosen weekdays, every week.
     Weekdays,
+    /// Every N months on one day of the month.
+    MonthDay,
+    /// Every N months on the first to fourth, or the last, of one weekday.
+    MonthWeekday,
 }
 
 /// The unit of [`RepeatKind::Every`].
@@ -979,50 +983,107 @@ pub enum RepeatUnit {
     Years,
 }
 
+/// How a repeat ends: never, on a day (UNTIL) or after a number of
+/// Occurrences (COUNT).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RepeatEnd {
+    Never,
+    Until,
+    Count,
+}
+
 /// A schedule the simple editor can show: once, every N days, weeks,
-/// months or years, or chosen weekdays.
+/// months or years, chosen weekdays, every N months on day N or on the
+/// Nth or last weekday, each but once with an end.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SimpleRepeat {
     pub kind: RepeatKind,
+    /// N in every N `unit`s, and in every N months for the month kinds.
     pub every: i64,
     pub unit: RepeatUnit,
     /// 1 for Monday to 7 for Sunday, for [`RepeatKind::Weekdays`].
     pub weekdays: BTreeSet<u32>,
+    /// The day of the month, 1 to 31, for [`RepeatKind::MonthDay`].
+    pub month_day: Option<i64>,
+    /// The weekday with its ordinal, 1 to 4 or -1 for the last, for
+    /// [`RepeatKind::MonthWeekday`].
+    pub nth: Option<WeekdayRule>,
+    /// How many Occurrences there are in all.
+    pub count: Option<i64>,
+    /// The last day, inclusive.
+    pub until: Option<Day>,
 }
 
 impl SimpleRepeat {
-    pub fn once() -> SimpleRepeat {
+    fn of_kind(kind: RepeatKind, every: i64, unit: RepeatUnit) -> SimpleRepeat {
         SimpleRepeat {
-            kind: RepeatKind::Once,
-            every: 1,
-            unit: RepeatUnit::Days,
-            weekdays: BTreeSet::new(),
-        }
-    }
-
-    pub fn every(every: i64, unit: RepeatUnit) -> SimpleRepeat {
-        SimpleRepeat {
-            kind: RepeatKind::Every,
+            kind,
             every,
             unit,
             weekdays: BTreeSet::new(),
+            month_day: None,
+            nth: None,
+            count: None,
+            until: None,
         }
+    }
+
+    pub fn once() -> SimpleRepeat {
+        SimpleRepeat::of_kind(RepeatKind::Once, 1, RepeatUnit::Days)
+    }
+
+    pub fn every(every: i64, unit: RepeatUnit) -> SimpleRepeat {
+        SimpleRepeat::of_kind(RepeatKind::Every, every, unit)
     }
 
     pub fn weekdays(weekdays: BTreeSet<u32>) -> SimpleRepeat {
         SimpleRepeat {
-            kind: RepeatKind::Weekdays,
-            every: 1,
-            unit: RepeatUnit::Weeks,
             weekdays,
+            ..SimpleRepeat::of_kind(RepeatKind::Weekdays, 1, RepeatUnit::Weeks)
+        }
+    }
+
+    /// Every `every` months on `day`.
+    pub fn month_day(day: i64, every: i64) -> SimpleRepeat {
+        SimpleRepeat {
+            month_day: Some(day),
+            ..SimpleRepeat::of_kind(RepeatKind::MonthDay, every, RepeatUnit::Months)
+        }
+    }
+
+    /// Every `every` months on the weekday `nth` names.
+    pub fn month_weekday(nth: WeekdayRule, every: i64) -> SimpleRepeat {
+        SimpleRepeat {
+            nth: Some(nth),
+            ..SimpleRepeat::of_kind(RepeatKind::MonthWeekday, every, RepeatUnit::Months)
+        }
+    }
+
+    /// This repeat, ending after `count` Occurrences or on `until`.
+    pub fn ending(self, count: Option<i64>, until: Option<Day>) -> SimpleRepeat {
+        SimpleRepeat {
+            count,
+            until,
+            ..self
+        }
+    }
+
+    /// How it ends.
+    pub fn end(&self) -> RepeatEnd {
+        if self.count.is_some() {
+            RepeatEnd::Count
+        } else if self.until.is_some() {
+            RepeatEnd::Until
+        } else {
+            RepeatEnd::Never
         }
     }
 
     /// The RRULE for this repeat; `None` for once.
     pub fn to_rule(&self) -> Option<Recurrence> {
-        match self.kind {
-            RepeatKind::Once => None,
-            RepeatKind::Every => Some(Recurrence::every(
+        let (frequency, interval) = match self.kind {
+            RepeatKind::Once => return None,
+            RepeatKind::Every => (
                 match self.unit {
                     RepeatUnit::Days => Frequency::Daily,
                     RepeatUnit::Weeks => Frequency::Weekly,
@@ -1030,9 +1091,13 @@ impl SimpleRepeat {
                     RepeatUnit::Years => Frequency::Yearly,
                 },
                 self.every,
-            )),
+            ),
+            RepeatKind::Weekdays => (Frequency::Weekly, 1),
+            RepeatKind::MonthDay | RepeatKind::MonthWeekday => (Frequency::Monthly, self.every),
+        };
+        let mut rule = Recurrence::every(frequency, interval);
+        match self.kind {
             RepeatKind::Weekdays => {
-                let mut rule = Recurrence::every(Frequency::Weekly, 1);
                 rule.by_day = self
                     .weekdays
                     .iter()
@@ -1041,9 +1106,14 @@ impl SimpleRepeat {
                         ordinal: None,
                     })
                     .collect();
-                Some(rule)
             }
+            RepeatKind::MonthDay => rule.by_month_day = self.month_day.into_iter().collect(),
+            RepeatKind::MonthWeekday => rule.by_day = self.nth.into_iter().collect(),
+            RepeatKind::Once | RepeatKind::Every => {}
         }
+        rule.count = self.count;
+        rule.until = self.until.map(|day| Until { day, time: None });
+        Some(rule)
     }
 
     /// What the simple editor shows for `rule`, or `None` when only the
@@ -1052,16 +1122,35 @@ impl SimpleRepeat {
         let Some(rule) = rule else {
             return Some(SimpleRepeat::once());
         };
-        if !rule.by_month_day.is_empty()
-            || !rule.by_month.is_empty()
+        if !rule.by_month.is_empty()
             || !rule.by_hour.is_empty()
             || !rule.by_minute.is_empty()
-            || rule.count.is_some()
-            || rule.until.is_some()
             || rule.week_start != 1
-            || rule.by_day.iter().any(|r| r.ordinal.is_some())
+            // The simple editor ends on a day, not at a time.
+            || rule.until.is_some_and(|until| until.time.is_some())
         {
             return None;
+        }
+        let until = rule.until.map(|until| until.day);
+        let monthly = rule.frequency == Frequency::Monthly;
+        if !rule.by_month_day.is_empty() {
+            let [day] = rule.by_month_day[..] else {
+                return None;
+            };
+            if !monthly || !rule.by_day.is_empty() || day < 1 {
+                return None;
+            }
+            return Some(SimpleRepeat::month_day(day, rule.interval).ending(rule.count, until));
+        }
+        if rule.by_day.iter().any(|r| r.ordinal.is_some()) {
+            let [nth] = rule.by_day[..] else {
+                return None;
+            };
+            let ordinal = nth.ordinal.unwrap_or(0);
+            if !monthly || (ordinal != -1 && !(1..=4).contains(&ordinal)) {
+                return None;
+            }
+            return Some(SimpleRepeat::month_weekday(nth, rule.interval).ending(rule.count, until));
         }
         let unit = match rule.frequency {
             Frequency::Daily => RepeatUnit::Days,
@@ -1070,14 +1159,15 @@ impl SimpleRepeat {
             Frequency::Yearly => RepeatUnit::Years,
         };
         if rule.by_day.is_empty() {
-            return Some(SimpleRepeat::every(rule.interval, unit));
+            return Some(SimpleRepeat::every(rule.interval, unit).ending(rule.count, until));
         }
         if rule.frequency != Frequency::Weekly || rule.interval != 1 {
             return None;
         }
-        Some(SimpleRepeat::weekdays(
-            rule.by_day.iter().map(|r| r.weekday).collect(),
-        ))
+        Some(
+            SimpleRepeat::weekdays(rule.by_day.iter().map(|r| r.weekday).collect())
+                .ending(rule.count, until),
+        )
     }
 }
 
@@ -1172,8 +1262,20 @@ mod tests {
             simple.and_then(|s| s.to_rule()).map(|r| r.format()),
             Some("FREQ=WEEKLY;BYDAY=MO,SA".to_string())
         );
-        let first = Recurrence::parse("FREQ=MONTHLY;BYDAY=1MO")?;
-        assert_eq!(SimpleRepeat::of(Some(&first)), None);
+        let first = Recurrence::parse("FREQ=MONTHLY;BYDAY=1MO;COUNT=3")?;
+        let simple = SimpleRepeat::of(Some(&first));
+        assert_eq!(
+            simple.as_ref().map(|s| (s.kind, s.end())),
+            Some((RepeatKind::MonthWeekday, RepeatEnd::Count))
+        );
+        assert_eq!(
+            simple.and_then(|s| s.to_rule()).map(|r| r.format()),
+            Some("FREQ=MONTHLY;COUNT=3;BYDAY=1MO".to_string())
+        );
+        let both = Recurrence::parse("FREQ=MONTHLY;BYDAY=1MO,-1FR")?;
+        assert_eq!(SimpleRepeat::of(Some(&both)), None);
+        let at_noon = Recurrence::parse("FREQ=DAILY;UNTIL=20261231T120000")?;
+        assert_eq!(SimpleRepeat::of(Some(&at_noon)), None);
         assert_eq!(SimpleRepeat::of(None), Some(SimpleRepeat::once()));
         Ok(())
     }

@@ -175,31 +175,116 @@ void main() {
     });
 
     test('the simple editor reads back what it wrote', () {
-      for (final repeat in [
-        const SimpleRepeat.once(),
-        const SimpleRepeat.every(1, RepeatUnit.days),
-        const SimpleRepeat.every(3, RepeatUnit.days),
-        const SimpleRepeat.every(2, RepeatUnit.weeks),
-        const SimpleRepeat.every(6, RepeatUnit.months),
-        const SimpleRepeat.every(1, RepeatUnit.years),
-        const SimpleRepeat.weekdays({DateTime.tuesday, DateTime.sunday}),
+      final newYear = Day(2026, 12, 31);
+      for (final (repeat, rule) in [
+        (const SimpleRepeat.once(), null),
+        (const SimpleRepeat.every(1, RepeatUnit.days), 'FREQ=DAILY'),
+        (const SimpleRepeat.every(3, RepeatUnit.days), 'FREQ=DAILY;INTERVAL=3'),
+        (
+          const SimpleRepeat.every(2, RepeatUnit.weeks),
+          'FREQ=WEEKLY;INTERVAL=2',
+        ),
+        (
+          const SimpleRepeat.every(6, RepeatUnit.months),
+          'FREQ=MONTHLY;INTERVAL=6',
+        ),
+        (const SimpleRepeat.every(1, RepeatUnit.years), 'FREQ=YEARLY'),
+        (
+          const SimpleRepeat.weekdays({DateTime.tuesday, DateTime.sunday}),
+          'FREQ=WEEKLY;BYDAY=TU,SU',
+        ),
+        (const SimpleRepeat.monthDay(15), 'FREQ=MONTHLY;BYMONTHDAY=15'),
+        (
+          const SimpleRepeat.monthDay(31, every: 3),
+          'FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=31',
+        ),
+        (
+          const SimpleRepeat.monthWeekday(WeekdayRule(DateTime.tuesday, 2)),
+          'FREQ=MONTHLY;BYDAY=2TU',
+        ),
+        (
+          const SimpleRepeat.monthWeekday(
+            WeekdayRule(DateTime.friday, -1),
+            every: 2,
+          ),
+          'FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR',
+        ),
+        (
+          const SimpleRepeat.every(1, RepeatUnit.days, count: 10),
+          'FREQ=DAILY;COUNT=10',
+        ),
+        (
+          SimpleRepeat.weekdays(const {DateTime.monday}, until: newYear),
+          'FREQ=WEEKLY;UNTIL=20261231;BYDAY=MO',
+        ),
+        (
+          const SimpleRepeat.monthDay(1, count: 12),
+          'FREQ=MONTHLY;COUNT=12;BYMONTHDAY=1',
+        ),
+        (
+          SimpleRepeat.monthWeekday(
+            const WeekdayRule(DateTime.thursday, 4),
+            until: newYear,
+          ),
+          'FREQ=MONTHLY;UNTIL=20261231;BYDAY=4TH',
+        ),
       ]) {
         final text = repeat.toRule()?.format();
+        expect(text, rule);
         final back = SimpleRepeat.of(
           text == null ? null : Recurrence.parse(text),
           start,
         );
-        expect(back?.kind, repeat.kind, reason: '$text');
-        expect(back?.every, repeat.every, reason: '$text');
-        expect(back?.unit, repeat.unit, reason: '$text');
-        expect(back?.weekdays, repeat.weekdays, reason: '$text');
+        expect(back, repeat, reason: '$text');
+        expect(back?.toRule()?.format(), text);
       }
+    });
+
+    test('its ends: never, on a day, after a number', () {
+      expect(const SimpleRepeat.monthDay(3).end, RepeatEnd.never);
+      expect(
+        SimpleRepeat.every(1, RepeatUnit.days, until: start).end,
+        RepeatEnd.until,
+      );
+      expect(
+        const SimpleRepeat.every(1, RepeatUnit.days, count: 2).end,
+        RepeatEnd.count,
+      );
+    });
+
+    test('its monthly rules fall where they say', () {
+      final schedule = Schedule(
+        start: Day(2026, 10, 1),
+        rule: SimpleRepeat.monthWeekday(
+          const WeekdayRule(DateTime.friday, -1),
+          until: Day(2026, 12, 25),
+        ).toRule(),
+      );
+      expect(keys(schedule, Day(2026, 10, 1), Day(2027, 3, 1)), [
+        '2026-10-30',
+        '2026-11-27',
+        '2026-12-25',
+      ]);
+      final paid = Schedule(
+        start: Day(2026, 10, 1),
+        rule: const SimpleRepeat.monthDay(15, count: 2).toRule(),
+      );
+      expect(keys(paid, Day(2026, 10, 1), Day(2027, 3, 1)), [
+        '2026-10-15',
+        '2026-11-15',
+      ]);
     });
 
     test('rules the simple editor cannot show need the advanced mode', () {
       for (final text in [
-        'FREQ=MONTHLY;BYDAY=1MO',
-        'FREQ=DAILY;COUNT=5',
+        'FREQ=MONTHLY;BYDAY=1MO,-1FR',
+        'FREQ=MONTHLY;BYDAY=5MO',
+        'FREQ=MONTHLY;BYDAY=-2MO',
+        'FREQ=YEARLY;BYDAY=1MO',
+        'FREQ=MONTHLY;BYMONTHDAY=1,15',
+        'FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR',
+        'FREQ=YEARLY;BYMONTHDAY=1',
+        'FREQ=DAILY;UNTIL=20261231T120000',
         'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TH',
         'FREQ=YEARLY;BYMONTH=3',
         'FREQ=DAILY;BYHOUR=8,20',

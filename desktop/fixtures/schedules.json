@@ -9,6 +9,11 @@
         "every": 1,
         "unit": "days",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=DAILY"
       }
     },
@@ -25,6 +30,11 @@
           3,
           5
         ],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR"
       }
     },
@@ -40,6 +50,11 @@
           1,
           6
         ],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=WEEKLY;BYDAY=MO,SA"
       }
     },
@@ -53,6 +68,89 @@
       "text": "FREQ=MONTHLY;BYDAY=+2TU",
       "format": "FREQ=MONTHLY;BYDAY=2TU",
       "times": null,
+      "simple": {
+        "kind": "monthWeekday",
+        "every": 1,
+        "unit": "months",
+        "weekdays": [],
+        "monthDay": null,
+        "nth": "2TU",
+        "end": "never",
+        "count": null,
+        "until": null,
+        "rule": "FREQ=MONTHLY;BYDAY=2TU"
+      }
+    },
+    {
+      "text": "FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR",
+      "format": "FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR",
+      "times": null,
+      "simple": {
+        "kind": "monthWeekday",
+        "every": 2,
+        "unit": "months",
+        "weekdays": [],
+        "monthDay": null,
+        "nth": "-1FR",
+        "end": "never",
+        "count": null,
+        "until": null,
+        "rule": "FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR"
+      }
+    },
+    {
+      "text": "FREQ=MONTHLY;BYDAY=5MO",
+      "format": "FREQ=MONTHLY;BYDAY=5MO",
+      "times": null,
+      "simple": null
+    },
+    {
+      "text": "FREQ=MONTHLY;BYMONTHDAY=15;COUNT=10",
+      "format": "FREQ=MONTHLY;COUNT=10;BYMONTHDAY=15",
+      "times": null,
+      "simple": {
+        "kind": "monthDay",
+        "every": 1,
+        "unit": "months",
+        "weekdays": [],
+        "monthDay": 15,
+        "nth": null,
+        "end": "count",
+        "count": 10,
+        "until": null,
+        "rule": "FREQ=MONTHLY;COUNT=10;BYMONTHDAY=15"
+      }
+    },
+    {
+      "text": "FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20261231",
+      "format": "FREQ=WEEKLY;UNTIL=20261231;BYDAY=MO,WE",
+      "times": null,
+      "simple": {
+        "kind": "weekdays",
+        "every": 1,
+        "unit": "weeks",
+        "weekdays": [
+          1,
+          3
+        ],
+        "monthDay": null,
+        "nth": null,
+        "end": "until",
+        "count": null,
+        "until": "2026-12-31",
+        "rule": "FREQ=WEEKLY;UNTIL=20261231;BYDAY=MO,WE"
+      }
+    },
+    {
+      "text": "FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR",
+      "format": "FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR",
+      "times": null,
+      "simple": null
+    },
+    {
+      "text": "FREQ=MONTHLY;BYMONTHDAY=-1",
+      "format": "FREQ=MONTHLY;BYMONTHDAY=-1",
+      "times": null,
       "simple": null
     },
     {
@@ -65,7 +163,18 @@
       "text": "FREQ=MONTHLY;BYMONTHDAY=31",
       "format": "FREQ=MONTHLY;BYMONTHDAY=31",
       "times": null,
-      "simple": null
+      "simple": {
+        "kind": "monthDay",
+        "every": 1,
+        "unit": "months",
+        "weekdays": [],
+        "monthDay": 31,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
+        "rule": "FREQ=MONTHLY;BYMONTHDAY=31"
+      }
     },
     {
       "text": "FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=1,15,-1",
@@ -83,7 +192,18 @@
       "text": "FREQ=DAILY;COUNT=5",
       "format": "FREQ=DAILY;COUNT=5",
       "times": null,
-      "simple": null
+      "simple": {
+        "kind": "every",
+        "every": 1,
+        "unit": "days",
+        "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "count",
+        "count": 5,
+        "until": null,
+        "rule": "FREQ=DAILY;COUNT=5"
+      }
     },
     {
       "text": "FREQ=DAILY;UNTIL=20260110T120000Z",
@@ -95,7 +215,18 @@
       "text": "FREQ=DAILY;UNTIL=20260105",
       "format": "FREQ=DAILY;UNTIL=20260105",
       "times": null,
-      "simple": null
+      "simple": {
+        "kind": "every",
+        "every": 1,
+        "unit": "days",
+        "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "until",
+        "count": null,
+        "until": "2026-01-05",
+        "rule": "FREQ=DAILY;UNTIL=20260105"
+      }
     },
     {
       "text": "FREQ=DAILY;BYHOUR=20,8;BYMINUTE=30,0",
@@ -166,6 +297,11 @@
         "every": 1,
         "unit": "years",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=YEARLY"
       }
     },
@@ -178,6 +314,11 @@
         "every": 1,
         "unit": "months",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=MONTHLY"
       }
     },
@@ -196,6 +337,11 @@
         "every": 3,
         "unit": "days",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=DAILY;INTERVAL=3"
       }
     },
@@ -208,6 +354,11 @@
         "every": 1,
         "unit": "days",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=DAILY"
       }
     },
@@ -220,6 +371,11 @@
         "every": 2,
         "unit": "days",
         "weekdays": [],
+        "monthDay": null,
+        "nth": null,
+        "end": "never",
+        "count": null,
+        "until": null,
         "rule": "FREQ=DAILY;INTERVAL=2"
       }
     },
@@ -374,6 +530,11 @@
     "every": 1,
     "unit": "days",
     "weekdays": [],
+    "monthDay": null,
+    "nth": null,
+    "end": "never",
+    "count": null,
+    "until": null,
     "rule": null
   },
   "schedules": [
@@ -614,6 +775,54 @@
         "2026-03-27",
         "2026-04-06",
         "2026-04-24"
+      ]
+    },
+    {
+      "start": "2026-01-01",
+      "times": [
+        "09:00"
+      ],
+      "rule": "FREQ=MONTHLY;INTERVAL=2;UNTIL=20261231;BYDAY=-1FR",
+      "from": "2026-01-01",
+      "to": "2027-03-31",
+      "dayTimes": [
+        "09:00"
+      ],
+      "between": [
+        "2026-01-30T09:00",
+        "2026-03-27T09:00",
+        "2026-05-29T09:00",
+        "2026-07-31T09:00",
+        "2026-09-25T09:00",
+        "2026-11-27T09:00"
+      ],
+      "next": [
+        "2026-01-30T09:00",
+        "2026-03-27T09:00",
+        "2026-05-29T09:00",
+        "2026-07-31T09:00",
+        "2026-09-25T09:00",
+        "2026-11-27T09:00"
+      ]
+    },
+    {
+      "start": "2026-01-20",
+      "times": [],
+      "rule": "FREQ=MONTHLY;COUNT=4;BYMONTHDAY=15",
+      "from": "2026-01-01",
+      "to": "2026-12-31",
+      "dayTimes": [],
+      "between": [
+        "2026-02-15",
+        "2026-03-15",
+        "2026-04-15",
+        "2026-05-15"
+      ],
+      "next": [
+        "2026-02-15",
+        "2026-03-15",
+        "2026-04-15",
+        "2026-05-15"
       ]
     },
     {

@@ -654,69 +654,182 @@ enum RepeatKind {
 
   /// On chosen weekdays, every week.
   weekdays,
+
+  /// Every N months on one day of the month.
+  monthDay,
+
+  /// Every N months on the first to fourth, or the last, of one weekday.
+  monthWeekday,
 }
 
 /// The unit of [RepeatKind.every].
 enum RepeatUnit { days, weeks, months, years }
 
+/// How a repeat ends: never, on a day (UNTIL) or after a number of
+/// Occurrences (COUNT).
+enum RepeatEnd { never, until, count }
+
 /// A schedule the simple editor can show: once, every N days, weeks,
-/// months or years, or chosen weekdays. Months and years fall on the
-/// start's day; a month or year without it is skipped (RFC 5545), so
-/// "every month from the 31st" skips the shorter months.
+/// months or years, chosen weekdays, every N months on day N or on the
+/// Nth or last weekday, each but once with an end. Months and years fall
+/// on the start's day; a month or year without it is skipped (RFC 5545),
+/// so "every month from the 31st" skips the shorter months, and so does
+/// "on day 31".
 class SimpleRepeat {
   final RepeatKind kind;
+
+  /// N in every N [unit]s, and in every N months for the month kinds.
   final int every;
   final RepeatUnit unit;
 
   /// `DateTime.monday` to `DateTime.sunday`, for [RepeatKind.weekdays].
   final Set<int> weekdays;
 
+  /// The day of the month, 1 to 31, for [RepeatKind.monthDay].
+  final int? monthDay;
+
+  /// The weekday with its ordinal, 1 to 4 or -1 for the last, for
+  /// [RepeatKind.monthWeekday].
+  final WeekdayRule? nth;
+
+  /// How many Occurrences there are in all; null when it does not end
+  /// after a number.
+  final int? count;
+
+  /// The last day, inclusive; null when it does not end on a day.
+  final Day? until;
+
   const SimpleRepeat.once()
     : kind = RepeatKind.once,
       every = 1,
       unit = RepeatUnit.days,
-      weekdays = const {};
+      weekdays = const {},
+      monthDay = null,
+      nth = null,
+      count = null,
+      until = null;
 
-  const SimpleRepeat.every(this.every, this.unit)
+  const SimpleRepeat.every(this.every, this.unit, {this.count, this.until})
     : kind = RepeatKind.every,
-      weekdays = const {};
+      weekdays = const {},
+      monthDay = null,
+      nth = null;
 
-  const SimpleRepeat.weekdays(this.weekdays)
+  const SimpleRepeat.weekdays(this.weekdays, {this.count, this.until})
     : kind = RepeatKind.weekdays,
       every = 1,
-      unit = RepeatUnit.weeks;
+      unit = RepeatUnit.weeks,
+      monthDay = null,
+      nth = null;
+
+  const SimpleRepeat.monthDay(
+    int this.monthDay, {
+    this.every = 1,
+    this.count,
+    this.until,
+  }) : kind = RepeatKind.monthDay,
+       unit = RepeatUnit.months,
+       weekdays = const {},
+       nth = null;
+
+  const SimpleRepeat.monthWeekday(
+    WeekdayRule this.nth, {
+    this.every = 1,
+    this.count,
+    this.until,
+  }) : kind = RepeatKind.monthWeekday,
+       unit = RepeatUnit.months,
+       weekdays = const {},
+       monthDay = null;
+
+  /// How it ends.
+  RepeatEnd get end => count != null
+      ? RepeatEnd.count
+      : until != null
+      ? RepeatEnd.until
+      : RepeatEnd.never;
 
   /// The RRULE for this repeat; null for once.
-  Recurrence? toRule() => switch (kind) {
-    RepeatKind.once => null,
-    RepeatKind.every => Recurrence(
-      frequency: switch (unit) {
+  Recurrence? toRule() {
+    final until = this.until;
+    Recurrence rule(
+      Frequency frequency, {
+      int interval = 1,
+      List<WeekdayRule> byDay = const [],
+      List<int> byMonthDay = const [],
+    }) => Recurrence(
+      frequency: frequency,
+      interval: interval,
+      byDay: byDay,
+      byMonthDay: byMonthDay,
+      count: count,
+      until: until == null ? null : (day: until, time: null),
+    );
+    return switch (kind) {
+      RepeatKind.once => null,
+      RepeatKind.every => rule(switch (unit) {
         RepeatUnit.days => Frequency.daily,
         RepeatUnit.weeks => Frequency.weekly,
         RepeatUnit.months => Frequency.monthly,
         RepeatUnit.years => Frequency.yearly,
-      },
-      interval: every,
-    ),
-    RepeatKind.weekdays => Recurrence(
-      frequency: Frequency.weekly,
-      byDay: [for (final d in weekdays.toList()..sort()) WeekdayRule(d)],
-    ),
-  };
+      }, interval: every),
+      RepeatKind.weekdays => rule(
+        Frequency.weekly,
+        byDay: [for (final d in weekdays.toList()..sort()) WeekdayRule(d)],
+      ),
+      RepeatKind.monthDay => rule(
+        Frequency.monthly,
+        interval: every,
+        byMonthDay: [?monthDay],
+      ),
+      RepeatKind.monthWeekday => rule(
+        Frequency.monthly,
+        interval: every,
+        byDay: [?nth],
+      ),
+    };
+  }
 
   /// What the simple editor shows for [rule] starting on [start], or null
   /// when only the advanced mode can show it.
   static SimpleRepeat? of(Recurrence? rule, Day start) {
     if (rule == null) return const SimpleRepeat.once();
-    if (rule.byMonthDay.isNotEmpty ||
-        rule.byMonth.isNotEmpty ||
+    final until = rule.until;
+    if (rule.byMonth.isNotEmpty ||
         rule.byHour.isNotEmpty ||
         rule.byMinute.isNotEmpty ||
-        rule.count != null ||
-        rule.until != null ||
         rule.weekStart != DateTime.monday ||
-        rule.byDay.any((r) => r.ordinal != null)) {
+        // The simple editor ends on a day, not at a time.
+        (until != null && until.time != null)) {
       return null;
+    }
+    final count = rule.count;
+    final untilDay = until?.day;
+    final byDay = rule.byDay;
+    final byMonthDay = rule.byMonthDay;
+    final monthly = rule.frequency == Frequency.monthly;
+    if (byMonthDay.isNotEmpty) {
+      if (!monthly || byDay.isNotEmpty || byMonthDay.length != 1) return null;
+      final day = byMonthDay.single;
+      if (day < 1) return null;
+      return SimpleRepeat.monthDay(
+        day,
+        every: rule.interval,
+        count: count,
+        until: untilDay,
+      );
+    }
+    if (byDay.any((r) => r.ordinal != null)) {
+      if (!monthly || byDay.length != 1) return null;
+      final nth = byDay.single;
+      final ordinal = nth.ordinal ?? 0;
+      if (ordinal != -1 && (ordinal < 1 || ordinal > 4)) return null;
+      return SimpleRepeat.monthWeekday(
+        nth,
+        every: rule.interval,
+        count: count,
+        until: untilDay,
+      );
     }
     final unit = switch (rule.frequency) {
       Frequency.daily => RepeatUnit.days,
@@ -724,11 +837,43 @@ class SimpleRepeat {
       Frequency.monthly => RepeatUnit.months,
       Frequency.yearly => RepeatUnit.years,
     };
-    if (rule.byDay.isEmpty) return SimpleRepeat.every(rule.interval, unit);
+    if (byDay.isEmpty) {
+      return SimpleRepeat.every(
+        rule.interval,
+        unit,
+        count: count,
+        until: untilDay,
+      );
+    }
     if (rule.frequency != Frequency.weekly || rule.interval != 1) return null;
-    final weekdays = {for (final r in rule.byDay) r.weekday};
-    return SimpleRepeat.weekdays(weekdays);
+    final weekdays = {for (final r in byDay) r.weekday};
+    return SimpleRepeat.weekdays(weekdays, count: count, until: untilDay);
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is SimpleRepeat &&
+      other.kind == kind &&
+      other.every == every &&
+      other.unit == unit &&
+      other.weekdays.length == weekdays.length &&
+      other.weekdays.containsAll(weekdays) &&
+      other.monthDay == monthDay &&
+      other.nth == nth &&
+      other.count == count &&
+      other.until == until;
+
+  @override
+  int get hashCode => Object.hash(
+    kind,
+    every,
+    unit,
+    Object.hashAllUnordered(weekdays),
+    monthDay,
+    nth,
+    count,
+    until,
+  );
 }
 
 const _weekdayCodes = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
