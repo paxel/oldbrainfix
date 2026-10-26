@@ -593,6 +593,7 @@
     }
   },
   "moreCaptureContext": "More about the capture",
+  "recordVoice": "Record voice",
   "recording": "Recording…",
   "stopAndSave": "Stop and save",
   "voiceRecording": "Voice recording",

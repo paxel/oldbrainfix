@@ -1019,6 +1019,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get moreCaptureContext => 'Mehr zur Erfassung';
 
   @override
+  String get recordVoice => 'Sprache aufnehmen';
+
+  @override
   String get recording => 'Aufnahme läuft …';
 
   @override

@@ -1592,6 +1592,12 @@ abstract class AppLocalizations {
   /// **'More about the capture'**
   String get moreCaptureContext;
 
+  /// No description provided for @recordVoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Record voice'**
+  String get recordVoice;
+
   /// No description provided for @recording.
   ///
   /// In en, this message translates to:

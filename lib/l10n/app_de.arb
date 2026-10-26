@@ -258,6 +258,7 @@
   "contextDuring": "Während: {events}",
   "contextBluetooth": "Verbunden: {devices}",
   "moreCaptureContext": "Mehr zur Erfassung",
+  "recordVoice": "Sprache aufnehmen",
   "recording": "Aufnahme läuft …",
   "stopAndSave": "Beenden und speichern",
   "voiceRecording": "Sprachaufnahme",
