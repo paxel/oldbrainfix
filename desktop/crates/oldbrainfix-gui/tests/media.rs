@@ -61,6 +61,8 @@ struct Devices {
     played: Vec<Vec<u8>>,
     playing: bool,
     stopped: u32,
+    /// Every playback speed the speakers were given.
+    speeds: Vec<f64>,
     /// The clipboard's photo, if any.
     clipboard: Option<Vec<u8>>,
 }
@@ -115,6 +117,10 @@ impl Player for FakeSpeakers {
     fn playing(&self) -> bool {
         self.0.borrow().playing
     }
+
+    fn set_speed(&mut self, speed: f64) {
+        self.0.borrow_mut().speeds.push(speed);
+    }
 }
 
 struct FakeClipboard(Shared);
@@ -137,7 +143,12 @@ fn png(width: u32, height: u32) -> Vec<u8> {
 
 /// The window over `store`, with the fake devices.
 fn window(store: Arc<Store>, devices: &Shared) -> Harness<'static, App> {
-    let mut app = App::new(store, "en");
+    window_in(store, devices, "en")
+}
+
+/// The window over `store` speaking `locale`, with the fake devices.
+fn window_in(store: Arc<Store>, devices: &Shared, locale: &str) -> Harness<'static, App> {
+    let mut app = App::new(store, locale);
     app.set_recorder(Box::new(FakeMic(devices.clone())));
     app.set_player(Box::new(FakeSpeakers(devices.clone())));
     app.set_clipboard(Box::new(FakeClipboard(devices.clone())));
@@ -708,5 +719,104 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     assert_eq!(note.removed_recordings, vec![recording.to_string()]);
     assert!(shows(&harness, "Bring the X-ray"));
     assert!(!shows(&harness, "Remove recording, keep text"));
+    Ok(())
+}
+
+/// A store on disk in `dir`, opened anew on every call.
+fn disk_store(dir: &std::path::Path) -> Result<Arc<Store>, Box<dyn std::error::Error>> {
+    let now = parse_time("2026-10-26T09:00:00.000Z")?;
+    let store = Store::open(&dir.join("log.db"), Box::new(move || now), || {
+        Ok(SigningKey::from_seed([9; 32]))
+    })?;
+    Ok(Arc::new(store))
+}
+
+/// Records a voice Note through the fake microphone; it opens in the
+/// editor with its play button.
+fn record_note<S>(harness: &mut Harness<'_, S>, devices: &Shared) {
+    devices.borrow_mut().mic = true;
+    harness.get_by_label("Record voice").click();
+    harness.run();
+    harness.get_by_label("Stop and save").click();
+    harness.run();
+}
+
+#[test]
+fn the_playback_speed_changes_what_plays_and_stays_on_this_device() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let devices: Shared = Rc::default();
+    {
+        let mut harness = window(disk_store(dir.path())?, &devices);
+        record_note(&mut harness, &devices);
+        // Normal speed beside the play button until another is chosen.
+        assert!(shows(&harness, "1×"));
+        harness.get_by_label("Play the voice recording").click();
+        harness.run_steps(3);
+        assert_eq!(devices.borrow().speeds.last(), Some(&1.0));
+        harness.get_by_label("1×").click();
+        harness.run_steps(3);
+        assert!(shows(&harness, "Playback speed"));
+        for option in ["×0.5", "×0.75", "×1", "×2"] {
+            assert!(shows(&harness, option), "{option}");
+        }
+        // Chosen while playing: the recording plays on, faster.
+        harness.get_by_label("×1.5").click();
+        harness.run_steps(3);
+        assert!(shows(&harness, "1.5×"));
+        assert!(!shows(&harness, "1×"));
+        assert!(!shows(&harness, "×2"), "the menu closed");
+        let d = devices.borrow();
+        assert_eq!(d.speeds.last(), Some(&1.5));
+        assert_eq!(d.played.len(), 1, "not started again");
+        assert!(d.playing);
+    }
+    // The next start of the window plays at the speed chosen.
+    devices.borrow_mut().speeds.clear();
+    let store = disk_store(dir.path())?;
+    assert_eq!(
+        store.local_setting("playbackSpeed")?.as_deref(),
+        Some("1.5")
+    );
+    let mut harness = window(store, &devices);
+    assert_eq!(devices.borrow().speeds, vec![1.5]);
+    let notes = Notes::new(harness.state().store()).all()?;
+    harness.state_mut().select_note(&notes[0].id);
+    harness.run();
+    assert!(shows(&harness, "1.5×"));
+    harness.get_by_label("Play the voice recording").click();
+    harness.run_steps(3);
+    assert_eq!(devices.borrow().speeds.last(), Some(&1.5));
+    Ok(())
+}
+
+#[test]
+fn an_unknown_playback_speed_plays_at_normal_speed() -> TestResult {
+    let devices: Shared = Rc::default();
+    for kept in ["3", "fast", "1.25"] {
+        let store = empty_store()?;
+        store.set_local_setting("playbackSpeed", kept)?;
+        let mut harness = window(store, &devices);
+        record_note(&mut harness, &devices);
+        assert!(shows(&harness, "1×"), "{kept}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
+    let store = empty_store()?;
+    store.set_local_setting("playbackSpeed", "1.5")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window_in(store, &devices, "de");
+    devices.borrow_mut().mic = true;
+    harness.get_by_label("Sprache aufnehmen").click();
+    harness.run();
+    harness.get_by_label("Beenden und speichern").click();
+    harness.run();
+    assert!(shows(&harness, "1,5×"));
+    harness.get_by_label("1,5×").click();
+    harness.run_steps(3);
+    assert!(shows(&harness, "Wiedergabegeschwindigkeit"));
+    assert!(shows(&harness, "×0,75"));
     Ok(())
 }

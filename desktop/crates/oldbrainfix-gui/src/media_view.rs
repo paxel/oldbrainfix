@@ -15,7 +15,7 @@ use oldbrainfix_whisper::model::{MEGABYTES, Outcome};
 use crate::app::icon_button;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::media::pixels;
+use crate::media::{PLAYBACK_SPEEDS, pixels, speed_number};
 use crate::speech::{SpeechModel, Status};
 
 /// The long edge photos are shown at, at most.
@@ -150,25 +150,29 @@ pub fn removed_texts(
 }
 
 /// What was asked of a voice recording.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Recording {
     /// Its play or stop button.
     Play(String),
     /// Removing it and keeping its Transcript (ADR 0020).
     Remove(String),
+    /// Playing every recording at this speed from now on, 1 being normal
+    /// speed.
+    Speed(f64),
 }
 
 /// What shows of the voice recordings `hashes`: a play or stop button
-/// each, with its Transcript, "Transcribing…" while it is being made, or
-/// "No words heard." for an empty one; each one `removable` with the
-/// button that removes it and keeps its Transcript. What was clicked
-/// comes back, `None` without buttons.
+/// each with the playback `speed` beside it, which opens the speeds to
+/// choose from, and its Transcript, "Transcribing…" while it is being
+/// made, or "No words heard." for an empty one; each one `removable`
+/// with the button that removes it and keeps its Transcript. What was
+/// clicked comes back, `None` without buttons.
 pub fn recordings(
     ui: &mut Ui,
     t: &L10n,
     hashes: &[String],
     transcripts: &BTreeMap<String, String>,
-    (playing, transcribing): (Option<&str>, Option<&str>),
+    (playing, transcribing, speed): (Option<&str>, Option<&str>, f64),
     buttons: bool,
     removable: &dyn Fn(&str) -> bool,
 ) -> Option<Recording> {
@@ -186,6 +190,9 @@ pub fn recordings(
                 };
                 if icon_button(ui, icon, label, text).clicked() {
                     clicked = Some(Recording::Play(hash.clone()));
+                }
+                if let Some(chosen) = speed_button(ui, t, speed) {
+                    clicked = Some(Recording::Speed(chosen));
                 }
             } else {
                 icons::show(ui, icons::MIC, 16.0, weak);
@@ -212,6 +219,31 @@ pub fn recordings(
         }
     }
     clicked
+}
+
+/// The playback `speed` beside a play button ("1×"); a click opens the
+/// speeds under it, the current one marked. The speed chosen comes back.
+fn speed_button(ui: &mut Ui, t: &L10n, speed: f64) -> Option<f64> {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let number = |speed| speed_number(t.locale(), speed);
+    let mut chosen = None;
+    let menu = ui.menu_button(
+        RichText::new(t.playback_speed_label(&number(speed))).color(text),
+        |ui| {
+            ui.label(RichText::new(t.playback_speed()).color(weak));
+            for option in PLAYBACK_SPEEDS {
+                let label = RichText::new(t.playback_speed_option(&number(option))).color(text);
+                if ui.radio(option == speed, label).clicked() {
+                    chosen = Some(option);
+                    ui.close();
+                }
+            }
+        },
+    );
+    menu.response
+        .on_hover_text(t.playback_speed_semantics(&number(speed)));
+    chosen.filter(|&chosen| chosen != speed)
 }
 
 /// What the microphone's button asked for.

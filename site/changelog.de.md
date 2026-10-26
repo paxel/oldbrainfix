@@ -10,7 +10,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Ein großer roter Knopf auf der Seite „Über Old Brain Fix“ des Telefons.
 - Auf dem Telefon öffnet ein Wischen nach links auf der Agenda die Liste der Bereiche und ein Wischen nach rechts aus der Liste der Bereiche führt zur Agenda zurück, und bei jedem Wischen zwischen der Agenda, der Liste der Bereiche, einem Bereich und einem Thema folgen die Seiten dem Finger, wobei der Wechsel ab der Mitte oder mit einem schnellen Wischen abgeschlossen wird und sonst zurückfedert.
 - Eine Sprachaufnahme mit Transkript oder ein Foto mit erkanntem Text lässt sich im Notiz-Editor (auf dem Telefon auch im ⋮-Menü der Karte) entfernen, von jedem Gerät und aus dem geteilten Bereich, während der Text in der Notiz und in der Suche bleibt.
-- Auf dem Telefon zeigt eine Anzeige neben jedem Abspielknopf die Wiedergabegeschwindigkeit von Sprachaufnahmen und öffnet ein Menü mit 0,5-, 0,75-, 1-, 1,5- und 2-facher Geschwindigkeit; die Wahl gilt sofort und bleibt auf diesem Gerät.
+- Auf dem Telefon und dem Computer zeigt eine Anzeige neben jedem Abspielknopf die Wiedergabegeschwindigkeit von Sprachaufnahmen und öffnet ein Menü mit 0,5-, 0,75-, 1-, 1,5- und 2-facher Geschwindigkeit; die Wahl gilt sofort und bleibt auf diesem Gerät.
 
 ### Geändert
 - Die Agenda auf dem Telefon zeigt die ganze Woche: nach morgen die fünf folgenden Tage, jeder unter Wochentag und Datum, ein leerer Tag als „Nichts geplant“.

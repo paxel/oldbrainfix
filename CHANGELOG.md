@@ -11,7 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - A big red button on the phone's About page.
 - On the phone, a swipe left on the Agenda opens the Areas list and a swipe right from the Areas list returns to the Agenda, and every swipe between Agenda, Areas list, Area and Topic moves the pages with the finger, completing past the middle or with a fling and springing back otherwise.
 - A voice recording with a Transcript or a photo with a Photo Text can be removed in the Note editor (on the phone also in the card's ⋮ menu), from every Device and the Shared Area, while the text stays on the Note and in search.
-- On the phone, a label beside every play button shows the playback speed of voice recordings and opens a menu with 0.5, 0.75, 1, 1.5 and 2 times normal speed; the choice applies at once and stays on this Device.
+- On the phone and the desktop, a label beside every play button shows the playback speed of voice recordings and opens a menu with 0.5, 0.75, 1, 1.5 and 2 times normal speed; the choice applies at once and stays on this Device.
 
 ### Changed
 - The phone's Agenda shows the whole week: after tomorrow come the five following days, each under its weekday and date, an empty day as "Nothing planned".

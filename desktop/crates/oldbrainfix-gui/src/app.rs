@@ -66,7 +66,7 @@ use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::L10n;
-use crate::media::{Clipboard, Player, Recorder, photo_from_file};
+use crate::media::{self, Clipboard, Player, Recorder, photo_from_file};
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView};
@@ -333,6 +333,9 @@ enum Action {
     Record,
     /// Plays the voice recording with this hash, or stops it playing.
     Play(String),
+    /// Plays recordings at this speed from now on, the one playing
+    /// included, and keeps it on this Device.
+    Speed(f64),
     /// Keeps the picture on the clipboard as a photo Note.
     PastePhoto,
     /// Keeps these photos, already made the phone's way, as a photo
@@ -512,6 +515,8 @@ pub struct App {
     player: Option<Box<dyn Player>>,
     /// The recording playing, by its hash.
     playing: Option<String>,
+    /// How fast recordings play, 1 being normal speed; a Device setting.
+    speed: f64,
     /// A recording that ended but could not be kept yet.
     recorded: Option<Vec<u8>>,
     clipboard: Option<Box<dyn Clipboard>>,
@@ -628,6 +633,7 @@ impl App {
     pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
         let store = store.into();
         let read_at = store.now();
+        let speed = media::playback_speed(&store);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -656,6 +662,7 @@ impl App {
             recorder: None,
             player: None,
             playing: None,
+            speed,
             recorded: None,
             clipboard: None,
             transcriber: None,
@@ -1040,7 +1047,8 @@ impl App {
     }
 
     /// The speakers voice recordings are played on.
-    pub fn set_player(&mut self, player: Box<dyn Player>) {
+    pub fn set_player(&mut self, mut player: Box<dyn Player>) {
+        player.set_speed(self.speed);
         self.player = Some(player);
     }
 
@@ -1502,6 +1510,14 @@ impl App {
                 {
                     self.playing = Some(hash);
                 }
+            }
+            Action::Speed(speed) => {
+                // The one playing changes even if keeping it fails.
+                self.speed = speed;
+                if let Some(player) = &mut self.player {
+                    player.set_speed(speed);
+                }
+                media::keep_playback_speed(&self.store, speed)?;
             }
             Action::PastePhoto => {
                 let photo = self.clipboard.as_mut().and_then(|c| c.photo());
@@ -2717,6 +2733,7 @@ impl App {
         let store = &self.store;
         let playing = self.playing.as_deref();
         let can_play = self.player.is_some();
+        let speed = self.speed;
         let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
         let transcribing = transcribing.as_deref();
         let removable = &self.view.removable;
@@ -2786,7 +2803,7 @@ impl App {
                             &t,
                             media,
                             shown,
-                            (playing, transcribing, can_play),
+                            (playing, transcribing, can_play, speed),
                             actions,
                         );
                     });
@@ -2889,7 +2906,7 @@ impl App {
                             &t,
                             media,
                             shown,
-                            (playing, transcribing, can_play),
+                            (playing, transcribing, can_play, speed),
                             actions,
                         );
                         ui.label(
@@ -4812,7 +4829,7 @@ struct Media<'a> {
 }
 
 /// What the editor shows of `media`: the photos, the recordings with
-/// their play buttons while `can_play`, the button under each one the
+/// their play buttons and playback `speed` while `can_play`, the button under each one the
 /// Device may remove while its text stays, and the texts of those
 /// removed where the files were (ADR 0020).
 fn editor_media(
@@ -4820,7 +4837,7 @@ fn editor_media(
     t: &L10n,
     media: Media,
     (cache, store, removable): (&mut PhotoCache, &Store, &HashSet<(String, String)>),
-    (playing, transcribing, can_play): (Option<&str>, Option<&str>, bool),
+    (playing, transcribing, can_play, speed): (Option<&str>, Option<&str>, bool, f64),
     actions: &mut Vec<Action>,
 ) {
     let id = media.id;
@@ -4840,13 +4857,14 @@ fn editor_media(
         t,
         recordings,
         transcripts,
-        (playing, transcribing),
+        (playing, transcribing, speed),
         can_play,
         &may,
     );
     match asked {
         Some(Recording::Play(hash)) => actions.push(Action::Play(hash)),
         Some(Recording::Remove(hash)) => actions.push(ask(hash, false)),
+        Some(Recording::Speed(speed)) => actions.push(Action::Speed(speed)),
         None => {}
     }
     media_view::removed_texts(
@@ -4909,7 +4927,7 @@ fn note_card(
                 t,
                 &note.recordings,
                 &note.transcripts,
-                (None, media.transcribing),
+                (None, media.transcribing, 1.0),
                 false,
                 &|_| false,
             );
