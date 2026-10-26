@@ -263,9 +263,15 @@ void main() {
         return note;
       }
 
-      capture('important, old', kitchen.id, Importance.important);
+      capture('important, old', home.id, Importance.important);
       capture('normal', home.id, Importance.normal);
       capture('unimportant, new', home.id, Importance.unimportant);
+      capture('important, in the kitchen', kitchen.id, Importance.important);
+      capture(
+        'unimportant, in the kitchen',
+        kitchen.id,
+        Importance.unimportant,
+      );
       List<String> cards() => [
         for (final card in tester.widgetList<NoteCard>(find.byType(NoteCard)))
           card.note.text,
@@ -289,7 +295,7 @@ void main() {
 
       await tap(tester, find.text('Kitchen'));
       await tap(tester, find.byTooltip('Hide unimportant Notes'));
-      expect(cards(), ['important, old']);
+      expect(cards(), ['important, in the kitchen']);
     });
   });
 

@@ -118,6 +118,15 @@ void main() {
       await search(tester, 'sauce');
       expect(cardTexts(tester), ['sauce at home', 'sauce in the kitchen']);
       expect(find.text('Kitchen'), findsNothing);
+      // The Topic's Note is marked with its Topic.
+      expect(find.text('Household / Kitchen'), findsOneWidget);
+      final kitchenCard = tester.widget<NoteCard>(
+        find.ancestor(
+          of: find.text('sauce in the kitchen'),
+          matching: find.byType(NoteCard),
+        ),
+      );
+      expect(kitchenCard.topic?.id, kitchen.id);
 
       await tester.tap(find.byTooltip('Clear search'));
       await tester.pumpAndSettle();
@@ -128,10 +137,11 @@ void main() {
   });
 
   group('levels', () {
-    testWidgets('an Area shows its Topics and its diary, newest first', (
+    testWidgets('an Area shows its Topics and only its Notes without one', (
       tester,
     ) async {
-      capture('older, in the kitchen', kitchen.id);
+      capture('older, in the Area', home.id);
+      capture('in the kitchen', kitchen.id);
       capture('newer, in the Area', home.id);
       capture('elsewhere', work.id);
       await openBrowser(tester);
@@ -139,13 +149,10 @@ void main() {
 
       expect(find.text('Kitchen'), findsOneWidget);
       expect(find.text('Garden'), findsOneWidget);
-      expect(cardTexts(tester), [
-        'newer, in the Area',
-        'older, in the kitchen',
-      ]);
+      expect(cardTexts(tester), ['newer, in the Area', 'older, in the Area']);
 
       await open(tester, 'Kitchen');
-      expect(cardTexts(tester), ['older, in the kitchen']);
+      expect(cardTexts(tester), ['in the kitchen']);
     });
 
     testWidgets('an empty Topic says so', (tester) async {

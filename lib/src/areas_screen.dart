@@ -361,9 +361,9 @@ enum _TopicAction { rename, delete }
 
 enum _AreaAdd { note, topic }
 
-/// The browser's second level, one Area: its Topics and its diary of
-/// cards, with a search field over the Area's Notes and "+" to add a
-/// Topic.
+/// The browser's second level, one Area: its Topics and the diary of
+/// its Notes without a Topic, with a search field over its Notes and
+/// those of its Topics, and "+" to add a Topic.
 class AreaScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -412,7 +412,8 @@ class _AreaScreenState extends State<AreaScreen> {
   }
 
   /// Reads the Area, its Topics sorted by the name the reader sees, and
-  /// its Notes that match the search.
+  /// its Notes without a Topic, or while searching every match in it and
+  /// its Topics.
   void _load() {
     final t = context.t;
     _area = widget.places.areaById(widget.areaId);
@@ -425,7 +426,7 @@ class _AreaScreenState extends State<AreaScreen> {
           a,
         ).toLowerCase().compareTo(topicName(t, b).toLowerCase()),
       );
-    _diary = _search(
+    final found = _search(
       widget.places,
       _query.text,
       within: widget.areaId,
@@ -434,6 +435,14 @@ class _AreaScreenState extends State<AreaScreen> {
       hideUnimportant: _hideUnimportant,
       people: _filter,
     );
+    // A Topic's Notes show inside the Topic; a search still finds them,
+    // their cards naming the Topic.
+    _diary = _query.text.trim().isNotEmpty
+        ? found
+        : [
+            for (final placed in found)
+              if (placed.note.place == widget.areaId) placed,
+          ];
   }
 
   void _reload() => setState(_load);
