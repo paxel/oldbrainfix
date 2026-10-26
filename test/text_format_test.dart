@@ -6,6 +6,8 @@ import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'reveal.dart';
+
 /// A text in a format this version does not know, as a later version
 /// would store it.
 const _future = '{"format":"x-future","text":"# Shopping\\n**milk**"}';
@@ -102,6 +104,7 @@ void main() {
     final section = notes.amend(note.id, 'Room 3');
     store.append(section.id, SectionKeys.text, '{"format":"plain","v":2}');
     await openEditor(tester, 'Dentist');
+    await reveal(tester, find.byKey(ValueKey('newer:${section.id}')));
     expect(find.byKey(ValueKey('newer:${section.id}')), findsOneWidget);
     expect(find.text('Room 3'), findsNothing);
   });
@@ -123,13 +126,14 @@ void main() {
     final section = notes.amend(note.id, 'Room 3');
     store.append(section.id, SectionKeys.text, _future);
     await openEditor(tester, 'Dentist');
-    expect(find.byKey(ValueKey('newer:${section.id}')), findsOneWidget);
-    expect(find.text('# Shopping\n**milk**'), findsOneWidget);
     expect(
       tester.widget<TextField>(find.byType(TextField)).readOnly,
       isFalse,
       reason: "the Note's own text is plain",
     );
+    await reveal(tester, find.byKey(ValueKey('newer:${section.id}')));
+    expect(find.byKey(ValueKey('newer:${section.id}')), findsOneWidget);
+    expect(find.text('# Shopping\n**milk**'), findsOneWidget);
   });
 
   testWidgets('a Conflict with a version in an unknown format cannot be '

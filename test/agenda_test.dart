@@ -7,6 +7,8 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'reveal.dart';
+
 void main() {
   late Store store;
   late Notes notes;
@@ -243,6 +245,7 @@ void main() {
 
       await tap(tester, find.text('Reminder'));
       await tap(tester, find.text('Save'));
+      await reveal(tester, find.text('Routine'));
       await tap(tester, find.text('Routine'));
       expect(find.text('New Routine'), findsOneWidget);
       await tap(tester, find.text('Save'));
@@ -314,12 +317,15 @@ void main() {
 
     testWidgets('every N weeks, and several times a day', (tester) async {
       await openNew(tester);
+      await reveal(tester, find.byTooltip('More'));
       await tap(tester, find.byTooltip('More'));
       await tap(tester, find.text('days'));
       await tap(tester, find.text('weeks').last);
       // A second time of day: the picker offers 08:00, after 08:00 went.
+      await reveal(tester, find.byTooltip('Remove 08:00'));
       await tap(tester, find.byTooltip('Remove 08:00'));
       expect(find.text('All day'), findsOneWidget);
+      await reveal(tester, find.text('Add a time'));
       await tap(tester, find.text('Add a time'));
       await tap(tester, find.text('OK'));
       await tap(tester, find.text('Save'));
@@ -328,6 +334,36 @@ void main() {
       expect(schedule.rule?.format(), 'FREQ=WEEKLY;INTERVAL=2');
       expect(schedule.times, [at(8)]);
       expect(schedule.start, today);
+    });
+
+    testWidgets('its choices are radio buttons, one per line', (tester) async {
+      await openNew(tester);
+      expect(find.byType(SegmentedButton<bool>), findsNothing);
+      expect(find.byType(SegmentedButton<RepeatKind>), findsNothing);
+      expect(find.byType(RadioListTile<bool>), findsNWidgets(2));
+      expect(find.byType(RadioListTile<RepeatKind>), findsNWidgets(3));
+      // One option per line: each sits below the one before.
+      final tops = [
+        for (final tile in find.byType(RadioListTile<RepeatKind>).evaluate())
+          tester.getTopLeft(find.byWidget(tile.widget)),
+      ];
+      expect(tops.map((o) => o.dx).toSet(), hasLength(1));
+      expect(tops[1].dy, greaterThan(tops[0].dy));
+      expect(tops[2].dy, greaterThan(tops[1].dy));
+
+      await tap(
+        tester,
+        find.descendant(
+          of: find.widgetWithText(RadioListTile<RepeatKind>, 'Weekdays'),
+          matching: find.byType(Radio<RepeatKind>),
+        ),
+      );
+      await tester.ensureVisible(find.text('Save'));
+      await tap(tester, find.text('Save'));
+      expect(
+        routines.all().single.schedule.rule?.format(),
+        'FREQ=WEEKLY;BYDAY=SA',
+      );
     });
 
     testWidgets('chosen weekdays', (tester) async {

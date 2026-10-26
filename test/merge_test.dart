@@ -7,6 +7,8 @@ import 'package:oldbrainfix/src/note_card.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'reveal.dart';
+
 void main() {
   late Store store;
   late Places places;
@@ -74,6 +76,7 @@ void main() {
     expect(cards(), ['sauce']);
     expect(notes.byId(merged.id)?.mergedInto, target.id);
     await tap(tester, find.text('sauce'));
+    await reveal(tester, find.text('need more sauce'));
     expect(find.text('need more sauce'), findsOneWidget);
     expect(find.text(shown(DateTime.utc(2026, 10, 24, 9))), findsOneWidget);
   });

@@ -16,6 +16,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
+import 'reveal.dart';
 
 void main() {
   late Store store;
@@ -245,6 +246,7 @@ void main() {
       await start(tester);
       await edit(tester, into);
 
+      await reveal(tester, find.byType(NotePhoto));
       expect(find.byType(NotePhoto), findsOneWidget);
     });
 

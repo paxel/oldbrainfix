@@ -10,6 +10,7 @@ import 'fake_context.dart';
 import 'fake_location.dart';
 import 'fake_photos.dart';
 import 'open_settings.dart';
+import 'reveal.dart';
 
 void main() {
   late Store store;
@@ -172,6 +173,7 @@ void main() {
       await openEditor(tester, 'nees mor sauce');
       expect(find.text('Connected: Headphones'), findsNothing);
 
+      await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));
       await tester.enterText(
         find.descendant(

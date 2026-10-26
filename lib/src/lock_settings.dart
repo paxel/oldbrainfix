@@ -362,28 +362,27 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
                               children: [
                                 Text(t.areaAlarmsShow),
                                 const SizedBox(height: 8),
-                                SegmentedButton<bool>(
+                                RadioColumn<bool>(
                                   key: ValueKey('areaMasked-${area.id}'),
-                                  segments: [
-                                    ButtonSegment(
+                                  value: _masked.contains(area.id),
+                                  options: [
+                                    RadioOption(
                                       value: true,
-                                      label: Text(t.areaAlarmsMasked),
-                                      icon: const Icon(
+                                      title: Text(t.areaAlarmsMasked),
+                                      secondary: const Icon(
                                         Icons.visibility_off_outlined,
                                       ),
                                     ),
-                                    ButtonSegment(
+                                    RadioOption(
                                       value: false,
-                                      label: Text(t.areaAlarmsFull),
-                                      icon: const Icon(
+                                      title: Text(t.areaAlarmsFull),
+                                      secondary: const Icon(
                                         Icons.visibility_outlined,
                                       ),
                                     ),
                                   ],
-                                  selected: {_masked.contains(area.id)},
-                                  showSelectedIcon: false,
-                                  onSelectionChanged: (picked) =>
-                                      _setMasked(area, picked.single),
+                                  onChanged: (masked) =>
+                                      _setMasked(area, masked),
                                 ),
                               ],
                             ),

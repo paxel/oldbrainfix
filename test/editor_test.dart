@@ -8,6 +8,8 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'reveal.dart';
+
 void main() {
   late Store store;
   late Places places;
@@ -81,6 +83,7 @@ void main() {
       );
       expect(find.text(shown(DateTime.utc(2026, 10, 24, 8))), findsOneWidget);
       expect(find.text('Household / Kitchen'), findsOneWidget);
+      await reveal(tester, find.text('Update: sauce bought'));
       expect(find.text('Update: sauce bought'), findsOneWidget);
       expect(find.text(shown(DateTime.utc(2026, 10, 25, 8))), findsOneWidget);
       expect(find.text('Normal'), findsOneWidget);
@@ -126,6 +129,7 @@ void main() {
       await tap(tester, find.text('nees mor sauce'));
 
       tick(const Duration(hours: 3));
+      await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));
       await tester.enterText(
         find.descendant(
@@ -305,6 +309,7 @@ void main() {
     await tap(tester, find.byTooltip('Alle Notizen'));
     await tap(tester, find.text('Soße kaufen'));
     await tap(tester, find.text('Unwichtig'));
+    await reveal(tester, find.text('Zur Notiz hinzufügen'));
     expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);
     await tap(tester, find.byType(BackButton));
     await tap(tester, find.byType(BackButton));

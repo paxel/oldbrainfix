@@ -96,28 +96,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsHeading(t.settingsLook),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SegmentedButton<ThemeChoice>(
+              child: RadioColumn<ThemeChoice>(
                 key: const ValueKey('theme'),
-                segments: [
-                  ButtonSegment(
+                value: _theme,
+                options: [
+                  RadioOption(
                     value: ThemeChoice.system,
-                    label: Text(t.themeSystem),
-                    icon: const Icon(Icons.brightness_auto_outlined),
+                    title: Text(t.themeSystem),
+                    secondary: const Icon(Icons.brightness_auto_outlined),
                   ),
-                  ButtonSegment(
+                  RadioOption(
                     value: ThemeChoice.light,
-                    label: Text(t.themeLight),
-                    icon: const Icon(Icons.light_mode_outlined),
+                    title: Text(t.themeLight),
+                    secondary: const Icon(Icons.light_mode_outlined),
                   ),
-                  ButtonSegment(
+                  RadioOption(
                     value: ThemeChoice.dark,
-                    label: Text(t.themeDark),
-                    icon: const Icon(Icons.dark_mode_outlined),
+                    title: Text(t.themeDark),
+                    secondary: const Icon(Icons.dark_mode_outlined),
                   ),
                 ],
-                selected: {_theme},
-                showSelectedIcon: false,
-                onSelectionChanged: (picked) => _setTheme(picked.single),
+                onChanged: _setTheme,
               ),
             ),
             SettingsHeading(t.settingsAlarms),

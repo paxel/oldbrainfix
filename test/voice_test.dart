@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_voice.dart';
+import 'reveal.dart';
 
 /// Stand-ins for two recordings: the app keeps any bytes as they are.
 final first = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
@@ -387,12 +388,14 @@ void main() {
         of: find.byType(NoteEditorScreen),
         matching: find.byType(RecordingButton),
       );
-      expect(buttons, findsNWidgets(2));
       await tap(tester, buttons.first);
       expect(voice.played, [first]);
-      await tester.ensureVisible(buttons.last);
-      await tester.pumpAndSettle();
-      await tap(tester, buttons.last);
+      // The merged Note's Section sits low on the page.
+      final low = find.byWidgetPredicate(
+        (w) => w is RecordingButton && w.hash == merged.recordings.single,
+      );
+      await reveal(tester, low);
+      await tap(tester, low);
       expect(voice.played, [first, second]);
     });
   });

@@ -183,9 +183,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _load();
   }
 
-  void _setImportance(Set<Importance> picked) {
+  void _setImportance(Importance picked) {
     _saveText();
-    widget.notes.setImportance(widget.noteId, picked.single);
+    widget.notes.setImportance(widget.noteId, picked);
     _reload();
   }
 
@@ -421,24 +421,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             const SizedBox(height: 16),
             EditorPanel(
               heading: t.importance,
-              child: SegmentedButton<Importance>(
-                segments: [
-                  ButtonSegment(
+              child: RadioColumn<Importance>(
+                value: note.importance,
+                options: [
+                  RadioOption(
                     value: Importance.unimportant,
-                    label: Text(t.importanceUnimportant),
+                    title: Text(t.importanceUnimportant),
                   ),
-                  ButtonSegment(
+                  RadioOption(
                     value: Importance.normal,
-                    label: Text(t.importanceNormal),
+                    title: Text(t.importanceNormal),
                   ),
-                  ButtonSegment(
+                  RadioOption(
                     value: Importance.important,
-                    label: Text(t.importanceImportant),
+                    title: Text(t.importanceImportant),
                   ),
                 ],
-                selected: {note.importance},
-                showSelectedIcon: false,
-                onSelectionChanged: changes ? _setImportance : null,
+                onChanged: changes ? _setImportance : null,
               ),
             ),
             EditorPanel(

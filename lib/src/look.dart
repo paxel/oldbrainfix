@@ -235,3 +235,73 @@ class SwitchBelow extends StatelessWidget {
     ),
   );
 }
+
+/// One option of a [RadioColumn].
+class RadioOption<T> {
+  final T value;
+  final Widget title;
+  final Widget? subtitle;
+
+  /// An icon at the line's end.
+  final Widget? secondary;
+
+  /// The option's own key, for finding and tapping it.
+  final Key? key;
+
+  const RadioOption({
+    required this.value,
+    required this.title,
+    this.subtitle,
+    this.secondary,
+    this.key,
+  });
+}
+
+/// A single choice: a column of radio buttons, one option per line, two
+/// options included (UI laws, "Dialogs and pages"). Without [onChanged]
+/// the options show but do not change.
+class RadioColumn<T> extends StatelessWidget {
+  final T value;
+  final List<RadioOption<T>> options;
+  final ValueChanged<T>? onChanged;
+
+  const RadioColumn({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final onChanged = this.onChanged;
+    return RadioGroup<T>(
+      groupValue: value,
+      onChanged: (picked) {
+        // A tap on the chosen option changes nothing.
+        if (onChanged == null || picked == null || picked == value) return;
+        onChanged(picked);
+      },
+      // Its own transparent Material, so the ink shows on an [Embossed]
+      // panel too.
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final option in options)
+              RadioListTile<T>(
+                key: option.key,
+                contentPadding: EdgeInsets.zero,
+                enabled: onChanged != null,
+                value: option.value,
+                title: option.title,
+                subtitle: option.subtitle,
+                secondary: option.secondary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

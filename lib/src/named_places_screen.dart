@@ -206,33 +206,37 @@ class _NamedPlaceDialogState extends State<_NamedPlaceDialog> {
     final t = context.t;
     return AlertDialog(
       title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(hintText: t.namedPlaceHint),
-            onSubmitted: (_) => _done(),
-          ),
-          const SizedBox(height: 16),
-          Text(t.radiusHeading, style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final radius in {...namedPlaceRadii, widget.radius})
-                ChoiceChip(
-                  label: Text(t.radiusMetres(radius.round())),
-                  selected: radius == _radius,
-                  onSelected: (_) => setState(() => _radius = radius),
-                ),
-            ],
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(hintText: t.namedPlaceHint),
+              onSubmitted: (_) => _done(),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              t.radiusHeading,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            RadioColumn<double>(
+              value: _radius,
+              options: [
+                for (final radius in {...namedPlaceRadii, widget.radius})
+                  RadioOption(
+                    value: radius,
+                    title: Text(t.radiusMetres(radius.round())),
+                  ),
+              ],
+              onChanged: (radius) => setState(() => _radius = radius),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

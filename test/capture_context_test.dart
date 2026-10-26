@@ -8,6 +8,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_location.dart';
 import 'open_settings.dart';
+import 'reveal.dart';
 
 void main() {
   late Store store;
@@ -183,6 +184,7 @@ void main() {
       await tap(tester, find.text('nees mor sauce'));
       expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
 
+      await reveal(tester, find.text('Add to Note'));
       await tap(tester, find.text('Add to Note'));
       await tester.enterText(
         find.descendant(

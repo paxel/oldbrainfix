@@ -202,6 +202,42 @@ void main() {
       expect(painter(tester).shift, 0);
     });
   });
+
+  group('radio column', () {
+    Future<List<int>> pump(WidgetTester tester, {bool enabled = true}) async {
+      final picks = <int>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Material(
+            child: RadioColumn<int>(
+              value: 1,
+              options: [
+                for (final n in [1, 2])
+                  RadioOption(value: n, title: Text('$n')),
+              ],
+              onChanged: enabled ? picks.add : null,
+            ),
+          ),
+        ),
+      );
+      return picks;
+    }
+
+    testWidgets('a tap picks another option, not the chosen one', (
+      tester,
+    ) async {
+      final picks = await pump(tester);
+      await tester.tap(find.text('1'));
+      await tester.tap(find.text('2'));
+      expect(picks, [2]);
+    });
+
+    testWidgets('without onChanged nothing changes', (tester) async {
+      final picks = await pump(tester, enabled: false);
+      await tester.tap(find.text('2'));
+      expect(picks, isEmpty);
+    });
+  });
 }
 
 /// WCAG contrast ratio of two colours.

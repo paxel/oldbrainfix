@@ -485,14 +485,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SegmentedButton<bool>(
-                segments: [
-                  ButtonSegment(value: false, label: Text(t.scheduleSimple)),
-                  ButtonSegment(value: true, label: Text(t.scheduleAdvanced)),
+              RadioColumn<bool>(
+                value: _advanced,
+                options: [
+                  RadioOption(value: false, title: Text(t.scheduleSimple)),
+                  RadioOption(value: true, title: Text(t.scheduleAdvanced)),
                 ],
-                selected: {_advanced},
-                showSelectedIcon: false,
-                onSelectionChanged: (picked) => _switchMode(picked.single),
+                onChanged: _switchMode,
               ),
               const SizedBox(height: 16),
               if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
@@ -657,19 +656,18 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   List<Widget> _simpleEditor(AppLocalizations t) {
     final locale = Localizations.localeOf(context).toString();
     return [
-      SegmentedButton<RepeatKind>(
-        segments: [
-          ButtonSegment(value: RepeatKind.once, label: Text(t.repeatOnce)),
-          ButtonSegment(value: RepeatKind.every, label: Text(t.repeatEvery)),
-          ButtonSegment(
+      RadioColumn<RepeatKind>(
+        value: _kind,
+        options: [
+          RadioOption(value: RepeatKind.once, title: Text(t.repeatOnce)),
+          RadioOption(value: RepeatKind.every, title: Text(t.repeatEvery)),
+          RadioOption(
             value: RepeatKind.weekdays,
-            label: Text(t.repeatWeekdays),
+            title: Text(t.repeatWeekdays),
           ),
         ],
-        selected: {_kind},
-        showSelectedIcon: false,
-        onSelectionChanged: (picked) => _change(() {
-          _kind = picked.single;
+        onChanged: (picked) => _change(() {
+          _kind = picked;
           if (_kind == RepeatKind.weekdays && _weekdays.isEmpty) {
             _weekdays = {_start.weekday};
           }

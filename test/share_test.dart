@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
+import 'reveal.dart';
 
 /// Reads no QR; this Device goes by Pixel.
 class FakePairing implements PairingPlatform {
@@ -169,6 +170,7 @@ void main() {
     );
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.readOnly, isTrue);
+    await reveal(tester, find.text('Add to Note'));
     expect(find.text('Add to Note'), findsOneWidget);
   });
 
