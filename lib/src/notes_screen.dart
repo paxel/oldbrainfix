@@ -90,19 +90,19 @@ class _AllNotesScreenState extends State<AllNotesScreen> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.allNotesTitle),
-        actions: [
-          PersonFilterButton(
-            store: widget.notes.store,
-            filter: _people,
-            onChanged: _filter,
-          ),
-        ],
-      ),
-      body: BrowserSwipes(
-        child: ListView(
+    return BrowserSwipes(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(t.allNotesTitle),
+          actions: [
+            PersonFilterButton(
+              store: widget.notes.store,
+              filter: _people,
+              onChanged: _filter,
+            ),
+          ],
+        ),
+        body: ListView(
           padding: clearOfSystemBars(
             context,
             const EdgeInsets.symmetric(vertical: 8),

@@ -122,20 +122,34 @@ class _AreasScreenState extends State<AreasScreen> {
 
   Future<void> _open(Area area) async {
     if (!await _unlock(area) || !mounted) return;
+    await Navigator.of(context).push(_areaRoute(area));
+  }
+
+  /// [area]'s page, chosen as the last selected Area.
+  BrowserRoute<void> _areaRoute(Area area) {
     widget.trail.choseArea(area);
     setState(() {});
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AreaScreen(
-          notes: widget.notes,
-          places: widget.places,
-          trail: widget.trail,
-          areaId: area.id,
-        ),
+    final route = BrowserRoute<void>(
+      builder: (_) => AreaScreen(
+        notes: widget.notes,
+        places: widget.places,
+        trail: widget.trail,
+        areaId: area.id,
       ),
     );
-    if (!mounted) return;
-    _reload();
+    route.popped.then((_) {
+      if (mounted) _reload();
+    });
+    return route;
+  }
+
+  /// The last selected Area's page for swipe left to pull in; none while
+  /// that Area is closed, so its Notes never show before the PIN.
+  BrowserRoute<void>? _forwardRoute() {
+    final area = widget.trail.area(widget.places);
+    if (area == null) return null;
+    final closed = LockScope.of(context)?.isAreaClosed(area.id) ?? false;
+    return closed ? null : _areaRoute(area);
   }
 
   void _forward() {
@@ -287,32 +301,33 @@ class _AreasScreenState extends State<AreasScreen> {
   Widget build(BuildContext context) {
     final t = context.t;
     final searching = _query.text.trim().isNotEmpty;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.areasTitle),
-        actions: [
-          // Only the search's hits are Notes on this level.
-          if (searching)
-            PersonFilterButton(
-              store: widget.places.store,
-              filter: _filter,
-              onChanged: _filtered,
+    return BrowserSwipes(
+      forwardRoute: _forwardRoute,
+      onForward: _forward,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(t.areasTitle),
+          actions: [
+            // Only the search's hits are Notes on this level.
+            if (searching)
+              PersonFilterButton(
+                store: widget.places.store,
+                filter: _filter,
+                onChanged: _filtered,
+              ),
+            IconButton(
+              tooltip: t.allNotesTitle,
+              onPressed: _openAllNotes,
+              icon: const Icon(Icons.notes),
             ),
-          IconButton(
-            tooltip: t.allNotesTitle,
-            onPressed: _openAllNotes,
-            icon: const Icon(Icons.notes),
-          ),
-          IconButton(
-            tooltip: t.trashTitle,
-            onPressed: _openTrash,
-            icon: const Icon(Icons.delete_outline),
-          ),
-        ],
-      ),
-      body: BrowserSwipes(
-        onForward: _forward,
-        child: Column(
+            IconButton(
+              tooltip: t.trashTitle,
+              onPressed: _openTrash,
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+        ),
+        body: Column(
           children: [
             BrowserSearchField(
               controller: _query,
@@ -349,11 +364,11 @@ class _AreasScreenState extends State<AreasScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: t.newArea,
-        onPressed: _add,
-        child: const Icon(Icons.add),
+        floatingActionButton: FloatingActionButton(
+          tooltip: t.newArea,
+          onPressed: _add,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -507,25 +522,30 @@ class _AreaScreenState extends State<AreaScreen> {
     _reload();
   }
 
-  Future<void> _open(Topic topic) async {
+  Future<void> _open(Topic topic) =>
+      Navigator.of(context).push(_topicRoute(topic));
+
+  /// [topic]'s page, chosen as the last selected Topic.
+  BrowserRoute<void> _topicRoute(Topic topic) {
     widget.trail.choseTopic(topic);
     setState(() {});
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => TopicScreen(
-          notes: widget.notes,
-          places: widget.places,
-          topicId: topic.id,
-        ),
+    final route = BrowserRoute<void>(
+      builder: (_) => TopicScreen(
+        notes: widget.notes,
+        places: widget.places,
+        topicId: topic.id,
       ),
     );
-    if (!mounted) return;
-    _reload();
+    route.popped.then((_) {
+      if (mounted) _reload();
+    });
+    return route;
   }
 
-  void _forward() {
+  /// The last selected Topic's page for swipe left to pull in.
+  BrowserRoute<void>? _forwardRoute() {
     final topic = widget.trail.topicIn(widget.places, widget.areaId);
-    if (topic != null) _open(topic);
+    return topic == null ? null : _topicRoute(topic);
   }
 
   Future<void> _file(Note note) async {
@@ -630,33 +650,33 @@ class _AreaScreenState extends State<AreaScreen> {
     final area = _area;
     if (area == null) return Scaffold(appBar: AppBar());
     final searching = _query.text.trim().isNotEmpty;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(areaName(t, area)),
-        actions: [
-          PersonFilterButton(
-            store: widget.places.store,
-            filter: _filter,
-            onChanged: _filtered,
-          ),
-          ...diaryActions(
-            context,
-            order: _order,
-            hideUnimportant: _hideUnimportant,
-            onOrder: (order) => setState(() {
-              _order = order;
-              _load();
-            }),
-            onHideUnimportant: (hide) => setState(() {
-              _hideUnimportant = hide;
-              _load();
-            }),
-          ),
-        ],
-      ),
-      body: BrowserSwipes(
-        onForward: _forward,
-        child: Column(
+    return BrowserSwipes(
+      forwardRoute: _forwardRoute,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(areaName(t, area)),
+          actions: [
+            PersonFilterButton(
+              store: widget.places.store,
+              filter: _filter,
+              onChanged: _filtered,
+            ),
+            ...diaryActions(
+              context,
+              order: _order,
+              hideUnimportant: _hideUnimportant,
+              onOrder: (order) => setState(() {
+                _order = order;
+                _load();
+              }),
+              onHideUnimportant: (hide) => setState(() {
+                _hideUnimportant = hide;
+                _load();
+              }),
+            ),
+          ],
+        ),
+        body: Column(
           children: [
             BrowserSearchField(
               controller: _query,
@@ -692,16 +712,16 @@ class _AreaScreenState extends State<AreaScreen> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: !_writes
-          ? null
-          : Builder(
-              builder: (button) => FloatingActionButton(
-                tooltip: t.addHere,
-                onPressed: () => _add(button),
-                child: const Icon(Icons.add),
+        floatingActionButton: !_writes
+            ? null
+            : Builder(
+                builder: (button) => FloatingActionButton(
+                  tooltip: t.addHere,
+                  onPressed: () => _add(button),
+                  child: const Icon(Icons.add),
+                ),
               ),
-            ),
+      ),
     );
   }
 }
@@ -819,32 +839,32 @@ class _TopicScreenState extends State<TopicScreen> {
     final topic = _topic;
     if (topic == null) return Scaffold(appBar: AppBar());
     final searching = _query.text.trim().isNotEmpty;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(topicName(t, topic)),
-        actions: [
-          PersonFilterButton(
-            store: widget.places.store,
-            filter: _filter,
-            onChanged: _filtered,
-          ),
-          ...diaryActions(
-            context,
-            order: _order,
-            hideUnimportant: _hideUnimportant,
-            onOrder: (order) => setState(() {
-              _order = order;
-              _load();
-            }),
-            onHideUnimportant: (hide) => setState(() {
-              _hideUnimportant = hide;
-              _load();
-            }),
-          ),
-        ],
-      ),
-      body: BrowserSwipes(
-        child: Column(
+    return BrowserSwipes(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(topicName(t, topic)),
+          actions: [
+            PersonFilterButton(
+              store: widget.places.store,
+              filter: _filter,
+              onChanged: _filtered,
+            ),
+            ...diaryActions(
+              context,
+              order: _order,
+              hideUnimportant: _hideUnimportant,
+              onOrder: (order) => setState(() {
+                _order = order;
+                _load();
+              }),
+              onHideUnimportant: (hide) => setState(() {
+                _hideUnimportant = hide;
+                _load();
+              }),
+            ),
+          ],
+        ),
+        body: Column(
           children: [
             BrowserSearchField(
               controller: _query,
@@ -898,14 +918,14 @@ class _TopicScreenState extends State<TopicScreen> {
             ),
           ],
         ),
+        floatingActionButton: !_writes
+            ? null
+            : FloatingActionButton(
+                tooltip: t.captureTooltip,
+                onPressed: _add,
+                child: const Icon(Icons.add),
+              ),
       ),
-      floatingActionButton: !_writes
-          ? null
-          : FloatingActionButton(
-              tooltip: t.captureTooltip,
-              onPressed: _add,
-              child: const Icon(Icons.add),
-            ),
     );
   }
 }

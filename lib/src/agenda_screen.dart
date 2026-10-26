@@ -296,20 +296,25 @@ class _AgendaScreenState extends State<AgendaScreen> {
     }
   }
 
-  Future<void> _browse() async {
+  Future<void> _browse() => Navigator.of(context).push(_areasRoute());
+
+  /// The Areas list's page, for the magnifier and for swipe left to pull
+  /// in; coming back closes the Areas opened on the way.
+  BrowserRoute<void> _areasRoute() {
     _capturedId = null;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AreasScreen(
-          notes: widget.notes,
-          places: widget.places,
-          trail: widget.trail,
-        ),
+    final route = BrowserRoute<void>(
+      builder: (_) => AreasScreen(
+        notes: widget.notes,
+        places: widget.places,
+        trail: widget.trail,
       ),
     );
-    if (!mounted) return;
-    _closeAreas();
-    _reload();
+    route.popped.then((_) {
+      if (!mounted) return;
+      _closeAreas();
+      _reload();
+    });
+    return route;
   }
 
   Future<void> _openUnsorted() async {
@@ -456,50 +461,52 @@ class _AgendaScreenState extends State<AgendaScreen> {
           onMenu: row.routine.isReminder ? null : (at) => _rowMenu(row, at),
         ),
     ];
-    return Scaffold(
-      appBar: AppBar(
-        // The band-aid brain of the feature graphic, title-high and
-        // silent: the title is still read as the app's name.
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/brain.png',
-              key: const ValueKey('brain'),
-              height: 28,
-              excludeFromSemantics: true,
+    // Swipe left opens the notes browser, as the magnifier does.
+    return BrowserSwipes(
+      forwardRoute: _areasRoute,
+      back: false,
+      child: Scaffold(
+        appBar: AppBar(
+          // The band-aid brain of the feature graphic, title-high and
+          // silent: the title is still read as the app's name.
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/brain.png',
+                key: const ValueKey('brain'),
+                height: 28,
+                excludeFromSemantics: true,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(t.appTitle, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          actions: [
+            if (CalendarScope.of(context).available)
+              IconButton(
+                tooltip: t.calendarExportTooltip,
+                onPressed: () => openCalendarExport(context, widget.notes),
+                icon: const Icon(Icons.event_outlined),
+              ),
+            IconButton(
+              tooltip: t.newRoutineTooltip,
+              onPressed: _newRoutine,
+              icon: const Icon(Icons.add_alarm),
             ),
-            const SizedBox(width: 8),
-            Flexible(child: Text(t.appTitle, overflow: TextOverflow.ellipsis)),
+            // The Profile picture, where the settings gear was: Settings,
+            // Sync and Backups are reached through the Profile page.
+            IconButton(
+              key: const ValueKey('profile'),
+              tooltip: t.profileTitle,
+              onPressed: _openProfile,
+              icon: OwnProfileAvatar(model: widget.profile),
+            ),
           ],
         ),
-        actions: [
-          if (CalendarScope.of(context).available)
-            IconButton(
-              tooltip: t.calendarExportTooltip,
-              onPressed: () => openCalendarExport(context, widget.notes),
-              icon: const Icon(Icons.event_outlined),
-            ),
-          IconButton(
-            tooltip: t.newRoutineTooltip,
-            onPressed: _newRoutine,
-            icon: const Icon(Icons.add_alarm),
-          ),
-          // The Profile picture, where the settings gear was: Settings,
-          // Sync and Backups are reached through the Profile page.
-          IconButton(
-            key: const ValueKey('profile'),
-            tooltip: t.profileTitle,
-            onPressed: _openProfile,
-            icon: OwnProfileAvatar(model: widget.profile),
-          ),
-        ],
-      ),
-      // Swipe left opens the notes browser, as the magnifier does.
-      body: BrowserSwipes(
-        onForward: _browse,
-        back: false,
-        child: ListView(
+        body: ListView(
           // Room under the last row for the floating buttons.
           padding: clearOfSystemBars(
             context,
@@ -569,24 +576,24 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ],
           ],
         ),
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'browse',
-            tooltip: t.browseTooltip,
-            onPressed: _browse,
-            child: const Icon(Icons.search),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: 'capture',
-            tooltip: t.captureTooltip,
-            onPressed: _capture,
-            child: const Icon(Icons.add),
-          ),
-        ],
+        floatingActionButton: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FloatingActionButton.small(
+              heroTag: 'browse',
+              tooltip: t.browseTooltip,
+              onPressed: _browse,
+              child: const Icon(Icons.search),
+            ),
+            const SizedBox(height: 16),
+            FloatingActionButton(
+              heroTag: 'capture',
+              tooltip: t.captureTooltip,
+              onPressed: _capture,
+              child: const Icon(Icons.add),
+            ),
+          ],
+        ),
       ),
     );
   }
