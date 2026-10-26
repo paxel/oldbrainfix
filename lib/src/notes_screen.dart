@@ -33,7 +33,8 @@ class AllNotesScreen extends StatefulWidget {
   State<AllNotesScreen> createState() => _AllNotesScreenState();
 }
 
-class _AllNotesScreenState extends State<AllNotesScreen> {
+class _AllNotesScreenState extends State<AllNotesScreen>
+    with ReloadsOnLogChange {
   late PersonFilter _people = widget.people;
   late List<PlacedNote> _shown = _load();
 
@@ -54,6 +55,12 @@ class _AllNotesScreenState extends State<AllNotesScreen> {
   });
 
   void _reload() => setState(() => _shown = _load());
+
+  @override
+  Store get log => widget.notes.store;
+
+  @override
+  void reloadLog() => _reload();
 
   Future<void> _file(Note note) async {
     if (await fileNote(context, widget.notes, widget.places, note)) {

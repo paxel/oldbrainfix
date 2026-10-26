@@ -29,8 +29,14 @@ class NudgeScreen extends StatefulWidget {
   State<NudgeScreen> createState() => _NudgeScreenState();
 }
 
-class _NudgeScreenState extends State<NudgeScreen> {
+class _NudgeScreenState extends State<NudgeScreen> with ReloadsOnLogChange {
   late List<Note> _unsorted = widget.notes.unsorted();
+
+  @override
+  Store get log => widget.notes.store;
+
+  @override
+  void reloadLog() => _reload();
 
   void _reload() {
     if (!mounted) return;
@@ -106,9 +112,16 @@ class UnsortedScreen extends StatefulWidget {
   State<UnsortedScreen> createState() => _UnsortedScreenState();
 }
 
-class _UnsortedScreenState extends State<UnsortedScreen> {
+class _UnsortedScreenState extends State<UnsortedScreen>
+    with ReloadsOnLogChange {
   PersonFilter _filter = PersonFilter.everyone;
   late List<Note> _unsorted = _load();
+
+  @override
+  Store get log => widget.notes.store;
+
+  @override
+  void reloadLog() => _reload();
 
   /// The Unsorted Notes of the people the filter keeps (#53).
   List<Note> _load() =>

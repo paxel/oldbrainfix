@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +10,41 @@ import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'profile.dart';
+
+/// Reloads a page's list once after the log changed, never in the middle
+/// of whatever changed it, so what a page opened on top sorted, like the
+/// Nudge screen from its notification, or what a sync brought, is gone
+/// or there once the page shows again.
+mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
+  /// The log whose changes the page follows.
+  Store get log;
+
+  /// Reads the list again and shows it.
+  void reloadLog();
+
+  var _reloadQueued = false;
+
+  @override
+  void initState() {
+    super.initState();
+    log.addListener(_logChanged);
+  }
+
+  @override
+  void dispose() {
+    log.removeListener(_logChanged);
+    super.dispose();
+  }
+
+  void _logChanged() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    scheduleMicrotask(() {
+      _reloadQueued = false;
+      if (mounted) reloadLog();
+    });
+  }
+}
 
 /// Where swipe left leads in the notes browser: the last selected Area
 /// and Topic (UI laws, "Navigation"). Lives as long as the app, so the

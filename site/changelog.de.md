@@ -19,6 +19,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 - Bei Navigation mit drei Knöpfen liegt das Ende der Seiten auf dem Telefon nicht mehr unter der Navigationsleiste.
+- Auf dem Telefon zeigen die Liste Unsortiert, die Seite des Stupsers, die Liste der Bereiche, ein Bereich, ein Thema, Alle Notizen und der Papierkorb Notizen nicht mehr so, wie sie waren, bevor eine darüber geöffnete Seite sie geändert hat, etwa die Seite des Stupsers aus seiner Benachrichtigung.
 
 ## [0.1.0] - 2026-10-26
 

@@ -20,6 +20,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 - With three-button navigation, the end of the phone's pages no longer lies under the navigation bar.
+- On the phone, the Unsorted list, the Nudge screen, the Areas list, an Area, a Topic, All Notes and the trash no longer show Notes as they were before a page opened on top of them, such as the Nudge screen from its notification, changed them.
 
 ---
 

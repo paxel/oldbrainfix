@@ -39,7 +39,7 @@ class AreasScreen extends StatefulWidget {
   State<AreasScreen> createState() => _AreasScreenState();
 }
 
-class _AreasScreenState extends State<AreasScreen> {
+class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
   final _query = TextEditingController();
   List<Area> _areas = const [];
 
@@ -103,6 +103,12 @@ class _AreasScreenState extends State<AreasScreen> {
   });
 
   void _reload() => setState(_load);
+
+  @override
+  Store get log => widget.places.store;
+
+  @override
+  void reloadLog() => _reload();
 
   Future<void> _add() async {
     final name = await askName(context, title: context.t.newArea);
@@ -401,7 +407,7 @@ class AreaScreen extends StatefulWidget {
   State<AreaScreen> createState() => _AreaScreenState();
 }
 
-class _AreaScreenState extends State<AreaScreen> {
+class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
   final _query = TextEditingController();
   Area? _area;
   List<Topic> _topics = const [];
@@ -474,6 +480,12 @@ class _AreaScreenState extends State<AreaScreen> {
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
+
+  @override
+  Store get log => widget.places.store;
+
+  @override
+  void reloadLog() => _reload();
 
   /// "+" opens a menu at the button: a Note filed straight into this
   /// Area, or a new Topic.
@@ -744,7 +756,7 @@ class TopicScreen extends StatefulWidget {
   State<TopicScreen> createState() => _TopicScreenState();
 }
 
-class _TopicScreenState extends State<TopicScreen> {
+class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
   final _query = TextEditingController();
   late Topic? _topic;
   late List<PlacedNote> _diary;
@@ -800,6 +812,12 @@ class _TopicScreenState extends State<TopicScreen> {
   void _reloadIfMounted() {
     if (mounted) _reload();
   }
+
+  @override
+  Store get log => widget.places.store;
+
+  @override
+  void reloadLog() => _reload();
 
   Future<void> _file(Note note) async {
     if (await fileNote(context, widget.notes, widget.places, note)) {

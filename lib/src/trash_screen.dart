@@ -28,9 +28,15 @@ class TrashScreen extends StatefulWidget {
 /// One thing in the trash: a Note or a Routine, with when it was deleted.
 typedef _Trashed = ({DateTime at, PlacedNote? note, Routine? routine});
 
-class _TrashScreenState extends State<TrashScreen> {
+class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
   late final _routines = Routines(widget.notes.store);
   late List<_Trashed> _trashed = _load();
+
+  @override
+  Store get log => widget.notes.store;
+
+  @override
+  void reloadLog() => setState(() => _trashed = _load());
 
   List<_Trashed> _load() {
     final lock = LockScope.of(context);

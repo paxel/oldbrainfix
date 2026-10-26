@@ -296,6 +296,34 @@ void main() {
       expect(find.text('2 Unsorted'), findsOneWidget);
     });
 
+    testWidgets('opened over the Unsorted list: Notes filed there are gone '
+        'from the list once it shows again', (tester) async {
+      final places = Places(store);
+      final household = places.addArea('Household');
+      places.addTopic(household.id, 'Bills');
+      captureMany(2);
+      await start(tester);
+      await tap(tester, find.byKey(const ValueKey('unsortedBanner')));
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(cards(tester), ['note 1', 'note 2']);
+
+      // The notification, tapped while the Unsorted list is open.
+      alarms.tapNudge();
+      await tester.pumpAndSettle();
+      expect(find.byType(NudgeScreen), findsOneWidget);
+      for (final text in ['note 1', 'note 2']) {
+        await tap(tester, find.byTooltip('File into…').first);
+        await tap(tester, find.text('Bills'));
+        expect(cards(tester), isNot(contains(text)));
+      }
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(UnsortedScreen), findsOneWidget);
+      expect(cards(tester), isEmpty);
+      expect(find.text('Nothing is Unsorted. Well done!'), findsOneWidget);
+    });
+
     testWidgets('says so when nothing is left', (tester) async {
       await start(tester);
       alarms.tapNudge();
