@@ -1,6 +1,7 @@
 // The JNI bridge to whisper.cpp for voice Notes (Speech.kt's
 // WhisperNative): load a model, transcribe 16 kHz mono float samples in
-// English or German, let the model go. Everything runs on the caller's
+// English or German, led in with the prompt for that language, let the
+// model go. Everything runs on the caller's
 // thread; Speech.kt calls it from its own background thread.
 
 #include <jni.h>
@@ -8,6 +9,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -32,6 +34,17 @@ const char *english_or_german(whisper_context *ctx, const float *samples, int co
     return probs[whisper_lang_id("de")] > probs[whisper_lang_id("en")] ? "de" : "en";
 }
 
+// The UTF-8 bytes of [bytes] as a string; empty for null. Bytes, not a
+// jstring: GetStringUTFChars gives modified UTF-8, which differs for
+// characters beyond the BMP, such as an emoji in an Area's name.
+std::string utf8(JNIEnv *env, jbyteArray bytes) {
+    if (bytes == nullptr) return {};
+    const jsize size = env->GetArrayLength(bytes);
+    std::string text(static_cast<size_t>(size), '\0');
+    env->GetByteArrayRegion(bytes, 0, size, reinterpret_cast<jbyte *>(&text[0]));
+    return text;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -47,7 +60,8 @@ Java_io_github_paxel_oldbrainfix_WhisperNative_open(JNIEnv *env, jobject, jstrin
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_github_paxel_oldbrainfix_WhisperNative_transcribe(JNIEnv *env, jobject, jlong handle,
-                                                           jfloatArray samples, jint threads) {
+                                                           jfloatArray samples, jint threads,
+                                                           jbyteArray english, jbyteArray german) {
     auto *ctx = reinterpret_cast<whisper_context *>(handle);
     if (ctx == nullptr) return nullptr;
     const jsize count = env->GetArrayLength(samples);
@@ -57,6 +71,9 @@ Java_io_github_paxel_oldbrainfix_WhisperNative_transcribe(JNIEnv *env, jobject, 
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads = std::max(1, static_cast<int>(threads));
     params.language = english_or_german(ctx, pcm.data(), count, params.n_threads);
+    // Kept until whisper_full is done with it.
+    const std::string prompt = utf8(env, std::strcmp(params.language, "de") == 0 ? german : english);
+    params.initial_prompt = prompt.empty() ? nullptr : prompt.c_str();
     params.translate = false;
     params.no_timestamps = true;
     params.print_progress = false;

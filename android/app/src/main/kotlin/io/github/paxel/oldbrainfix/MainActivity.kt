@@ -213,8 +213,15 @@ class MainActivity : FlutterActivity() {
                         speech.remove()
                         true
                     }
-                    "transcribe" -> speech.transcribe(call.arguments as ByteArray) {
-                        runOnUiThread { result.success(it) }
+                    "transcribe" -> {
+                        val request = Speech.request(call.arguments)
+                        if (request == null) {
+                            result.success(null)
+                        } else {
+                            speech.transcribe(request.bytes, request.prompts) {
+                                runOnUiThread { result.success(it) }
+                            }
+                        }
                     }
                     "idle" -> {
                         speech.idle()

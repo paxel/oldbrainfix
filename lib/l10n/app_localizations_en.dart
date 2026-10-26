@@ -1108,6 +1108,46 @@ class AppLocalizationsEn extends AppLocalizations {
       'That is not the expected speech model, so it was not kept.';
 
   @override
+  String get speechModelSourceModels =>
+      'Each download comes only from Old Brain Fix\'s own release on GitHub and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.';
+
+  @override
+  String get speechModelCreditModels =>
+      'The speech models are the base and small models of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License.';
+
+  @override
+  String get speechModelChoice => 'Model';
+
+  @override
+  String speechModelBase(int megabytes) {
+    return 'Base, $megabytes MB';
+  }
+
+  @override
+  String get speechModelBaseDetail =>
+      'Faster, and enough for English or German alone.';
+
+  @override
+  String speechModelSmall(int megabytes) {
+    return 'Small, $megabytes MB';
+  }
+
+  @override
+  String get speechModelSmallDetail =>
+      'Better with English words in German speech, but slower, and it needs more memory.';
+
+  @override
+  String get speechModelKeepsOne =>
+      'Choosing a model downloads it. Only the chosen model is kept: the one before is deleted once the new one is in place.';
+
+  @override
+  String get speechModelPickEither =>
+      'It must be whisper.cpp\'s multilingual ggml-base.bin or ggml-small.bin; any other file is rejected.';
+
+  @override
+  String get agenda => 'Agenda';
+
+  @override
   String get speechOfferQuestion => 'Transcribe voice Notes on the phone?';
 
   @override

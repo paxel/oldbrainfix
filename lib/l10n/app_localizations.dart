@@ -1748,6 +1748,66 @@ abstract class AppLocalizations {
   /// **'That is not the expected speech model, so it was not kept.'**
   String get speechModelMismatch;
 
+  /// No description provided for @speechModelSourceModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Each download comes only from Old Brain Fix\'s own release on GitHub and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.'**
+  String get speechModelSourceModels;
+
+  /// Credit for the downloadable Whisper models on the speech model page.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech models are the base and small models of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License.'**
+  String get speechModelCreditModels;
+
+  /// Heading above the choice of Whisper model on the speech model page.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get speechModelChoice;
+
+  /// Radio option for Whisper's base model, with its download size.
+  ///
+  /// In en, this message translates to:
+  /// **'Base, {megabytes} MB'**
+  String speechModelBase(int megabytes);
+
+  /// No description provided for @speechModelBaseDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Faster, and enough for English or German alone.'**
+  String get speechModelBaseDetail;
+
+  /// Radio option for Whisper's small model, with its download size.
+  ///
+  /// In en, this message translates to:
+  /// **'Small, {megabytes} MB'**
+  String speechModelSmall(int megabytes);
+
+  /// No description provided for @speechModelSmallDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Better with English words in German speech, but slower, and it needs more memory.'**
+  String get speechModelSmallDetail;
+
+  /// No description provided for @speechModelKeepsOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing a model downloads it. Only the chosen model is kept: the one before is deleted once the new one is in place.'**
+  String get speechModelKeepsOne;
+
+  /// No description provided for @speechModelPickEither.
+  ///
+  /// In en, this message translates to:
+  /// **'It must be whisper.cpp\'s multilingual ggml-base.bin or ggml-small.bin; any other file is rejected.'**
+  String get speechModelPickEither;
+
+  /// The name of the app's Agenda, as a word on its own. Whisper is told it so the word is recognised in speech.
+  ///
+  /// In en, this message translates to:
+  /// **'Agenda'**
+  String get agenda;
+
   /// No description provided for @speechOfferQuestion.
   ///
   /// In en, this message translates to:

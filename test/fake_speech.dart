@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:oldbrainfix/src/speech_platform.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// A [SpeechPlatform] the test drives: whether Whisper runs, which model
 /// is in use, what a download or pick brings, and what each recording
@@ -33,6 +34,9 @@ class FakeSpeech implements SpeechPlatform {
   /// What was asked for, in order.
   final downloads = <Uri>[];
   final transcribed = <Uint8List>[];
+
+  /// The prompts each transcription was led in with, in order.
+  final prompts = <TranscriptPrompts>[];
   var picks = 0;
   var cancels = 0;
   var discards = 0;
@@ -116,8 +120,9 @@ class FakeSpeech implements SpeechPlatform {
   }
 
   @override
-  Future<String?> transcribe(Uint8List bytes) async {
+  Future<String?> transcribe(Uint8List bytes, TranscriptPrompts prompts) async {
     transcribed.add(bytes);
+    this.prompts.add(prompts);
     await transcribeGate?.future;
     return transcripts[bytes.last];
   }

@@ -10,6 +10,23 @@ import java.io.ByteArrayOutputStream
 
 class SpeechTest {
     @Test
+    fun `a transcribe request carries the recording and both prompts`() {
+        val bytes = byteArrayOf(1, 2, 3)
+        val request = Speech.request(
+            mapOf("bytes" to bytes, "english" to "Work, Garten.", "german" to "Notiz. Work, Garten."),
+        )!!
+        assertSame(bytes, request.bytes)
+        assertEquals(Speech.Prompts("Work, Garten.", "Notiz. Work, Garten."), request.prompts)
+    }
+
+    @Test
+    fun `a request without prompts has none, one without bytes is none`() {
+        assertEquals(Speech.Prompts(), Speech.request(mapOf("bytes" to byteArrayOf(1)))!!.prompts)
+        assertNull(Speech.request(mapOf("english" to "Work.")))
+        assertNull(Speech.request(byteArrayOf(1)))
+    }
+
+    @Test
     fun `16-bit samples become floats from -1 to 1`() {
         assertArrayEquals(
             floatArrayOf(0f, 0.5f, -0.5f, -1f, 32767f / 32768f),

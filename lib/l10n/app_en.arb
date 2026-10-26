@@ -651,6 +651,35 @@
   },
   "speechModelFailed": "The download did not finish, and nothing was kept. Try again later.",
   "speechModelMismatch": "That is not the expected speech model, so it was not kept.",
+  "speechModelSourceModels": "Each download comes only from Old Brain Fix's own release on GitHub and is checked against a fixed checksum before it is used. Wi-Fi is best. Nothing else is ever sent or fetched.",
+  "speechModelCreditModels": "The speech models are the base and small models of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License.",
+  "@speechModelCreditModels": {"description": "Credit for the downloadable Whisper models on the speech model page."},
+  "speechModelChoice": "Model",
+  "@speechModelChoice": {"description": "Heading above the choice of Whisper model on the speech model page."},
+  "speechModelBase": "Base, {megabytes} MB",
+  "@speechModelBase": {
+    "description": "Radio option for Whisper's base model, with its download size.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "speechModelBaseDetail": "Faster, and enough for English or German alone.",
+  "speechModelSmall": "Small, {megabytes} MB",
+  "@speechModelSmall": {
+    "description": "Radio option for Whisper's small model, with its download size.",
+    "placeholders": {
+      "megabytes": {
+        "type": "int"
+      }
+    }
+  },
+  "speechModelSmallDetail": "Better with English words in German speech, but slower, and it needs more memory.",
+  "speechModelKeepsOne": "Choosing a model downloads it. Only the chosen model is kept: the one before is deleted once the new one is in place.",
+  "speechModelPickEither": "It must be whisper.cpp's multilingual ggml-base.bin or ggml-small.bin; any other file is rejected.",
+  "agenda": "Agenda",
+  "@agenda": {"description": "The name of the app's Agenda, as a word on its own. Whisper is told it so the word is recognised in speech."},
   "speechOfferQuestion": "Transcribe voice Notes on the phone?",
   "speechOfferDetail": "Download the speech model ({megabytes} MB) once. It downloads in the background while you go on, and Settings offers it any time later.",
   "@speechOfferDetail": {

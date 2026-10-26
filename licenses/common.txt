@@ -466,7 +466,7 @@ ggml's YaRN rotary embedding is based on https://github.com/jquesnelle/yarn: MIT
 ================================================================================
 OpenAI Whisper base model
 
-ggml-base.bin, the speech model for Transcripts, downloaded on request from Old Brain Fix's own release and never bundled: the "base" model of Whisper by OpenAI (https://github.com/openai/whisper), converted to ggml format by the whisper.cpp project (https://huggingface.co/ggerganov/whisper.cpp).
+ggml-base.bin or ggml-small.bin, the speech model for Transcripts, whichever the user chooses, downloaded on request from Old Brain Fix's own release and never bundled: the "base" or "small" model of Whisper by OpenAI (https://github.com/openai/whisper), converted to ggml format by the whisper.cpp project (https://huggingface.co/ggerganov/whisper.cpp).
 
 MIT License
 

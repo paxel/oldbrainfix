@@ -23,10 +23,11 @@ Future<void> fetchSpeechModel(
   if (text != null) announcements?.announce(text);
 }
 
-/// The speech model for Transcripts: what it is for, how big it is and
-/// where it comes from, then a download on request or a file of the
-/// user's own. A model that is not the pinned one is never kept. Opens
-/// from Settings.
+/// The speech model for Transcripts: what it is for and where it comes
+/// from, where it stands, then the choice of model, each with its size:
+/// choosing one downloads it, and only the chosen one is kept. A file of
+/// the user's own works too. A model that is not a pinned one is never
+/// kept. Opens from Settings.
 class SpeechModelScreen extends StatelessWidget {
   final SpeechModel model;
 
@@ -42,23 +43,43 @@ class SpeechModelScreen extends StatelessWidget {
         children: [
           Text(t.speechModelIntro),
           const SizedBox(height: 8),
-          Text(t.speechModelSource(WhisperModel.megabytes)),
+          Text(t.speechModelSourceModels),
           const SizedBox(height: 8),
-          Text(t.speechModelCredit),
+          Text(t.speechModelCreditModels),
           const SizedBox(height: 16),
-          Embossed(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: ListenableBuilder(
-                listenable: model,
-                builder: (context, _) => _state(context),
-              ),
+          ListenableBuilder(
+            listenable: model,
+            builder: (context, _) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Embossed(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: _state(context),
+                  ),
+                ),
+                if (_choosable) ...[
+                  const SizedBox(height: 16),
+                  Embossed(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _choice(context),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
       ),
     );
   }
+
+  /// Whether a model can be chosen, or is being fetched.
+  bool get _choosable => switch (model.status) {
+    ModelStatus.missing || ModelStatus.ready || ModelStatus.fetching => true,
+    ModelStatus.checking || ModelStatus.unsupported => false,
+  };
 
   Widget _state(BuildContext context) {
     final t = context.t;
@@ -89,26 +110,7 @@ class SpeechModelScreen extends StatelessWidget {
           ],
         );
       case ModelStatus.missing:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.speechModelMissing, style: text.titleMedium),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () => fetchSpeechModel(context, model.download),
-              icon: const Icon(Icons.download),
-              label: Text(t.speechModelDownload(WhisperModel.megabytes)),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => fetchSpeechModel(context, model.pick),
-              icon: const Icon(Icons.folder_open),
-              label: Text(t.speechModelPick),
-            ),
-            const SizedBox(height: 8),
-            Text(t.speechModelPickDetail, style: text.bodySmall),
-          ],
-        );
+        return Text(t.speechModelMissing, style: text.titleMedium);
       case ModelStatus.fetching:
         final (:received, :total) = model.progress;
         final downloading = model.downloading;
@@ -132,6 +134,53 @@ class SpeechModelScreen extends StatelessWidget {
           ],
         );
     }
+  }
+
+  /// The models with their sizes and trade-offs; choosing one downloads
+  /// it. Nothing to choose while a model is being fetched.
+  Widget _choice(BuildContext context) {
+    final t = context.t;
+    final text = Theme.of(context).textTheme;
+    final idle = model.status != ModelStatus.fetching;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(t.speechModelChoice, style: text.titleMedium),
+        RadioColumn<WhisperModel?>(
+          value: model.chosen,
+          options: [
+            RadioOption(
+              key: const ValueKey('speech-model-base'),
+              value: WhisperModel.base,
+              title: Text(t.speechModelBase(WhisperModel.base.megabytes)),
+              subtitle: Text(t.speechModelBaseDetail),
+            ),
+            RadioOption(
+              key: const ValueKey('speech-model-small'),
+              value: WhisperModel.small,
+              title: Text(t.speechModelSmall(WhisperModel.small.megabytes)),
+              subtitle: Text(t.speechModelSmallDetail),
+            ),
+          ],
+          onChanged: idle
+              ? (picked) {
+                  if (picked == null) return;
+                  fetchSpeechModel(context, () => model.download(picked));
+                }
+              : null,
+        ),
+        const SizedBox(height: 8),
+        Text(t.speechModelKeepsOne, style: text.bodySmall),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: idle ? () => fetchSpeechModel(context, model.pick) : null,
+          icon: const Icon(Icons.folder_open),
+          label: Text(t.speechModelPick),
+        ),
+        const SizedBox(height: 8),
+        Text(t.speechModelPickEither, style: text.bodySmall),
+      ],
+    );
   }
 
   /// [bytes] in megabytes, rounded.

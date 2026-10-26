@@ -5,27 +5,60 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'l10n.dart';
+import 'place_names.dart';
 
-/// The speech model Transcripts are made with (ADR 0007): whisper.cpp's
-/// multilingual `base` model, for English and German. Fetched once on
-/// request from Old Brain Fix's own GitHub release, never from anywhere
-/// else, or picked from a file; kept only when its SHA-256 is this one.
-abstract final class WhisperModel {
-  /// The release asset; GitHub may redirect it to its download host.
-  static final url = Uri.parse(
-    'https://github.com/paxel/oldbrainfix/releases/download/whisper-model-v1/ggml-base.bin',
+/// The speech models Transcripts can be made with (ADR 0007):
+/// whisper.cpp's multilingual models, for English and German. One is
+/// fetched on request from Old Brain Fix's own GitHub release, never
+/// from anywhere else, or picked from a file; kept only when its SHA-256
+/// is one of these. Only the chosen one is kept on the Device.
+enum WhisperModel {
+  /// `base`: the default, and the one the first start offers.
+  base(
+    file: 'ggml-base.bin',
+    // SHA-1 465707469ff3a37a2b9b8d8f89f2f99de7299dac in whisper.cpp's
+    // model list; 147,951,465 bytes.
+    sha256: '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe',
+    megabytes: 148,
+  ),
+
+  /// `small`: better with English words in German speech, but slower.
+  small(
+    file: 'ggml-small.bin',
+    // As on Hugging Face (ggerganov/whisper.cpp); 487,601,967 bytes.
+    sha256: '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b',
+    megabytes: 488,
   );
 
-  /// The SHA-256 of whisper.cpp's `ggml-base.bin` (SHA-1
-  /// 465707469ff3a37a2b9b8d8f89f2f99de7299dac in whisper.cpp's model
-  /// list).
-  static const sha256 =
-      '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe';
+  /// Its file name, on the release and in whisper.cpp's model list.
+  final String file;
 
-  /// Its size in megabytes (147,951,465 bytes), as told before the
-  /// download.
-  static const megabytes = 148;
+  /// The SHA-256 a model must have to be kept as this one.
+  final String sha256;
+
+  /// Its size in megabytes, as told before the download.
+  final int megabytes;
+
+  const WhisperModel({
+    required this.file,
+    required this.sha256,
+    required this.megabytes,
+  });
+
+  /// The release asset; GitHub may redirect it to its download host.
+  Uri get url => Uri.parse(
+    'https://github.com/paxel/oldbrainfix/releases/download/whisper-model-v1/$file',
+  );
+
+  /// The model whose SHA-256 is [hash], or null when it is none of them.
+  static WhisperModel? byHash(String? hash) {
+    for (final model in values) {
+      if (model.sha256 == hash) return model;
+    }
+    return null;
+  }
 }
 
 /// How far a download has come: bytes so far, and of how many (null
@@ -73,9 +106,10 @@ abstract interface class SpeechPlatform {
   /// Drops the model in use.
   Future<void> remove();
 
-  /// The Transcript of the voice recording [bytes]; null when it could
-  /// not be transcribed.
-  Future<String?> transcribe(Uint8List bytes);
+  /// The Transcript of the voice recording [bytes], Whisper led in with
+  /// the one of [prompts] in the recording's language; null when it
+  /// could not be transcribed.
+  Future<String?> transcribe(Uint8List bytes, TranscriptPrompts prompts);
 
   /// Nothing more to transcribe for now: the model's memory can go.
   Future<void> idle();
@@ -119,7 +153,10 @@ class NoSpeech implements SpeechPlatform {
   Future<void> remove() async {}
 
   @override
-  Future<String?> transcribe(Uint8List bytes) async => null;
+  Future<String?> transcribe(
+    Uint8List bytes,
+    TranscriptPrompts prompts,
+  ) async => null;
 
   @override
   Future<void> idle() async {}
@@ -178,8 +215,12 @@ class AndroidSpeech implements SpeechPlatform {
   Future<void> remove() => _ask<void>('remove');
 
   @override
-  Future<String?> transcribe(Uint8List bytes) =>
-      _ask<String>('transcribe', bytes);
+  Future<String?> transcribe(Uint8List bytes, TranscriptPrompts prompts) =>
+      _ask<String>('transcribe', {
+        'bytes': bytes,
+        'english': prompts.english,
+        'german': prompts.german,
+      });
 
   @override
   Future<void> idle() => _ask<void>('idle');
@@ -204,10 +245,11 @@ enum ModelStatus {
   /// None yet: it can be downloaded or picked.
   missing,
 
-  /// Being downloaded or copied in, then checked.
+  /// One being downloaded or copied in, then checked; the model in use
+  /// before, if any, stays in use meanwhile.
   fetching,
 
-  /// Checked against [WhisperModel.sha256] and in use.
+  /// Checked against a [WhisperModel]'s SHA-256 and in use.
   ready,
 }
 
@@ -222,18 +264,22 @@ enum ModelOutcome {
   /// The download or copy broke off.
   failed,
 
-  /// Not the pinned model: not kept.
+  /// Not the expected model: not kept.
   mismatch,
 }
 
-/// The speech model on this Device: checked against the pinned checksum
+/// The speech model on this Device: checked against the pinned checksums
 /// once per start before anything is transcribed, fetched on request,
-/// and kept only when it is the pinned one.
+/// and kept only when it is one of the [WhisperModel]s. A model fetched
+/// takes the place of the one in use only once it is checked, so the
+/// one before is gone then and not earlier.
 class SpeechModel extends ChangeNotifier {
   final SpeechPlatform platform;
 
   late final StreamSubscription<ModelProgress> _progressing;
   var _status = ModelStatus.checking;
+  WhisperModel? _current;
+  WhisperModel? _target;
   ModelProgress _progress = (received: 0, total: null);
   var _downloading = false;
   var _cancelling = false;
@@ -248,38 +294,47 @@ class SpeechModel extends ChangeNotifier {
 
   ModelStatus get status => _status;
 
+  /// The checked model in use, or null while there is none; it stays in
+  /// use while another one is fetched.
+  WhisperModel? get current => _current;
+
+  /// The model chosen: the one being downloaded, else the one in use.
+  WhisperModel? get chosen => _target ?? _current;
+
   /// How far the download running has come.
   ModelProgress get progress => _progress;
 
   /// Whether the fetch running is a download, not a picked file.
   bool get downloading => _downloading;
 
-  /// Looks whether a model is here and whether it is the pinned one; a
-  /// model that is not is dropped, and so is a fetch cut off when the
-  /// app was last closed.
+  /// Looks whether a model is here and whether it is one of the pinned
+  /// ones; a model that is not is dropped, and so is a fetch cut off
+  /// when the app was last closed.
   Future<void> check() async {
+    _current = null;
     _set(ModelStatus.checking);
     if (!await platform.supported()) return _set(ModelStatus.unsupported);
     await platform.discard();
     final hash = await platform.modelHash();
-    if (hash == WhisperModel.sha256) return _set(ModelStatus.ready);
+    _current = WhisperModel.byHash(hash);
+    if (_current != null) return _set(ModelStatus.ready);
     if (hash != null) await platform.remove();
     _set(ModelStatus.missing);
   }
 
-  /// Downloads the model from [WhisperModel.url].
-  Future<ModelOutcome> download() => _fetch(
-    () => platform.download(WhisperModel.url),
-    downloading: true,
-    nothing: ModelOutcome.failed,
-  );
+  /// Downloads [model] from its release asset and, once it is checked,
+  /// uses it instead of the one in use.
+  Future<ModelOutcome> download([WhisperModel model = WhisperModel.base]) =>
+      _fetch(
+        () => platform.download(model.url),
+        target: model,
+        nothing: ModelOutcome.failed,
+      );
 
-  /// Takes the model from a file the user picks.
-  Future<ModelOutcome> pick() => _fetch(
-    platform.pick,
-    downloading: false,
-    nothing: ModelOutcome.cancelled,
-  );
+  /// Takes the model from a file the user picks: either [WhisperModel],
+  /// told apart by its SHA-256.
+  Future<ModelOutcome> pick() =>
+      _fetch(platform.pick, target: null, nothing: ModelOutcome.cancelled);
 
   /// Stops the download or copy running.
   Future<void> cancel() async {
@@ -289,32 +344,40 @@ class SpeechModel extends ChangeNotifier {
   }
 
   /// Fetches a model to the side with [fetch] and keeps it when its
-  /// checksum is the pinned one; [nothing] is the outcome when [fetch]
-  /// brings none and no one cancelled.
+  /// checksum is [target]'s, or any pinned one's for a picked file
+  /// (null [target]); [nothing] is the outcome when [fetch] brings none
+  /// and no one cancelled. Whatever the outcome, the model in use before
+  /// stays until a new one took its place.
   Future<ModelOutcome> _fetch(
     Future<String?> Function() fetch, {
-    required bool downloading,
+    required WhisperModel? target,
     required ModelOutcome nothing,
   }) async {
-    if (_status != ModelStatus.missing) return ModelOutcome.cancelled;
-    _downloading = downloading;
+    if (_status != ModelStatus.missing && _status != ModelStatus.ready) {
+      return ModelOutcome.cancelled;
+    }
+    _target = target;
+    _downloading = target != null;
     _cancelling = false;
     _progress = (received: 0, total: null);
     _set(ModelStatus.fetching);
     final hash = await fetch();
+    final fetched = WhisperModel.byHash(hash);
+    final expected = fetched != null && (target == null || fetched == target);
     final outcome = hash == null
         ? (_cancelling ? ModelOutcome.cancelled : nothing)
-        : hash == WhisperModel.sha256
+        : expected
         ? (await platform.install()
               ? ModelOutcome.installed
               : ModelOutcome.failed)
         : ModelOutcome.mismatch;
-    if (outcome != ModelOutcome.installed) await platform.discard();
-    _set(
-      outcome == ModelOutcome.installed
-          ? ModelStatus.ready
-          : ModelStatus.missing,
-    );
+    if (outcome == ModelOutcome.installed) {
+      _current = fetched;
+    } else {
+      await platform.discard();
+    }
+    _target = null;
+    _set(_current == null ? ModelStatus.missing : ModelStatus.ready);
     return outcome;
   }
 
@@ -336,8 +399,10 @@ class SpeechModel extends ChangeNotifier {
 }
 
 /// Transcribes voice recordings in the background, one at a time, while
-/// the speech model is ready: each new one after its Note is saved, and
-/// those from before the model came. A recording that cannot be
+/// a speech model is in use: each new one after its Note is saved, and
+/// those from before the model came. Whisper is led in with the Area and
+/// Topic names as the user reads them, and for German speech with the
+/// English words German is full of ([TranscriptPrompts]). A recording that cannot be
 /// transcribed is left alone until the next start; it is never lost,
 /// as the recording itself is always kept.
 class Transcriber extends ChangeNotifier {
@@ -355,6 +420,9 @@ class Transcriber extends ChangeNotifier {
   var _again = false;
   var _disposed = false;
 
+  /// The app's strings in the user's language, once the app has them.
+  AppLocalizations? _texts;
+
   Transcriber({
     required this.notes,
     required this.model,
@@ -368,6 +436,22 @@ class Transcriber extends ChangeNotifier {
   /// The recording being transcribed, by its hash; null while none is.
   String? get current => _current;
 
+  /// Names the Starter Set's places and the app's words in the language
+  /// of [t] in the prompts from now on.
+  void setTexts(AppLocalizations t) => _texts = t;
+
+  /// The prompts for the next recording: the Areas and Topics as they
+  /// are now, as the user reads them.
+  TranscriptPrompts prompts() {
+    final t = _texts;
+    return TranscriptPrompts.forPlaces(
+      Places(notes.store),
+      terms: t == null ? const [] : [t.unsorted, t.routine, t.agenda],
+      areaName: t == null ? null : (area) => areaName(t, area),
+      topicName: t == null ? null : (topic) => topicName(t, topic),
+    );
+  }
+
   /// The Transcript of the recording [hash] of the Note [noteId] as it
   /// is now, or null when it has none.
   String? transcriptOf(String noteId, String hash) =>
@@ -377,7 +461,7 @@ class Transcriber extends ChangeNotifier {
   /// it runs already.
   void _kick() {
     if (_running) _again = true;
-    if (_queued || _running || model.status != ModelStatus.ready) return;
+    if (_queued || _running || model.current == null) return;
     _queued = true;
     scheduleMicrotask(() {
       _queued = false;
@@ -390,7 +474,7 @@ class Transcriber extends ChangeNotifier {
     _running = true;
     _again = false;
     try {
-      while (!_disposed && model.status == ModelStatus.ready) {
+      while (!_disposed && model.current != null) {
         final next = notes
             .untranscribed()
             .where((r) => !_skipped.contains(r.hash))
@@ -401,7 +485,7 @@ class Transcriber extends ChangeNotifier {
         if (bytes != null) {
           _current = next.hash;
           notifyListeners();
-          text = await platform.transcribe(bytes);
+          text = await platform.transcribe(bytes, prompts());
           if (_disposed) return;
           _current = null;
         }

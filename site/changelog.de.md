@@ -11,6 +11,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon öffnet ein Wischen nach links auf der Agenda die Liste der Bereiche und ein Wischen nach rechts aus der Liste der Bereiche führt zur Agenda zurück, und bei jedem Wischen zwischen der Agenda, der Liste der Bereiche, einem Bereich und einem Thema folgen die Seiten dem Finger, wobei der Wechsel ab der Mitte oder mit einem schnellen Wischen abgeschlossen wird und sonst zurückfedert.
 - Eine Sprachaufnahme mit Transkript oder ein Foto mit erkanntem Text lässt sich im Notiz-Editor (auf dem Telefon auch im ⋮-Menü der Karte) entfernen, von jedem Gerät und aus dem geteilten Bereich, während der Text in der Notiz und in der Suche bleibt.
 - Auf dem Telefon und dem Computer zeigt eine Anzeige neben jedem Abspielknopf die Wiedergabegeschwindigkeit von Sprachaufnahmen und öffnet ein Menü mit 0,5-, 0,75-, 1-, 1,5- und 2-facher Geschwindigkeit; die Wahl gilt sofort und bleibt auf diesem Gerät.
+- Auf dem Telefon bietet die Seite des Sprachmodells neben dem Basismodell (148 MB) das kleine Modell von Whisper (488 MB) an, das englische Wörter in deutscher Sprache besser erkennt, aber langsamer ist; die Wahl eines Modells lädt es herunter, und nur das gewählte Modell wird behalten.
 
 ### Geändert
 - Die Agenda auf dem Telefon zeigt die ganze Woche: nach morgen die fünf folgenden Tage, jeder unter Wochentag und Datum, ein leerer Tag als „Nichts geplant“.
@@ -18,6 +19,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Die Erfassen-Seite auf dem Telefon hat große Knöpfe für Foto und Sprache über der Erinnerungsauswahl statt Symbolen in der oberen Leiste.
 - Auf dem Telefon ist jede einzelne Auswahl eine Spalte von Optionsfeldern, und jeder Schalter, Knopf und jede Liste steht in einer eigenen Zeile unter ihrem Text.
 - Eine Notizkarte auf dem Telefon zeigt von oben nach unten das Profil einer anderen Person, die sie geschrieben hat, das Datum mit dem Ort, Bereich und Thema oder Unsortiert dort, wo die Seite sie nicht schon nennt, die Notiz und eine Reihe von Symbolen für Ablegen, Routine oder Erinnerung, Zusammenführen und ⋮ mit Wichtigkeit, An eine Person senden, dem Kalender, Zur Notiz hinzufügen und Löschen.
+- Auf dem Telefon bekommt Whisper die Namen der Bereiche und Themen und bei deutscher Sprache dazu die Wörter der App und gängige englische Wörter wie Meeting oder Update, damit Transkripte sie so schreiben, wie sie geschrieben werden.
 
 ### Behoben
 - Bei Navigation mit drei Knöpfen liegt das Ende der Seiten auf dem Telefon nicht mehr unter der Navigationsleiste.

@@ -37,3 +37,4 @@ export 'src/signing.dart';
 export 'src/store.dart';
 export 'src/sync.dart';
 export 'src/text_format.dart';
+export 'src/transcript_prompts.dart';

@@ -51,7 +51,7 @@ class _SpeechOfferScreenState extends State<SpeechOfferScreen> {
         children: [
           Text(t.speechOfferQuestion, style: text.headlineSmall),
           const SizedBox(height: 8),
-          Text(t.speechOfferDetail(WhisperModel.megabytes)),
+          Text(t.speechOfferDetail(WhisperModel.base.megabytes)),
           const SizedBox(height: 24),
           if (_mobileData) ...[
             Row(
@@ -60,7 +60,9 @@ class _SpeechOfferScreenState extends State<SpeechOfferScreen> {
                 const Icon(Icons.signal_cellular_alt),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(t.speechOfferMobileData(WhisperModel.megabytes)),
+                  child: Text(
+                    t.speechOfferMobileData(WhisperModel.base.megabytes),
+                  ),
                 ),
               ],
             ),
@@ -74,7 +76,7 @@ class _SpeechOfferScreenState extends State<SpeechOfferScreen> {
                   ? widget.onDownload
                   : null,
               icon: const Icon(Icons.download),
-              label: Text(t.speechModelDownload(WhisperModel.megabytes)),
+              label: Text(t.speechModelDownload(WhisperModel.base.megabytes)),
             ),
           ),
           const SizedBox(height: 8),

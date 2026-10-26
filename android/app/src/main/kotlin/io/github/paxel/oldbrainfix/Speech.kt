@@ -27,7 +27,17 @@ object WhisperNative {
 
     external fun open(model: String): Long
 
-    external fun transcribe(context: Long, samples: FloatArray, threads: Int): String?
+    /**
+     * [english] and [german] are the UTF-8 prompts Whisper is led in
+     * with, whichever language it hears; empty for none.
+     */
+    external fun transcribe(
+        context: Long,
+        samples: FloatArray,
+        threads: Int,
+        english: ByteArray,
+        german: ByteArray,
+    ): String?
 
     external fun close(context: Long)
 }
@@ -55,7 +65,11 @@ class Speech(private val context: Context) {
     private val dir: File
         get() = File(context.noBackupFilesDir, "whisper").apply { mkdirs() }
 
-    /** The model in use, once it was checked and kept. */
+    /**
+     * The model in use, once it was checked and kept: base or small,
+     * whichever was chosen last. A new one replaces it in one rename, so
+     * only the chosen one is kept.
+     */
     private val modelFile: File
         get() = File(dir, MODEL_NAME)
 
@@ -141,12 +155,12 @@ class Speech(private val context: Context) {
 
     /**
      * The Transcript of the voice recording [bytes], on the transcribing
-     * thread: [done] hears its text, or null when it could not be read
-     * or there is no model.
+     * thread, Whisper led in with [prompts]: [done] hears its text, or
+     * null when it could not be read or there is no model.
      */
-    fun transcribe(bytes: ByteArray, done: (String?) -> Unit) {
+    fun transcribe(bytes: ByteArray, prompts: Prompts, done: (String?) -> Unit) {
         worker.execute {
-            done(runCatching { transcribeNow(bytes) }.getOrNull())
+            done(runCatching { transcribeNow(bytes, prompts) }.getOrNull())
         }
     }
 
@@ -162,7 +176,7 @@ class Speech(private val context: Context) {
         worker.shutdown()
     }
 
-    private fun transcribeNow(bytes: ByteArray): String? {
+    private fun transcribeNow(bytes: ByteArray, prompts: Prompts): String? {
         if (!WhisperNative.loaded || !modelFile.isFile) return null
         val file = File(context.cacheDir, "transcribing.${Voice.extension(bytes)}").apply { writeBytes(bytes) }
         val samples = try {
@@ -173,7 +187,13 @@ class Speech(private val context: Context) {
         if (loadedModel == 0L) loadedModel = WhisperNative.open(modelFile.path)
         if (loadedModel == 0L) return null
         val threads = threadsFor(Runtime.getRuntime().availableProcessors())
-        return WhisperNative.transcribe(loadedModel, samples, threads)?.trim()
+        return WhisperNative.transcribe(
+            loadedModel,
+            samples,
+            threads,
+            prompts.english.toByteArray(Charsets.UTF_8),
+            prompts.german.toByteArray(Charsets.UTF_8),
+        )?.trim()
     }
 
     private fun closeModel() {
@@ -181,7 +201,14 @@ class Speech(private val context: Context) {
         loadedModel = 0L
     }
 
+    /** What Whisper is led in with, by the language it hears (lib/…/speech_platform.dart). */
+    data class Prompts(val english: String = "", val german: String = "")
+
+    /** A recording to transcribe and its [Prompts], as the channel hands them over. */
+    class Request(val bytes: ByteArray, val prompts: Prompts)
+
     companion object {
+        /** The model in use, named after the first one there was, whichever it is now. */
         const val MODEL_NAME = "ggml-base.bin"
         private const val TIMEOUT_MS = 30_000
         private const val TIMEOUT_US = 10_000L
@@ -261,6 +288,23 @@ class Speech(private val context: Context) {
                 codec?.release()
                 extractor.release()
             }
+        }
+
+        /**
+         * The channel's "transcribe" arguments as a [Request]: a map with
+         * the recording's `bytes` and the `english` and `german` prompts;
+         * null without bytes. A missing prompt is none.
+         */
+        fun request(arguments: Any?): Request? {
+            val map = arguments as? Map<*, *> ?: return null
+            val bytes = map["bytes"] as? ByteArray ?: return null
+            return Request(
+                bytes,
+                Prompts(
+                    english = map["english"] as? String ?: "",
+                    german = map["german"] as? String ?: "",
+                ),
+            )
         }
 
         /** Whisper's own rate. */

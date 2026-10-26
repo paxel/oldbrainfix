@@ -489,6 +489,7 @@ class _HomeState extends State<_Home> {
       Localizations.localeOf(context).toString(),
     );
     widget.mirror.setTexts(context.t);
+    SpeechScope.of(context)?.transcriber.setTexts(context.t);
   }
 
   void _hidden() {
