@@ -69,10 +69,15 @@ class _RingScreenState extends State<RingScreen> {
                         child: FilledButton.icon(
                           key: const ValueKey('ringDone'),
                           onPressed: _answered ? null : _answer,
+                          // The size only: a style on the Text would take
+                          // the page's ink and hide the button's own colour.
+                          style: FilledButton.styleFrom(
+                            textStyle: text.titleLarge,
+                          ),
                           icon: const Icon(Icons.check),
                           label: Padding(
                             padding: const EdgeInsets.all(12),
-                            child: Text(t.markDone, style: text.titleLarge),
+                            child: Text(t.markDone),
                           ),
                         ),
                       ),

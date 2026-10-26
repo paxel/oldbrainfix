@@ -147,6 +147,17 @@ void main() {
       expect(alarms.pending, isEmpty, reason: 'acknowledged');
     });
 
+    testWidgets('its Done label takes the button\'s colour', (tester) async {
+      alarms.ringingNow = ringing();
+      await start(tester);
+      final done = find.byKey(const ValueKey('ringDone'));
+      final label = tester.widget<RichText>(
+        find.descendant(of: done, matching: find.byType(RichText)).last,
+      );
+      final scheme = Theme.of(tester.element(done)).colorScheme;
+      expect(label.text.style?.color, scheme.onPrimary);
+    });
+
     testWidgets('a snooze from it rings again later', (tester) async {
       await start(tester);
       expect(find.byType(RingScreen), findsNothing);
