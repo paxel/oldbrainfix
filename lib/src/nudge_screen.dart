@@ -187,6 +187,8 @@ List<Widget> _sortingCards(
     (note) => then(fileNote(context, notes, places, note)),
     (note) => then(mergeNote(context, notes, places, note)),
     (note) => then(openNote(context, notes, places, note)),
+    notes: notes,
+    onChanged: changed,
     onSchedule: (note, reminder) =>
         then(spawnFromNote(context, notes, places, note, reminder: reminder)),
   );

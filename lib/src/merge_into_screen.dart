@@ -104,6 +104,7 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                             :topic,
                             changes: _,
                             schedules: _,
+                            amends: _,
                             :author,
                           )
                           in _shown)

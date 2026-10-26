@@ -178,27 +178,33 @@ class CalendarButton extends StatelessWidget {
     );
   }
 
-  Future<void> _pressed(BuildContext context) async {
-    final all = choices();
-    if (all.isEmpty) return;
-    if (all.length == 1) return all.single.run();
-    final box = context.findRenderObject() as RenderBox?;
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox?;
-    if (box == null || overlay == null) return;
-    final at = box.localToGlobal(box.size.bottomLeft(Offset.zero));
-    final index = await showMenu<int>(
-      context: context,
-      position: RelativeRect.fromRect(
-        overlay.globalToLocal(at) & Size.zero,
-        Offset.zero & overlay.size,
-      ),
-      items: [
-        for (final (i, choice) in all.indexed)
-          PopupMenuItem(value: i, child: Text(choice.label)),
-      ],
-    );
-    if (index == null || !context.mounted) return;
-    await all[index].run();
-  }
+  Future<void> _pressed(BuildContext context) =>
+      runCalendarChoice(context, choices());
+}
+
+/// Does the only one of [all] at once, or opens a menu of them where
+/// [button] is and does the one picked.
+Future<void> runCalendarChoice(
+  BuildContext button,
+  List<CalendarChoice> all,
+) async {
+  if (all.isEmpty) return;
+  if (all.length == 1) return all.single.run();
+  final box = button.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(button).context.findRenderObject() as RenderBox?;
+  if (box == null || overlay == null) return;
+  final at = box.localToGlobal(box.size.bottomLeft(Offset.zero));
+  final index = await showMenu<int>(
+    context: button,
+    position: RelativeRect.fromRect(
+      overlay.globalToLocal(at) & Size.zero,
+      Offset.zero & overlay.size,
+    ),
+    items: [
+      for (final (i, choice) in all.indexed)
+        PopupMenuItem(value: i, child: Text(choice.label)),
+    ],
+  );
+  if (index == null || !button.mounted) return;
+  await all[index].run();
 }

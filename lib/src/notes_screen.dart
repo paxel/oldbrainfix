@@ -124,6 +124,8 @@ class _AllNotesScreenState extends State<AllNotesScreen> {
                 _file,
                 _merge,
                 _open,
+                notes: widget.notes,
+                onChanged: _reload,
                 onSchedule: _schedule,
               ),
           ],

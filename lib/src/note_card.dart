@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'area_look.dart';
+import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'person_screen.dart';
@@ -15,15 +16,16 @@ import 'voice_platform.dart';
 /// A Note with the Area and Topic it is filed in, read once per change.
 /// A Note with where it is filed, what this Device may do to it in a
 /// Shared Area (ADR 0013): change it ([changes]: file, merge, edit,
-/// delete) and give it Routines or Reminders ([schedules]), and the
-/// Profile of the other person who wrote it ([author], ADR 0017; null
-/// for the user's own).
+/// delete), give it Routines or Reminders ([schedules]) and add to it
+/// ([amends]), and the Profile of the other person who wrote it
+/// ([author], ADR 0017; null for the user's own).
 typedef PlacedNote = ({
   Note note,
   Area? area,
   Topic? topic,
   bool changes,
   bool schedules,
+  bool amends,
   Profile? author,
 });
 
@@ -33,6 +35,7 @@ PlacedNote placeNote(Places places, Note note) {
   final store = places.store;
   final changes = store.mayChange(note.id);
   final schedules = store.mayManage(store.areaOf(note.id));
+  final amends = store.mayWriteIn(note.id);
   final author = store.authorOf(note.id);
   final place = note.place;
   if (place == null) {
@@ -42,6 +45,7 @@ PlacedNote placeNote(Places places, Note note) {
       topic: null,
       changes: changes,
       schedules: schedules,
+      amends: amends,
       author: author,
     );
   }
@@ -53,6 +57,7 @@ PlacedNote placeNote(Places places, Note note) {
     topic: topic,
     changes: changes,
     schedules: schedules,
+    amends: amends,
     author: author,
   );
 }
@@ -71,17 +76,52 @@ String? whereCaptured(CaptureContext capture) =>
       null => null,
     };
 
-/// A Note drawn as a softly embossed card: its text, thumbnails of its
-/// first [shownPhotos] photos, a play button per voice recording with
-/// the start of its Transcript under it, capture
-/// time, the Named Place or
-/// coordinates it was captured at with an icon when there is more
-/// Capture Context, and where it is filed; another person's Note leads
-/// its time with their picture (ADR 0017). Its Area's colour runs down
-/// the left edge and its icon leads the place line. Its enrich options
-/// file it, spawn a Routine or Reminder from it, and merge it. An
-/// important Note gets an accent marker and a stronger emboss, an
-/// unimportant one is dimmed (UI laws, "Cards").
+/// What a card's calendar entries offer: adding the Note, or an event
+/// of its Routines and Reminders, to the calendar, and all of those
+/// events as one calendar file when there are any.
+typedef NoteCalendar = ({List<CalendarChoice> add, CalendarChoice? file});
+
+/// What a card's ⋮ menu offers beyond filing, scheduling and merging:
+/// the actions the Note editor has. An entry is left out when its
+/// callback is null.
+class NoteActions {
+  /// Sets the Note's Importance, picked in the menu.
+  final ValueChanged<Importance>? onImportance;
+
+  /// Sends the Note to a person as a Sent Item.
+  final VoidCallback? onSend;
+
+  /// The calendar choices, read as the menu opens; only shown with a
+  /// calendar.
+  final NoteCalendar Function()? calendar;
+
+  /// Adds a Section to the Note.
+  final VoidCallback? onAmend;
+
+  /// Deletes the Note, after asking once.
+  final VoidCallback? onDelete;
+
+  const NoteActions({
+    this.onImportance,
+    this.onSend,
+    this.calendar,
+    this.onAmend,
+    this.onDelete,
+  });
+}
+
+/// A Note drawn as a softly embossed card, top to bottom: the Profile of
+/// the other person who wrote it, picture and name (none on the user's
+/// own, ADR 0017); its capture time with the Named Place or coordinates
+/// it was captured at and an icon when there is more Capture Context;
+/// where it is filed; a separator; its text, thumbnails of its first
+/// [shownPhotos] photos and a play button per voice recording with the
+/// start of its Transcript under it; a separator; and its action row,
+/// icons only: file it, spawn a Routine or Reminder from it, merge it,
+/// and ⋮ for the rest with words. Its Area's colour runs down the left
+/// edge and its icon leads the place line. An important Note gets an
+/// accent marker and a stronger emboss, an unimportant one is dimmed
+/// (UI laws, "Cards").
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -94,7 +134,7 @@ class NoteCard extends StatelessWidget {
   final Topic? topic;
 
   /// The Profile of the other person who wrote the Note; null for the
-  /// user's own, which shows no picture.
+  /// user's own, which shows no Profile line.
   final Profile? author;
 
   /// Opens "file into…"; no button when null.
@@ -107,10 +147,13 @@ class NoteCard extends StatelessWidget {
   /// from a menu that opens at the button; no button when null.
   final ValueChanged<bool>? onSchedule;
 
+  /// The ⋮ menu's actions; no ⋮ when null.
+  final NoteActions? actions;
+
   /// Opens the Note's editor.
   final VoidCallback? onTap;
 
-  /// Shown under the place line, e.g. the trash's restore.
+  /// Shown where the action row goes, e.g. the trash's restore.
   final Widget? footer;
 
   /// How much faded an unimportant card is drawn.
@@ -129,6 +172,7 @@ class NoteCard extends StatelessWidget {
     this.onFile,
     this.onMerge,
     this.onSchedule,
+    this.actions,
     this.onTap,
     this.footer,
   });
@@ -150,6 +194,65 @@ class NoteCard extends StatelessWidget {
           ].join(' / ');
     final important = note.importance == Importance.important;
     final footer = this.footer;
+    final actions = this.actions;
+    final acts =
+        onFile != null ||
+        onSchedule != null ||
+        onMerge != null ||
+        actions != null;
+    final header = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (author case final author?) ...[
+          _AuthorLine(noteId: note.id, author: author),
+          const SizedBox(height: 4),
+        ],
+        Row(
+          children: [
+            Text(when.format(note.captured.toLocal()), style: text.bodySmall),
+            if (whereCaptured(note.context) case final where?) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.place_outlined,
+                size: 14,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 2),
+              Flexible(
+                child: Text(
+                  where,
+                  style: text.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+            // The editor shows the rest.
+            if (note.context.hasMore) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.more_horiz,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+                semanticLabel: t.moreCaptureContext,
+              ),
+            ],
+          ],
+        ),
+        if (place != null) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              if (areaIconData(area?.icon) case final icon?) ...[
+                Icon(icon, size: 16, color: colour ?? scheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+              ],
+              Flexible(child: Text(place, style: text.labelMedium)),
+            ],
+          ),
+        ],
+      ],
+    );
     final card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Embossed(
@@ -169,151 +272,110 @@ class NoteCard extends StatelessWidget {
                           left: BorderSide(color: colour, width: 6),
                         ),
                       ),
-                padding: const EdgeInsets.fromLTRB(16, 16, 4, 16),
-                child: Row(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, acts ? 4 : 16),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // A photo Note may have no words.
-                          if (note.text.isNotEmpty)
-                            Text(note.text, style: text.bodyLarge),
-                          if (note.photos.isNotEmpty) ...[
-                            if (note.text.isNotEmpty) const SizedBox(height: 8),
-                            // Not a sideways list: swipes on a card
-                            // belong to the browser.
-                            Row(
-                              children: [
-                                for (final hash in note.photos.take(
-                                  shownPhotos,
-                                )) ...[
-                                  NotePhoto(
-                                    key: ValueKey(hash),
-                                    hash: hash,
-                                    size: 64,
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                                if (note.photos.length > shownPhotos)
-                                  Text(
-                                    t.morePhotos(
-                                      note.photos.length - shownPhotos,
-                                    ),
-                                    style: text.labelLarge,
-                                  ),
-                              ],
-                            ),
-                          ],
-                          if (note.recordings.isNotEmpty) ...[
-                            if (note.text.isNotEmpty || note.photos.isNotEmpty)
-                              const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                for (final hash in note.recordings)
-                                  RecordingButton(
-                                    key: ValueKey(hash),
-                                    hash: hash,
-                                  ),
-                              ],
-                            ),
-                            for (final hash in note.recordings)
-                              TranscriptText(
-                                key: ValueKey('transcript:$hash'),
-                                noteId: note.id,
-                                hash: hash,
-                                transcript: note.transcripts[hash],
-                              ),
-                          ],
-                          const SizedBox(height: 6),
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 4,
-                            children: [
-                              if (author case final author?)
-                                _AuthorPicture(noteId: note.id, author: author),
-                              Text(
-                                when.format(note.captured.toLocal()),
-                                style: text.bodySmall,
-                              ),
-                              if (whereCaptured(note.context)
-                                  case final where?) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.place_outlined,
-                                  size: 14,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                                Text(where, style: text.bodySmall),
-                              ],
-                              // The editor shows the rest.
-                              if (note.context.hasMore) ...[
-                                const SizedBox(width: 4),
-                                Icon(
-                                  Icons.more_horiz,
-                                  size: 16,
-                                  color: scheme.onSurfaceVariant,
-                                  semanticLabel: t.moreCaptureContext,
-                                ),
-                              ],
-                            ],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: header),
+                        if (important)
+                          Icon(
+                            Icons.label_important,
+                            color: scheme.primary,
+                            semanticLabel: t.importanceImportant,
                           ),
-                          if (place != null) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                if (areaIconData(area?.icon)
-                                    case final icon?) ...[
-                                  Icon(
-                                    icon,
-                                    size: 16,
-                                    color: colour ?? scheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 4),
-                                ],
-                                Flexible(
-                                  child: Text(place, style: text.labelMedium),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    // A photo Note may have no words.
+                    if (note.text.isNotEmpty)
+                      Text(note.text, style: text.bodyLarge),
+                    if (note.photos.isNotEmpty) ...[
+                      if (note.text.isNotEmpty) const SizedBox(height: 8),
+                      // Not a sideways list: swipes on a card belong to
+                      // the browser.
+                      Row(
+                        children: [
+                          for (final hash in note.photos.take(shownPhotos)) ...[
+                            NotePhoto(
+                              key: ValueKey(hash),
+                              hash: hash,
+                              size: 64,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (note.photos.length > shownPhotos)
+                            Text(
+                              t.morePhotos(note.photos.length - shownPhotos),
+                              style: text.labelLarge,
+                            ),
+                        ],
+                      ),
+                    ],
+                    if (note.recordings.isNotEmpty) ...[
+                      if (note.text.isNotEmpty || note.photos.isNotEmpty)
+                        const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final hash in note.recordings)
+                            RecordingButton(key: ValueKey(hash), hash: hash),
+                        ],
+                      ),
+                      for (final hash in note.recordings)
+                        TranscriptText(
+                          key: ValueKey('transcript:$hash'),
+                          noteId: note.id,
+                          hash: hash,
+                          transcript: note.transcripts[hash],
+                        ),
+                    ],
+                    if (acts || footer != null) const Divider(height: 24),
+                    // Icons only, so the row stays one line in every
+                    // language; the words show on a long press.
+                    if (acts)
+                      Row(
+                        key: const ValueKey('note-actions'),
+                        children: [
+                          if (onFile != null)
+                            IconButton(
+                              tooltip: t.fileInto,
+                              onPressed: onFile,
+                              icon: const Icon(Icons.drive_file_move_outline),
+                            ),
+                          if (onSchedule case final onSchedule?)
+                            PopupMenuButton<bool>(
+                              tooltip: t.routineOrReminder,
+                              icon: const Icon(Icons.alarm_add_outlined),
+                              onSelected: onSchedule,
+                              itemBuilder: (_) => [
+                                PopupMenuItem(
+                                  value: false,
+                                  child: Text(t.routine),
+                                ),
+                                PopupMenuItem(
+                                  value: true,
+                                  child: Text(t.reminder),
                                 ),
                               ],
                             ),
-                          ],
-                          ?footer,
+                          if (onMerge != null)
+                            IconButton(
+                              tooltip: t.mergeInto,
+                              onPressed: onMerge,
+                              icon: const Icon(Icons.call_merge),
+                            ),
+                          const Spacer(),
+                          if (actions != null)
+                            _MoreButton(
+                              importance: note.importance,
+                              actions: actions,
+                            ),
                         ],
                       ),
-                    ),
-                    if (important)
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.label_important,
-                          color: scheme.primary,
-                          semanticLabel: t.importanceImportant,
-                        ),
-                      ),
-                    if (onFile != null)
-                      IconButton(
-                        tooltip: t.fileInto,
-                        onPressed: onFile,
-                        icon: const Icon(Icons.drive_file_move_outline),
-                      ),
-                    if (onSchedule case final onSchedule?)
-                      PopupMenuButton<bool>(
-                        tooltip: t.routineOrReminder,
-                        icon: const Icon(Icons.alarm_add_outlined),
-                        onSelected: onSchedule,
-                        itemBuilder: (_) => [
-                          PopupMenuItem(value: false, child: Text(t.routine)),
-                          PopupMenuItem(value: true, child: Text(t.reminder)),
-                        ],
-                      ),
-                    if (onMerge != null)
-                      IconButton(
-                        tooltip: t.mergeInto,
-                        onPressed: onMerge,
-                        icon: const Icon(Icons.call_merge),
-                      ),
+                    ?footer,
                   ],
                 ),
               ),
@@ -328,23 +390,119 @@ class NoteCard extends StatelessWidget {
   }
 }
 
-/// Another person's picture on a card, opening their Profile (#52): a
-/// small picture with room around it for a finger. It follows their
+/// The ⋮ of a card's action row: a menu at the button with words. It
+/// leads with the Note's Importance as radio buttons, the one it has
+/// marked, then sending, the calendar, adding to the Note and deleting.
+class _MoreButton extends StatelessWidget {
+  final Importance importance;
+  final NoteActions actions;
+
+  const _MoreButton({required this.importance, required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return PopupMenuButton<VoidCallback>(
+      key: const ValueKey('note-menu'),
+      tooltip: t.more,
+      icon: const Icon(Icons.more_vert),
+      onSelected: (run) => run(),
+      itemBuilder: (button) {
+        final calendar = CalendarScope.of(button).available
+            ? actions.calendar?.call()
+            : null;
+        PopupMenuItem<VoidCallback> item(
+          String key,
+          IconData icon,
+          String label,
+          VoidCallback run,
+        ) => PopupMenuItem(
+          key: ValueKey(key),
+          value: run,
+          child: Row(
+            children: [
+              Icon(icon),
+              const SizedBox(width: 12),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        );
+        return [
+          if (actions.onImportance case final set?) ...[
+            // The heading the choices continue: "Importance" "Important".
+            PopupMenuItem(enabled: false, child: Text(t.importance)),
+            for (final (value, label) in [
+              (Importance.important, t.importanceImportant),
+              (Importance.normal, t.importanceNormal),
+              (Importance.unimportant, t.importanceUnimportant),
+            ])
+              PopupMenuItem(
+                key: ValueKey('importance-${value.name}'),
+                // A tap on the one it has changes nothing.
+                value: () {
+                  if (value != importance) set(value);
+                },
+                child: Semantics(
+                  checked: value == importance,
+                  inMutuallyExclusiveGroup: true,
+                  child: Row(
+                    children: [
+                      Icon(
+                        value == importance
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(child: Text(label)),
+                    ],
+                  ),
+                ),
+              ),
+            const PopupMenuDivider(),
+          ],
+          if (actions.onSend case final send?)
+            item('note-send', Icons.send_outlined, t.sendToPerson, send),
+          if (calendar != null && calendar.add.isNotEmpty)
+            item(
+              'note-calendar',
+              Icons.event_outlined,
+              t.addToCalendar,
+              () => runCalendarChoice(button, calendar.add),
+            ),
+          if (calendar?.file case final file?)
+            item(
+              'note-calendar-file',
+              Icons.share_outlined,
+              file.label,
+              file.run,
+            ),
+          if (actions.onAmend case final amend?)
+            item('note-amend', Icons.add, t.amend, amend),
+          if (actions.onDelete case final delete?)
+            item('note-delete', Icons.delete_outline, t.delete, delete),
+        ];
+      },
+    );
+  }
+}
+
+/// Another person's Profile on a card, picture and name, opening their
+/// Profile (#52) with room around it for a finger. It follows their
 /// Profile and the user's Override as they change, as the writer of the
 /// Note [noteId] is shown ([People.authorOf]).
-class _AuthorPicture extends StatefulWidget {
+class _AuthorLine extends StatefulWidget {
   final String noteId;
 
   /// The writer as the card was read.
   final Profile author;
 
-  const _AuthorPicture({required this.noteId, required this.author});
+  const _AuthorLine({required this.noteId, required this.author});
 
   @override
-  State<_AuthorPicture> createState() => _AuthorPictureState();
+  State<_AuthorLine> createState() => _AuthorLineState();
 }
 
-class _AuthorPictureState extends State<_AuthorPicture> {
+class _AuthorLineState extends State<_AuthorLine> {
   Store? _store;
   late Profile? _author = widget.author;
 
@@ -358,7 +516,7 @@ class _AuthorPictureState extends State<_AuthorPicture> {
   }
 
   @override
-  void didUpdateWidget(_AuthorPicture old) {
+  void didUpdateWidget(_AuthorLine old) {
     super.didUpdateWidget(old);
     _author = widget.author;
   }
@@ -381,25 +539,40 @@ class _AuthorPictureState extends State<_AuthorPicture> {
     if (author == null) return const SizedBox.shrink();
     final t = context.t;
     final id = author.id;
+    final name = profileDisplayName(t, author.name);
     final opens = canOpenPerson(context, id);
-    final picture = ProfileAvatar(
-      key: const ValueKey('author'),
-      profile: author,
-      size: 20,
+    final line = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ProfileAvatar(key: const ValueKey('author'), profile: author, size: 24),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            name,
+            key: const ValueKey('author-name'),
+            style: Theme.of(context).textTheme.labelLarge,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
     return Semantics(
-      label: t.authorPicture(profileDisplayName(t, author.name)),
+      label: t.authorPicture(name),
       image: !opens,
       button: opens,
       excludeSemantics: true,
       onTap: opens ? () => openPerson(context, id) : null,
       child: !opens
-          ? picture
+          ? line
           : GestureDetector(
               key: const ValueKey('author-open'),
               behavior: HitTestBehavior.opaque,
               onTap: () => openPerson(context, id),
-              child: Padding(padding: const EdgeInsets.all(6), child: picture),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: line,
+              ),
             ),
     );
   }

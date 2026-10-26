@@ -41,6 +41,138 @@ Future<void> openNote(
   ),
 );
 
+/// What the calendar offers for [note], with [text] as typed in place
+/// of its text: the Note on its own at a time the calendar app lets the
+/// user pick, each event of its Routines and Reminders, and all of those
+/// events as one calendar file when there are any.
+NoteCalendar noteCalendar(
+  BuildContext context,
+  Routines routines,
+  Note note, {
+  String text = '',
+}) {
+  final t = context.t;
+  final typed = text.trim();
+  final owned = routines.ofNote(note.id);
+  final events = [
+    for (final routine in owned) ...eventsOf(context, routines, routine),
+  ];
+  return (
+    add: [
+      (
+        label: t.addNoteToCalendar,
+        run: () => addToCalendar(
+          context,
+          CalendarEvent.ofText(
+            note.id,
+            typed.isEmpty ? noteText(t, note) : typed,
+          ),
+        ),
+      ),
+      for (final routine in owned) ...addChoices(context, routines, routine),
+    ],
+    file: events.isEmpty
+        ? null
+        : (
+            label: t.shareCalendarFile,
+            run: () => shareCalendarFile(context, routines.store, events),
+          ),
+  );
+}
+
+/// Asks for the text of a new Section of the Note [noteId] and adds it;
+/// whether it did. The Section gets its own Capture Context when it
+/// arrives, without asking; [attached] runs each time some did.
+Future<bool> amendNote(
+  BuildContext context,
+  Notes notes,
+  String noteId, {
+  VoidCallback? attached,
+}) async {
+  final text = await showDialog<String>(
+    context: context,
+    builder: (_) => const _AmendDialog(),
+  );
+  final trimmed = text?.trim();
+  if (!context.mounted || trimmed == null || trimmed.isEmpty) return false;
+  final section = notes.amend(noteId, trimmed);
+  final here = currentIfGranted(LocationScope.of(context));
+  final extras = currentExtras(notes.store, ContextScope.of(context));
+  for (final attaching in [
+    attachLocation(notes, section.id, here),
+    attachExtras(notes, section.id, extras),
+  ]) {
+    unawaited(
+      attaching.then((done) {
+        if (done) attached?.call();
+      }),
+    );
+  }
+  return true;
+}
+
+/// Asks once whether the Note [noteId] goes to the trash, with the verb
+/// on the button in the error colour, and moves it there; whether it
+/// did. When it spawned Routines or Reminders, the dialog offers to
+/// delete the Note only or with them; they never go as a side effect.
+Future<bool> deleteNote(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+) async {
+  final book = Routines(notes.store);
+  final linked = book.ofNote(noteId).length;
+  final withRoutines = await showDialog<bool>(
+    context: context,
+    builder: (context) => _DeleteNoteDialog(linked: linked),
+  );
+  if (withRoutines == null) return false;
+  book.trashNote(noteId, withRoutines: withRoutines);
+  return true;
+}
+
+/// The ⋮ menu of [placed]'s card: what the Note editor offers beyond
+/// filing, scheduling and merging, as far as this Device may (ADR 0013).
+/// [changed] runs after each step that may have changed the Note.
+NoteActions noteActions(
+  BuildContext context,
+  Notes notes,
+  PlacedNote placed,
+  VoidCallback changed,
+) {
+  final id = placed.note.id;
+  void then(Future<Object?> step) => unawaited(
+    step.then((_) {
+      if (context.mounted) changed();
+    }),
+  );
+  return NoteActions(
+    onImportance: placed.changes
+        ? (picked) {
+            notes.setImportance(id, picked);
+            changed();
+          }
+        : null,
+    onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
+    calendar: () => noteCalendar(context, Routines(notes.store), placed.note),
+    onAmend: placed.amends
+        ? () => then(
+            amendNote(
+              context,
+              notes,
+              id,
+              attached: () {
+                if (context.mounted) changed();
+              },
+            ),
+          )
+        : null,
+    onDelete: placed.changes
+        ? () => then(deleteNote(context, notes, id))
+        : null,
+  );
+}
+
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its photos at full width, each opening full screen when
 /// tapped and with its Photo Text under it, a play button per voice
@@ -201,28 +333,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   Future<void> _amend() async {
     _saveText();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (_) => const _AmendDialog(),
+    final added = await amendNote(
+      context,
+      widget.notes,
+      widget.noteId,
+      attached: () {
+        if (mounted) _reload();
+      },
     );
-    final trimmed = text?.trim();
-    if (!mounted || trimmed == null || trimmed.isEmpty) return;
-    final section = widget.notes.amend(widget.noteId, trimmed);
+    if (!mounted || !added) return;
     _reload();
-    // The Section gets its own Capture Context when it arrives, without
-    // asking.
-    final here = currentIfGranted(LocationScope.of(context));
-    final extras = currentExtras(widget.notes.store, ContextScope.of(context));
-    for (final attached in [
-      attachLocation(widget.notes, section.id, here),
-      attachExtras(widget.notes, section.id, extras),
-    ]) {
-      unawaited(
-        attached.then((attached) {
-          if (attached && mounted) _reload();
-        }),
-      );
-    }
   }
 
   Future<void> _spawn({required bool reminder}) async {
@@ -253,31 +373,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   List<CalendarChoice> _calendarChoices() {
     final note = _placed?.note;
     if (note == null) return const [];
-    final t = context.t;
-    final typed = _text.text.trim();
-    final events = [
-      for (final routine in _routines)
-        ...eventsOf(context, _routineBook, routine),
-    ];
-    return [
-      (
-        label: t.addNoteToCalendar,
-        run: () => addToCalendar(
-          context,
-          CalendarEvent.ofText(
-            note.id,
-            typed.isEmpty ? noteText(t, note) : typed,
-          ),
-        ),
-      ),
-      for (final routine in _routines)
-        ...addChoices(context, _routineBook, routine),
-      if (events.isNotEmpty)
-        (
-          label: t.shareCalendarFile,
-          run: () => shareCalendarFile(context, widget.notes.store, events),
-        ),
-    ];
+    final (:add, :file) = noteCalendar(
+      context,
+      _routineBook,
+      note,
+      text: _text.text,
+    );
+    return [...add, ?file];
   }
 
   /// Merges the Note, with its text as typed, into the one picked; it
@@ -315,7 +417,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final t = context.t;
     final placed = _placed;
     if (placed == null) return Scaffold(appBar: AppBar());
-    final (:note, :area, :topic, :changes, :schedules, author: _) = placed;
+    final (:note, :area, :topic, :changes, :schedules, amends: _, author: _) =
+        placed;
     // In a Shared Area a Member changes only their own Notes, and only a
     // Manager their Routines (ADR 0013); Amend stays.
     final amends = _amends;
@@ -726,6 +829,45 @@ class _TrashRoutinesDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(t.yes),
         ),
+      ],
+    );
+  }
+}
+
+/// Asks once whether a Note goes to the trash: true to delete its
+/// [linked] Routines and Reminders with it, false to delete the Note
+/// only, null to cancel.
+class _DeleteNoteDialog extends StatelessWidget {
+  final int linked;
+
+  const _DeleteNoteDialog({required this.linked});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    Widget destructive(String label, bool value) => TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: Theme.of(context).colorScheme.error,
+      ),
+      onPressed: () => Navigator.of(context).pop(value),
+      child: Text(label),
+    );
+    return AlertDialog(
+      title: Text(t.deleteNoteQuestion),
+      content: Text(
+        linked == 0 ? t.deleteNoteDetail : t.deleteNoteLinkedDetail,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        if (linked == 0)
+          destructive(t.delete, false)
+        else ...[
+          destructive(t.deleteNoteOnly, false),
+          destructive(t.deleteNoteWithLinked(linked), true),
+        ],
       ],
     );
   }

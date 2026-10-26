@@ -142,6 +142,7 @@ class _TrashScreenState extends State<TrashScreen> {
                     :final topic,
                     :final changes,
                     schedules: _,
+                    amends: _,
                     :final author,
                   ))
                     NoteCard(

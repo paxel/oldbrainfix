@@ -3991,6 +3991,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.'**
   String get crashLastRunBody;
+
+  /// No description provided for @sendToPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to a person'**
+  String get sendToPerson;
+
+  /// No description provided for @addToCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to calendar'**
+  String get addToCalendar;
+
+  /// No description provided for @deleteNoteQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this Note?'**
+  String get deleteNoteQuestion;
+
+  /// No description provided for @deleteNoteDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It stays in the trash for 30 days.'**
+  String get deleteNoteDetail;
+
+  /// No description provided for @deleteNoteOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete only the Note'**
+  String get deleteNoteOnly;
+
+  /// No description provided for @deleteNoteWithLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}'**
+  String deleteNoteWithLinked(int count);
 }
 
 class _AppLocalizationsDelegate

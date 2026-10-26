@@ -32,6 +32,10 @@ void main() {
   tearDown(() => store.close());
 
   Future<void> start(WidgetTester tester) async {
+    // Tall enough for five cards with their action rows.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(OldBrainFixApp(store: store, alarms: alarms));
     await tester.pumpAndSettle();
   }

@@ -522,6 +522,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
               onFile: () => _file(captured.note),
               onMerge: () => _merge(captured.note),
               onSchedule: (reminder) => _schedule(captured.note, reminder),
+              actions: noteActions(context, widget.notes, captured, _reload),
               onTap: () => _open(captured.note),
             ),
           ],

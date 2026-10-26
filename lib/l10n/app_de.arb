@@ -657,5 +657,11 @@
   "crashBody": "Old Brain Fix ist auf einen unerwarteten Fehler gestoßen. Deine gespeicherten Notizen sind sicher. Starte die App neu, und wenn es wieder passiert, schick den Bericht, damit es behoben werden kann.",
   "crashRestart": "App neu starten",
   "crashSendReport": "Bericht an den Entwickler senden",
-  "crashLastRunBody": "Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken."
+  "crashLastRunBody": "Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken.",
+  "sendToPerson": "An eine Person senden",
+  "addToCalendar": "In den Kalender",
+  "deleteNoteQuestion": "Diese Notiz löschen?",
+  "deleteNoteDetail": "Sie bleibt 30 Tage im Papierkorb.",
+  "deleteNoteOnly": "Nur die Notiz löschen",
+  "deleteNoteWithLinked": "{count, plural, =1{Mit ihrer Routine oder Erinnerung löschen} other{Mit ihren {count} Routinen und Erinnerungen löschen}}"
 }

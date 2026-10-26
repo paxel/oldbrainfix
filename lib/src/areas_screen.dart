@@ -339,6 +339,8 @@ class _AreasScreenState extends State<AreasScreen> {
                         _merge,
                         _openNote,
                         _schedule,
+                        widget.notes,
+                        _reload,
                       )
                     : _areaRows(t),
               ),
@@ -611,6 +613,8 @@ class _AreaScreenState extends State<AreaScreen> {
         _file,
         _merge,
         _openNote,
+        notes: widget.notes,
+        onChanged: _reload,
         onSchedule: _schedule,
       ),
     ];
@@ -674,6 +678,8 @@ class _AreaScreenState extends State<AreaScreen> {
                         _merge,
                         _openNote,
                         _schedule,
+                        widget.notes,
+                        _reload,
                       )
                     : _browsing(t, area),
               ),
@@ -858,6 +864,8 @@ class _TopicScreenState extends State<TopicScreen> {
                         _merge,
                         _openNote,
                         _schedule,
+                        widget.notes,
+                        _reload,
                       )
                     : _diary.isEmpty
                     ? [
@@ -873,6 +881,8 @@ class _TopicScreenState extends State<TopicScreen> {
                         _file,
                         _merge,
                         _openNote,
+                        notes: widget.notes,
+                        onChanged: _reload,
                         onSchedule: _schedule,
                       ),
               ),
@@ -922,6 +932,8 @@ List<Widget> _hitCards(
   void Function(Note note) onMerge,
   void Function(Note note) onOpen,
   void Function(Note note, bool reminder) onSchedule,
+  Notes notes,
+  VoidCallback onChanged,
 ) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
@@ -930,6 +942,8 @@ List<Widget> _hitCards(
         onFile,
         onMerge,
         onOpen,
+        notes: notes,
+        onChanged: onChanged,
         onSchedule: onSchedule,
       );
 

@@ -2499,4 +2499,30 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get crashLastRunBody =>
       'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.';
+
+  @override
+  String get sendToPerson => 'Send to a person';
+
+  @override
+  String get addToCalendar => 'Add to calendar';
+
+  @override
+  String get deleteNoteQuestion => 'Delete this Note?';
+
+  @override
+  String get deleteNoteDetail => 'It stays in the trash for 30 days.';
+
+  @override
+  String get deleteNoteOnly => 'Delete only the Note';
+
+  @override
+  String deleteNoteWithLinked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete with its $count Routines and Reminders',
+      one: 'Delete with its Routine or Reminder',
+    );
+    return '$_temp0';
+  }
 }

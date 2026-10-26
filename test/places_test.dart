@@ -374,6 +374,8 @@ void main() {
           .whereType<BoxDecoration>()
           .map((d) => d.border)
           .whereType<Border>()
+          // The separators are borders too, at the bottom.
+          .where((b) => b.left != BorderSide.none)
           .single;
       expect(edge.left.color, const Color(0xFF2E7D32));
     });

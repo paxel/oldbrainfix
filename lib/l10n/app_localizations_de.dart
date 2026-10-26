@@ -2520,4 +2520,30 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get crashLastRunBody =>
       'Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken.';
+
+  @override
+  String get sendToPerson => 'An eine Person senden';
+
+  @override
+  String get addToCalendar => 'In den Kalender';
+
+  @override
+  String get deleteNoteQuestion => 'Diese Notiz löschen?';
+
+  @override
+  String get deleteNoteDetail => 'Sie bleibt 30 Tage im Papierkorb.';
+
+  @override
+  String get deleteNoteOnly => 'Nur die Notiz löschen';
+
+  @override
+  String deleteNoteWithLinked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Mit ihren $count Routinen und Erinnerungen löschen',
+      one: 'Mit ihrer Routine oder Erinnerung löschen',
+    );
+    return '$_temp0';
+  }
 }

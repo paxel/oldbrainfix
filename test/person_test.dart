@@ -432,6 +432,10 @@ void main() {
 
     testWidgets('in an Area "Me" and a person add up, and the filter '
         'combines with the search', (tester) async {
+      // Tall enough for all three cards.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       Notes(ann).capture('Ann buys milk', place: area);
       Notes(ann).capture('Ann bakes bread', place: area);
       Notes(ben).capture('Ben buys bread', place: area);

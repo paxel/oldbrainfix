@@ -5,6 +5,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'note_editor_screen.dart';
 import 'profile.dart';
 
 /// Where swipe left leads in the notes browser: the last selected Area
@@ -105,35 +106,48 @@ class BrowserSearchField extends StatelessWidget {
   );
 }
 
-/// Notes as a diary of cards, each with "file into…", "merge into…"
-/// and, with [onSchedule], Routine or Reminder, as far as this Device
-/// may; tapping a card opens it.
+/// Notes as a diary of cards, each with "file into…", "merge into…",
+/// with [onSchedule] Routine or Reminder, and ⋮ for the rest the Note
+/// editor offers, as far as this Device may; tapping a card opens it.
+/// [onChanged] runs after a step of ⋮ that may have changed a Note.
 List<Widget> diaryCards(
   BuildContext context,
   List<PlacedNote> shown,
   void Function(Note note) onFile,
   void Function(Note note) onMerge,
   void Function(Note note) onOpen, {
+  required Notes notes,
+  required VoidCallback onChanged,
   void Function(Note note, bool reminder)? onSchedule,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
   return [
-    for (final (:note, :area, :topic, :changes, :schedules, :author) in shown)
-      NoteCard(
-        note: note,
-        when: when,
-        area: area,
-        topic: topic,
-        author: author,
-        // What a Member may not do to it is not offered (ADR 0013).
-        onFile: changes ? () => onFile(note) : null,
-        onMerge: changes ? () => onMerge(note) : null,
-        onSchedule: onSchedule == null || !schedules
-            ? null
-            : (reminder) => onSchedule(note, reminder),
-        onTap: () => onOpen(note),
-      ),
+    for (final placed in shown)
+      if (placed case (
+        :final note,
+        :final area,
+        :final topic,
+        :final changes,
+        :final schedules,
+        amends: _,
+        :final author,
+      ))
+        NoteCard(
+          note: note,
+          when: when,
+          area: area,
+          topic: topic,
+          author: author,
+          // What a Member may not do to it is not offered (ADR 0013).
+          onFile: changes ? () => onFile(note) : null,
+          onMerge: changes ? () => onMerge(note) : null,
+          onSchedule: onSchedule == null || !schedules
+              ? null
+              : (reminder) => onSchedule(note, reminder),
+          actions: noteActions(context, notes, placed, onChanged),
+          onTap: () => onOpen(note),
+        ),
   ];
 }
 

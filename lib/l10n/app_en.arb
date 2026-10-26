@@ -1410,5 +1410,12 @@
   "crashLastRunBody": "Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.",
   "@crashLastRunBody": {
     "description": "Announcement at the next start after the app died; tapping it opens a mail with the report."
-  }
+  },
+  "sendToPerson": "Send to a person",
+  "addToCalendar": "Add to calendar",
+  "deleteNoteQuestion": "Delete this Note?",
+  "deleteNoteDetail": "It stays in the trash for 30 days.",
+  "deleteNoteOnly": "Delete only the Note",
+  "deleteNoteWithLinked": "{count, plural, =1{Delete with its Routine or Reminder} other{Delete with its {count} Routines and Reminders}}",
+  "@deleteNoteWithLinked": {"placeholders": {"count": {"type": "int"}}}
 }
