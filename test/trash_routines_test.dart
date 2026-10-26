@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -32,6 +33,14 @@ void main() {
   Future<void> start(WidgetTester tester) async {
     await tester.pumpWidget(OldBrainFixApp(store: store));
     await tester.pumpAndSettle();
+  }
+
+  /// Starts on a page tall enough for the Agenda's whole week.
+  Future<void> startWeek(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await start(tester);
   }
 
   /// Starts the app anew, as after it was closed.
@@ -112,8 +121,8 @@ void main() {
         'with it', (tester) async {
       final pills = notes.capture('pills');
       routines.spawn(pills.id, daily([at(20)]));
-      await start(tester);
-      expect(find.byType(Checkbox), findsNWidgets(2));
+      await startWeek(tester);
+      expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
       await openNote(tester, 'pills');
       await tap(tester, find.byTooltip('Move to trash'));
       await tap(tester, find.text('Yes'));
@@ -130,20 +139,20 @@ void main() {
       await tap(tester, find.text('Restore'));
       expect(find.text('The trash is empty.'), findsOneWidget);
       await backToAgenda(tester);
-      expect(find.byType(Checkbox), findsNWidgets(2));
+      expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
     });
 
     testWidgets('No: they stay, linking to the Note in the trash, then to '
         'a deleted Note', (tester) async {
       final pills = notes.capture('pills');
       routines.spawn(pills.id, daily([at(20)]));
-      await start(tester);
+      await startWeek(tester);
       await openNote(tester, 'pills');
       await tap(tester, find.byTooltip('Move to trash'));
       await tap(tester, find.text('No'));
       expect(notes.byId(pills.id)?.isTrashed, isTrue);
       await backToAgenda(tester);
-      expect(find.byType(Checkbox), findsNWidgets(2));
+      expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
 
       await tap(tester, find.text('pills').first);
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
@@ -228,7 +237,7 @@ void main() {
       tester,
     ) async {
       final routine = routines.create('pills', daily([at(20)]));
-      await start(tester);
+      await startWeek(tester);
       await tap(tester, find.text('pills').first);
       await tap(tester, find.byTooltip('Delete'));
       expect(
@@ -252,7 +261,7 @@ void main() {
       expect(find.text('The trash is empty.'), findsOneWidget);
       expect(routines.byId(routine.id)?.isTrashed, isFalse);
       await backToAgenda(tester);
-      expect(find.byType(Checkbox), findsNWidgets(2));
+      expect(find.byType(Checkbox), findsNWidgets(AgendaScreen.days));
     });
 
     testWidgets('after 30 days the trash has purged it', (tester) async {

@@ -35,8 +35,10 @@ import 'system_bars.dart';
 typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
-/// then by time, a visible gap, and tomorrow's in dimmer colours. Each
-/// is checked off as Done on its own, tomorrow's already today. "+"
+/// then by time, a visible gap, and tomorrow's in dimmer colours, then
+/// the five days after the same way, each under its weekday and date.
+/// Each is checked off as Done on its own, the coming days' already
+/// today. "+"
 /// captures a Note, whose card then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
 /// the notes browser; the app bar makes a Routine without a Note, opens
@@ -54,8 +56,11 @@ typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 /// checked off; opening it, or its history, asks to open its Area first.
 /// Back on the Agenda, every Area opened meanwhile is closed again.
 class AgendaScreen extends StatefulWidget {
-  /// How much tomorrow is faded.
+  /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
+
+  /// How many days the Agenda shows, today included.
+  static const days = 7;
 
   final Notes notes;
   final Places places;
@@ -99,6 +104,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
   List<_PlacedRow> _today = const [];
   List<_PlacedRow> _tomorrow = const [];
+
+  /// The days after tomorrow, each with its rows.
+  List<({Day day, List<_PlacedRow> rows})> _later = const [];
   var _unsorted = 0;
 
   /// The Note captured last from here, shown on top until it is let go.
@@ -174,9 +182,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   void _load() {
-    final agenda = _routines.agenda(deviceWallClock);
+    final agenda = _routines.agenda(deviceWallClock, days: AgendaScreen.days);
     _today = [for (final row in agenda.todayRows) _place(row)];
     _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
+    _later = [
+      for (final (i, rows) in agenda.laterRows.indexed)
+        (day: agenda.later(i), rows: [for (final row in rows) _place(row)]),
+    ];
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
     _armTimer();
@@ -518,6 +530,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
               ],
             ),
           ),
+          // The days after, each under its weekday and date; one with
+          // nothing due still shows.
+          for (final (:day, rows: later) in _later) ...[
+            const SizedBox(height: 16),
+            Opacity(
+              opacity: AgendaScreen.tomorrowOpacity,
+              child: Column(
+                children: [
+                  _Heading(t.agendaDay(day.wall)),
+                  if (later.isEmpty)
+                    _NothingPlanned(t.nothingPlanned)
+                  else
+                    ...rows(later),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
       floatingActionButton: Column(
@@ -634,6 +663,22 @@ class _Heading extends StatelessWidget {
     child: Align(
       alignment: Alignment.centerLeft,
       child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    ),
+  );
+}
+
+/// The line under a day with nothing due.
+class _NothingPlanned extends StatelessWidget {
+  final String text;
+
+  const _NothingPlanned(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: Text(text, style: Theme.of(context).textTheme.bodyLarge),
     ),
   );
 }

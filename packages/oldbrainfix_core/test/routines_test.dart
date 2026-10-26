@@ -308,6 +308,25 @@ void main() {
       expect(agenda.tomorrowRows, isEmpty);
     });
 
+    test('over a week, the days after tomorrow cross a month end', () {
+      routines.create('pills', daily([at(8)]));
+      routines.create('dentist', Schedule(start: Day(2026, 11, 2)));
+      expect(routines.agenda(europe).laterRows, isEmpty);
+      now = DateTime.utc(2026, 10, 28, 11);
+      final agenda = routines.agenda(europe, days: 7);
+      expect(agenda.today, Day(2026, 10, 28));
+      expect(agenda.laterRows, hasLength(5));
+      expect(
+        [for (var i = 0; i < 5; i++) '${agenda.later(i)}'],
+        ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03'],
+      );
+      expect(rows(agenda.laterRows[1]), ['2026-10-31T08:00 pills']);
+      expect(rows(agenda.laterRows[3]), [
+        '2026-11-02 dentist',
+        '2026-11-02T08:00 pills',
+      ]);
+    });
+
     test('a trashed Routine leaves the Agenda', () {
       final routine = routines.create('pills', daily([at(8)]));
       routines.trash(routine.id);

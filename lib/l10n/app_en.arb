@@ -157,6 +157,19 @@
   "agendaTomorrow": "Tomorrow",
   "nothingToday": "Nothing due today. Tap + to capture a thought.",
   "nothingTomorrow": "Nothing due tomorrow.",
+  "agendaDay": "{day}",
+  "@agendaDay": {
+    "description": "Heading of a day on the Agenda after tomorrow: its weekday and date, as in \"Thursday, 29 Oct\".",
+    "placeholders": {
+      "day": {
+        "type": "DateTime",
+        "format": "EEEE, d MMM",
+        "isCustomDateFormat": "true"
+      }
+    }
+  },
+  "nothingPlanned": "Nothing planned",
+  "@nothingPlanned": {"description": "Under the heading of a day after tomorrow on the Agenda when nothing is due that day."},
   "justCaptured": "Just captured",
   "allNotesTitle": "All Notes",
   "newRoutineTooltip": "New Routine or Reminder",

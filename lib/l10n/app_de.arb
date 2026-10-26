@@ -101,6 +101,17 @@
   "agendaTomorrow": "Morgen",
   "nothingToday": "Heute steht nichts an. Tippe auf +, um einen Gedanken festzuhalten.",
   "nothingTomorrow": "Morgen steht nichts an.",
+  "agendaDay": "{day}",
+  "@agendaDay": {
+    "placeholders": {
+      "day": {
+        "type": "DateTime",
+        "format": "EEEE, d. MMM",
+        "isCustomDateFormat": "true"
+      }
+    }
+  },
+  "nothingPlanned": "Nichts geplant",
   "justCaptured": "Gerade erfasst",
   "allNotesTitle": "Alle Notizen",
   "newRoutineTooltip": "Neue Routine oder Erinnerung",

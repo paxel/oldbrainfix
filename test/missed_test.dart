@@ -240,8 +240,14 @@ void main() {
     ) async {
       madeAt(DateTime(2026, 10, 22, 6), 'pills', daily([at(8)]));
       await start(tester);
-      await tap(tester, find.text('pills').last);
+      // Tomorrow's row; [tap] scrolls it to the top of the week.
+      await tap(tester, find.text('pills').at(1));
       await tap(tester, find.text('Save'));
+      await tester.scrollUntilVisible(
+        card,
+        -100,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(inCard(find.text('pills · 2 times')), findsOneWidget);
     });
   });

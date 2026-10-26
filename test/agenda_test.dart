@@ -98,7 +98,7 @@ void main() {
       routines.create('call Mum', Schedule(start: today, times: [at(12)]));
       await start(tester);
 
-      expect(agendaRows(tester), [
+      expect(agendaRows(tester).take(8), [
         'All day tidy up',
         '08:00 pills',
         '12:00 call Mum',
@@ -115,6 +115,101 @@ void main() {
       final todayEnd = tester.getRect(find.text('20:00').first).bottom;
       final tomorrowStart = tester.getRect(find.text('Tomorrow')).top;
       expect(tomorrowStart - todayEnd, greaterThan(32));
+    });
+
+    /// Starts on a page tall enough for the whole week to be built.
+    Future<void> startTall(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await start(tester);
+    }
+
+    /// The heading texts from top to bottom.
+    List<String> headings(WidgetTester tester, List<String> texts) {
+      final found = [
+        for (final text in texts)
+          if (find.text(text).evaluate().isNotEmpty) text,
+      ];
+      found.sort(
+        (a, b) => tester
+            .getTopLeft(find.text(a))
+            .dy
+            .compareTo(tester.getTopLeft(find.text(b)).dy),
+      );
+      return found;
+    }
+
+    testWidgets('a week: days three to seven under weekday and date, dimmed, '
+        'across a month end', (tester) async {
+      // 12:00 on Wednesday, 28 October 2026.
+      now = DateTime(2026, 10, 28, 12);
+      routines.create('dentist', Schedule(start: Day(2026, 11, 2)));
+      routines.create(
+        'bins',
+        Schedule(start: Day(2026, 10, 30), times: [at(7)]),
+      );
+      await startTall(tester);
+
+      const week = [
+        'Today',
+        'Tomorrow',
+        'Friday, 30 Oct',
+        'Saturday, 31 Oct',
+        'Sunday, 1 Nov',
+        'Monday, 2 Nov',
+        'Tuesday, 3 Nov',
+      ];
+      expect(headings(tester, week), week);
+      for (final day in week.skip(1)) {
+        expect(dimmed(tester, day), isTrue, reason: day);
+      }
+      expect(dimmed(tester, 'Today'), isFalse);
+      expect(agendaRows(tester), ['07:00 bins', 'All day dentist']);
+      expect(dimmed(tester, 'bins'), isTrue);
+      expect(dimmed(tester, 'dentist'), isTrue);
+      // Each empty day after tomorrow says so, dimmed.
+      expect(find.text('Nothing planned'), findsNWidgets(3));
+      expect(dimmed(tester, 'Nothing planned'), isTrue);
+      final bins = tester.getTopLeft(find.text('bins')).dy;
+      expect(bins, greaterThan(tester.getTopLeft(find.text(week[2])).dy));
+      expect(bins, lessThan(tester.getTopLeft(find.text(week[3])).dy));
+      final dentist = tester.getTopLeft(find.text('dentist')).dy;
+      expect(dentist, greaterThan(tester.getTopLeft(find.text(week[5])).dy));
+      expect(dentist, lessThan(tester.getTopLeft(find.text(week[6])).dy));
+    });
+
+    testWidgets('a day after tomorrow is checked off today', (tester) async {
+      final dentist = routines.create(
+        'dentist',
+        Schedule(start: Day(2026, 10, 27)),
+      );
+      await startTall(tester);
+      expect(find.text('Tuesday, 27 Oct'), findsOneWidget);
+      await tap(tester, find.byType(Checkbox));
+      expect(agendaRows(tester), ['[x] All day dentist']);
+      expect(
+        routines.byId(dentist.id)?.doneAt(Occurrence(Day(2026, 10, 27))),
+        now.toUtc(),
+      );
+    });
+
+    testWidgets('the week in German', (tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      now = DateTime(2026, 10, 28, 12);
+      await startTall(tester);
+      const week = [
+        'Heute',
+        'Morgen',
+        'Freitag, 30. Okt.',
+        'Samstag, 31. Okt.',
+        'Sonntag, 1. Nov.',
+        'Montag, 2. Nov.',
+        'Dienstag, 3. Nov.',
+      ];
+      expect(headings(tester, week), week);
+      expect(find.text('Nichts geplant'), findsNWidgets(5));
     });
 
     testWidgets('each time of day is checked off on its own', (tester) async {
@@ -303,7 +398,7 @@ void main() {
       expect(note.text, 'pills');
       expect(note.isUnsorted, isFalse);
       expect(routines.note(routines.all().single)?.id, note.id);
-      expect(agendaRows(tester), ['08:00 pills', '08:00 pills']);
+      expect(agendaRows(tester).take(2), ['08:00 pills', '08:00 pills']);
     });
   });
 

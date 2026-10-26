@@ -111,7 +111,7 @@ The run of consecutive Occurrences of a Routine that were Done.
 The share of a Routine's Occurrences that were Done over a period, e.g. "92 % this month".
 
 **Agenda**:
-The home screen: today's Occurrences, then a dimmed tomorrow, with the Missed Summary and the Unsorted count on top.
+The home screen: today's Occurrences, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
 _Avoid_: dashboard, today view, home
 
 ### People and devices

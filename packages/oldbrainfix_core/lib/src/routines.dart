@@ -123,19 +123,27 @@ class AgendaRow {
 }
 
 /// The home screen's content (CONTEXT.md): today's Occurrences, all-day
-/// first and then by time, and tomorrow's the same way.
+/// first and then by time, tomorrow's the same way, and those of the
+/// days after when asked for.
 class Agenda {
   final Day today;
   final List<AgendaRow> todayRows;
   final List<AgendaRow> tomorrowRows;
 
+  /// The rows of each day after tomorrow, one list per day, in order.
+  final List<List<AgendaRow>> laterRows;
+
   const Agenda({
     required this.today,
     required this.todayRows,
     required this.tomorrowRows,
+    this.laterRows = const [],
   });
 
   Day get tomorrow => today.addDays(1);
+
+  /// The day of `laterRows[index]`.
+  Day later(int index) => today.addDays(2 + index);
 }
 
 /// Spawning, changing and checking off Routines and Reminders.
@@ -393,8 +401,9 @@ class Routines {
       if (note(routine)?.id == noteId) routine,
   ];
 
-  /// The Agenda at the store's now, with days as [wallClock] shows them.
-  Agenda agenda(WallClock wallClock) {
+  /// The Agenda at the store's now, with days as [wallClock] shows them,
+  /// over [days] days from today; never fewer than today and tomorrow.
+  Agenda agenda(WallClock wallClock, {int days = 2}) {
     final today = Day.today(store.clock(), wallClock);
     final routines = [for (final r in all()) (r, note(r))];
     List<AgendaRow> rowsOn(Day day) {
@@ -417,6 +426,7 @@ class Routines {
       today: today,
       todayRows: rowsOn(today),
       tomorrowRows: rowsOn(today.addDays(1)),
+      laterRows: [for (var i = 2; i < days; i++) rowsOn(today.addDays(i))],
     );
   }
 

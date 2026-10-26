@@ -349,6 +349,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingTomorrow => 'Nothing due tomorrow.';
 
   @override
+  String agendaDay(DateTime day) {
+    final intl.DateFormat dayDateFormat = intl.DateFormat(
+      'EEEE, d MMM',
+      localeName,
+    );
+    final String dayString = dayDateFormat.format(day);
+
+    return '$dayString';
+  }
+
+  @override
+  String get nothingPlanned => 'Nothing planned';
+
+  @override
   String get justCaptured => 'Just captured';
 
   @override

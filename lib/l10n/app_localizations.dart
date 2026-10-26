@@ -704,6 +704,18 @@ abstract class AppLocalizations {
   /// **'Nothing due tomorrow.'**
   String get nothingTomorrow;
 
+  /// Heading of a day on the Agenda after tomorrow: its weekday and date, as in "Thursday, 29 Oct".
+  ///
+  /// In en, this message translates to:
+  /// **'{day}'**
+  String agendaDay(DateTime day);
+
+  /// Under the heading of a day after tomorrow on the Agenda when nothing is due that day.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing planned'**
+  String get nothingPlanned;
+
   /// No description provided for @justCaptured.
   ///
   /// In en, this message translates to:

@@ -29,7 +29,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - Typed text in the editor survives the app being closed or killed.
 - Every Note and every added part records when and where it was captured, the calendar event and Bluetooth device at the time, and for shares the app they came from.
 - Named Places that show "Home" or "Work" instead of coordinates, matched offline.
-- The Agenda as home screen: today's Routines and Reminders, then tomorrow's, dimmed.
+- The Agenda as home screen: today's Routines and Reminders, then, dimmed, tomorrow's and those of the five days after, each further day under its weekday and date.
 - Routines and Reminders made from any Note, each linking back to it.
 - Schedules from once to iCalendar repeat rules, with several times per day, fixed across early or late ticks and daylight-saving changes.
 - Alarms on the minute with Done and Snooze (10 min, 30 min, 1 h), even from the lock screen and after a restart.

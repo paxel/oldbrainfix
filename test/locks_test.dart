@@ -100,6 +100,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Starts on a page tall enough for the Agenda's whole week.
+  Future<void> startWeek(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 4000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await start(tester);
+  }
+
   Future<void> tap(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
@@ -446,10 +454,13 @@ void main() {
     testWidgets('shows a Masked Occurrence on the Agenda without its title, '
         'checkable without unlocking', (tester) async {
       final (:routine, doctor: _, note: _) = lockedDoctor();
-      await start(tester);
+      await startWeek(tester);
 
       expect(find.text('Pills'), findsNothing);
-      expect(find.text(en.maskedRoutineAt('10:00')), findsNWidgets(2));
+      expect(
+        find.text(en.maskedRoutineAt('10:00')),
+        findsNWidgets(AgendaScreen.days),
+      );
 
       await tap(tester, find.byType(Checkbox).first);
       expect(find.byKey(const ValueKey('pinField')), findsNothing);
@@ -490,9 +501,9 @@ void main() {
       tester,
     ) async {
       lockedDoctor(masked: false);
-      await start(tester);
+      await startWeek(tester);
 
-      expect(find.text('Pills'), findsNWidgets(2));
+      expect(find.text('Pills'), findsNWidgets(AgendaScreen.days));
       expect(alarms.armed.map((a) => a.title), everyElement('Pills'));
     });
 

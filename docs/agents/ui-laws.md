@@ -73,7 +73,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - Order: the Missed Summary card, then the "x Unsorted" banner, then
   today's all-day Occurrences, then today's timed Occurrences by time.
-- After a visible gap comes tomorrow, in dimmer colours. Tomorrow's
+- After a visible gap comes tomorrow, in dimmer colours, then the five
+  days after it, each under its weekday and date, dimmed alike. Every
+  day shows, an empty one with "Nothing planned". The later days'
   Occurrences can be checked off today.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
