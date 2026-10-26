@@ -33,6 +33,7 @@
 //! and found by the search over All Notes, an Area or a Topic.
 
 use std::cell::RefCell;
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -66,7 +67,7 @@ use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::{Clipboard, Player, Recorder, photo_from_file};
-use crate::media_view::{self, PhotoCache, Speech, Voice};
+use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView};
 use crate::profile_view::{self, ProfileAction, ProfileView, Square};
@@ -173,6 +174,10 @@ struct View {
     mine: std::collections::HashMap<String, String>,
     /// What this Device may do to the selected Note.
     may: NoteMay,
+    /// The photos and voice recordings of the selected Note and its
+    /// Sections this Device may remove while their texts stay
+    /// (ADR 0020), by Note id and hash.
+    removable: HashSet<(String, String)>,
     notes: Vec<Placed>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
@@ -274,6 +279,13 @@ enum Dialog {
         area: String,
         person: String,
         question: String,
+    },
+    /// Whether the photo (`photo`) or voice recording `hash` of the Note
+    /// `note` goes while its text stays (ADR 0020).
+    RemoveMedia {
+        note: String,
+        hash: String,
+        photo: bool,
     },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
@@ -412,6 +424,16 @@ enum Action {
     },
     /// Takes the person asked about out of the Area.
     RemovePerson,
+    /// Asks whether the photo (`photo`) or voice recording `hash` of the
+    /// Note `note`, the selected one or one merged into it, goes while
+    /// its text stays.
+    AskRemoveMedia {
+        note: String,
+        hash: String,
+        photo: bool,
+    },
+    /// Removes the photo or recording asked about and keeps its text.
+    RemoveMedia,
     /// Something asked of the Backups card on the Profile page.
     Backup(BackupAction),
     /// Something asked of the own Profile on the Profile page.
@@ -1306,6 +1328,25 @@ impl App {
             },
             None => NoteMay::default(),
         };
+        let mut removable = HashSet::new();
+        if let Some((p, sections)) = &detail
+            && !p.note.is_trashed()
+        {
+            let note = (&p.note.id, &p.note.photos, &p.note.recordings);
+            let merged = sections.iter().map(|s| (&s.id, &s.photos, &s.recordings));
+            for (id, photos, recordings) in std::iter::once(note).chain(merged) {
+                for hash in photos {
+                    if notes.may_remove_photo(id, hash)? {
+                        removable.insert((id.clone(), hash.clone()));
+                    }
+                }
+                for hash in recordings {
+                    if notes.may_remove_recording(id, hash)? {
+                        removable.insert((id.clone(), hash.clone()));
+                    }
+                }
+            }
+        }
         let agenda = match self.selection {
             Selection::Agenda => {
                 let wall = &*self.wall;
@@ -1354,6 +1395,7 @@ impl App {
             },
             mine,
             may,
+            removable,
             notes: placed,
             detail,
             routines: note_routines,
@@ -1804,6 +1846,29 @@ impl App {
                 if let Some(Dialog::RemovePerson { area, person, .. }) = self.dialog.take() {
                     self.store.remove_person(&area, &person)?;
                     self.dialog = Some(Dialog::People { area });
+                }
+            }
+            Action::AskRemoveMedia { note, hash, photo } => {
+                self.save_text()?;
+                self.dialog = Some(Dialog::RemoveMedia { note, hash, photo });
+            }
+            Action::RemoveMedia => {
+                if let Some(Dialog::RemoveMedia { note, hash, photo }) = self.dialog.take() {
+                    // A sync while the dialog was open may have taken it
+                    // already.
+                    if photo {
+                        if notes.may_remove_photo(&note, &hash)? {
+                            notes.remove_photo(&note, &hash)?;
+                        }
+                    } else if notes.may_remove_recording(&note, &hash)? {
+                        if self.playing.as_deref() == Some(hash.as_str()) {
+                            if let Some(player) = &mut self.player {
+                                player.stop();
+                            }
+                            self.playing = None;
+                        }
+                        notes.remove_recording(&note, &hash)?;
+                    }
                 }
             }
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
@@ -2654,6 +2719,7 @@ impl App {
         let can_play = self.player.is_some();
         let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
         let transcribing = transcribing.as_deref();
+        let removable = &self.view.removable;
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -2697,21 +2763,32 @@ impl App {
                         actions.push(Action::SaveText);
                     }
                 });
-                if !note.photos.is_empty() || !note.recordings.is_empty() {
+                let media = [
+                    &note.photos,
+                    &note.recordings,
+                    &note.removed_photos,
+                    &note.removed_recordings,
+                ];
+                if media.iter().any(|m| !m.is_empty()) {
                     embossed(ui, tones, false, None, |ui| {
-                        media_view::photos(ui, &t, cache, store, &note.photos);
-                        let clicked = media_view::recordings(
+                        let media = Media {
+                            id: &note.id,
+                            photos: (&note.photos, &note.removed_photos, &note.photo_texts),
+                            recordings: (
+                                &note.recordings,
+                                &note.removed_recordings,
+                                &note.transcripts,
+                            ),
+                        };
+                        let shown = (&mut *cache, &**store, removable);
+                        editor_media(
                             ui,
                             &t,
-                            &note.recordings,
-                            &note.transcripts,
-                            playing,
-                            transcribing,
-                            can_play,
+                            media,
+                            shown,
+                            (playing, transcribing, can_play),
+                            actions,
                         );
-                        if let Some(hash) = clicked {
-                            actions.push(Action::Play(hash));
-                        }
                     });
                 }
                 embossed(ui, tones, false, None, |ui| {
@@ -2793,19 +2870,28 @@ impl App {
                         if !section.text.is_empty() {
                             ui.label(RichText::new(&section.text).color(text));
                         }
-                        media_view::photos(ui, &t, cache, store, &section.photos);
-                        let clicked = media_view::recordings(
+                        let media = Media {
+                            id: &section.id,
+                            photos: (
+                                &section.photos,
+                                &section.removed_photos,
+                                &section.photo_texts,
+                            ),
+                            recordings: (
+                                &section.recordings,
+                                &section.removed_recordings,
+                                &section.transcripts,
+                            ),
+                        };
+                        let shown = (&mut *cache, &**store, removable);
+                        editor_media(
                             ui,
                             &t,
-                            &section.recordings,
-                            &section.transcripts,
-                            playing,
-                            transcribing,
-                            can_play,
+                            media,
+                            shown,
+                            (playing, transcribing, can_play),
+                            actions,
                         );
-                        if let Some(hash) = clicked {
-                            actions.push(Action::Play(hash));
-                        }
                         ui.label(
                             RichText::new(when(&t, section.captured))
                                 .small()
@@ -2991,6 +3077,24 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove_person()) {
                                 actions.push(Action::RemovePerson);
+                            }
+                        });
+                    }
+                    Dialog::RemoveMedia { photo, .. } => {
+                        title(
+                            ui,
+                            if *photo {
+                                t.remove_photo_question()
+                            } else {
+                                t.remove_recording_question()
+                            },
+                        );
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.remove_media_detail()).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove()) {
+                                actions.push(Action::RemoveMedia);
                             }
                         });
                     }
@@ -4699,6 +4803,59 @@ pub(crate) fn embossed(
     inner.response
 }
 
+/// The photos and voice recordings of the Note `id`, or of a Note merged
+/// into it, each as `(shown, removed, texts)`.
+struct Media<'a> {
+    id: &'a str,
+    photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
+    recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
+}
+
+/// What the editor shows of `media`: the photos, the recordings with
+/// their play buttons while `can_play`, the button under each one the
+/// Device may remove while its text stays, and the texts of those
+/// removed where the files were (ADR 0020).
+fn editor_media(
+    ui: &mut Ui,
+    t: &L10n,
+    media: Media,
+    (cache, store, removable): (&mut PhotoCache, &Store, &HashSet<(String, String)>),
+    (playing, transcribing, can_play): (Option<&str>, Option<&str>, bool),
+    actions: &mut Vec<Action>,
+) {
+    let id = media.id;
+    let (photos, removed_photos, photo_texts) = media.photos;
+    let (recordings, removed_recordings, transcripts) = media.recordings;
+    let may = |hash: &str| removable.contains(&(id.to_string(), hash.to_string()));
+    let ask = |hash: String, photo: bool| Action::AskRemoveMedia {
+        note: id.to_string(),
+        hash,
+        photo,
+    };
+    if let Some(hash) = media_view::photos(ui, t, cache, store, photos, &may) {
+        actions.push(ask(hash, true));
+    }
+    let asked = media_view::recordings(
+        ui,
+        t,
+        recordings,
+        transcripts,
+        (playing, transcribing),
+        can_play,
+        &may,
+    );
+    match asked {
+        Some(Recording::Play(hash)) => actions.push(Action::Play(hash)),
+        Some(Recording::Remove(hash)) => actions.push(ask(hash, false)),
+        None => {}
+    }
+    media_view::removed_texts(
+        ui,
+        (removed_photos, photo_texts),
+        (removed_recordings, transcripts),
+    );
+}
+
 /// A Note as a card (UI laws, "Cards"): its text, when it was captured
 /// and where it is filed, its Area's colour down the left edge and icon
 /// before the place. Important cards carry the accent marker and a
@@ -4752,9 +4909,14 @@ fn note_card(
                 t,
                 &note.recordings,
                 &note.transcripts,
-                None,
-                media.transcribing,
+                (None, media.transcribing),
                 false,
+                &|_| false,
+            );
+            media_view::removed_texts(
+                ui,
+                (&note.removed_photos, &note.photo_texts),
+                (&note.removed_recordings, &note.transcripts),
             );
             // Another person's Note shows their picture (ADR 0017); the
             // user's own none.

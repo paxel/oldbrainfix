@@ -10,7 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - The phone's Routine editor builds a day of the month, the first to fourth or last weekday of the month, and an end (never, on a day or after a number of times) without typing a repeat rule.
 - A big red button on the phone's About page.
 - On the phone, a swipe left on the Agenda opens the Areas list and a swipe right from the Areas list returns to the Agenda, and every swipe between Agenda, Areas list, Area and Topic moves the pages with the finger, completing past the middle or with a fling and springing back otherwise.
-- On the phone, a voice recording with a Transcript or a photo with a Photo Text can be removed in the Note editor or the card's ⋮ menu, from every Device and the Shared Area, while the text stays on the Note and in search.
+- A voice recording with a Transcript or a photo with a Photo Text can be removed in the Note editor (on the phone also in the card's ⋮ menu), from every Device and the Shared Area, while the text stays on the Note and in search.
 
 ### Changed
 - The phone's Agenda shows the whole week: after tomorrow come the five following days, each under its weekday and date, an empty day as "Nothing planned".

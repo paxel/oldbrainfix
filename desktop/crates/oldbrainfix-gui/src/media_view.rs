@@ -1,10 +1,11 @@
 //! How photos, voice recordings, their Transcripts and the speech model
 //! show in the window and the capture popup: photos as pictures, a play
-//! button per recording with its Transcript under it, the microphone's
+//! button per recording with its Transcript under it, the texts of those
+//! removed while their texts stay (ADR 0020), the microphone's
 //! button and the one big stop button (UI laws, "Capture"), and the
 //! speech model's card in the Settings.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
 use egui::{ColorImage, RichText, TextureHandle, TextureOptions, Ui};
@@ -86,9 +87,20 @@ pub fn thumbnails(
     });
 }
 
-/// The photos `hashes` one under the other, as wide as there is room.
-pub fn photos(ui: &mut Ui, t: &L10n, cache: &mut PhotoCache, store: &Store, hashes: &[String]) {
+/// The photos `hashes` one under the other, as wide as there is room,
+/// each one `removable` with the button that removes it and keeps its
+/// Photo Text (ADR 0020). The hash whose button was clicked comes back.
+pub fn photos(
+    ui: &mut Ui,
+    t: &L10n,
+    cache: &mut PhotoCache,
+    store: &Store,
+    hashes: &[String],
+    removable: &dyn Fn(&str) -> bool,
+) -> Option<String> {
+    let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
+    let mut remove = None;
     for hash in hashes {
         match cache.get(ui, store, hash) {
             Some(texture) => {
@@ -108,22 +120,58 @@ pub fn photos(ui: &mut Ui, t: &L10n, cache: &mut PhotoCache, store: &Store, hash
                 });
             }
         }
+        if removable(hash)
+            && ui
+                .button(RichText::new(t.remove_photo_keep_text()).color(text))
+                .clicked()
+        {
+            remove = Some(hash.clone());
+        }
     }
+    remove
+}
+
+/// The texts of the photos and voice recordings removed while their
+/// texts stay (ADR 0020), where the files were: each Photo Text of
+/// `photos` and Transcript of `recordings` that is not empty.
+pub fn removed_texts(
+    ui: &mut Ui,
+    (photos, photo_texts): (&[String], &BTreeMap<String, String>),
+    (recordings, transcripts): (&[String], &BTreeMap<String, String>),
+) {
+    let weak = ui.visuals().weak_text_color();
+    let texts = photos
+        .iter()
+        .filter_map(|h| photo_texts.get(h))
+        .chain(recordings.iter().filter_map(|h| transcripts.get(h)));
+    for said in texts.filter(|s| !s.trim().is_empty()) {
+        ui.label(RichText::new(said).color(weak));
+    }
+}
+
+/// What was asked of a voice recording.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Recording {
+    /// Its play or stop button.
+    Play(String),
+    /// Removing it and keeping its Transcript (ADR 0020).
+    Remove(String),
 }
 
 /// What shows of the voice recordings `hashes`: a play or stop button
 /// each, with its Transcript, "Transcribing…" while it is being made, or
-/// "No words heard." for an empty one. The hash whose button was clicked
+/// "No words heard." for an empty one; each one `removable` with the
+/// button that removes it and keeps its Transcript. What was clicked
 /// comes back, `None` without buttons.
 pub fn recordings(
     ui: &mut Ui,
     t: &L10n,
     hashes: &[String],
-    transcripts: &std::collections::BTreeMap<String, String>,
-    playing: Option<&str>,
-    transcribing: Option<&str>,
+    transcripts: &BTreeMap<String, String>,
+    (playing, transcribing): (Option<&str>, Option<&str>),
     buttons: bool,
-) -> Option<String> {
+    removable: &dyn Fn(&str) -> bool,
+) -> Option<Recording> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut clicked = None;
@@ -137,7 +185,7 @@ pub fn recordings(
                     (icons::PLAY, t.play_recording())
                 };
                 if icon_button(ui, icon, label, text).clicked() {
-                    clicked = Some(hash.clone());
+                    clicked = Some(Recording::Play(hash.clone()));
                 }
             } else {
                 icons::show(ui, icons::MIC, 16.0, weak);
@@ -154,6 +202,13 @@ pub fn recordings(
         };
         if let Some(line) = line {
             ui.label(line.color(weak));
+        }
+        if removable(hash)
+            && ui
+                .button(RichText::new(t.remove_recording_keep_text()).color(text))
+                .clicked()
+        {
+            clicked = Some(Recording::Remove(hash.clone()));
         }
     }
     clicked

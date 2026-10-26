@@ -591,3 +591,122 @@ fn the_merge_dialog_finds_notes_by_their_transcripts_too() -> TestResult {
     assert_eq!(count(&harness, "Shed"), shed - 1);
     Ok(())
 }
+
+const SHED: &str = "note:00000000000000000000000000000003";
+const DENTIST: &str = "note:00000000000000000000000000000004";
+
+#[test]
+fn only_a_photo_or_recording_with_a_text_offers_its_removal() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store, &devices);
+    // Shed: a photo with a Photo Text, one with an empty one and one
+    // without; a recording with an empty Transcript and one without.
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    assert_eq!(
+        harness
+            .query_all_by_label("Remove photo, keep text")
+            .count(),
+        1
+    );
+    assert!(!shows(&harness, "Remove recording, keep text"));
+    // Groceries: a photo without a Photo Text, its recording removed and
+    // the Transcript on the card and in the editor.
+    harness
+        .state_mut()
+        .select_note("note:00000000000000000000000000000002");
+    harness.run();
+    assert!(!shows(&harness, "Remove photo, keep text"));
+    assert!(harness.query_all_by_label("Milk, eggs and bread").count() >= 2);
+    // A Note whose only photo was removed shows its Photo Text alone.
+    harness
+        .state_mut()
+        .select_note("note:00000000000000000000000000000001");
+    harness.run();
+    assert!(harness.query_all_by_label("RECEIPT\nTotal 12,50").count() >= 2);
+    // Dentist: the removed photo of a merged Note, in its Section.
+    harness.state_mut().select_note(DENTIST);
+    harness.run();
+    assert!(shows(&harness, "Dr. Müller, Tuesday 9:00"));
+    assert!(!shows(&harness, "Remove recording, keep text"));
+    Ok(())
+}
+
+#[test]
+fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
+    // Cancel keeps it.
+    harness.get_by_label("Remove photo, keep text").click();
+    harness.run();
+    assert!(shows(
+        &harness,
+        "Remove this photo and keep its Photo Text?"
+    ));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(
+        &harness,
+        "Remove this photo and keep its Photo Text?"
+    ));
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.photos.len(), 3);
+    assert!(shed.removed_photos.is_empty());
+    // Remove takes it; the Photo Text stays where it was.
+    harness.get_by_label("Remove photo, keep text").click();
+    harness.run();
+    harness.get_by_label("Remove").click();
+    harness.run();
+    assert!(!shows(
+        &harness,
+        "Remove this photo and keep its Photo Text?"
+    ));
+    assert_eq!(harness.state().error(), None);
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.photos.len(), 2);
+    assert_eq!(shed.removed_photos, vec![photo.to_string()]);
+    assert!(store.photo(photo).is_none(), "its bytes go");
+    assert!(shows(&harness, "Spare key under the pot"));
+    assert!(!shows(&harness, "Remove photo, keep text"));
+    // Search still finds it.
+    type_into(&mut harness, "Search all Notes", "spare key");
+    assert_eq!(harness.state().shown_notes(), vec![SHED]);
+    Ok(())
+}
+
+#[test]
+fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
+    let store = media_store()?;
+    let merged = "note:00000000000000000000000000000006";
+    let recording = "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d";
+    Notes::new(&store).set_transcript(merged, recording, "Bring the X-ray")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(DENTIST);
+    harness.run();
+    harness.get_by_label("Remove recording, keep text").click();
+    harness.run();
+    assert!(shows(
+        &harness,
+        "Remove this recording and keep its Transcript?"
+    ));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert_eq!(note.recordings, vec![recording.to_string()]);
+    harness.get_by_label("Remove recording, keep text").click();
+    harness.run();
+    harness.get_by_label("Remove").click();
+    harness.run();
+    let note = Notes::new(&store).by_id(merged)?.ok_or("merged")?;
+    assert!(note.recordings.is_empty());
+    assert_eq!(note.removed_recordings, vec![recording.to_string()]);
+    assert!(shows(&harness, "Bring the X-ray"));
+    assert!(!shows(&harness, "Remove recording, keep text"));
+    Ok(())
+}
