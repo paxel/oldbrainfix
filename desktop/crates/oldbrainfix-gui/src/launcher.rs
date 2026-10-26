@@ -22,10 +22,8 @@ use std::path::{Path, PathBuf};
 
 use oldbrainfix_core::{APP_ID, APP_NAME};
 
-use crate::ICON_NAME;
+use crate::{ICON, ICON_NAME};
 
-/// The icon as the menu draws it, 256 pixels, by its theme name.
-pub const ICON: &[u8] = include_bytes!("../../../packaging/icon/icon_256.png");
 /// The marker claiming an entry as ours to update.
 const MARKER: &str = "X-Oldbrainfix-Managed=true";
 

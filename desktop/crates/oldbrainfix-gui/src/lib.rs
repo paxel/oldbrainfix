@@ -51,6 +51,10 @@ use std::path::PathBuf;
 /// by `icons/hicolor/256x256/apps/oldbrainfix.png`.
 pub const ICON_NAME: &str = "oldbrainfix";
 
+/// The icon, 256 pixels: what the launcher entry installs and the tray
+/// scales down.
+pub const ICON: &[u8] = include_bytes!("../../../packaging/icon/icon_256.png");
+
 /// Where the desktop keeps its store: the system's data directory for
 /// the app, e.g. `~/.local/share/oldbrainfix` on Linux.
 pub fn data_dir() -> Option<PathBuf> {

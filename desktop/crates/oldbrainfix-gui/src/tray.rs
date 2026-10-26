@@ -41,7 +41,7 @@ impl Drop for Tray {
 /// The square icon of `size` pixels as ARGB32 rows, big-endian: the
 /// packaged 256 px icon, scaled down. Empty if it does not decode.
 pub fn icon_argb(size: i32) -> Vec<u8> {
-    let Ok(icon) = image::load_from_memory(crate::launcher::ICON) else {
+    let Ok(icon) = image::load_from_memory(crate::ICON) else {
         return Vec::new();
     };
     let side = size.max(1) as u32;
