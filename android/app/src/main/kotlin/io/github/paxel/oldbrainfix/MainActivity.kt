@@ -172,6 +172,10 @@ class MainActivity : FlutterActivity() {
                         voice.stopPlaying()
                         result.success(true)
                     }
+                    "speed" -> {
+                        voice.setSpeed((call.arguments as Number).toFloat())
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

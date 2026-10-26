@@ -669,5 +669,9 @@
   "removeRecordingQuestion": "Diese Aufnahme entfernen und ihr Transkript behalten?",
   "removePhotoQuestion": "Dieses Foto entfernen und seinen Text behalten?",
   "removeMediaDetail": "Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der Notiz teilst. Der Text bleibt in der Notiz.",
-  "remove": "Entfernen"
+  "remove": "Entfernen",
+  "playbackSpeed": "Wiedergabegeschwindigkeit",
+  "playbackSpeedLabel": "{speed}×",
+  "playbackSpeedOption": "×{speed}",
+  "playbackSpeedSemantics": "Wiedergabegeschwindigkeit {speed}-fach"
 }

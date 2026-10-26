@@ -24,6 +24,9 @@ class Voice(private val context: Context) {
     private var recorder: MediaRecorder? = null
     private var player: MediaPlayer? = null
 
+    /** How fast recordings play: 1 is normal speed. */
+    private var speed = 1f
+
     /** Where the recording running is written until it is handed over. */
     private val recordingFile: File
         get() = File(context.cacheDir, "voice").apply { mkdirs() }.let { File(it, "recording.m4a") }
@@ -113,12 +116,29 @@ class Voice(private val context: Context) {
             }
             player.prepare()
             player.start()
+            // After the start: on a player not started yet, a speed
+            // starts it.
+            applySpeed(player)
             this.player = player
             true
         } catch (e: Exception) {
             player.release()
             false
         }
+    }
+
+    /**
+     * Plays recordings at [speed], 1 being normal speed: the one playing
+     * at once, and every one after it.
+     */
+    fun setSpeed(speed: Float) {
+        this.speed = speed
+        player?.let(::applySpeed)
+    }
+
+    /** Lets [player] play at [speed]; a player that cannot keeps its own. */
+    private fun applySpeed(player: MediaPlayer) {
+        runCatching { player.playbackParams = player.playbackParams.setSpeed(speed) }
     }
 
     /** Stops playing, if anything plays. */

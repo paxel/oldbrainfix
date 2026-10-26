@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 
@@ -33,6 +35,10 @@ abstract interface class VoicePlatform {
   /// Stops playing.
   Future<void> stopPlaying();
 
+  /// Plays recordings at [speed], 1 being normal speed: the one playing
+  /// at once, and every one after it.
+  Future<void> setSpeed(double speed);
+
   /// A recording played to its end.
   Stream<void> get playbackEnded;
 }
@@ -61,6 +67,9 @@ class NoVoice implements VoicePlatform {
 
   @override
   Future<void> stopPlaying() async {}
+
+  @override
+  Future<void> setSpeed(double speed) async {}
 
   @override
   Stream<void> get playbackEnded => const Stream.empty();
@@ -106,6 +115,9 @@ class AndroidVoice implements VoicePlatform {
   Future<void> stopPlaying() => _ask('stopPlaying');
 
   @override
+  Future<void> setSpeed(double speed) => _ask('speed', speed);
+
+  @override
   Stream<void> get playbackEnded => _ended.stream;
 
   static Future<bool> _ask(String method, [Object? arguments]) async {
@@ -117,6 +129,23 @@ class AndroidVoice implements VoicePlatform {
   }
 }
 
+/// The playback speeds offered, 1 being normal speed.
+const playbackSpeeds = [0.5, 0.75, 1.0, 1.5, 2.0];
+
+/// How fast this Device plays recordings, a setting of this Device that
+/// is never synced (ADR 0008).
+extension PlaybackSpeedSetting on Store {
+  static const _playbackSpeed = 'playbackSpeed';
+
+  /// One of [playbackSpeeds]; normal speed when nothing else is set.
+  double get playbackSpeed {
+    final speed = double.tryParse(localSetting(_playbackSpeed) ?? '');
+    return speed != null && playbackSpeeds.contains(speed) ? speed : 1;
+  }
+
+  set playbackSpeed(double speed) => setLocalSetting(_playbackSpeed, '$speed');
+}
+
 /// The one recording playing at a time, by its hash, for every play
 /// button to show; null while none plays.
 class Playback extends ValueNotifier<String?> {
@@ -126,9 +155,21 @@ class Playback extends ValueNotifier<String?> {
   /// not on this Device.
   final Uint8List? Function(String hash) bytes;
 
+  /// How fast recordings play, for every speed label to show.
+  final ValueNotifier<double> speed;
+
+  /// Keeps a chosen speed for the next start.
+  final ValueChanged<double>? onSpeed;
+
   late final StreamSubscription<void> _ended;
 
-  Playback({required this.voice, required this.bytes}) : super(null) {
+  Playback({
+    required this.voice,
+    required this.bytes,
+    double speed = 1,
+    this.onSpeed,
+  }) : speed = ValueNotifier(speed),
+       super(null) {
     _ended = voice.playbackEnded.listen((_) => value = null);
   }
 
@@ -137,7 +178,18 @@ class Playback extends ValueNotifier<String?> {
     if (value == hash) return stop();
     final recording = bytes(hash);
     if (recording == null) return;
+    // The player may not know the speed yet, as after a start.
+    await voice.setSpeed(speed.value);
     value = await voice.play(recording) ? hash : null;
+  }
+
+  /// Plays recordings at [rate] from now on, the one playing included,
+  /// and keeps it.
+  Future<void> setSpeed(double rate) async {
+    if (rate == speed.value) return;
+    speed.value = rate;
+    onSpeed?.call(rate);
+    await voice.setSpeed(rate);
   }
 
   /// Stops playing, if anything plays.
@@ -150,6 +202,7 @@ class Playback extends ValueNotifier<String?> {
   @override
   void dispose() {
     unawaited(_ended.cancel());
+    speed.dispose();
     super.dispose();
   }
 }
@@ -205,19 +258,113 @@ class RecordingButton extends StatelessWidget {
         final on = playing == hash;
         final icon = Icon(on ? Icons.stop : Icons.play_arrow);
         void onPressed() => unawaited(playback.toggle(hash));
-        if (compact) {
-          return IconButton.filledTonal(
-            tooltip: on ? t.stopPlaying : t.playRecording,
-            onPressed: onPressed,
-            icon: icon,
-          );
-        }
-        return FilledButton.tonalIcon(
-          onPressed: onPressed,
-          icon: icon,
-          label: Text(on ? t.stopPlaying : t.voiceRecording),
+        // The speed goes under the button where both do not fit.
+        return Wrap(
+          spacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (compact)
+              IconButton.filledTonal(
+                tooltip: on ? t.stopPlaying : t.playRecording,
+                onPressed: onPressed,
+                icon: icon,
+              )
+            else
+              FilledButton.tonalIcon(
+                onPressed: onPressed,
+                icon: icon,
+                label: Text(on ? t.stopPlaying : t.voiceRecording),
+              ),
+            PlaybackSpeedButton(playback: playback),
+          ],
         );
       },
+    );
+  }
+}
+
+/// [speed] as the locale [locale] writes it: "1", "1.5", or "1,5" in
+/// German.
+String speedNumber(String locale, double speed) =>
+    NumberFormat.decimalPattern(locale).format(speed);
+
+/// The current playback speed beside a play button ("1×"); a tap opens
+/// the speeds where the finger is, the current one marked.
+class PlaybackSpeedButton extends StatefulWidget {
+  final Playback playback;
+
+  const PlaybackSpeedButton({super.key, required this.playback});
+
+  @override
+  State<PlaybackSpeedButton> createState() => _PlaybackSpeedButtonState();
+}
+
+class _PlaybackSpeedButtonState extends State<PlaybackSpeedButton> {
+  /// Where the finger last went down on the button.
+  Offset? _finger;
+
+  Future<void> _open() async {
+    final t = context.t;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final box = context.findRenderObject() as RenderBox?;
+    if (overlay == null || box == null) return;
+    // Opened without a finger, as by a screen reader: at the button.
+    final at = _finger ?? box.localToGlobal(box.size.center(Offset.zero));
+    _finger = null;
+    final current = widget.playback.speed.value;
+    final picked = await showMenu<double>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(enabled: false, child: Text(t.playbackSpeed)),
+        for (final speed in playbackSpeeds)
+          PopupMenuItem(
+            key: ValueKey('playbackSpeed-$speed'),
+            value: speed,
+            child: Semantics(
+              checked: speed == current,
+              inMutuallyExclusiveGroup: true,
+              child: Row(
+                children: [
+                  Icon(
+                    speed == current
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(t.playbackSpeedOption(speedNumber(t.localeName, speed))),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    await widget.playback.setSpeed(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Listener(
+      onPointerDown: (event) => _finger = event.position,
+      child: ValueListenableBuilder<double>(
+        valueListenable: widget.playback.speed,
+        builder: (context, speed, _) => TextButton(
+          key: const ValueKey('playbackSpeed'),
+          onPressed: () => unawaited(_open()),
+          child: Text(
+            t.playbackSpeedLabel(speedNumber(t.localeName, speed)),
+            semanticsLabel: t.playbackSpeedSemantics(
+              speedNumber(t.localeName, speed),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

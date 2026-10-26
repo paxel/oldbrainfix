@@ -2567,4 +2567,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get remove => 'Entfernen';
+
+  @override
+  String get playbackSpeed => 'Wiedergabegeschwindigkeit';
+
+  @override
+  String playbackSpeedLabel(String speed) {
+    return '$speed×';
+  }
+
+  @override
+  String playbackSpeedOption(String speed) {
+    return '×$speed';
+  }
+
+  @override
+  String playbackSpeedSemantics(String speed) {
+    return 'Wiedergabegeschwindigkeit $speed-fach';
+  }
 }

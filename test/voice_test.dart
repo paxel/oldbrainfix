@@ -388,15 +388,109 @@ void main() {
         of: find.byType(NoteEditorScreen),
         matching: find.byType(RecordingButton),
       );
-      await tap(tester, buttons.first);
+      Finder play(Finder button) =>
+          find.descendant(of: button, matching: find.byIcon(Icons.play_arrow));
+      await tap(tester, play(buttons.first));
       expect(voice.played, [first]);
       // The merged Note's Section sits low on the page.
       final low = find.byWidgetPredicate(
         (w) => w is RecordingButton && w.hash == merged.recordings.single,
       );
       await reveal(tester, low);
-      await tap(tester, low);
+      await tap(tester, play(low));
       expect(voice.played, [first, second]);
+    });
+  });
+
+  group('the playback speed', () {
+    final label = find.descendant(
+      of: find.byType(NoteCard),
+      matching: find.byKey(const ValueKey('playbackSpeed')),
+    );
+    String shown(WidgetTester tester) => tester
+        .widget<Text>(find.descendant(of: label, matching: find.byType(Text)))
+        .data!;
+
+    /// Records a voice Note, whose card shows on the Agenda.
+    Future<void> record(WidgetTester tester) async {
+      await openCapture(tester);
+      await tap(tester, mic);
+      await tap(tester, stop);
+    }
+
+    testWidgets('changes at once, while playing, and is kept', (tester) async {
+      await start(tester);
+      await record(tester);
+      expect(shown(tester), '1×');
+      await tap(tester, find.byIcon(Icons.play_arrow));
+      expect(voice.speed, 1);
+
+      await tap(tester, label);
+      // The current speed is the one marked.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('playbackSpeed-1.0')),
+          matching: find.byIcon(Icons.radio_button_checked),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.radio_button_unchecked), findsNWidgets(4));
+      await tap(tester, find.text('×1.5'));
+
+      expect(shown(tester), '1.5×');
+      // The recording playing goes faster without starting over.
+      expect(voice.speed, 1.5);
+      expect(voice.played, [first]);
+      expect(store.playbackSpeed, 1.5);
+
+      // After a restart the player gets it before it plays; the Note is
+      // no longer just captured, so its editor shows it.
+      await tester.pumpWidget(const SizedBox());
+      final again = FakeVoice();
+      await tester.pumpWidget(OldBrainFixApp(store: store, voice: again));
+      await tester.pumpAndSettle();
+      final agenda = tester.element(find.byType(AgendaScreen));
+      unawaited(openNote(agenda, notes, Places(store), notes.all().single));
+      await tester.pumpAndSettle();
+      final editor = find.byType(NoteEditorScreen);
+      final inEditor = find.descendant(
+        of: editor,
+        matching: find.byKey(const ValueKey('playbackSpeed')),
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(of: inEditor, matching: find.byType(Text)),
+            )
+            .data,
+        '1.5×',
+      );
+      await tap(
+        tester,
+        find.descendant(of: editor, matching: find.byIcon(Icons.play_arrow)),
+      );
+      expect(again.speed, 1.5);
+      expect(again.played, [first]);
+    });
+
+    testWidgets('is written the German way', (tester) async {
+      tester.platformDispatcher.localesTestValue = const [Locale('de')];
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      store.playbackSpeed = 1.5;
+      await start(tester);
+      await record(tester);
+      expect(shown(tester), '1,5×');
+
+      await tap(tester, label);
+      expect(find.text('×0,75'), findsOneWidget);
+      await tap(tester, find.text('×0,5'));
+      expect(shown(tester), '0,5×');
+      expect(store.playbackSpeed, 0.5);
+    });
+
+    testWidgets('anything unknown kept plays at normal speed', (tester) async {
+      store.setLocalSetting('playbackSpeed', '7');
+      expect(store.playbackSpeed, 1);
     });
   });
 }

@@ -32,6 +32,9 @@ class FakeVoice implements VoicePlatform {
   /// How often playing was stopped.
   int stoppedPlaying = 0;
 
+  /// The speed the player plays at.
+  double speed = 1;
+
   final _ended = StreamController<void>.broadcast();
 
   FakeVoice({
@@ -79,6 +82,9 @@ class FakeVoice implements VoicePlatform {
 
   @override
   Future<void> stopPlaying() async => stoppedPlaying++;
+
+  @override
+  Future<void> setSpeed(double speed) async => this.speed = speed;
 
   @override
   Stream<void> get playbackEnded => _ended.stream;

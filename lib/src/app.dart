@@ -173,6 +173,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
   late final _playback = Playback(
     voice: widget.voice,
     bytes: _notes.recordingBytes,
+    speed: widget.store.playbackSpeed,
+    onSpeed: (speed) => widget.store.playbackSpeed = speed,
   );
   late final _speechModel = SpeechModel(widget.speech);
   late final _lock = AppLock(store: widget.store, platform: widget.lock);

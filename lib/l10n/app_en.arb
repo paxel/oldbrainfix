@@ -1423,5 +1423,13 @@
   "removeRecordingQuestion": "Remove this recording and keep its Transcript?",
   "removePhotoQuestion": "Remove this photo and keep its Photo Text?",
   "removeMediaDetail": "The file goes from all your Devices and from everyone you share the Note's Area with. The text stays on the Note.",
-  "remove": "Remove"
+  "remove": "Remove",
+  "playbackSpeed": "Playback speed",
+  "@playbackSpeed": {"description": "Heading of the menu that chooses how fast recordings play."},
+  "playbackSpeedLabel": "{speed}×",
+  "@playbackSpeedLabel": {"description": "The current playback speed beside a play button, as in \"1.5×\"; speed is the number as the locale writes it.", "placeholders": {"speed": {"type": "String"}}},
+  "playbackSpeedOption": "×{speed}",
+  "@playbackSpeedOption": {"description": "One speed in the playback speed menu, as in \"×1.5\"; speed is the number as the locale writes it.", "placeholders": {"speed": {"type": "String"}}},
+  "playbackSpeedSemantics": "Playback speed {speed} times",
+  "@playbackSpeedSemantics": {"description": "What a screen reader says for the speed label.", "placeholders": {"speed": {"type": "String"}}}
 }

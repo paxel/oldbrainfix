@@ -4063,6 +4063,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove'**
   String get remove;
+
+  /// Heading of the menu that chooses how fast recordings play.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed'**
+  String get playbackSpeed;
+
+  /// The current playback speed beside a play button, as in "1.5×"; speed is the number as the locale writes it.
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}×'**
+  String playbackSpeedLabel(String speed);
+
+  /// One speed in the playback speed menu, as in "×1.5"; speed is the number as the locale writes it.
+  ///
+  /// In en, this message translates to:
+  /// **'×{speed}'**
+  String playbackSpeedOption(String speed);
+
+  /// What a screen reader says for the speed label.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback speed {speed} times'**
+  String playbackSpeedSemantics(String speed);
 }
 
 class _AppLocalizationsDelegate
