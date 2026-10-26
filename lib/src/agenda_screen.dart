@@ -458,7 +458,21 @@ class _AgendaScreenState extends State<AgendaScreen> {
     ];
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.appTitle),
+        // The band-aid brain of the feature graphic, title-high and
+        // silent: the title is still read as the app's name.
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/brain.png',
+              key: const ValueKey('brain'),
+              height: 28,
+              excludeFromSemantics: true,
+            ),
+            const SizedBox(width: 8),
+            Flexible(child: Text(t.appTitle, overflow: TextOverflow.ellipsis)),
+          ],
+        ),
         actions: [
           if (CalendarScope.of(context).available)
             IconButton(

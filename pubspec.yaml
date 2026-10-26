@@ -35,3 +35,7 @@ flutter:
     - licenses/common.txt
     - licenses/android.txt
     - licenses/android-crates.txt
+    # The band-aid brain of the feature graphic
+    # (play-developer/feature-graphic.svg), rendered 28 dp high at 1x to
+    # 4x; the project's own art, under the project's licence.
+    - assets/brain.png

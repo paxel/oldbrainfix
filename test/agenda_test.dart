@@ -89,6 +89,45 @@ void main() {
       expect(scaffold.bottomSheet, isNull);
     });
 
+    for (final choice in [ThemeChoice.light, ThemeChoice.dark]) {
+      testWidgets('shows the brain before "Old Brain Fix" in the top bar, '
+          'read only as the name (${choice.name})', (tester) async {
+        store.themeChoice = choice;
+        final semantics = tester.ensureSemantics();
+        await start(tester);
+
+        final bar = find.byType(AppBar);
+        expect(
+          Theme.of(tester.element(bar)).brightness,
+          choice == ThemeChoice.dark ? Brightness.dark : Brightness.light,
+        );
+        final brain = find.descendant(
+          of: bar,
+          matching: find.byKey(const ValueKey('brain')),
+        );
+        final title = find.descendant(
+          of: bar,
+          matching: find.text('Old Brain Fix'),
+        );
+        expect(brain, findsOneWidget);
+        expect(title, findsOneWidget);
+        final image = tester.widget<Image>(brain);
+        expect(image.excludeFromSemantics, isTrue);
+        expect((image.image as AssetImage).assetName, 'assets/brain.png');
+        final brainBox = tester.getRect(brain);
+        final titleBox = tester.getRect(title);
+        expect(brainBox.right, lessThanOrEqualTo(titleBox.left));
+        expect(brainBox.height, 28);
+        expect(brainBox.center.dy, closeTo(titleBox.center.dy, 2));
+        expect(
+          tester.getSemantics(find.text('Old Brain Fix')),
+          isSemantics(label: 'Old Brain Fix', isHeader: true, namesRoute: true),
+        );
+        expect(find.bySemanticsLabel('Old Brain Fix'), findsOneWidget);
+        semantics.dispose();
+      });
+    }
+
     testWidgets('today all-day first, then by time; a gap; tomorrow dimmed', (
       tester,
     ) async {
