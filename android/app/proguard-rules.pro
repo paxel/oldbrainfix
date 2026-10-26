@@ -4,3 +4,9 @@
 # open source, so obfuscation hides nothing.
 -dontobfuscate
 -keepattributes SourceFile,LineNumberTable
+
+# WorkManager starts at launch (androidx.startup) and makes its Room
+# database by reflection. Room 2.6's own rule keeps the class only, and R8
+# in full mode then drops the constructor: every release start died with
+# NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
