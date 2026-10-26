@@ -6,6 +6,7 @@ import 'app_lock.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'note_card.dart';
+import 'system_bars.dart';
 
 /// Opens "merge into…" for [note] and merges it into the Note picked
 /// there; true when it was merged.
@@ -84,7 +85,10 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
           ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: clearOfSystemBars(
+                context,
+                const EdgeInsets.symmetric(vertical: 8),
+              ),
               children: _shown.isEmpty
                   ? [
                       BrowserEmpty(

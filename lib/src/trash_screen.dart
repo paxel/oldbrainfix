@@ -8,6 +8,7 @@ import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// The deleted Notes, and the Routines and Reminders deleted on their
 /// own, most recently deleted first, each with how long it stays and a
@@ -130,7 +131,10 @@ class _TrashScreenState extends State<TrashScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.trashTitle)),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.symmetric(vertical: 8),
+        ),
         children: _trashed.isEmpty
             ? [BrowserEmpty(text: t.trashEmpty)]
             : [

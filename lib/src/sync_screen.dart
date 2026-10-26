@@ -17,6 +17,7 @@ import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
 import 'profile.dart';
+import 'system_bars.dart';
 
 /// How a sync is run; the app passes the core's [lanSync], tests a fake.
 typedef Join = Future<SyncResult> Function(
@@ -412,7 +413,10 @@ class _SyncScreenState extends State<SyncScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.syncTitle)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(t.syncJoinIntro),
           const SizedBox(height: 16),

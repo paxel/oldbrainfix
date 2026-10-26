@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 import 'place_names.dart';
+import 'system_bars.dart';
 
 /// The colours offered for an Area, as stored (`RRGGBB`).
 const areaPalette = [
@@ -79,7 +80,7 @@ class _AreaLookScreenState extends State<AreaLookScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(areaName(t, area))),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           Text(t.colourHeading, style: heading),
           const SizedBox(height: 8),

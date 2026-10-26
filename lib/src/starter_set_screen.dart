@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'place_names.dart';
+import 'system_bars.dart';
 
 /// First start: the Starter Set, every Area and Topic ticked. A Topic
 /// can only stay ticked with its Area. Restoring a Backup is offered
@@ -67,7 +68,10 @@ class _StarterSetScreenState extends State<StarterSetScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.symmetric(vertical: 8),
+        ),
         children: [
           if (widget.onRestore case final restore?)
             ListTile(

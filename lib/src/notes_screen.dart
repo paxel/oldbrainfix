@@ -9,6 +9,7 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
+import 'system_bars.dart';
 
 /// Every Note as a diary of cards, newest first, Unsorted ones included
 /// and those of closed locked Areas left out; reached from the top of
@@ -102,7 +103,10 @@ class _AllNotesScreenState extends State<AllNotesScreen> {
       ),
       body: BrowserSwipes(
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: clearOfSystemBars(
+            context,
+            const EdgeInsets.symmetric(vertical: 8),
+          ),
           children: [
             PersonFilterChips(
               store: widget.notes.store,

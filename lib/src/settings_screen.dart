@@ -19,6 +19,7 @@ import 'schedule_text.dart';
 import 'setup_screen.dart';
 import 'speech_model_screen.dart';
 import 'speech_platform.dart';
+import 'system_bars.dart';
 
 /// This Device's settings (ADR 0008), reached only through the Profile
 /// page: the theme; the alarm setup and the default Re-nag interval; the
@@ -84,7 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: Text(t.settingsTitle)),
       // A short page, built whole.
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 24)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

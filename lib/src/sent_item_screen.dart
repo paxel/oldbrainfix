@@ -11,6 +11,7 @@ import 'note_editor_screen.dart';
 import 'person_screen.dart';
 import 'profile.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
@@ -326,7 +327,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.sentItemTitle)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           EditorPanel(
             child: Column(

@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'system_bars.dart';
 
 /// What stands in front of the Agenda while the App Lock is locked: the
 /// PIN, a button for biometrics or the screen lock where they are on,
@@ -53,7 +54,10 @@ class _LockScreenState extends State<LockScreen> {
       appBar: AppBar(title: Text(t.appTitle)),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 160),
+          padding: clearOfSystemBars(
+            context,
+            const EdgeInsets.fromLTRB(24, 24, 24, 160),
+          ),
           child: Embossed(
             child: Padding(
               padding: const EdgeInsets.all(24),

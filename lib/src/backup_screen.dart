@@ -14,6 +14,7 @@ import 'bundle_platform.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'system_bars.dart';
 
 /// [backupPassKey] in an isolate of its own, so the screen keeps
 /// moving while Argon2id works.
@@ -442,7 +443,10 @@ class _BackupScreenState extends State<BackupScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.backupsTitle)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(t.backupsIntro),
           const SizedBox(height: 16),

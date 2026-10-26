@@ -10,6 +10,7 @@ import 'merge_into_screen.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
+import 'system_bars.dart';
 
 /// How many of the oldest Unsorted Notes the Nudge screen shows.
 const nudgeCards = 3;
@@ -48,7 +49,10 @@ class _NudgeScreenState extends State<NudgeScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.nudgeScreenTitle)),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.symmetric(vertical: 8),
+        ),
         children: [
           if (_unsorted.isEmpty)
             BrowserEmpty(text: t.noUnsorted)
@@ -135,7 +139,10 @@ class _UnsortedScreenState extends State<UnsortedScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.symmetric(vertical: 8),
+        ),
         children: [
           PersonFilterChips(
             store: widget.notes.store,

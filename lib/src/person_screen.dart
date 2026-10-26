@@ -12,6 +12,7 @@ import 'profile.dart';
 import 'profile_platform.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
+import 'system_bars.dart';
 
 /// What opening another person's Profile needs, wherever their picture
 /// shows (#52): the store, and where an Override's picture comes from.
@@ -262,7 +263,10 @@ class _PersonScreenState extends State<PersonScreen> {
       child: Scaffold(
         appBar: AppBar(title: Text(profileDisplayName(t, shown.name))),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: clearOfSystemBars(
+            context,
+            const EdgeInsets.only(bottom: 24),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

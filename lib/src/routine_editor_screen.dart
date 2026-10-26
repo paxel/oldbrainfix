@@ -9,6 +9,7 @@ import 'look.dart';
 import 'note_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// The Device's wall clock: what its own clock shows for an instant.
 DateTime deviceWallClock(DateTime utc) => utc.toLocal();
@@ -419,7 +420,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     required bool once,
   }) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
       children: [
         if (_locked)
           Padding(

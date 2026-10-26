@@ -4,6 +4,7 @@ import 'announcements.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'speech_platform.dart';
+import 'system_bars.dart';
 
 /// The speech model for Transcripts: what it is for, how big it is and
 /// where it comes from, then a download on request or a file of the
@@ -35,7 +36,7 @@ class SpeechModelScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(t.speechModelTitle)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           Text(t.speechModelIntro),
           const SizedBox(height: 8),

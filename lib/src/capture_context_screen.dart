@@ -5,6 +5,7 @@ import 'announcements.dart';
 import 'context_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'system_bars.dart';
 
 /// Switches for the parts of the Capture Context that need their own
 /// permission: the calendar event running and the connected Bluetooth
@@ -71,7 +72,7 @@ class _CaptureContextScreenState extends State<CaptureContextScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.captureContextTitle)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         children: [
           Text(t.captureContextIntro),
           const SizedBox(height: 16),

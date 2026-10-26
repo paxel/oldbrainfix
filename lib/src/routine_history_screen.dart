@@ -8,6 +8,7 @@ import 'l10n.dart';
 import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// Opens the history of [routine].
 Future<void> openHistory(BuildContext context, Notes notes, Routine routine) =>
@@ -104,7 +105,7 @@ class _RoutineHistoryScreenState extends State<RoutineHistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.historyTitle)),
       body: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
         itemCount: header.length + _log.length,
         itemBuilder: (context, i) => i < header.length
             ? header[i]

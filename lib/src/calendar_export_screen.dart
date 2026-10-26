@@ -6,6 +6,7 @@ import 'browser.dart';
 import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// Opens the calendar export; returns once the user left it.
 Future<void> openCalendarExport(BuildContext context, Notes notes) =>
@@ -83,7 +84,7 @@ class _CalendarExportScreenState extends State<CalendarExportScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 16)),
         children: [
           if (_rows.isEmpty)
             BrowserEmpty(text: t.calendarExportEmpty)

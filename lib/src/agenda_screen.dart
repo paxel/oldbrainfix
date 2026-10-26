@@ -28,6 +28,7 @@ import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
 import 'setup_screen.dart';
+import 'system_bars.dart';
 
 /// An Agenda row with where its Note is filed and whether it shows
 /// Masked, read once per change.
@@ -470,7 +471,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
       ),
       body: ListView(
         // Room under the last row for the floating buttons.
-        padding: const EdgeInsets.only(top: 8, bottom: 160),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.only(top: 8, bottom: 160),
+        ),
         children: [
           if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
           if (!_missed.isEmpty)

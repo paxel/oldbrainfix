@@ -21,6 +21,7 @@ import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
 import 'speech_platform.dart';
+import 'system_bars.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
@@ -362,7 +363,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ],
         ),
         body: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
           children: [
             if (!note.textEditable) ...[
               const NewerFormatNote(key: ValueKey('note-newer-format')),

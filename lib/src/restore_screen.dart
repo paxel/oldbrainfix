@@ -12,6 +12,7 @@ import 'bundle_platform.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
+import 'system_bars.dart';
 
 /// The newest Backup in [dir] by when it was made, or null when none
 /// lies there: what Android's Auto Backup brought back (ADR 0010).
@@ -275,7 +276,10 @@ class _RestoreScreenState extends State<RestoreScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(found ? t.restoreFoundTitle : t.restoreOffer)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(found ? t.restoreFound : t.restoreIntro),
           const SizedBox(height: 16),

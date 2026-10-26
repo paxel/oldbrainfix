@@ -9,6 +9,7 @@ import 'calendar_mirror.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'place_names.dart';
+import 'system_bars.dart';
 
 /// Makes sure a PIN is set, asking for a new one when none is; whether
 /// one is set now.
@@ -317,7 +318,10 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.areaLocksTitle)),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.symmetric(vertical: 8),
+        ),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),

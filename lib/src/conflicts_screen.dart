@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
 import 'schedule_text.dart';
+import 'system_bars.dart';
 
 /// The Conflicts (Catlog's conflicts screen adapted): what two Devices
 /// changed apart, each with every version, the Device it came from and
@@ -61,7 +62,10 @@ class _ConflictsScreenState extends State<ConflictsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.conflictsTitle)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(_conflicts.isEmpty ? t.conflictsNone : t.conflictsIntro),
           for (final conflict in _conflicts)

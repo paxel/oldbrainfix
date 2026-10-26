@@ -11,6 +11,7 @@ import 'photo_platform.dart';
 import 'place_names.dart';
 import 'profile.dart';
 import 'sync_screen.dart';
+import 'system_bars.dart';
 
 /// How an invite is run; the app passes the core's [lanSync], tests a
 /// fake.
@@ -147,7 +148,10 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
         title: Text(t.shareTitle(area == null ? '' : areaName(t, area))),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(t.shareIntro),
           const SizedBox(height: 16),
@@ -375,7 +379,10 @@ class _PeopleScreenState extends State<PeopleScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(t.peopleTitle)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: clearOfSystemBars(
+          context,
+          const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        ),
         children: [
           Text(t.peopleIntro),
           const SizedBox(height: 8),

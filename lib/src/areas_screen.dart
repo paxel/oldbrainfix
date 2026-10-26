@@ -17,6 +17,7 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'share_area_screen.dart';
+import 'system_bars.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
@@ -326,7 +327,10 @@ class _AreasScreenState extends State<AreasScreen> {
               ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: clearOfSystemBars(
+                  context,
+                  const EdgeInsets.symmetric(vertical: 8),
+                ),
                 children: searching
                     ? _hitCards(
                         context,
@@ -649,7 +653,10 @@ class _AreaScreenState extends State<AreaScreen> {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: clearOfSystemBars(
+                  context,
+                  const EdgeInsets.symmetric(vertical: 8),
+                ),
                 children: searching
                     ? _hitCards(
                         context,
@@ -830,7 +837,10 @@ class _TopicScreenState extends State<TopicScreen> {
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: clearOfSystemBars(
+                  context,
+                  const EdgeInsets.symmetric(vertical: 8),
+                ),
                 children: searching
                     ? _hitCards(
                         context,

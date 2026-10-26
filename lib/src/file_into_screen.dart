@@ -6,6 +6,7 @@ import 'area_look.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'place_names.dart';
+import 'system_bars.dart';
 
 /// Picks the Area or Topic to file a Note into; pops with its id.
 class FileIntoScreen extends StatefulWidget {
@@ -72,7 +73,10 @@ class _FileIntoScreenState extends State<FileIntoScreen> {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: clearOfSystemBars(
+                context,
+                const EdgeInsets.symmetric(vertical: 8),
+              ),
               children: [
                 for (final (area, topics) in _tree)
                   Padding(

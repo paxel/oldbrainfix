@@ -15,6 +15,7 @@ import 'photo_platform.dart';
 import 'profile.dart';
 import 'settings_screen.dart';
 import 'sync_screen.dart';
+import 'system_bars.dart';
 
 /// Opens the Profile page; returns once the user left it.
 Future<void> openProfile(
@@ -198,7 +199,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         body: ListenableBuilder(
           listenable: model,
           builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: clearOfSystemBars(
+              context,
+              const EdgeInsets.only(bottom: 24),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
