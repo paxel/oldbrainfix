@@ -2090,6 +2090,18 @@ abstract class AppLocalizations {
   /// **'Open-source licenses'**
   String get openSourceLicenses;
 
+  /// No description provided for @dangerButton.
+  ///
+  /// In en, this message translates to:
+  /// **'DON\'T PRESS.\nDANGER'**
+  String get dangerButton;
+
+  /// No description provided for @dangerThanks.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you for using Old Brain Fix!'**
+  String get dangerThanks;
+
   /// No description provided for @settingsPrivacy.
   ///
   /// In en, this message translates to:

@@ -745,6 +745,8 @@
   "buyCoffee": "Buy me a coffee",
   "coffeeSubtitle": "On Ko-fi, if Old Brain Fix helps you",
   "openSourceLicenses": "Open-source licenses",
+  "dangerButton": "DON'T PRESS.\nDANGER",
+  "dangerThanks": "Thank you for using Old Brain Fix!",
   "settingsPrivacy": "Privacy",
   "appLock": "App Lock",
   "appLockDetail": "Asks for the PIN before showing your Notes. Capture and alarms never need it.",

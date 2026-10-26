@@ -1269,6 +1269,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get openSourceLicenses => 'Open-Source-Lizenzen';
 
   @override
+  String get dangerButton => 'NICHT DRÜCKEN.\nGEFAHR';
+
+  @override
+  String get dangerThanks => 'Danke, dass du Old Brain Fix benutzt!';
+
+  @override
   String get settingsPrivacy => 'Privatsphäre';
 
   @override

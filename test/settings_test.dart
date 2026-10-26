@@ -342,6 +342,35 @@ void main() {
       expect(find.byType(LicensePage), findsOneWidget);
     });
 
+    for (final (locale, button, thanks, done) in [
+      (
+        const Locale('en'),
+        "DON'T PRESS.\nDANGER",
+        'Thank you for using Old Brain Fix!',
+        'Done',
+      ),
+      (
+        const Locale('de'),
+        'NICHT DRÜCKEN.\nGEFAHR',
+        'Danke, dass du Old Brain Fix benutzt!',
+        'Fertig',
+      ),
+    ]) {
+      testWidgets('the red button thanks the user and Done closes the thanks '
+          '(${locale.languageCode})', (tester) async {
+        await about(tester, locale: locale);
+        await tap(tester, find.text(button));
+        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.text('\u{1F917}'), findsOneWidget);
+        expect(find.text(thanks), findsOneWidget);
+        await tester.tap(find.text(done));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.text(thanks), findsNothing);
+        expect(find.byType(AboutScreen), findsOneWidget);
+      });
+    }
+
     test('the licences name everything that is not a Dart package', () async {
       registerLicenses();
       registerLicenses();

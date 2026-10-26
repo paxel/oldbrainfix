@@ -332,6 +332,8 @@
   "buyCoffee": "Spendier mir einen Kaffee",
   "coffeeSubtitle": "Auf Ko-fi, wenn Old Brain Fix dir hilft",
   "openSourceLicenses": "Open-Source-Lizenzen",
+  "dangerButton": "NICHT DRÜCKEN.\nGEFAHR",
+  "dangerThanks": "Danke, dass du Old Brain Fix benutzt!",
   "settingsPrivacy": "Privatsphäre",
   "appLock": "App-Sperre",
   "appLockDetail": "Fragt nach der PIN, bevor deine Notizen zu sehen sind. Erfassen und Alarme brauchen sie nie.",
