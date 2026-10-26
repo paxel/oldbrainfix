@@ -2568,3 +2568,59 @@ fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResu
     }
     Ok(())
 }
+
+/// The name a place with `slug` and `name` shows under, as the
+/// generator's `_shownName`: the translation in `starters` while it keeps
+/// its Starter Set name, else the name as stored.
+fn shown_name(starters: &Value, slug: Option<&str>, name: &str) -> String {
+    match slug {
+        Some(slug) if oldbrainfix_core::places::starter_name(slug) == Some(name) => {
+            starters[slug].as_str().unwrap_or(name).to_string()
+        }
+        _ => name.to_string(),
+    }
+}
+
+#[test]
+fn transcript_prompts_come_out_as_the_dart_core_writes_them() -> TestResult {
+    use oldbrainfix_core::transcript_prompts::{
+        GERMAN_LEAD_IN, MAX_LENGTH, MAX_NAMES, TranscriptPrompts,
+    };
+    let fixture = read_json(&fixtures().join("transcript_prompts.json"))?;
+    assert_eq!(fixture["germanLeadIn"], GERMAN_LEAD_IN);
+    assert_eq!(fixture["maxLength"], MAX_LENGTH);
+    assert_eq!(fixture["maxNames"], MAX_NAMES);
+    let texts = |list: &Value| -> Vec<String> {
+        list.as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect()
+    };
+    for case in fixture["lists"].as_array().ok_or("lists")? {
+        let prompts = TranscriptPrompts::of(texts(&case["names"]), texts(&case["terms"]));
+        assert_eq!(prompts.english, case["english"], "{case}");
+        assert_eq!(prompts.german, case["german"], "{case}");
+    }
+    let mut seen = 0;
+    for view in fixture["views"].as_array().ok_or("views")? {
+        let name = view["store"].as_str().ok_or("store")?;
+        let ui = &fixture["ui"][view["locale"].as_str().ok_or("locale")?];
+        let store = Store::in_memory(Box::new(Utc::now), || Ok(writer_key()))?;
+        for entry in fixture["stores"][name].as_array().ok_or("entries")? {
+            store.insert(&WireEntry::from_value(entry).ok_or("an entry")?)?;
+        }
+        let starters = &ui["starters"];
+        let prompts = TranscriptPrompts::for_places(
+            &Places::new(&store),
+            texts(&ui["terms"]),
+            &|a| shown_name(starters, a.starter.as_deref(), &a.name),
+            &|t| shown_name(starters, t.starter.as_deref(), &t.name),
+        )?;
+        assert_eq!(prompts.english, view["english"], "{name}");
+        assert_eq!(prompts.german, view["german"], "{name}");
+        seen += 1;
+    }
+    assert_eq!(seen, 6);
+    Ok(())
+}

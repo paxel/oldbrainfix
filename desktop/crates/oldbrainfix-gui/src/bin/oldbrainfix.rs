@@ -36,7 +36,9 @@ use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::backups;
 use oldbrainfix_gui::cli::{self, Launch};
-use oldbrainfix_gui::enrich::{Enricher, Kind, OcrEngine, WhisperEngine};
+use oldbrainfix_gui::enrich::{
+    Enricher, Kind, OcrEngine, PromptsNow, WhisperEngine, transcript_prompts,
+};
 use oldbrainfix_gui::folder_sync;
 use oldbrainfix_gui::hotkey::{self, Hotkey};
 use oldbrainfix_gui::l10n::{L10n, locale_for_system};
@@ -44,7 +46,7 @@ use oldbrainfix_gui::login;
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
-use oldbrainfix_gui::speech::{SpeechModel, Status};
+use oldbrainfix_gui::speech::SpeechModel;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
@@ -486,10 +488,14 @@ fn run() -> Result<i32, String> {
         let window = window.clone();
         SpeechModel::new(dir.join("whisper"), Arc::new(move || wake(&window)))
     };
+    let prompts: PromptsNow = {
+        let store = store.clone();
+        Box::new(move || transcript_prompts(&store, &L10n::new(locale)))
+    };
     let transcriber = Enricher::spawn(
         store.clone(),
         Kind::Transcripts,
-        Box::new(WhisperEngine::new(speech.model())),
+        Box::new(WhisperEngine::new(speech.model(), prompts)),
         enriched(),
     );
     let reader = Enricher::spawn(
@@ -507,7 +513,7 @@ fn run() -> Result<i32, String> {
             wake(&window);
             // A voice Note from the popup is transcribed without the window.
             reader.kick();
-            if speech.status() == Status::Ready {
+            if speech.current().is_some() {
                 transcriber.kick();
             }
         })

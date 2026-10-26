@@ -7,15 +7,21 @@
 //! recording or photo itself is always kept.
 //!
 //! The engines sit behind a trait: Whisper and ocrs in the app, fakes in
-//! the tests.
+//! the tests. Whisper is led in with the Area and Topic names as the user
+//! reads them, and for German speech with the English words German is
+//! full of (`TranscriptPrompts`).
 
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 
-use oldbrainfix_core::{Blob, Notes, Store};
+use oldbrainfix_core::{Blob, Notes, Places, Store, TranscriptPrompts};
+use oldbrainfix_whisper::Prompts;
 use parking_lot::Mutex;
+
+use crate::l10n::L10n;
+use crate::names;
 
 /// Reads the text out of a recording or photo.
 pub trait Engine: Send {
@@ -145,20 +151,45 @@ fn run(
     }
 }
 
+/// What Whisper is led in with for the next recording.
+pub type PromptsNow = Box<dyn Fn() -> Prompts + Send>;
+
 /// Whisper with the speech model at `model`, loaded on first use and let
-/// go when idle. Device-only beyond a missing model.
+/// go when idle, led in for each recording with what `prompts` gives
+/// then. Device-only beyond a missing model.
 pub struct WhisperEngine {
     model: PathBuf,
+    prompts: PromptsNow,
     whisper: Option<oldbrainfix_whisper::Whisper>,
 }
 
 impl WhisperEngine {
-    pub fn new(model: PathBuf) -> WhisperEngine {
+    pub fn new(model: PathBuf, prompts: PromptsNow) -> WhisperEngine {
         WhisperEngine {
             model,
+            prompts,
             whisper: None,
         }
     }
+}
+
+/// The prompts for the next recording in `store`: its Areas and Topics as
+/// they are now, as the user reads them in `t`, with the app's words
+/// Unsorted, Routine and Agenda; none when the store cannot be read.
+pub fn transcript_prompts(store: &Store, t: &L10n) -> Prompts {
+    let prompts = TranscriptPrompts::for_places(
+        &Places::new(store),
+        [t.unsorted(), t.routine(), t.agenda()],
+        &|area| names::area_name(t, area),
+        &|topic| names::topic_name(t, topic),
+    );
+    prompts.map_or_else(
+        |_| Prompts::default(),
+        |p| Prompts {
+            english: p.english,
+            german: p.german,
+        },
+    )
 }
 
 impl Engine for WhisperEngine {
@@ -168,9 +199,12 @@ impl Engine for WhisperEngine {
             self.whisper = oldbrainfix_whisper::Whisper::open(&self.model);
         }
         let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
-        self.whisper
-            .as_mut()?
-            .transcribe(&samples, oldbrainfix_whisper::threads_for(cores))
+        let prompts = (self.prompts)();
+        self.whisper.as_mut()?.transcribe(
+            &samples,
+            oldbrainfix_whisper::threads_for(cores),
+            &prompts,
+        )
     }
 
     fn idle(&mut self) {
@@ -268,9 +302,58 @@ mod tests {
         assert_eq!(OcrEngine::default().read(b"no picture".to_vec()), None);
     }
 
+    /// The stores of the prompt fixture the Dart core wrote, seen with
+    /// the app's own strings, give the prompts it wrote: the Area and
+    /// Topic names as the user reads them, translated Starter Set places
+    /// in German among them.
+    #[test]
+    fn the_prompts_name_the_places_as_the_app_shows_them() -> oldbrainfix_core::Result<()> {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fixtures/transcript_prompts.json"
+        );
+        let text = std::fs::read_to_string(path).unwrap_or_default();
+        let fixture: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+        let views = fixture["views"].as_array().cloned().unwrap_or_default();
+        assert_eq!(views.len(), 6);
+        for view in views {
+            let name = view["store"].as_str().unwrap_or_default();
+            let t = L10n::new(view["locale"].as_str().unwrap_or_default());
+            let store = Store::in_memory(Box::new(chrono::Utc::now), || {
+                Ok(oldbrainfix_core::SigningKey::from_seed([1; 32]))
+            })?;
+            for entry in fixture["stores"][name].as_array().into_iter().flatten() {
+                if let Some(entry) = oldbrainfix_core::WireEntry::from_value(entry) {
+                    store.insert(&entry)?;
+                }
+            }
+            let prompts = transcript_prompts(&store, &t);
+            assert_eq!(prompts.english, view["english"], "{name}");
+            assert_eq!(prompts.german, view["german"], "{name}");
+        }
+        let de = L10n::new("de");
+        let store = Store::in_memory(Box::new(chrono::Utc::now), || {
+            Ok(oldbrainfix_core::SigningKey::from_seed([1; 32]))
+        })?;
+        let places = Places::new(&store);
+        places.plant_starter_set(&["household", "kitchen"])?;
+        places.add_area("Fahrrad")?;
+        let prompts = transcript_prompts(&store, &de);
+        assert_eq!(prompts.english, "Fahrrad, Haushalt, Küche.");
+        assert!(
+            prompts
+                .german
+                .ends_with("Unsortiert, Routine, Agenda. Fahrrad, Haushalt, Küche.")
+        );
+        Ok(())
+    }
+
     #[test]
     fn without_its_model_whisper_reads_nothing() {
-        let mut engine = WhisperEngine::new(PathBuf::from("/nonexistent/ggml-base.bin"));
+        let mut engine = WhisperEngine::new(
+            PathBuf::from("/nonexistent/ggml-base.bin"),
+            Box::new(Prompts::default),
+        );
         assert_eq!(engine.read(crate::media::wav(&[0.0; 1600])), None);
         assert_eq!(engine.read(b"no recording".to_vec()), None);
     }

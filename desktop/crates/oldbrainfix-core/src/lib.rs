@@ -42,6 +42,7 @@ pub mod signing;
 pub mod store;
 pub mod sync;
 pub mod text_format;
+pub mod transcript_prompts;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use conflicts::{Conflict, ConflictVersion};
@@ -66,6 +67,7 @@ pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, Store};
 pub use sync::Moment;
 pub use text_format::StoredText;
+pub use transcript_prompts::TranscriptPrompts;
 
 /// The app's name, as the window title shows it.
 pub const APP_NAME: &str = "Old Brain Fix";

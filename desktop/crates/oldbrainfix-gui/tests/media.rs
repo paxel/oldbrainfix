@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
 
 use chrono::Duration;
@@ -20,7 +20,7 @@ use oldbrainfix_gui::media::{self, Clipboard, Player, Recorder};
 use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 use oldbrainfix_gui::speech::{Download, SpeechModel, Status};
 use oldbrainfix_gui::{App, Selection};
-use oldbrainfix_whisper::model::Outcome as ModelOutcome;
+use oldbrainfix_whisper::model::{ModelDir, Outcome as ModelOutcome, WhisperModel, copy_hashing};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -460,8 +460,9 @@ fn the_background_reads_what_waits_and_leaves_what_it_cannot() -> TestResult {
 fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResult {
     let store = media_store()?;
     let tmp = tempfile::tempdir()?;
-    let wrong: Download = Arc::new(|_, _, _| ModelOutcome::Mismatch);
-    let speech = SpeechModel::with_download(tmp.path().join("whisper"), wrong, Arc::new(|| {}));
+    let wrong: Download = Arc::new(|_, _, _, _| ModelOutcome::Mismatch);
+    let dir = ModelDir::new(tmp.path().join("whisper"));
+    let speech = SpeechModel::with_download(dir, wrong, Arc::new(|| {}));
     assert!(eventually(|| speech.status() == Status::Missing));
     let transcripts = Enricher::spawn(
         store.clone(),
@@ -480,15 +481,7 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
         Some(picked.clone())
     }));
     app.select(Selection::Settings);
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1400.0))
-        .build_ui_state(
-            |ui, app: &mut App| {
-                App::install(ui.ctx());
-                app.show(ui);
-            },
-            app,
-        );
+    let mut harness = settings(app);
     harness.run();
     std::thread::sleep(StdDuration::from_millis(100));
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2, "no model yet");
@@ -496,9 +489,13 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     assert!(shows(&harness, "No speech model yet"));
     assert!(shows(
         &harness,
-        "The speech model is the base model of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License."
+        "The speech models are the base and small models of Whisper by OpenAI, Copyright (c) 2022 OpenAI, under the MIT License."
     ));
-    harness.get_by_label("Download (148 MB)").click();
+    assert!(shows(
+        &harness,
+        "Better with English words in German speech, but slower, and it needs more memory."
+    ));
+    harness.get_by_label("Small, 488 MB").click();
     harness.run();
     assert!(eventually(|| speech.outcome().is_some()));
     harness.run();
@@ -511,6 +508,99 @@ fn transcripts_wait_for_the_speech_model_and_the_settings_fetch_it() -> TestResu
     harness.run();
     assert!(eventually(|| speech.status() == Status::Missing));
     assert_eq!(Notes::new(&store).untranscribed()?.len(), 2);
+    Ok(())
+}
+
+/// The Settings of `app`, tall enough for the speech model's card.
+fn settings(app: App) -> Harness<'static, App> {
+    Harness::builder()
+        .with_size(egui::vec2(1280.0, 1400.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        )
+}
+
+/// The SHA-256 of `bytes`, as the model directory reads it.
+fn sha(bytes: &[u8]) -> String {
+    let hash = copy_hashing(bytes, std::io::sink(), &AtomicBool::new(false), |_| {});
+    hash.ok().flatten().unwrap_or_default()
+}
+
+#[test]
+fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
+    let store = media_store()?;
+    let tmp = tempfile::tempdir()?;
+    let whisper = tmp.path().join("whisper");
+    // Stand-ins for the models: the bytes "base" and "small".
+    let dir = ModelDir::pinned_to(&whisper, &sha(b"base"), &sha(b"small"));
+    let gate = Arc::new(AtomicBool::new(false));
+    let open = gate.clone();
+    let mirror: Download = Arc::new(move |dir, model, stop, _| {
+        let bytes: &[u8] = match model {
+            WhisperModel::Base => b"base",
+            WhisperModel::Small => {
+                while !open.load(Ordering::SeqCst) {
+                    std::thread::sleep(StdDuration::from_millis(1));
+                }
+                b"small"
+            }
+        };
+        dir.take_in(bytes, None, Some(model), stop, |_, _| {})
+    });
+    let speech = SpeechModel::with_download(dir, mirror, Arc::new(|| {}));
+    assert!(eventually(|| speech.status() == Status::Missing));
+    let transcripts = Enricher::spawn(
+        store.clone(),
+        Kind::Transcripts,
+        Box::new(FakeEngine {
+            fail_over: usize::MAX,
+        }),
+        Box::new(|| {}),
+    );
+    let mut app = App::new(store.clone(), "en");
+    app.set_enrichers(Some(transcripts), None, Some(speech.clone()));
+    app.select(Selection::Settings);
+    let mut harness = settings(app);
+    harness.run();
+    harness.get_by_label("Base, 148 MB").click();
+    harness.run();
+    assert!(eventually(|| speech.current() == Some(WhisperModel::Base)));
+    harness.run();
+    assert!(shows(
+        &harness,
+        "The speech model is ready. Voice Notes are transcribed on this computer."
+    ));
+    // The model came: what waited is transcribed.
+    assert!(eventually(|| Notes::new(&store)
+        .untranscribed()
+        .is_ok_and(|w| w.is_empty())));
+    // The small one downloads while the base one stays in use.
+    harness.get_by_label("Small, 488 MB").click();
+    // A download repaints to show how far it came.
+    harness.run_steps(3);
+    assert!(matches!(
+        speech.status(),
+        Status::Fetching {
+            downloading: true,
+            ..
+        }
+    ));
+    assert_eq!(speech.current(), Some(WhisperModel::Base));
+    assert_eq!(speech.chosen(), Some(WhisperModel::Small));
+    assert!(shows(&harness, "Downloading: 0 of 488 MB"));
+    gate.store(true, Ordering::SeqCst);
+    assert!(eventually(|| speech.status() == Status::Ready));
+    harness.run();
+    assert_eq!(speech.current(), Some(WhisperModel::Small));
+    assert_eq!(std::fs::read(speech.model())?, b"small");
+    let kept: Vec<_> = std::fs::read_dir(&whisper)?
+        .filter_map(|e| e.ok().map(|e| e.file_name()))
+        .collect();
+    assert_eq!(kept.len(), 1, "only the chosen model is kept: {kept:?}");
     Ok(())
 }
 

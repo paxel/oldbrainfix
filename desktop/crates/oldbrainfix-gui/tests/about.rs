@@ -41,7 +41,10 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
         .click_accesskit();
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::About);
-    assert!(shows(&harness, "Version 0.1.0"));
+    assert!(shows(
+        &harness,
+        &format!("Version {}", env!("CARGO_PKG_VERSION"))
+    ));
     harness.get_by_label("Documentation");
     harness.get_by_label("Privacy policy");
     harness

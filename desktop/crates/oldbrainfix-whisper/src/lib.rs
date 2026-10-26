@@ -1,7 +1,8 @@
 //! Transcripts for the Old Brain Fix desktop (ADR 0007): Whisper from the
 //! whisper.cpp sources the phone vendors, built unchanged and reached
 //! through the small C bridge in `native/`, in English or German as on
-//! the phone; the speech model it needs, fetched from the phone's mirror
+//! the phone, led in with the prompt for the language it hears; the
+//! speech model it needs, fetched from the phone's mirror
 //! and checked against the phone's checksum ([`model`]); and voice
 //! recordings decoded as Whisper hears them, the phone's AAC `.m4a` and
 //! the desktop's WAV alike ([`decode`]).
@@ -26,9 +27,26 @@ unsafe extern "C" {
         samples: *const f32,
         count: c_int,
         threads: c_int,
+        english: *const c_char,
+        german: *const c_char,
     ) -> *mut c_char;
     fn obf_whisper_free_text(text: *mut c_char);
     fn obf_whisper_close(ctx: *mut c_void);
+}
+
+/// What Whisper is led in with (its initial prompt), by the language it
+/// hears; an empty one leads in nothing. The core's `TranscriptPrompts`
+/// makes them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Prompts {
+    pub english: String,
+    pub german: String,
+}
+
+/// `text` as a C string; a NUL inside it, which no name should hold, is
+/// left out.
+fn c_text(text: &str) -> CString {
+    CString::new(text.replace('\0', "")).unwrap_or_default()
 }
 
 /// Whisper's own rate: 16 kHz.
@@ -56,11 +74,29 @@ impl Whisper {
 
     /// The words in `samples`, 16 kHz mono from -1 to 1, in English or
     /// German, trimmed; `None` when they could not be transcribed.
-    pub fn transcribe(&mut self, samples: &[f32], threads: usize) -> Option<String> {
+    /// Whisper is led in with `prompts`, the one in the language it hears.
+    pub fn transcribe(
+        &mut self,
+        samples: &[f32],
+        threads: usize,
+        prompts: &Prompts,
+    ) -> Option<String> {
         let count = c_int::try_from(samples.len()).ok()?;
         let threads = c_int::try_from(threads).unwrap_or(1);
-        // SAFETY: `ctx` is a live context, `samples` holds `count` floats.
-        let text = unsafe { obf_whisper_transcribe(self.ctx, samples.as_ptr(), count, threads) };
+        let english = c_text(&prompts.english);
+        let german = c_text(&prompts.german);
+        // SAFETY: `ctx` is a live context, `samples` holds `count` floats,
+        // and both prompts are C strings that live until the call returns.
+        let text = unsafe {
+            obf_whisper_transcribe(
+                self.ctx,
+                samples.as_ptr(),
+                count,
+                threads,
+                english.as_ptr(),
+                german.as_ptr(),
+            )
+        };
         if text.is_null() {
             return None;
         }
@@ -250,13 +286,19 @@ mod tests {
     }
 
     #[test]
+    fn a_prompt_with_a_nul_inside_still_goes_without_it() {
+        assert_eq!(c_text("Ar\0beit").as_bytes(), b"Arbeit");
+        assert_eq!(c_text("").as_bytes(), b"");
+    }
+
+    #[test]
     fn a_missing_model_does_not_load() {
         assert!(Whisper::open(Path::new("/nonexistent/ggml-base.bin")).is_none());
     }
 
-    /// Device-only: needs the 148 MB model and a recording, named by
+    /// Device-only: needs a speech model and a recording, named by
     /// `OBF_WHISPER_MODEL` and `OBF_VOICE_SAMPLE` (a phone .m4a or a
-    /// desktop .wav):
+    /// desktop .wav), and leads in with `OBF_PROMPT` if set:
     /// `cargo test -p oldbrainfix-whisper -- --ignored --nocapture`.
     #[test]
     #[ignore = "needs the speech model and a recording"]
@@ -270,10 +312,16 @@ mod tests {
         let bytes = std::fs::read(sample).unwrap_or_default();
         let samples = decode(bytes);
         assert!(samples.as_ref().is_some_and(|s| !s.is_empty()));
+        // `OBF_PROMPT` leads in both languages, if set.
+        let prompt = std::env::var("OBF_PROMPT").unwrap_or_default();
+        let prompts = Prompts {
+            english: prompt.clone(),
+            german: prompt,
+        };
         let mut whisper = Whisper::open(Path::new(&model));
         let text = whisper
             .as_mut()
-            .and_then(|w| w.transcribe(&samples.unwrap_or_default(), 2));
+            .and_then(|w| w.transcribe(&samples.unwrap_or_default(), 2, &prompts));
         println!("Transcript: {text:?}");
         assert!(text.is_some());
     }

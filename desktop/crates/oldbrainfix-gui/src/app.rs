@@ -73,7 +73,7 @@ use crate::person_view::{self, Comparing, PersonAction, PersonView};
 use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{day_text, occurrence_time, schedule_text};
-use crate::speech::{SpeechModel, Status as SpeechStatus};
+use crate::speech::SpeechModel;
 use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
@@ -523,7 +523,7 @@ pub struct App {
     /// The background threads making Transcripts and Photo Texts.
     transcriber: Option<Enricher>,
     reader: Option<Enricher>,
-    /// The speech model the Transcripts need, and whether it was ready
+    /// The speech model the Transcripts need, and whether one was in use
     /// when last looked at.
     speech: Option<SpeechModel>,
     speech_ready: bool,
@@ -1094,15 +1094,12 @@ impl App {
     }
 
     /// Tells the background threads to look for something to read; the
-    /// Transcripts only once the speech model is ready.
+    /// Transcripts only once a speech model is in use.
     fn kick(&mut self) {
         if let Some(reader) = &self.reader {
             reader.kick();
         }
-        let ready = self
-            .speech
-            .as_ref()
-            .is_none_or(|s| s.status() == SpeechStatus::Ready);
+        let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
         self.speech_ready = ready;
         if ready && let Some(transcriber) = &self.transcriber {
             transcriber.kick();
@@ -1536,7 +1533,7 @@ impl App {
             Action::Speech(asked) => {
                 if let Some(speech) = &self.speech {
                     match asked {
-                        Speech::Download => speech.download(),
+                        Speech::Download(chosen) => speech.download(chosen),
                         Speech::PickFile => {
                             if let Some(path) = (self.model_picker)(self.t.speech_model_pick()) {
                                 speech.take_file(&path);
@@ -2121,11 +2118,8 @@ impl App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
-        // The speech model came: what waited is transcribed now.
-        let ready = self
-            .speech
-            .as_ref()
-            .is_none_or(|s| s.status() == SpeechStatus::Ready);
+        // A speech model came: what waited is transcribed now.
+        let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
         if ready != self.speech_ready {
             self.kick();
         }

@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use egui::{ColorImage, RichText, TextureHandle, TextureOptions, Ui};
 use oldbrainfix_core::Store;
-use oldbrainfix_whisper::model::{MEGABYTES, Outcome};
+use oldbrainfix_whisper::model::{Outcome, WhisperModel};
 
 use crate::app::icon_button;
 use crate::icons;
@@ -293,14 +293,18 @@ pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Optio
 /// What the speech model's card asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Speech {
-    Download,
+    /// The model chosen, to download in place of the one in use.
+    Download(WhisperModel),
     /// A file of the user's own, chosen in the system's dialog.
     PickFile,
     Cancel,
 }
 
-/// The speech model's card in the Settings: what it is, where it comes
-/// from, how it stands, and the buttons to fetch it.
+/// The speech model's card in the Settings: what it is and where it
+/// comes from, how it stands, then the choice of model, each with its
+/// size and trade-off: choosing one downloads it, and only the chosen one
+/// is kept. A file of the user's own works too. Nothing to choose while a
+/// model is being fetched.
 pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -308,7 +312,16 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
     let mut asked = None;
     ui.label(RichText::new(t.speech_model_title()).strong().color(text));
     ui.label(RichText::new(t.speech_model_intro()).color(weak));
-    ui.label(RichText::new(t.speech_model_credit()).small().color(weak));
+    ui.label(
+        RichText::new(t.speech_model_source_models())
+            .small()
+            .color(weak),
+    );
+    ui.label(
+        RichText::new(t.speech_model_credit_models())
+            .small()
+            .color(weak),
+    );
     match model.outcome() {
         Some(Outcome::Failed) => {
             ui.label(RichText::new(t.speech_model_failed()).color(error));
@@ -318,9 +331,11 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
         }
         _ => {}
     }
-    match model.status() {
+    let status = model.status();
+    match status {
         Status::Checking => {
             ui.label(RichText::new(t.speech_model_checking()).color(text));
+            return None;
         }
         Status::Ready => {
             ui.label(RichText::new(t.speech_model_ready()).color(text));
@@ -332,7 +347,8 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
         } => {
             if downloading {
                 let mb = |bytes: u64| format!("{:.0}", bytes as f64 / 1_000_000.0);
-                let total = total.map_or_else(|| MEGABYTES.to_string(), mb);
+                let size = model.chosen().unwrap_or(WhisperModel::Base).megabytes();
+                let total = total.map_or_else(|| size.to_string(), mb);
                 ui.label(
                     RichText::new(t.speech_model_downloading(&mb(received), &total)).color(text),
                 );
@@ -344,29 +360,43 @@ pub fn speech_card(ui: &mut Ui, t: &L10n, model: &SpeechModel) -> Option<Speech>
         }
         Status::Missing => {
             ui.label(RichText::new(t.speech_model_missing()).color(text));
-            ui.label(
-                RichText::new(t.speech_model_source(MEGABYTES))
-                    .small()
-                    .color(weak),
-            );
-            if ui
-                .button(RichText::new(t.speech_model_download(MEGABYTES)).color(text))
-                .clicked()
-            {
-                asked = Some(Speech::Download);
-            }
-            if ui
-                .button(RichText::new(t.speech_model_pick()).color(text))
-                .clicked()
-            {
-                asked = Some(Speech::PickFile);
-            }
-            ui.label(
-                RichText::new(t.speech_model_pick_detail())
-                    .small()
-                    .color(weak),
-            );
         }
     }
+    let idle = !matches!(status, Status::Fetching { .. });
+    let chosen = model.chosen();
+    ui.label(RichText::new(t.speech_model_choice()).strong().color(text));
+    for (option, title, detail) in [
+        (
+            WhisperModel::Base,
+            t.speech_model_base(WhisperModel::Base.megabytes()),
+            t.speech_model_base_detail(),
+        ),
+        (
+            WhisperModel::Small,
+            t.speech_model_small(WhisperModel::Small.megabytes()),
+            t.speech_model_small_detail(),
+        ),
+    ] {
+        let radio =
+            egui::RadioButton::new(chosen == Some(option), RichText::new(title).color(text));
+        if ui.add_enabled(idle, radio).clicked() && chosen != Some(option) {
+            asked = Some(Speech::Download(option));
+        }
+        ui.label(RichText::new(detail).small().color(weak));
+    }
+    ui.label(
+        RichText::new(t.speech_model_keeps_one())
+            .small()
+            .color(weak),
+    );
+    let pick = egui::Button::new(RichText::new(t.speech_model_pick()).color(text));
+    if ui.add_enabled(idle, pick).clicked() {
+        asked = Some(Speech::PickFile);
+    }
+    ui.label(
+        RichText::new(t.speech_model_pick_either())
+            .small()
+            .color(weak),
+    );
     asked
 }

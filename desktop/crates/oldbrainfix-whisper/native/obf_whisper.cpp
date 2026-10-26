@@ -1,7 +1,7 @@
 // The C bridge from Rust to whisper.cpp for the desktop's voice Notes,
 // the desktop's twin of the phone's whisper_jni.cpp: load a model,
-// transcribe 16 kHz mono float samples in English or German, let the
-// model go. Rust only passes pointers and numbers, never whisper's own
+// transcribe 16 kHz mono float samples in English or German, led in with
+// the prompt for that language, let the model go. Rust only passes pointers and numbers, never whisper's own
 // structs. Everything runs on the caller's thread.
 
 #include <algorithm>
@@ -42,12 +42,17 @@ whisper_context *obf_whisper_open(const char *path) {
 
 // The words in [count] [samples] as UTF-8, to be freed with
 // obf_whisper_free_text; null when they could not be transcribed.
+// Whisper is led in with the UTF-8 [english] or [german] prompt,
+// whichever language it hears; null or empty for none.
 char *obf_whisper_transcribe(whisper_context *ctx, const float *samples, int count,
-                             int threads) {
+                             int threads, const char *english, const char *german) {
     if (ctx == nullptr || samples == nullptr || count <= 0) return nullptr;
     whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.n_threads = std::max(1, threads);
     params.language = english_or_german(ctx, samples, count, params.n_threads);
+    // The caller keeps both until whisper_full is done with them.
+    const char *prompt = std::strcmp(params.language, "de") == 0 ? german : english;
+    params.initial_prompt = (prompt == nullptr || *prompt == '\0') ? nullptr : prompt;
     params.translate = false;
     params.no_timestamps = true;
     params.print_progress = false;

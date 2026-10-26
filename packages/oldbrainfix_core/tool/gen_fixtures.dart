@@ -2983,6 +2983,177 @@ void _writeBytes(File file, List<int> bytes) {
   file.writeAsBytesSync(bytes);
 }
 
+/// The ARB key of each Starter Set place's translation in the app.
+const _starterKeys = {
+  'household': 'starterHousehold',
+  'kitchen': 'starterKitchen',
+  'garden': 'starterGarden',
+  'cleaning': 'starterCleaning',
+  'work': 'starterWork',
+  'meetings': 'starterMeetings',
+  'to-sort-out': 'starterToSortOut',
+  'car': 'starterCar',
+  'service': 'starterService',
+  'repairs': 'starterRepairs',
+  'health': 'starterHealth',
+  'doctor': 'starterDoctor',
+  'medication': 'starterMedication',
+};
+
+/// The app's words Whisper is told and the Starter Set's names, as the
+/// app's [locale] shows them, read from its ARB file.
+({List<String> terms, Map<String, String> starters}) _uiTexts(String locale) {
+  final arb = jsonDecode(
+    File.fromUri(Platform.script.resolve('../../../lib/l10n/app_$locale.arb'))
+        .readAsStringSync(),
+  ) as Map<String, Object?>;
+  String text(String key) => arb[key]! as String;
+  return (
+    terms: [text('unsorted'), text('routine'), text('agenda')],
+    starters: {
+      for (final MapEntry(:key, :value) in _starterKeys.entries)
+        key: text(value),
+    },
+  );
+}
+
+/// The name [slug] and [name] show under: a Starter Set place's
+/// translation in [starters] while it keeps its canonical name, else the
+/// name as stored.
+String _shownName(Map<String, String> starters, String? slug, String name) {
+  if (slug == null) return name;
+  final canonical = {
+    for (final area in starterSet) ...{
+      area.slug: area.name,
+      for (final topic in area.topics) topic.slug: topic.name,
+    },
+  };
+  if (canonical[slug] != name) return name;
+  return starters[slug] ?? name;
+}
+
+/// The lead-ins Whisper gets: name lists as given, and three stores,
+/// each seen in English and German: one with the Starter Set, one with
+/// names too long to all fit, one with more names than are listed.
+Map<String, Object?> _transcriptPrompts() {
+  final lists = [
+    (names: ['Work', 'Garten', 'Fahrradladen'], terms: ['Unsortiert']),
+    (names: <String>[], terms: <String>[]),
+    (names: <String>[], terms: [' Unsorted ', '', 'Agenda']),
+    (
+      names: [' Work ', '', 'work', 'WORK', '  ', '﻿Home ', 'home'],
+      terms: <String>[],
+    ),
+    (
+      names: [
+        'ΟΔΟΣ',
+        'οδοσ',
+        'Straße',
+        'STRASSE',
+        'İstanbul',
+        'istanbul',
+        '𐐀',
+        '𐐨',
+      ],
+      terms: <String>[],
+    ),
+    (names: ['x' * 500, 'Work', '🚲 Fahrrad', 'Café'], terms: ['Unsortiert']),
+    (names: [for (var i = 0; i < 100; i++) 'N$i'], terms: <String>[]),
+    (
+      names: [
+        for (var i = 0; i < 200; i++) 'Grundstücksverwaltungsangelegenheit $i',
+      ],
+      terms: ['Unsortiert', 'Routine', 'Agenda'],
+    ),
+    (names: ['Work'], terms: ['y' * 500]),
+  ];
+  final stores = <String, void Function(Places)>{
+    'starters': (places) {
+      places.plantStarterSet({
+        for (final area in starterSet) ...{
+          area.slug,
+          for (final topic in area.topics) topic.slug,
+        },
+      });
+      final car = places.areas().firstWhere((a) => a.starter == 'car');
+      places.rename(car.id, 'Bike');
+      final kids = places.addArea('Kids');
+      places.addTopic(kids.id, 'School');
+    },
+    'many': (places) {
+      places.plantStarterSet({'household', 'kitchen', 'garden', 'work'});
+      places.addArea('garten');
+      places.addArea('🚲 Fahrrad');
+      places.addArea(
+        'Grundstücksverwaltungsangelegenheiten der Familie '
+        'Müller-Lüdenscheidt',
+      );
+      final short = places.addArea('Kurz');
+      for (var i = 1; i <= 45; i++) {
+        places.addTopic(short.id, 'K$i');
+      }
+      places.addTopic(short.id, 'k1');
+    },
+    'numbers': (places) {
+      final numbers = places.addArea('Nummern');
+      for (var i = 1; i <= 50; i++) {
+        places.addTopic(numbers.id, '$i');
+      }
+    },
+  };
+  final texts = {
+    for (final locale in ['en', 'de']) locale: _uiTexts(locale),
+  };
+  final storeJson = <String, Object?>{};
+  final views = <Map<String, Object?>>[];
+  for (final MapEntry(key: name, value: build) in stores.entries) {
+    final store = _store();
+    try {
+      final places = Places(store);
+      build(places);
+      storeJson[name] = [for (final e in store.allEntries()) e.toJson()];
+      for (final MapEntry(key: locale, value: ui) in texts.entries) {
+        final prompts = TranscriptPrompts.forPlaces(
+          places,
+          terms: ui.terms,
+          areaName: (area) => _shownName(ui.starters, area.starter, area.name),
+          topicName: (topic) =>
+              _shownName(ui.starters, topic.starter, topic.name),
+        );
+        views.add({
+          'store': name,
+          'locale': locale,
+          'english': prompts.english,
+          'german': prompts.german,
+        });
+      }
+    } finally {
+      store.close();
+    }
+  }
+  return {
+    'germanLeadIn': TranscriptPrompts.germanLeadIn,
+    'maxLength': TranscriptPrompts.maxLength,
+    'maxNames': TranscriptPrompts.maxNames,
+    'lists': [
+      for (final (:names, :terms) in lists)
+        if (TranscriptPrompts.of(names: names, terms: terms) case final p)
+          {
+            'names': names,
+            'terms': terms,
+            'english': p.english,
+            'german': p.german,
+          },
+    ],
+    'ui': {
+      for (final MapEntry(key: locale, value: ui) in texts.entries)
+        locale: {'terms': ui.terms, 'starters': ui.starters},
+    },
+    'stores': storeJson,
+    'views': views,
+  };
+}
+
 const _json = JsonEncoder.withIndent('  ');
 
 void _write(File file, String text) {
@@ -3295,6 +3466,12 @@ Future<void> main(List<String> args) async {
     '- `crypto.json`: messages sealed with XChaCha20-Poly1305 under given '
     'keys, nonces and what they are bound to; a key\'s id; a blob\'s name '
     'in the shared folder.\n'
+    '- `transcript_prompts.json`: the lead-ins Whisper gets: name lists '
+    'with the app\'s words as given, and three stores, as their entries, '
+    'seen with the English and the German app\'s words and Starter Set '
+    'names (`ui`, from the app\'s ARB files): the whole Starter Set with '
+    'one Area renamed, one with names too long to all fit, repeats in '
+    'another case among them, and one with more names than are listed.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -3396,6 +3573,10 @@ Future<void> main(List<String> args) async {
   );
   _write(File('${root.path}/keys.json'), '${_json.convert(_keys())}\n');
   _write(File('${root.path}/crypto.json'), '${_json.convert(_crypto())}\n');
+  _write(
+    File('${root.path}/transcript_prompts.json'),
+    '${_json.convert(_transcriptPrompts())}\n',
+  );
   _sync(root);
   _conflictsFixture(root);
   await _folder(root);
