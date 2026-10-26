@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
@@ -9,6 +10,7 @@ import 'l10n/app_localizations.dart';
 import 'src/about_screen.dart';
 import 'src/alarm_platform.dart';
 import 'src/alarm_sync.dart';
+import 'src/announcements.dart';
 import 'src/app.dart';
 import 'src/auto_sync.dart';
 import 'src/bundle_platform.dart';
@@ -16,6 +18,7 @@ import 'src/calendar_mirror.dart';
 import 'src/calendar_platform.dart';
 import 'src/capture_requests.dart';
 import 'src/context_platform.dart';
+import 'src/crash_guard.dart';
 import 'src/drafts.dart';
 import 'src/folder_platform.dart';
 import 'src/location.dart';
@@ -29,15 +32,56 @@ import 'src/speech_platform.dart';
 import 'src/sync_platform.dart';
 import 'src/voice_platform.dart';
 
+/// The store the running app writes to; closed before Restart opens it
+/// again.
+Store? _store;
+
+/// What the app has to say; one for the whole run, across Restarts.
+final _announcements = Announcements();
+
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  registerLicenses();
-  final dir = await getApplicationSupportDirectory();
+  await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    registerLicenses();
+    final dir = await getApplicationSupportDirectory();
+    // Armed before the store opens: a failure while opening it has to
+    // reach the user instead of dying in a zone with nothing to catch it.
+    // Restart closes what is left and opens it again.
+    await initCrashGuard(
+      dir,
+      restart: () {
+        try {
+          _store?.close();
+        } catch (_) {}
+        unawaited(_openAndRun(dir));
+      },
+    );
+    // Read the marker before arming it again: dirty means the last run
+    // was killed without going out of sight first.
+    if (await previousRunDied()) {
+      final locale = basicLocaleListResolution(
+        PlatformDispatcher.instance.locales,
+        AppLocalizations.supportedLocales,
+      );
+      offerCrashReport(_announcements, lookupAppLocalizations(locale));
+    }
+    markRunning();
+    // Out of sight is a clean end; back on screen, running again.
+    AppLifecycleListener(onHide: markCleanExit, onShow: markRunning);
+    await _openAndRun(dir);
+  }, reportCrash);
+}
+
+/// Opens the store and starts the app. Separate from [main] because the
+/// crash screen's Restart runs it again.
+Future<void> _openAndRun(Directory dir) async {
   final work = await getTemporaryDirectory();
   final store = Store.open('${dir.path}/oldbrainfix.db');
+  _store = store;
   runApp(
     OldBrainFixApp(
       store: store,
+      announcements: _announcements,
       drafts: FileDrafts(Directory('${dir.path}/drafts')),
       location: const AndroidLocation(),
       alarms: AndroidAlarms(),

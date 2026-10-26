@@ -3799,6 +3799,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Their Notes'**
   String get personTheirNotes;
+
+  /// Title of the crash screen that replaces the app after an unexpected error.
+  ///
+  /// In en, this message translates to:
+  /// **'That should not have happened'**
+  String get crashTitle;
+
+  /// Text of the crash screen, under its title.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix ran into an unexpected error. Your saved Notes are safe. Restart the app, and if this happens again, send the report so it can be fixed.'**
+  String get crashBody;
+
+  /// Crash screen button: starts the app again.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart the app'**
+  String get crashRestart;
+
+  /// Crash screen button: opens a mail to the developer with the error report.
+  ///
+  /// In en, this message translates to:
+  /// **'Send report to the developer'**
+  String get crashSendReport;
+
+  /// Announcement at the next start after the app died; tapping it opens a mail with the report.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.'**
+  String get crashLastRunBody;
 }
 
 class _AppLocalizationsDelegate

@@ -1,6 +1,8 @@
 package io.github.paxel.oldbrainfix
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
@@ -351,6 +353,12 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        // Why the process died last time, as Android 11+ remembers it: a
+        // battery saver's kill is not a crash and gets no report.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, EXIT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "lastExit") result.success(lastExit()) else result.notImplemented()
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCK_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -641,6 +649,36 @@ class MainActivity : FlutterActivity() {
      * Whether [intent] is the Agenda widget's Unsorted count, not a
      * reopening from the recent apps with it.
      */
+    /**
+     * The newest exit record of this app: the reason in a word, whether
+     * the app was on screen, when, and the system's own description.
+     * Null before Android 11 or when the system holds no record.
+     */
+    private fun lastExit(): Map<String, Any?>? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return try {
+            val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+            val info = manager.getHistoricalProcessExitReasons(packageName, 0, 1)
+                .firstOrNull() ?: return null
+            val reason = when (info.reason) {
+                ApplicationExitInfo.REASON_CRASH -> "crash"
+                ApplicationExitInfo.REASON_CRASH_NATIVE -> "native"
+                ApplicationExitInfo.REASON_ANR -> "anr"
+                ApplicationExitInfo.REASON_LOW_MEMORY -> "low_memory"
+                else -> "other"
+            }
+            mapOf(
+                "reason" to reason,
+                "foreground" to
+                    (info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND),
+                "timestamp" to info.timestamp,
+                "description" to (info.description ?: ""),
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun opensUnsorted(intent: Intent?): Boolean =
         intent?.getBooleanExtra(EXTRA_UNSORTED, false) == true &&
             intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
@@ -656,6 +694,7 @@ class MainActivity : FlutterActivity() {
         private const val OCR_CHANNEL = "io.github.paxel.oldbrainfix/ocr"
         private const val CALENDAR_CHANNEL = "io.github.paxel.oldbrainfix/calendar"
         private const val LOCK_CHANNEL = "io.github.paxel.oldbrainfix/lock"
+        private const val EXIT_CHANNEL = "io.github.paxel.oldbrainfix/exit"
         private const val PAIRING_CHANNEL = "io.github.paxel.oldbrainfix/pairing"
         const val SYNC_CHANNEL = "io.github.paxel.oldbrainfix/sync"
         private const val BUNDLE_CHANNEL = "io.github.paxel.oldbrainfix/bundle"

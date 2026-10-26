@@ -15,4 +15,7 @@
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+    <style name="CrashTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorAccent">@color/capture_teal</item>
+    </style>
 </resources>

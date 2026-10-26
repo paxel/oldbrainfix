@@ -1274,5 +1274,25 @@
   "personTheirNotes": "Their Notes",
   "@personTheirNotes": {
     "description": "On another person's Profile: opens All Notes with only the Notes this person wrote."
+  },
+  "crashTitle": "That should not have happened",
+  "@crashTitle": {
+    "description": "Title of the crash screen that replaces the app after an unexpected error."
+  },
+  "crashBody": "Old Brain Fix ran into an unexpected error. Your saved Notes are safe. Restart the app, and if this happens again, send the report so it can be fixed.",
+  "@crashBody": {
+    "description": "Text of the crash screen, under its title."
+  },
+  "crashRestart": "Restart the app",
+  "@crashRestart": {
+    "description": "Crash screen button: starts the app again."
+  },
+  "crashSendReport": "Send report to the developer",
+  "@crashSendReport": {
+    "description": "Crash screen button: opens a mail to the developer with the error report."
+  },
+  "crashLastRunBody": "Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.",
+  "@crashLastRunBody": {
+    "description": "Announcement at the next start after the app died; tapping it opens a mail with the report."
   }
 }

@@ -48,7 +48,7 @@
          the encrypted Backup file, never the database. -->
     <application
         android:label="Old Brain Fix"
-        android:name="${applicationName}"
+        android:name=".OldBrainFixApplication"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
         android:backupAgent=".AutoBackupAgent"
@@ -79,6 +79,14 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+        <!-- A crash in the Kotlin code, shown in a process of its own
+             (CrashLog.kt). -->
+        <activity
+            android:name=".CrashActivity"
+            android:process=":crash"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/CrashTheme"/>
         <!-- The share target: images, text and links from other apps. It
              only hands the share over to MainActivity. -->
         <activity

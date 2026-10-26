@@ -2337,4 +2337,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personTheirNotes => 'Their Notes';
+
+  @override
+  String get crashTitle => 'That should not have happened';
+
+  @override
+  String get crashBody =>
+      'Old Brain Fix ran into an unexpected error. Your saved Notes are safe. Restart the app, and if this happens again, send the report so it can be fixed.';
+
+  @override
+  String get crashRestart => 'Restart the app';
+
+  @override
+  String get crashSendReport => 'Send report to the developer';
+
+  @override
+  String get crashLastRunBody =>
+      'Old Brain Fix stopped unexpectedly last time. Tap here to send a short report to the developer.';
 }

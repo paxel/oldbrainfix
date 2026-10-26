@@ -16,4 +16,10 @@
     <string name="agenda_widget_open_app">Open Old Brain Fix to see what\'s due today.</string>
     <!-- The "open with" and share choice for sync bundles. -->
     <string name="bundle_import">Import into Old Brain Fix</string>
+    <!-- The crash screen of the Kotlin code (CrashActivity), shown without
+         Flutter; same meaning as crashTitle and crashBody in lib/l10n. -->
+    <string name="crash_title">That should not have happened</string>
+    <string name="crash_body">Old Brain Fix ran into an unexpected error and had to stop. Your saved Notes are safe. Open the app again, and if this happens again, send the report so it can be fixed.</string>
+    <string name="crash_send_report">Send report to the developer</string>
+    <string name="crash_close">Close</string>
 </resources>

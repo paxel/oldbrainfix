@@ -616,5 +616,10 @@
   "personFilterMe": "Mir",
   "personFilterEveryone": "Allen",
   "personFilterShowing": "Nur Notizen von",
-  "personTheirNotes": "Notizen dieser Person"
+  "personTheirNotes": "Notizen dieser Person",
+  "crashTitle": "Das hätte nicht passieren dürfen",
+  "crashBody": "Old Brain Fix ist auf einen unerwarteten Fehler gestoßen. Deine gespeicherten Notizen sind sicher. Starte die App neu, und wenn es wieder passiert, schick den Bericht, damit es behoben werden kann.",
+  "crashRestart": "App neu starten",
+  "crashSendReport": "Bericht an den Entwickler senden",
+  "crashLastRunBody": "Old Brain Fix wurde beim letzten Mal unerwartet beendet. Tippe hier, um dem Entwickler einen kurzen Bericht zu schicken."
 }

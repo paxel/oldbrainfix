@@ -12,4 +12,8 @@
     <string name="agenda_widget_description">Die Routinen und Erinnerungen von heute zum Abhaken und was unsortiert ist.</string>
     <string name="agenda_widget_open_app">Öffne Old Brain Fix, um zu sehen, was heute ansteht.</string>
     <string name="bundle_import">In Old Brain Fix importieren</string>
+    <string name="crash_title">Das hätte nicht passieren dürfen</string>
+    <string name="crash_body">Old Brain Fix ist auf einen unerwarteten Fehler gestoßen und musste beendet werden. Deine gespeicherten Notizen sind sicher. Öffne die App wieder, und wenn es wieder passiert, schick den Bericht, damit es behoben werden kann.</string>
+    <string name="crash_send_report">Bericht an den Entwickler senden</string>
+    <string name="crash_close">Schließen</string>
 </resources>
