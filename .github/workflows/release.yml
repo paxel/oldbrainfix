@@ -411,8 +411,8 @@ jobs:
           ls archive/oldbrainfix-*-android-arm64-v8a.apk 2>/dev/null | sort -V | head -n -2 | xargs -r rm -f
           cp "$GITHUB_WORKSPACE/apks/oldbrainfix-$v-android-arm64-v8a.apk" repo/
           # The store listing travels with the app: only this app's files
-          # are replaced, the other apps' stay untouched. No store graphics
-          # or screenshots yet: F-Droid takes the icon from the APK.
+          # are replaced, the other apps' stay untouched. The icon and the
+          # phone screenshots come along from fastlane's images folders.
           id=io.github.paxel.oldbrainfix
           app="$GITHUB_WORKSPACE/app"
           mkdir -p metadata
