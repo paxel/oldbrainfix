@@ -2,7 +2,23 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.1.0]
+## [0.1.1]
+
+### Neu
+- Auf dem Telefon wird der Download des Sprachmodells einmal nach der Startauswahl angeboten.
+- Der Routinen-Editor auf dem Telefon baut ohne Tippen einer Wiederholungsregel einen Tag des Monats, den ersten bis vierten oder letzten Wochentag des Monats und ein Ende (nie, an einem Tag oder nach einer Anzahl von Malen).
+- Ein großer roter Knopf auf der Seite „Über Old Brain Fix“ des Telefons.
+
+### Geändert
+- Die Agenda auf dem Telefon zeigt die ganze Woche: nach morgen die fünf folgenden Tage, jeder unter Wochentag und Datum, ein leerer Tag als „Nichts geplant“.
+- Auf dem Telefon zeigt ein Bereich nur seine Notizen ohne Thema; eine Suche im Bereich findet weiter die Notizen seiner Themen.
+- Die Erfassen-Seite auf dem Telefon hat große Knöpfe für Foto und Sprache über der Erinnerungsauswahl statt Symbolen in der oberen Leiste.
+- Auf dem Telefon ist jede einzelne Auswahl eine Spalte von Optionsfeldern, und jeder Schalter, Knopf und jede Liste steht in einer eigenen Zeile unter ihrem Text.
+
+### Behoben
+- Bei Navigation mit drei Knöpfen liegt das Ende der Seiten auf dem Telefon nicht mehr unter der Navigationsleiste.
+
+## [0.1.0] - 2026-10-26
 
 ### Neu
 - Einen Gedanken mit einem Tipp auf + als Textnotiz erfassen; wer mit Zurück geht oder die App wechselt, behält sie.
@@ -61,3 +77,4 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Eine Dokumentation auf Englisch und Deutsch mit Glossar, "Was ist neu" und Datenschutzerklärung, verlinkt von "Über" auf dem Handy und am Computer.
 - Eine Computer-App für Linux, Windows und macOS im Aussehen des Handys, die Notizen erfasst, bearbeitet und sortiert, Bereiche, Themen, Routinen und Erinnerungen verwaltet, die Agenda wie das Handy zeigt, Sprachnotizen aufnimmt und abspielt, eingefügte Bilder als Fotonotizen behält, Transkripte mit Whisper und Fototexte mit ocrs schreibt und Notizen über ihren Text, ihre Transkripte und Fototexte findet, mit Ablegen per Ziehen und Loslassen, Tasten statt Wischen, Benachrichtigungen mit Erneut erinnern von einem Tray-Symbol, das bei der Anmeldung startet, wenn es nicht ausgeschaltet ist, und einem kleinen Erfassungsfenster, das ein globales Tastenkürzel, das Tray oder der Befehl `oldbrainfix capture` öffnet, wobei der Befehl einen mitgegebenen Text auch als Notiz behält, ohne etwas zu öffnen; sie kommt als .deb, AppImage und Flatpak, über Homebrew und Scoop, und steht mit eigenem Symbol im Anwendungsmenü.
 - Ein Profil mit deinem Namen, Bild und Kurzcode, ohne Nachfrage aus dem Namen des Handys oder der Anmeldung am Computer übernommen und auf allen deinen Geräten dasselbe, wobei das Koppeln zweier Geräte mit je einem benannten Profil einmal fragt, welches du bist; seine Seite bündelt Sicherungen, deine Geräte, die Personen, die du kennst, und die Einstellungen, und das Profil jeder anderen Person zeigt ihren Kurzcode, eine Möglichkeit, ihn zu vergleichen, einen eigenen Namen und ein eigenes Bild für sie, die nur deine Geräte sehen, und öffnet ihre Notizen; der Notizbrowser kann nur die Notizen der Personen zeigen, die du wählst, dich eingeschlossen.
+- Auf dem Telefon zeigt ein Absturz, was passiert ist, mit Knöpfen zum Neustart der App und zum Mailen eines Berichts an den Entwickler; ein unerwartetes Ende wird beim nächsten Start als Bericht angeboten.
