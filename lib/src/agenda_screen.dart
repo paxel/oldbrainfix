@@ -495,75 +495,80 @@ class _AgendaScreenState extends State<AgendaScreen> {
           ),
         ],
       ),
-      body: ListView(
-        // Room under the last row for the floating buttons.
-        padding: clearOfSystemBars(
-          context,
-          const EdgeInsets.only(top: 8, bottom: 160),
-        ),
-        children: [
-          if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
-          if (!_missed.isEmpty)
-            MissedSummaryCard(
-              summary: _missed,
-              masks: _locks.masks,
-              onCheck: _checkMissed,
-              onSeen: _seen,
-            ),
-          if (_unsorted > 0)
-            _UnsortedBanner(count: _unsorted, onTap: _openUnsorted),
-          if (captured != null) ...[
-            _Heading(t.justCaptured),
-            NoteCard(
-              note: captured.note,
-              when: DateFormat.yMd(locale).add_Hm(),
-              area: captured.area,
-              topic: captured.topic,
-              showPlace: true,
-              onFile: () => _file(captured.note),
-              onMerge: () => _merge(captured.note),
-              onSchedule: (reminder) => _schedule(captured.note, reminder),
-              actions: noteActions(context, widget.notes, captured, _reload),
-              onTap: () => _open(captured.note),
-            ),
-          ],
-          _Heading(t.agendaToday),
-          if (_today.isEmpty)
-            BrowserEmpty(text: t.nothingToday)
-          else
-            ...rows(_today),
-          // The visible gap between today and tomorrow.
-          const SizedBox(height: 32),
-          Opacity(
-            opacity: AgendaScreen.tomorrowOpacity,
-            child: Column(
-              children: [
-                _Heading(t.agendaTomorrow),
-                if (_tomorrow.isEmpty)
-                  BrowserEmpty(text: t.nothingTomorrow)
-                else
-                  ...rows(_tomorrow),
-              ],
-            ),
+      // Swipe left opens the notes browser, as the magnifier does.
+      body: BrowserSwipes(
+        onForward: _browse,
+        back: false,
+        child: ListView(
+          // Room under the last row for the floating buttons.
+          padding: clearOfSystemBars(
+            context,
+            const EdgeInsets.only(top: 8, bottom: 160),
           ),
-          // The days after, each under its weekday and date; one with
-          // nothing due still shows.
-          for (final (:day, rows: later) in _later) ...[
-            const SizedBox(height: 16),
+          children: [
+            if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
+            if (!_missed.isEmpty)
+              MissedSummaryCard(
+                summary: _missed,
+                masks: _locks.masks,
+                onCheck: _checkMissed,
+                onSeen: _seen,
+              ),
+            if (_unsorted > 0)
+              _UnsortedBanner(count: _unsorted, onTap: _openUnsorted),
+            if (captured != null) ...[
+              _Heading(t.justCaptured),
+              NoteCard(
+                note: captured.note,
+                when: DateFormat.yMd(locale).add_Hm(),
+                area: captured.area,
+                topic: captured.topic,
+                showPlace: true,
+                onFile: () => _file(captured.note),
+                onMerge: () => _merge(captured.note),
+                onSchedule: (reminder) => _schedule(captured.note, reminder),
+                actions: noteActions(context, widget.notes, captured, _reload),
+                onTap: () => _open(captured.note),
+              ),
+            ],
+            _Heading(t.agendaToday),
+            if (_today.isEmpty)
+              BrowserEmpty(text: t.nothingToday)
+            else
+              ...rows(_today),
+            // The visible gap between today and tomorrow.
+            const SizedBox(height: 32),
             Opacity(
               opacity: AgendaScreen.tomorrowOpacity,
               child: Column(
                 children: [
-                  _Heading(t.agendaDay(day.wall)),
-                  if (later.isEmpty)
-                    _NothingPlanned(t.nothingPlanned)
+                  _Heading(t.agendaTomorrow),
+                  if (_tomorrow.isEmpty)
+                    BrowserEmpty(text: t.nothingTomorrow)
                   else
-                    ...rows(later),
+                    ...rows(_tomorrow),
                 ],
               ),
             ),
+            // The days after, each under its weekday and date; one with
+            // nothing due still shows.
+            for (final (:day, rows: later) in _later) ...[
+              const SizedBox(height: 16),
+              Opacity(
+                opacity: AgendaScreen.tomorrowOpacity,
+                child: Column(
+                  children: [
+                    _Heading(t.agendaDay(day.wall)),
+                    if (later.isEmpty)
+                      _NothingPlanned(t.nothingPlanned)
+                    else
+                      ...rows(later),
+                  ],
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,

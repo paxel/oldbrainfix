@@ -37,20 +37,30 @@ class BrowserTrail {
 }
 
 /// Swipe right goes back one level, swipe left forward into the last
-/// selected Area or Topic, when there is one.
+/// selected Area or Topic, when there is one. The Agenda is the level
+/// above the Areas list: there swipe left opens it and swipe right,
+/// with [back] false, does nothing.
 class BrowserSwipes extends StatelessWidget {
   /// Below this horizontal speed (pixels per second) a drag is no swipe.
   static const _minSpeed = 300.0;
 
   final VoidCallback? onForward;
+
+  /// Whether swipe right leaves this level.
+  final bool back;
   final Widget child;
 
-  const BrowserSwipes({super.key, required this.child, this.onForward});
+  const BrowserSwipes({
+    super.key,
+    required this.child,
+    this.onForward,
+    this.back = true,
+  });
 
   void _ended(BuildContext context, DragEndDetails details) {
     final speed = details.primaryVelocity ?? 0;
     if (speed > _minSpeed) {
-      Navigator.of(context).maybePop();
+      if (back) Navigator.of(context).maybePop();
     } else if (speed < -_minSpeed) {
       onForward?.call();
     }

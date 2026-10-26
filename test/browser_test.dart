@@ -317,6 +317,61 @@ void main() {
   });
 
   group('swipes', () {
+    testWidgets('left on the Agenda opens the Areas list, right returns', (
+      tester,
+    ) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+
+      // The Agenda is the top level: right leads nowhere.
+      await swipe(tester, 400);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+
+      await swipe(tester, -400);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+
+      await swipe(tester, 400);
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('a vertical drag on the Agenda scrolls, it does not swipe', (
+      tester,
+    ) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.fling(
+        find.byType(BrowserSwipes),
+        const Offset(0, -400),
+        1000,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+    });
+
+    testWidgets('from the Agenda left goes on into the last Area and Topic', (
+      tester,
+    ) async {
+      await openBrowser(tester);
+      await open(tester, 'Household');
+      await open(tester, 'Kitchen');
+      for (var i = 0; i < 3; i++) {
+        await swipe(tester, 400);
+      }
+      expect(find.byType(AgendaScreen), findsOneWidget);
+
+      await swipe(tester, -400);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      await swipe(tester, -400);
+      expect(find.byType(AreaScreen), findsOneWidget);
+      await swipe(tester, -400);
+      expect(find.byType(TopicScreen), findsOneWidget);
+    });
+
     testWidgets('right goes back: Topic, Area, Areas, then the home screen', (
       tester,
     ) async {

@@ -16,10 +16,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   opens the Profile page: picture, name and short code; Backups and
   recovery; Your Devices; People; Settings of this Device, with About
   inside. No hamburger menu, no ⋮ menu for them.
-- In the notes browser, **swipe right goes back** one level (Topic,
-  Area, Agenda) and **swipe left goes forward** into the last selected
-  Area or Topic, if there is one. The last selected Area and Topic are
-  highlighted.
+- The levels run Agenda, Areas list, Area, Topic: **the Agenda is the
+  level above the Areas list**. **Swipe left on the Agenda opens the
+  Areas list**, as the magnifier does. In the notes browser, **swipe
+  right goes back** one level (Topic, Area, Areas list, Agenda) and
+  **swipe left goes forward** into the last selected Area or Topic, if
+  there is one. The last selected Area and Topic are highlighted.
 - Every browser level (Areas, Topics, Notes) has a "+" that adds the
   thing shown on that level.
 - **Nothing slides in from the bottom**, anywhere: a bottom sheet is a
@@ -36,6 +38,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   itself.
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
+- **A horizontal swipe only navigates** (see Navigation); it never
+  changes data or swipes a row or card away.
 
 ## Announcements
 
