@@ -299,7 +299,11 @@ final _scenarios = <Scenario>[
         'empty ones for nothing found; a Note with a Photo Text and one '
         'with an untranscribed recording merged into another; a trashed '
         'Note whose media waits for nothing; a photo from another Device '
-        'whose bytes are not here.',
+        'whose bytes are not here; a photo that may be removed; a photo '
+        'removed and its Photo Text kept, '
+        'its bytes kept for the other Note showing it; a merged Note\'s '
+        'photo and a recording removed, their bytes gone, their texts '
+        'kept.',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -324,7 +328,7 @@ final _scenarios = <Scenario>[
         photos: [_photo(2), _photo(3)],
         recordings: [_recording(2)],
       );
-      notes.addPhoto(shed.id, _photo(4));
+      final key = notes.addPhoto(shed.id, _photo(4));
       notes.addRecording(shed.id, _recording(3));
       notes.setTranscript(shed.id, shed.recordings.single, '');
       notes.setPhotoText(shed.id, shed.photos.first, '');
@@ -345,6 +349,10 @@ final _scenarios = <Scenario>[
       );
       notes.trash(binned.id);
       store.append(dentist.id, NoteKeys.photo('ab' * 32), NoteKeys.photoAdded);
+      notes.setPhotoText(shed.id, key, 'Spare key under the pot');
+      notes.removePhoto(receipt.id, receipt.photos.single);
+      notes.removePhoto(card.id, card.photos.single);
+      notes.removeRecording(voice.id, voice.recordings.single);
     },
   ),
   (
@@ -559,6 +567,8 @@ Map<String, Object?> _note(Note note) => {
   'recordings': note.recordings,
   'transcripts': note.transcripts,
   'photoTexts': note.photoTexts,
+  'removedPhotos': note.removedPhotos,
+  'removedRecordings': note.removedRecordings,
 };
 
 Map<String, Object?> _section(Section section) => {
@@ -573,7 +583,18 @@ Map<String, Object?> _section(Section section) => {
   'recordings': section.recordings,
   'transcripts': section.transcripts,
   'photoTexts': section.photoTexts,
+  'removedPhotos': section.removedPhotos,
+  'removedRecordings': section.removedRecordings,
 };
+
+/// The photos and recordings of [note] this Device may remove and keep
+/// the text of, as `photo/<hash>` and `audio/<hash>`.
+List<String> _removable(Notes notes, Note note) => [
+  for (final hash in note.photos)
+    if (notes.mayRemovePhoto(note.id, hash)) 'photo/$hash',
+  for (final hash in note.recordings)
+    if (notes.mayRemoveRecording(note.id, hash)) 'audio/$hash',
+];
 
 List<Map<String, String>> _blobs(List<({String noteId, String hash})> list) => [
   for (final b in list) {'noteId': b.noteId, 'hash': b.hash},
@@ -630,6 +651,12 @@ Map<String, Object?> _expected(Store store) {
     },
     'untranscribed': _blobs(notes.untranscribed()),
     'unreadPhotos': _blobs(notes.unreadPhotos()),
+    'removable': {
+      for (final id in noteIds)
+        if (notes.byId(id) case final note?)
+          if (_removable(notes, note) case final refs when refs.isNotEmpty)
+            id: refs,
+    },
     'search': {
       for (final query in _queries)
         query: [for (final n in Search(store).notes(query)) n.id],

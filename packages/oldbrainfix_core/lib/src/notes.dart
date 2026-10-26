@@ -5,6 +5,7 @@ import 'named_places.dart';
 import 'places.dart';
 import 'shared_areas.dart';
 import 'store.dart';
+import 'sync.dart';
 import 'text_format.dart';
 
 /// Field keys of a Note.
@@ -44,7 +45,8 @@ abstract final class NoteKeys {
 
   /// One field per photo, `photo:<hash>` = [photoAdded], so photos added
   /// on two Devices at once are both kept. The bytes are in the store's
-  /// photos, under the hash ([Store.photo]).
+  /// photos, under the hash ([Store.photo]). Null once the photo was
+  /// removed and its Photo Text kept (ADR 0020).
   static const photoPrefix = 'photo:';
   static const photoAdded = 'added';
 
@@ -52,7 +54,8 @@ abstract final class NoteKeys {
 
   /// One field per voice recording, `audio:<hash>` = [audioAdded], as for
   /// photos. The bytes are in the store's audio, under the hash
-  /// ([Store.audio]).
+  /// ([Store.audio]). Null once the recording was removed and its
+  /// Transcript kept (ADR 0020).
   static const audioPrefix = 'audio:';
   static const audioAdded = 'added';
 
@@ -248,6 +251,15 @@ class Note {
   /// has none.
   final Map<String, String> photoTexts;
 
+  /// The hashes of its photos that were removed while their Photo Text
+  /// stays, in the order they were added; the text is in [photoTexts].
+  final List<String> removedPhotos;
+
+  /// The hashes of its voice recordings that were removed while their
+  /// Transcript stays, in the order they were added; the text is in
+  /// [transcripts].
+  final List<String> removedRecordings;
+
   const Note({
     required this.id,
     required this.text,
@@ -265,6 +277,8 @@ class Note {
     this.recordings = const [],
     this.transcripts = const {},
     this.photoTexts = const {},
+    this.removedPhotos = const [],
+    this.removedRecordings = const [],
   });
 
   /// When the Note was captured.
@@ -316,6 +330,11 @@ class Section {
   /// [Note.photoTexts].
   final Map<String, String> photoTexts;
 
+  /// The photos and voice recordings removed while their texts stay, as
+  /// for [Note.removedPhotos] and [Note.removedRecordings].
+  final List<String> removedPhotos;
+  final List<String> removedRecordings;
+
   const Section({
     required this.id,
     required this.noteId,
@@ -328,6 +347,8 @@ class Section {
     this.recordings = const [],
     this.transcripts = const {},
     this.photoTexts = const {},
+    this.removedPhotos = const [],
+    this.removedRecordings = const [],
   });
 }
 
@@ -512,6 +533,64 @@ class Notes {
     ];
   }
 
+  /// Whether this Device may remove the photo [hash] of the Note
+  /// [noteId], a merged one included, and keep its Photo Text: the photo
+  /// has one that is not empty, and the Note is this Device's to change
+  /// ([SharedAreas.mayChange]).
+  bool mayRemovePhoto(String noteId, String hash) {
+    final note = byId(noteId);
+    return note != null &&
+        note.photos.contains(hash) &&
+        _hasText(note.photoTexts[hash]) &&
+        store.mayChange(noteId);
+  }
+
+  /// Whether this Device may remove the voice recording [hash] of the
+  /// Note [noteId], a merged one included, and keep its Transcript, as
+  /// for [mayRemovePhoto].
+  bool mayRemoveRecording(String noteId, String hash) {
+    final note = byId(noteId);
+    return note != null &&
+        note.recordings.contains(hash) &&
+        _hasText(note.transcripts[hash]) &&
+        store.mayChange(noteId);
+  }
+
+  /// Removes the photo [hash] from the Note [noteId] and keeps its Photo
+  /// Text, which search still finds (ADR 0020). The edit syncs like any
+  /// other; every Device lets the bytes go once no Note refers to them.
+  /// Refused unless [mayRemovePhoto].
+  void removePhoto(String noteId, String hash) {
+    if (byId(noteId)?.photos.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a photo of $noteId');
+    }
+    if (!mayRemovePhoto(noteId, hash)) {
+      throw StateError('the photo $hash of $noteId may not be removed here');
+    }
+    store.append(noteId, NoteKeys.photo(hash), null);
+    store.dropRemovedBlobs();
+  }
+
+  /// Removes the voice recording [hash] from the Note [noteId] and keeps
+  /// its Transcript, as [removePhoto] does. Refused unless
+  /// [mayRemoveRecording].
+  void removeRecording(String noteId, String hash) {
+    if (byId(noteId)?.recordings.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a recording of $noteId');
+    }
+    if (!mayRemoveRecording(noteId, hash)) {
+      throw StateError(
+        'the recording $hash of $noteId may not be removed here',
+      );
+    }
+    store.append(noteId, NoteKeys.audio(hash), null);
+    store.dropRemovedBlobs();
+  }
+
+  /// Whether a Transcript or Photo Text says anything: an empty one
+  /// means nothing was found.
+  static bool _hasText(String? text) => text != null && text.trim().isNotEmpty;
+
   /// Files the Note [noteId] into the Area or Topic [placeId], out of
   /// wherever it was before.
   void file(String noteId, String placeId) {
@@ -623,6 +702,8 @@ class Notes {
             recordings: note.recordings,
             transcripts: note.transcripts,
             photoTexts: note.photoTexts,
+            removedPhotos: note.removedPhotos,
+            removedRecordings: note.removedRecordings,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -744,6 +825,8 @@ class Notes {
     final place = fields[NoteKeys.place];
     final trashed = fields[NoteKeys.trashed];
     final text = StoredText.read(fields[NoteKeys.text]);
+    final transcripts = _texts(fields, NoteKeys.transcriptPrefix);
+    final photoTexts = _texts(fields, NoteKeys.ocrPrefix);
     return Note(
       id: id,
       text: text.text,
@@ -760,30 +843,41 @@ class Notes {
       spawned: fields[NoteKeys.spawned] != null,
       nudge: DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
       // The fields come in the order they were first written.
-      photos: [
-        for (final MapEntry(:key, :value) in fields.entries)
-          if (key.startsWith(NoteKeys.photoPrefix) &&
-              value == NoteKeys.photoAdded)
-            key.substring(NoteKeys.photoPrefix.length),
+      photos: _blobs(fields, NoteKeys.photoPrefix, NoteKeys.photoAdded),
+      recordings: _blobs(fields, NoteKeys.audioPrefix, NoteKeys.audioAdded),
+      transcripts: transcripts,
+      photoTexts: photoTexts,
+      removedPhotos: [
+        for (final hash in _blobs(fields, NoteKeys.photoPrefix, null))
+          if (_hasText(photoTexts[hash])) hash,
       ],
-      recordings: [
-        for (final MapEntry(:key, :value) in fields.entries)
-          if (key.startsWith(NoteKeys.audioPrefix) &&
-              value == NoteKeys.audioAdded)
-            key.substring(NoteKeys.audioPrefix.length),
+      removedRecordings: [
+        for (final hash in _blobs(fields, NoteKeys.audioPrefix, null))
+          if (_hasText(transcripts[hash])) hash,
       ],
-      transcripts: {
-        for (final MapEntry(:key, :value) in fields.entries)
-          if (key.startsWith(NoteKeys.transcriptPrefix) && value != null)
-            key.substring(NoteKeys.transcriptPrefix.length): value,
-      },
-      photoTexts: {
-        for (final MapEntry(:key, :value) in fields.entries)
-          if (key.startsWith(NoteKeys.ocrPrefix) && value != null)
-            key.substring(NoteKeys.ocrPrefix.length): value,
-      },
     );
   }
+
+  /// The hashes of the fields under [prefix] whose value is [value], in
+  /// the order they were first written.
+  static List<String> _blobs(
+    Map<String, String?> fields,
+    String prefix,
+    String? value,
+  ) => [
+    for (final MapEntry(:key, value: held) in fields.entries)
+      if (key.startsWith(prefix) && held == value) key.substring(prefix.length),
+  ];
+
+  /// The texts under [prefix], by the hash they belong to.
+  static Map<String, String> _texts(
+    Map<String, String?> fields,
+    String prefix,
+  ) => {
+    for (final MapEntry(:key, :value) in fields.entries)
+      if (key.startsWith(prefix) && value != null)
+        key.substring(prefix.length): value,
+  };
 
   /// Every Note neither in the trash nor merged, newest capture first.
   List<Note> all() {

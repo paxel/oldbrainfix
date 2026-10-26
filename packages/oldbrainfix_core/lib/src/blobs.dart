@@ -13,6 +13,9 @@ abstract interface class Blobs {
 
   /// The bytes under [hash], or null when they are not here (yet).
   Uint8List? get(String hash);
+
+  /// Lets go of the bytes under [hash]; returns whether they were here.
+  bool remove(String hash);
 }
 
 /// [Blobs] as one file per blob in [dir].
@@ -47,6 +50,14 @@ class FileBlobs implements Blobs {
     final file = _file(hash);
     return file != null && file.existsSync() ? file.readAsBytesSync() : null;
   }
+
+  @override
+  bool remove(String hash) {
+    final file = _file(hash);
+    if (file == null || !file.existsSync()) return false;
+    file.deleteSync();
+    return true;
+  }
 }
 
 /// [Blobs] in memory: gone with the store. For tests.
@@ -59,4 +70,7 @@ class MemoryBlobs implements Blobs {
 
   @override
   Uint8List? get(String hash) => _held[hash];
+
+  @override
+  bool remove(String hash) => _held.remove(hash) != null;
 }

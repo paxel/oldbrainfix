@@ -320,6 +320,7 @@ Future<FolderSyncResult> folderSync(
   final names = (await folder.list('blobs')).toSet();
   final blobsIn = await _fetchBlobs(store, folder, names);
   final blobsOut = await _publishBlobs(store, folder, names, nextNonce);
+  await _deleteRemovedBlobs(store, folder, names);
   return FolderSyncResult(
     applied: applied,
     entriesOut: entriesOut,
@@ -962,6 +963,30 @@ Future<int> _publishBlobs(
     out++;
   }
   return out;
+}
+
+/// Deletes the sealed copies of the blobs the log lets go of
+/// ([Sync.removedBlobs]) from [folder], under every key held here: a
+/// removed photo or recording leaves the shared folder too (ADR 0020).
+Future<void> _deleteRemovedBlobs(
+  Store store,
+  SyncFolder folder,
+  Set<String> names,
+) async {
+  final removed = store.removedBlobs();
+  if (removed.isEmpty) return;
+  final keys = store.areaKeys();
+  for (final ref in removed) {
+    for (final key in keys) {
+      final name = blobName(key.key, ref);
+      if (!names.remove(name)) continue;
+      try {
+        await folder.delete('blobs', name);
+      } on FileSystemException {
+        // The folder went meanwhile: the next round tries again.
+      }
+    }
+  }
 }
 
 /// How the last folder sync on this Device went, for the status line;

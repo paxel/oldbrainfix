@@ -7,3 +7,7 @@ Voice Notes are transcribed with Whisper (the same vendored whisper.cpp sources 
 - Android's on-device speech recognizer (rejected: missing on some devices, nothing on desktop).
 - ML Kit text recognition as in Catlog's phone app (rejected: Google library that may send usage statistics).
 - Downloading the model from Hugging Face (rejected: a second third-party host in the privacy statement).
+
+## Removing a recording or photo (ADR 0020)
+
+Amended by ADR 0020 (#77): the recording and the photo are kept until the user removes one that has a Transcript or Photo Text. The text stays, and a recording or photo without one cannot be removed this way.

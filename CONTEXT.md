@@ -23,10 +23,10 @@ A spot the user gave a name ("Home", "Work", "Mum's"). A Note captured near it c
 _Avoid_: location, geofence, favourite
 
 **Transcript**:
-Text recognised from a Note's voice recording, kept next to the recording, never replacing it.
+Text recognised from a Note's voice recording, kept next to the recording. The recording can be removed and the Transcript stays.
 
 **Photo Text**:
-Text recognised in a Note's photo or screenshot, kept next to the photo, never replacing it.
+Text recognised in a Note's photo or screenshot, kept next to the photo. The photo can be removed and the Photo Text stays.
 _Avoid_: OCR (in the UI), caption
 
 **Section**:

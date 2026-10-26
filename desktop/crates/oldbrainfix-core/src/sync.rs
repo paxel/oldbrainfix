@@ -5,7 +5,8 @@
 //! is checked against the key of the Device that signed it. Local
 //! settings never travel (ADR 0008).
 
-use std::collections::{BTreeSet, HashMap};
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::Result;
 use crate::entry::{Entry, WireEntry};
@@ -156,6 +157,22 @@ impl Store {
         verified_device: Option<&str>,
         report: &mut ImportReport,
     ) -> Result<Vec<WireEntry>> {
+        let applied = self.apply_entries_only(entries, keys, verified_device, report)?;
+        // A photo or recording removed elsewhere goes here too (ADR
+        // 0020). Anything new may decide it, a grant or a filing as well.
+        if !applied.is_empty() {
+            self.drop_removed_blobs()?;
+        }
+        Ok(applied)
+    }
+
+    fn apply_entries_only(
+        &self,
+        entries: &[WireEntry],
+        keys: &[KeyRecord],
+        verified_device: Option<&str>,
+        report: &mut ImportReport,
+    ) -> Result<Vec<WireEntry>> {
         self.batch(|| {
             self.learn_keys(keys, verified_device, report)?;
             let own = self.device_id()?;
@@ -224,15 +241,100 @@ impl Store {
         Ok(missing.into_iter().collect())
     }
 
-    /// Whether the log ever referred to the blob `reference`.
+    /// Whether the log refers to the blob `reference` now: only those
+    /// are taken from another Device. A removed one stays out (ADR 0020).
     pub fn knows_blob(&self, reference: &str) -> Result<bool> {
         let (kind, hash) = split_blob_ref(reference);
         for (k, prefix) in BLOB_KINDS {
-            if k == kind {
-                return self.mentions(&format!("{prefix}{hash}"));
+            if k != kind {
+                continue;
+            }
+            let field = format!("{prefix}{hash}");
+            for (entity, f) in self.fields_with_prefix(&field)? {
+                if f == field && self.current(&entity, &f)?.is_some() {
+                    return Ok(true);
+                }
             }
         }
         Ok(false)
+    }
+
+    /// The blobs the log referred to and lets go of now, as the Dart
+    /// core's `removedBlobs`, sorted (ADR 0020): every field that named
+    /// one was last set to null by a removal that may let the bytes go,
+    /// one written by the user's own Devices or one on a Note that lies
+    /// in a Shared Area, where its role was judged. A removal another
+    /// person wrote anywhere else hides the file but keeps its bytes.
+    pub fn removed_blobs(&self) -> Result<Vec<String>> {
+        let mut own: HashMap<String, bool> = HashMap::new();
+        let mut histories: HashMap<String, Vec<Entry>> = HashMap::new();
+        let mut removed: BTreeMap<String, bool> = BTreeMap::new();
+        for (kind, prefix) in BLOB_KINDS {
+            for (entity, field) in self.fields_with_prefix(prefix)? {
+                let reference = format!("{kind}/{}", &field[prefix.len()..]);
+                if removed.get(&reference) == Some(&false) {
+                    continue;
+                }
+                if !histories.contains_key(&entity) {
+                    histories.insert(entity.clone(), self.history(&entity)?);
+                }
+                let mut last: Option<&Entry> = None;
+                for e in histories.get(&entity).into_iter().flatten() {
+                    if e.field != field {
+                        continue;
+                    }
+                    if last.is_none_or(|held| Self::latest_wins(e, held) == Ordering::Greater) {
+                        last = Some(e);
+                    }
+                }
+                let lets_go = match last {
+                    Some(last) => self.lets_go(last, &mut own)?,
+                    None => false,
+                };
+                removed.insert(reference, lets_go);
+            }
+        }
+        Ok(removed
+            .into_iter()
+            .filter_map(|(reference, gone)| gone.then_some(reference))
+            .collect())
+    }
+
+    /// Whether `last`, the entry a blob's field holds, lets its bytes go:
+    /// a removal by one of the user's own Devices, whose answers `own`
+    /// keeps, or one on a Note in a Shared Area.
+    fn lets_go(&self, last: &Entry, own: &mut HashMap<String, bool>) -> Result<bool> {
+        if last.value.is_some() {
+            return Ok(false);
+        }
+        let by_own = match own.get(&last.device) {
+            Some(known) => *known,
+            None => {
+                let known = self.written_by_own(&last.device)?;
+                own.insert(last.device.clone(), known);
+                known
+            }
+        };
+        if by_own {
+            return Ok(true);
+        }
+        match self.area_of(&last.entity)? {
+            Some(area) => self.is_shared(&area),
+            None => Ok(false),
+        }
+    }
+
+    /// Lets go of the bytes of every blob in [`Store::removed_blobs`]
+    /// held here; returns those that were here.
+    pub fn drop_removed_blobs(&self) -> Result<Vec<String>> {
+        let mut dropped = Vec::new();
+        for reference in self.removed_blobs()? {
+            let (kind, hash) = split_blob_ref(&reference);
+            if self.drop_blob(kind, hash)? {
+                dropped.push(reference);
+            }
+        }
+        Ok(dropped)
     }
 
     /// Every recorded Moment, newest first.

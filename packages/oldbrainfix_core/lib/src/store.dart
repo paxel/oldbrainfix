@@ -236,6 +236,14 @@ class Store {
     _ => null,
   };
 
+  /// Lets go of the bytes of the [kind] blob [hash]; returns whether
+  /// they were here. Only the log says when that is right (ADR 0020).
+  bool dropBlob(String kind, String hash) => switch (kind) {
+    'photo' => _photos.remove(hash),
+    'audio' => _audio.remove(hash),
+    _ => false,
+  };
+
   /// Keeps [bytes] another Device holds under [hash], as they are: they
   /// were made the way this Device makes them over there. Bytes whose
   /// SHA-256 is not [hash], or of an unknown [kind], are not kept;

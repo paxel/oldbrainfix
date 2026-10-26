@@ -36,10 +36,12 @@ pub mod keys {
 
     /// One field per photo, `photo:<hash>` = [`ADDED`], so photos added on
     /// two Devices at once are both kept. The bytes are in the store's
-    /// photos, under the hash.
+    /// photos, under the hash. Null once the photo was removed and its
+    /// Photo Text kept (ADR 0020).
     pub const PHOTO_PREFIX: &str = "photo:";
     /// One field per voice recording, `audio:<hash>` = [`ADDED`], as for
-    /// photos. The bytes are in the store's audio, under the hash.
+    /// photos. The bytes are in the store's audio, under the hash. Null
+    /// once the recording was removed and its Transcript kept (ADR 0020).
     pub const AUDIO_PREFIX: &str = "audio:";
     /// The value of a photo's or a recording's field.
     pub const ADDED: &str = "added";
@@ -141,6 +143,14 @@ pub struct Note {
     /// The Photo Texts of its photos, by photo hash; a photo not read yet
     /// has none.
     pub photo_texts: BTreeMap<String, String>,
+    /// The hashes of its photos that were removed while their Photo Text
+    /// stays, in the order they were added; the text is in
+    /// `photo_texts`.
+    pub removed_photos: Vec<String>,
+    /// The hashes of its voice recordings that were removed while their
+    /// Transcript stays, in the order they were added; the text is in
+    /// `transcripts`.
+    pub removed_recordings: Vec<String>,
 }
 
 impl Note {
@@ -187,6 +197,10 @@ pub struct Section {
     pub recordings: Vec<String>,
     pub transcripts: BTreeMap<String, String>,
     pub photo_texts: BTreeMap<String, String>,
+    /// The photos and voice recordings removed while their texts stay,
+    /// as for [`Note::removed_photos`] and [`Note::removed_recordings`].
+    pub removed_photos: Vec<String>,
+    pub removed_recordings: Vec<String>,
 }
 
 /// A photo or a voice recording of a Note, by its hash.
@@ -366,6 +380,78 @@ impl<'a> Notes<'a> {
         self.waiting(|n| (&n.photos, &n.photo_texts))
     }
 
+    /// Whether this Device may remove the photo `hash` of the Note
+    /// `note_id`, a merged one included, and keep its Photo Text: the
+    /// photo has one that is not empty, and the Note is this Device's to
+    /// change ([`Store::may_change`]).
+    pub fn may_remove_photo(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove(note_id, hash, |n| (&n.photos, &n.photo_texts))
+    }
+
+    /// Whether this Device may remove the voice recording `hash` of the
+    /// Note `note_id`, a merged one included, and keep its Transcript, as
+    /// for [`Notes::may_remove_photo`].
+    pub fn may_remove_recording(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove(note_id, hash, |n| (&n.recordings, &n.transcripts))
+    }
+
+    fn may_remove(
+        &self,
+        note_id: &str,
+        hash: &str,
+        of: impl Fn(&Note) -> (&Vec<String>, &BTreeMap<String, String>),
+    ) -> Result<bool> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Ok(false);
+        };
+        let (blobs, texts) = of(&note);
+        if !blobs.iter().any(|h| h == hash) || !has_text(texts.get(hash)) {
+            return Ok(false);
+        }
+        self.store.may_change(note_id)
+    }
+
+    /// Removes the photo `hash` from the Note `note_id` and keeps its
+    /// Photo Text, which search still finds (ADR 0020). The edit syncs
+    /// like any other; every Device lets the bytes go once no Note refers
+    /// to them. Refused unless [`Notes::may_remove_photo`].
+    pub fn remove_photo(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.photos.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!("not a photo of {note_id}: {hash}")));
+        }
+        if !self.may_remove_photo(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the photo {hash} of {note_id} may not be removed here"
+            )));
+        }
+        self.store.append(note_id, &keys::photo(hash), None, None)?;
+        self.store.drop_removed_blobs().map(drop)
+    }
+
+    /// Removes the voice recording `hash` from the Note `note_id` and
+    /// keeps its Transcript, as [`Notes::remove_photo`] does. Refused
+    /// unless [`Notes::may_remove_recording`].
+    pub fn remove_recording(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.recordings.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!(
+                "not a recording of {note_id}: {hash}"
+            )));
+        }
+        if !self.may_remove_recording(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the recording {hash} of {note_id} may not be removed here"
+            )));
+        }
+        self.store.append(note_id, &keys::audio(hash), None, None)?;
+        self.store.drop_removed_blobs().map(drop)
+    }
+
     /// The blobs `of` every Note not in the trash that have no text yet.
     fn waiting(
         &self,
@@ -535,6 +621,14 @@ impl<'a> Notes<'a> {
             _ => None,
         };
         let text = StoredText::read(fields.get(keys::TEXT));
+        let transcripts = texts(&fields, keys::TRANSCRIPT_PREFIX);
+        let photo_texts = texts(&fields, keys::OCR_PREFIX);
+        let removed = |prefix: &str, texts: &BTreeMap<String, String>| -> Vec<String> {
+            removed(&fields, prefix)
+                .into_iter()
+                .filter(|hash| has_text(texts.get(hash)))
+                .collect()
+        };
         Ok(Some(Note {
             id: id.to_string(),
             text: text.text,
@@ -551,8 +645,10 @@ impl<'a> Notes<'a> {
             // The fields come in the order they were first written.
             photos: added(&fields, keys::PHOTO_PREFIX),
             recordings: added(&fields, keys::AUDIO_PREFIX),
-            transcripts: texts(&fields, keys::TRANSCRIPT_PREFIX),
-            photo_texts: texts(&fields, keys::OCR_PREFIX),
+            removed_photos: removed(keys::PHOTO_PREFIX, &photo_texts),
+            removed_recordings: removed(keys::AUDIO_PREFIX, &transcripts),
+            transcripts,
+            photo_texts,
         }))
     }
 
@@ -644,6 +740,8 @@ impl<'a> Notes<'a> {
                     recordings: note.recordings,
                     transcripts: note.transcripts,
                     photo_texts: note.photo_texts,
+                    removed_photos: note.removed_photos,
+                    removed_recordings: note.removed_recordings,
                 });
             }
         }
@@ -682,6 +780,8 @@ impl<'a> Notes<'a> {
             recordings: Vec::new(),
             transcripts: BTreeMap::new(),
             photo_texts: BTreeMap::new(),
+            removed_photos: Vec::new(),
+            removed_recordings: Vec::new(),
         }))
     }
 
@@ -722,6 +822,22 @@ fn added(fields: &Fields, prefix: &str) -> Vec<String> {
         .filter(|(_, value)| *value == Some(keys::ADDED))
         .filter_map(|(key, _)| key.strip_prefix(prefix).map(str::to_string))
         .collect()
+}
+
+/// The hashes of the photos or recordings under `prefix` that were
+/// removed, in the order they were added.
+fn removed(fields: &Fields, prefix: &str) -> Vec<String> {
+    fields
+        .iter()
+        .filter(|(_, value)| value.is_none())
+        .filter_map(|(key, _)| key.strip_prefix(prefix).map(str::to_string))
+        .collect()
+}
+
+/// Whether a Transcript or Photo Text says anything: an empty one means
+/// nothing was found.
+fn has_text(text: Option<&String>) -> bool {
+    text.is_some_and(|t| !t.trim().is_empty())
 }
 
 /// The texts under `prefix`, by the hash they belong to.
@@ -834,6 +950,324 @@ mod tests {
         assert_eq!(shown[0].text_version, 2);
         assert!(!shown[0].text_editable);
         assert_eq!(store.current(&a.id, keys::TEXT)?.as_deref(), Some(LATER));
+        Ok(())
+    }
+
+    // ------------------------------------------ removing media (ADR 0020)
+
+    use crate::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
+    use crate::shared::{AreaRole, Invite};
+    use crate::signing::SigningKey;
+    use crate::store::Clock;
+    use crate::sync::split_blob_ref;
+    use crate::{PairedDevice, Search};
+    use chrono::TimeZone;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI64, Ordering};
+
+    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    /// Devices sharing one clock, a second per read, so they write in a
+    /// known order; each with a Profile of its own.
+    struct Devices(Arc<AtomicI64>);
+
+    impl Devices {
+        fn new() -> Devices {
+            Devices(Arc::new(AtomicI64::new(0)))
+        }
+
+        fn device(&self, seed: u8, name: &str) -> Result<Store> {
+            let ticks = Arc::clone(&self.0);
+            let clock: Clock = Box::new(move || {
+                let n = ticks.fetch_add(1, Ordering::SeqCst) + 1;
+                let start = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).single();
+                start.unwrap_or_default() + Duration::seconds(n)
+            });
+            let store = Store::in_memory(clock, move || Ok(SigningKey::from_seed([seed; 32])))?;
+            crate::profile::OwnProfile::new(&store).apply_defaults(name, None)?;
+            Ok(store)
+        }
+    }
+
+    /// Stand-ins: a JPEG start, so the store keeps the photo as it is.
+    fn photo(n: u8) -> Vec<u8> {
+        vec![0xFF, 0xD8, 0xFF, 0xD9, n]
+    }
+
+    fn voice(n: u8) -> Vec<u8> {
+        vec![0x52, 0x49, 0x46, 0x46, n]
+    }
+
+    /// A Note with a photo and a recording, both with their text.
+    fn with_texts(store: &Store, place: Option<&str>, n: u8) -> Result<(String, String, String)> {
+        let notes = Notes::new(store);
+        let note = notes.capture_with("Dentist", place, None, &[photo(n)], &[voice(n)])?;
+        let (p, r) = (note.photos[0].clone(), note.recordings[0].clone());
+        notes.set_photo_text(&note.id, &p, "Dr. Weber, Mon 9-12")?;
+        notes.set_transcript(&note.id, &r, "Bring the old X-ray")?;
+        Ok((note.id, p, r))
+    }
+
+    /// The blobs `to` lacks, carried over from `from`.
+    fn carry(from: &Store, to: &Store) -> Result<()> {
+        for reference in to.missing_blobs()? {
+            let (kind, hash) = split_blob_ref(&reference);
+            if let Some(bytes) = from.blob(kind, hash) {
+                to.put_blob(kind, hash, &bytes)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// One LAN session without the network, the blobs after it both
+    /// ways: `joiner` joins `host`, which invites it when `inviting`.
+    /// Both remember each other, as the apps do.
+    fn exchange(joiner: &Store, host: &Store, inviting: Option<&Invite>) -> TestResult {
+        let host_id = host.device_id()?;
+        let joiner_id = joiner.device_id()?;
+        let shared = inviting.is_some() || joiner.is_shared_peer(&host_id)?;
+        let joining = match inviting {
+            Some(_) => Joining::Invited,
+            None => Joining::Plain,
+        };
+        let vector = host.version_vector()?;
+        let request = sync_request_as(joiner, &vector, "Phone", &host_id, "", joining)?;
+        let (answer, _) =
+            answer_sync_inviting(host, &request, "Desk", inviting)?.ok_or("an answer")?;
+        apply_answer_as(joiner, &answer, shared, None)?;
+        for (store, id) in [(host, &joiner_id), (joiner, &host_id)] {
+            store.remember_device(&PairedDevice {
+                id: id.clone(),
+                name: "Other".into(),
+                fingerprint: String::new(),
+                host: None,
+                port: None,
+                last_sync: store.now(),
+                shared,
+            })?;
+        }
+        carry(host, joiner)?;
+        carry(joiner, host)?;
+        Ok(())
+    }
+
+    fn found(store: &Store, query: &str) -> Result<Vec<String>> {
+        Ok(Search::new(store)
+            .notes(query, None)?
+            .into_iter()
+            .map(|n| n.id)
+            .collect())
+    }
+
+    fn note(store: &Store, id: &str) -> Result<Note> {
+        Notes::new(store)
+            .by_id(id)?
+            .ok_or_else(|| Error::Invalid(format!("no Note {id}")))
+    }
+
+    /// Ann's Household shared with Ben as a Member, and her private
+    /// Health beside it: (area, private).
+    fn household(
+        ann: &Store,
+        ben: &Store,
+    ) -> std::result::Result<(String, String), Box<dyn std::error::Error>> {
+        let places = Places::new(ann);
+        let area = ann.share(&places.add_area("Household")?.id)?;
+        let private = places.add_area("Health")?.id;
+        let invite = Invite {
+            area: area.clone(),
+            role: AreaRole::Member,
+        };
+        exchange(ben, ann, Some(&invite))?;
+        Ok((area, private))
+    }
+
+    #[test]
+    fn a_removed_file_goes_and_its_text_stays_and_is_found() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let (id, p, r) = with_texts(&ann, None, 1)?;
+        assert!(notes.may_remove_photo(&id, &p)?);
+        assert!(notes.may_remove_recording(&id, &r)?);
+        notes.remove_photo(&id, &p)?;
+        notes.remove_recording(&id, &r)?;
+        let read = note(&ann, &id)?;
+        assert!(read.photos.is_empty() && read.recordings.is_empty());
+        assert_eq!(read.removed_photos, vec![p.clone()]);
+        assert_eq!(read.removed_recordings, vec![r.clone()]);
+        assert_eq!(
+            read.photo_texts.get(&p).map(String::as_str),
+            Some("Dr. Weber, Mon 9-12")
+        );
+        assert_eq!(
+            read.transcripts.get(&r).map(String::as_str),
+            Some("Bring the old X-ray")
+        );
+        assert_eq!(ann.photo(&p), None);
+        assert_eq!(ann.audio(&r), None);
+        assert!(ann.missing_blobs()?.is_empty(), "not wanted back");
+        assert!(!ann.knows_blob(&format!("photo/{p}"))?);
+        assert_eq!(found(&ann, "weber")?, vec![id.clone()]);
+        assert_eq!(found(&ann, "x-ray")?, vec![id.clone()]);
+        assert!(!notes.may_remove_photo(&id, &p)?);
+        assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_without_a_text_or_with_an_empty_one_is_not_removed() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let n = notes.capture_with("", None, None, &[photo(1), photo(2)], &[voice(1)])?;
+        let (p1, p2, r) = (&n.photos[0], &n.photos[1], &n.recordings[0]);
+        notes.set_photo_text(&n.id, p2, "   ")?;
+        for hash in [p1, p2] {
+            assert!(!notes.may_remove_photo(&n.id, hash)?);
+            assert!(notes.remove_photo(&n.id, hash).is_err());
+        }
+        assert!(!notes.may_remove_recording(&n.id, r)?);
+        assert!(notes.remove_recording(&n.id, r).is_err());
+        assert!(
+            notes.remove_photo(&n.id, r).is_err(),
+            "a recording is no photo"
+        );
+        assert!(!notes.may_remove_photo("note:none", p1)?);
+        assert_eq!(note(&ann, &n.id)?.photos, n.photos);
+        assert!(ann.photo(p1).is_some());
+        Ok(())
+    }
+
+    #[test]
+    fn the_bytes_stay_while_another_note_shows_the_same_photo() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let (id, p, _) = with_texts(&ann, None, 1)?;
+        let other = notes.capture_with("Same card", None, None, &[photo(1)], &[])?;
+        assert_eq!(other.photos, vec![p.clone()]);
+        notes.remove_photo(&id, &p)?;
+        assert_eq!(ann.photo(&p), Some(photo(1)));
+        assert!(ann.removed_blobs()?.is_empty());
+        let target = notes.capture("Health", None, None)?;
+        notes.merge(&other.id, &target.id)?;
+        notes.set_photo_text(&other.id, &p, "Same card")?;
+        notes.remove_photo(&other.id, &p)?;
+        let section = notes.sections(&target.id)?;
+        assert_eq!(section[0].removed_photos, vec![p.clone()]);
+        assert_eq!(ann.photo(&p), None, "gone with the last Note showing it");
+        Ok(())
+    }
+
+    #[test]
+    fn the_removal_reaches_another_own_device() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        let (id, p, r) = with_texts(&ann, None, 1)?;
+        exchange(&desk, &ann, None)?;
+        assert!(desk.photo(&p).is_some() && desk.audio(&r).is_some());
+        Notes::new(&ann).remove_photo(&id, &p)?;
+        Notes::new(&desk).remove_recording(&id, &r)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            let read = note(store, &id)?;
+            assert!(read.photos.is_empty() && read.recordings.is_empty());
+            assert_eq!(read.photo_texts.len() + read.transcripts.len(), 2);
+            assert_eq!(store.photo(&p), None);
+            assert_eq!(store.audio(&r), None);
+            assert!(store.missing_blobs()?.is_empty());
+            assert_eq!(found(store, "weber")?, vec![id.clone()]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_removal_in_a_shared_area_reaches_the_member_and_the_manager() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
+        let (own, own_p, own_r) = with_texts(&ben, Some(&area), 2)?;
+        exchange(&ben, &ann, None)?;
+        assert!(ben.photo(&p).is_some() && ann.photo(&own_p).is_some());
+        assert!(!Notes::new(&ben).may_remove_photo(&id, &p)?);
+        Notes::new(&ann).remove_photo(&id, &p)?;
+        // A Member removes from their own Note, a Manager from anyone's.
+        Notes::new(&ben).remove_photo(&own, &own_p)?;
+        Notes::new(&ann).remove_recording(&own, &own_r)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(note(store, &id)?.removed_photos, vec![p.clone()]);
+            assert_eq!(note(store, &own)?.removed_photos, vec![own_p.clone()]);
+            assert_eq!(note(store, &own)?.removed_recordings, vec![own_r.clone()]);
+            assert_eq!(store.photo(&p), None);
+            assert_eq!(store.photo(&own_p), None);
+            assert_eq!(store.audio(&own_r), None);
+            assert_eq!(found(store, "weber")?.len(), 2);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_removal_on_anothers_note_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
+        exchange(&ben, &ann, None)?;
+        assert!(Notes::new(&ben).remove_photo(&id, &p).is_err());
+        // As a modified app would write it.
+        ben.append(&id, &keys::photo(&p), None, None)?;
+        ben.drop_removed_blobs()?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            assert_eq!(note(store, &id)?.photos, vec![p.clone()]);
+            assert!(store.photo(&p).is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn another_persons_removal_outside_a_shared_area_keeps_the_bytes() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, private) = household(&ann, &ben)?;
+        let (id, p, _) = with_texts(&ann, Some(&area), 1)?;
+        exchange(&ben, &ann, None)?;
+        // Ann takes the Note out of the Shared Area; Ben has not seen it
+        // and writes a removal as a modified app would.
+        Notes::new(&ann).file(&id, &private)?;
+        ben.append(&id, &keys::photo(&p), None, None)?;
+        exchange(&ben, &ann, None)?;
+        assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
+        assert!(ann.removed_blobs()?.is_empty());
+        assert_eq!(ann.photo(&p), Some(photo(1)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_removed_photo_leaves_the_shared_folder() -> TestResult {
+        use crate::folder::{MemoryFolder, folder_sync, random_nonce};
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        exchange(&desk, &ann, None)?;
+        let (id, p, r) = with_texts(&ann, None, 1)?;
+        let mut folder = MemoryFolder::default();
+        let blobs = |folder: &MemoryFolder| folder.dirs.get("blobs").map_or(0, |b| b.len());
+        folder_sync(&ann, &mut folder, &mut random_nonce)?;
+        assert_eq!(blobs(&folder), 2);
+        folder_sync(&desk, &mut folder, &mut random_nonce)?;
+        assert!(desk.photo(&p).is_some());
+        Notes::new(&ann).remove_photo(&id, &p)?;
+        folder_sync(&ann, &mut folder, &mut random_nonce)?;
+        assert_eq!(blobs(&folder), 1);
+        folder_sync(&desk, &mut folder, &mut random_nonce)?;
+        assert_eq!(desk.photo(&p), None);
+        assert!(desk.audio(&r).is_some());
+        assert_eq!(note(&desk, &id)?.removed_photos, vec![p]);
         Ok(())
     }
 

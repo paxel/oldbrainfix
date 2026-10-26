@@ -345,6 +345,7 @@ pub fn folder_sync(
     let mut names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
     let blobs_in = fetch_blobs(store, folder, &names)?;
     let blobs_out = publish_blobs(store, folder, &mut names, nonce, None)?;
+    delete_removed_blobs(store, folder, &mut names)?;
     let conflicts = store.conflicts_among(&applied)?;
     Ok(FolderSyncResult {
         applied,
@@ -946,6 +947,33 @@ fn publish_blobs(
         out += 1;
     }
     Ok(out)
+}
+
+/// Deletes the sealed copies of the blobs the log lets go of
+/// ([`Store::removed_blobs`]) from `folder`, under every key held here,
+/// as the Dart core does: a removed photo or recording leaves the shared
+/// folder too (ADR 0020).
+fn delete_removed_blobs(
+    store: &Store,
+    folder: &mut dyn SyncFolder,
+    names: &mut BTreeSet<String>,
+) -> Result<()> {
+    let removed = store.removed_blobs()?;
+    if removed.is_empty() {
+        return Ok(());
+    }
+    let keys = store.area_keys()?;
+    for reference in &removed {
+        for key in &keys {
+            let name = blob_name(&key.key, reference);
+            if !names.remove(&name) {
+                continue;
+            }
+            // The folder went meanwhile: the next round tries again.
+            folder.delete("blobs", &name).ok();
+        }
+    }
+    Ok(())
 }
 
 const FOLDER_KEY: &str = "folder";

@@ -50,7 +50,9 @@
         "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd"
       ],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -69,7 +71,9 @@
       ],
       "recordings": [],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -88,7 +92,9 @@
       ],
       "recordings": [],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     }
   ],
   "all": [
@@ -125,7 +131,9 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       }
     ],
     "note:00000000000000000000000000000001": []
@@ -146,6 +154,7 @@
       "hash": "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
     }
   ],
+  "removable": {},
   "search": {
     "": [
       "note:00000000000000000000000000000003",

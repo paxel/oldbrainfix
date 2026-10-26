@@ -3,7 +3,8 @@ import 'dart:typed_data';
 
 import 'entry.dart';
 import 'notes.dart';
-import 'profiles.dart' show OverrideKeys;
+import 'profiles.dart' show OverrideKeys, Overrides;
+import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 
@@ -103,6 +104,9 @@ extension Sync on Store {
     if (applied.any((e) => e.entity.startsWith(OverrideKeys.prefix))) {
       profileChanged();
     }
+    // A photo or recording removed elsewhere goes here too (ADR 0020).
+    // Anything new may decide it, a grant or a filing as well.
+    if (applied.isNotEmpty) dropRemovedBlobs();
     return applied;
   }
 
@@ -163,16 +167,71 @@ extension Sync on Store {
     return missing.toList()..sort();
   }
 
-  /// Whether the log ever referred to the blob [ref] (`photo/<hash>` or
-  /// `audio/<hash>`): only those are taken from another Device, anything
-  /// else would be storage filled by whoever holds the PIN.
+  /// Whether the log refers to the blob [ref] (`photo/<hash>` or
+  /// `audio/<hash>`) now: only those are taken from another Device,
+  /// anything else would be storage filled by whoever holds the PIN. A
+  /// removed one stays out (ADR 0020).
   bool knowsBlob(String ref) {
     final (kind, hash) = splitBlobRef(ref);
     for (final (k, prefix) in blobKinds) {
-      if (k == kind) return mentions('$prefix$hash');
+      if (k != kind) continue;
+      final field = '$prefix$hash';
+      for (final (entity, f) in fieldsWithPrefix(field)) {
+        if (f == field && current(entity, f) != null) return true;
+      }
     }
     return false;
   }
+
+  /// The blobs the log referred to and lets go of now, as `photo/<hash>`
+  /// and `audio/<hash>`, sorted (ADR 0020): every field that named one
+  /// was last set to null by a removal that may let the bytes go. That
+  /// is one written by the user's own Devices ([writtenByOwn]), or one on
+  /// a Note that lies in a Shared Area, where its role was judged. A
+  /// removal another person wrote anywhere else hides the file but
+  /// keeps its bytes.
+  List<String> removedBlobs() {
+    final own = <String, bool>{};
+    final histories = <String, List<Entry>>{};
+    final removed = <String, bool>{};
+    for (final (kind, prefix) in blobKinds) {
+      for (final (entity, field) in fieldsWithPrefix(prefix)) {
+        final ref = '$kind/${field.substring(prefix.length)}';
+        if (removed[ref] == false) continue;
+        Entry? last;
+        for (final e in histories.putIfAbsent(entity, () => history(entity))) {
+          if (e.field != field) continue;
+          if (last == null || Store.latestWins(e, last) > 0) last = e;
+        }
+        removed[ref] = last != null && _letsGo(last, own);
+      }
+    }
+    return [
+      for (final MapEntry(:key, :value) in removed.entries)
+        if (value) key,
+    ]..sort();
+  }
+
+  /// Whether [last], the entry a blob's field holds, lets its bytes go:
+  /// a removal by one of the user's own Devices, whose answers [own]
+  /// keeps, or one on a Note in a Shared Area.
+  bool _letsGo(Entry last, Map<String, bool> own) {
+    if (last.value != null) return false;
+    if (own.putIfAbsent(last.device, () => writtenByOwn(last.device))) {
+      return true;
+    }
+    final area = areaOf(last.entity);
+    return area != null && isShared(area);
+  }
+
+  /// Lets go of the bytes of every blob in [removedBlobs] held here;
+  /// returns those that were here.
+  List<String> dropRemovedBlobs() => [
+    for (final ref in removedBlobs())
+      if (splitBlobRef(ref) case (final kind, final hash)
+          when dropBlob(kind, hash))
+        ref,
+  ];
 
   /// The blob kinds and the field prefixes naming them.
   static const blobKinds = [

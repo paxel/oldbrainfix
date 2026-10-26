@@ -385,6 +385,16 @@ impl Store {
         }
     }
 
+    /// Lets go of the bytes of the `kind` blob `hash`; returns whether
+    /// they were here. Only the log says when that is right (ADR 0020).
+    pub fn drop_blob(&self, kind: &str, hash: &str) -> Result<bool> {
+        match kind {
+            "photo" => self.photos.remove(hash),
+            "audio" => self.audio.remove(hash),
+            _ => Ok(false),
+        }
+    }
+
     /// Keeps `bytes` another Device holds under `hash`, as they are.
     /// Bytes whose SHA-256 is not `hash`, or of an unknown `kind`, are
     /// not kept; returns whether they were.

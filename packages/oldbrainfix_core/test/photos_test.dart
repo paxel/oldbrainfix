@@ -76,6 +76,22 @@ void main() {
       blobs.put('../escape', Uint8List.fromList([1]));
       expect(File('${dir.path}/escape').existsSync(), isFalse);
       expect(blobs.get('../escape'), isNull);
+      // Nor does a removal: a hash from another Device's log decides it.
+      final outside = File('${dir.path}/kept')..writeAsBytesSync([2]);
+      expect(blobs.remove('../kept'), isFalse);
+      expect(outside.existsSync(), isTrue);
+    });
+
+    test('a removed blob is gone from its directory', () {
+      final dir = Directory.systemTemp.createTempSync('obf');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final blobs = FileBlobs('${dir.path}/photos');
+      final hash = 'ab' * 32;
+      blobs.put(hash, Uint8List.fromList([1]));
+      expect(blobs.remove(hash), isTrue);
+      expect(File('${dir.path}/photos/$hash').existsSync(), isFalse);
+      expect(blobs.remove(hash), isFalse);
+      expect(blobs.get(hash), isNull);
     });
   });
 

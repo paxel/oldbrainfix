@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:51.000Z",
+  "now": "2026-01-02T10:00:55.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -15,14 +15,16 @@
       "trashed": null,
       "mergedInto": null,
       "spawned": false,
-      "photos": [
-        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
-      ],
+      "photos": [],
       "recordings": [],
       "transcripts": {},
       "photoTexts": {
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb": "RECEIPT\nTotal 12,50"
-      }
+      },
+      "removedPhotos": [
+        "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
+      ],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -39,13 +41,15 @@
       "photos": [
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
       ],
-      "recordings": [
-        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
-      ],
+      "recordings": [],
       "transcripts": {
         "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0": "Milk, eggs and bread"
       },
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [
+        "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
+      ]
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -72,8 +76,11 @@
         "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd": ""
       },
       "photoTexts": {
-        "7ec527edac2e24eb8eacd5511812e56933e694219d6c927c23672c55371c2664": ""
-      }
+        "7ec527edac2e24eb8eacd5511812e56933e694219d6c927c23672c55371c2664": "",
+        "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90": "Spare key under the pot"
+      },
+      "removedPhotos": [],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000004",
@@ -92,7 +99,9 @@
       ],
       "recordings": [],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000005",
@@ -106,14 +115,16 @@
       "trashed": null,
       "mergedInto": "note:00000000000000000000000000000004",
       "spawned": false,
-      "photos": [
-        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
-      ],
+      "photos": [],
       "recordings": [],
       "transcripts": {},
       "photoTexts": {
         "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
-      }
+      },
+      "removedPhotos": [
+        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+      ],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -132,7 +143,9 @@
         "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d"
       ],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     },
     {
       "id": "note:00000000000000000000000000000007",
@@ -153,7 +166,9 @@
         "52f0f855e3f6ef7cfd85ef214bcf3b80db8af56da1f0cc1811655661c1aeb442"
       ],
       "transcripts": {},
-      "photoTexts": {}
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": []
     }
   ],
   "all": [
@@ -182,14 +197,16 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:30.000Z",
-        "photos": [
-          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
-        ],
+        "photos": [],
         "recordings": [],
         "transcripts": {},
         "photoTexts": {
           "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66": "Dr. Müller, Tuesday 9:00"
-        }
+        },
+        "removedPhotos": [
+          "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+        ],
+        "removedRecordings": []
       },
       {
         "id": "note:00000000000000000000000000000006",
@@ -204,7 +221,9 @@
           "f30aa31ce85ada5e75454198abfd7a73294f261d712e5ec3dbe7a8846606879d"
         ],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       }
     ],
     "note:00000000000000000000000000000003": [],
@@ -232,14 +251,15 @@
       "hash": "27f48b35d69a634fb50fa0404cb641e8fd6dbc4c4fe413edd6869063aeb28fa9"
     },
     {
-      "noteId": "note:00000000000000000000000000000003",
-      "hash": "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
-    },
-    {
       "noteId": "note:00000000000000000000000000000002",
       "hash": "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
     }
   ],
+  "removable": {
+    "note:00000000000000000000000000000003": [
+      "photo/0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
+    ]
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000004",

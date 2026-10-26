@@ -19,6 +19,9 @@ pub trait Blobs: Send + Sync {
 
     /// The bytes under `hash`, or `None` when they are not here (yet).
     fn get(&self, hash: &str) -> Option<Vec<u8>>;
+
+    /// Lets go of the bytes under `hash`; returns whether they were here.
+    fn remove(&self, hash: &str) -> Result<bool>;
 }
 
 /// A blob name is its SHA-256 as lowercase hex, nothing else: a hash
@@ -75,6 +78,17 @@ impl Blobs for FileBlobs {
     fn get(&self, hash: &str) -> Option<Vec<u8>> {
         std::fs::read(self.file(hash)?).ok()
     }
+
+    fn remove(&self, hash: &str) -> Result<bool> {
+        let Some(file) = self.file(hash) else {
+            return Ok(false);
+        };
+        match std::fs::remove_file(file) {
+            Ok(()) => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 /// [`Blobs`] in memory: gone with the store. For tests.
@@ -94,6 +108,10 @@ impl Blobs for MemoryBlobs {
 
     fn get(&self, hash: &str) -> Option<Vec<u8>> {
         self.held.lock().get(hash).cloned()
+    }
+
+    fn remove(&self, hash: &str) -> Result<bool> {
+        Ok(self.held.lock().remove(hash).is_some())
     }
 }
 
@@ -125,11 +143,18 @@ mod tests {
         blobs.put("../escaped", b"x")?;
         assert!(!tmp.path().join("escaped").exists());
         assert_eq!(blobs.get("../escaped"), None);
+        // Nor does a removal: a hash from another Device's log decides it.
+        std::fs::write(tmp.path().join("kept"), b"x")?;
+        assert!(!blobs.remove("../kept")?);
+        assert!(tmp.path().join("kept").exists());
         assert_eq!(blobs.get(&"0".repeat(64)), None);
         let names: Vec<_> = std::fs::read_dir(tmp.path().join("photos"))?
             .map(|e| e.map(|e| e.file_name()))
             .collect::<std::io::Result<_>>()?;
         assert_eq!(names, vec![std::ffi::OsString::from(HASH)]);
+        assert!(blobs.remove(HASH)?);
+        assert!(!blobs.remove(HASH)?);
+        assert_eq!(blobs.get(HASH), None);
         Ok(())
     }
 
@@ -140,6 +165,8 @@ mod tests {
         blobs.put(HASH, b"second")?;
         assert_eq!(blobs.get(HASH).as_deref(), Some(&b"first"[..]));
         assert_eq!(blobs.get("other"), None);
+        assert!(blobs.remove(HASH)?);
+        assert_eq!(blobs.get(HASH), None);
         Ok(())
     }
 }

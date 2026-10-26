@@ -60,7 +60,9 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       },
       {
         "id": "note:00000000000000000000000000000004",
@@ -77,7 +79,9 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       },
       {
         "id": "note:00000000000000000000000000000008",
@@ -96,7 +100,9 @@
         ],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       },
       {
         "id": "note:0000000000000000000000000000000a",
@@ -115,7 +121,9 @@
           "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
         ],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       },
       {
         "id": "note:0000000000000000000000000000000b",
@@ -132,7 +140,9 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       },
       {
         "id": "note:0000000000000000000000000000000c",
@@ -149,7 +159,9 @@
         "photos": [],
         "recordings": [],
         "transcripts": {},
-        "photoTexts": {}
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": []
       }
     ],
     "all": [
@@ -194,7 +206,9 @@
           "photos": [],
           "recordings": [],
           "transcripts": {},
-          "photoTexts": {}
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": []
         }
       ],
       "note:00000000000000000000000000000004": [],
@@ -212,6 +226,7 @@
         "hash": "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
       }
     ],
+    "removable": {},
     "search": {
       "": [
         "note:0000000000000000000000000000000c",

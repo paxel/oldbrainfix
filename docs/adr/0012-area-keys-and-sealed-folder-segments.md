@@ -23,3 +23,7 @@ A reader takes only the segments of keys it holds and remembers how far it read 
 ## Versions (ADR 0019)
 
 Amended by ADR 0019 (#59): the manifest writes its `format` only above 1, and a missing one reads as 1. A manifest of a newer format is announced as needing an update, not skipped silently, and nothing of its writer is read.
+
+## Removed recordings and photos (ADR 0020)
+
+Amended by ADR 0020 (#77): a blob the log lets go of, a recording or photo removed with its text kept, is deleted from `blobs/` by the next folder sync of a Device that holds its key; the segments keep the removal like any other entry.

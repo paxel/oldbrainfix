@@ -141,6 +141,8 @@ fn note_json(note: &Note) -> Value {
         "recordings": note.recordings,
         "transcripts": note.transcripts,
         "photoTexts": note.photo_texts,
+        "removedPhotos": note.removed_photos,
+        "removedRecordings": note.removed_recordings,
     })
 }
 
@@ -157,6 +159,8 @@ fn section_json(section: &Section) -> Value {
         "recordings": section.recordings,
         "transcripts": section.transcripts,
         "photoTexts": section.photo_texts,
+        "removedPhotos": section.removed_photos,
+        "removedRecordings": section.removed_recordings,
     })
 }
 
@@ -220,9 +224,24 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         }));
     }
     let mut every = Vec::new();
+    let mut removable = serde_json::Map::new();
     for id in &note_ids {
         if let Some(note) = notes.by_id(id)? {
             every.push(note_json(&note));
+            let mut refs = Vec::new();
+            for hash in &note.photos {
+                if notes.may_remove_photo(id, hash)? {
+                    refs.push(format!("photo/{hash}"));
+                }
+            }
+            for hash in &note.recordings {
+                if notes.may_remove_recording(id, hash)? {
+                    refs.push(format!("audio/{hash}"));
+                }
+            }
+            if !refs.is_empty() {
+                removable.insert(id.clone(), json!(refs));
+            }
         }
     }
     let mut sections = serde_json::Map::new();
@@ -247,6 +266,7 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "sections": sections,
         "untranscribed": blobs_json(&notes.untranscribed()?),
         "unreadPhotos": blobs_json(&notes.unread_photos()?),
+        "removable": removable,
         "search": searched,
         "searchWithin": within,
         "conflicts": conflicts_json(&store.conflicts()?),
@@ -728,7 +748,7 @@ fn write_media(store: &Store) -> Built {
     notes.set_transcript(&voice.id, &voice.recordings[0], " Milk, eggs and bread ")?;
     notes.add_photo(&voice.id, &photo(1))?;
     let shed = notes.capture_with("Shed", None, None, &[photo(2), photo(3)], &[recording(2)])?;
-    notes.add_photo(&shed.id, &photo(4))?;
+    let key = notes.add_photo(&shed.id, &photo(4))?;
     notes.add_recording(&shed.id, &recording(3))?;
     notes.set_transcript(&shed.id, &shed.recordings[0], "")?;
     notes.set_photo_text(&shed.id, &shed.photos[0], "")?;
@@ -742,6 +762,10 @@ fn write_media(store: &Store) -> Built {
     notes.trash(&binned.id)?;
     let elsewhere = format!("photo:{}", "ab".repeat(32));
     store.append(&dentist.id, &elsewhere, Some(note_keys::ADDED), None)?;
+    notes.set_photo_text(&shed.id, &key, "Spare key under the pot")?;
+    notes.remove_photo(&receipt.id, &receipt.photos[0])?;
+    notes.remove_photo(&card.id, &card.photos[0])?;
+    notes.remove_recording(&voice.id, &voice.recordings[0])?;
     Ok(())
 }
 
