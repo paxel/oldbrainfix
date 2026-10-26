@@ -374,9 +374,9 @@ class _BackupScreenState extends State<BackupScreen> {
         _Card(
           title: t.backupAutoTitle,
           children: [
-            SwitchListTile(
-              key: const ValueKey('backup-auto'),
-              contentPadding: EdgeInsets.zero,
+            SwitchBelow(
+              switchKey: const ValueKey('backup-auto'),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               title: Text(t.backupAutoSwitch),
               subtitle: Text(t.backupAutoDetail),
               value: _store.autoBackupOn,
@@ -409,9 +409,9 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
             ),
             if (folder != null || _store.autoBackupOn) ...[
-              SwitchListTile(
-                key: const ValueKey('backup-weekly'),
-                contentPadding: EdgeInsets.zero,
+              SwitchBelow(
+                switchKey: const ValueKey('backup-weekly'),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 title: Text(t.backupWeekly),
                 subtitle: Text(t.backupWeeklyDetail),
                 value: _store.backupsWeekly,

@@ -138,11 +138,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                ListTile(
+                ControlBelow(
                   leading: const Icon(Icons.repeat),
                   title: Text(t.renagDevice),
                   subtitle: Text(t.settingsRenagDetail),
-                  trailing: DropdownButton<int>(
+                  control: DropdownButton<int>(
                     key: const ValueKey('renagDevice'),
                     value: renag,
                     onChanged: (minutes) {
@@ -205,9 +205,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SettingsHeading(t.settingsHistory),
             SettingsSection(
               children: [
-                SwitchListTile(
-                  key: const ValueKey('streaks'),
-                  secondary: const Icon(Icons.local_fire_department_outlined),
+                SwitchBelow(
+                  switchKey: const ValueKey('streaks'),
+                  leading: const Icon(Icons.local_fire_department_outlined),
                   value: _streaksOn,
                   onChanged: _setStreaks,
                   title: Text(t.showStreaks),
@@ -323,10 +323,10 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Text(t.nudgeSettingsExplain),
         ),
-        ListTile(
+        ControlBelow(
           leading: const Icon(Icons.notifications_paused_outlined),
           title: Text(t.nudgeRepeat),
-          trailing: DropdownButton<int>(
+          control: DropdownButton<int>(
             key: const ValueKey('nudgeRepeat'),
             value: repeat,
             onChanged: (minutes) {
@@ -340,9 +340,9 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
             ],
           ),
         ),
-        SwitchListTile(
-          key: const ValueKey('quietHours'),
-          secondary: const Icon(Icons.bedtime_outlined),
+        SwitchBelow(
+          switchKey: const ValueKey('quietHours'),
+          leading: const Icon(Icons.bedtime_outlined),
           title: Text(t.quietHours),
           value: _quietOn,
           onChanged: (on) {
@@ -499,7 +499,7 @@ class _MirrorSwitchState extends State<MirrorSwitch> {
         // The tile's ink shows on the card, not under it.
         child: Material(
           type: MaterialType.transparency,
-          child: ListTile(
+          child: SwitchBelow(
             leading: const Icon(Icons.event_repeat),
             title: Text(t.calendarMirrorSwitch),
             subtitle: Text(
@@ -507,11 +507,11 @@ class _MirrorSwitchState extends State<MirrorSwitch> {
                   ? t.calendarMirrorDetail
                   : t.calendarMirrorIn(calendar.name),
             ),
-            trailing: Switch(
-              value: calendar != null,
-              onChanged: _busy ? null : (on) => on ? _choose() : _turnOff(),
-            ),
-            onTap: _busy ? null : _choose,
+            value: calendar != null,
+            onChanged: _busy ? null : (on) => on ? _choose() : _turnOff(),
+            // While on, a tap on the text picks another calendar; only
+            // the switch turns the mirror on or off.
+            onTap: _busy || calendar == null ? null : _choose,
           ),
         ),
       ),

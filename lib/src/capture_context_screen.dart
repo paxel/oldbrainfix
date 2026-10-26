@@ -96,8 +96,9 @@ class _CaptureContextScreenState extends State<CaptureContextScreen> {
                 // The tile's ink shows on the card, not under it.
                 child: Material(
                   type: MaterialType.transparency,
-                  child: SwitchListTile(
-                    secondary: Icon(icon),
+                  child: SwitchBelow(
+                    switchKey: ValueKey('context-${kind.name}'),
+                    leading: Icon(icon),
                     title: Text(title),
                     subtitle: Text(detail),
                     value: _on.contains(kind),

@@ -497,17 +497,14 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
               const SizedBox(height: 16),
               if (_advanced) _advancedEditor(t) else ..._simpleEditor(t),
               const SizedBox(height: 8),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(once ? t.onDay : t.startsOn),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: _pickStart,
-                    icon: const Icon(Icons.event),
-                    label: Text(dayText(locale, _start)),
-                  ),
-                ],
+              ControlBelow(
+                padding: EdgeInsets.zero,
+                title: Text(once ? t.onDay : t.startsOn),
+                control: TextButton.icon(
+                  onPressed: _pickStart,
+                  icon: const Icon(Icons.event),
+                  label: Text(dayText(locale, _start)),
+                ),
               ),
             ],
           ),
@@ -581,27 +578,26 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         children: [
           Text(t.renagExplain),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: Text(t.renagThis)),
-              DropdownButton<int?>(
-                key: const ValueKey('renagThis'),
-                value: own,
-                onChanged: (minutes) => setState(
-                  () => _renag = minutes == null
-                      ? null
-                      : Duration(minutes: minutes),
-                ),
-                items: [
-                  DropdownMenuItem(
-                    value: null,
-                    child: Text(t.renagDeviceDefault(device)),
-                  ),
-                  for (final m in choices)
-                    DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
-                ],
+          ControlBelow(
+            padding: EdgeInsets.zero,
+            title: Text(t.renagThis),
+            control: DropdownButton<int?>(
+              key: const ValueKey('renagThis'),
+              value: own,
+              onChanged: (minutes) => setState(
+                () => _renag = minutes == null
+                    ? null
+                    : Duration(minutes: minutes),
               ),
-            ],
+              items: [
+                DropdownMenuItem(
+                  value: null,
+                  child: Text(t.renagDeviceDefault(device)),
+                ),
+                for (final m in choices)
+                  DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
+              ],
+            ),
           ),
         ],
       ),
@@ -625,34 +621,33 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(t.escalationExplain),
-          SwitchListTile(
-            key: const ValueKey('escalationOn'),
-            contentPadding: EdgeInsets.zero,
+          SwitchBelow(
+            switchKey: const ValueKey('escalationOn'),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             title: Text(t.escalationSwitch),
             value: after != null,
             onChanged: (on) =>
                 setState(() => _escalation = on ? defaultEscalation : null),
           ),
           if (after != null)
-            Row(
-              children: [
-                Expanded(child: Text(t.escalationAfter)),
-                DropdownButton<int>(
-                  key: const ValueKey('escalationAfter'),
-                  value: after,
-                  onChanged: (count) {
-                    if (count != null) setState(() => _escalation = count);
-                  },
-                  items: [
-                    // A value set elsewhere stays pickable.
-                    for (final n in {
-                      ..._escalationChoices,
-                      after,
-                    }.toList()..sort())
-                      DropdownMenuItem(value: n, child: Text('$n')),
-                  ],
-                ),
-              ],
+            ControlBelow(
+              padding: EdgeInsets.zero,
+              title: Text(t.escalationAfter),
+              control: DropdownButton<int>(
+                key: const ValueKey('escalationAfter'),
+                value: after,
+                onChanged: (count) {
+                  if (count != null) setState(() => _escalation = count);
+                },
+                items: [
+                  // A value set elsewhere stays pickable.
+                  for (final n in {
+                    ..._escalationChoices,
+                    after,
+                  }.toList()..sort())
+                    DropdownMenuItem(value: n, child: Text('$n')),
+                ],
+              ),
             ),
         ],
       ),
@@ -682,40 +677,43 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       ),
       if (_kind == RepeatKind.every) ...[
         const SizedBox(height: 8),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(t.everyLabel),
-            IconButton(
-              tooltip: t.fewer,
-              onPressed: _every > 1 ? () => _change(() => _every--) : null,
-              icon: const Icon(Icons.remove),
-            ),
-            Text('$_every', style: Theme.of(context).textTheme.titleMedium),
-            IconButton(
-              tooltip: t.more,
-              onPressed: () => _change(() => _every++),
-              icon: const Icon(Icons.add),
-            ),
-            DropdownButton<RepeatUnit>(
-              value: _unit,
-              onChanged: (unit) {
-                if (unit != null) _change(() => _unit = unit);
-              },
-              items: [
-                for (final unit in RepeatUnit.values)
-                  DropdownMenuItem(
-                    value: unit,
-                    child: Text(switch (unit) {
-                      RepeatUnit.days => t.unitDays(_every),
-                      RepeatUnit.weeks => t.unitWeeks(_every),
-                      RepeatUnit.months => t.unitMonths(_every),
-                      RepeatUnit.years => t.unitYears(_every),
-                    }),
-                  ),
-              ],
-            ),
-          ],
+        ControlBelow(
+          padding: EdgeInsets.zero,
+          title: Text(t.everyLabel),
+          control: Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              IconButton(
+                tooltip: t.fewer,
+                onPressed: _every > 1 ? () => _change(() => _every--) : null,
+                icon: const Icon(Icons.remove),
+              ),
+              Text('$_every', style: Theme.of(context).textTheme.titleMedium),
+              IconButton(
+                tooltip: t.more,
+                onPressed: () => _change(() => _every++),
+                icon: const Icon(Icons.add),
+              ),
+              DropdownButton<RepeatUnit>(
+                value: _unit,
+                onChanged: (unit) {
+                  if (unit != null) _change(() => _unit = unit);
+                },
+                items: [
+                  for (final unit in RepeatUnit.values)
+                    DropdownMenuItem(
+                      value: unit,
+                      child: Text(switch (unit) {
+                        RepeatUnit.days => t.unitDays(_every),
+                        RepeatUnit.weeks => t.unitWeeks(_every),
+                        RepeatUnit.months => t.unitMonths(_every),
+                        RepeatUnit.years => t.unitYears(_every),
+                      }),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
       if (_kind == RepeatKind.weekdays) ...[

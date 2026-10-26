@@ -66,16 +66,13 @@ class _TrashScreenState extends State<TrashScreen> {
     return at.difference(widget.notes.store.clock().toUtc()).inDays;
   }
 
-  Widget _footer(DateTime? purgeAt, VoidCallback restore) => Row(
-    children: [
-      Expanded(
-        child: Text(
-          context.t.goneIn(_daysLeft(purgeAt)),
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ),
-      TextButton(onPressed: restore, child: Text(context.t.restore)),
-    ],
+  Widget _footer(DateTime? purgeAt, VoidCallback restore) => ControlBelow(
+    padding: EdgeInsets.zero,
+    title: Text(
+      context.t.goneIn(_daysLeft(purgeAt)),
+      style: Theme.of(context).textTheme.bodySmall,
+    ),
+    control: TextButton(onPressed: restore, child: Text(context.t.restore)),
   );
 
   /// A Routine or Reminder: what it reminds of and when.

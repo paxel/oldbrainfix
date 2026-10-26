@@ -52,7 +52,6 @@ class MissedSummaryCard extends StatelessWidget {
                   Icon(Icons.history, color: scheme.error),
                   const SizedBox(width: 8),
                   Expanded(child: Text(t.missedTitle, style: text.titleMedium)),
-                  TextButton(onPressed: onSeen, child: Text(t.missedSeen)),
                 ],
               ),
               for (final missed in summary.routines) ...[
@@ -95,6 +94,11 @@ class MissedSummaryCard extends StatelessWidget {
                     ),
                   ),
               ],
+              // Below what it marks as seen (UI laws, "Dialogs and pages").
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton(onPressed: onSeen, child: Text(t.missedSeen)),
+              ),
             ],
           ),
         ),

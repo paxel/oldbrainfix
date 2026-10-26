@@ -168,6 +168,75 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    for (final (locale, labels) in [
+      (
+        const Locale('en'),
+        {
+          'renagDevice': 'Default on this phone',
+          'nudgeRepeat': 'Nudge again after',
+          'quietHours': 'Quiet Hours',
+          'streaks': 'Adherence shows either way.',
+        },
+      ),
+      (
+        const Locale('de'),
+        {
+          'renagDevice': 'Standard auf diesem Handy',
+          'nudgeRepeat': 'Erneut stupsen nach',
+          'quietHours': 'Ruhezeit',
+          'streaks': 'Die Einhaltung wird immer gezeigt.',
+        },
+      ),
+    ]) {
+      testWidgets('put each switch and dropdown on its own line below its '
+          'text (${locale.languageCode})', (tester) async {
+        tester.platformDispatcher.localesTestValue = [locale];
+        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+        await start(tester);
+        await openDeviceSettings(tester);
+        for (final MapEntry(key: key, value: label) in labels.entries) {
+          final control = find.byKey(ValueKey(key));
+          await tester.scrollUntilVisible(
+            control,
+            200,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          final text = find.text(label);
+          expect(
+            tester.getTopLeft(control).dy,
+            greaterThanOrEqualTo(tester.getBottomLeft(text).dy),
+            reason: '$key sits below "$label"',
+          );
+          expect(
+            tester.getTopLeft(control).dx,
+            closeTo(tester.getTopLeft(text).dx, 0.5),
+            reason: '$key starts where its text starts',
+          );
+        }
+      });
+    }
+
+    testWidgets('name a switch by its text', (tester) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      final streaks = find.byKey(const ValueKey('streaks'));
+      await tester.scrollUntilVisible(
+        streaks,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSemantics(streaks),
+        isSemantics(
+          label: 'Show Streaks on this phone\nAdherence shows either way.',
+          hasToggledState: true,
+          isToggled: true,
+        ),
+      );
+    });
+
     testWidgets('lead to About', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);

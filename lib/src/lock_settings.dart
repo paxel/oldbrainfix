@@ -148,18 +148,18 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
             type: MaterialType.transparency,
             child: Column(
               children: [
-                SwitchListTile(
-                  key: const ValueKey('appLock'),
-                  secondary: const Icon(Icons.lock_outline),
+                SwitchBelow(
+                  switchKey: const ValueKey('appLock'),
+                  leading: const Icon(Icons.lock_outline),
                   value: _appLock,
                   onChanged: _setAppLock,
                   title: Text(t.appLock),
                   subtitle: Text(t.appLockDetail),
                 ),
                 if (_hasPin && _canBiometrics == true)
-                  SwitchListTile(
-                    key: const ValueKey('biometrics'),
-                    secondary: const Icon(Icons.fingerprint),
+                  SwitchBelow(
+                    switchKey: const ValueKey('biometrics'),
+                    leading: const Icon(Icons.fingerprint),
                     value: _biometrics,
                     onChanged: _setBiometrics,
                     title: Text(t.unlockBiometrics),
@@ -172,11 +172,11 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
                     title: Text(t.pinChange),
                     onTap: _changePin,
                   ),
-                ListTile(
+                ControlBelow(
                   leading: const Icon(Icons.timer_outlined),
                   title: Text(t.relockAfter),
                   subtitle: Text(t.relockDetail),
-                  trailing: DropdownButton<int>(
+                  control: DropdownButton<int>(
                     key: const ValueKey('relock'),
                     value: relock,
                     onChanged: (minutes) {
@@ -343,9 +343,9 @@ class _AreaLocksScreenState extends State<AreaLocksScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SwitchListTile(
-                          key: ValueKey('areaLock-${area.id}'),
-                          secondary: Icon(
+                        SwitchBelow(
+                          switchKey: ValueKey('areaLock-${area.id}'),
+                          leading: Icon(
                             _locked.contains(area.id)
                                 ? Icons.lock_outline
                                 : Icons.lock_open,

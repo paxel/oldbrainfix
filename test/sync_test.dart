@@ -144,6 +144,8 @@ void main() {
     expect([for (final n in Notes(phone).all()) n.text], ['From the desk']);
     expect(find.text('Desk'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Forget'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Forget'));
     await tester.pumpAndSettle();
     expect(phone.pairedDevices(), isEmpty);

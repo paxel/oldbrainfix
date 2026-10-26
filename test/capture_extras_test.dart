@@ -219,14 +219,8 @@ void main() {
   });
 
   group('the switches', () {
-    final calendarSwitch = find.widgetWithText(
-      SwitchListTile,
-      'Calendar event',
-    );
-    final bluetoothSwitch = find.widgetWithText(
-      SwitchListTile,
-      'Bluetooth device',
-    );
+    final calendarSwitch = find.byKey(const ValueKey('context-calendar'));
+    final bluetoothSwitch = find.byKey(const ValueKey('context-bluetooth'));
 
     Future<void> openPage(WidgetTester tester) async {
       await start(tester);
@@ -236,7 +230,7 @@ void main() {
     }
 
     bool isOn(WidgetTester tester, Finder finder) =>
-        tester.widget<SwitchListTile>(finder).value;
+        tester.widget<Switch>(finder).value;
 
     testWidgets('are off until switched on', (tester) async {
       await openPage(tester);

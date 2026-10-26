@@ -13,6 +13,7 @@ import 'sent_item_screen.dart';
 import 'conflicts_screen.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
+import 'look.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
@@ -269,13 +270,13 @@ class _SyncScreenState extends State<SyncScreen> {
           ),
         )
       else
-        ListTile(
+        ControlBelow(
           key: const ValueKey('folder'),
-          contentPadding: EdgeInsets.zero,
+          padding: const EdgeInsets.symmetric(vertical: 8),
           leading: const Icon(Icons.folder_shared_outlined),
           title: Text(_folderName ?? ''),
           subtitle: Text(_folderStatus(t, when)),
-          trailing: TextButton(
+          control: TextButton(
             key: const ValueKey('forget-folder'),
             onPressed: _folderBusy ? null : _forgetFolder,
             child: Text(t.folderForget),
@@ -361,26 +362,22 @@ class _SyncScreenState extends State<SyncScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(t.bundleIntro),
       ),
-      Row(
-        children: [
-          Text(t.bundleFor),
-          const SizedBox(width: 16),
-          Expanded(
-            child: DropdownButton<String?>(
-              key: const ValueKey('bundle-for'),
-              isExpanded: true,
-              value: chosen,
-              items: [
-                for (final device in _paired)
-                  DropdownMenuItem(value: device.id, child: Text(device.name)),
-                DropdownMenuItem(child: Text(t.bundleEverything)),
-              ],
-              onChanged: _bundleBusy
-                  ? null
-                  : (id) => setState(() => _bundleFor = id),
-            ),
-          ),
-        ],
+      ControlBelow(
+        padding: EdgeInsets.zero,
+        title: Text(t.bundleFor),
+        control: DropdownButton<String?>(
+          key: const ValueKey('bundle-for'),
+          isExpanded: true,
+          value: chosen,
+          items: [
+            for (final device in _paired)
+              DropdownMenuItem(value: device.id, child: Text(device.name)),
+            DropdownMenuItem(child: Text(t.bundleEverything)),
+          ],
+          onChanged: _bundleBusy
+              ? null
+              : (id) => setState(() => _bundleFor = id),
+        ),
       ),
       const SizedBox(height: 8),
       Wrap(
@@ -481,8 +478,8 @@ class _SyncScreenState extends State<SyncScreen> {
             child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),
           ),
           for (final device in _paired) ...[
-            ListTile(
-              contentPadding: EdgeInsets.zero,
+            ControlBelow(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               leading: Icon(
                 device.shared ? Icons.people_outline : Icons.computer_outlined,
               ),
@@ -493,16 +490,17 @@ class _SyncScreenState extends State<SyncScreen> {
                   t.pairedLastSync(when.format(device.lastSync.toLocal())),
                 ].join('\n'),
               ),
-              trailing: TextButton(
+              control: TextButton(
                 onPressed: () => _forget(device),
                 child: Text(t.forgetDevice),
               ),
             ),
             // Only a Device that hosts can be found and synced with.
             if (device.fingerprint.isNotEmpty)
-              SwitchListTile(
-                key: ValueKey('auto-${device.id}'),
-                contentPadding: const EdgeInsets.only(left: 56),
+              SwitchBelow(
+                switchKey: ValueKey('auto-${device.id}'),
+                // In line with the Device's name above.
+                padding: const EdgeInsetsDirectional.fromSTEB(40, 0, 0, 8),
                 title: Text(t.syncAutomatically),
                 value: widget.store.autoSyncOn(device.id),
                 onChanged: (on) => _setAuto(device, on),

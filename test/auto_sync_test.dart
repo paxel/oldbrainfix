@@ -171,12 +171,18 @@ void main() {
       expect(find.textContaining('sync on their own'), findsOneWidget);
       expect(find.textContaining('Last synced'), findsOneWidget);
       final toggle = find.byKey(ValueKey('auto-${desk.deviceId}'));
-      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+      await tester.scrollUntilVisible(
+        toggle,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.widget<Switch>(toggle).value, isTrue);
 
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       expect(phone.autoSyncOn(desk.deviceId), isFalse);
-      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(tester.widget<Switch>(toggle).value, isFalse);
       expect(sync.background, isFalse, reason: 'nobody to sync with');
 
       await tester.tap(toggle);

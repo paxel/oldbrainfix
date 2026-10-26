@@ -119,3 +119,119 @@ class Embossed extends StatelessWidget {
     );
   }
 }
+
+/// A row of text with its control (a switch, button or dropdown) on its
+/// own line below the text, start-aligned with it, never beside it (UI
+/// laws, "Dialogs and pages").
+class ControlBelow extends StatelessWidget {
+  final Widget? leading;
+  final Widget title;
+  final Widget? subtitle;
+  final Widget control;
+  final EdgeInsetsGeometry padding;
+
+  /// A tap on the text, for a row whose text opens something. It is a
+  /// convenience for the finger: the control stays the one target for
+  /// assistive technology.
+  final VoidCallback? onTap;
+
+  const ControlBelow({
+    super.key,
+    this.leading,
+    required this.title,
+    this.subtitle,
+    required this.control,
+    this.padding = const EdgeInsetsDirectional.fromSTEB(16, 8, 24, 8),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    Widget text = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DefaultTextStyle.merge(
+          style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurface),
+          child: title,
+        ),
+        if (subtitle case final subtitle?)
+          DefaultTextStyle.merge(
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+            child: subtitle,
+          ),
+      ],
+    );
+    if (onTap case final onTap?) {
+      text = InkWell(onTap: onTap, excludeFromSemantics: true, child: text);
+    }
+    return Padding(
+      padding: padding,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (leading case final leading?) ...[
+            IconTheme.merge(
+              data: IconThemeData(color: scheme.onSurfaceVariant),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 24),
+                child: leading,
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [text, const SizedBox(height: 4), control],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A [ControlBelow] with a switch: its text is the switch's semantic
+/// label, as in a [SwitchListTile]. Only the switch toggles; the row
+/// around it does not (UI laws, "Gestures").
+class SwitchBelow extends StatelessWidget {
+  /// The switch's own key, for finding and tapping it.
+  final Key? switchKey;
+  final Widget? leading;
+  final Widget title;
+  final Widget? subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final EdgeInsetsGeometry padding;
+
+  /// See [ControlBelow.onTap].
+  final VoidCallback? onTap;
+
+  const SwitchBelow({
+    super.key,
+    this.switchKey,
+    this.leading,
+    required this.title,
+    this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.padding = const EdgeInsetsDirectional.fromSTEB(16, 8, 24, 8),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => MergeSemantics(
+    child: ControlBelow(
+      leading: leading,
+      title: title,
+      subtitle: subtitle,
+      padding: padding,
+      onTap: onTap,
+      control: Switch(key: switchKey, value: value, onChanged: onChanged),
+    ),
+  );
+}

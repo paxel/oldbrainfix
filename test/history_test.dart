@@ -186,7 +186,8 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       await openDeviceSettings(tester);
-      await tap(tester, find.text('Show Streaks on this phone'));
+      // Only the switch toggles, not its text (UI laws, "Gestures").
+      await tap(tester, find.byKey(const ValueKey('streaks')));
       expect(store.streaksOn, isFalse);
       await tester.pageBack();
       await tester.pumpAndSettle();
