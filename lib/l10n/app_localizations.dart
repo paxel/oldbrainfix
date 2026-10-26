@@ -128,17 +128,17 @@ abstract class AppLocalizations {
   /// **'A few words about it (optional)'**
   String get capturePhotoHint;
 
-  /// No description provided for @takePhoto.
-  ///
-  /// In en, this message translates to:
-  /// **'Take a photo'**
-  String get takePhoto;
-
   /// No description provided for @photo.
   ///
   /// In en, this message translates to:
   /// **'Photo'**
   String get photo;
+
+  /// No description provided for @voice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get voice;
 
   /// No description provided for @photoMissing.
   ///
@@ -1591,12 +1591,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More about the capture'**
   String get moreCaptureContext;
-
-  /// No description provided for @recordVoice.
-  ///
-  /// In en, this message translates to:
-  /// **'Record voice'**
-  String get recordVoice;
 
   /// No description provided for @recording.
   ///

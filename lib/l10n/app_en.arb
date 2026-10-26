@@ -5,8 +5,8 @@
   "captureTooltip": "Capture a Note",
   "captureHint": "What's on your mind?",
   "capturePhotoHint": "A few words about it (optional)",
-  "takePhoto": "Take a photo",
   "photo": "Photo",
+  "voice": "Voice",
   "photoMissing": "Photo not on this device",
   "morePhotos": "+{count}",
   "@morePhotos": {
@@ -593,7 +593,6 @@
     }
   },
   "moreCaptureContext": "More about the capture",
-  "recordVoice": "Record voice",
   "recording": "Recording…",
   "stopAndSave": "Stop and save",
   "voiceRecording": "Voice recording",

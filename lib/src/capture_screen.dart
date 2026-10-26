@@ -90,12 +90,12 @@ Future<void> captureNote(
 /// buttons at the bottom, each of which saves; Save means 1 h (UI laws,
 /// "Capture").
 ///
-/// The camera button takes a photo into the Note; the text is then
+/// The Photo button takes a photo into the Note; the text is then
 /// optional. Something shared in from another app opens here with its
 /// text and photos filled in, and the app it came from recorded. Photos
 /// are written at once, so none is lost.
 ///
-/// The mic button switches to voice: recording starts at once, the
+/// The Voice button switches to voice: recording starts at once, the
 /// elapsed time runs, and one big stop button ends it and saves, as do
 /// the Nudge buttons and Back; there is no hold-to-talk and no stop on
 /// silence (UI laws, "Capture"). The first time, while the microphone is
@@ -382,62 +382,46 @@ class _CaptureScreenState extends State<CaptureScreen> {
           // While recording, the big stop button is the one way out.
           actions: recording
               ? null
-              : [
-                  if (widget.voice.available && !_voiceMode)
-                    IconButton(
-                      tooltip: t.recordVoice,
-                      onPressed: _openVoice,
-                      icon: const Icon(Icons.mic_none),
-                    ),
-                  if (widget.photos.available)
-                    IconButton(
-                      tooltip: t.takePhoto,
-                      onPressed: _takePhoto,
-                      icon: const Icon(Icons.photo_camera_outlined),
-                    ),
-                  TextButton(onPressed: _save, child: Text(t.save)),
-                ],
+              : [TextButton(onPressed: _save, child: Text(t.save))],
         ),
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (_photos.isNotEmpty) ...[
-                  PhotoStrip(
-                    hashes: _photos,
-                    size: 96,
-                    onTap: (hash) => viewPhoto(context, hash),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (_recordings.isNotEmpty && !_voiceMode) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final hash in _recordings)
-                          RecordingButton(key: ValueKey(hash), hash: hash),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
+                // With the keyboard up the room is small: the photos and
+                // recordings scroll with the text, the buttons stay.
                 Expanded(
                   child: _voiceMode
-                      ? _voice(context)
-                      : TextField(
-                          controller: _text,
-                          autofocus: !widget.startVoice && !widget.startPhoto,
-                          maxLines: null,
-                          decoration: InputDecoration(
-                            hintText: _photos.isEmpty && _recordings.isEmpty
-                                ? t.captureHint
-                                : t.capturePhotoHint,
-                          ),
+                      ? Column(
+                          children: [
+                            ..._attachments(context),
+                            Expanded(child: _voice(context)),
+                          ],
+                        )
+                      : CustomScrollView(
+                          slivers: [
+                            for (final attachment in _attachments(context))
+                              SliverToBoxAdapter(child: attachment),
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: TextField(
+                                controller: _text,
+                                autofocus:
+                                    !widget.startVoice && !widget.startPhoto,
+                                maxLines: null,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      _photos.isEmpty && _recordings.isEmpty
+                                      ? t.captureHint
+                                      : t.capturePhotoHint,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                 ),
+                if (!recording) _captureButtons(context),
                 NudgeButtons(onPicked: _save),
               ],
             ),
@@ -446,6 +430,74 @@ class _CaptureScreenState extends State<CaptureScreen> {
       ),
     );
   }
+
+  /// The Note's photos, and its recordings outside voice, above the text.
+  List<Widget> _attachments(BuildContext context) => [
+    if (_photos.isNotEmpty) ...[
+      PhotoStrip(
+        hashes: _photos,
+        size: 96,
+        onTap: (hash) => viewPhoto(context, hash),
+      ),
+      const SizedBox(height: 8),
+    ],
+    if (_recordings.isNotEmpty && !_voiceMode) ...[
+      Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: 8,
+          children: [
+            for (final hash in _recordings)
+              RecordingButton(key: ValueKey(hash), hash: hash),
+          ],
+        ),
+      ),
+      const SizedBox(height: 8),
+    ],
+  ];
+
+  /// The Photo and Voice buttons above the Nudge choices, side by side,
+  /// or one full width; none while recording, where the big stop button
+  /// is the one way out. Below the text field, they rise with the
+  /// keyboard.
+  Widget _captureButtons(BuildContext context) {
+    final t = context.t;
+    final buttons = [
+      if (widget.photos.available)
+        FilledButton.tonalIcon(
+          key: const ValueKey('capturePhoto'),
+          onPressed: _takePhoto,
+          style: _bigButton,
+          icon: const Icon(Icons.photo_camera_outlined),
+          label: Text(t.photo),
+        ),
+      if (widget.voice.available && !_voiceMode)
+        FilledButton.tonalIcon(
+          key: const ValueKey('captureVoice'),
+          onPressed: _openVoice,
+          style: _bigButton,
+          icon: const Icon(Icons.mic_none),
+          label: Text(t.voice),
+        ),
+    ];
+    if (buttons.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      child: Row(
+        children: [
+          for (final (i, button) in buttons.indexed) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: button),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static final _bigButton = FilledButton.styleFrom(
+    minimumSize: const Size.fromHeight(56),
+    iconSize: 28,
+  );
 
   /// Voice: the text typed so far, then the running time and the big
   /// stop button; or, without the microphone, why there is none.

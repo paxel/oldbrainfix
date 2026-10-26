@@ -25,10 +25,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get capturePhotoHint => 'A few words about it (optional)';
 
   @override
-  String get takePhoto => 'Take a photo';
+  String get photo => 'Photo';
 
   @override
-  String get photo => 'Photo';
+  String get voice => 'Voice';
 
   @override
   String get photoMissing => 'Photo not on this device';
@@ -1012,9 +1012,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moreCaptureContext => 'More about the capture';
-
-  @override
-  String get recordVoice => 'Record voice';
 
   @override
   String get recording => 'Recording…';

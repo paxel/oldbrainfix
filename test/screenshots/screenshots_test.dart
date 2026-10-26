@@ -449,8 +449,8 @@ void main() {
         await tap(tester, find.byTooltip(t.captureTooltip));
         await tester.enterText(find.byType(TextField), texts.captureText);
         await tester.pumpAndSettle();
-        expect(find.byTooltip(t.recordVoice), findsOneWidget);
-        expect(find.byTooltip(t.takePhoto), findsOneWidget);
+        expect(find.text(t.voice), findsOneWidget);
+        expect(find.text(t.photo), findsOneWidget);
       });
 
       frame('3-diary.png', (tester) async {

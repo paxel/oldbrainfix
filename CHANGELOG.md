@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ## [0.1.0]
 
 ### Added
-- Capture a thought as a text Note with one tap on +; leaving by Back or switching apps keeps it.
+- Capture a thought as a text Note with one tap on +, with large Photo and Voice buttons above the reminder choices; leaving by Back or switching apps keeps it.
 - Take a photo as a Note, optionally with a few words; kept photos carry no location data.
 - Record a voice Note that starts at once and ends with one big stop button; the recording is kept to play back.
 - Transcripts of voice Notes, written on the phone by Whisper in English or German, after a one-time speech model download, offered once after the Starter Set and on request in Settings, or from a file of your own.

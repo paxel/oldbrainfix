@@ -8,6 +8,9 @@ import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/trash_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'fake_photos.dart';
+import 'fake_voice.dart';
+
 void main() {
   // The three-button navigation bar of a Pixel: 48 logical pixels.
   const bar = 48.0;
@@ -86,9 +89,20 @@ void main() {
     tester,
   ) async {
     phoneWithNavigationBar(tester);
-    await show(tester, CaptureScreen(notes: Notes(store)));
+    await show(
+      tester,
+      CaptureScreen(
+        notes: Notes(store),
+        photos: FakePhotos(),
+        voice: FakeVoice(),
+      ),
+    );
 
-    for (final (_, key) in NudgeButtons.choices) {
+    for (final key in [
+      const ValueKey('capturePhoto'),
+      const ValueKey('captureVoice'),
+      for (final (_, key) in NudgeButtons.choices) key,
+    ]) {
       expectAboveBar(tester, find.byKey(key));
     }
   });
