@@ -163,13 +163,24 @@ class Voice(private val context: Context) {
 
         /**
          * The file extension of the recording [bytes]: `wav` for a WAV
-         * file (`RIFF`…`WAVE`), as the desktop records, else `m4a`, as
-         * this phone records. Players and extractors read the bytes, the
-         * name only keeps them from guessing wrong.
+         * file (`RIFF`…`WAVE`), as the desktop records; `ogg` for an Ogg
+         * file (`OggS`), as a messenger's voice message shared in is;
+         * `mp3` for an MP3 file (an `ID3` tag or an MPEG audio frame);
+         * else `m4a`, as this phone records. Players and extractors read
+         * the bytes, the name only keeps them from guessing wrong.
          */
         fun extension(bytes: ByteArray): String {
             fun tag(at: Int) = if (bytes.size < at + 4) "" else String(bytes, at, 4, Charsets.US_ASCII)
-            return if (tag(0) == "RIFF" && tag(8) == "WAVE") "wav" else "m4a"
+            fun byte(at: Int) = if (bytes.size <= at) 0 else bytes[at].toInt() and 0xFF
+            return when {
+                tag(0) == "RIFF" && tag(8) == "WAVE" -> "wav"
+                tag(0) == "OggS" -> "ogg"
+                tag(0).startsWith("ID3") -> "mp3"
+                // An MPEG audio frame's sync bits, with a layer set: ADTS
+                // AAC has the same sync but no layer.
+                byte(0) == 0xFF && (byte(1) and 0xE0) == 0xE0 && (byte(1) and 0x06) != 0 -> "mp3"
+                else -> "m4a"
+            }
         }
 
         /** Whether the user allowed the microphone. */

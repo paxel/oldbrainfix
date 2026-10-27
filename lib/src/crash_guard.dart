@@ -235,12 +235,15 @@ String mailBody(String body, {int limit = mailBodyLimit}) {
   return text.length > limit ? text.substring(0, limit) : text;
 }
 
-Future<void> mailCrashReport(String body) async {
+Future<void> mailCrashReport(
+  String body, {
+  String subject = 'Old Brain Fix crash report',
+}) async {
   final uri = Uri(
     scheme: 'mailto',
     path: crashMail,
     query:
-        'subject=${Uri.encodeComponent('Old Brain Fix crash report')}'
+        'subject=${Uri.encodeComponent(subject)}'
         '&body=${Uri.encodeComponent(mailBody(body))}',
   );
   try {

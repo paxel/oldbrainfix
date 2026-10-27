@@ -5,15 +5,43 @@ import 'package:flutter/widgets.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 /// Something another app shared into Old Brain Fix: its text, links
-/// included, its photos, and the app it came from when Android said.
+/// included, its photos, its sound files as voice recordings, and the app
+/// it came from when Android said.
 class SharedItem {
   final String text;
   final List<Uint8List> photos;
+  final List<SharedRecording> recordings;
   final SourceApp? sourceApp;
 
-  const SharedItem({this.text = '', this.photos = const [], this.sourceApp});
+  const SharedItem({
+    this.text = '',
+    this.photos = const [],
+    this.recordings = const [],
+    this.sourceApp,
+  });
 
-  bool get isEmpty => text.trim().isEmpty && photos.isEmpty;
+  bool get isEmpty =>
+      text.trim().isEmpty && photos.isEmpty && recordings.isEmpty;
+}
+
+/// Why a sound file shared in cannot be transcribed on this Device.
+enum SoundProblem {
+  /// No sound was found in it: not a sound file, or a damaged one.
+  unreadable,
+
+  /// This Device has no decoder for its format.
+  unsupported,
+}
+
+/// A sound file shared in, kept as it is as a voice recording; [problem]
+/// says why it cannot be transcribed, null when it can, and [format] is
+/// its MIME type when that is known.
+class SharedRecording {
+  final Uint8List bytes;
+  final SoundProblem? problem;
+  final String? format;
+
+  const SharedRecording(this.bytes, {this.problem, this.format});
 }
 
 /// The text of a share: the [subject] a sharing app sends with a link,
@@ -29,7 +57,7 @@ String sharedText(String? subject, String? text) {
 }
 
 /// The platform seam for photos: the camera, the system's picture picker
-/// and what other apps share in (android/…/Photos.kt, ShareActivity.kt).
+/// and what other apps share in, sound files included (android/…/Photos.kt, ShareActivity.kt).
 /// Widget tests hand in a fake.
 abstract interface class PhotoPlatform {
   /// Whether this Device has a camera to take photos with; the camera
@@ -131,6 +159,19 @@ class AndroidPhotos implements PhotoPlatform {
       photos: [
         for (final photo in raw['photos'] as List? ?? const [])
           if (photo is Uint8List) photo,
+      ],
+      recordings: [
+        for (final recording in raw['recordings'] as List? ?? const [])
+          if (recording case {'bytes': final Uint8List bytes})
+            SharedRecording(
+              bytes,
+              problem: switch (recording['problem']) {
+                'unreadable' => SoundProblem.unreadable,
+                'unsupported' => SoundProblem.unsupported,
+                _ => null,
+              },
+              format: recording['format'] as String?,
+            ),
       ],
       sourceApp: package is String && package.isNotEmpty
           ? SourceApp(package, label: raw['sourceLabel'] as String?)

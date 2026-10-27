@@ -2602,4 +2602,36 @@ class AppLocalizationsDe extends AppLocalizations {
   String playbackSpeedSemantics(String speed) {
     return 'Wiedergabegeschwindigkeit $speed-fach';
   }
+
+  @override
+  String get close => 'Schließen';
+
+  @override
+  String get report => 'Melden';
+
+  @override
+  String sharedRecordingFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count geteilte Aufnahmen können nicht transkribiert werden.',
+      one: 'Eine geteilte Aufnahme kann nicht transkribiert werden.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sharedRecordingFailedTitle => 'Aufnahme nicht transkribiert';
+
+  @override
+  String get sharedRecordingUnreadable =>
+      'In der geteilten Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.';
+
+  @override
+  String get sharedRecordingUnsupported =>
+      'Dieses Telefon kann das Format der geteilten Datei nicht lesen.';
+
+  @override
+  String get sharedRecordingFix =>
+      'Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder teile sie noch einmal als m4a oder mp3.';
 }

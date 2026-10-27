@@ -228,6 +228,20 @@ class Speech(private val context: Context) {
     /** What Whisper is led in with, by the language it hears (lib/…/speech_platform.dart). */
     data class Prompts(val english: String = "", val german: String = "")
 
+    /**
+     * Why a sound file cannot be transcribed: its [kind], one of the
+     * constants below, and the [format] (MIME type) it is in, when known.
+     */
+    data class Problem(val kind: String, val format: String?) {
+        companion object {
+            /** No sound found: not a sound file, or a damaged one. */
+            const val UNREADABLE = "unreadable"
+
+            /** A format this phone has no decoder for. */
+            const val UNSUPPORTED = "unsupported"
+        }
+    }
+
     /** A recording to transcribe and its [Prompts], as the channel hands them over. */
     class Request(val bytes: ByteArray, val prompts: Prompts)
 
@@ -239,6 +253,39 @@ class Speech(private val context: Context) {
         const val MODEL_NAME = "ggml-base.bin"
         private const val TIMEOUT_MS = 30_000
         private const val TIMEOUT_US = 10_000L
+
+        /**
+         * Why the sound file [file] cannot be decoded here as [decode]
+         * would, or null when it can: [Problem.UNREADABLE] when no sound
+         * is found in it, [Problem.UNSUPPORTED] when this phone has no
+         * decoder for its format. Only opens the decoder, decodes nothing.
+         */
+        fun problem(file: File): Problem? {
+            val extractor = MediaExtractor()
+            try {
+                try {
+                    extractor.setDataSource(file.path)
+                } catch (e: Exception) {
+                    return Problem(Problem.UNREADABLE, null)
+                }
+                val format = (0 until extractor.trackCount).map(extractor::getTrackFormat).firstOrNull {
+                    it.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+                } ?: return Problem(Problem.UNREADABLE, null)
+                val mime = format.getString(MediaFormat.KEY_MIME)
+                var codec: MediaCodec? = null
+                return try {
+                    codec = MediaCodec.createDecoderByType(mime ?: return Problem(Problem.UNREADABLE, null))
+                    codec.configure(format, null, null, 0)
+                    null
+                } catch (e: Exception) {
+                    Problem(Problem.UNSUPPORTED, mime)
+                } finally {
+                    codec?.release()
+                }
+            } finally {
+                extractor.release()
+            }
+        }
 
         /**
          * The recording in [file] as Whisper hears it: 16 kHz mono

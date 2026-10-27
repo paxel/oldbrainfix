@@ -89,6 +89,23 @@ class SpeechTest {
     }
 
     @Test
+    fun `48 kHz stereo, as Opus voice messages decode, comes out as 16 kHz mono`() {
+        // A 440 Hz tone, the same on both channels, for one second.
+        fun tone(i: Int, rate: Int) = 0.5f * kotlin.math.sin(2 * Math.PI * 440 * i / rate).toFloat()
+        val stereo = FloatArray(48_000 * 2) { tone(it / 2, 48_000) }
+        val whisper = Speech.toWhisper(stereo, 2, 48_000)
+        assertEquals(16_000, whisper.size)
+        // Still the same tone, at Whisper's rate.
+        for (i in whisper.indices) assertEquals(tone(i, 16_000), whisper[i], 1e-3f)
+    }
+
+    @Test
+    fun `48 kHz mono keeps every third sample`() {
+        val mono = FloatArray(9) { it.toFloat() }
+        assertArrayEquals(floatArrayOf(0f, 3f, 6f), Speech.toWhisper(mono, 1, 48_000), 1e-6f)
+    }
+
+    @Test
     fun `Whisper gets one core less than there are, at most four`() {
         assertEquals(1, Speech.threadsFor(1))
         assertEquals(1, Speech.threadsFor(2))

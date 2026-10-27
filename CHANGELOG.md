@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Added
 - On the phone, text Capture has a Gallery button next to Photo and Voice that picks one or more pictures from the phone into the Note as its photos, each with its Photo Text.
+- On the phone, an audio file shared in from another app, such as a WhatsApp voice message, becomes a voice Note with its Transcript, several shared at once one Note with a recording each, and a file the phone cannot decode is kept in the Note with an announcement that it could not be transcribed, whose tap shows the reason.
 
 ### Changed
 - On the phone, "+" on the Agenda, also while the app is locked, fans out Text, Voice, Photo and Gallery instead of opening text Capture at once, and closes again on a second tap, a tap outside or Back.

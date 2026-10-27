@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
+import 'announcements.dart';
 import 'context_platform.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'photo_platform.dart';
@@ -22,6 +24,9 @@ typedef Captured = ({String noteId, List<Future<bool>> attached});
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
 /// [onCaptured] gets the new Note's id first, when there is one.
+///
+/// A shared sound file this Device cannot transcribe is kept all the
+/// same, and announced at the top ([announceUntranscribable]).
 ///
 /// After this Device's first Capture, while the location is not allowed
 /// yet, it explains why Notes record where they were captured and asks;
@@ -41,6 +46,7 @@ Future<void> captureNote(
   final photos = PhotoScope.of(context);
   final microphone = VoiceScope.of(context);
   final contextSource = ContextScope.of(context);
+  if (shared != null) announceUntranscribable(context, shared.recordings);
   final captured = await Navigator.of(context).push<Captured>(
     MaterialPageRoute(
       // Capture never needs unlocking.
@@ -83,6 +89,41 @@ Future<void> captureNote(
   }
 }
 
+/// Announces at the top that some of the shared [recordings] cannot be
+/// transcribed on this Device, when some cannot; the tap opens why, what
+/// to do and each one's problem and format (UI laws, "Announcements").
+void announceUntranscribable(
+  BuildContext context,
+  List<SharedRecording> recordings,
+) {
+  final failed = [
+    for (final recording in recordings)
+      if (recording.problem case final problem?) (problem, recording.format),
+  ];
+  final announcements = AnnouncementsScope.of(context);
+  if (failed.isEmpty || announcements == null) return;
+  final t = context.t;
+  final navigator = Navigator.of(context);
+  announcements.announce(
+    t.sharedRecordingFailed(failed.length),
+    onTap: () => unawaited(
+      showFailure(
+        navigator.context,
+        title: t.sharedRecordingFailedTitle,
+        cause: switch (failed.first.$1) {
+          SoundProblem.unreadable => t.sharedRecordingUnreadable,
+          SoundProblem.unsupported => t.sharedRecordingUnsupported,
+        },
+        fix: t.sharedRecordingFix,
+        details: [
+          for (final (problem, format) in failed)
+            format == null ? problem.name : '${problem.name}: $format',
+        ].join('\n'),
+      ),
+    ),
+  );
+}
+
 /// Text capture: opens with the keyboard up, Save writes the Note. The
 /// position, and the calendar events and Bluetooth devices where they
 /// are switched on, are looked up from the start, without asking, and
@@ -95,8 +136,9 @@ Future<void> captureNote(
 /// The Photo button takes a photo into the Note, and the Gallery button
 /// picks pictures from the Device into it, several at once; the text is
 /// then optional. Closing the picker without picking changes nothing. Something shared in from another app opens here with its
-/// text and photos filled in, and the app it came from recorded. Photos
-/// are written at once, so none is lost.
+/// text, photos and sound files filled in, the sound files as voice
+/// recordings, and the app it came from recorded. All of it goes into one
+/// Note written at once, so nothing is lost.
 ///
 /// The Voice button switches to voice: recording starts at once, the
 /// elapsed time runs, and one big stop button ends it and saves, as do
@@ -193,12 +235,17 @@ class _CaptureScreenState extends State<CaptureScreen> {
     // The fix may take a while; it starts while the user types.
     _here = currentIfGranted(widget.location);
     _extras = currentExtras(widget.notes.store, widget.contextSource);
-    // A share is meant to be kept: it is written at once.
+    // A share is meant to be kept: it is written at once, as one Note.
     final shared = widget.shared;
     if (shared != null && !shared.isEmpty) {
       _text.text = shared.text;
-      _addPhotos(shared.photos);
-      _write(null);
+      _create(
+        shared.text.trim(),
+        photos: shared.photos,
+        recordings: [
+          for (final recording in shared.recordings) recording.bytes,
+        ],
+      );
     }
     // The app may be killed in the background: the text is kept.
     _lifecycle = AppLifecycleListener(

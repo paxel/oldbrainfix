@@ -6,6 +6,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Neu
 - Auf dem Telefon hat die Text-Erfassung neben „Foto“ und „Sprache“ einen Knopf „Galerie“, der ein oder mehrere Bilder vom Telefon als Fotos in die Notiz übernimmt, jedes mit seinem erkannten Text.
+- Auf dem Telefon wird eine aus einer anderen App geteilte Audiodatei, etwa eine WhatsApp-Sprachnachricht, zu einer Sprachnotiz mit Transkript, mehrere auf einmal geteilte zu einer Notiz mit je einer Aufnahme, und eine Datei, die das Telefon nicht lesen kann, bleibt in der Notiz, mit einer Meldung, dass sie nicht transkribiert werden konnte, die beim Tippen den Grund zeigt.
 
 ### Geändert
 - Auf dem Telefon fächert „+“ in der Agenda, auch solange die App gesperrt ist, „Text“, „Sprache“, „Foto“ und „Galerie“ auf, statt sofort die Text-Erfassung zu öffnen, und schließt sich wieder bei einem zweiten Tippen, einem Tippen daneben oder mit „Zurück“.

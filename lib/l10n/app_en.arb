@@ -1439,5 +1439,19 @@
   "playbackSpeedOption": "×{speed}",
   "@playbackSpeedOption": {"description": "One speed in the playback speed menu, as in \"×1.5\"; speed is the number as the locale writes it.", "placeholders": {"speed": {"type": "String"}}},
   "playbackSpeedSemantics": "Playback speed {speed} times",
-  "@playbackSpeedSemantics": {"description": "What a screen reader says for the speed label.", "placeholders": {"speed": {"type": "String"}}}
+  "@playbackSpeedSemantics": {"description": "What a screen reader says for the speed label.", "placeholders": {"speed": {"type": "String"}}},
+  "close": "Close",
+  "@close": {"description": "Closes a dialog."},
+  "report": "Report",
+  "@report": {"description": "Button in a failure dialog that mails its details to the developer."},
+  "sharedRecordingFailed": "{count, plural, =1{A shared recording cannot be transcribed.} other{{count} shared recordings cannot be transcribed.}}",
+  "@sharedRecordingFailed": {"description": "Announcement after a sound file was shared in that this phone cannot transcribe; the Note is kept.", "placeholders": {"count": {"type": "int"}}},
+  "sharedRecordingFailedTitle": "Recording not transcribed",
+  "@sharedRecordingFailedTitle": {"description": "Title of the dialog explaining why a shared recording cannot be transcribed."},
+  "sharedRecordingUnreadable": "No sound was found in the shared file: it is not a sound file, or it is damaged.",
+  "@sharedRecordingUnreadable": {"description": "Cause of a shared recording that cannot be transcribed."},
+  "sharedRecordingUnsupported": "This phone cannot decode the format of the shared file.",
+  "@sharedRecordingUnsupported": {"description": "Cause of a shared recording that cannot be transcribed."},
+  "sharedRecordingFix": "The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.",
+  "@sharedRecordingFix": {"description": "What to do about a shared recording that cannot be transcribed."}
 }

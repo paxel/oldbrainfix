@@ -2581,4 +2581,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String playbackSpeedSemantics(String speed) {
     return 'Playback speed $speed times';
   }
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get report => 'Report';
+
+  @override
+  String sharedRecordingFailed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shared recordings cannot be transcribed.',
+      one: 'A shared recording cannot be transcribed.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sharedRecordingFailedTitle => 'Recording not transcribed';
+
+  @override
+  String get sharedRecordingUnreadable =>
+      'No sound was found in the shared file: it is not a sound file, or it is damaged.';
+
+  @override
+  String get sharedRecordingUnsupported =>
+      'This phone cannot decode the format of the shared file.';
+
+  @override
+  String get sharedRecordingFix =>
+      'The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.';
 }

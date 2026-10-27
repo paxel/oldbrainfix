@@ -683,5 +683,12 @@
   "playbackSpeed": "Wiedergabegeschwindigkeit",
   "playbackSpeedLabel": "{speed}×",
   "playbackSpeedOption": "×{speed}",
-  "playbackSpeedSemantics": "Wiedergabegeschwindigkeit {speed}-fach"
+  "playbackSpeedSemantics": "Wiedergabegeschwindigkeit {speed}-fach",
+  "close": "Schließen",
+  "report": "Melden",
+  "sharedRecordingFailed": "{count, plural, =1{Eine geteilte Aufnahme kann nicht transkribiert werden.} other{{count} geteilte Aufnahmen können nicht transkribiert werden.}}",
+  "sharedRecordingFailedTitle": "Aufnahme nicht transkribiert",
+  "sharedRecordingUnreadable": "In der geteilten Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.",
+  "sharedRecordingUnsupported": "Dieses Telefon kann das Format der geteilten Datei nicht lesen.",
+  "sharedRecordingFix": "Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder teile sie noch einmal als m4a oder mp3."
 }

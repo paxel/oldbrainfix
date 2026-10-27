@@ -4147,6 +4147,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playback speed {speed} times'**
   String playbackSpeedSemantics(String speed);
+
+  /// Closes a dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// Button in a failure dialog that mails its details to the developer.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get report;
+
+  /// Announcement after a sound file was shared in that this phone cannot transcribe; the Note is kept.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{A shared recording cannot be transcribed.} other{{count} shared recordings cannot be transcribed.}}'**
+  String sharedRecordingFailed(int count);
+
+  /// Title of the dialog explaining why a shared recording cannot be transcribed.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording not transcribed'**
+  String get sharedRecordingFailedTitle;
+
+  /// Cause of a shared recording that cannot be transcribed.
+  ///
+  /// In en, this message translates to:
+  /// **'No sound was found in the shared file: it is not a sound file, or it is damaged.'**
+  String get sharedRecordingUnreadable;
+
+  /// Cause of a shared recording that cannot be transcribed.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone cannot decode the format of the shared file.'**
+  String get sharedRecordingUnsupported;
+
+  /// What to do about a shared recording that cannot be transcribed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.'**
+  String get sharedRecordingFix;
 }
 
 class _AppLocalizationsDelegate

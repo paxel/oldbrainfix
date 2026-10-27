@@ -92,8 +92,9 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:theme="@style/CrashTheme"/>
-        <!-- The share target: images, text and links from other apps. It
-             only hands the share over to MainActivity. -->
+        <!-- The share target: images, sound files such as voice messages,
+             text and links from other apps. It only hands the share over
+             to MainActivity. -->
         <activity
             android:name=".ShareActivity"
             android:exported="true"
@@ -111,9 +112,21 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
             <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+            </intent-filter>
+            <intent-filter>
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
             </intent-filter>
         </activity>
         <!-- Sync bundles (ADR 0003) and Sent Items (ADR 0009) opened with
