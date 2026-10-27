@@ -143,6 +143,7 @@ fn note_json(note: &Note) -> Value {
         "photoTexts": note.photo_texts,
         "removedPhotos": note.removed_photos,
         "removedRecordings": note.removed_recordings,
+        "wordless": note.wordless().name(),
     })
 }
 
@@ -766,6 +767,9 @@ fn write_media(store: &Store) -> Built {
     notes.remove_photo(&receipt.id, &receipt.photos[0])?;
     notes.remove_photo(&card.id, &card.photos[0])?;
     notes.remove_recording(&voice.id, &voice.recordings[0])?;
+    notes.capture_with("", None, None, &[photo(7)], &[])?;
+    let hum = notes.capture_with("", None, None, &[], &[recording(6)])?;
+    notes.set_transcript(&hum.id, &hum.recordings[0], "")?;
     Ok(())
 }
 
@@ -1027,6 +1031,7 @@ fn check_json(store: &Store, local: &Value) -> Result<Value, Box<dyn std::error:
             "ends": wall(&a.ends),
             "endsAt": dart_iso(a.ends_at),
             "text": a.text,
+            "wordless": a.wordless.name(),
             "firesAfterNow": iso(a.fires_after(now)),
         })).collect::<Vec<_>>(),
         "missed": {

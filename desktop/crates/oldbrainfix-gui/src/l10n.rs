@@ -4,6 +4,17 @@
 
 include!(concat!(env!("OUT_DIR"), "/l10n.rs"));
 
+use oldbrainfix_core::Wordless;
+
+/// What a Note without words is titled as where only its words fit, as
+/// in a row or an alarm ([`oldbrainfix_core::Note::wordless`]).
+pub fn wordless(t: &L10n, wordless: Wordless) -> &'static str {
+    match wordless {
+        Wordless::Photo => t.photo(),
+        Wordless::VoiceRecording => t.voice_recording(),
+    }
+}
+
 /// The app's locale for a system locale such as `de_DE.UTF-8` or
 /// `en-US`: the language part when the app speaks it, else English.
 pub fn locale_for_system(system: Option<&str>) -> &'static str {
@@ -35,6 +46,16 @@ mod tests {
         assert_eq!(locale_for_system(Some("en-US")), "en");
         assert_eq!(locale_for_system(Some("fr")), "en");
         assert_eq!(locale_for_system(None), "en");
+    }
+
+    #[test]
+    fn a_note_without_words_is_titled_by_what_it_holds() {
+        let en = L10n::new("en");
+        let de = L10n::new("de");
+        assert_eq!(wordless(&en, Wordless::Photo), "Photo");
+        assert_eq!(wordless(&en, Wordless::VoiceRecording), "Voice recording");
+        assert_eq!(wordless(&de, Wordless::Photo), "Foto");
+        assert_eq!(wordless(&de, Wordless::VoiceRecording), "Sprachaufnahme");
     }
 
     #[test]

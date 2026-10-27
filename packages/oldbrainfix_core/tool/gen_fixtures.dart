@@ -303,7 +303,8 @@ final _scenarios = <Scenario>[
         'removed and its Photo Text kept, '
         'its bytes kept for the other Note showing it; a merged Note\'s '
         'photo and a recording removed, their bytes gone, their texts '
-        'kept.',
+        'kept; Notes without words titled as a photo or as a voice '
+        'recording, one with an empty Transcript.',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -353,6 +354,9 @@ final _scenarios = <Scenario>[
       notes.removePhoto(receipt.id, receipt.photos.single);
       notes.removePhoto(card.id, card.photos.single);
       notes.removeRecording(voice.id, voice.recordings.single);
+      notes.capture('', photos: [_photo(7)]);
+      final hum = notes.capture('', recordings: [_recording(6)]);
+      notes.setTranscript(hum.id, hum.recordings.single, '');
     },
   ),
   (
@@ -569,6 +573,7 @@ Map<String, Object?> _note(Note note) => {
   'photoTexts': note.photoTexts,
   'removedPhotos': note.removedPhotos,
   'removedRecordings': note.removedRecordings,
+  'wordless': note.wordless.name,
 };
 
 Map<String, Object?> _section(Section section) => {
@@ -884,6 +889,7 @@ Map<String, Object?> _alarms(Store store) {
                   'ends': _wall(a.ends),
                   'endsAt': a.endsAt.toUtc().toIso8601String(),
                   'text': a.text,
+                  'wordless': a.wordless.name,
                   'firesAfterNow': a.firesAfter(now)?.toUtc().toIso8601String(),
                 },
             ],

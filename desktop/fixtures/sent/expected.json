@@ -63,7 +63,8 @@
     "transcripts": {},
     "photoTexts": {},
     "removedPhotos": [],
-    "removedRecordings": []
+    "removedRecordings": [],
+    "wordless": "photo"
   },
   "routines": [
     {
@@ -155,7 +156,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     "sections": [
       {
@@ -304,7 +306,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     "sections": [
       {

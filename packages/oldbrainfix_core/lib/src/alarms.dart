@@ -182,6 +182,9 @@ class PlannedAlarm {
   /// gone.
   final String? text;
 
+  /// What that Note is titled as while [text] is blank ([Note.wordless]).
+  final Wordless wordless;
+
   const PlannedAlarm({
     required this.kind,
     required this.routineId,
@@ -193,6 +196,7 @@ class PlannedAlarm {
     required this.ends,
     required this.endsAt,
     required this.text,
+    this.wordless = Wordless.photo,
   });
 
   /// Names the alarm for good: one per kind and Occurrence.
@@ -277,6 +281,7 @@ List<PlannedAlarm> alarmPlan({
           ends: t.ends,
           endsAt: t.endsAt,
           text: note?.text,
+          wordless: note?.wordless ?? Wordless.photo,
         ),
       );
       planned++;

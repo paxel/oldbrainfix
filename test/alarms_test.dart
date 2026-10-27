@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
@@ -7,6 +9,7 @@ import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
+import 'fake_photos.dart';
 
 void main() {
   late Store store;
@@ -75,6 +78,27 @@ void main() {
           alarms.labels?.snooze60,
         ],
         ['10 min', '30 min', '1 h'],
+      );
+    });
+
+    testWidgets('titles an alarm of a Note without words by what it holds', (
+      tester,
+    ) async {
+      final notes = Notes(store);
+      final photo = notes.capture('', photos: [onePixelPng]);
+      routines.spawn(photo.id, daily([at(20)]));
+      final voice = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      routines.spawn(voice.id, daily([at(21)]));
+      await start(tester);
+
+      expect(
+        [for (final armed in alarms.armed.take(2)) armed.title],
+        ['Photo', 'Voice recording'],
       );
     });
 

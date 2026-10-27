@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:55.000Z",
+  "now": "2026-01-02T10:01:06.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -24,7 +24,8 @@
       "removedPhotos": [
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
       ],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -49,7 +50,8 @@
       "removedPhotos": [],
       "removedRecordings": [
         "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
-      ]
+      ],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -80,7 +82,8 @@
         "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90": "Spare key under the pot"
       },
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000004",
@@ -101,7 +104,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000005",
@@ -124,7 +128,8 @@
       "removedPhotos": [
         "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
       ],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000006",
@@ -145,7 +150,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "voiceRecording"
     },
     {
       "id": "note:00000000000000000000000000000007",
@@ -168,10 +174,59 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000008",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:56.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [
+        "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
+      ],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000009",
+      "text": "",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:01.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [
+        "acc46e54dc1fb67e91de5283bcb4adc566cdf6b5ee4b24e47565e00e2bacf4d4"
+      ],
+      "transcripts": {
+        "acc46e54dc1fb67e91de5283bcb4adc566cdf6b5ee4b24e47565e00e2bacf4d4": ""
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "wordless": "voiceRecording"
     }
   ],
   "all": [
+    "note:00000000000000000000000000000009",
+    "note:00000000000000000000000000000008",
     "note:00000000000000000000000000000004",
     "note:00000000000000000000000000000003",
     "note:00000000000000000000000000000002",
@@ -181,13 +236,17 @@
     "note:00000000000000000000000000000001",
     "note:00000000000000000000000000000002",
     "note:00000000000000000000000000000003",
-    "note:00000000000000000000000000000004"
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000008",
+    "note:00000000000000000000000000000009"
   ],
   "trashed": [
     "note:00000000000000000000000000000007"
   ],
   "inside": {},
   "sections": {
+    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000008": [],
     "note:00000000000000000000000000000004": [
       {
         "id": "note:00000000000000000000000000000005",
@@ -243,6 +302,10 @@
   ],
   "unreadPhotos": [
     {
+      "noteId": "note:00000000000000000000000000000008",
+      "hash": "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
+    },
+    {
       "noteId": "note:00000000000000000000000000000004",
       "hash": "abababababababababababababababababababababababababababababababab"
     },
@@ -262,6 +325,8 @@
   },
   "search": {
     "": [
+      "note:00000000000000000000000000000009",
+      "note:00000000000000000000000000000008",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002",

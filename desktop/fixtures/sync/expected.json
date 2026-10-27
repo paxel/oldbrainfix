@@ -52,7 +52,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "voiceRecording"
     },
     {
       "id": "note:00000000000000000000000000000002",
@@ -73,7 +74,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     },
     {
       "id": "note:00000000000000000000000000000003",
@@ -94,7 +96,8 @@
       "transcripts": {},
       "photoTexts": {},
       "removedPhotos": [],
-      "removedRecordings": []
+      "removedRecordings": [],
+      "wordless": "photo"
     }
   ],
   "all": [

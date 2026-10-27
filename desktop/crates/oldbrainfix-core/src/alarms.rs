@@ -10,7 +10,7 @@ use std::fmt;
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 
 use crate::entry::{dart_iso, parse_time};
-use crate::notes::{Note, Notes};
+use crate::notes::{Note, Notes, Wordless};
 use crate::nudges::{NudgeSnooze, PlannedNudge, nudge_plan};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Occurrence, WallClock};
@@ -205,6 +205,9 @@ pub struct PlannedAlarm {
     pub ends_at: DateTime<Utc>,
     /// The text of the Note the Routine links back to; `None` when gone.
     pub text: Option<String>,
+    /// What that Note is titled as while `text` is blank
+    /// ([`Note::wordless`]).
+    pub wordless: Wordless,
 }
 
 impl PlannedAlarm {
@@ -296,6 +299,7 @@ pub fn alarm_plan(
                 ends: t.ends,
                 ends_at: t.ends_at,
                 text: note.as_ref().map(|n| n.text.clone()),
+                wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
             });
             planned += 1;
         }
@@ -594,6 +598,7 @@ mod tests {
             ends: moment,
             ends_at: parse_time(ends)?,
             text: None,
+            wordless: Wordless::Photo,
         })
     }
 
@@ -608,6 +613,30 @@ mod tests {
         );
         assert_eq!(a.fires_after(t("2026-01-01T09:30:00.000Z")?), None);
         assert_eq!(a.escalates_at(), Some(t("2026-01-01T09:30:00.000Z")?));
+        Ok(())
+    }
+
+    #[test]
+    fn an_alarm_names_what_its_note_without_words_holds() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let routines = Routines::new(&store);
+        let memo = notes.capture_with("", None, None, &[], &[vec![0x52, 0x49, 0x46, 0x46]])?;
+        let receipt = notes.capture_with("", None, None, &[vec![0xFF, 0xD8, 0xFF, 0xD9]], &[])?;
+        let ten = ClockTime::new(10, 0).into_iter().collect::<Vec<_>>();
+        let schedule = crate::schedule::Schedule::new(Day::new(2026, 1, 2), &ten, None)
+            .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+        let voice = routines.spawn(&memo.id, &schedule)?.id;
+        let photo = routines.spawn(&receipt.id, &schedule)?.id;
+        let titled: BTreeMap<String, Wordless> = Alarms::new(&store)
+            .plan(&utc_wall)?
+            .into_iter()
+            .map(|a| (a.routine_id, a.wordless))
+            .collect();
+        assert_eq!(
+            titled,
+            BTreeMap::from([(voice, Wordless::VoiceRecording), (photo, Wordless::Photo)])
+        );
         Ok(())
     }
 

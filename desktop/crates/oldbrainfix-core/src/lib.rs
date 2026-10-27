@@ -48,7 +48,7 @@ pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
-pub use notes::{Blob, Importance, Note, Notes, Section};
+pub use notes::{Blob, Importance, Note, Notes, Section, Wordless};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
 pub use pairing::PairedDevice;

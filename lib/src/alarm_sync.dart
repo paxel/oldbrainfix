@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'agenda_widget.dart';
 import 'alarm_platform.dart';
 import 'app_lock.dart';
+import 'l10n.dart';
 import 'schedule_text.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
@@ -192,8 +193,9 @@ class AlarmSync extends ChangeNotifier {
       if (routine != null && locks.masks(routine)) {
         return maskedText(t, _locale, routine, alarm.occurrence);
       }
-      // A photo Note without words is still there.
-      return _title(alarm.text) ?? (alarm.text == null ? t.noteGone : t.photo);
+      // A photo or voice Note without words is still there.
+      return _title(alarm.text) ??
+          (alarm.text == null ? t.noteGone : wordlessTitle(t, alarm.wordless));
     }
 
     final armed = [

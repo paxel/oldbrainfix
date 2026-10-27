@@ -105,6 +105,25 @@ impl Importance {
     }
 }
 
+/// What a Note without words is titled as where only its words fit, as
+/// in a row or an alarm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Wordless {
+    #[default]
+    Photo,
+    VoiceRecording,
+}
+
+impl Wordless {
+    /// Its name, as the Dart core's enum has it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Wordless::Photo => "photo",
+            Wordless::VoiceRecording => "voiceRecording",
+        }
+    }
+}
+
 /// A Note as the screens want it (CONTEXT.md).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
@@ -172,6 +191,20 @@ impl Note {
     /// [`Notes::default_nudge`] after it.
     pub fn nudge_at(&self) -> DateTime<Utc> {
         self.nudge.unwrap_or(self.captured + Notes::default_nudge())
+    }
+
+    /// What the Note is titled as while its text is blank: a voice
+    /// recording when it has one and no photo, removed ones whose texts
+    /// stay included; a photo otherwise.
+    pub fn wordless(&self) -> Wordless {
+        if self.photos.is_empty()
+            && self.removed_photos.is_empty()
+            && !(self.recordings.is_empty() && self.removed_recordings.is_empty())
+        {
+            Wordless::VoiceRecording
+        } else {
+            Wordless::Photo
+        }
     }
 }
 
@@ -865,6 +898,34 @@ mod tests {
         }
         assert_eq!(Importance::from_name(None), Importance::Normal);
         assert_eq!(Importance::from_name(Some("huge")), Importance::Normal);
+    }
+
+    #[test]
+    fn a_note_without_words_is_titled_by_what_it_holds() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let wordless =
+            |id: &str| -> Result<Option<Wordless>> { Ok(notes.by_id(id)?.map(|n| n.wordless())) };
+        let untranscribed = notes.capture_with("", None, None, &[], &[voice(1)])?;
+        let silent = notes.capture_with("", None, None, &[], &[voice(2)])?;
+        notes.set_transcript(&silent.id, &silent.recordings[0], "")?;
+        let receipt = notes.capture_with("", None, None, &[photo(1)], &[])?;
+        let both = notes.capture_with("", None, None, &[photo(2)], &[voice(3)])?;
+        assert_eq!(wordless(&untranscribed.id)?, Some(Wordless::VoiceRecording));
+        assert_eq!(wordless(&silent.id)?, Some(Wordless::VoiceRecording));
+        assert_eq!(wordless(&receipt.id)?, Some(Wordless::Photo));
+        assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
+        // A file gone while its text stays still counts.
+        let memo = notes.capture_with("", None, None, &[], &[voice(4)])?;
+        notes.set_transcript(&memo.id, &memo.recordings[0], "call the bank")?;
+        notes.remove_recording(&memo.id, &memo.recordings[0])?;
+        notes.set_photo_text(&both.id, &both.photos[0], "RECEIPT")?;
+        notes.remove_photo(&both.id, &both.photos[0])?;
+        assert_eq!(notes.by_id(&memo.id)?.map(|n| n.recordings.len()), Some(0));
+        assert_eq!(wordless(&memo.id)?, Some(Wordless::VoiceRecording));
+        assert_eq!(notes.by_id(&both.id)?.map(|n| n.photos.len()), Some(0));
+        assert_eq!(wordless(&both.id)?, Some(Wordless::Photo));
+        Ok(())
     }
 
     #[test]

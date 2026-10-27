@@ -9,6 +9,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ### Behoben
 - Auf dem Telefon und dem Desktop fragt der Papierkorb-Knopf im Notiz-Editor einmal nach, bevor die Notiz gelöscht wird, mit demselben Dialog wie „Löschen“ auf der Notizkarte, einschließlich der Wahl, ihre Routinen und Erinnerungen zu behalten oder mitzulöschen.
+- Auf dem Telefon und dem Desktop heißt eine Sprachnotiz ohne Worte überall dort, wo nur ihre Worte Platz haben, etwa in der Agenda, im Startbildschirm-Widget, auf der Verpasst-Karte und in Alarmen, „Sprachaufnahme“ statt „Foto“.
 
 ## [0.1.1] - 2026-10-27
 

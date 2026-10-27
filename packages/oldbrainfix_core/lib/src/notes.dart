@@ -116,6 +116,10 @@ abstract final class SectionKeys {
 /// How much a Note matters (CONTEXT.md).
 enum Importance { unimportant, normal, important }
 
+/// What a Note without words is titled as where only its words fit, as
+/// in a row or an alarm.
+enum Wordless { photo, voiceRecording }
+
 /// The app something was shared in from (CONTEXT.md, Capture Context).
 class SourceApp {
   /// Its Android package, such as `com.whatsapp`.
@@ -295,6 +299,16 @@ class Note {
   /// When the Note's Nudge is due while it is Unsorted: the time chosen
   /// at Capture, else [Notes.defaultNudge] after it was captured.
   DateTime get nudgeAt => nudge ?? captured.add(Notes.defaultNudge);
+
+  /// What the Note is titled as while its text is blank: a voice
+  /// recording when it has one and no photo, removed ones whose texts
+  /// stay included; a photo otherwise.
+  Wordless get wordless =>
+      photos.isEmpty &&
+          removedPhotos.isEmpty &&
+          (recordings.isNotEmpty || removedRecordings.isNotEmpty)
+      ? Wordless.voiceRecording
+      : Wordless.photo;
 }
 
 /// A dated part of a Note, added by Amend or Merge (CONTEXT.md).

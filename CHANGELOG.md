@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Fixed
 - On the phone and the desktop, the Note editor's trash button asks once before deleting the Note, with the same dialog as the Note card's Delete, including the choice to keep or delete its Routines and Reminders.
+- On the phone and the desktop, a voice Note without words is titled "Voice recording" instead of "Photo" wherever only its words fit, such as the Agenda, the home-screen widget, the Missed Summary and alarms.
 
 ---
 

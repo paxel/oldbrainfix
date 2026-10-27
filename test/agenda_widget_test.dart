@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -110,13 +112,30 @@ void main() {
       expect(days['2026-10-25']?.every((row) => !row.done), isTrue);
     });
 
-    test('titles a row by its Note\'s first line, "Photo" for a photo Note '
-        'without words', () {
+    test('titles a row by its Note\'s first line, "Photo" or "Voice '
+        'recording" for a photo or voice Note without words', () {
       routines.create('pills\ntwo of them', daily([ClockTime(8, 0)]));
       final photo = notes.capture('', photos: [onePixelPng]);
       routines.spawn(photo.id, daily([ClockTime(9, 0)]));
+      final voice = notes.capture(
+        '',
+        recordings: [
+          Uint8List.fromList([1]),
+        ],
+      );
+      notes.setTranscript(voice.id, voice.recordings.single, '');
+      routines.spawn(voice.id, daily([ClockTime(10, 0)]));
 
-      expect(titles(snapshot().days['2026-10-24']), ['pills', 'Photo']);
+      expect(titles(snapshot().days['2026-10-24']), [
+        'pills',
+        'Photo',
+        'Voice recording',
+      ]);
+      expect(titles(snapshot(de, 'de').days['2026-10-24']), [
+        'pills',
+        'Foto',
+        'Sprachaufnahme',
+      ]);
     });
 
     test('a Routine in the trash is gone from it', () {

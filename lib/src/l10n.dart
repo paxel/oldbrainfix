@@ -9,6 +9,13 @@ extension L10nContext on BuildContext {
 }
 
 /// [note] where only its words fit, as in a row or an alarm: its text,
-/// or "Photo" for a photo Note without words.
+/// or what it holds when it has no words ([Note.wordless]).
 String noteText(AppLocalizations t, Note note) =>
-    note.text.trim().isEmpty ? t.photo : note.text;
+    note.text.trim().isEmpty ? wordlessTitle(t, note.wordless) : note.text;
+
+/// "Photo" or "Voice recording" for a Note without words.
+String wordlessTitle(AppLocalizations t, Wordless wordless) =>
+    switch (wordless) {
+      Wordless.photo => t.photo,
+      Wordless.voiceRecording => t.voiceRecording,
+    };

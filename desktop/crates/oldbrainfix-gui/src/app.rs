@@ -65,7 +65,7 @@ use crate::enrich::Enricher;
 use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
-use crate::l10n::L10n;
+use crate::l10n::{self, L10n};
 use crate::media::{self, Clipboard, Player, Recorder, photo_from_file};
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
@@ -3736,7 +3736,7 @@ impl App {
             ui.label(RichText::new(t.routines_heading()).strong().color(text));
             for (routine, note) in &self.view.trashed_routines {
                 ui.horizontal_wrapped(|ui| {
-                    let what = note.as_ref().map_or(t.note_gone(), |n| n.text.as_str());
+                    let what = row_title(&t, note.as_ref());
                     ui.label(RichText::new(what).color(text));
                     ui.label(
                         RichText::new(schedule_text(&t, &routine.schedule))
@@ -4547,15 +4547,12 @@ fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
-/// What an Occurrence of a Routine shows as: its Note's text, or that the
-/// Note is gone.
+/// What an Occurrence of a Routine shows as: its Note's text, what the
+/// Note holds when it has no words, or that the Note is gone.
 fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if !note.text.trim().is_empty() => note.text.trim().to_string(),
-        Some(note) if note.photos.is_empty() && !note.recordings.is_empty() => {
-            t.voice_recording().to_string()
-        }
-        Some(_) => t.photo().to_string(),
+        Some(note) => l10n::wordless(t, note.wordless()).to_string(),
         None => t.note_gone().to_string(),
     }
 }

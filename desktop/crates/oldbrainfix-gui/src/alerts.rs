@@ -20,7 +20,7 @@ use oldbrainfix_core::{
     Alarms, DeviceSettings, Occurrence, PlannedNudge, Routines, Store, WallClock,
 };
 
-use crate::l10n::L10n;
+use crate::l10n::{L10n, wordless};
 use crate::schedule_text::occurrence_time;
 
 /// An alarm that came due this long before a tick still shows; older
@@ -304,7 +304,7 @@ impl Alerts {
             if alarm.text.is_none() {
                 t.note_gone().to_string()
             } else {
-                t.photo().to_string()
+                wordless(&t, alarm.wordless).to_string()
             }
         });
         let key = occurrence_key(&alarm.routine_id, &alarm.occurrence);
@@ -415,7 +415,7 @@ pub fn run(
 mod tests {
     use super::*;
     use oldbrainfix_core::alarms::{AlarmKind, WallMoment};
-    use oldbrainfix_core::{ClockTime, Day, parse_time};
+    use oldbrainfix_core::{ClockTime, Day, Wordless, parse_time};
 
     fn alarm(
         at: &str,
@@ -438,6 +438,7 @@ mod tests {
             ends: moment,
             ends_at: parse_time(ends)?,
             text: Some("Pills".into()),
+            wordless: Wordless::Photo,
         })
     }
 
@@ -501,6 +502,35 @@ mod tests {
             ),
             0
         );
+        Ok(())
+    }
+
+    #[test]
+    fn an_alarm_of_a_note_without_words_names_what_it_holds() -> oldbrainfix_core::Result<()> {
+        let notifier = crate::notify::RecordingNotifier::default();
+        let changed = Arc::new(AtomicU64::new(0));
+        let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("de"), changed);
+        let now = parse_time("2026-01-01T09:00:00.000Z")?;
+        let voice = PlannedAlarm {
+            text: Some(" \n".into()),
+            wordless: Wordless::VoiceRecording,
+            ..alarm("2026-01-01T09:00:00.000Z", "2026-01-01T12:00:00.000Z", None)?
+        };
+        let photo = PlannedAlarm {
+            wordless: Wordless::Photo,
+            ..voice.clone()
+        };
+        alerts.show_alarm(&voice, now);
+        alerts.show_alarm(&photo, now);
+        let titles: Vec<String> = notifier
+            .take()
+            .into_iter()
+            .filter_map(|r| match r {
+                crate::notify::Recorded::Shown(notice) => Some(notice.title),
+                crate::notify::Recorded::Closed(_) => None,
+            })
+            .collect();
+        assert_eq!(titles, ["Sprachaufnahme", "Foto"]);
         Ok(())
     }
 
