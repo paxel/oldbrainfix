@@ -2,11 +2,17 @@ package io.github.paxel.oldbrainfix
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FilterInputStream
+import java.io.InputStream
+import java.nio.file.Files
 
 class SpeechTest {
     @Test
@@ -121,5 +127,92 @@ class SpeechTest {
     @Test
     fun `hex is lowercase, two digits a byte`() {
         assertEquals("00ff0a80", Speech.hex(byteArrayOf(0, -1, 10, -128)))
+    }
+
+    /** A model file with "abc" in it, its record beside it, and the bytes read from it. */
+    private class Model {
+        val dir: File = Files.createTempDirectory("whisper").toFile().apply { deleteOnExit() }
+        val file = File(dir, "ggml-base.bin").apply { writeText("abc") }
+        val record = File(dir, "ggml-base.bin.checked")
+        var read = 0L
+
+        fun hash(): String? = Speech.checkedHash(file, record) { counting(it.inputStream()) }
+
+        private fun counting(input: InputStream) = object : FilterInputStream(input) {
+            override fun read(b: ByteArray, off: Int, len: Int): Int =
+                super.read(b, off, len).also { if (it > 0) read += it }
+        }
+    }
+
+    private val abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+
+    @Test
+    fun `a model without a record is hashed once and then recorded`() {
+        val model = Model()
+        assertEquals(abc, model.hash())
+        assertEquals(3L, model.read)
+        assertEquals(Speech.ModelRecord(abc, 3, model.file.lastModified()), Speech.readRecord(model.record))
+        assertEquals(abc, model.hash())
+        assertEquals(3L, model.read)
+    }
+
+    @Test
+    fun `a model kept with its hash is not read again`() {
+        val model = Model()
+        val incoming = File(model.dir, "ggml-base.bin.part").apply { writeText("abc") }
+        model.file.delete()
+        assertTrue(Speech.keep(incoming, model.file, model.record, abc))
+        assertEquals(abc, model.hash())
+        assertEquals(0L, model.read)
+    }
+
+    @Test
+    fun `a changed modification time hashes the model again`() {
+        val model = Model()
+        model.hash()
+        assertTrue(model.file.setLastModified(model.file.lastModified() - 60_000))
+        assertEquals(abc, model.hash())
+        assertEquals(6L, model.read)
+    }
+
+    @Test
+    fun `a changed size hashes the model again`() {
+        val model = Model()
+        val modified = model.file.lastModified()
+        model.hash()
+        model.file.writeText("abcd")
+        model.file.setLastModified(modified)
+        assertEquals("88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589", model.hash())
+        assertEquals(7L, model.read)
+    }
+
+    @Test
+    fun `a record that is not one is no record`() {
+        val model = Model()
+        for (text in listOf("", "ba78 3 1", "$abc 3", "$abc x 1", "${abc.uppercase()} 3 1", "$abc 3 1 1")) {
+            model.record.writeText(text)
+            assertNull(text, Speech.readRecord(model.record))
+        }
+        model.record.writeText("${abc.dropLast(1)} 3 ${model.file.lastModified()}")
+        assertEquals(abc, model.hash())
+        assertEquals(3L, model.read)
+    }
+
+    @Test
+    fun `no model has no hash and reads nothing`() {
+        val model = Model()
+        model.file.delete()
+        assertNull(model.hash())
+        assertEquals(0L, model.read)
+    }
+
+    @Test
+    fun `keeping a model drops the record of the one before`() {
+        val model = Model()
+        model.hash()
+        val incoming = File(model.dir, "ggml-base.bin.part").apply { writeText("abcd") }
+        assertTrue(Speech.keep(incoming, model.file, model.record, null))
+        assertFalse(model.record.exists())
+        assertFalse(Speech.keep(incoming, model.file, model.record, abc))
     }
 }

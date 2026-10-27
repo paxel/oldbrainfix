@@ -1,6 +1,7 @@
 //! The speech model on this computer, as the phone's `SpeechModel` keeps
 //! it: checked against the pinned checksums once per start before
-//! anything is transcribed, fetched on request, the chosen one from the
+//! anything is transcribed, by the checksum recorded when it was kept
+//! unless the file changed since, fetched on request, the chosen one from the
 //! phone's mirror or either from a file of the user's own, and kept only
 //! when it is one of the pinned ones. A model fetched takes the place of
 //! the one in use only once it is checked, so the one before stays in

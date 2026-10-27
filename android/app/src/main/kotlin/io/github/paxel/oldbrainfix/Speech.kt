@@ -50,7 +50,9 @@ object WhisperNative {
  * only moves the bytes and says what their SHA-256 is.
  *
  * The model lives in the no-backup files: 142 MB has no place in a
- * backup, and it can always be fetched again.
+ * backup, and it can always be fetched again. Its SHA-256 is recorded
+ * with its size and modification time when it is kept, so a start reads
+ * the whole file again only when it changed.
  */
 class Speech(private val context: Context) {
     /** The one thread transcribing: recordings go one at a time. */
@@ -61,6 +63,10 @@ class Speech(private val context: Context) {
 
     @Volatile
     private var cancelled = false
+
+    /** The SHA-256 of the model on the side, until it is kept or dropped. */
+    @Volatile
+    private var incomingHash: String? = null
 
     private val dir: File
         get() = File(context.noBackupFilesDir, "whisper").apply { mkdirs() }
@@ -77,6 +83,10 @@ class Speech(private val context: Context) {
     private val incomingFile: File
         get() = File(dir, "$MODEL_NAME.part")
 
+    /** The [modelFile]'s SHA-256 with its size and modification time then. */
+    private val recordFile: File
+        get() = File(dir, "$MODEL_NAME.checked")
+
     /** Whether the phone is online through mobile data now. */
     fun onMobileData(): Boolean = try {
         val connectivity = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -86,10 +96,11 @@ class Speech(private val context: Context) {
         false
     }
 
-    /** The SHA-256 of the model in use, or null when there is none. */
-    fun modelHash(): String? = modelFile.takeIf { it.isFile }?.inputStream()?.use {
-        copyHashing(it, Nowhere)
-    }
+    /**
+     * The SHA-256 of the model in use, or null when there is none: as
+     * recorded, unless the file changed since.
+     */
+    fun modelHash(): String? = checkedHash(modelFile, recordFile) { it.inputStream() }
 
     /**
      * Downloads [url] to the side and answers its SHA-256, or null when
@@ -115,7 +126,10 @@ class Speech(private val context: Context) {
             null
         } finally {
             connection.disconnect()
-        }.also { if (it == null) file.delete() }
+        }.also {
+            incomingHash = it
+            if (it == null) file.delete()
+        }
     }
 
     /** Copies a model the user picked to the side; its SHA-256, or null. */
@@ -126,7 +140,10 @@ class Speech(private val context: Context) {
             input()?.use { stream -> file.outputStream().use { copyHashing(stream, it, { cancelled }) } }
         } catch (e: Exception) {
             null
-        }.also { if (it == null) file.delete() }
+        }.also {
+            incomingHash = it
+            if (it == null) file.delete()
+        }
     }
 
     /** Stops a download or copy running. */
@@ -134,22 +151,29 @@ class Speech(private val context: Context) {
         cancelled = true
     }
 
-    /** Keeps the model waiting on the side as the one in use. */
+    /**
+     * Keeps the model waiting on the side as the one in use, and records
+     * the SHA-256 it was fetched with.
+     */
     fun install(): Boolean {
         val incoming = incomingFile
         if (!incoming.isFile) return false
         worker.submit { closeModel() }.get()
-        return incoming.renameTo(modelFile)
+        val hash = incomingHash
+        incomingHash = null
+        return keep(incoming, modelFile, recordFile, hash)
     }
 
     /** Drops the model waiting on the side. */
     fun discard() {
+        incomingHash = null
         incomingFile.delete()
     }
 
     /** Drops the model in use. */
     fun remove() {
         worker.submit { closeModel() }.get()
+        recordFile.delete()
         modelFile.delete()
     }
 
@@ -206,6 +230,9 @@ class Speech(private val context: Context) {
 
     /** A recording to transcribe and its [Prompts], as the channel hands them over. */
     class Request(val bytes: ByteArray, val prompts: Prompts)
+
+    /** A model's SHA-256 as recorded, with its size in bytes and modification time in milliseconds then. */
+    data class ModelRecord(val sha256: String, val size: Long, val modified: Long)
 
     companion object {
         /** The model in use, named after the first one there was, whichever it is now. */
@@ -380,6 +407,74 @@ class Speech(private val context: Context) {
             copied(total)
             return hex(digest.digest())
         }
+
+        /**
+         * The SHA-256 of [model], or null when there is none. It is taken
+         * from [record] while the file's size and modification time are
+         * still the ones recorded; else the whole file is read through
+         * [open] and hashed, and the record written anew.
+         */
+        fun checkedHash(model: File, record: File, open: (File) -> InputStream): String? {
+            if (!model.isFile) return null
+            val recorded = readRecord(record)
+            if (recorded != null && recorded.size == model.length() && recorded.modified == model.lastModified()) {
+                return recorded.sha256
+            }
+            val hash = try {
+                open(model).use { copyHashing(it, Nowhere) }
+            } catch (e: Exception) {
+                null
+            } ?: return null
+            writeRecord(model, record, hash)
+            return hash
+        }
+
+        /**
+         * Moves [incoming] to [model] and records [hash] for it, if there
+         * is one; whether it moved. The record of the model before goes
+         * first, so it never stands for another file.
+         */
+        fun keep(incoming: File, model: File, record: File, hash: String?): Boolean {
+            record.delete()
+            if (!incoming.renameTo(model)) return false
+            if (hash != null) writeRecord(model, record, hash)
+            return true
+        }
+
+        /**
+         * Records [sha256] for [model] with its size and modification time
+         * now, in [record]: one line, `<sha256> <bytes> <milliseconds>`.
+         * Written to the side and renamed, so it is whole or not there.
+         */
+        fun writeRecord(model: File, record: File, sha256: String) {
+            val side = File(record.path + ".part")
+            try {
+                side.writeText("$sha256 ${model.length()} ${model.lastModified()}\n")
+                if (!side.renameTo(record)) side.delete()
+            } catch (e: Exception) {
+                side.delete()
+            }
+        }
+
+        /**
+         * The record in [record], or null when there is none or it is not
+         * one: anything but a lowercase hex SHA-256, a size and a time is
+         * no record, so the model is hashed again rather than dropped.
+         */
+        fun readRecord(record: File): ModelRecord? {
+            val parts = try {
+                if (!record.isFile) return null
+                record.readText().trim().split(' ')
+            } catch (e: Exception) {
+                return null
+            }
+            if (parts.size != 3 || !SHA256.matches(parts[0])) return null
+            val size = parts[1].toLongOrNull() ?: return null
+            val modified = parts[2].toLongOrNull() ?: return null
+            return ModelRecord(parts[0], size, modified)
+        }
+
+        private val SHA256 = Regex("[0-9a-f]{64}")
 
         /** [bytes] as lowercase hex. */
         fun hex(bytes: ByteArray): String =

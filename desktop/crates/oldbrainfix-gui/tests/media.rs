@@ -597,10 +597,16 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     harness.run();
     assert_eq!(speech.current(), Some(WhisperModel::Small));
     assert_eq!(std::fs::read(speech.model())?, b"small");
-    let kept: Vec<_> = std::fs::read_dir(&whisper)?
+    let mut kept: Vec<_> = std::fs::read_dir(&whisper)?
         .filter_map(|e| e.ok().map(|e| e.file_name()))
         .collect();
-    assert_eq!(kept.len(), 1, "only the chosen model is kept: {kept:?}");
+    kept.sort();
+    // The model, with the record of its checksum.
+    assert_eq!(
+        kept,
+        ["ggml-base.bin", "ggml-base.bin.checked"],
+        "only the chosen model is kept"
+    );
     Ok(())
 }
 

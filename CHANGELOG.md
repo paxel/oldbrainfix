@@ -7,6 +7,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ### Changed
 - On the phone and the desktop, the unit of a Routine's "every N", its Re-nag and Escalation, and the Device's Re-nag and Nudge repeat in Settings are columns of radio buttons instead of dropdowns, with a value set elsewhere kept as an extra option.
+- On the phone and the desktop, the app starts faster with a speech model: its checksum is computed once when it is downloaded or picked, and again only when the file's size or modification time changes.
 
 ### Fixed
 - On the phone and the desktop, the Note editor's trash button asks once before deleting the Note, with the same dialog as the Note card's Delete, including the choice to keep or delete its Routines and Reminders.

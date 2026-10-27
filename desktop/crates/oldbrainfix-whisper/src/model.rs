@@ -8,12 +8,16 @@
 //! A model on its way in is written beside the one in use and only takes
 //! its place once it is checked, so a broken download never leaves a
 //! half model behind, and the one before stays in use until then.
+//!
+//! A kept model's SHA-256 is recorded beside it with its size and
+//! modification time, as on the phone, so a start reads the whole model
+//! again only when the file changed since.
 
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
 
@@ -132,19 +136,68 @@ impl ModelDir {
         self.dir.join(format!("{FILE_NAME}.part"))
     }
 
+    /// The model in use's SHA-256 with its size and modification time
+    /// then: one line, `<sha256> <bytes> <milliseconds>`, as on the phone.
+    fn record(&self) -> PathBuf {
+        self.dir.join(format!("{FILE_NAME}.checked"))
+    }
+
     /// Which pinned model is here, if any. A model that is none of them
     /// is dropped, and so is a fetch cut off when the app was last
-    /// closed. Reads the whole model: run it off the window's thread.
+    /// closed. Reads the whole model unless its record still fits it:
+    /// run it off the window's thread.
     pub fn check(&self) -> Option<WhisperModel> {
+        self.check_reading(|path| File::open(path))
+    }
+
+    /// As [`ModelDir::check`], reading the model through `open`.
+    fn check_reading<R: Read>(
+        &self,
+        open: impl FnOnce(&Path) -> io::Result<R>,
+    ) -> Option<WhisperModel> {
         let _ = std::fs::remove_file(self.incoming());
         let model = self.model();
-        let file = File::open(&model).ok()?;
-        let hash = copy_hashing(file, io::sink(), &AtomicBool::new(false), |_| {});
-        let found = hash.ok().flatten().and_then(|h| self.model_by_hash(&h));
-        if found.is_none() {
+        let stamp = stamp(&model)?;
+        // A record that is broken, stale or names no pinned model is
+        // none: the model is hashed again rather than dropped for it.
+        let recorded = read_record(&self.record())
+            .filter(|r| r.size == stamp.size && r.modified == stamp.modified)
+            .and_then(|r| self.model_by_hash(&r.sha256));
+        if recorded.is_some() {
+            return recorded;
+        }
+        // A model that cannot be read now, say while another program
+        // holds it, is kept for the next start; only a wrong one goes.
+        let hash = open(&model)
+            .and_then(|file| copy_hashing(file, io::sink(), &AtomicBool::new(false), |_| {}))
+            .ok()
+            .flatten()?;
+        let found = self.model_by_hash(&hash);
+        if found.is_some() {
+            // Stamped as before the hashing: a file changed meanwhile is
+            // hashed again at the next start.
+            self.write_record(&hash, stamp);
+        } else {
+            let _ = std::fs::remove_file(self.record());
             let _ = std::fs::remove_file(model);
         }
         found
+    }
+
+    /// Records `sha256` for the model in use with its `stamp`. Written to the side and renamed, so it is
+    /// whole or not there; when it cannot be written, the next start
+    /// hashes the model again.
+    fn write_record(&self, sha256: &str, stamp: Stamp) {
+        let record = self.record();
+        let side = self.dir.join(format!("{FILE_NAME}.checked.part"));
+        let written = (|| {
+            let line = format!("{sha256} {} {}\n", stamp.size, stamp.modified);
+            std::fs::write(&side, line)?;
+            std::fs::rename(&side, &record)
+        })();
+        if written.is_err() {
+            let _ = std::fs::remove_file(&side);
+        }
     }
 
     /// Downloads `model` from its release asset, over HTTPS only, and
@@ -207,7 +260,13 @@ impl ModelDir {
             };
             Ok::<_, io::Error>(match self.model_by_hash(&hash) {
                 Some(model) if expected.is_none_or(|e| e == model) => {
+                    // The record of the model before goes first, so it
+                    // never stands for another file.
+                    let _ = std::fs::remove_file(self.record());
                     std::fs::rename(&incoming, self.model())?;
+                    if let Some(stamp) = stamp(&self.model()) {
+                        self.write_record(&hash, stamp);
+                    }
                     Outcome::Installed(model)
                 }
                 _ => Outcome::Mismatch,
@@ -220,10 +279,64 @@ impl ModelDir {
         outcome
     }
 
-    /// Drops the model in use.
+    /// Drops the model in use, and its record.
     pub fn remove(&self) {
+        let _ = std::fs::remove_file(self.record());
         let _ = std::fs::remove_file(self.model());
     }
+}
+
+/// A file's size in bytes and modification time in milliseconds since
+/// the epoch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Stamp {
+    size: u64,
+    modified: i128,
+}
+
+/// The stamp of the file at `path`, or `None` when there is no file.
+/// A time the system cannot tell is recorded as 0, so such a model is
+/// still hashed only once.
+fn stamp(path: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(path).ok().filter(|m| m.is_file())?;
+    let modified = meta
+        .modified()
+        .map_or(0, |time| match time.duration_since(UNIX_EPOCH) {
+            Ok(after) => after.as_millis() as i128,
+            Err(before) => -(before.duration().as_millis() as i128),
+        });
+    Some(Stamp {
+        size: meta.len(),
+        modified,
+    })
+}
+
+/// A model's SHA-256 as recorded, with its stamp then.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Record {
+    sha256: String,
+    size: u64,
+    modified: i128,
+}
+
+/// The record in `path`, or `None` when there is none or it is not one:
+/// anything but a lowercase hex SHA-256, a size and a time is no record.
+fn read_record(path: &Path) -> Option<Record> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut parts = text.trim().split(' ');
+    let (sha256, size, modified) = (parts.next()?, parts.next()?, parts.next()?);
+    let hex = sha256.len() == 64
+        && sha256
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    if !hex || parts.next().is_some() {
+        return None;
+    }
+    Some(Record {
+        sha256: sha256.to_string(),
+        size: size.parse().ok()?,
+        modified: modified.parse().ok()?,
+    })
 }
 
 /// Copies `input` to `output` and answers the SHA-256 of what was copied,
@@ -264,6 +377,8 @@ pub fn copy_hashing(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     /// A reader that breaks off after `left` bytes.
     struct Broken {
@@ -426,12 +541,167 @@ mod tests {
             Outcome::Installed(WhisperModel::Small)
         );
         assert_eq!(dir.check(), Some(WhisperModel::Small));
-        // Only the chosen one is kept.
-        let files: Vec<_> = std::fs::read_dir(&dir.dir)?
+        // Only the chosen one is kept, with its record.
+        let mut files: Vec<_> = std::fs::read_dir(&dir.dir)?
             .filter_map(|e| e.ok().map(|e| e.file_name()))
             .collect();
-        assert_eq!(files, vec![std::ffi::OsString::from(FILE_NAME)]);
+        files.sort();
+        assert_eq!(
+            files,
+            vec![
+                std::ffi::OsString::from(FILE_NAME),
+                std::ffi::OsString::from(format!("{FILE_NAME}.checked")),
+            ]
+        );
         Ok(())
+    }
+
+    /// A reader that counts the bytes read through it.
+    struct Counting {
+        file: File,
+        read: Rc<Cell<u64>>,
+    }
+
+    impl Read for Counting {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let n = self.file.read(buf)?;
+            self.read.set(self.read.get() + n as u64);
+            Ok(n)
+        }
+    }
+
+    /// Checks `dir` as a start does; what it found and how many bytes of
+    /// the model it read.
+    fn start(dir: &ModelDir) -> (Option<WhisperModel>, u64) {
+        let read = Rc::new(Cell::new(0));
+        let counter = read.clone();
+        let found = dir.check_reading(|path| {
+            File::open(path).map(|file| Counting {
+                file,
+                read: counter,
+            })
+        });
+        (found, read.get())
+    }
+
+    /// Sets the model's modification time `by` from what it is.
+    fn touch(dir: &ModelDir, by: Duration) -> io::Result<()> {
+        let file = File::options().write(true).open(dir.model())?;
+        let modified = file.metadata()?.modified()?;
+        file.set_modified(modified + by)
+    }
+
+    #[test]
+    fn after_a_verified_download_a_start_reads_nothing() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        assert_eq!(
+            take(&dir, b"small", Some(WhisperModel::Small)),
+            Outcome::Installed(WhisperModel::Small)
+        );
+        let stamp = stamp(&dir.model()).ok_or_else(|| io::Error::other("no model"))?;
+        assert_eq!(
+            std::fs::read_to_string(dir.record())?,
+            format!("{} 5 {}\n", sha(b"small"), stamp.modified)
+        );
+        assert_eq!(start(&dir), (Some(WhisperModel::Small), 0));
+        assert_eq!(start(&dir), (Some(WhisperModel::Small), 0));
+        Ok(())
+    }
+
+    #[test]
+    fn a_model_without_a_record_is_hashed_once() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        std::fs::create_dir_all(&dir.dir)?;
+        // As 0.1.1 left it.
+        std::fs::write(dir.model(), b"base")?;
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 0));
+        Ok(())
+    }
+
+    #[test]
+    fn a_changed_size_or_time_is_checked_again() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        take(&dir, b"base", None);
+        touch(&dir, Duration::from_secs(60))?;
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 0));
+        // A record of another size, at the same time.
+        let record = read_record(&dir.record()).ok_or_else(|| io::Error::other("no record"))?;
+        let other = format!("{} 5 {}\n", record.sha256, record.modified);
+        std::fs::write(dir.record(), other)?;
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 0));
+        Ok(())
+    }
+
+    #[test]
+    fn a_broken_record_never_drops_a_good_model() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        take(&dir, b"base", None);
+        let modified = stamp(&dir.model())
+            .ok_or_else(|| io::Error::other("no model"))?
+            .modified;
+        for broken in [
+            "",
+            "garbage",
+            "60ED5BC3 4 0\n",
+            &format!("{} four {modified}\n", sha(b"base")),
+            &format!("{} 4\n", sha(b"base")),
+            &format!("{} 4 {modified} extra\n", sha(b"base")),
+            &format!("{} 4 {modified}\n", sha(b"base").to_uppercase()),
+        ] {
+            std::fs::write(dir.record(), broken)?;
+            assert_eq!(start(&dir), (Some(WhisperModel::Base), 4), "{broken:?}");
+            assert_eq!(start(&dir), (Some(WhisperModel::Base), 0), "{broken:?}");
+        }
+        // A record that fits the file, of a hash pinned to no model.
+        let unpinned = format!("{} 4 {modified}\n", sha(b"none"));
+        std::fs::write(dir.record(), unpinned)?;
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        assert!(!dir.dir.join(format!("{FILE_NAME}.checked.part")).exists());
+        Ok(())
+    }
+
+    #[test]
+    fn a_changed_model_with_a_bad_hash_is_dropped() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        take(&dir, b"base", None);
+        std::fs::write(dir.model(), b"bad!")?;
+        touch(&dir, Duration::from_secs(60))?;
+        assert_eq!(start(&dir), (None, 4));
+        assert!(!dir.model().exists());
+        assert!(!dir.record().exists());
+        Ok(())
+    }
+
+    #[test]
+    fn a_model_that_cannot_be_read_now_is_kept() -> io::Result<()> {
+        let (_tmp, dir) = pinned();
+        std::fs::create_dir_all(&dir.dir)?;
+        std::fs::write(dir.model(), b"base")?;
+        let locked = dir.check_reading(|_| Err::<File, _>(io::Error::other("locked")));
+        assert_eq!(locked, None);
+        assert!(dir.model().exists());
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        // A stale record stays too, and still does not count.
+        touch(&dir, Duration::from_secs(60))?;
+        let locked = dir.check_reading(|_| Err::<File, _>(io::Error::other("locked")));
+        assert_eq!(locked, None);
+        assert!(dir.model().exists() && dir.record().exists());
+        assert_eq!(start(&dir), (Some(WhisperModel::Base), 4));
+        Ok(())
+    }
+
+    #[test]
+    fn removing_the_model_removes_its_record() {
+        let (_tmp, dir) = pinned();
+        take(&dir, b"base", None);
+        assert!(dir.record().exists());
+        dir.remove();
+        assert!(!dir.model().exists());
+        assert!(!dir.record().exists());
+        assert_eq!(start(&dir), (None, 0));
     }
 
     #[test]
