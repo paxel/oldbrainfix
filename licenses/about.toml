@@ -238,6 +238,13 @@ path = "LICENSE-MIT.txt"
 license = "MIT"
 checksum = "96b5371602fbd3cb11a680dade714465520c72b02397be5095a3c29b1a3fb30a"
 
+[opus-decoder.clarify]
+license = "MIT OR Apache-2.0"
+[[opus-decoder.clarify.git]]
+path = "LICENSE-MIT"
+license = "MIT"
+checksum = "e1fad4579cc186a874efbdd8dcf6ad74ff4bae338295300b628cb0cda0c5e776"
+
 [profiling.clarify]
 license = "MIT OR Apache-2.0"
 [[profiling.clarify.git]]

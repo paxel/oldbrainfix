@@ -15,8 +15,12 @@ name = "oldbrainfix_whisper"
 [dependencies]
 sha2 = "0.10"
 hex = "0.4"
-# The phone's AAC .m4a recordings and the desktop's WAV ones.
-symphonia = { version = "0.5.5", default-features = false, features = ["aac", "isomp4", "pcm", "wav"] }
+# The phone's AAC .m4a recordings and the desktop's WAV ones, and sound
+# files made into voice Notes: MP3, and Ogg with Vorbis or Opus.
+symphonia = { version = "0.5.5", default-features = false, features = ["aac", "isomp4", "pcm", "wav", "mp3", "ogg", "vorbis"] }
+# Opus, as messengers send voice messages, which symphonia cannot
+# decode; pure Rust.
+opus-decoder = "0.1.1"
 # The speech model from Old Brain Fix's own release, over HTTPS only.
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 

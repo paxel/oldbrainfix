@@ -73,11 +73,28 @@ mod tests {
             (en.bundle_open(), de.bundle_open()),
             (en.bundle_drop(), de.bundle_drop()),
             (en.bundle_pair_first(), de.bundle_pair_first()),
+            (en.from_file(), de.from_file()),
+            (en.from_file_title(), de.from_file_title()),
+            (en.from_file_hint(), de.from_file_hint()),
+            (
+                en.file_recording_unreadable(),
+                de.file_recording_unreadable(),
+            ),
+            (
+                en.file_recording_unsupported(),
+                de.file_recording_unsupported(),
+            ),
+            (en.file_recording_fix(), de.file_recording_fix()),
         ] {
             assert_ne!(en, de);
         }
         assert_ne!(en.sync_conflicts_below(2), de.sync_conflicts_below(2));
         assert_ne!(en.bundle_saved(2), de.bundle_saved(2));
+        assert_eq!(
+            en.file_recording_failed(1),
+            "A recording from a file cannot be transcribed."
+        );
+        assert_ne!(en.file_recording_failed(2), de.file_recording_failed(2));
         assert_ne!(
             en.person_filter_remove("Ben"),
             de.person_filter_remove("Ben")

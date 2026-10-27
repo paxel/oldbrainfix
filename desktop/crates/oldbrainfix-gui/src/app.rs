@@ -22,8 +22,11 @@
 //! The capture field records voice too: the microphone's button starts
 //! at once and one big stop button ends it and keeps the Note, as do the
 //! Nudge times (UI laws, "Capture"). A picture pasted from the clipboard
-//! or dropped onto the window (where the system hands drops over: not on
-//! Wayland) becomes a photo Note, with what is typed; a sync bundle
+//! becomes a photo Note, with what is typed; pictures and sound files
+//! chosen with "From file…" or dropped onto the window (where the system
+//! hands drops over: not on Wayland) become one Note with their photos
+//! and voice recordings, as a share does on the phone, and a sound file
+//! that cannot be transcribed here is kept and announced; a sync bundle
 //! dropped there is imported, what came in announced at the top; a
 //! Sent Item dropped there, opened or handed over by `oldbrainfix open`
 //! shows its preview to accept or decline. A Note is sent from its
@@ -66,7 +69,10 @@ use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
-use crate::media::{Clipboard, Player, Recorder, photo_from_file};
+use crate::media::{
+    Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
+    photo_from_file,
+};
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView};
@@ -290,6 +296,15 @@ enum Dialog {
         hash: String,
         photo: bool,
     },
+    /// What a failure announced at the top was (UI laws,
+    /// "Announcements"): its cause and fix, one sentence each, and the
+    /// full text, with Close and Report.
+    Failure {
+        title: String,
+        cause: String,
+        fix: String,
+        details: String,
+    },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
@@ -341,9 +356,15 @@ enum Action {
     Speed(f64),
     /// Keeps the picture on the clipboard as a photo Note.
     PastePhoto,
-    /// Keeps these photos, already made the phone's way, as a photo
-    /// Note.
-    Photos(Vec<Vec<u8>>),
+    /// Asks the system's dialog for pictures and sound files and makes
+    /// them into a Note.
+    PickFiles,
+    /// Makes these files, by name and content, into one Note with what
+    /// is typed: the pictures as photos, the sound files as voice
+    /// recordings; anything else is left alone.
+    Files(Vec<(String, Vec<u8>)>),
+    /// Shows why the recordings announced could not be transcribed.
+    ShowUntranscribable,
     /// The search over the Notes shown changed.
     Search,
     /// Shows only the Notes of these people (#53).
@@ -572,6 +593,12 @@ pub struct App {
     question_view: ProfileView,
     /// The square of a new picture for the person the dialog shows.
     person_square: Option<Square>,
+    /// Asks the system's dialog for pictures and sound files, titled as
+    /// given.
+    files_picker: FilesPicker,
+    /// Why the recordings from files last made into a Note cannot be
+    /// transcribed, one line each, announced at the top until clicked.
+    untranscribable: Vec<(oldbrainfix_whisper::Problem, String)>,
     /// The dialog a person's Profile opened over, shown again after it.
     dialog_behind: Option<Dialog>,
     /// "Which one is you?" was put off until the Profile page asks again.
@@ -590,6 +617,9 @@ pub struct App {
 /// Asks for a folder, or a file to open, with the dialog's title.
 pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
 
+/// Asks for files to open, with the dialog's title; none when cancelled.
+pub type FilesPicker = Box<dyn Fn(&str) -> Vec<std::path::PathBuf>>;
+
 /// Asks where to save a file, with the dialog's title and the name it
 /// proposes.
 pub type FileSaver = Box<dyn Fn(&str, &str) -> Option<std::path::PathBuf>>;
@@ -607,6 +637,18 @@ fn picture_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(title, &["jpg", "jpeg", "png", "webp"])
+}
+
+/// The open dialog's filter for "From file…": pictures and sound files.
+fn files_dialog(title: &str) -> rfd::FileDialog {
+    let both: Vec<&str> = PICTURE_EXTENSIONS
+        .iter()
+        .chain(SOUND_EXTENSIONS.iter())
+        .copied()
+        .collect();
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(title, &both)
 }
 
 /// The save dialog's filter for the Recovery Sheet.
@@ -694,6 +736,8 @@ impl App {
             profile_view: ProfileView::default(),
             question_view: ProfileView::default(),
             person_square: None,
+            files_picker: Box::new(|title| files_dialog(title).pick_files().unwrap_or_default()),
+            untranscribable: Vec::new(),
             dialog_behind: None,
             question_later: false,
             picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
@@ -881,6 +925,12 @@ impl App {
     /// Hands in the dialog asking where to save a Sent Item.
     pub fn set_item_saver(&mut self, saver: FileSaver) {
         self.item_saver = saver;
+    }
+
+    /// Asks `picker` for the files of "From file…" instead of the
+    /// system's dialog; tests hand them in.
+    pub fn set_files_picker(&mut self, picker: FilesPicker) {
+        self.files_picker = picker;
     }
 
     /// Opens the files put into `handed` from outside the window, as
@@ -1559,8 +1609,40 @@ impl App {
                 };
                 self.capture_note(Notes::default_nudge(), &[photo], &[])?;
             }
-            Action::Photos(photos) => {
-                self.capture_note(Notes::default_nudge(), &photos, &[])?;
+            Action::PickFiles => {
+                let files = (self.files_picker)(self.t.from_file_title())
+                    .into_iter()
+                    .filter_map(|path| {
+                        let bytes = std::fs::read(&path).ok()?;
+                        Some((file_name(&path), bytes))
+                    })
+                    .collect();
+                self.capture_files(files)?;
+            }
+            Action::Files(files) => self.capture_files(files)?,
+            Action::ShowUntranscribable => {
+                let failed = std::mem::take(&mut self.untranscribable);
+                if let Some((first, _)) = failed.first() {
+                    let t = self.t;
+                    self.dialog = Some(Dialog::Failure {
+                        title: t.shared_recording_failed_title().into(),
+                        cause: match first {
+                            oldbrainfix_whisper::Problem::Unreadable => {
+                                t.file_recording_unreadable()
+                            }
+                            oldbrainfix_whisper::Problem::Unsupported => {
+                                t.file_recording_unsupported()
+                            }
+                        }
+                        .into(),
+                        fix: t.file_recording_fix().into(),
+                        details: failed
+                            .into_iter()
+                            .map(|(_, line)| line)
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                    });
+                }
             }
             Action::Search => {}
             Action::FilterPeople(people) => self.people = people,
@@ -1956,6 +2038,34 @@ impl App {
         Ok(())
     }
 
+    /// Makes `files`, by name and content, into one Note with the capture
+    /// field's text, as a share does on the phone: the pictures as
+    /// photos, the sound files as voice recordings, each kept even when
+    /// it cannot be transcribed here, which is announced at the top.
+    /// Anything else is left alone; nothing when nothing is left.
+    fn capture_files(&mut self, files: Vec<(String, Vec<u8>)>) -> oldbrainfix_core::Result<()> {
+        let (mut photos, mut recordings, mut failed) = (Vec::new(), Vec::new(), Vec::new());
+        for (name, bytes) in files {
+            match from_file(&name, &bytes) {
+                Some(FromFile::Photo(photo)) => photos.push(photo),
+                Some(FromFile::Recording { bytes, problem }) => {
+                    if let Some(problem) = problem {
+                        failed.push((problem, problem_line(problem, &name)));
+                    }
+                    recordings.push(bytes);
+                }
+                None => {}
+            }
+        }
+        if photos.is_empty() && recordings.is_empty() {
+            return Ok(());
+        }
+        self.capture_note(Notes::default_nudge(), &photos, &recordings)?;
+        // Added to what still waits to be clicked, so none goes unsaid.
+        self.untranscribable.extend(failed);
+        Ok(())
+    }
+
     /// The Notes the Note `selected` can be merged into that the core's
     /// search finds for `query`, by id and the title they show under.
     fn merge_candidates(
@@ -2152,9 +2262,9 @@ impl App {
                 self.playing = None;
             }
         }
-        // Pictures dropped onto the window become a photo Note; a bundle
-        // file is imported, a Sent Item previewed, as are the files
-        // handed over from outside.
+        // Pictures and sound files dropped onto the window become a
+        // Note; a bundle file is imported, a Sent Item previewed, as are
+        // the files handed over from outside.
         let dropped = ui.input(|i| i.raw.dropped_files.clone());
         let (files, dropped): (Vec<_>, Vec<_>) = dropped.into_iter().partition(|file| {
             file.path.as_ref().is_some_and(|p| {
@@ -2175,17 +2285,22 @@ impl App {
             // Nothing else stirs the window: what it opened shows at once.
             ui.ctx().request_repaint();
         }
-        let photos: Vec<Vec<u8>> = dropped
+        let files: Vec<(String, Vec<u8>)> = dropped
             .iter()
-            .filter_map(|file| match (&file.bytes, &file.path) {
-                (Some(bytes), _) => Some(bytes.to_vec()),
-                (None, Some(path)) => std::fs::read(path).ok(),
-                (None, None) => None,
+            .filter_map(|file| {
+                let name = file
+                    .path
+                    .as_deref()
+                    .map_or_else(|| file.name.clone(), file_name);
+                match (&file.bytes, &file.path) {
+                    (Some(bytes), _) => Some((name, bytes.to_vec())),
+                    (None, Some(path)) => std::fs::read(path).ok().map(|bytes| (name, bytes)),
+                    (None, None) => None,
+                }
             })
-            .filter_map(|bytes| photo_from_file(&bytes))
             .collect();
-        if !photos.is_empty() {
-            actions.push(Action::Photos(photos));
+        if !files.is_empty() {
+            actions.push(Action::Files(files));
         }
         if self.dialog.is_none() {
             let typing = ui.ctx().text_edit_focused();
@@ -2214,6 +2329,22 @@ impl App {
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                });
+        } else if !self.untranscribable.is_empty() {
+            // Recordings from files kept but not transcribable; the click
+            // shows why (UI laws, "Announcements").
+            let text = self
+                .t
+                .file_recording_failed(self.untranscribable.len() as i64);
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowUntranscribable);
+                    }
                 });
         } else if let Some(notice) = self.notice.clone() {
             // What a bundle did, until clicked away.
@@ -2482,6 +2613,18 @@ impl App {
                     }
                 });
                 ui.label(RichText::new(t.photos_hint()).small().color(weak));
+            }
+            if recording.is_none() {
+                ui.horizontal(|ui| {
+                    icons::show(ui, icons::FOLDER_OPEN, 20.0, text);
+                    if ui
+                        .button(RichText::new(t.from_file()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::PickFiles);
+                    }
+                });
+                ui.label(RichText::new(t.from_file_hint()).small().color(weak));
             }
             if self.capture.trim().is_empty() && recording.is_none() {
                 return;
@@ -3172,6 +3315,12 @@ impl App {
                         }
                         actions.extend(asked.into_iter().map(Action::Person));
                     }
+                    Dialog::Failure {
+                        title: heading,
+                        cause,
+                        fix,
+                        details,
+                    } => failure_form(ui, &t, heading, (cause, fix), details, actions),
                     Dialog::WhichProfile => {
                         if let Some(other) = &view.profile_question {
                             let mut asked = Vec::new();
@@ -3890,6 +4039,97 @@ fn focused_field(
         field.request_focus();
     }
     field
+}
+
+/// Where Report sends a problem's details: the developer's mail, as on
+/// the phone (crash_guard.dart).
+const REPORT_MAIL: &str = "taum@tuta.io";
+
+/// What a failure announced at the top was (UI laws, "Announcements"):
+/// `heading`, the cause and the fix in one sentence each, the full
+/// `details` to select and copy, Close, and Report, which opens a mail
+/// with the details to the developer that the user still sends.
+fn failure_form(
+    ui: &mut Ui,
+    t: &L10n,
+    heading: &str,
+    (cause, fix): (&str, &str),
+    details: &str,
+    actions: &mut Vec<Action>,
+) {
+    title(ui, heading);
+    let text = ui.visuals().text_color();
+    ui.label(RichText::new(format!("{cause} {fix}")).color(text));
+    Frame::NONE
+        .fill(ui.visuals().extreme_bg_color)
+        .corner_radius(8.0)
+        .inner_margin(Margin::same(8))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.add(
+                egui::Label::new(RichText::new(details).monospace().color(text)).selectable(true),
+            );
+        });
+    ui.horizontal(|ui| {
+        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+            actions.push(Action::CloseDialog);
+        }
+        if ui.button(RichText::new(t.report()).color(text)).clicked() {
+            ui.ctx()
+                .open_url(egui::OpenUrl::new_tab(report_url(details)));
+            actions.push(Action::CloseDialog);
+        }
+    });
+}
+
+/// A `mailto:` link to [`REPORT_MAIL`] carrying `details` and this
+/// app's version.
+fn report_url(details: &str) -> String {
+    let body = format!(
+        "{} {}\n{}\n\n{details}",
+        oldbrainfix_core::APP_NAME,
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+    );
+    format!(
+        "mailto:{REPORT_MAIL}?subject={}&body={}",
+        percent_encoded(&format!("{} problem report", oldbrainfix_core::APP_NAME)),
+        percent_encoded(&body),
+    )
+}
+
+/// `text` with everything but unreserved characters percent-encoded,
+/// as a URL's query takes it.
+fn percent_encoded(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                char::from(b).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// The name of the file at `path`, as a drop or a dialog hands it over.
+fn file_name(path: &std::path::Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// The details line of a recording from the file `name` that cannot be
+/// transcribed: the problem and the file's ending, not its name, which
+/// may say more than a report should.
+fn problem_line(problem: oldbrainfix_whisper::Problem, name: &str) -> String {
+    let kind = match problem {
+        oldbrainfix_whisper::Problem::Unreadable => "unreadable",
+        oldbrainfix_whisper::Problem::Unsupported => "unsupported",
+    };
+    match std::path::Path::new(name).extension() {
+        Some(ending) => format!("{kind}: .{}", ending.to_string_lossy()),
+        None => kind.to_string(),
+    }
 }
 
 /// Cancel, which closes the dialog without a change.
@@ -5071,6 +5311,25 @@ mod tests {
         );
         assert_eq!(area_colour(Some("nope")), None);
         assert_eq!(area_colour(None), None);
+    }
+
+    #[test]
+    fn a_report_mails_the_details_percent_encoded_and_names_no_file() {
+        let url = report_url("unreadable: .ogg\nunsupported");
+        assert!(
+            url.starts_with(
+                "mailto:taum@tuta.io?subject=Old%20Brain%20Fix%20problem%20report&body="
+            )
+        );
+        assert!(
+            url.ends_with("%0A%0Aunreadable%3A%20.ogg%0Aunsupported"),
+            "{url}"
+        );
+        assert_eq!(percent_encoded("ä &"), "%C3%A4%20%26");
+        let line = problem_line(oldbrainfix_whisper::Problem::Unsupported, "Dr. Ben.OGG");
+        assert_eq!(line, "unsupported: .OGG");
+        let line = problem_line(oldbrainfix_whisper::Problem::Unreadable, "voice");
+        assert_eq!(line, "unreadable");
     }
 
     #[test]

@@ -42,7 +42,7 @@ fn harness(
     app.select(Selection::All);
     // Tall enough for every Note of the `formats` scenario unscrolled.
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1400.0))
+        .with_size(egui::vec2(1280.0, 1500.0))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());

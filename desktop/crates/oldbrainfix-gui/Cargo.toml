@@ -31,8 +31,10 @@ notify-rust = "4"
 global-hotkey = "0.9"
 parking_lot = "0.12"
 # Voice Notes: the microphone and the speakers, as Catlog plays its
-# sounds; WAV as the desktop records, AAC in .m4a as the phone does.
-rodio = { version = "0.22", default-features = false, features = ["playback", "recording", "wav", "mp4"] }
+# sounds; WAV as the desktop records, AAC in .m4a as the phone does,
+# and MP3 and Ogg Vorbis from sound files (Ogg Opus plays through
+# oldbrainfix-whisper's decoder).
+rodio = { version = "0.22", default-features = false, features = ["playback", "recording", "wav", "mp4", "mp3", "vorbis"] }
 # Pictures pasted in.
 arboard = "3.6"
 # Photos pasted or dropped in, kept as the phone keeps them, and shown.

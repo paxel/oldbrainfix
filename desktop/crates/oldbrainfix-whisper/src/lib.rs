@@ -5,15 +5,18 @@
 //! speech model it needs, fetched from the phone's mirror
 //! and checked against the phone's checksum ([`model`]); and voice
 //! recordings decoded as Whisper hears them, the phone's AAC `.m4a` and
-//! the desktop's WAV alike ([`decode`]).
+//! the desktop's WAV alike, and the sound files made into voice Notes:
+//! MP3, Ogg Vorbis and Ogg Opus, as messengers send voice messages
+//! ([`decode`]).
 
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::path::Path;
 
+use opus_decoder::OpusDecoder;
 use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::{CODEC_TYPE_NULL, DecoderOptions};
+use symphonia::core::codecs::{CODEC_TYPE_NULL, CODEC_TYPE_OPUS, Decoder, DecoderOptions};
 use symphonia::core::errors::Error as DecodeError;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::formats::{FormatOptions, FormatReader};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
@@ -126,8 +129,60 @@ pub fn threads_for(cores: usize) -> usize {
 
 /// The voice recording `bytes` as Whisper hears it: 16 kHz mono samples
 /// from -1 to 1; `None` when it cannot be read. AAC in MPEG-4, as the
-/// phone records, and WAV, as the desktop records, are both read.
+/// phone records, WAV, as the desktop records, and the sound files
+/// made into voice Notes ([`pcm`]) are all read.
 pub fn decode(bytes: Vec<u8>) -> Option<Vec<f32>> {
+    let pcm = pcm(bytes)?;
+    Some(to_whisper(&pcm.samples, pcm.channels, pcm.rate))
+}
+
+/// A sound file's samples as it holds them: interleaved, from -1 to 1.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pcm {
+    pub samples: Vec<f32>,
+    pub channels: usize,
+    pub rate: u32,
+}
+
+/// Why a sound file cannot be decoded here, as the phone tells it
+/// (Speech.kt).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Problem {
+    /// No sound found: not a sound file, or a damaged one.
+    Unreadable,
+    /// A format this computer has no decoder for.
+    Unsupported,
+}
+
+/// The rate Opus decodes at: its own, whatever rate the sound was
+/// recorded at.
+const OPUS_RATE: u32 = 48_000;
+
+/// What decodes a sound file's track: symphonia, or the Opus decoder
+/// for Ogg Opus, which symphonia only unpacks.
+enum Sound {
+    Symphonia(Box<dyn Decoder>),
+    Opus {
+        decoder: Box<OpusDecoder>,
+        channels: usize,
+        /// The samples at the start that only prime the decoder (the
+        /// pre-skip), of all channels.
+        skip: usize,
+    },
+}
+
+/// A sound file opened for decoding.
+struct Opened {
+    format: Box<dyn FormatReader>,
+    track_id: u32,
+    sound: Sound,
+    rate: Option<u32>,
+    channels: Option<usize>,
+}
+
+/// The sound file `bytes` opened, its first track with sound ready to
+/// decode; why not when it cannot be. Decodes nothing yet.
+fn open(bytes: Vec<u8>) -> Result<Opened, Problem> {
     let source = MediaSourceStream::new(Box::new(std::io::Cursor::new(bytes)), Default::default());
     let probed = symphonia::default::get_probe()
         .format(
@@ -136,19 +191,73 @@ pub fn decode(bytes: Vec<u8>) -> Option<Vec<f32>> {
             &FormatOptions::default(),
             &MetadataOptions::default(),
         )
-        .ok()?;
-    let mut format = probed.format;
+        .map_err(|_| Problem::Unreadable)?;
+    let format = probed.format;
     let track = format
         .tracks()
         .iter()
-        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)?;
+        .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
+        .ok_or(Problem::Unreadable)?;
+    let params = &track.codec_params;
     let track_id = track.id;
-    let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
-        .ok()?;
-    let mut rate = track.codec_params.sample_rate;
-    let mut channels = track.codec_params.channels.map(|c| c.count());
-    let mut pcm: Vec<f32> = Vec::new();
+    let (sound, rate, channels) = if params.codec == CODEC_TYPE_OPUS {
+        let channels = opus_channels(params.extra_data.as_deref()).ok_or(Problem::Unsupported)?;
+        let decoder = OpusDecoder::new(OPUS_RATE, channels).map_err(|_| Problem::Unsupported)?;
+        let decoder = Box::new(decoder);
+        let skip = params.delay.unwrap_or(0) as usize * channels;
+        let sound = Sound::Opus {
+            decoder,
+            channels,
+            skip,
+        };
+        (sound, Some(OPUS_RATE), Some(channels))
+    } else {
+        let decoder = symphonia::default::get_codecs()
+            .make(params, &DecoderOptions::default())
+            .map_err(|_| Problem::Unsupported)?;
+        let channels = params.channels.map(|c| c.count());
+        (Sound::Symphonia(decoder), params.sample_rate, channels)
+    };
+    Ok(Opened {
+        format,
+        track_id,
+        sound,
+        rate,
+        channels,
+    })
+}
+
+/// The channels of the Ogg Opus stream whose identification header
+/// (`OpusHead`, RFC 7845) is `head`: one or two, in one stream; `None`
+/// for more, which this decoder does not take.
+fn opus_channels(head: Option<&[u8]>) -> Option<usize> {
+    let head = head?;
+    if head.len() < 19 || &head[..8] != b"OpusHead" {
+        return None;
+    }
+    let (channels, family) = (usize::from(head[9]), head[18]);
+    ((family == 0 || family == 1) && (1..=2).contains(&channels)).then_some(channels)
+}
+
+/// Why the sound file `bytes` cannot be decoded here, or `None` when it
+/// can, as the phone tells it: only opens the decoder, decodes nothing.
+pub fn problem(bytes: &[u8]) -> Option<Problem> {
+    open(bytes.to_vec()).err()
+}
+
+/// The sound file `bytes` decoded: AAC in MPEG-4, WAV, MP3, Ogg Vorbis
+/// and Ogg Opus; `None` when it cannot be read. A damaged packet is
+/// skipped, as players do.
+pub fn pcm(bytes: Vec<u8>) -> Option<Pcm> {
+    let Opened {
+        mut format,
+        track_id,
+        mut sound,
+        mut rate,
+        mut channels,
+    } = open(bytes).ok()?;
+    let mut samples: Vec<f32> = Vec::new();
+    let mut opus = Vec::new();
     loop {
         let packet = match format.next_packet() {
             Ok(packet) => packet,
@@ -158,22 +267,42 @@ pub fn decode(bytes: Vec<u8>) -> Option<Vec<f32>> {
         if packet.track_id() != track_id {
             continue;
         }
-        match decoder.decode(&packet) {
-            Ok(decoded) => {
-                // What comes out may differ from what went in.
-                let spec = *decoded.spec();
-                rate = Some(spec.rate);
-                channels = Some(spec.channels.count());
-                let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                buffer.copy_interleaved_ref(decoded);
-                pcm.extend_from_slice(buffer.samples());
+        match &mut sound {
+            Sound::Symphonia(decoder) => match decoder.decode(&packet) {
+                Ok(decoded) => {
+                    // What comes out may differ from what went in.
+                    let spec = *decoded.spec();
+                    rate = Some(spec.rate);
+                    channels = Some(spec.channels.count());
+                    let mut buffer = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                    buffer.copy_interleaved_ref(decoded);
+                    samples.extend_from_slice(buffer.samples());
+                }
+                Err(DecodeError::DecodeError(_)) => continue,
+                Err(_) => return None,
+            },
+            Sound::Opus {
+                decoder, channels, ..
+            } => {
+                opus.resize(decoder.max_frame_size_per_channel() * *channels, 0.0);
+                if let Ok(frames) = decoder.decode_float(&packet.data, &mut opus, false) {
+                    samples.extend_from_slice(&opus[..(frames * *channels).min(opus.len())]);
+                }
             }
-            // A damaged packet is skipped, as players do.
-            Err(DecodeError::DecodeError(_)) => continue,
-            Err(_) => return None,
         }
     }
-    Some(to_whisper(&pcm, channels?, rate?))
+    if let Sound::Opus { skip, .. } = sound {
+        // Nothing decoded is no sound.
+        if samples.is_empty() {
+            return None;
+        }
+        samples.drain(..skip.min(samples.len()));
+    }
+    Some(Pcm {
+        samples,
+        channels: channels?,
+        rate: rate?,
+    })
 }
 
 /// `interleaved` samples of `channels` channels at `rate` as Whisper
@@ -279,6 +408,66 @@ mod tests {
         assert!((stereo[0] - 0.25).abs() < 1e-3, "{stereo:?}");
     }
 
+    /// The phone's test voice message: 0.2 s of a 440 Hz tone, 16 kHz
+    /// mono, encoded with libopus into an Ogg file, as messengers send.
+    const VOICE_MESSAGE: &[u8] = include_bytes!("../testdata/voice-message.ogg");
+
+    /// The pitch of `samples` at `rate`, from its rising zero crossings.
+    fn hertz(samples: &[f32], rate: u32) -> f32 {
+        let rising = samples
+            .windows(2)
+            .filter(|w| w[0] < 0.0 && w[1] >= 0.0)
+            .count();
+        rising as f32 * rate as f32 / samples.len() as f32
+    }
+
+    #[test]
+    fn an_ogg_opus_voice_message_decodes_without_its_pre_skip() {
+        assert_eq!(problem(VOICE_MESSAGE), None);
+        let pcm = pcm(VOICE_MESSAGE.to_vec()).unwrap_or_else(|| Pcm {
+            samples: Vec::new(),
+            channels: 0,
+            rate: 0,
+        });
+        assert_eq!((pcm.channels, pcm.rate), (1, 48_000));
+        // 0.2 s, give or take a frame of the encoder's.
+        assert!(
+            (9_600 - 960..=9_600 + 960).contains(&pcm.samples.len()),
+            "{}",
+            pcm.samples.len()
+        );
+        let heard = decode(VOICE_MESSAGE.to_vec()).unwrap_or_default();
+        assert!((2_880..=3_520).contains(&heard.len()), "{}", heard.len());
+        let middle = &heard[400..2_800];
+        let pitch = hertz(middle, WHISPER_RATE);
+        assert!((pitch - 440.0).abs() < 20.0, "{pitch} Hz");
+        assert!(middle.iter().any(|s| s.abs() > 0.1));
+    }
+
+    #[test]
+    fn opus_in_more_than_one_stream_is_not_taken() {
+        let head = |channels: u8, family: u8| {
+            let mut head = b"OpusHead".to_vec();
+            head.extend_from_slice(&[1, channels, 0x38, 1, 0x80, 0x3E, 0, 0, 0, 0, family]);
+            head
+        };
+        assert_eq!(opus_channels(Some(&head(1, 0))), Some(1));
+        assert_eq!(opus_channels(Some(&head(2, 1))), Some(2));
+        assert_eq!(opus_channels(Some(&head(6, 1))), None);
+        assert_eq!(opus_channels(Some(&head(1, 255))), None);
+        assert_eq!(opus_channels(Some(b"OpusHead")), None);
+        assert_eq!(opus_channels(None), None);
+    }
+
+    #[test]
+    fn what_is_no_sound_file_is_unreadable() {
+        assert_eq!(problem(b"not a recording"), Some(Problem::Unreadable));
+        assert_eq!(problem(&[]), Some(Problem::Unreadable));
+        // An Ogg file cut off before its sound.
+        assert_eq!(pcm(VOICE_MESSAGE[..100].to_vec()), None);
+        assert_eq!(problem(&wav(&[0, 1], 1, 16_000)), None);
+    }
+
     #[test]
     fn what_is_no_recording_does_not_decode() {
         assert_eq!(decode(b"not a recording".to_vec()), None);
@@ -297,8 +486,8 @@ mod tests {
     }
 
     /// Device-only: needs a speech model and a recording, named by
-    /// `OBF_WHISPER_MODEL` and `OBF_VOICE_SAMPLE` (a phone .m4a or a
-    /// desktop .wav), and leads in with `OBF_PROMPT` if set:
+    /// `OBF_WHISPER_MODEL` and `OBF_VOICE_SAMPLE` (a phone .m4a, a
+    /// desktop .wav, or a sound file such as an Ogg voice message), and leads in with `OBF_PROMPT` if set:
     /// `cargo test -p oldbrainfix-whisper -- --ignored --nocapture`.
     #[test]
     #[ignore = "needs the speech model and a recording"]

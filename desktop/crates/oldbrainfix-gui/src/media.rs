@@ -7,6 +7,12 @@
 //! (the phone reads it with its own MediaExtractor). The phone records
 //! AAC in `.m4a`; the desktop plays and transcribes that too.
 //!
+//! A picture or sound file chosen with "From file…" or dropped in
+//! becomes a photo or a voice recording ([`from_file`]). A sound file is
+//! kept as it is, MP3, Ogg Opus as messengers send voice messages, m4a
+//! or WAV; one that cannot be decoded here is kept all the same, with
+//! why it cannot be transcribed.
+//!
 //! A photo pasted or dropped in is kept as the phone keeps one
 //! (Photos.kt): upright, at most 2048 pixels on the long side, a JPEG
 //! at quality 85 on white where it was see-through, without metadata.
@@ -236,14 +242,14 @@ impl Default for SpeakerPlayer {
 impl Player for SpeakerPlayer {
     fn play(&mut self, bytes: Vec<u8>) -> bool {
         self.stop();
-        let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes)) else {
+        let Some(sound) = playable(bytes) else {
             return false;
         };
         let Ok(sink) = rodio::DeviceSinkBuilder::open_default_sink() else {
             return false;
         };
         let player = rodio::Player::connect_new(sink.mixer());
-        player.append(Stretch::new(decoder, self.speed.clone()));
+        player.append(Stretch::new(sound, self.speed.clone()));
         self.playing = Some((sink, player));
         true
     }
@@ -261,6 +267,25 @@ impl Player for SpeakerPlayer {
     fn set_speed(&mut self, speed: f64) {
         self.speed
             .store((speed as f32).to_bits(), Ordering::Relaxed);
+    }
+}
+
+/// The recording `bytes` as the speakers play it: through rodio's own
+/// decoders, or, for what they cannot decode, such as Ogg Opus, decoded
+/// whole by oldbrainfix-whisper; `None` when neither can.
+fn playable(bytes: Vec<u8>) -> Option<Box<dyn rodio::Source + Send>> {
+    match rodio::Decoder::new(Cursor::new(bytes.clone())) {
+        Ok(decoder) => Some(Box::new(decoder)),
+        Err(_) => {
+            let pcm = oldbrainfix_whisper::pcm(bytes)?;
+            let channels = rodio::ChannelCount::new(u16::try_from(pcm.channels).ok()?)?;
+            let rate = rodio::SampleRate::new(pcm.rate)?;
+            Some(Box::new(rodio::buffer::SamplesBuffer::new(
+                channels,
+                rate,
+                pcm.samples,
+            )))
+        }
     }
 }
 
@@ -522,6 +547,65 @@ impl Clipboard for SystemClipboard {
     }
 }
 
+/// What a file chosen with "From file…" or dropped in becomes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FromFile {
+    /// A photo, already made the phone's way.
+    Photo(Vec<u8>),
+    /// A voice recording, the sound file as it is, and why it cannot be
+    /// transcribed here, if it cannot.
+    Recording {
+        bytes: Vec<u8>,
+        problem: Option<oldbrainfix_whisper::Problem>,
+    },
+}
+
+/// The endings of the sound files "From file…" offers and a drop takes.
+pub const SOUND_EXTENSIONS: [&str; 7] = ["ogg", "oga", "opus", "m4a", "mp3", "wav", "aac"];
+
+/// The endings of the pictures "From file…" offers.
+pub const PICTURE_EXTENSIONS: [&str; 4] = ["jpg", "jpeg", "png", "webp"];
+
+/// The file `bytes` named `name` as a photo or a voice recording; `None`
+/// when it is neither a picture nor a sound file. A sound file is told
+/// by its ending or its first bytes, not by whether it decodes here, so
+/// one that cannot be decoded is still kept.
+pub fn from_file(name: &str, bytes: &[u8]) -> Option<FromFile> {
+    if let Some(photo) = photo_from_file(bytes) {
+        return Some(FromFile::Photo(photo));
+    }
+    if bytes.is_empty() || !is_sound(name, bytes) {
+        return None;
+    }
+    Some(FromFile::Recording {
+        bytes: bytes.to_vec(),
+        problem: oldbrainfix_whisper::problem(bytes),
+    })
+}
+
+/// Whether the file `bytes` named `name` is a sound file: by its ending
+/// ([`SOUND_EXTENSIONS`]) or by its first bytes, as the phone names a
+/// recording (Voice.kt): Ogg, WAV, MP3 with its tag or an MPEG audio
+/// frame, or MPEG-4.
+fn is_sound(name: &str, bytes: &[u8]) -> bool {
+    let ending = std::path::Path::new(name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_lowercase);
+    if ending.is_some_and(|e| SOUND_EXTENSIONS.contains(&e.as_str())) {
+        return true;
+    }
+    let tag = |at: usize| bytes.get(at..at + 4).unwrap_or_default();
+    let byte = |at: usize| bytes.get(at).copied().unwrap_or(0);
+    tag(0) == b"OggS"
+        || (tag(0) == b"RIFF" && tag(8) == b"WAVE")
+        || bytes.starts_with(b"ID3")
+        // An MPEG audio frame's sync bits, with a layer set: ADTS AAC
+        // has the same sync but no layer.
+        || (byte(0) == 0xFF && byte(1) & 0xE0 == 0xE0 && byte(1) & 0x06 != 0)
+        || tag(4) == b"ftyp"
+}
+
 /// The picture file `bytes` (JPEG, PNG or WebP) as a photo to keep,
 /// turned upright as its Exif says; `None` when it is no picture.
 pub fn photo_from_file(bytes: &[u8]) -> Option<Vec<u8>> {
@@ -742,6 +826,73 @@ mod tests {
         assert_eq!(pixels(&kept, 15).map(|p| p.dimensions()), Some((15, 10)));
         assert_eq!(photo_from_file(b"not a picture"), None);
         assert_eq!(pixels(b"not a picture", 100), None);
+    }
+
+    /// The phone's test voice message: 0.2 s of a 440 Hz tone in Ogg
+    /// Opus, as messengers send.
+    const VOICE_MESSAGE: &[u8] =
+        include_bytes!("../../oldbrainfix-whisper/testdata/voice-message.ogg");
+
+    #[test]
+    fn a_picture_file_becomes_a_photo_and_a_sound_file_a_recording() {
+        let picture = from_file("receipt.png", &png(30, 20, [0, 0, 255, 255]));
+        assert!(matches!(picture, Some(FromFile::Photo(ref p)) if p[0..2] == [0xFF, 0xD8]));
+        // An Ogg voice message is kept as it is, by its ending or its
+        // first bytes alone.
+        for name in ["voice.ogg", "voice", "VOICE.OPUS"] {
+            assert_eq!(
+                from_file(name, VOICE_MESSAGE),
+                Some(FromFile::Recording {
+                    bytes: VOICE_MESSAGE.to_vec(),
+                    problem: None,
+                }),
+                "{name}"
+            );
+        }
+        assert!(matches!(
+            from_file("talk.wav", &wav(&[0.1, 0.2])),
+            Some(FromFile::Recording { problem: None, .. })
+        ));
+    }
+
+    #[test]
+    fn a_sound_file_that_does_not_decode_is_kept_with_why() {
+        assert_eq!(
+            from_file("damaged.m4a", b"not a recording"),
+            Some(FromFile::Recording {
+                bytes: b"not a recording".to_vec(),
+                problem: Some(oldbrainfix_whisper::Problem::Unreadable),
+            })
+        );
+        // Neither a picture nor a sound file: left alone.
+        assert_eq!(from_file("notes.txt", b"plain text"), None);
+        assert_eq!(from_file("empty.ogg", b""), None);
+    }
+
+    #[test]
+    fn sound_files_are_told_by_their_first_bytes_as_the_phone_names_them() {
+        assert!(is_sound("x", b"ID3\x04\0\0\0"));
+        assert!(is_sound("x", &[0xFF, 0xFB, 0x90, 0]));
+        assert!(!is_sound("x", &[0xFF, 0xF1, 0x50, 0x80]));
+        assert!(is_sound("x", b"\0\0\0\x20ftypM4A "));
+        assert!(!is_sound("x", b"RIFF\0\0\0\0AVI "));
+        assert!(!is_sound("x.txt", b"plain"));
+    }
+
+    #[test]
+    fn ogg_opus_plays_through_the_whisper_decoder() {
+        use rodio::Source;
+        // rodio's own decoders take no Opus.
+        assert!(rodio::Decoder::new(Cursor::new(VOICE_MESSAGE.to_vec())).is_err());
+        let Some(sound) = playable(VOICE_MESSAGE.to_vec()) else {
+            panic!("the voice message plays");
+        };
+        assert_eq!(
+            (sound.channels().get(), sound.sample_rate().get()),
+            (1, 48_000)
+        );
+        assert!(sound.count() > 8_000);
+        assert!(playable(b"not a recording".to_vec()).is_none());
     }
 
     #[test]
