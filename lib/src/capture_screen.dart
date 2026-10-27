@@ -90,8 +90,9 @@ Future<void> captureNote(
 /// buttons at the bottom, each of which saves; Save means 1 h (UI laws,
 /// "Capture").
 ///
-/// The Photo button takes a photo into the Note; the text is then
-/// optional. Something shared in from another app opens here with its
+/// The Photo button takes a photo into the Note, and the Gallery button
+/// picks pictures from the Device into it, several at once; the text is
+/// then optional. Closing the picker without picking changes nothing. Something shared in from another app opens here with its
 /// text and photos filled in, and the app it came from recorded. Photos
 /// are written at once, so none is lost.
 ///
@@ -168,6 +169,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   /// Ending the recording and keeping it, once asked for.
   Future<void>? _stopping;
+
+  /// The pictures being picked and written; null while none are.
+  Future<void>? _picking;
 
   /// Counts the recording's seconds while it runs.
   Timer? _ticker;
@@ -285,6 +289,23 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _addPhotos([bytes]));
   }
 
+  /// Picks pictures with the system's picker into the Note; the same
+  /// picking when asked again while it runs.
+  Future<void> _pickPhotos() =>
+      _picking ??= _pick().whenComplete(() => _picking = null);
+
+  /// Waits for the pictures picked and writes them into the Note, also
+  /// when leaving began meanwhile, so none is lost.
+  Future<void> _pick() async {
+    final picked = await widget.photos.pickPhotos();
+    if (picked.isEmpty) return;
+    if (mounted && !_leaving) {
+      setState(() => _addPhotos(picked));
+    } else {
+      _addPhotos(picked);
+    }
+  }
+
   /// Writes the recording [bytes] into the Note, capturing it with the
   /// text so far when there is none yet.
   void _addRecording(Uint8List bytes) {
@@ -357,11 +378,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
   }
 
   /// Saves and leaves: by Save, Back or the stop button (1 h), or a
-  /// picked Nudge time. A running recording is ended and kept first.
+  /// picked Nudge time. A running recording is ended and kept first, and
+  /// pictures still being picked are written first.
   Future<void> _save([Duration? nudgeIn]) async {
     if (_leaving) return;
     _leaving = true;
     await _stopRecording();
+    await _picking;
     if (!mounted) return;
     _write(nudgeIn);
     Navigator.of(context).pop(_captured);
@@ -456,28 +479,33 @@ class _CaptureScreenState extends State<CaptureScreen> {
     ],
   ];
 
-  /// The Photo and Voice buttons above the Nudge choices, side by side,
-  /// or one full width; none while recording, where the big stop button
-  /// is the one way out. Below the text field, they rise with the
-  /// keyboard.
+  /// The Photo, Voice and Gallery buttons above the Nudge choices, side
+  /// by side, each with its icon above its one-word label so three fit
+  /// the row; none while recording, where the big stop button is the
+  /// one way out. Below the text field, they rise with the keyboard.
   Widget _captureButtons(BuildContext context) {
     final t = context.t;
     final buttons = [
       if (widget.photos.available)
-        FilledButton.tonalIcon(
+        _captureButton(
           key: const ValueKey('capturePhoto'),
           onPressed: _takePhoto,
-          style: _bigButton,
-          icon: const Icon(Icons.photo_camera_outlined),
-          label: Text(t.photo),
+          icon: Icons.photo_camera_outlined,
+          label: t.photo,
         ),
       if (widget.voice.available && !_voiceMode)
-        FilledButton.tonalIcon(
+        _captureButton(
           key: const ValueKey('captureVoice'),
           onPressed: _openVoice,
-          style: _bigButton,
-          icon: const Icon(Icons.mic_none),
-          label: Text(t.voice),
+          icon: Icons.mic_none,
+          label: t.voice,
+        ),
+      if (widget.photos.pickable)
+        _captureButton(
+          key: const ValueKey('captureGallery'),
+          onPressed: _pickPhotos,
+          icon: Icons.photo_library_outlined,
+          label: t.gallery,
         ),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
@@ -494,9 +522,29 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
+  /// One big capture button: the icon above the label.
+  Widget _captureButton({
+    required Key key,
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+  }) => FilledButton.tonal(
+    key: key,
+    onPressed: onPressed,
+    style: _bigButton,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 28),
+        const SizedBox(height: 4),
+        Text(label, maxLines: 1, softWrap: false),
+      ],
+    ),
+  );
+
   static final _bigButton = FilledButton.styleFrom(
     minimumSize: const Size.fromHeight(56),
-    iconSize: 28,
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
   );
 
   /// Voice: the text typed so far, then the running time and the big

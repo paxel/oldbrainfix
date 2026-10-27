@@ -28,16 +28,26 @@ String sharedText(String? subject, String? text) {
   return '$s\n$t';
 }
 
-/// The platform seam for photos: the camera and what other apps share in
-/// (android/…/Photos.kt, ShareActivity.kt). Widget tests hand in a fake.
+/// The platform seam for photos: the camera, the system's picture picker
+/// and what other apps share in (android/…/Photos.kt, ShareActivity.kt).
+/// Widget tests hand in a fake.
 abstract interface class PhotoPlatform {
   /// Whether this Device has a camera to take photos with; the camera
   /// button only shows where it has.
   bool get available;
 
+  /// Whether this Device has a picker for its pictures; the Gallery
+  /// button only shows where it has.
+  bool get pickable;
+
   /// Takes a photo with the Device's camera app; its bytes as a JPEG
   /// without metadata, or null when none was taken.
   Future<Uint8List?> takePhoto();
+
+  /// Opens the system's picture picker, several pictures at once; each
+  /// picked one as a JPEG without metadata, none when the picker was
+  /// closed without picking.
+  Future<List<Uint8List>> pickPhotos();
 
   /// What was shared in and not taken yet, or null; taking clears it.
   Future<SharedItem?> takeShared();
@@ -54,7 +64,13 @@ class NoPhotos implements PhotoPlatform {
   bool get available => false;
 
   @override
+  bool get pickable => false;
+
+  @override
   Future<Uint8List?> takePhoto() async => null;
+
+  @override
+  Future<List<Uint8List>> pickPhotos() async => const [];
 
   @override
   Future<SharedItem?> takeShared() async => null;
@@ -63,8 +79,8 @@ class NoPhotos implements PhotoPlatform {
   Stream<void> get sharedArrived => const Stream.empty();
 }
 
-/// Android's own camera intent and share target behind the app's method
-/// channel; no Google library.
+/// Android's own camera intent, picture picker and share target behind the
+/// app's method channel; no Google library.
 class AndroidPhotos implements PhotoPlatform {
   static const _channel = MethodChannel('io.github.paxel.oldbrainfix/photos');
   final _shared = StreamController<void>.broadcast();
@@ -79,11 +95,24 @@ class AndroidPhotos implements PhotoPlatform {
   bool get available => true;
 
   @override
+  bool get pickable => true;
+
+  @override
   Future<Uint8List?> takePhoto() async {
     try {
       return await _channel.invokeMethod<Uint8List>('take');
     } on PlatformException {
       return null;
+    }
+  }
+
+  @override
+  Future<List<Uint8List>> pickPhotos() async {
+    try {
+      final picked = await _channel.invokeListMethod<Object?>('pick');
+      return [...?picked?.whereType<Uint8List>()];
+    } on PlatformException {
+      return const [];
     }
   }
 

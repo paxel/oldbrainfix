@@ -32,6 +32,14 @@ class PhotosTest {
     }
 
     @Test
+    fun `the picker answers several pictures, one, or none when closed`() {
+        assertEquals(listOf("a", "b"), Photos.picked(true, listOf("a", "b"), "a"))
+        assertEquals(listOf("a"), Photos.picked(true, null, "a"))
+        assertEquals(emptyList<String>(), Photos.picked(true, null, null))
+        assertEquals(emptyList<String>(), Photos.picked(false, listOf("a"), "a"))
+    }
+
+    @Test
     fun `only images are taken as pictures from a share`() {
         assertTrue(Shares.isImage("image/jpeg"))
         assertTrue(Shares.isImage("image/*"))

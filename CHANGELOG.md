@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [0.2.0]
 
+### Added
+- On the phone, text Capture has a Gallery button next to Photo and Voice that picks one or more pictures from the phone into the Note as its photos, each with its Photo Text.
+
 ### Changed
 - On the phone and the desktop, the unit of a Routine's "every N", its Re-nag and Escalation, and the Device's Re-nag and Nudge repeat in Settings are columns of radio buttons instead of dropdowns, with a value set elsewhere kept as an extra option.
 - On the phone and the desktop, the app starts faster with a speech model: its checksum is computed once when it is downloaded or picked, and again only when the file's size or modification time changes.

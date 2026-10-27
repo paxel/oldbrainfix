@@ -110,6 +110,17 @@ void main() {
       expect(notes.all().single.photoTexts.values, ['Invoice 42']);
     });
 
+    testWidgets('a photo picked from the gallery is read too', (tester) async {
+      ocr.texts[otherPng.length] = 'Parking P4';
+      photos.nextPicked = [otherPng];
+      await start(tester);
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, find.byKey(const ValueKey('captureGallery')));
+      await tap(tester, find.text('Save'));
+
+      expect(notes.all().single.photoTexts.values, ['Parking P4']);
+    });
+
     testWidgets('a photo that cannot be read is not tried again until the '
         'next start', (tester) async {
       final note = notes.capture('', photos: [onePixelPng]);

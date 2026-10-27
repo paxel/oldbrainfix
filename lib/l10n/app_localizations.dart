@@ -140,6 +140,12 @@ abstract class AppLocalizations {
   /// **'Voice'**
   String get voice;
 
+  /// No description provided for @gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get gallery;
+
   /// No description provided for @photoMissing.
   ///
   /// In en, this message translates to:

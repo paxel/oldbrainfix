@@ -31,6 +31,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get voice => 'Sprache';
 
   @override
+  String get gallery => 'Galerie';
+
+  @override
   String get photoMissing => 'Foto nicht auf diesem Gerät';
 
   @override

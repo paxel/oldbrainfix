@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/photo_views.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
@@ -23,6 +26,7 @@ void main() {
 
   final photo = find.byKey(const ValueKey('capturePhoto'));
   final mic = find.byKey(const ValueKey('captureVoice'));
+  final gallery = find.byKey(const ValueKey('captureGallery'));
   final stop = find.byKey(const ValueKey('stopRecording'));
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
@@ -44,19 +48,49 @@ void main() {
   double nudgeTop(WidgetTester tester) =>
       tester.getRect(find.byType(NudgeButtons)).top;
 
-  testWidgets('Photo and Voice sit side by side above the remind me line', (
-    tester,
-  ) async {
+  /// Whether the label [text] shows on one line, as high as the same
+  /// words laid out without a width limit. The test font's glyphs are
+  /// wider than the phone's, so whether the words fit across is not
+  /// measured.
+  void expectOneLine(WidgetTester tester, String text) {
+    final label = tester.renderObject<RenderParagraph>(find.text(text));
+    final line = TextPainter(
+      text: label.text,
+      textDirection: TextDirection.ltr,
+      textScaler: label.textScaler,
+    )..layout();
+    addTearDown(line.dispose);
+    expect(label.didExceedMaxLines, isFalse);
+    expect(label.size.height, line.height);
+  }
+
+  testWidgets('Photo, Voice and Gallery sit side by side above the remind '
+      'me line', (tester) async {
     await openCapture(tester);
 
     expect(find.text('Photo'), findsOneWidget);
     expect(find.text('Voice'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
     final left = tester.getRect(photo);
-    final right = tester.getRect(mic);
-    expect(left.top, right.top);
-    expect(left.right, lessThan(right.left));
-    expect(left.bottom, lessThanOrEqualTo(nudgeTop(tester)));
-    expect(right.bottom, lessThanOrEqualTo(nudgeTop(tester)));
+    final middle = tester.getRect(mic);
+    final right = tester.getRect(gallery);
+    expect(left.top, middle.top);
+    expect(middle.top, right.top);
+    expect(left.right, lessThan(middle.left));
+    expect(middle.right, lessThan(right.left));
+    for (final rect in [left, middle, right]) {
+      expect(rect.bottom, lessThanOrEqualTo(nudgeTop(tester)));
+    }
+    for (final label in ['Photo', 'Voice', 'Gallery']) {
+      expectOneLine(tester, label);
+    }
+    expect(
+      find.descendant(
+        of: gallery,
+        matching: find.byIcon(Icons.photo_library_outlined),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.descendant(
         of: photo,
@@ -101,6 +135,56 @@ void main() {
     expect(Notes(store).all().single.photos, hasLength(1));
   });
 
+  testWidgets('Gallery puts the pictures picked into one Note', (tester) async {
+    photos.nextPicked = [onePixelPng, otherPng];
+    await openCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Receipts');
+    await tap(tester, gallery);
+
+    expect(photos.picks, 1);
+    expect(photos.taken, 0);
+    final note = Notes(store).all().single;
+    expect(note.photos, hasLength(2));
+    expect(note.text, 'Receipts');
+    expect(find.byType(CaptureScreen), findsOneWidget);
+  });
+
+  testWidgets('leaving while the pictures are read still keeps them', (
+    tester,
+  ) async {
+    photos.picker = Completer();
+    await openCapture(tester);
+    await tester.tap(gallery);
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('nudge10')));
+    await tester.pump();
+    photos.picker?.complete([onePixelPng, otherPng]);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CaptureScreen), findsNothing);
+    final note = Notes(store).all().single;
+    expect(note.photos, hasLength(2));
+    // The Nudge picked holds for the pictures: they were written first.
+    expect(
+      note.nudge?.isBefore(DateTime.now().add(const Duration(minutes: 20))),
+      isTrue,
+    );
+  });
+
+  testWidgets('closing the picker without picking changes nothing', (
+    tester,
+  ) async {
+    await openCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Half a thought');
+    await tap(tester, gallery);
+
+    expect(photos.picks, 1);
+    expect(Notes(store).all(), isEmpty);
+    expect(find.byType(CaptureScreen), findsOneWidget);
+    expect(find.text('Half a thought'), findsOneWidget);
+    expect(find.byType(PhotoStrip), findsNothing);
+  });
+
   testWidgets('Voice records at once; the buttons wait meanwhile', (
     tester,
   ) async {
@@ -142,7 +226,11 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Foto'), findsOneWidget);
     expect(find.text('Sprache'), findsOneWidget);
-    for (final button in [photo, mic]) {
+    expect(find.text('Galerie'), findsOneWidget);
+    for (final label in ['Foto', 'Sprache', 'Galerie']) {
+      expectOneLine(tester, label);
+    }
+    for (final button in [photo, mic, gallery]) {
       expect(
         tester.getRect(button).bottom,
         lessThanOrEqualTo(height - keyboard),
@@ -150,6 +238,11 @@ void main() {
     }
     await tap(tester, photo);
     expect(photos.taken, 2);
+    photos.nextPicked = [otherPng];
+    await tap(tester, gallery);
+    expect(photos.picks, 1);
+    // The camera's two photos are the same picture, kept once.
+    expect(Notes(store).all().single.photos, hasLength(2));
     await tap(tester, mic);
     expect(voice.starts, 1);
     // Voice takes the focus from the text: the keyboard goes down.

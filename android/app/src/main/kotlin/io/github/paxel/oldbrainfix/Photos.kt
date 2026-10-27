@@ -43,6 +43,16 @@ object Photos {
         return if (long <= maxEdge) 1f else maxEdge.toFloat() / long
     }
 
+    /**
+     * What the picture picker answered: the [many] pictures of a multiple
+     * pick, else the [single] one; none when it was closed without [ok].
+     */
+    fun <T> picked(ok: Boolean, many: List<T>?, single: T?): List<T> = when {
+        !ok -> emptyList()
+        many != null -> many
+        else -> listOfNotNull(single)
+    }
+
     /** Degrees to turn a photo by for its Exif orientation tag to stand upright. */
     fun rotation(orientation: Int): Int = when (orientation) {
         3, 4 -> 180 // ORIENTATION_ROTATE_180, FLIP_VERTICAL

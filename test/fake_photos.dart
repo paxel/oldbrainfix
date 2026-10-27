@@ -94,12 +94,22 @@ class FakePhotos implements PhotoPlatform {
   /// How often the camera was opened.
   int taken = 0;
 
+  /// What the picker hands back next; empty as if the user closed it.
+  List<Uint8List> nextPicked;
+
+  /// When set, picking waits for it, as while the pictures are read; it
+  /// overrides [nextPicked].
+  Completer<List<Uint8List>>? picker;
+
+  /// How often the picker was opened.
+  int picks = 0;
+
   /// The shares not taken yet, oldest first.
   final waiting = <SharedItem>[];
 
   final _arrived = StreamController<void>.broadcast();
 
-  FakePhotos({this.nextPhoto});
+  FakePhotos({this.nextPhoto, this.nextPicked = const []});
 
   /// Another app shares [item] while the app runs.
   void share(SharedItem item) {
@@ -111,9 +121,18 @@ class FakePhotos implements PhotoPlatform {
   bool get available => true;
 
   @override
+  bool get pickable => true;
+
+  @override
   Future<Uint8List?> takePhoto() {
     taken++;
     return camera?.future ?? Future.value(nextPhoto);
+  }
+
+  @override
+  Future<List<Uint8List>> pickPhotos() async {
+    picks++;
+    return picker?.future ?? nextPicked;
   }
 
   @override

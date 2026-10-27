@@ -31,6 +31,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voice => 'Voice';
 
   @override
+  String get gallery => 'Gallery';
+
+  @override
   String get photoMissing => 'Photo not on this device';
 
   @override

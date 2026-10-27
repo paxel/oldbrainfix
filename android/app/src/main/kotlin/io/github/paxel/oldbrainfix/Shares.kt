@@ -45,8 +45,17 @@ object Shares {
                     .orEmpty()
             else -> return
         }
+        val files = copy(context, streams)
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
+        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        if (text.isNullOrBlank() && subject.isNullOrBlank() && files.isEmpty()) return
+        synchronized(waiting) { waiting.addLast(Share(subject, text, files, source)) }
+    }
+
+    /** Copies the pictures behind [uris] to the side, while the permission to read them lasts. */
+    private fun copy(context: Context, uris: List<Uri>): List<File> {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val files = streams.mapNotNull { uri ->
+        return uris.mapNotNull { uri ->
             runCatching {
                 val file = File(dir, UUID.randomUUID().toString())
                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -55,10 +64,16 @@ object Shares {
                 file
             }.getOrNull()
         }
-        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
-        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
-        if (text.isNullOrBlank() && subject.isNullOrBlank() && files.isEmpty()) return
-        synchronized(waiting) { waiting.addLast(Share(subject, text, files, source)) }
+    }
+
+    /**
+     * Keeps the pictures [uris] picked from the gallery while the app was
+     * gone, as with [keepPhoto]: they come back as a share of their own.
+     */
+    fun keepPicked(context: Context, uris: List<Uri>) {
+        val files = copy(context, uris)
+        if (files.isEmpty()) return
+        synchronized(waiting) { waiting.addLast(Share(null, null, files)) }
     }
 
     /**

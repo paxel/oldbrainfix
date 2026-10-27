@@ -30,6 +30,9 @@ class MainActivity : FlutterActivity() {
     /** The answer to "take", until the camera app comes back. */
     private var photoAnswer: MethodChannel.Result? = null
 
+    /** The answer to Capture's "pick", until the gallery comes back. */
+    private var galleryAnswer: MethodChannel.Result? = null
+
     /** The answer to the Profile's "pick", until the picture picker comes back. */
     private var pictureAnswer: MethodChannel.Result? = null
 
@@ -144,6 +147,7 @@ class MainActivity : FlutterActivity() {
             setMethodCallHandler { call, result ->
                 when (call.method) {
                     "take" -> takePhoto(result)
+                    "pick" -> pickPhotos(result)
                     "shared" -> inBackground(result) { Shares.take() }
                     else -> result.notImplemented()
                 }
@@ -445,6 +449,26 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
+     * Opens the system's picture picker for Capture, several pictures at
+     * once, which needs no storage permission; they come back as photos
+     * are kept, upright and without metadata, in [onActivityResult].
+     */
+    private fun pickPhotos(result: MethodChannel.Result) {
+        val intent = Intent(Intent.ACTION_GET_CONTENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("image/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_GALLERY)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(emptyList<ByteArray>())
+        }
+        galleryAnswer?.success(emptyList<ByteArray>())
+        galleryAnswer = result
+    }
+
+    /**
      * Lets the user pick a speech model file of their own with the
      * system's file picker, which needs no storage permission, and copies
      * it to the side; answers its SHA-256, or null when none was picked.
@@ -548,6 +572,31 @@ class MainActivity : FlutterActivity() {
             val uri = data?.data
             if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
             return inBackground(answer) { Photos.normalize { contentResolver.openInputStream(uri) } }
+        }
+        if (requestCode == REQUEST_GALLERY) {
+            val answer = galleryAnswer
+            galleryAnswer = null
+            val clips = data?.clipData
+            val uris = Photos.picked(
+                resultCode == Activity.RESULT_OK,
+                clips?.let { (0 until it.itemCount).mapNotNull { i -> it.getItemAt(i).uri } },
+                data?.data,
+            )
+            if (answer == null) {
+                // The app was gone while the gallery was open: the
+                // pictures still reach a Note, through Capture like a share.
+                if (uris.isNotEmpty()) {
+                    Thread {
+                        Shares.keepPicked(this, uris)
+                        runOnUiThread { photoChannel?.invokeMethod("shared", null) }
+                    }.start()
+                }
+                return
+            }
+            if (uris.isEmpty()) return answer.success(emptyList<ByteArray>())
+            return inBackground(answer) {
+                uris.mapNotNull { uri -> Photos.normalize { contentResolver.openInputStream(uri) } }
+            }
         }
         if (requestCode == REQUEST_MODEL) {
             val answer = modelAnswer ?: return
@@ -718,6 +767,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_FOLDER = 5
         private const val REQUEST_BUNDLE = 6
         private const val REQUEST_PICTURE = 7
+        private const val REQUEST_GALLERY = 8
         private const val REQUEST_CALENDAR = 10
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
