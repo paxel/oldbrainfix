@@ -9,7 +9,8 @@
 //! The engines sit behind a trait: Whisper and ocrs in the app, fakes in
 //! the tests. Whisper is led in with the Area and Topic names as the user
 //! reads them, and for German speech with the English words German is
-//! full of (`TranscriptPrompts`).
+//! full of (`TranscriptPrompts`); what it only repeats of that lead-in
+//! is taken out of the Transcript.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -152,11 +153,12 @@ fn run(
 }
 
 /// What Whisper is led in with for the next recording.
-pub type PromptsNow = Box<dyn Fn() -> Prompts + Send>;
+pub type PromptsNow = Box<dyn Fn() -> TranscriptPrompts + Send>;
 
 /// Whisper with the speech model at `model`, loaded on first use and let
 /// go when idle, led in for each recording with what `prompts` gives
-/// then. Device-only beyond a missing model.
+/// then; its Transcript is guarded against those prompts. Device-only
+/// beyond a missing model.
 pub struct WhisperEngine {
     model: PathBuf,
     prompts: PromptsNow,
@@ -176,20 +178,14 @@ impl WhisperEngine {
 /// The prompts for the next recording in `store`: its Areas and Topics as
 /// they are now, as the user reads them in `t`, with the app's words
 /// Unsorted, Routine and Agenda; none when the store cannot be read.
-pub fn transcript_prompts(store: &Store, t: &L10n) -> Prompts {
-    let prompts = TranscriptPrompts::for_places(
+pub fn transcript_prompts(store: &Store, t: &L10n) -> TranscriptPrompts {
+    TranscriptPrompts::for_places(
         &Places::new(store),
         [t.unsorted(), t.routine(), t.agenda()],
         &|area| names::area_name(t, area),
         &|topic| names::topic_name(t, topic),
-    );
-    prompts.map_or_else(
-        |_| Prompts::default(),
-        |p| Prompts {
-            english: p.english,
-            german: p.german,
-        },
     )
+    .unwrap_or_default()
 }
 
 impl Engine for WhisperEngine {
@@ -200,11 +196,16 @@ impl Engine for WhisperEngine {
         }
         let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
         let prompts = (self.prompts)();
-        self.whisper.as_mut()?.transcribe(
+        let lead_in = Prompts {
+            english: prompts.english.clone(),
+            german: prompts.german.clone(),
+        };
+        let heard = self.whisper.as_mut()?.transcribe(
             &samples,
             oldbrainfix_whisper::threads_for(cores),
-            &prompts,
-        )
+            &lead_in,
+        )?;
+        Some(prompts.guard(&heard))
     }
 
     fn idle(&mut self) {
@@ -340,6 +341,10 @@ mod tests {
         places.add_area("Fahrrad")?;
         let prompts = transcript_prompts(&store, &de);
         assert_eq!(prompts.english, "Fahrrad, Haushalt, Küche.");
+        // What the Transcript is guarded against.
+        assert_eq!(prompts.names, ["Fahrrad", "Haushalt", "Küche"]);
+        assert_eq!(prompts.terms, ["Unsortiert", "Routine", "Agenda"]);
+        assert_eq!(prompts.guard("Fahrrad, Haushalt, Küche."), "");
         assert!(
             prompts
                 .german
@@ -352,7 +357,7 @@ mod tests {
     fn without_its_model_whisper_reads_nothing() {
         let mut engine = WhisperEngine::new(
             PathBuf::from("/nonexistent/ggml-base.bin"),
-            Box::new(Prompts::default),
+            Box::new(TranscriptPrompts::default),
         );
         assert_eq!(engine.read(crate::media::wav(&[0.0; 1600])), None);
         assert_eq!(engine.read(b"no recording".to_vec()), None);

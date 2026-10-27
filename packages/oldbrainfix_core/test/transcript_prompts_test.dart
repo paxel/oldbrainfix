@@ -122,4 +122,61 @@ void main() {
       expect(prompts.german, contains('Unsortiert. Haushalt, Küche.'));
     });
   });
+
+  group('TranscriptPrompts.guard', () {
+    final prompts = TranscriptPrompts.of(
+      names: ['Arzt', 'Work', 'Meetings'],
+      terms: ['Unsortiert', 'Routine', 'Agenda'],
+    );
+    const leadIn = TranscriptPrompts.germanLeadIn;
+
+    test('keeps the listed names and terms', () {
+      expect(prompts.names, ['Arzt', 'Work', 'Meetings']);
+      expect(prompts.terms, ['Unsortiert', 'Routine', 'Agenda']);
+    });
+
+    test('a Transcript that only repeats a prompt is left empty', () {
+      expect(prompts.guard(leadIn), '');
+      expect(prompts.guard(prompts.german), '');
+      expect(prompts.guard(prompts.english), '');
+      expect(prompts.guard(' ${leadIn.toUpperCase()} $leadIn'), '');
+      expect(prompts.guard('Notiz auf Deutsch mit englischen Wörtern:'), '');
+    });
+
+    test('speech after or before the lead-in stays', () {
+      expect(
+        prompts.guard('$leadIn Morgen den Zahnarzt anrufen.'),
+        'Morgen den Zahnarzt anrufen.',
+      );
+      expect(prompts.guard('Brot holen. $leadIn'), 'Brot holen.');
+    });
+
+    test('real speech naming places stays as it is', () {
+      for (final speech in [
+        '  Morgen um zehn zum Arzt,  Rezept nicht vergessen. ',
+        'Arzt und Work.',
+        'Work, Arzt.',
+        'Nach dem Meeting das Update ans Team.',
+        'Notiz auf Deutsch mit englischen Sätzen.',
+      ]) {
+        expect(prompts.guard(speech), speech);
+      }
+    });
+
+    test('a run of three names goes, with its punctuation', () {
+      expect(
+        prompts.guard('Erst Arzt, Work, Meetings – dann Pause.'),
+        'Erst dann Pause.',
+      );
+      expect(prompts.guard('Unsortiert, Routine, Agenda.'), '');
+    });
+
+    test('two names go only as the whole list in its order', () {
+      final two = TranscriptPrompts.of(names: ['Arzt', 'Work']);
+      expect(two.guard('Arzt, Work.'), '');
+      expect(two.guard('Work, Arzt.'), 'Work, Arzt.');
+      final one = TranscriptPrompts.of(names: ['Garten']);
+      expect(one.guard('Garten.'), 'Garten.');
+    });
+  });
 }

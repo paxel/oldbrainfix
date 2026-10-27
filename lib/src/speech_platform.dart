@@ -402,9 +402,10 @@ class SpeechModel extends ChangeNotifier {
 /// a speech model is in use: each new one after its Note is saved, and
 /// those from before the model came. Whisper is led in with the Area and
 /// Topic names as the user reads them, and for German speech with the
-/// English words German is full of ([TranscriptPrompts]). A recording that cannot be
-/// transcribed is left alone until the next start; it is never lost,
-/// as the recording itself is always kept.
+/// English words German is full of ([TranscriptPrompts]); what Whisper
+/// only repeats of that lead-in is taken out of the Transcript. A
+/// recording that cannot be transcribed is left alone until the next
+/// start; it is never lost, as the recording itself is always kept.
 class Transcriber extends ChangeNotifier {
   final Notes notes;
   final SpeechModel model;
@@ -485,8 +486,10 @@ class Transcriber extends ChangeNotifier {
         if (bytes != null) {
           _current = next.hash;
           notifyListeners();
-          text = await platform.transcribe(bytes, prompts());
+          final lead = prompts();
+          final heard = await platform.transcribe(bytes, lead);
           if (_disposed) return;
+          text = heard == null ? null : lead.guard(heard);
           _current = null;
         }
         // Still there: the Note may have been trashed meanwhile.

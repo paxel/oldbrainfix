@@ -3040,7 +3040,8 @@ String _shownName(Map<String, String> starters, String? slug, String name) {
 
 /// The lead-ins Whisper gets: name lists as given, and three stores,
 /// each seen in English and German: one with the Starter Set, one with
-/// names too long to all fit, one with more names than are listed.
+/// names too long to all fit, one with more names than are listed. Then
+/// Transcripts guarded against the prompts Whisper got.
 Map<String, Object?> _transcriptPrompts() {
   final lists = [
     (names: ['Work', 'Garten', 'Fahrradladen'], terms: ['Unsortiert']),
@@ -3137,6 +3138,80 @@ Map<String, Object?> _transcriptPrompts() {
       store.close();
     }
   }
+  const words = ['Unsortiert', 'Routine', 'Agenda'];
+  const places = ['Arzt', 'Work', 'Meetings'];
+  final german = TranscriptPrompts.of(names: places, terms: words).german;
+  const leadIn = TranscriptPrompts.germanLeadIn;
+  final guards = [
+    (names: places, terms: words, transcript: leadIn),
+    (names: places, terms: words, transcript: ' $leadIn'),
+    (
+      names: places,
+      terms: words,
+      transcript: '$leadIn Morgen um zehn den Zahnarzt anrufen.',
+    ),
+    (names: places, terms: words, transcript: 'Arzt, Work, Meetings.'),
+    (
+      names: places,
+      terms: words,
+      transcript: 'Morgen um zehn zum Arzt, Rezept nicht vergessen.',
+    ),
+    (names: places, terms: words, transcript: german),
+    (names: places, terms: words, transcript: 'Unsortiert, Routine, Agenda.'),
+    (
+      names: places,
+      terms: words,
+      transcript:
+          'notiz auf deutsch mit englischen wörtern. nach dem meeting das '
+          'update ans team. feedback vor der deadline!',
+    ),
+    (names: places, terms: words, transcript: '$leadIn $leadIn'),
+    (
+      names: places,
+      terms: words,
+      transcript: 'Notiz auf Deutsch mit englischen Wörtern:',
+    ),
+    (
+      names: places,
+      terms: words,
+      transcript: 'Notiz auf Deutsch mit englischen Sätzen.',
+    ),
+    (
+      names: places,
+      terms: words,
+      transcript: 'Nach dem Meeting das Update ans Team.',
+    ),
+    (names: places, terms: words, transcript: 'Brot holen. $leadIn'),
+    (
+      names: places,
+      terms: words,
+      transcript: 'Erst Arzt, Work, Meetings – dann Pause.',
+    ),
+    (names: places, terms: words, transcript: 'Arzt – Work – Meetings'),
+    (names: places, terms: words, transcript: 'Arzt und Work.'),
+    (names: places, terms: words, transcript: 'Work, Arzt.'),
+    (names: ['Garten'], terms: words, transcript: 'Garten.'),
+    (names: ['Arzt', 'Work'], terms: words, transcript: 'Arzt, Work.'),
+    (names: ['Arzt', 'Work'], terms: words, transcript: 'Work, Arzt.'),
+    (
+      names: ['Haushalt', 'Küche'],
+      terms: words,
+      transcript: 'Haushalt, Küche, Milch kaufen.',
+    ),
+    (
+      names: ['Dr. Müller', 'Müller-Lüdenscheidt', 'Garten'],
+      terms: <String>[],
+      transcript: '„Dr. Müller, Müller-Lüdenscheidt, Garten“',
+    ),
+    (
+      names: ['İstanbul', 'Straße', 'Café', '🚲 Fahrrad'],
+      terms: <String>[],
+      transcript: 'İSTANBUL, Straße, CAFÉ, 🚲 Fahrrad. Bis bald',
+    ),
+    (names: places, terms: words, transcript: ''),
+    (names: places, terms: words, transcript: ' ... '),
+    (names: <String>[], terms: <String>[], transcript: '$leadIn Hallo.'),
+  ];
   return {
     'germanLeadIn': TranscriptPrompts.germanLeadIn,
     'maxLength': TranscriptPrompts.maxLength,
@@ -3157,6 +3232,18 @@ Map<String, Object?> _transcriptPrompts() {
     },
     'stores': storeJson,
     'views': views,
+    'guards': [
+      for (final (:names, :terms, :transcript) in guards)
+        {
+          'names': names,
+          'terms': terms,
+          'transcript': transcript,
+          'guarded': TranscriptPrompts.of(
+            names: names,
+            terms: terms,
+          ).guard(transcript),
+        },
+    ],
   };
 }
 
@@ -3477,7 +3564,13 @@ Future<void> main(List<String> args) async {
     'seen with the English and the German app\'s words and Starter Set '
     'names (`ui`, from the app\'s ARB files): the whole Starter Set with '
     'one Area renamed, one with names too long to all fit, repeats in '
-    'another case among them, and one with more names than are listed.\n'
+    'another case among them, and one with more names than are listed; '
+    'Transcripts guarded against the prompts Whisper got for names and '
+    'words as given (`guards`): the lead-in alone, at the start, twice, in '
+    'another case and punctuation, cut short and after speech; the name '
+    'list, the app\'s words, the whole German prompt; one, two and three '
+    'names alone and amid speech, names of several words, and real '
+    'speech naming a place, kept as it is.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '

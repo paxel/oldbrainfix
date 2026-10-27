@@ -4520,5 +4520,351 @@
       "english": "Nummern, 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 2, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 3, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 4, 40, 41, 42, 43, 44.",
       "german": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice. Unsortiert, Routine, Agenda. Nummern, 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 2, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 3, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 4, 40, 41, 42, 43, 44."
     }
+  ],
+  "guards": [
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": " Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice. Morgen um zehn den Zahnarzt anrufen.",
+      "guarded": "Morgen um zehn den Zahnarzt anrufen."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Arzt, Work, Meetings.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Morgen um zehn zum Arzt, Rezept nicht vergessen.",
+      "guarded": "Morgen um zehn zum Arzt, Rezept nicht vergessen."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice. Unsortiert, Routine, Agenda. Arzt, Work, Meetings.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Unsortiert, Routine, Agenda.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "notiz auf deutsch mit englischen wörtern. nach dem meeting das update ans team. feedback vor der deadline!",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice. Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern:",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Notiz auf Deutsch mit englischen Sätzen.",
+      "guarded": "Notiz auf Deutsch mit englischen Sätzen."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Nach dem Meeting das Update ans Team.",
+      "guarded": "Nach dem Meeting das Update ans Team."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Brot holen. Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice.",
+      "guarded": "Brot holen."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Erst Arzt, Work, Meetings – dann Pause.",
+      "guarded": "Erst dann Pause."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Arzt – Work – Meetings",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Arzt und Work.",
+      "guarded": "Arzt und Work."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Work, Arzt.",
+      "guarded": "Work, Arzt."
+    },
+    {
+      "names": [
+        "Garten"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Garten.",
+      "guarded": "Garten."
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Arzt, Work.",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Work, Arzt.",
+      "guarded": "Work, Arzt."
+    },
+    {
+      "names": [
+        "Haushalt",
+        "Küche"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "Haushalt, Küche, Milch kaufen.",
+      "guarded": "Haushalt, Küche, Milch kaufen."
+    },
+    {
+      "names": [
+        "Dr. Müller",
+        "Müller-Lüdenscheidt",
+        "Garten"
+      ],
+      "terms": [],
+      "transcript": "„Dr. Müller, Müller-Lüdenscheidt, Garten“",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "İstanbul",
+        "Straße",
+        "Café",
+        "🚲 Fahrrad"
+      ],
+      "terms": [],
+      "transcript": "İSTANBUL, Straße, CAFÉ, 🚲 Fahrrad. Bis bald",
+      "guarded": "Bis bald"
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": "",
+      "guarded": ""
+    },
+    {
+      "names": [
+        "Arzt",
+        "Work",
+        "Meetings"
+      ],
+      "terms": [
+        "Unsortiert",
+        "Routine",
+        "Agenda"
+      ],
+      "transcript": " ... ",
+      "guarded": " ... "
+    },
+    {
+      "names": [],
+      "terms": [],
+      "transcript": "Notiz auf Deutsch mit englischen Wörtern: Nach dem Meeting das Update ans Team, Feedback vor der Deadline, Call und Termin am Montag, Shopping, Download, Ticket, Event, Homeoffice. Hallo.",
+      "guarded": "Hallo."
+    }
   ]
 }

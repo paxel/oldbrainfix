@@ -676,6 +676,32 @@ void main() {
       expect(find.text('No words heard.'), findsOneWidget);
     });
 
+    testWidgets('Whisper repeating its lead-in is kept as "no words heard", '
+        'speech after it as said', (tester) async {
+      final places = Places(store);
+      for (final name in ['Arzt', 'Work', 'Meetings']) {
+        places.addArea(name);
+      }
+      speech
+        ..installed = WhisperModel.base.sha256
+        ..transcripts[1] = ' ${TranscriptPrompts.germanLeadIn}'
+        ..transcripts[2] =
+            '${TranscriptPrompts.germanLeadIn} Arzt, Meetings, Work. '
+            'Morgen um zehn zum Arzt.';
+      final echo = notes.capture('', recordings: [first]);
+      final said = notes.capture('', recordings: [second]);
+      await start(tester);
+      expect(notes.byId(echo.id)?.transcripts.values, ['']);
+      expect(notes.byId(said.id)?.transcripts.values, [
+        'Morgen um zehn zum Arzt.',
+      ]);
+      final agenda = tester.element(find.byType(AgendaScreen));
+      unawaited(openNote(agenda, notes, places, notes.byId(echo.id)!));
+      await tester.pumpAndSettle();
+      expect(find.text('No words heard.'), findsOneWidget);
+      expect(find.textContaining('Notiz auf Deutsch'), findsNothing);
+    });
+
     testWidgets('the editor shows each recording\'s Transcript, a merged '
         'Note\'s too', (tester) async {
       speech

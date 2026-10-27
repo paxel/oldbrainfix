@@ -2629,3 +2629,24 @@ fn transcript_prompts_come_out_as_the_dart_core_writes_them() -> TestResult {
     assert_eq!(seen, 6);
     Ok(())
 }
+
+#[test]
+fn transcripts_are_guarded_as_the_dart_core_guards_them() -> TestResult {
+    use oldbrainfix_core::transcript_prompts::TranscriptPrompts;
+    let fixture = read_json(&fixtures().join("transcript_prompts.json"))?;
+    let texts = |list: &Value| -> Vec<String> {
+        list.as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect()
+    };
+    let guards = fixture["guards"].as_array().ok_or("guards")?;
+    assert!(guards.len() >= 4);
+    for case in guards {
+        let prompts = TranscriptPrompts::of(texts(&case["names"]), texts(&case["terms"]));
+        let transcript = case["transcript"].as_str().ok_or("transcript")?;
+        assert_eq!(prompts.guard(transcript), case["guarded"], "{case}");
+    }
+    Ok(())
+}
