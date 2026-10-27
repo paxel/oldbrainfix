@@ -47,6 +47,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   the status bar: one announcement at a time, the page pushed down
   below it. Nothing ever appears at the bottom, where the gestures and
   the keyboard live: a snackbar is a bug.
+- An announcement goes by itself or by a tap; it is never swiped away.
+  A horizontal swipe stays navigation only.
 - An announcement says only that a job finished, failed or waits; the
   tap opens the details. Values never go into an announcement.
 - A quick local success the screen already shows (copied, saved) gets
@@ -69,6 +71,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   button**. No hold-to-talk, no stop on silence.
 - Every capture screen shows three buttons at the bottom: remind me in
   **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
+  The three are actions, not a choice of value: a tap saves the Note
+  with that Nudge time, so the radio-button law does not apply to them.
 - After saving, the new Note's card shows with its enrich options
   (Area or Topic, Routine, Reminder). Enriching is never required;
   leaving keeps the Note Unsorted.
@@ -108,7 +112,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   a menu at the finger or a page, never a sheet.
 - Text and buttons must be readable at the phone's default font size:
   buttons stacked full width or in one row of two, never a cramped row
-  of four. The content scrolls if it does not fit; nothing shrinks to
+  of four. A row of three is allowed when every label is a few
+  characters long, like "10 min", "30 min", "1 h". The content scrolls if it does not fit; nothing shrinks to
   fit.
 - **The control goes below its text.** In every row that holds text and
   a control (switch, button, dropdown), the control sits on its own line
