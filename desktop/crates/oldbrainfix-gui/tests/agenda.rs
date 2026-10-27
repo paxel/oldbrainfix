@@ -349,10 +349,18 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     harness.run();
     harness.get_by_label("Move to trash").click();
     harness.run();
-    assert!(shows(&harness, "Also delete the linked Routine?"));
-    harness.get_by_label("Yes").click();
+    assert!(shows(&harness, "Delete this Note?"));
+    harness
+        .get_by_label("Delete with its Routine or Reminder")
+        .click();
     harness.run();
     let walk = find_note(harness.state(), "Walk the dog")?;
+    assert!(
+        Notes::new(harness.state().store())
+            .by_id(&walk)?
+            .ok_or("note")?
+            .is_trashed()
+    );
     let routines = Routines::new(harness.state().store());
     assert!(routines.all()?.iter().all(|r| r.note_id != walk));
     // Restored, the Note brings its Routine back.
@@ -398,6 +406,49 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
         .click();
     harness.run();
     assert!(routine_of(harness.state(), "Night meds").is_ok());
+    Ok(())
+}
+
+#[test]
+fn deleting_a_note_with_routines_from_the_editor_asks_and_cancel_keeps_it() -> TestResult {
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    harness.get_by_label("All Notes").click();
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, "Walk the dog")
+        .click();
+    harness.run();
+    let walk = find_note(harness.state(), "Walk the dog")?;
+    let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
+        Ok(Notes::new(h.state().store())
+            .by_id(&walk)?
+            .ok_or("note")?
+            .is_trashed())
+    };
+
+    // Cancel keeps the Note and its Routine.
+    harness.get_by_label("Move to trash").click();
+    harness.run();
+    assert!(shows(&harness, "Delete this Note?"));
+    assert!(shows(
+        &harness,
+        "Deleted ones come back with the Note when you restore it. Kept ones go on reminding you."
+    ));
+    assert!(!shows(&harness, "Yes"));
+    assert!(!shows(&harness, "No"));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(&harness, "Delete this Note?"));
+    assert!(!trashed(&harness)?);
+    assert!(routine_of(harness.state(), "Walk the dog").is_ok());
+
+    // Deleting only the Note keeps its Routine reminding.
+    harness.get_by_label("Move to trash").click();
+    harness.run();
+    harness.get_by_label("Delete only the Note").click();
+    harness.run();
+    assert!(trashed(&harness)?);
+    assert!(routine_of(harness.state(), "Walk the dog").is_ok());
     Ok(())
 }
 

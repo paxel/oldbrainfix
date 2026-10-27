@@ -1454,24 +1454,6 @@ abstract class AppLocalizations {
   /// **'No'**
   String get no;
 
-  /// No description provided for @deleteNoteRoutines.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{Also delete the linked Routine?} other{Also delete the {count} linked Routines?}}'**
-  String deleteNoteRoutines(int count);
-
-  /// No description provided for @deleteNoteReminders.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{Also delete the linked Reminder?} other{Also delete the {count} linked Reminders?}}'**
-  String deleteNoteReminders(int count);
-
-  /// No description provided for @deleteNoteRoutinesAndReminders.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, other{Also delete the {count} linked Routines and Reminders?}}'**
-  String deleteNoteRoutinesAndReminders(int count);
-
   /// No description provided for @deleteNoteLinkedDetail.
   ///
   /// In en, this message translates to:

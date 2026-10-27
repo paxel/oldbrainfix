@@ -240,10 +240,10 @@ enum Dialog {
         query: String,
         others: Vec<(String, String)>,
     },
-    /// Whether the Routines and Reminders of the Note being deleted go
-    /// to the trash too.
+    /// Whether the selected Note goes to the trash, and with it its
+    /// `linked` Routines and Reminders.
     TrashNote {
-        question: String,
+        linked: i64,
     },
     /// Whether the edited Routine or Reminder goes to the trash.
     DeleteRoutine {
@@ -1561,21 +1561,8 @@ impl App {
             }
             Action::Trash => {
                 self.save_text()?;
-                let linked = Routines::new(&self.store).of_note(&selected)?;
-                if linked.is_empty() {
-                    Routines::new(&self.store).trash_note(&selected, false)?;
-                } else {
-                    let count = linked.len() as i64;
-                    let reminders = linked.iter().filter(|r| r.is_reminder()).count() as i64;
-                    let question = if reminders == count {
-                        self.t.delete_note_reminders(count)
-                    } else if reminders == 0 {
-                        self.t.delete_note_routines(count)
-                    } else {
-                        self.t.delete_note_routines_and_reminders(count)
-                    };
-                    self.dialog = Some(Dialog::TrashNote { question });
-                }
+                let linked = Routines::new(&self.store).of_note(&selected)?.len() as i64;
+                self.dialog = Some(Dialog::TrashNote { linked });
             }
             Action::TrashNote(with_routines) => {
                 Routines::new(&self.store).trash_note(&selected, with_routines)?;
@@ -3032,17 +3019,29 @@ impl App {
                     Dialog::Merge { query, others } => {
                         merge_form(ui, &t, tones, (query, focus), others, actions);
                     }
-                    Dialog::TrashNote { question } => {
-                        title(ui, question);
+                    Dialog::TrashNote { linked } => {
+                        let linked = *linked;
+                        title(ui, t.delete_note_question());
                         let text = ui.visuals().text_color();
-                        ui.label(RichText::new(t.delete_note_linked_detail()).color(text));
-                        ui.horizontal(|ui| {
+                        let detail = if linked == 0 {
+                            t.delete_note_detail()
+                        } else {
+                            t.delete_note_linked_detail()
+                        };
+                        ui.label(RichText::new(detail).color(text));
+                        ui.horizontal_wrapped(|ui| {
                             cancel(ui, &t, actions);
-                            if ui.button(RichText::new(t.no()).color(text)).clicked() {
-                                actions.push(Action::TrashNote(false));
-                            }
-                            if destructive(ui, t.yes()) {
-                                actions.push(Action::TrashNote(true));
+                            if linked == 0 {
+                                if destructive(ui, t.delete()) {
+                                    actions.push(Action::TrashNote(false));
+                                }
+                            } else {
+                                if destructive(ui, t.delete_note_only()) {
+                                    actions.push(Action::TrashNote(false));
+                                }
+                                if destructive(ui, &t.delete_note_with_linked(linked)) {
+                                    actions.push(Action::TrashNote(true));
+                                }
                             }
                         });
                     }

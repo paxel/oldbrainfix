@@ -528,30 +528,6 @@
   "quietUntil": "Until",
   "yes": "Yes",
   "no": "No",
-  "deleteNoteRoutines": "{count, plural, =1{Also delete the linked Routine?} other{Also delete the {count} linked Routines?}}",
-  "@deleteNoteRoutines": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "deleteNoteReminders": "{count, plural, =1{Also delete the linked Reminder?} other{Also delete the {count} linked Reminders?}}",
-  "@deleteNoteReminders": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "deleteNoteRoutinesAndReminders": "{count, plural, other{Also delete the {count} linked Routines and Reminders?}}",
-  "@deleteNoteRoutinesAndReminders": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "deleteNoteLinkedDetail": "Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.",
   "noteInTrash": "The Note is in the trash",
   "noteDeleted": "The Note was deleted",

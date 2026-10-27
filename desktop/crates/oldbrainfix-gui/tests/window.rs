@@ -549,7 +549,19 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     assert_eq!(sections.len(), 1);
     assert!(shows(&harness, "Vinegar works"));
 
+    // Deleting asks once; Cancel keeps the Note.
     harness.get_by_label("Move to trash").click();
+    harness.run();
+    assert!(shows(&harness, "Delete this Note?"));
+    assert!(shows(&harness, "It stays in the trash for 30 days."));
+    assert!(!shows(&harness, "Delete only the Note"));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(&harness, "Delete this Note?"));
+    assert!(!note(&harness, &kettle)?.is_trashed());
+    harness.get_by_label("Move to trash").click();
+    harness.run();
+    harness.get_by_label("Delete").click();
     harness.run();
     assert!(note(&harness, &kettle)?.is_trashed());
     assert!(

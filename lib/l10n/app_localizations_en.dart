@@ -908,38 +908,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get no => 'No';
 
   @override
-  String deleteNoteRoutines(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Also delete the $count linked Routines?',
-      one: 'Also delete the linked Routine?',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String deleteNoteReminders(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Also delete the $count linked Reminders?',
-      one: 'Also delete the linked Reminder?',
-    );
-    return '$_temp0';
-  }
-
-  @override
-  String deleteNoteRoutinesAndReminders(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other: 'Also delete the $count linked Routines and Reminders?',
-    );
-    return '$_temp0';
-  }
-
-  @override
   String get deleteNoteLinkedDetail =>
       'Deleted ones come back with the Note when you restore it. Kept ones go on reminding you.';
 
