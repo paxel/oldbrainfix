@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use egui::accesskit::Role;
+use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
@@ -98,6 +98,11 @@ fn banner(harness: &Harness<'_, App>) -> f32 {
 /// The left pane's row `label`, left of everything else of that name.
 fn left<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by_role_and_label(Role::Button, label)
+}
+
+/// The radio button `label`.
+fn radio<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
+    harness.get_by_role_and_label(Role::RadioButton, label)
 }
 
 fn top(harness: &Harness<'_, App>, label: &str) -> f32 {
@@ -231,14 +236,21 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     harness.get_by_label("Add a time").click();
     harness.run();
     assert!(shows(&harness, "Remove 20:00"));
-    // Its own Re-nag, and Escalation.
-    harness.get_by_value("Default (10 min)").click();
-    harness.run();
-    harness.get_by_label("5 min").click();
+    // Its own Re-nag, and Escalation, each a column of radio buttons.
+    assert!(
+        radio(&harness, "Default (10 min)")
+            .accesskit_node()
+            .toggled()
+            == Some(Toggled::True)
+    );
+    radio(&harness, "5 min").click();
     harness.run();
     harness
         .get_by_label("Escalate to an urgent alarm with sound")
         .click();
+    harness.run();
+    assert!(radio(&harness, "3").accesskit_node().toggled() == Some(Toggled::True));
+    radio(&harness, "5").click();
     harness.run();
     harness.get_by_label("Save").click();
     harness.run();
@@ -256,7 +268,7 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
         Some("FREQ=DAILY")
     );
     assert_eq!(routine.renag, Some(chrono::Duration::minutes(5)));
-    assert_eq!(routine.escalation, Some(3));
+    assert_eq!(routine.escalation, Some(5));
     // The Note left Unsorted and lists its Routine.
     let notes = Notes::new(harness.state().store());
     assert!(
@@ -266,6 +278,34 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
             .all(|n| n.text != "Another thought")
     );
     assert!(shows(&harness, "Every day · 08:00, 20:00"));
+    Ok(())
+}
+
+#[test]
+fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestResult {
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    harness.get_by_label("New Routine or Reminder").click();
+    harness.run();
+    type_into(&mut harness, "What is to be done?", "Clean the bike chain");
+    harness.get_by_label("More").click();
+    harness.run();
+    let more = harness.get_by_label("More").rect();
+    let units: Vec<_> = ["days", "weeks", "months", "years"]
+        .iter()
+        .map(|u| radio(&harness, u).rect())
+        .collect();
+    assert!(more.bottom() <= units[0].top());
+    // One option per line.
+    assert!(units.windows(2).all(|w| w[0].bottom() <= w[1].top()));
+    radio(&harness, "weeks").click();
+    harness.run();
+    harness.get_by_label("Save").click();
+    harness.run();
+    let routine = routine_of(harness.state(), "Clean the bike chain")?;
+    assert_eq!(
+        routine.schedule.rule.map(|r| r.format()).as_deref(),
+        Some("FREQ=WEEKLY;INTERVAL=2")
+    );
     Ok(())
 }
 
@@ -386,6 +426,10 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     };
     start.set(true)?;
     harness.state_mut().set_autostart(Some(start.clone()));
+    // A Re-nag set elsewhere stays among the choices.
+    DeviceSettings::new(harness.state().store())
+        .set_renag_interval(chrono::Duration::minutes(20))?;
+    DeviceSettings::new(harness.state().store()).set_nudge_repeat(chrono::Duration::minutes(45))?;
     // The Profile picture sits where the gear was; the settings are on
     // the Profile page.
     harness.get_by_label("Profile").click();
@@ -415,11 +459,23 @@ fn the_settings_keep_this_devices_alerts_and_login_start() -> TestResult {
     type_over(&mut harness, "22:00", "21:30");
     let quiet = DeviceSettings::new(harness.state().store()).quiet_hours()?;
     assert_eq!(quiet.to_string(), "21:30-08:00");
-    // The Re-nag default.
-    harness.get_by_value("10 min").click();
+    // The Re-nag default, a radio button per choice.
+    assert!(radio(&harness, "20 min").accesskit_node().toggled() == Some(Toggled::True));
+    radio(&harness, "15 min").click();
     harness.run();
-    harness.get_by_label("15 min").click();
+    let renag = DeviceSettings::new(harness.state().store()).renag_interval()?;
+    assert_eq!(renag, chrono::Duration::minutes(15));
+    // The Nudge repeat set elsewhere is picked among its choices.
+    assert!(radio(&harness, "45 min").accesskit_node().toggled() == Some(Toggled::True));
+    // The Nudge repeat, below the Re-nag: its "60 min" is the last one.
+    harness
+        .query_all_by_role_and_label(Role::RadioButton, "60 min")
+        .last()
+        .ok_or("the Nudge repeat's 60 min")?
+        .click();
     harness.run();
+    let repeat = DeviceSettings::new(harness.state().store()).nudge_repeat()?;
+    assert_eq!(repeat, chrono::Duration::minutes(60));
     let renag = DeviceSettings::new(harness.state().store()).renag_interval()?;
     assert_eq!(renag, chrono::Duration::minutes(15));
     // Back to the Profile page, and to the Agenda.

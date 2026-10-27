@@ -4,6 +4,9 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 
 ## [0.2.0]
 
+### Geändert
+- Auf dem Telefon und dem Desktop sind die Einheit von „Alle N“ einer Routine, ihr erneutes Erinnern und ihre Eskalation sowie in den Einstellungen das erneute Erinnern und das erneute Stupsen des Geräts Spalten von Optionsfeldern statt Auswahllisten, und ein anderswo gesetzter Wert bleibt als zusätzliche Option erhalten.
+
 ## [0.1.1] - 2026-10-27
 
 ### Neu

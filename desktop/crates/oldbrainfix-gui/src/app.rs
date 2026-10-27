@@ -3651,17 +3651,9 @@ impl App {
                         choices.push(renag);
                         choices.sort();
                     }
-                    minutes_choice(
-                        ui,
-                        "renag device",
-                        t.renag_device(),
-                        &t,
-                        renag,
-                        &choices,
-                        |m| {
-                            actions.push(Action::Setting(Setting::Renag(m)));
-                        },
-                    );
+                    minutes_choice(ui, t.renag_device(), &t, renag, &choices, |m| {
+                        actions.push(Action::Setting(Setting::Renag(m)));
+                    });
                     ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
                 });
                 embossed(ui, tones, false, None, |ui| {
@@ -3676,17 +3668,9 @@ impl App {
                         choices.push(repeat);
                         choices.sort();
                     }
-                    minutes_choice(
-                        ui,
-                        "nudge repeat",
-                        t.nudge_repeat(),
-                        &t,
-                        repeat,
-                        &choices,
-                        |m| {
-                            actions.push(Action::Setting(Setting::NudgeRepeat(m)));
-                        },
-                    );
+                    minutes_choice(ui, t.nudge_repeat(), &t, repeat, &choices, |m| {
+                        actions.push(Action::Setting(Setting::NudgeRepeat(m)));
+                    });
                     let mut on = quiet_on;
                     if ui
                         .checkbox(&mut on, RichText::new(t.quiet_hours()).color(text))
@@ -4473,10 +4457,10 @@ fn quick_capture_card(
 /// The Nudge repeats offered, in minutes (the phone's choices).
 pub const NUDGE_REPEAT_CHOICES: [i64; 3] = [10, 30, 60];
 
-/// A row of `label` and a choice of `minutes`; `picked` gets a new one.
+/// `label`, and below it a column of radio buttons for `minutes`;
+/// `picked` gets a new one.
 fn minutes_choice(
     ui: &mut Ui,
-    id: &str,
     label: &str,
     t: &L10n,
     minutes: i64,
@@ -4484,24 +4468,29 @@ fn minutes_choice(
     mut picked: impl FnMut(i64),
 ) {
     let text = ui.visuals().text_color();
-    ui.horizontal(|ui| {
-        ui.label(RichText::new(label).color(text));
-        let mut chosen = minutes;
-        egui::ComboBox::from_id_salt(id)
-            .selected_text(RichText::new(t.renag_minutes(minutes)).color(text))
-            .show_ui(ui, |ui| {
-                for m in choices {
-                    ui.selectable_value(
-                        &mut chosen,
-                        *m,
-                        RichText::new(t.renag_minutes(*m)).color(text),
-                    );
-                }
-            });
-        if chosen != minutes {
-            picked(chosen);
-        }
-    });
+    ui.label(RichText::new(label).color(text));
+    let mut chosen = minutes;
+    let options = choices.iter().map(|m| (*m, t.renag_minutes(*m)));
+    if radio_column(ui, &mut chosen, options) && chosen != minutes {
+        picked(chosen);
+    }
+}
+
+/// A single choice: one radio button per line, the `current` one marked.
+/// True when a click picked one.
+pub(crate) fn radio_column<T: PartialEq + Copy>(
+    ui: &mut Ui,
+    current: &mut T,
+    options: impl IntoIterator<Item = (T, String)>,
+) -> bool {
+    let text = ui.visuals().text_color();
+    let mut changed = false;
+    for (value, label) in options {
+        changed |= ui
+            .radio_value(current, value, RichText::new(label).color(text))
+            .clicked();
+    }
+    changed
 }
 
 /// A pill to pick one of a few choices: self-painted so its text reads in

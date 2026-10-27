@@ -16,7 +16,7 @@ use oldbrainfix_core::{
     Schedule, SimpleRepeat, Store,
 };
 
-use crate::app::{embossed, icon_button, pill};
+use crate::app::{embossed, icon_button, pill, radio_column};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, desktop_simple, occurrence_time, weekday_text};
@@ -446,8 +446,8 @@ impl RoutineEditor {
             }
         });
         if self.kind == RepeatKind::Every {
+            ui.label(RichText::new(t.every_label()).color(text));
             ui.horizontal(|ui| {
-                ui.label(RichText::new(t.every_label()).color(text));
                 if self.every > 1 && icon_button(ui, icons::REMOVE, t.fewer(), text).clicked() {
                     self.every -= 1;
                     changed = true;
@@ -457,34 +457,25 @@ impl RoutineEditor {
                     self.every += 1;
                     changed = true;
                 }
-                let unit_text = |unit: RepeatUnit| match unit {
-                    RepeatUnit::Days => t.unit_days(self.every),
-                    RepeatUnit::Weeks => t.unit_weeks(self.every),
-                    RepeatUnit::Months => t.unit_months(self.every),
-                    RepeatUnit::Years => t.unit_years(self.every),
-                };
-                let mut unit = self.unit;
-                egui::ComboBox::from_id_salt("unit")
-                    .selected_text(RichText::new(unit_text(unit)).color(text))
-                    .show_ui(ui, |ui| {
-                        for u in [
-                            RepeatUnit::Days,
-                            RepeatUnit::Weeks,
-                            RepeatUnit::Months,
-                            RepeatUnit::Years,
-                        ] {
-                            ui.selectable_value(
-                                &mut unit,
-                                u,
-                                RichText::new(unit_text(u)).color(text),
-                            );
-                        }
-                    });
-                if unit != self.unit {
-                    self.unit = unit;
-                    changed = true;
-                }
             });
+            let unit_text = |unit: RepeatUnit| match unit {
+                RepeatUnit::Days => t.unit_days(self.every),
+                RepeatUnit::Weeks => t.unit_weeks(self.every),
+                RepeatUnit::Months => t.unit_months(self.every),
+                RepeatUnit::Years => t.unit_years(self.every),
+            };
+            let mut unit = self.unit;
+            let units = [
+                RepeatUnit::Days,
+                RepeatUnit::Weeks,
+                RepeatUnit::Months,
+                RepeatUnit::Years,
+            ];
+            radio_column(ui, &mut unit, units.map(|u| (u, unit_text(u))));
+            if unit != self.unit {
+                self.unit = unit;
+                changed = true;
+            }
         }
         if self.kind == RepeatKind::Weekdays {
             ui.horizontal_wrapped(|ui| {
@@ -630,23 +621,13 @@ impl RoutineEditor {
             None => t.renag_device_default(device),
             Some(m) => t.renag_minutes(m),
         };
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(t.renag_this()).color(text));
-            let mut picked = own;
-            egui::ComboBox::from_id_salt("renag")
-                .selected_text(RichText::new(label(picked)).color(text))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut picked, None, RichText::new(label(None)).color(text));
-                    for m in &choices {
-                        ui.selectable_value(
-                            &mut picked,
-                            Some(*m),
-                            RichText::new(label(Some(*m))).color(text),
-                        );
-                    }
-                });
-            self.renag = picked;
-        });
+        ui.label(RichText::new(t.renag_this()).color(text));
+        let mut picked = own;
+        let options = std::iter::once(None)
+            .chain(choices.into_iter().map(Some))
+            .map(|m| (m, label(m)));
+        radio_column(ui, &mut picked, options);
+        self.renag = picked;
     }
 
     fn escalation_editor(&mut self, ui: &mut Ui, t: &L10n) {
@@ -667,24 +648,16 @@ impl RoutineEditor {
             self.escalation = on.then_some(DEFAULT_ESCALATION);
         }
         if let Some(after) = self.escalation {
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(t.escalation_after()).color(text));
-                let mut choices: BTreeSet<i64> = ESCALATION_CHOICES.into_iter().collect();
-                choices.insert(after);
-                let mut picked = after;
-                egui::ComboBox::from_id_salt("escalation")
-                    .selected_text(RichText::new(after.to_string()).color(text))
-                    .show_ui(ui, |ui| {
-                        for n in choices {
-                            ui.selectable_value(
-                                &mut picked,
-                                n,
-                                RichText::new(n.to_string()).color(text),
-                            );
-                        }
-                    });
-                self.escalation = Some(picked);
-            });
+            ui.label(RichText::new(t.escalation_after()).color(text));
+            let mut choices: BTreeSet<i64> = ESCALATION_CHOICES.into_iter().collect();
+            choices.insert(after);
+            let mut picked = after;
+            radio_column(
+                ui,
+                &mut picked,
+                choices.into_iter().map(|n| (n, n.to_string())),
+            );
+            self.escalation = Some(picked);
         }
     }
 }

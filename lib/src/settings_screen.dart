@@ -141,19 +141,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.repeat),
                   title: Text(t.renagDevice),
                   subtitle: Text(t.settingsRenagDetail),
-                  control: DropdownButton<int>(
+                  control: RadioColumn<int>(
                     key: const ValueKey('renagDevice'),
                     value: renag,
-                    onChanged: (minutes) {
-                      if (minutes == null) return;
-                      _setRenag(Duration(minutes: minutes));
-                    },
-                    items: [
+                    onChanged: (minutes) =>
+                        _setRenag(Duration(minutes: minutes)),
+                    options: [
                       for (final m in renagChoices)
-                        DropdownMenuItem(
-                          value: m,
-                          child: Text(t.renagMinutes(m)),
-                        ),
+                        RadioOption(value: m, title: Text(t.renagMinutes(m))),
                     ],
                   ),
                 ),
@@ -325,17 +320,16 @@ class _NudgeSettingsState extends State<_NudgeSettings> {
         ControlBelow(
           leading: const Icon(Icons.notifications_paused_outlined),
           title: Text(t.nudgeRepeat),
-          control: DropdownButton<int>(
+          control: RadioColumn<int>(
             key: const ValueKey('nudgeRepeat'),
             value: repeat,
             onChanged: (minutes) {
-              if (minutes == null) return;
               widget.store.nudgeRepeat = Duration(minutes: minutes);
               _changed();
             },
-            items: [
+            options: [
               for (final m in choices)
-                DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
+                RadioOption(value: m, title: Text(t.renagMinutes(m))),
             ],
           ),
         ),

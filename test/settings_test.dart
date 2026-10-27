@@ -114,10 +114,20 @@ void main() {
       await start(tester);
       await openDeviceSettings(tester);
       await tap(tester, find.text('Light'));
-      await tap(tester, find.byKey(const ValueKey('renagDevice')));
-      await tap(tester, find.text('30 min').last);
-      await tap(tester, find.byKey(const ValueKey('nudgeRepeat')));
-      await tap(tester, find.text('10 min').last);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('renagDevice')),
+          matching: find.text('30 min'),
+        ),
+      );
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('nudgeRepeat')),
+          matching: find.text('10 min'),
+        ),
+      );
       await tap(tester, find.byKey(const ValueKey('quietHours')));
       await tap(tester, find.byKey(const ValueKey('streaks')));
 
@@ -127,6 +137,53 @@ void main() {
       expect(store.quietHoursOn, isFalse);
       expect(store.streaksOn, isFalse);
       expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+    });
+
+    testWidgets('are radio columns that keep a value outside the choices', (
+      tester,
+    ) async {
+      store
+        ..renagInterval = const Duration(minutes: 20)
+        ..nudgeRepeat = const Duration(minutes: 45);
+      await start(tester);
+      await openDeviceSettings(tester);
+      for (final (key, count, chosen) in [
+        ('renagDevice', 6, 20),
+        ('nudgeRepeat', 4, 45),
+      ]) {
+        final column = find.byKey(ValueKey(key));
+        await tester.scrollUntilVisible(
+          column,
+          200,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: column,
+            matching: find.byType(RadioListTile<int>),
+          ),
+          findsNWidgets(count),
+          reason: key,
+        );
+        expect(
+          find.descendant(of: column, matching: find.text('$chosen min')),
+          findsOneWidget,
+          reason: key,
+        );
+        expect(
+          tester
+              .widget<RadioGroup<int>>(
+                find.descendant(
+                  of: column,
+                  matching: find.byType(RadioGroup<int>),
+                ),
+              )
+              .groupValue,
+          chosen,
+          reason: key,
+        );
+      }
     });
 
     testWidgets('lead to the alarm setup, which comes back to them', (
@@ -188,7 +245,7 @@ void main() {
         },
       ),
     ]) {
-      testWidgets('put each switch and dropdown on its own line below its '
+      testWidgets('put each switch and single choice on its own line below its '
           'text (${locale.languageCode})', (tester) async {
         tester.platformDispatcher.localesTestValue = [locale];
         addTearDown(tester.platformDispatcher.clearLocalesTestValue);

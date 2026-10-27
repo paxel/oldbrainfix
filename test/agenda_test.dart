@@ -453,8 +453,12 @@ void main() {
       await openNew(tester);
       await reveal(tester, find.byTooltip('More'));
       await tap(tester, find.byTooltip('More'));
-      await tap(tester, find.text('days'));
-      await tap(tester, find.text('weeks').last);
+      final weeks = find.descendant(
+        of: find.byKey(const ValueKey('everyUnit')),
+        matching: find.text('weeks'),
+      );
+      await reveal(tester, weeks);
+      await tap(tester, weeks);
       // A second time of day: the picker offers 08:00, after 08:00 went.
       await reveal(tester, find.byTooltip('Remove 08:00'));
       await tap(tester, find.byTooltip('Remove 08:00'));

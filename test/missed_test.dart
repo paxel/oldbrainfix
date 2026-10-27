@@ -195,8 +195,13 @@ void main() {
 
       expect(find.byKey(const ValueKey('renagDevice')), findsNothing);
 
-      await tap(tester, find.byKey(const ValueKey('renagThis')));
-      await tap(tester, find.text('5 min').last);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('renagThis')),
+          matching: find.text('5 min'),
+        ),
+      );
       expect(find.text('Rings again every 5 min until Done'), findsOneWidget);
       expect(
         routines.byId(pills.id)?.renag,
@@ -210,6 +215,51 @@ void main() {
       expect(armed.alarm.renag, const Duration(minutes: 5));
     });
 
+    testWidgets('a Routine\'s own interval outside the choices stays chosen, '
+        'and the Device default takes over again', (tester) async {
+      final pills = routines.create('pills', daily([at(8)]));
+      routines.setRenag(pills.id, const Duration(minutes: 20));
+      await start(tester);
+      await tap(tester, find.text('pills').first);
+      final section = find.text('Re-nag');
+      await tester.scrollUntilVisible(
+        section,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byType(RoutineEditorScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tap(tester, section);
+      final column = find.byKey(const ValueKey('renagThis'));
+      expect(find.byType(DropdownButton<int?>), findsNothing);
+      expect(
+        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        findsNWidgets(7),
+        reason: 'the default, the five choices and 20 min',
+      );
+      expect(
+        find.descendant(of: column, matching: find.text('20 min')),
+        findsOneWidget,
+      );
+      int? chosen() => tester
+          .widget<RadioGroup<int>>(
+            find.descendant(of: column, matching: find.byType(RadioGroup<int>)),
+          )
+          .groupValue;
+      expect(chosen(), 20);
+
+      await tap(
+        tester,
+        find.descendant(of: column, matching: find.text('Default (10 min)')),
+      );
+      expect(find.text('Rings again every 10 min until Done'), findsOneWidget);
+      await tap(tester, find.text('Save'));
+      expect(routines.byId(pills.id)?.renag, isNull);
+    });
+
     testWidgets('a Device default changed in Settings is armed at once', (
       tester,
     ) async {
@@ -217,8 +267,13 @@ void main() {
       await start(tester);
       expect(alarms.armed.first.alarm.renag, const Duration(minutes: 10));
       await openDeviceSettings(tester);
-      await tap(tester, find.byKey(const ValueKey('renagDevice')));
-      await tap(tester, find.text('15 min').last);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('renagDevice')),
+          matching: find.text('15 min'),
+        ),
+      );
       expect(store.renagInterval, const Duration(minutes: 15));
       expect(alarms.armed.first.alarm.renag, const Duration(minutes: 15));
     });

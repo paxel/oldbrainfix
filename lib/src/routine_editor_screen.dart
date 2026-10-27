@@ -662,21 +662,20 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
           ControlBelow(
             padding: EdgeInsets.zero,
             title: Text(t.renagThis),
-            control: DropdownButton<int?>(
+            // 0 stands for the Device default: no Re-nag lasts 0 min.
+            control: RadioColumn<int>(
               key: const ValueKey('renagThis'),
-              value: own,
+              value: own ?? 0,
               onChanged: (minutes) => setState(
-                () => _renag = minutes == null
-                    ? null
-                    : Duration(minutes: minutes),
+                () => _renag = minutes == 0 ? null : Duration(minutes: minutes),
               ),
-              items: [
-                DropdownMenuItem(
-                  value: null,
-                  child: Text(t.renagDeviceDefault(device)),
+              options: [
+                RadioOption(
+                  value: 0,
+                  title: Text(t.renagDeviceDefault(device)),
                 ),
                 for (final m in choices)
-                  DropdownMenuItem(value: m, child: Text(t.renagMinutes(m))),
+                  RadioOption(value: m, title: Text(t.renagMinutes(m))),
               ],
             ),
           ),
@@ -714,19 +713,17 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             ControlBelow(
               padding: EdgeInsets.zero,
               title: Text(t.escalationAfter),
-              control: DropdownButton<int>(
+              control: RadioColumn<int>(
                 key: const ValueKey('escalationAfter'),
                 value: after,
-                onChanged: (count) {
-                  if (count != null) setState(() => _escalation = count);
-                },
-                items: [
+                onChanged: (count) => setState(() => _escalation = count),
+                options: [
                   // A value set elsewhere stays pickable.
                   for (final n in {
                     ..._escalationChoices,
                     after,
                   }.toList()..sort())
-                    DropdownMenuItem(value: n, child: Text('$n')),
+                    RadioOption(value: n, title: Text('$n')),
                 ],
               ),
             ),
@@ -773,30 +770,19 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         ControlBelow(
           padding: EdgeInsets.zero,
           title: Text(t.everyLabel),
-          control: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
+          control: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                tooltip: t.fewer,
-                onPressed: _every > 1 ? () => _change(() => _every--) : null,
-                icon: const Icon(Icons.remove),
-              ),
-              Text('$_every', style: Theme.of(context).textTheme.titleMedium),
-              IconButton(
-                tooltip: t.more,
-                onPressed: () => _change(() => _every++),
-                icon: const Icon(Icons.add),
-              ),
-              DropdownButton<RepeatUnit>(
+              _stepper(_every, onChanged: (n) => _every = n),
+              RadioColumn<RepeatUnit>(
+                key: const ValueKey('everyUnit'),
                 value: _unit,
-                onChanged: (unit) {
-                  if (unit != null) _change(() => _unit = unit);
-                },
-                items: [
+                onChanged: (unit) => _change(() => _unit = unit),
+                options: [
                   for (final unit in RepeatUnit.values)
-                    DropdownMenuItem(
+                    RadioOption(
                       value: unit,
-                      child: Text(switch (unit) {
+                      title: Text(switch (unit) {
                         RepeatUnit.days => t.unitDays(_every),
                         RepeatUnit.weeks => t.unitWeeks(_every),
                         RepeatUnit.months => t.unitMonths(_every),

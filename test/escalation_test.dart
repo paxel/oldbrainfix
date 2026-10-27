@@ -76,8 +76,13 @@ void main() {
         find.text('Full-screen alarm after 3 ignored Re-nags'),
         findsOneWidget,
       );
-      await tap(tester, find.byKey(const ValueKey('escalationAfter')));
-      await tap(tester, find.text('5').last);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('escalationAfter')),
+          matching: find.text('5'),
+        ),
+      );
       expect(
         find.text('Full-screen alarm after 5 ignored Re-nags'),
         findsOneWidget,
@@ -91,6 +96,31 @@ void main() {
       await tap(tester, find.text('Save'));
       expect(routines.byId(pills.id)?.escalation, 5);
       expect(alarms.armed.first.alarm.escalation, 5);
+    });
+
+    testWidgets('a count outside the choices stays chosen', (tester) async {
+      final pills = routines.create('pills', daily([at(20)]));
+      routines.setEscalation(pills.id, 4);
+      await start(tester);
+      await tap(tester, find.text('pills').first);
+      await openSection(tester);
+      final column = find.byKey(const ValueKey('escalationAfter'));
+      expect(find.byType(DropdownButton<int>), findsNothing);
+      expect(
+        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        findsNWidgets(6),
+      );
+      expect(
+        tester
+            .widget<RadioGroup<int>>(
+              find.descendant(
+                of: column,
+                matching: find.byType(RadioGroup<int>),
+              ),
+            )
+            .groupValue,
+        4,
+      );
     });
 
     testWidgets('turned off again, the Routine no longer escalates', (

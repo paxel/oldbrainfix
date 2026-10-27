@@ -349,8 +349,13 @@ void main() {
       await openDeviceSettings(tester);
       expect(find.text('22:00'), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
-      await tap(tester, find.byKey(const ValueKey('nudgeRepeat')));
-      await tap(tester, find.text('10 min').last);
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byKey(const ValueKey('nudgeRepeat')),
+          matching: find.text('10 min'),
+        ),
+      );
       expect(store.nudgeRepeat, const Duration(minutes: 10));
       expect(alarms.nudge?.nudge.repeat, const Duration(minutes: 10));
 
