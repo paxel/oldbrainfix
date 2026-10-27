@@ -2,7 +2,9 @@
 
 Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `CHANGELOG.md` und `OLDER_CHANGES.md` im Wurzelverzeichnis, in einer Datei: die aktuelle Version oben ohne Datum, die veröffentlichten darunter mit dem Datum ihres Tags. Die Seite "Was ist neu" der Dokumentation wird daraus gebaut; eine englische Version ohne deutschen Abschnitt lässt den Bau fehlschlagen.
 
-## [0.1.1]
+## [0.2.0]
+
+## [0.1.1] - 2026-10-27
 
 ### Neu
 - Auf dem Telefon wird der Download des Sprachmodells einmal nach der Startauswahl angeboten.
