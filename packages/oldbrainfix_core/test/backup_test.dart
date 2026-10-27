@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -25,7 +26,8 @@ Uint8List bigPhoto() =>
 
 /// A Device with something of everything: an Area with a Note, a photo
 /// and a voice recording, a Routine checked off once, a Moment, Area
-/// keys, another Device's pinned key and Device settings of all kinds.
+/// keys, another Device's pinned key and Device settings of all kinds,
+/// a playback speed among them.
 Store fullDevice(Directory dir) {
   final store = Store.open('${dir.path}/old.db', clock: ticking());
   final places = Places(store);
@@ -71,6 +73,8 @@ Store fullDevice(Directory dir) {
         lastSync: DateTime.utc(2026, 9, 1),
       ),
     );
+  // The one that does.
+  store.playbackSpeed = 1.5;
   return store;
 }
 
@@ -170,8 +174,8 @@ void main() {
   });
 
   group('a Backup', () {
-    test('restores everything but the settings onto a new identity, with '
-        'the passphrase', () async {
+    test('restores everything but the settings, the playback speed aside, '
+        'onto a new identity, with the passphrase', () async {
       final (old, code, path) = await backedUp();
       addTearDown(old.close);
       final header = readBackupHeader(path)!;
@@ -220,7 +224,9 @@ void main() {
         containsAll(old.pinnedKeys().map((p) => p.record.device)),
       );
       expect(pinned[old.deviceId]?.trust, KeyTrust.verified);
-      // None of the old Device's settings came along.
+      // None of the old Device's settings came along but the playback
+      // speed.
+      expect(store.playbackSpeed, 1.5);
       expect(store.themeChoice, ThemeChoice.system);
       expect(store.renagInterval, DeviceSettings.defaultRenag);
       expect(store.syncFolder, isNull);
@@ -235,7 +241,12 @@ void main() {
             k != 'device' &&
             k != 'signseed',
       );
-      expect(keys.toSet(), {'backup:key', 'backup:pass', 'backup:version'});
+      expect(keys.toSet(), {
+        'backup:key',
+        'backup:pass',
+        'backup:version',
+        'playbackSpeed',
+      });
       // The Recovery Sheet stays good.
       expect(store.recoveryCode, code);
       // What the new Device writes signs under its own key.
@@ -255,6 +266,59 @@ void main() {
       addTearDown(store.close);
       final result = await restoreBackup(store, path, key!);
       expect(result.entries, old.allEntries().length);
+    });
+
+    test('a Device without a playback speed chosen leaves the new one at '
+        'normal speed', () async {
+      final old = fullDevice(dir)..setLocalSetting('playbackSpeed', '7');
+      addTearDown(old.close);
+      final code = await setUpBackups(old, passphrase, kdf: cheap);
+      final path = '${dir.path}/b.$backupExtension';
+      await writeBackup(old, path);
+      final store = fresh('b');
+      addTearDown(store.close);
+      await restoreBackup(store, path, decodeRecoveryCode(code)!);
+      expect(store.localSetting('playbackSpeed'), isNull);
+      expect(store.playbackSpeed, 1);
+    });
+
+    test('a playback speed not offered here, or not written as text, is '
+        'passed over', () async {
+      final old = fullDevice(dir);
+      addTearDown(old.close);
+      final code = await setUpBackups(old, passphrase, kdf: cheap);
+      final backupKey = decodeRecoveryCode(code)!;
+      // A Backup of nothing but the old Device and those speeds, sealed
+      // as one last chunk.
+      final contentKey = secretBytes(backupKeyBytes);
+      final line = BackupHeader.encode(
+        created: DateTime.utc(2026, 10, 2),
+        pass: old.backupPass!,
+        sealedKey: seal(backupKey, contentKey, aad: SealedAs.backupKey),
+      );
+      final payload = [
+        {
+          'about': {'device': old.deviceId, 'seed': old.signingKey.seedHex},
+        },
+        {'playbackSpeed': '1.25'},
+        {'playbackSpeed': 2},
+      ].map((r) => '${jsonEncode(r)}\n').join();
+      final hash = sha256.convert(line).toString();
+      final file = File('${dir.path}/speeds.$backupExtension')
+        ..writeAsBytesSync([
+          ...line,
+          0x0a,
+          ...seal(
+            contentKey,
+            utf8.encode(payload),
+            aad: SealedAs.backupChunk(hash, 0, last: true),
+          ),
+        ]);
+      final store = fresh('b');
+      addTearDown(store.close);
+      await restoreBackup(store, file.path, backupKey);
+      expect(store.localSetting('playbackSpeed'), isNull);
+      expect(store.playbackSpeed, 1);
     });
 
     test('a text in a format not known here comes back as it was', () async {

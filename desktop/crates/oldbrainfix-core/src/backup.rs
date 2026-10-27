@@ -1,8 +1,8 @@
 //! Backups, as the Dart core's `backup.dart` writes and reads them
 //! (ADR 0010, 0016): an encrypted file holding everything on this
-//! Device but its settings, written by hand or weekly into a folder the
-//! user picks, and restored on a fresh install with the passphrase or
-//! the recovery key of the Recovery Sheet.
+//! Device but its settings, the playback speed aside, written by hand or
+//! weekly into a folder the user picks, and restored on a fresh install
+//! with the passphrase or the recovery key of the Recovery Sheet.
 //!
 //! Setting Backups up makes a random backup key, which the Recovery
 //! Sheet shows, and seals it once with a key the passphrase derives
@@ -27,6 +27,7 @@ use crate::entry::{WireEntry, dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, SEAL_TAG_BYTES, seal, unseal};
 use crate::profile::OwnProfile;
 use crate::recovery;
+use crate::settings::{DeviceSettings, offered_speed, speed_text};
 use crate::shared::{ROLE_PREFIX, role_field};
 use crate::signing::{
     ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey, device_id_from_key, entry_bytes,
@@ -560,9 +561,9 @@ pub fn held_blobs(store: &Store) -> Result<Vec<String>> {
 }
 
 /// Writes a Backup of `store` to `path`: this Device's identity, the own
-/// Profile with its binding and the backup key's version, every entry,
-/// Moment, Area key, pinned key and blob; none of its settings. Backups
-/// must be set up.
+/// Profile with its binding and the backup key's version, the playback
+/// speed chosen here, every entry, Moment, Area key, pinned key and blob;
+/// none of its other settings. Backups must be set up.
 pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts> {
     let (Some(backup_key), Some(pass)) = (store.backup_key()?, store.backup_pass()?) else {
         return Err(Error::Invalid("Backups are not set up".into()));
@@ -597,6 +598,11 @@ pub fn write_backup(store: &Store, path: &Path, random: Random) -> Result<Counts
             })
             .to_string(),
         )?;
+    }
+    // As the setting is written, never as a number: the cores need not
+    // write fractions alike.
+    if let Some(speed) = DeviceSettings::new(store).chosen_playback_speed()? {
+        out.line(&json!({"playbackSpeed": speed_text(speed)}).to_string())?;
     }
     let entries = store.all_entries()?;
     for e in &entries {
@@ -794,8 +800,9 @@ struct MomentIn {
 /// and pinned keys, pins the old Device's key as verified, takes the own
 /// Profile back with its own key bound to it by the old Device's, keeps
 /// the backup key, and signs as the old Device its roles in the Shared
-/// Areas for itself. The log is written in one transaction, once the
-/// whole file proved sound.
+/// Areas for itself. Of the old Device's settings only the playback
+/// speed comes along, if it is one offered. The log is written in one
+/// transaction, once the whole file proved sound.
 pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Result<Restored> {
     if store.current_seq()? != 0 {
         return Err(problem(Problem::NotEmpty));
@@ -824,6 +831,7 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
     let mut keys: Vec<AreaKey> = Vec::new();
     let mut pinned: Vec<PinnedKey> = Vec::new();
     let mut profile: Option<(Value, i64)> = None;
+    let mut speed: Option<f64> = None;
     let mut blobs = 0;
     while let Some(text) = payload.line()? {
         let json: Value = serde_json::from_str(&text).map_err(|_| damaged())?;
@@ -873,6 +881,11 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
         } else if let (Some(v), Some(p)) = (json.get("backupVersion"), json.get("profile")) {
             let v = v.as_i64().filter(|v| *v >= 0).ok_or_else(damaged)?;
             profile = Some((p.clone(), v));
+        } else if let Some(text) = json.get("playbackSpeed").and_then(Value::as_str) {
+            // One not offered here is passed over, as normal speed.
+            if let Some(kept) = offered_speed(text) {
+                speed = Some(kept);
+            }
         } else if let Some(reference) = json.get("blob").and_then(Value::as_str) {
             let bytes = payload.bytes(size_of(&json)?)?;
             let (kind, hash) = split_blob_ref(reference);
@@ -923,6 +936,9 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             &header.pass,
             profile.as_ref().map_or(1, |(_, v)| *v),
         )?;
+        if let Some(speed) = speed {
+            DeviceSettings::new(store).set_playback_speed(speed)?;
+        }
         hand_roles(store, &old)
     })?;
     Ok(Restored {
@@ -1117,7 +1133,8 @@ mod tests {
     }
 
     /// A Device with an Area, a Note with a photo bigger than a chunk and
-    /// a recording, a Moment, its keys, another Device's key and settings.
+    /// a recording, a Moment, its keys, another Device's key and settings,
+    /// a playback speed among them.
     fn full(dir: &Path) -> Result<Store> {
         let store = device(dir, "old", &held(1), 1)?;
         let area = Places::new(&store).add_area("Doctor")?;
@@ -1142,6 +1159,7 @@ mod tests {
         store.choose_sync_folder("/somewhere/sync")?;
         store.set_backup_folder(Some("/somewhere/backups"))?;
         store.set_local_setting("theme", "dark")?;
+        DeviceSettings::new(&store).set_playback_speed(1.5)?;
         Ok(store)
     }
 
@@ -1166,7 +1184,8 @@ mod tests {
     }
 
     #[test]
-    fn a_backup_restores_everything_but_the_settings_onto_a_new_identity() -> Result<()> {
+    fn a_backup_restores_everything_but_the_settings_other_than_the_speed_onto_a_new_identity()
+    -> Result<()> {
         let dir = tempfile::tempdir()?;
         let (old, code, path) = backed_up(dir.path())?;
         let header = read_header(&path)?.ok_or(damaged_err())?;
@@ -1203,7 +1222,16 @@ mod tests {
             })
             .collect();
         kept.sort();
-        assert_eq!(kept, vec!["backup:key", "backup:pass", "backup:version"]);
+        assert_eq!(
+            kept,
+            vec![
+                "backup:key",
+                "backup:pass",
+                "backup:version",
+                "playbackSpeed"
+            ]
+        );
+        assert_eq!(DeviceSettings::new(&store).playback_speed()?, 1.5);
         assert_eq!(store.recovery_code()?, Some(code));
         assert_eq!(store.backup_folder()?, None);
         assert_eq!(store.sync_folder()?, None);
@@ -1212,6 +1240,56 @@ mod tests {
 
     fn damaged_err() -> Error {
         problem(Problem::Damaged)
+    }
+
+    #[test]
+    fn a_device_without_a_playback_speed_chosen_leaves_the_new_one_at_normal_speed() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        old.set_local_setting("playbackSpeed", "7")?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let path = dir.path().join(format!("b.{EXTENSION}"));
+        write_backup(&old, &path, &mut system_random)?;
+        let header = read_header(&path)?.ok_or(damaged_err())?;
+        let key = unlock(&header, None, Some(&code))?.ok_or(damaged_err())?;
+        let store = device(dir.path(), "new", &held(20), 2)?;
+        restore(&store, &path, &key)?;
+        assert_eq!(store.local_setting("playbackSpeed")?, None);
+        assert_eq!(DeviceSettings::new(&store).playback_speed()?, 1.0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_playback_speed_not_offered_here_or_not_written_as_text_is_passed_over() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let backup_key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        let pass = old.backup_pass()?.ok_or(damaged_err())?;
+        // A Backup of nothing but the old Device and those speeds, sealed
+        // as one last chunk.
+        let content_key = [7; KEY_BYTES];
+        let sealed_key = seal(&backup_key, &content_key, sealed_as::KEY, &[1; 24])?;
+        let line = Header::encode(*held(2).lock(), &pass, &sealed_key, CHUNK_BYTES);
+        let payload = [
+            json!({"about": {"device": old.device_id()?, "seed": old.signing_key()?.seed_hex()}}),
+            json!({"playbackSpeed": "1.25"}),
+            json!({"playbackSpeed": 2}),
+        ]
+        .iter()
+        .map(|r| format!("{r}\n"))
+        .collect::<String>();
+        let aad = sealed_as::chunk(&hex::encode(Sha256::digest(&line)), 0, true);
+        let mut file = line.clone();
+        file.push(b'\n');
+        file.extend(seal(&content_key, payload.as_bytes(), &aad, &[2; 24])?);
+        let path = dir.path().join(format!("speeds.{EXTENSION}"));
+        std::fs::write(&path, file)?;
+        let store = device(dir.path(), "new", &held(20), 2)?;
+        restore(&store, &path, &backup_key)?;
+        assert_eq!(store.local_setting("playbackSpeed")?, None);
+        assert_eq!(DeviceSettings::new(&store).playback_speed()?, 1.0);
+        Ok(())
     }
 
     #[test]

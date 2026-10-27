@@ -488,6 +488,17 @@ void main() {
       expect(store.playbackSpeed, 0.5);
     });
 
+    testWidgets('the one kept before, as the app kept it in 0.1.1, carries '
+        'over', (tester) async {
+      store.setLocalSetting('playbackSpeed', '1.5');
+      await start(tester);
+      await record(tester);
+      expect(shown(tester), '1.5×');
+      await tap(tester, find.byIcon(Icons.play_arrow));
+      expect(voice.speed, 1.5);
+      expect(store.localSetting('playbackSpeed'), '1.5');
+    });
+
     testWidgets('anything unknown kept plays at normal speed', (tester) async {
       store.setLocalSetting('playbackSpeed', '7');
       expect(store.playbackSpeed, 1);

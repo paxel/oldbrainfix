@@ -129,23 +129,6 @@ class AndroidVoice implements VoicePlatform {
   }
 }
 
-/// The playback speeds offered, 1 being normal speed.
-const playbackSpeeds = [0.5, 0.75, 1.0, 1.5, 2.0];
-
-/// How fast this Device plays recordings, a setting of this Device that
-/// is never synced (ADR 0008).
-extension PlaybackSpeedSetting on Store {
-  static const _playbackSpeed = 'playbackSpeed';
-
-  /// One of [playbackSpeeds]; normal speed when nothing else is set.
-  double get playbackSpeed {
-    final speed = double.tryParse(localSetting(_playbackSpeed) ?? '');
-    return speed != null && playbackSpeeds.contains(speed) ? speed : 1;
-  }
-
-  set playbackSpeed(double speed) => setLocalSetting(_playbackSpeed, '$speed');
-}
-
 /// The one recording playing at a time, by its hash, for every play
 /// button to show; null while none plays.
 class Playback extends ValueNotifier<String?> {

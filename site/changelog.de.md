@@ -7,6 +7,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 ### Geändert
 - Auf dem Telefon und dem Desktop sind die Einheit von „Alle N“ einer Routine, ihr erneutes Erinnern und ihre Eskalation sowie in den Einstellungen das erneute Erinnern und das erneute Stupsen des Geräts Spalten von Optionsfeldern statt Auswahllisten, und ein anderswo gesetzter Wert bleibt als zusätzliche Option erhalten.
 - Auf dem Telefon und dem Desktop startet die App mit einem Sprachmodell schneller: Seine Prüfsumme wird einmal beim Herunterladen oder Auswählen berechnet und erst wieder, wenn sich Größe oder Änderungszeit der Datei ändern.
+- Auf dem Telefon und dem Desktop bringt das Wiederherstellen einer Sicherung die Wiedergabegeschwindigkeit von Sprachaufnahmen zurück, die auf dem Gerät gewählt war, auf dem die Sicherung erstellt wurde.
 
 ### Behoben
 - Auf dem Telefon und dem Desktop fragt der Papierkorb-Knopf im Notiz-Editor einmal nach, bevor die Notiz gelöscht wird, mit demselben Dialog wie „Löschen“ auf der Notizkarte, einschließlich der Wahl, ihre Routinen und Erinnerungen zu behalten oder mitzulöschen.

@@ -757,6 +757,8 @@ class _HomeState extends State<_Home> {
       _found = null;
     }
     widget.store.starterSetOffered = true;
+    // The playback speed came with it.
+    VoiceScope.playbackOf(context)?.speed.value = widget.store.playbackSpeed;
     setState(() {
       _starterSetOffered = true;
       _speechOfferDue = _speechWanted;

@@ -6,8 +6,12 @@
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use oldbrainfix_core::backup::{self, EXTENSION, Kdf, system_random};
-use oldbrainfix_core::{Notes, Places, SigningKey, Store};
+use oldbrainfix_core::{DeviceSettings, Notes, Places, SigningKey, Store};
+use oldbrainfix_gui::media::Player;
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -173,7 +177,27 @@ fn backups_set_up_on_a_paired_phone_show_with_the_same_recovery_sheet() -> TestR
     Ok(())
 }
 
-/// A Backup of a Device with a Note in an Area, and its recovery key.
+/// Speakers that play nothing and keep every speed they were given.
+struct Speakers(Rc<RefCell<Vec<f64>>>);
+
+impl Player for Speakers {
+    fn play(&mut self, _: Vec<u8>) -> bool {
+        false
+    }
+
+    fn stop(&mut self) {}
+
+    fn playing(&self) -> bool {
+        false
+    }
+
+    fn set_speed(&mut self, speed: f64) {
+        self.0.borrow_mut().push(speed);
+    }
+}
+
+/// A Backup of a Device with a Note in an Area and a playback speed
+/// chosen, and its recovery key.
 fn old_backup(
     dir: &std::path::Path,
 ) -> Result<(std::path::PathBuf, String), Box<dyn std::error::Error>> {
@@ -183,6 +207,7 @@ fn old_backup(
     profile.rename("Ada")?;
     let area = Places::new(&old).add_area("Doctor")?;
     Notes::new(&old).capture("Pills at eight", Some(&area.id), None)?;
+    DeviceSettings::new(&old).set_playback_speed(1.5)?;
     let code = backup::set_up(&old, "correct horse", CHEAP, &mut system_random)?;
     let path = dir.join(format!("old.{EXTENSION}"));
     backup::write_backup(&old, &path, &mut system_random)?;
@@ -210,6 +235,11 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
     let dir = tempfile::tempdir()?;
     let (path, _) = old_backup(dir.path())?;
     let mut harness = first_start(path)?;
+    let speeds = Rc::new(RefCell::new(Vec::new()));
+    harness
+        .state_mut()
+        .set_player(Box::new(Speakers(speeds.clone())));
+    assert_eq!(*speeds.borrow(), vec![1.0]);
     // The computer made a Profile of its own at its first start.
     oldbrainfix_core::profile::OwnProfile::new(harness.state().store())
         .apply_defaults("Computer", None)?;
@@ -233,6 +263,9 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
         .map(|n| n.text)
         .collect();
     assert_eq!(texts, vec!["Pills at eight"]);
+    // The playback speed came with it, for what plays from now on.
+    assert_eq!(DeviceSettings::new(store).playback_speed()?, 1.5);
+    assert_eq!(speeds.borrow().last(), Some(&1.5));
     // The Profile came back with it, and the Profile page shows it.
     harness.state_mut().select(Selection::Profile);
     harness.step();

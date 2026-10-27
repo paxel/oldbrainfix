@@ -5,6 +5,9 @@ import 'store.dart';
 /// Which theme this Device shows: the system's, or a fixed one.
 enum ThemeChoice { system, light, dark }
 
+/// The playback speeds of voice recordings offered, 1 being normal speed.
+const playbackSpeeds = [0.5, 0.75, 1.0, 1.5, 2.0];
+
 /// Settings of this Device, kept as local settings and never synced
 /// (ADR 0008).
 extension DeviceSettings on Store {
@@ -20,6 +23,7 @@ extension DeviceSettings on Store {
   static const _calendarContext = 'calendarContext';
   static const _bluetoothContext = 'bluetoothContext';
   static const _streaksOff = 'streaksOff';
+  static const _playbackSpeed = 'playbackSpeed';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -136,4 +140,24 @@ extension DeviceSettings on Store {
   bool get streaksOn => localSetting(_streaksOff) != 'true';
 
   set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
+
+  /// How fast this Device plays voice recordings: one of
+  /// [playbackSpeeds], normal speed when none was chosen. The one Device
+  /// setting a Backup carries (ADR 0016).
+  double get playbackSpeed => chosenPlaybackSpeed ?? 1;
+
+  /// The playback speed chosen on this Device; null when none of
+  /// [playbackSpeeds] was.
+  double? get chosenPlaybackSpeed {
+    final speed = double.tryParse(localSetting(_playbackSpeed) ?? '');
+    return speed != null && playbackSpeeds.contains(speed) ? speed : null;
+  }
+
+  /// Keeps [speed] as written since 0.1.1: "1.0", "1.5".
+  set playbackSpeed(double speed) {
+    if (!playbackSpeeds.contains(speed)) {
+      throw ArgumentError.value(speed, 'speed', 'not a speed offered');
+    }
+    setLocalSetting(_playbackSpeed, '$speed');
+  }
 }

@@ -100,4 +100,33 @@ void main() {
     expect(store.streaksOn, isTrue);
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
+
+  test('recordings play at normal speed until this Device chooses one', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.playbackSpeed, 1);
+    expect(store.chosenPlaybackSpeed, isNull);
+    store.playbackSpeed = 0.75;
+    expect(store.playbackSpeed, 0.75);
+    expect(store.localSetting('playbackSpeed'), '0.75');
+    store.playbackSpeed = 2;
+    expect(store.localSetting('playbackSpeed'), '2.0');
+    expect(() => store.playbackSpeed = 1.25, throwsArgumentError);
+    expect(store.playbackSpeed, 2);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
+  test('the playback speed the phone kept before carries over as it is', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    // As the phone's app wrote it in 0.1.1.
+    store.setLocalSetting('playbackSpeed', '1.5');
+    expect(store.playbackSpeed, 1.5);
+    expect(store.chosenPlaybackSpeed, 1.5);
+    for (final kept in ['7', 'fast', '1.25', '']) {
+      store.setLocalSetting('playbackSpeed', kept);
+      expect(store.playbackSpeed, 1, reason: kept);
+      expect(store.chosenPlaybackSpeed, isNull, reason: kept);
+    }
+  });
 }

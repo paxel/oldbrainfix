@@ -10,12 +10,13 @@ use std::time::Duration;
 
 use egui::{ColorImage, RichText, TextureHandle, TextureOptions, Ui};
 use oldbrainfix_core::Store;
+use oldbrainfix_core::settings::PLAYBACK_SPEEDS;
 use oldbrainfix_whisper::model::{Outcome, WhisperModel};
 
 use crate::app::icon_button;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::media::{PLAYBACK_SPEEDS, pixels, speed_number};
+use crate::media::{pixels, speed_number};
 use crate::speech::{SpeechModel, Status};
 
 /// The long edge photos are shown at, at most.

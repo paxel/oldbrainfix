@@ -66,7 +66,7 @@ use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
-use crate::media::{self, Clipboard, Player, Recorder, photo_from_file};
+use crate::media::{Clipboard, Player, Recorder, photo_from_file};
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView};
@@ -633,7 +633,8 @@ impl App {
     pub fn new(store: impl Into<Arc<Store>>, locale: &str) -> App {
         let store = store.into();
         let read_at = store.now();
-        let speed = media::playback_speed(&store);
+        // Normal speed when it cannot be read.
+        let speed = DeviceSettings::new(&store).playback_speed().unwrap_or(1.0);
         let mut app = App {
             store,
             wall: Arc::new(local_wall),
@@ -858,6 +859,14 @@ impl App {
                         backup_view::restore_answered(&self.store)?;
                         self.welcome = None;
                         self.notice = Some(t.restore_done(restored.entries as i64));
+                        // The playback speed came with it; one that cannot
+                        // be read leaves the speed as it was.
+                        if let Ok(speed) = DeviceSettings::new(&self.store).playback_speed() {
+                            self.speed = speed;
+                            if let Some(player) = &mut self.player {
+                                player.set_speed(speed);
+                            }
+                        }
                     }
                     Err(e) => self.notice = Some(backup_view::restore_failure(&t, &e)),
                 }
@@ -1514,7 +1523,7 @@ impl App {
                 if let Some(player) = &mut self.player {
                     player.set_speed(speed);
                 }
-                media::keep_playback_speed(&self.store, speed)?;
+                DeviceSettings::new(&self.store).set_playback_speed(speed)?;
             }
             Action::PastePhoto => {
                 let photo = self.clipboard.as_mut().and_then(|c| c.photo());

@@ -21,7 +21,6 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use image::{DynamicImage, ImageDecoder, ImageReader, RgbImage, RgbaImage};
-use oldbrainfix_core::Store;
 use parking_lot::Mutex;
 
 /// The rate a recording is kept at: Whisper's own.
@@ -64,28 +63,6 @@ pub trait Player {
     /// Plays recordings at `speed`, 1 being normal speed: the one playing
     /// at once, and every one after it.
     fn set_speed(&mut self, speed: f64);
-}
-
-/// The playback speeds offered, 1 being normal speed: the phone's.
-pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
-
-/// The Device setting keeping the playback speed, the phone's key; never
-/// synced (ADR 0008).
-const PLAYBACK_SPEED: &str = "playbackSpeed";
-
-/// How fast this Device plays recordings: one of [`PLAYBACK_SPEEDS`],
-/// normal speed when nothing else is kept or it cannot be read.
-pub fn playback_speed(store: &Store) -> f64 {
-    let kept = store.local_setting(PLAYBACK_SPEED).ok().flatten();
-    kept.and_then(|s| s.parse::<f64>().ok())
-        .filter(|s| PLAYBACK_SPEEDS.contains(s))
-        .unwrap_or(1.0)
-}
-
-/// Keeps `speed` as this Device's playback speed, written as the phone
-/// writes it ("1.0", "1.5").
-pub fn keep_playback_speed(store: &Store, speed: f64) -> oldbrainfix_core::Result<()> {
-    store.set_local_setting(PLAYBACK_SPEED, &format!("{speed:?}"))
 }
 
 /// `speed` as the locale `locale` writes it: "1", "1.5", or "1,5" in

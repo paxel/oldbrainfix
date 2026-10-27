@@ -1787,6 +1787,8 @@ Future<void> _backupFixture(Directory root) async {
     ada
       ..applyProfileDefaults(name: 'Desk')
       ..renameOwnProfile('Ada');
+    // The one Device setting a Backup carries.
+    ada.playbackSpeed = 1.5;
     const passphrase = 'Grüße an die Katze';
     final code = await setUpBackups(ada, passphrase);
     final moment = ada.momentRows().single;
@@ -1798,6 +1800,7 @@ Future<void> _backupFixture(Directory root) async {
         'device': [
           ..._keySettings(ada),
           for (final (key, value) in ada.localSettingsWithPrefix('backup:')) [key, value],
+          ['playbackSpeed', '${ada.playbackSpeed}'],
         ],
       })}\n',
     );
@@ -3633,14 +3636,16 @@ Future<void> main(List<String> args) async {
     '- `backup/`: Ada\'s Device with Areas, a Shared Area, a photo, a '
     'recording longer than a chunk, a Routine checked off, a Moment and '
     'another Device\'s key: her log with its blobs (`device.jsonl`), the '
-    'keys, her Profile and the backup key she holds (`settings.json`), '
+    'keys, her Profile, the backup key she holds and the playback speed '
+    'she chose (`settings.json`), '
     'her Moments '
     '(`moments.json`), the Backup she wrote with the standard Argon2id '
     'cost (`backup.$backupExtension`, random bytes counted from 5001 on, '
     'at a held clock), and a new Device restoring it with the passphrase '
     'a day later: its log (`restored.jsonl`), the settings it keeps, her '
     'Profile with the new Device\'s key bound to it by the old one\'s '
-    'among them, and what it reads (`expected.json`).\n'
+    'and her playback speed among them, and what it reads '
+    '(`expected.json`).\n'
     '- `profiles/`: Profile names as typed and as kept, initials, '
     'placeholder colours, short codes from an id and a first key, records '
     'as they are written and records refused, the own Profile\'s local '

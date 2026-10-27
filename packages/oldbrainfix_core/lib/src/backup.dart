@@ -9,6 +9,7 @@ import 'package:cryptography/cryptography.dart' show SecretKey;
 import 'package:cryptography/dart.dart' show DartArgon2id;
 
 import 'area_keys.dart';
+import 'device_settings.dart';
 import 'entry.dart';
 import 'profiles.dart';
 import 'recovery_sheet.dart';
@@ -18,9 +19,10 @@ import 'store.dart';
 import 'sync.dart';
 
 /// Backups (ADR 0010, 0016): an encrypted file holding everything on
-/// this Device but its settings, written by hand or weekly into a folder
-/// the user picks, and restored on a fresh install with the passphrase
-/// or the recovery key of the Recovery Sheet.
+/// this Device but its settings, the playback speed aside, written by
+/// hand or weekly into a folder the user picks, and restored on a fresh
+/// install with the passphrase or the recovery key of the Recovery
+/// Sheet.
 ///
 /// Setting Backups up makes a random backup key, which the Recovery
 /// Sheet shows, and seals it once with a key the passphrase derives
@@ -573,9 +575,10 @@ class _ChunkWriter {
 List<int> _line(String json) => utf8.encode('$json\n');
 
 /// Writes a Backup of [store] to [path]: this Device's identity, the
-/// own Profile with its binding and the backup key's version, every
-/// entry, Moment, Area key, pinned key and blob; none of its settings. Backups must be set up. Keys and nonces come from
-/// [secretBytes].
+/// own Profile with its binding and the backup key's version, the
+/// playback speed chosen here, every entry, Moment, Area key, pinned key
+/// and blob; none of its other settings. Backups must be set up. Keys
+/// and nonces come from [secretBytes].
 Future<BackupCounts> writeBackup(Store store, String path) async {
   final backupKey = store.backupKey;
   final pass = store.backupPass;
@@ -615,6 +618,11 @@ Future<BackupCounts> writeBackup(Store store, String path) async {
           }),
         ),
       );
+    }
+    // As the setting is written, never as a number: the cores need not
+    // write fractions alike.
+    if (store.chosenPlaybackSpeed case final speed?) {
+      await out.add(_line(jsonEncode({'playbackSpeed': '$speed'})));
     }
     final entries = store.allEntries();
     for (final e in entries) {
@@ -807,9 +815,10 @@ class _ChunkReader {
 /// the entries, Moments, blobs, Area keys and pinned keys, pins the old
 /// Device's key as verified, takes the own Profile back with its own key
 /// bound to it by the old Device's ([OwnProfile.restoreOwnProfile]),
-/// and keeps the backup key, so the Recovery Sheet stays good. In every Shared Area where the old Device held a
-/// role, it signs the same role for itself as the old Device. Nothing
-/// of the old Device's settings comes along. The log is written in one
+/// and keeps the backup key, so the Recovery Sheet stays good. In every
+/// Shared Area where the old Device held a role, it signs the same role
+/// for itself as the old Device. Of the old Device's settings only the
+/// playback speed comes along, if it is one offered. The log is written in one
 /// transaction, once the whole file proved sound.
 Future<RestoreResult> restoreBackup(
   Store store,
@@ -838,6 +847,7 @@ Future<RestoreResult> restoreBackup(
   final pinned = <PinnedKey>[];
   Object? profile;
   int? version;
+  double? speed;
   var blobs = 0;
   try {
     raf.setPositionSync(header.line.length + 1);
@@ -883,6 +893,10 @@ Future<RestoreResult> restoreBackup(
           if (v < 0) throw damaged;
           profile = p;
           version = v;
+        case {'playbackSpeed': final String s}:
+          // One not offered here is passed over, as normal speed.
+          final kept = double.tryParse(s);
+          if (kept != null && playbackSpeeds.contains(kept)) speed = kept;
         case {'blob': final String ref, 'size': final int size}:
           if (size < 0 || size > _maxBlobBytes) throw damaged;
           final bytes = await payload.bytes(size);
@@ -932,6 +946,7 @@ Future<RestoreResult> restoreBackup(
     store
       ..restoreOwnProfile(profile, old: from)
       ..keepBackupKeys(backupKey, header.pass, version: version ?? 1);
+    if (speed case final speed?) store.playbackSpeed = speed;
     return _handRoles(store, from);
   });
   store.profileChanged();

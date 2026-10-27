@@ -43,6 +43,10 @@
     [
       "backup:version",
       "1"
+    ],
+    [
+      "playbackSpeed",
+      "1.5"
     ]
   ]
 }

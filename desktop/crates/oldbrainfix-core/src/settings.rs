@@ -4,11 +4,11 @@
 
 use chrono::{DateTime, Duration, Utc};
 
-use crate::Result;
 use crate::entry::{dart_iso, parse_time};
 use crate::nudges::QuietHours;
 use crate::schedule::ClockTime;
 use crate::store::Store;
+use crate::{Error, Result};
 
 const RENAG_MINUTES: &str = "renagMinutes";
 const MISSED_SEEN: &str = "missedSeen";
@@ -19,6 +19,22 @@ const ALERTS_OFF: &str = "alertsOff";
 const AUTOSTART_OFF: &str = "autostartOff";
 const LAST_FIRED: &str = "lastFired";
 const CAPTURE_HOTKEY: &str = "captureHotkey";
+const PLAYBACK_SPEED: &str = "playbackSpeed";
+
+/// The playback speeds of voice recordings offered, 1 being normal speed.
+pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
+
+/// `speed` as the Dart core writes it: "1.0", "1.5", "0.75".
+pub(crate) fn speed_text(speed: f64) -> String {
+    format!("{speed:?}")
+}
+
+/// The playback speed in `text`, if it is one offered.
+pub(crate) fn offered_speed(text: &str) -> Option<f64> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|s| PLAYBACK_SPEEDS.contains(s))
+}
 
 /// The key chord that opens the desktop's capture popup when nothing
 /// else is set.
@@ -177,6 +193,32 @@ impl<'a> DeviceSettings<'a> {
     pub fn set_capture_hotkey(&self, chord: &str) -> Result<()> {
         self.store.set_local_setting(CAPTURE_HOTKEY, chord)
     }
+
+    /// How fast this Device plays voice recordings: one of
+    /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. The one
+    /// Device setting a Backup carries (ADR 0016).
+    pub fn playback_speed(&self) -> Result<f64> {
+        Ok(self.chosen_playback_speed()?.unwrap_or(1.0))
+    }
+
+    /// The playback speed chosen on this Device; `None` when none of
+    /// [`PLAYBACK_SPEEDS`] was.
+    pub fn chosen_playback_speed(&self) -> Result<Option<f64>> {
+        Ok(self
+            .store
+            .local_setting(PLAYBACK_SPEED)?
+            .and_then(|s| offered_speed(&s)))
+    }
+
+    /// Keeps `speed` as written since 0.1.1: "1.0", "1.5"; one not
+    /// offered is refused.
+    pub fn set_playback_speed(&self, speed: f64) -> Result<()> {
+        if !PLAYBACK_SPEEDS.contains(&speed) {
+            return Err(Error::Invalid(format!("{speed} is no speed offered")));
+        }
+        self.store
+            .set_local_setting(PLAYBACK_SPEED, &speed_text(speed))
+    }
 }
 
 #[cfg(test)]
@@ -236,6 +278,40 @@ mod tests {
         assert_eq!(settings.missed_seen()?, Some(now));
         settings.set_missed_seen(None)?;
         assert_eq!(settings.missed_seen()?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn recordings_play_at_normal_speed_until_this_device_chooses_one() -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        assert_eq!(settings.playback_speed()?, 1.0);
+        assert_eq!(settings.chosen_playback_speed()?, None);
+        settings.set_playback_speed(0.75)?;
+        assert_eq!(settings.playback_speed()?, 0.75);
+        assert_eq!(
+            store.local_setting(PLAYBACK_SPEED)?.as_deref(),
+            Some("0.75")
+        );
+        settings.set_playback_speed(2.0)?;
+        assert_eq!(store.local_setting(PLAYBACK_SPEED)?.as_deref(), Some("2.0"));
+        assert!(settings.set_playback_speed(1.25).is_err());
+        assert_eq!(settings.playback_speed()?, 2.0);
+        Ok(())
+    }
+
+    #[test]
+    fn the_playback_speed_kept_before_carries_over_as_it_is() -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        // As the desktop and the phone wrote it in 0.1.1.
+        store.set_local_setting(PLAYBACK_SPEED, "1.5")?;
+        assert_eq!(settings.playback_speed()?, 1.5);
+        for kept in ["7", "fast", "1.25", ""] {
+            store.set_local_setting(PLAYBACK_SPEED, kept)?;
+            assert_eq!(settings.playback_speed()?, 1.0, "{kept}");
+            assert_eq!(settings.chosen_playback_speed()?, None, "{kept}");
+        }
         Ok(())
     }
 }

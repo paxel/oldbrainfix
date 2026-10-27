@@ -5,3 +5,5 @@ Notes, Areas, Routines and their history sync; settings do not. Each Device deci
 ## Consequences
 
 Two Devices with alerts on both fire the same Occurrence until a sync tells one of them it is Done (see ADR 0003 for the delay).
+
+A Backup carries none of them but the playback speed of voice recordings, which a restored Device takes over (ADR 0016, #86).

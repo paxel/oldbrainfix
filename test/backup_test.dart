@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/folder_platform.dart';
 import 'package:oldbrainfix/src/pairing_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/restore_screen.dart';
+import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
@@ -102,7 +103,8 @@ void main() {
   Future<(String, String)> backup() async {
     final old = Store.inMemory(clock: () => now)
       ..applyProfileDefaults(name: 'Pixel')
-      ..renameOwnProfile('Ada');
+      ..renameOwnProfile('Ada')
+      ..playbackSpeed = 1.5;
     addTearDown(old.close);
     final area = Places(old).addArea('Doctor');
     Notes(old).capture('Pills at eight', place: area.id);
@@ -428,6 +430,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Pick your Areas'), findsOneWidget);
+      Playback? playback() =>
+          VoiceScope.playbackOf(tester.element(find.byType(Navigator).first));
+      expect(playback()?.speed.value, 1);
       await tester.tap(find.byKey(const ValueKey('restore-offer')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('restore-pick')));
@@ -451,6 +456,9 @@ void main() {
       expect(store.starterSetOffered, isTrue);
       expect(Places(store).areas().single.name, 'Doctor');
       expect(store.recoveryCode, code);
+      // The playback speed came with it, for every play button.
+      expect(store.playbackSpeed, 1.5);
+      expect(playback()?.speed.value, 1.5);
     });
 
     testWidgets('a Backup that came back from Google is opened at once on '
