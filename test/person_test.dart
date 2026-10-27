@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -524,6 +525,133 @@ void main() {
       await tap(tester, find.byKey(const ValueKey('personFilter')));
       expect(find.text('Mir'), findsOneWidget);
       expect(find.text('Allen'), findsOneWidget);
+    });
+  });
+
+  group('blocking', () {
+    testWidgets('Block on the Profile page asks once; Unblock ends it', (
+      tester,
+    ) async {
+      await page(tester, person());
+      await tap(tester, find.byKey(const ValueKey('block-person')));
+      expect(find.text('Block Ben?'), findsOneWidget);
+      expect(find.textContaining('A shared folder can still'), findsOneWidget);
+      await tap(tester, find.text('Cancel'));
+      expect(ann.isBlocked(benId), isFalse);
+
+      await tap(tester, find.byKey(const ValueKey('block-person')));
+      final confirm = find.byKey(const ValueKey('block-confirm'));
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(of: confirm, matching: find.byType(Text)),
+            )
+            .data,
+        'Block',
+      );
+      await tap(tester, confirm);
+      expect(ann.isBlocked(benId), isTrue);
+      expect(find.byKey(const ValueKey('personBlocked')), findsOneWidget);
+      expect(find.byKey(const ValueKey('block-person')), findsNothing);
+
+      await tap(tester, find.byKey(const ValueKey('unblock-person')));
+      expect(find.text('Unblock Ben?'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('unblock-confirm')));
+      expect(ann.isBlocked(benId), isFalse);
+      expect(find.byKey(const ValueKey('personBlocked')), findsNothing);
+      expect(find.byKey(const ValueKey('block-person')), findsOneWidget);
+    });
+
+    testWidgets('blocking a Manager names the Area it leaves', (tester) async {
+      final annId = ann.ownProfile!.id;
+      await page(
+        tester,
+        PersonScreen(store: ben, platform: platform, work: inline, id: annId),
+      );
+      await tap(tester, find.byKey(const ValueKey('block-person')));
+      expect(find.textContaining('you leave Household'), findsOneWidget);
+      expect(find.text('Block and leave'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('block-confirm')));
+      expect(ben.isBlocked(annId), isTrue);
+      expect(ben.grantsOf(area)?.grantOf(ben.deviceId), isNull);
+    });
+
+    testWidgets('"Decline and block" leaves the Area of a Manager too', (
+      tester,
+    ) async {
+      final annId = ann.ownProfile!.id;
+      final file = sendNote(ann, Notes(ann).capture('Party').id);
+      await page(tester, const SizedBox.shrink());
+      final context = tester.element(find.byType(SizedBox));
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                SentItemScreen(store: ben, opened: openSentItem(ben, file)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tap(tester, find.byKey(const ValueKey('block-sent')));
+      expect(find.textContaining('you leave Household'), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('block-confirm')));
+      expect(find.byType(SentItemScreen), findsNothing);
+      expect(ben.isBlocked(annId), isTrue);
+      expect(ben.grantsOf(area)?.grantOf(ben.deviceId), isNull);
+      expect(Notes(ben).all().where((n) => n.text == 'Party'), isEmpty);
+    });
+
+    testWidgets('People folds the blocked away, the fold kept per Device', (
+      tester,
+    ) async {
+      ann.blockPerson(benId);
+      Future<void> people() => page(
+        tester,
+        Scaffold(
+          body: ListView(children: [PeopleSection(store: ann)]),
+        ),
+      );
+      await people();
+      expect(find.byKey(ValueKey('people-$benId')), findsNothing);
+      expect(find.byKey(const ValueKey('peopleEmpty')), findsNothing);
+      expect(find.text('Blocked'), findsOneWidget);
+      expect(find.byKey(ValueKey('blocked-$benId')), findsNothing);
+      await tap(tester, find.text('Blocked'));
+      expect(find.byKey(ValueKey('blocked-$benId')), findsOneWidget);
+      expect(find.text('Ben'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await people();
+      expect(find.byKey(ValueKey('blocked-$benId')), findsOneWidget);
+      await tap(tester, find.byKey(ValueKey('blocked-$benId')));
+      expect(find.byType(PersonScreen), findsOneWidget);
+      expect(find.text(ann.personCode(benId)!), findsOneWidget);
+      expect(find.byKey(const ValueKey('unblock-person')), findsOneWidget);
+      await tap(tester, find.byKey(const ValueKey('unblock-person')));
+      await tap(tester, find.byKey(const ValueKey('unblock-confirm')));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(ValueKey('people-$benId')), findsOneWidget);
+      expect(find.text('Blocked'), findsNothing);
+    });
+
+    testWidgets('the block dialog fits a phone in German', (tester) async {
+      tester.view.physicalSize = const Size(720, 1280);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await page(
+        tester,
+        PersonScreen(
+          store: ben,
+          platform: platform,
+          work: inline,
+          id: ann.ownProfile!.id,
+        ),
+        locale: const Locale('de'),
+      );
+      await tap(tester, find.byKey(const ValueKey('block-person')));
+      expect(tester.takeException(), isNull);
+      expect(find.text('Blockieren und verlassen'), findsOneWidget);
     });
   });
 }

@@ -175,8 +175,12 @@ struct View {
     names: std::collections::HashMap<String, String>,
     /// Each person's Profile as it shows, Override applied, by Profile id.
     shown: std::collections::HashMap<String, Profile>,
-    /// People (#52): every Profile kept here, as the user sees them.
+    /// People (#52): every Profile kept here, as the user sees them,
+    /// but the blocked ones, listed apart (#90), and whether their
+    /// folded section is open.
     people_shown: Vec<Profile>,
+    blocked_people: Vec<Profile>,
+    blocked_open: bool,
     /// The person whose Profile the dialog shows.
     person: Option<PersonView>,
     /// The person this Device belongs to in each Shared Area.
@@ -274,10 +278,14 @@ enum Dialog {
         cancel: bool,
     },
     /// The preview of a Sent Item opened here, with what comparing its
-    /// sender's short code came to.
+    /// sender's short code came to; whether its sender may be blocked,
+    /// not the user's own Profile, and, while "Decline and block" asks,
+    /// the Shared Areas blocking them leaves (#90).
     SentItem {
         opened: Box<Opened>,
         compared: Compared,
+        may_block: bool,
+        blocking: Option<Vec<String>>,
     },
     /// The people of the Shared Area `area`.
     People {
@@ -309,12 +317,23 @@ enum Dialog {
     /// Devices, both changed by the user, met.
     WhichProfile,
     /// Another person's Profile (#52), with where comparing their code
-    /// stands and the name for the user being typed.
+    /// stands, the name for the user being typed, and whether blocking
+    /// them or ending their block is being asked (#90).
     Person {
         id: String,
         comparing: Comparing,
         name: String,
+        asking: Option<Asking>,
     },
+}
+
+/// What a person's Profile asks before it blocks them or ends their
+/// block (#90, ADR 0021).
+#[derive(Debug, Clone, PartialEq)]
+enum Asking {
+    /// Whether to block them, leaving these Shared Areas they manage.
+    Block(Vec<String>),
+    Unblock,
 }
 
 /// Where comparing the short code of a Sent Item's sender stands
@@ -429,6 +448,17 @@ enum Action {
     /// Accepts the Sent Item previewed, or declines it.
     AcceptSent,
     DeclineSent,
+    /// Asks whether to decline the Sent Item previewed and block its
+    /// sender (#90).
+    AskBlockSender,
+    /// Blocks the person the dialog asks about, declining the Sent Item
+    /// previewed; ends the block of the person whose Profile asks; or
+    /// takes the question back.
+    Block,
+    Unblock,
+    CancelBlock,
+    /// Keeps whether the "Blocked" section of People is open.
+    BlockedOpen(bool),
     /// Asks to compare the sender's short code in person, and what that
     /// came to: whether the codes match.
     CompareCodes,
@@ -1000,9 +1030,12 @@ impl App {
         }
         match self.store.open_sent_item(&bytes) {
             Ok(Ok(opened)) => {
+                let may_block = matches!(self.store.is_own_person(&opened.sender.id), Ok(false));
                 self.dialog = Some(Dialog::SentItem {
                     opened: Box::new(opened),
                     compared: Compared::Not,
+                    may_block,
+                    blocking: None,
                 });
             }
             Ok(Err(OpenError::NotForUs)) => {
@@ -1013,6 +1046,9 @@ impl App {
             }
             Ok(Err(OpenError::NotFromSender)) => {
                 self.notice = Some(self.t.sent_item_not_from_sender().to_string());
+            }
+            Ok(Err(OpenError::FromBlocked)) => {
+                self.notice = Some(self.t.sent_item_from_blocked().to_string());
             }
             Err(e) => self.notice = Some(format!("{} ({e})", self.t.sent_item_unreadable())),
         }
@@ -1478,6 +1514,8 @@ impl App {
             names,
             shown: shown_people,
             people_shown: self.store.people_shown()?,
+            blocked_people: self.store.blocked_people()?,
+            blocked_open: self.store.local_setting(BLOCKED_OPEN)?.as_deref() == Some("true"),
             person: match &self.dialog {
                 Some(Dialog::Person { id, .. }) => Some(PersonView::read(&self.store, id)?),
                 _ => None,
@@ -1891,10 +1929,20 @@ impl App {
             }
             Action::SendNote => self.send_note()?,
             Action::AcceptSent => {
-                if let Some(Dialog::SentItem { opened, compared }) = self.dialog.take() {
+                if let Some(Dialog::SentItem {
+                    opened, compared, ..
+                }) = self.dialog.take()
+                {
                     // The alerts plan its alarms once the action is done.
-                    self.store
-                        .accept_sent_item(&opened.item, compared == Compared::Match)?;
+                    let accepted = self
+                        .store
+                        .accept_sent_item(&opened.item, compared == Compared::Match);
+                    if let Err(oldbrainfix_core::Error::FromBlocked) = accepted {
+                        // Its sender was blocked since it opened.
+                        self.notice = Some(self.t.sent_item_from_blocked().to_string());
+                        return Ok(());
+                    }
+                    accepted?;
                     let said = match opened.state {
                         SentItemState::Update => self.t.sent_item_applied(),
                         SentItemState::Cancel => self.t.sent_item_trashed(),
@@ -1909,6 +1957,30 @@ impl App {
                 if previewed {
                     self.notice = Some(self.t.sent_item_declined().to_string());
                 }
+            }
+            Action::AskBlockSender => {
+                if let Some(Dialog::SentItem {
+                    opened, blocking, ..
+                }) = &mut self.dialog
+                {
+                    *blocking = Some(self.store.areas_to_leave_for_blocking(&opened.sender.id)?);
+                }
+            }
+            Action::Block => self.block()?,
+            Action::Unblock => {
+                if let Some(Dialog::Person { id, asking, .. }) = &mut self.dialog {
+                    self.store.unblock_person(id)?;
+                    *asking = None;
+                }
+            }
+            Action::CancelBlock => match &mut self.dialog {
+                Some(Dialog::SentItem { blocking, .. }) => *blocking = None,
+                Some(Dialog::Person { asking, .. }) => *asking = None,
+                _ => {}
+            },
+            Action::BlockedOpen(open) => {
+                self.store
+                    .set_local_setting(BLOCKED_OPEN, if open { "true" } else { "false" })?;
             }
             Action::CompareCodes => {
                 if let Some(Dialog::SentItem { compared, .. }) = &mut self.dialog {
@@ -3245,8 +3317,22 @@ impl App {
                         cancel,
                         ..
                     } => send_form(ui, &t, recipients, (picked, *update, cancel), actions),
-                    Dialog::SentItem { opened, compared } => {
-                        sent_item_form(ui, &t, tones, (opened, *compared, pictures), actions);
+                    Dialog::SentItem {
+                        opened,
+                        blocking: Some(areas),
+                        ..
+                    } => {
+                        let name = profile_view::display_name(&t, &opened.sender.name);
+                        block_form(ui, &t, name, &area_names(&t, view, areas), actions);
+                    }
+                    Dialog::SentItem {
+                        opened,
+                        compared,
+                        may_block,
+                        blocking: None,
+                    } => {
+                        let shown = (opened.as_ref(), *compared, *may_block);
+                        sent_item_form(ui, &t, tones, (shown, pictures), actions);
                     }
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
@@ -3286,10 +3372,22 @@ impl App {
                         });
                     }
                     Dialog::Person {
-                        comparing, name, ..
+                        comparing,
+                        name,
+                        asking,
+                        ..
                     } => {
                         let mut asked = Vec::new();
-                        if let Some(square) = person_square.as_mut() {
+                        if let (Some(asking), Some(person)) = (asking.as_ref(), &view.person) {
+                            let name = profile_view::display_name(&t, &person.shown.name);
+                            match asking {
+                                Asking::Block(areas) => {
+                                    let areas = area_names(&t, view, areas);
+                                    block_form(ui, &t, name, &areas, actions);
+                                }
+                                Asking::Unblock => unblock_form(ui, &t, name, actions),
+                            }
+                        } else if let Some(square) = person_square.as_mut() {
                             let mut picked = Vec::new();
                             profile_view::square_page(ui, &t, square, &mut picked);
                             asked.extend(picked.into_iter().filter_map(|a| match a {
@@ -3341,6 +3439,13 @@ impl App {
             // Put off, not lost: it waits on the Profile page.
             actions.push(match dialog {
                 Dialog::WhichProfile => Action::Profile(ProfileAction::Later),
+                // A question about blocking goes back to what asked it.
+                Dialog::SentItem {
+                    blocking: Some(_), ..
+                }
+                | Dialog::Person {
+                    asking: Some(_), ..
+                } => Action::CancelBlock,
                 _ => Action::CloseDialog,
             });
         }
@@ -3500,6 +3605,7 @@ impl App {
             &mut self.profile_view,
         );
         let (people, pictures) = (&self.view.people_shown, &mut self.pictures);
+        let (blocked, blocked_open) = (&self.view.blocked_people, self.view.blocked_open);
         let mut people_asked = Vec::new();
         let profile = self.view.profile.as_ref();
         let code = self.view.profile_code.as_deref();
@@ -3542,25 +3648,31 @@ impl App {
                     }
                     ui.label(RichText::new(t.sync_settings_detail()).small().color(weak));
                 });
-                // People (#52): every Profile kept here, each opening it.
+                // People (#52): every Profile kept here, each opening it;
+                // the blocked ones (#90) in a fold of their own, closed
+                // until opened, which this Device remembers.
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.people_title()).strong().color(text));
-                    if people.is_empty() {
+                    if people.is_empty() && blocked.is_empty() {
                         ui.label(RichText::new(t.profile_people_empty()).small().color(weak));
                     }
                     for person in people {
-                        let name = profile_view::display_name(&t, &person.name).to_string();
-                        ui.horizontal(|ui| {
-                            let open = t.person_open(&name);
-                            let picture =
-                                profile_view::person_button(ui, pictures, person, 32.0, &open);
-                            let line = ui.add(
-                                egui::Button::new(RichText::new(&name).color(text)).frame(false),
-                            );
-                            if picture.clicked() || line.clicked() {
-                                people_asked.push(person.id.clone());
+                        people_row(ui, &t, pictures, person, &mut people_asked);
+                    }
+                    if !blocked.is_empty() {
+                        let fold = egui::CollapsingHeader::new(
+                            RichText::new(t.people_blocked()).color(text),
+                        )
+                        .id_salt("people blocked")
+                        .open(Some(blocked_open))
+                        .show(ui, |ui| {
+                            for person in blocked {
+                                people_row(ui, &t, pictures, person, &mut people_asked);
                             }
                         });
+                        if fold.header_response.clicked() {
+                            actions.push(Action::BlockedOpen(!blocked_open));
+                        }
                     }
                 });
                 embossed(ui, tones, false, None, |ui| {
@@ -3607,23 +3719,79 @@ impl App {
             id,
             comparing: Comparing::Not,
             name,
+            asking: None,
         });
         Ok(())
     }
 
     /// Closes the dialog. A person's Profile keeps the name typed last
     /// and shows the dialog it opened over again, a Sent Item's sender as
-    /// the user sees them now.
+    /// the user sees them now; a Sent Item whose sender the user blocked
+    /// there shows nothing more and closes too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
         let behind = self.dialog_behind.take();
         if let Some(Dialog::Person { id, name, .. }) = self.dialog.take() {
             self.store.set_override_name(&id, &name)?;
             self.person_square = None;
             self.dialog = behind;
-            if let Some(Dialog::SentItem { opened, .. }) = &mut self.dialog
-                && opened.trust != SenderTrust::Unknown
-            {
-                opened.sender = self.store.person_shown(&opened.sender.id)?;
+            if let Some(Dialog::SentItem { opened, .. }) = &mut self.dialog {
+                if self.store.is_blocked(&opened.sender.id)? {
+                    self.dialog = None;
+                    self.notice = Some(self.t.sent_item_from_blocked().to_string());
+                } else if opened.trust != SenderTrust::Unknown {
+                    opened.sender = self.store.person_shown(&opened.sender.id)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Blocks the person the dialog asks about (#90), leaving the Shared
+    /// Areas it named; asks again, naming them, should one have come in
+    /// by sync since. From a Sent Item's preview the item is declined and
+    /// the preview closes; a person's Profile stays and shows the block.
+    fn block(&mut self) -> oldbrainfix_core::Result<()> {
+        let done = match &mut self.dialog {
+            Some(Dialog::Person {
+                id,
+                asking: Some(Asking::Block(areas)),
+                ..
+            }) => match self.store.block_person(id, !areas.is_empty()) {
+                Ok(_) => None,
+                Err(oldbrainfix_core::Error::MustLeaveAreas(more)) => {
+                    *areas = more;
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            },
+            Some(Dialog::SentItem {
+                opened,
+                blocking: Some(areas),
+                ..
+            }) => match self.store.block_sent_item_sender(opened, !areas.is_empty()) {
+                Ok(blocked) => Some(blocked),
+                Err(oldbrainfix_core::Error::MustLeaveAreas(more)) => {
+                    *areas = more;
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            },
+            _ => return Ok(()),
+        };
+        match done {
+            None => {
+                if let Some(Dialog::Person { asking, .. }) = &mut self.dialog {
+                    *asking = None;
+                }
+            }
+            // A copied id blocks nobody: the item is only declined.
+            Some(blocked) => {
+                self.dialog = None;
+                self.notice = Some(if blocked {
+                    self.t.sent_item_blocked().to_string()
+                } else {
+                    self.t.sent_item_declined().to_string()
+                });
             }
         }
         Ok(())
@@ -3641,6 +3809,7 @@ impl App {
             id,
             comparing,
             name,
+            asking,
         }) = &mut self.dialog
         else {
             return Ok(());
@@ -3669,6 +3838,10 @@ impl App {
                 }
             }
             PersonAction::UseSquare | PersonAction::CancelSquare | PersonAction::TheirNotes => {}
+            PersonAction::Block => {
+                *asking = Some(Asking::Block(self.store.areas_to_leave_for_blocking(id)?));
+            }
+            PersonAction::Unblock => *asking = Some(Asking::Unblock),
             PersonAction::CompareCodes => *comparing = Comparing::Asking,
             PersonAction::CodesCompared(false) => *comparing = Comparing::Differ,
             PersonAction::CodesCompared(true) => {
@@ -4140,6 +4313,83 @@ fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
     }
 }
 
+/// The setting of this Device that keeps the "Blocked" section of People
+/// open (#90), the phone's.
+const BLOCKED_OPEN: &str = "peopleBlockedOpen";
+
+/// A person in People: their picture and name, either opening their
+/// Profile.
+fn people_row(
+    ui: &mut Ui,
+    t: &L10n,
+    pictures: &mut profile_view::Pictures,
+    person: &Profile,
+    asked: &mut Vec<String>,
+) {
+    let text = ui.visuals().text_color();
+    let name = profile_view::display_name(t, &person.name).to_string();
+    ui.horizontal(|ui| {
+        let open = t.person_open(&name);
+        let picture = profile_view::person_button(ui, pictures, person, 32.0, &open);
+        let line = ui.add(egui::Button::new(RichText::new(&name).color(text)).frame(false));
+        if picture.clicked() || line.clicked() {
+            asked.push(person.id.clone());
+        }
+    });
+}
+
+/// The names of the Areas `ids` as shown, separated by commas.
+fn area_names(t: &L10n, view: &View, ids: &[String]) -> String {
+    ids.iter()
+        .filter_map(|id| view.area(id))
+        .map(|a| area_name(t, a))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Whether to block the person shown as `name` (#90, ADR 0021), as the
+/// phone asks: when they manage Shared Areas this Device is in, `areas`
+/// names them, and blocking leaves them.
+fn block_form(ui: &mut Ui, t: &L10n, name: &str, areas: &str, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    title(ui, &t.person_block_question(name));
+    let (detail, verb) = if areas.is_empty() {
+        (t.person_block_detail(name), t.person_block())
+    } else {
+        (
+            t.person_block_leave_detail(name, areas),
+            t.person_block_leave(),
+        )
+    };
+    ui.label(RichText::new(detail).color(text));
+    ui.horizontal(|ui| {
+        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+            actions.push(Action::CancelBlock);
+        }
+        if destructive(ui, verb) {
+            actions.push(Action::Block);
+        }
+    });
+}
+
+/// Whether to end the block of the person shown as `name` (#90).
+fn unblock_form(ui: &mut Ui, t: &L10n, name: &str, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    title(ui, &t.person_unblock_question(name));
+    ui.label(RichText::new(t.person_unblock_detail()).color(text));
+    ui.horizontal(|ui| {
+        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+            actions.push(Action::CancelBlock);
+        }
+        if ui
+            .button(RichText::new(t.person_unblock()).color(text))
+            .clicked()
+        {
+            actions.push(Action::Unblock);
+        }
+    });
+}
+
 /// A confirm button for a destructive step: its verb in the error colour
 /// (UI laws).
 fn destructive(ui: &mut Ui, label: &str) -> bool {
@@ -4267,7 +4517,10 @@ fn sent_item_form(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    (opened, compared, pictures): (&Opened, Compared, &mut profile_view::Pictures),
+    ((opened, compared, may_block), pictures): (
+        (&Opened, Compared, bool),
+        &mut profile_view::Pictures,
+    ),
     actions: &mut Vec<Action>,
 ) {
     let text = ui.visuals().text_color();
@@ -4394,6 +4647,13 @@ fn sent_item_form(
             actions.push(Action::DeclineSent);
         }
     });
+    if may_block
+        && ui
+            .button(RichText::new(t.sent_item_block()).color(text))
+            .clicked()
+    {
+        actions.push(Action::AskBlockSender);
+    }
     let full = matches!(opened.state, SentItemState::Fresh | SentItemState::Update);
     egui::ScrollArea::vertical()
         .id_salt("sent item")

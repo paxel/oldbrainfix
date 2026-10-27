@@ -119,12 +119,14 @@ extension Overrides on Store {
 
   /// People (#52): every Profile of another person kept here, as the
   /// user sees them, Overrides applied, by name; a Profile another one
-  /// kept here replaced shows only as that one.
+  /// kept here replaced shows only as that one, and a blocked person
+  /// only among [Blocks.blockedPeople].
   List<Profile> get peopleShown {
     final ids = _people.byId.keys.toList()..sort(_compareUtf8);
+    final blocked = blockedIds;
     final shown = [
       for (final id in ids)
-        if (resolvePerson(id) == id) personShown(id),
+        if (resolvePerson(id) == id && !blocked.contains(id)) personShown(id),
     ];
     shown.sort((a, b) {
       final byName = _compareUtf8(a.name, b.name);

@@ -148,6 +148,10 @@ _Avoid_: nickname, contact name
 Every Profile the user's Devices know, listed on the Profile page.
 _Avoid_: contacts, friends
 
+**Block**:
+What the user does to a person whose writing they never want to see again: on all of the user's own Devices, everything that person wrote is deleted and nothing more of it is stored, shown or passed on, in any Shared Area and from any Device that relays it, and no Sent Item of theirs is shown; only their check-offs stay, without their name or picture. The person is not told. Blocking a Manager of a Shared Area means leaving that Area. Unblocking fetches their writing again.
+_Avoid_: ban, mute, ignore
+
 **Conflict**:
 Two versions of the same user-edited field written on different Devices without either having seen the other. The newest shows meanwhile; the user picks which one stays.
 _Avoid_: clash, merge conflict

@@ -99,3 +99,7 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 - "Verified" is a local setting of the Device where the codes were compared; the user's other Devices do not learn it.
 - A key met by pair code no longer makes a Sent Item's sender verified; only the short code compared does.
 - A person removed from a Shared Area keeps its key (ADR 0012, 0013), so they can still read the Profiles published in the shared folder under it afterwards.
+
+## Blocks (ADR 0021)
+
+Amended by ADR 0021 (#90): a blocked person's Profile is kept with its picture taken out of the record (`"stripped":true`), never passed on, and no newer record of theirs is taken while they are blocked; after an unblock any record of theirs at the same version or newer replaces it. People leaves blocked people out. The block itself lies in the log like an Override, `block:<profile id>`, and counts only when one of the user's own Devices wrote it.

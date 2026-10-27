@@ -2,7 +2,9 @@
 //! their picture on a card, in an Area's people and on a Sent Item;
 //! it shows their own name, picture, code and verified state, compares
 //! codes, and keeps a name and picture for the user alone, which every
-//! view shows; the Profile page lists People.
+//! view shows; the Profile page lists People. A person is blocked from
+//! their Profile or a Sent Item's preview and listed in a folded
+//! "Blocked" section of People (#90).
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -16,8 +18,8 @@ use oldbrainfix_core::lan::{
     Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
 };
 use oldbrainfix_core::{
-    AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonFilter, Places, SigningKey, Store,
-    profile,
+    AreaAccess, AreaRole, Invite, Notes, OwnProfile, PairedDevice, PersonFilter, Places,
+    SigningKey, Store, profile,
 };
 use oldbrainfix_gui::{App, Selection};
 
@@ -391,5 +393,200 @@ fn the_person_filter_ticks_me_and_people_and_combines_with_the_search() -> TestR
     press(&mut harness, Role::CheckBox, "Ben");
     press(&mut harness, Role::CheckBox, "Me");
     assert_eq!(harness.state().shown_notes(), vec![unsorted]);
+    Ok(())
+}
+
+/// Ben's Note sent to Ann, dropped onto Ann's window: its preview shows.
+fn preview_from_ben(
+    shared: Shared,
+) -> Result<(Harness<'static, App>, tempfile::TempDir), Box<dyn std::error::Error>> {
+    let note = Notes::new(&shared.ben).capture("Dentist", None, None)?;
+    let bytes = shared.ben.send_note(&note.id, None, false)?;
+    let dir = tempfile::tempdir()?;
+    let mut harness = window(app(shared.ann, Selection::All));
+    drop_bytes(&mut harness, &dir, "from-ben.oldbrain", &bytes)?;
+    assert!(shows(&harness, "From Ben"));
+    Ok((harness, dir))
+}
+
+/// Drops `bytes` as the file `name` onto the window.
+fn drop_bytes(
+    harness: &mut Harness<'_, App>,
+    dir: &tempfile::TempDir,
+    name: &str,
+    bytes: &[u8],
+) -> TestResult {
+    let path = dir.path().join(name);
+    std::fs::write(&path, bytes)?;
+    harness.input_mut().dropped_files = vec![egui::DroppedFile {
+        path: Some(path),
+        ..Default::default()
+    }];
+    harness.run();
+    Ok(())
+}
+
+#[test]
+fn blocking_from_a_profile_deletes_their_notes_and_folds_them_into_blocked() -> TestResult {
+    let Shared { ann, ben_id, .. } = shared()?;
+    let mut harness = window(app(ann, Selection::Profile));
+    click(&mut harness, "Open the Profile of Ben");
+    click(&mut harness, "Block");
+    assert!(shows(&harness, "Block Ben?"));
+    assert!(shows(&harness, "A shared folder can still hold"));
+    // Cancel goes back to the Profile, nothing blocked.
+    click(&mut harness, "Cancel");
+    assert!(shows(&harness, "Name and picture for me"));
+    assert!(!harness.state().store().is_blocked(&ben_id)?);
+
+    click(&mut harness, "Block");
+    click(&mut harness, "Block");
+    let store = harness.state().store();
+    assert!(store.is_blocked(&ben_id)?);
+    assert!(
+        Notes::new(store)
+            .all()?
+            .iter()
+            .all(|n| n.text != "Ben buys bread")
+    );
+    // The Profile stays open and says so.
+    assert!(shows(&harness, "Blocked: nothing they write is kept"));
+    assert!(harness.query_by_label("Unblock").is_some());
+    click(&mut harness, "Close");
+
+    // People leaves him out; the "Blocked" fold lists him, closed first.
+    assert!(harness.query_by_label("Blocked").is_some());
+    assert!(harness.query_by_label("Open the Profile of Ben").is_none());
+    assert!(!shows(&harness, "Nobody yet."));
+    click(&mut harness, "Blocked");
+    assert_eq!(
+        harness.state().store().local_setting("peopleBlockedOpen")?,
+        Some("true".to_string())
+    );
+    click(&mut harness, "Open the Profile of Ben");
+    click(&mut harness, "Unblock");
+    assert!(shows(&harness, "Unblock Ben?"));
+    click(&mut harness, "Unblock");
+    assert!(!harness.state().store().is_blocked(&ben_id)?);
+    assert!(harness.query_by_label("Block").is_some());
+    click(&mut harness, "Close");
+    assert!(harness.query_by_label("Blocked").is_none());
+    assert!(harness.query_by_label("Open the Profile of Ben").is_some());
+    Ok(())
+}
+
+#[test]
+fn the_blocked_fold_stays_as_left() -> TestResult {
+    let Shared { ann, ben_id, .. } = shared()?;
+    ann.block_person(&ben_id, false)?;
+    ann.set_local_setting("peopleBlockedOpen", "true")?;
+    let mut harness = window(app(ann, Selection::Profile));
+    assert!(harness.query_by_label("Open the Profile of Ben").is_some());
+    click(&mut harness, "Blocked");
+    assert!(harness.query_by_label("Open the Profile of Ben").is_none());
+    assert_eq!(
+        harness.state().store().local_setting("peopleBlockedOpen")?,
+        Some("false".to_string())
+    );
+    Ok(())
+}
+
+#[test]
+fn blocking_a_manager_leaves_the_areas_they_manage() -> TestResult {
+    let Shared { ann, ben, area, .. } = shared()?;
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("a Profile")?.id;
+    let mut harness = window(app(ben, Selection::Profile));
+    click(&mut harness, "Open the Profile of Ann");
+    click(&mut harness, "Block");
+    assert!(shows(
+        &harness,
+        "and you leave Household, which they manage"
+    ));
+    click(&mut harness, "Block and leave");
+    let store = harness.state().store();
+    assert!(store.is_blocked(&ann_id)?);
+    assert!(store.areas_to_leave_for_blocking(&ann_id)?.is_empty());
+    assert_eq!(store.access_in(&area, None)?, AreaAccess::None);
+    Ok(())
+}
+
+#[test]
+fn decline_and_block_in_a_preview_blocks_the_sender_and_refuses_their_items() -> TestResult {
+    let shared = shared()?;
+    let ben_id = shared.ben_id.clone();
+    let note = Notes::new(&shared.ben).capture("Plumber", None, None)?;
+    let again = shared.ben.send_note(&note.id, None, false)?;
+    let (mut harness, dir) = preview_from_ben(shared)?;
+    click(&mut harness, "Decline and block");
+    assert!(shows(&harness, "Block Ben?"));
+    // Cancel shows the preview again.
+    click(&mut harness, "Cancel");
+    assert!(shows(&harness, "From Ben"));
+    click(&mut harness, "Decline and block");
+    click(&mut harness, "Block");
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Declined and blocked: nothing was kept.")
+    );
+    let store = harness.state().store();
+    assert!(store.is_blocked(&ben_id)?);
+    assert!(Notes::new(store).all()?.iter().all(|n| n.text != "Dentist"));
+
+    // Another item of his shows nothing.
+    drop_bytes(&mut harness, &dir, "again.oldbrain", &again)?;
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Refused: this file comes from a person you blocked.")
+    );
+    Ok(())
+}
+
+#[test]
+fn a_preview_whose_sender_is_blocked_meanwhile_is_not_accepted() -> TestResult {
+    let shared = shared()?;
+    let ben_id = shared.ben_id.clone();
+    let (mut harness, _dir) = preview_from_ben(shared)?;
+    harness.state().store().block_person(&ben_id, false)?;
+    click(&mut harness, "Accept");
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Refused: this file comes from a person you blocked.")
+    );
+    let store = harness.state().store();
+    assert!(Notes::new(store).all()?.iter().all(|n| n.text != "Dentist"));
+    Ok(())
+}
+
+#[test]
+fn blocking_from_the_senders_profile_closes_the_preview() -> TestResult {
+    let shared = shared()?;
+    let ben_id = shared.ben_id.clone();
+    let (mut harness, _dir) = preview_from_ben(shared)?;
+    click(&mut harness, "Open the Profile of Ben");
+    click(&mut harness, "Block");
+    click(&mut harness, "Block");
+    assert!(harness.state().store().is_blocked(&ben_id)?);
+    click(&mut harness, "Close");
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Refused: this file comes from a person you blocked.")
+    );
+    Ok(())
+}
+
+#[test]
+fn ones_own_sent_item_offers_no_block() -> TestResult {
+    let Shared { ann, .. } = shared()?;
+    let note = Notes::new(&ann).capture("Mine", None, None)?;
+    let bytes = ann.send_note(&note.id, None, false)?;
+    let dir = tempfile::tempdir()?;
+    let mut harness = window(app(ann, Selection::All));
+    drop_bytes(&mut harness, &dir, "mine.oldbrain", &bytes)?;
+    assert!(harness.state().previewing());
+    assert!(harness.query_by_label("Decline and block").is_none());
     Ok(())
 }

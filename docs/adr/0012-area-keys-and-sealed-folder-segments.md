@@ -27,3 +27,7 @@ Amended by ADR 0019 (#59): the manifest writes its `format` only above 1, and a 
 ## Removed recordings and photos (ADR 0020)
 
 Amended by ADR 0020 (#77): a blob the log lets go of, a recording or photo removed with its text kept, is deleted from `blobs/` by the next folder sync of a Device that holds its key; the segments keep the removal like any other entry.
+
+## Blocks (ADR 0021)
+
+Amended by ADR 0021 (#90): the segments a blocked person's Devices write are never opened, and the folder is not touched for a block. An unblock forgets how far every segment was read, so the next folder sync reads them whole and takes in again what was refused.

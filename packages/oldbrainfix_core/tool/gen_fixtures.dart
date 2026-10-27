@@ -2489,6 +2489,221 @@ Future<void> _sharedFixture(Directory root) async {
   }
 }
 
+/// Every local setting of [store] but its own key, by key.
+List<List<String>> _settings(Store store) => [
+  for (final (key, value) in store.localSettingsWithPrefix(''))
+    if (key != 'device' && key != 'signseed') [key, value],
+];
+
+/// What blocking left on [store]: the entries it holds, how far it tells
+/// others it holds each Device, its refusal marks, its Profiles of other
+/// people as kept, the people blocked and the photos it holds.
+Map<String, Object?> _blockState(Store store, List<String> photos) => {
+  'entries': [for (final e in store.allEntries()) e.id],
+  'vector': Map.fromEntries(
+    store.versionVector().entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key)),
+  ),
+  'refused': [
+    for (final (key, value) in store.localSettingsWithPrefix('refused:'))
+      [key, value],
+  ],
+  'people': [
+    for (final (key, value) in store.localSettingsWithPrefix('person:'))
+      [key, value],
+  ],
+  'blocked': [
+    for (final p in store.blockedPeople)
+      {'id': p.id, 'name': p.name, 'picture': p.picture != null},
+  ],
+  'shown': [for (final p in store.peopleShown) p.id],
+  'photos': [
+    for (final hash in photos)
+      if (store.photo(hash) != null) hash,
+  ],
+  'read': _expected(store)..remove('device'),
+};
+
+/// Ann shares her Household with Carol as a Member and joins Carol's
+/// School as one; Carol writes a Note with a photo and its Photo Text,
+/// Amends Ann's Note and checks off Ann's Routine, and Ann makes a
+/// Reminder of Carol's Note. Ann blocks Carol, which leaves the School
+/// Carol manages; Carol writes more, which Ann takes in; Ann unblocks
+/// her and takes in Carol's whole log again. The block and the unblock
+/// are written at a held clock.
+void _blockFixture(Directory root) {
+  final out = Directory('${root.path}/block');
+  final keep = secretBytes;
+  secretBytes = _counted(600);
+  final ann = _store();
+  final carol = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    ann
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ann');
+    carol
+      ..applyProfileDefaults(name: 'Carol')
+      ..setOwnProfilePicture(squareProfilePicture(_gradient(40, 30)));
+    ann.ensureAreaKeys();
+    carol.ensureAreaKeys();
+
+    void remember(Store store, Store peer, String name) => store.rememberDevice(
+      PairedDevice(
+        id: peer.deviceId,
+        name: name,
+        fingerprint: '',
+        host: null,
+        port: null,
+        lastSync: DateTime.utc(2026, 1, 1),
+        shared: true,
+      ),
+    );
+    void invite(Store host, Store joiner, String area) {
+      final done = answerSync(
+        host,
+        syncRequest(
+          joiner,
+          host.versionVector(),
+          name: 'Phone',
+          hostDevice: host.deviceId,
+          invited: true,
+        ),
+        name: 'Desk',
+        inviting: Invite(area, role: AreaRole.member),
+      )!;
+      applyAnswer(joiner, done.answer, shared: true);
+      remember(host, joiner, 'Phone');
+      remember(joiner, host, 'Desk');
+    }
+
+    void session() {
+      final done = answerSync(
+        ann,
+        syncRequest(
+          carol,
+          ann.versionVector(),
+          name: 'Phone',
+          hostDevice: ann.deviceId,
+        ),
+        name: 'Desk',
+      )!;
+      applyAnswer(carol, done.answer, shared: true);
+      for (final ref in ann.missingBlobs()) {
+        final (kind, hash) = splitBlobRef(ref);
+        if (carol.blob(kind, hash) case final bytes?) {
+          ann.putBlob(kind, hash, bytes);
+        }
+      }
+    }
+
+    final household = ann.share(Places(ann).addArea('Household').id);
+    invite(ann, carol, household);
+    final school = carol.share(Places(carol).addArea('School').id);
+    invite(carol, ann, school);
+    final milk = Notes(ann).capture('Buy milk', place: household);
+    final bins = Routines(ann).spawn(
+      milk.id,
+      Schedule(
+        start: Day(2026, 1, 1),
+        times: [_at(8)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    session();
+    final rude = Notes(carol)
+        .capture('Rude words', place: household, photos: [_gradient(16, 12)]);
+    final hash = rude.photos.single;
+    // A Note of her own, which never leaves her Device.
+    Notes(carol).capture('Carol alone');
+    Notes(carol).setPhotoText(rude.id, hash, 'Rude picture');
+    Notes(carol).amend(milk.id, 'Rude too');
+    Routines(carol).markDone(bins.id, Occurrence(Day(2026, 1, 1), _at(8)));
+    session();
+    final cake = Routines(ann)
+        .spawn(rude.id, Schedule(start: Day(2026, 1, 2), times: [_at(9)]));
+    final carolId = carol.ownProfile!.id;
+    _write(File('${out.path}/before.jsonl'), _log(ann));
+    _writeBlobs(ann, Directory('${out.path}/before'));
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert(_settings(ann))}\n',
+    );
+    final leave = ann.areasToLeaveForBlocking(carolId);
+
+    // Ann blocks Carol, leaving the School she manages.
+    final blockAt = DateTime.utc(2026, 1, 3, 9);
+    _held = blockAt;
+    var mark = ann.currentSeq();
+    ann.blockPerson(carolId, leaveAreas: true);
+    _writeAfter(ann, mark, File('${out.path}/block.jsonl'));
+    final blocked = _blockState(ann, [hash]);
+    // Carol learns that Ann left the School, and of nothing else.
+    carol.applyEntries([
+      for (final e in ann.entriesAfter(mark))
+        if (e.entity == school) e,
+    ]);
+
+    // Carol writes more: a Note and a check-off; Ann takes them in.
+    _held = null;
+    mark = carol.currentSeq();
+    Notes(carol).capture('Ruder words', place: household);
+    Routines(carol).markDone(bins.id, Occurrence(Day(2026, 1, 2), _at(8)));
+    _writeAfter(carol, mark, File('${out.path}/incoming.jsonl'));
+    final incomingAt = DateTime.utc(2026, 1, 3, 12);
+    _held = incomingAt;
+    ann.applyEntries(carol.entriesAfter(mark));
+    final incoming = _blockState(ann, [hash]);
+
+    // Ann unblocks her, and Carol's Device syncs with hers: what Ann
+    // still shares with Carol comes back, the School and Carol's own Note
+    // do not, and nothing of Carol's is asked for again.
+    final unblockAt = DateTime.utc(2026, 1, 4, 9);
+    _held = unblockAt;
+    mark = ann.currentSeq();
+    ann.unblockPerson(carolId);
+    _writeAfter(ann, mark, File('${out.path}/unblock.jsonl'));
+    final unblocked = _blockState(ann, [hash]);
+    // Without the Profiles, whose pictures each core makes again its
+    // own way.
+    final refetch = syncRequest(
+      carol,
+      ann.versionVector(),
+      name: 'Phone',
+      hostDevice: ann.deviceId,
+    )..remove('profiles');
+    _write(File('${out.path}/refetch.json'), '${_json.convert(refetch)}\n');
+    answerSync(ann, refetch, name: 'Desk');
+    final refetched = _blockState(ann, [hash]);
+    final again = syncRequest(
+      carol,
+      ann.versionVector(),
+      name: 'Phone',
+      hostDevice: ann.deviceId,
+    );
+    if (Notes(ann).byId(rude.id)?.text != 'Rude words' ||
+        !ann.missingBlobs().contains('photo/$hash') ||
+        Places(ann).areaById(school)?.name != null ||
+        ann.refusalMarks().isNotEmpty ||
+        (again['entries']! as List).any(
+          (e) => (e as Map)['device'] == carol.deviceId,
+        )) {
+      throw StateError('the block fixture did not fetch Carol\'s Note again');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({'carol': carolId, 'household': household, 'school': school, 'note': rude.id, 'cake': cake.id, 'photo': hash, 'leave': leave, 'blockAt': blockAt.toIso8601String(), 'incomingAt': incomingAt.toIso8601String(), 'unblockAt': unblockAt.toIso8601String(), 'blocked': blocked, 'incoming': incoming, 'unblocked': unblocked, 'refetched': refetched})}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    _held = null;
+    ann.close();
+    carol.close();
+  }
+}
+
 /// The Profiles of other people [store] keeps, as both cores keep them:
 /// signed as received, by id.
 Map<String, Object?> _people(Store store) => {
@@ -3654,7 +3869,21 @@ Future<void> main(List<String> args) async {
     'after (`takes`, ids counted from 0x65), Profiles of another person '
     'taken by a Device that keeps one with what became of each and what '
     'it keeps after (`people`), and a Profile picture made here '
-    '(`picture.jpg`).\n',
+    '(`picture.jpg`).\n'
+    '- `block/`: Ann shares her Household with Carol as a Member and '
+    'joins the School Carol manages; Carol writes a Note with a photo and '
+    'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '
+    'Ann makes a Reminder of Carol\'s Note: Ann\'s log with its photo '
+    '(`before.jsonl`) and every setting of hers but her key '
+    '(`settings.json`); Ann blocking Carol, which leaves the School '
+    '(`block.jsonl`, at a held clock); Carol writing more '
+    '(`incoming.jsonl`), which Ann takes in; Ann unblocking her '
+    '(`unblock.jsonl`, at a held clock), and Carol\'s Device syncing with '
+    'hers (`refetch.json`, the request without its Profiles), which brings '
+    'back what they still share and neither the School Ann left nor a Note '
+    'Carol kept to herself; after each step the entries Ann holds, the '
+    'vector she tells, her refusal marks, the Profiles she keeps, the '
+    'people blocked, the photo and what she reads (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -3690,6 +3919,7 @@ Future<void> main(List<String> args) async {
   await _backupFixture(root);
   _profilesFixture(root);
   _versionsFixture(root);
+  _blockFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

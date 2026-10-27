@@ -16,6 +16,13 @@ pub enum Error {
     /// an update.
     #[error("a sync bundle of a newer version")]
     BundleNeedsUpdate,
+    /// Blocking a person who manages these Shared Areas leaves them, and
+    /// was not asked to (ADR 0021): nothing changed.
+    #[error("blocking leaves the Shared Areas the person manages")]
+    MustLeaveAreas(Vec<String>),
+    /// A Sent Item from a person the user blocked (ADR 0021).
+    #[error("a Sent Item from a blocked person")]
+    FromBlocked,
     /// A Backup that could not be restored, and why.
     #[error("backup: {0:?}")]
     Backup(crate::backup::Problem),

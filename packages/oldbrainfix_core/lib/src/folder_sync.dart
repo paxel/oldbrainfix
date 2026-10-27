@@ -566,7 +566,8 @@ String _readStateKey(String device) => 'folderRead:$device';
 /// to be read once the key is here. Entries are never filtered by the
 /// version vector: a segment of a key learned late fills a gap below it,
 /// and only the store knows what it holds. A manifest of a newer format
-/// is counted, and nothing of its writer read.
+/// is counted, and nothing of its writer read. A blocked person's
+/// Devices' segments are never opened (ADR 0021).
 Future<(List<Entry>, int, int)> _readForeign(
   Store store,
   SyncFolder folder,
@@ -574,6 +575,7 @@ Future<(List<Entry>, int, int)> _readForeign(
   bool remember = true,
 }) async {
   final self = store.deviceId;
+  final blocked = store.blockedDevices();
   final fresh = <Entry>[];
   final states = <String, Map<String, Object>>{};
   var unreadable = 0;
@@ -581,7 +583,7 @@ Future<(List<Entry>, int, int)> _readForeign(
   for (final name in await folder.list('')) {
     if (!name.endsWith('.manifest')) continue;
     final device = name.substring(0, name.length - '.manifest'.length);
-    if (device == self || device.isEmpty) continue;
+    if (device == self || device.isEmpty || blocked.contains(device)) continue;
     final FolderManifest? manifest;
     final List<int>? bytes;
     try {
@@ -1070,6 +1072,13 @@ extension SyncFolderSettings on Store {
   void forgetSyncFolder() {
     removeLocalSetting(_folderKey);
     removeLocalSetting(_statusKey);
+    forgetFolderReads();
+  }
+
+  /// Forgets how far every other Device's segments were read, so the
+  /// next folder sync reads them whole; the store skips what it holds.
+  /// After an unblock that brings back what was refused (ADR 0021).
+  void forgetFolderReads() {
     for (final (key, _) in localSettingsWithPrefix(_readPrefix)) {
       removeLocalSetting(key);
     }

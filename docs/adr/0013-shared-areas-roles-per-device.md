@@ -29,3 +29,7 @@ A Shared Area reuses whatever shared folder both people reach, with no folder of
 ## Profiles (ADR 0017)
 
 Amended by ADR 0017 (#50): nobody types a name any more. The grant's `name` and its person id (the id of the first Device invited) gave way to the Profile id; no release carried the old grants, so nothing is migrated. The invite shows the other person's Profile, with picture, name and short code, and the grant is written only once the inviter confirmed it: a phone inviting a computer fetches the computer's Profile with `GET /profile` before its `POST /sync`; a computer inviting a phone holds the phone's `POST /sync`, which carries the phone's Profile, until the user answers. The person of a Note is its Profile, found through the key of the Device that wrote it, the Profile's binding and the aliases, and checked against the person the grant names. The Profiles of the people of a Shared Area travel with its sync, the shared folder and bundles; the details are in ADR 0017.
+
+## Blocks and leaving (ADR 0021)
+
+Amended by ADR 0021 (#90): a blocked person's Devices are those the grants name them for, and what they write is refused at import, but their check-offs, grants and the filing of their Notes. A grant set to null counts also when the Device that signed it holds a grant naming the same person as the grant it ends: a person may end the grants of their own Devices, and so leave an Area, a Member too.

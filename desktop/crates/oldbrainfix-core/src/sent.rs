@@ -455,6 +455,46 @@ impl Store {
         })
     }
 
+    /// Whether `item` comes from a person the user blocked: its Profile's
+    /// id is blocked, or it is signed by a blocked person's Device.
+    fn sent_by_blocked(&self, item: &SentItem) -> Result<bool> {
+        if let Some(profile) = Profile::parse(&item.profile.record)
+            && self.is_blocked(&profile.id)?
+        {
+            return Ok(true);
+        }
+        Ok(self.blocked_devices()?.contains(&item.from.device))
+    }
+
+    /// "Decline and block" on the preview of `opened` (#90), as the Dart
+    /// core's `blockSentItemSender`: keeps nothing of the item and blocks
+    /// its sender ([`Store::block_person`]), keeping their Profile
+    /// without its picture so the "Blocked" list names them. With
+    /// `leave_areas` as there, and the same [`Error::MustLeaveAreas`]
+    /// before anything is kept. Returns false, blocking nobody, for the
+    /// own Profile's id and for an id kept here under another first key:
+    /// a copied id would block whoever the Profile kept here is.
+    pub fn block_sent_item_sender(&self, opened: &Opened, leave_areas: bool) -> Result<bool> {
+        let id = &opened.sender.id;
+        if self.is_own_person(id)? {
+            return Ok(false);
+        }
+        if let Some(kept) = self.person_code(id)?
+            && kept != opened.code
+        {
+            return Ok(false);
+        }
+        if !leave_areas {
+            let areas = self.areas_to_leave_for_blocking(id)?;
+            if !areas.is_empty() {
+                return Err(Error::MustLeaveAreas(areas));
+            }
+        }
+        self.take_person(&opened.item.profile.to_json(), None)?;
+        self.block_person(id, leave_areas)?;
+        Ok(true)
+    }
+
     /// The Note `item` was accepted as before, from the same key, in the
     /// trash or merged too: the newest of them.
     pub fn accepted_note(&self, item: &SentItem) -> Result<Option<String>> {
@@ -471,8 +511,12 @@ impl Store {
     /// record of it replaces the one kept (ADR 0017); with `verified` the
     /// user compared its short code in person ([`Store::verify_person`]).
     /// Returns the Note it is held as; `None` when there was nothing to
-    /// cancel. One whose id came here from another key only is refused.
+    /// cancel. One whose id came here from another key only is refused,
+    /// and one from a person the user blocked is [`Error::FromBlocked`].
     pub fn accept_sent_item(&self, item: &SentItem, verified: bool) -> Result<Option<String>> {
+        if self.sent_by_blocked(item)? {
+            return Err(Error::FromBlocked);
+        }
         let (held, foreign) = self.held(item)?;
         if held.is_none() && foreign {
             return Err(Error::Invalid(
@@ -1056,6 +1100,9 @@ pub enum OpenError {
     /// Its id came here from another key: only its sender may update or
     /// cancel it (ADR 0009).
     NotFromSender,
+    /// From a person the user blocked (ADR 0021): nothing of it is shown
+    /// or kept.
+    FromBlocked,
 }
 
 /// Whether `bytes` look like a Sent Item rather than a bundle: a JSON
@@ -1070,6 +1117,8 @@ pub fn looks_like_sent_item(bytes: &[u8]) -> bool {
 impl Store {
     /// Reads the Sent Item in `bytes`: decrypts it when it is encrypted,
     /// checks the signature over it and what accepting it would do here.
+    /// One from a person the user blocked is [`OpenError::FromBlocked`]
+    /// before anything of it is shown (ADR 0021).
     pub fn open_sent_item(&self, bytes: &[u8]) -> Result<std::result::Result<Opened, OpenError>> {
         if bytes.len() > MAX_BYTES {
             return Ok(Err(OpenError::NotASentItem));
@@ -1117,6 +1166,9 @@ impl Store {
         else {
             return Ok(Err(OpenError::NotASentItem));
         };
+        if self.sent_by_blocked(&item)? {
+            return Ok(Err(OpenError::FromBlocked));
+        }
         let trust = if sender.verified {
             SenderTrust::Verified
         } else if sender.kept {

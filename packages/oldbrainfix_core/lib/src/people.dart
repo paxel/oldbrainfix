@@ -9,7 +9,10 @@ part of 'profiles.dart';
 /// sight an id is bound to the keys that came with it; later a record
 /// counts only when one of them signed it. `"verified":true` says the
 /// user compared its short code in person (#51); it stays on this
-/// Device and is kept through every newer record.
+/// Device and is kept through every newer record. `"stripped":true` says
+/// the person was blocked and their picture taken out of the record
+/// (ADR 0021), so its signature no longer holds and it is never passed
+/// on; any record of theirs at the same version or newer replaces it.
 
 /// What became of another person's Profile that came in.
 enum PersonTaken {
@@ -39,7 +42,17 @@ class _Held {
   /// Whether the user compared its short code in person.
   final bool verified;
 
-  const _Held(this.sent, this.profile, this.bound, this.seen, this.verified);
+  /// Whether the picture was taken out of the record for a block.
+  final bool stripped;
+
+  const _Held(
+    this.sent,
+    this.profile,
+    this.bound,
+    this.seen,
+    this.verified, {
+    this.stripped = false,
+  });
 
   String get id => profile.id;
 }
@@ -160,6 +173,7 @@ extension People on Store {
           _chain(profile.id, signed.first, signed.keys).$1,
           seen,
           json['verified'] == true,
+          stripped: json['stripped'] == true,
         );
       }
     } on FormatException {
@@ -225,7 +239,11 @@ extension People on Store {
     }
     final resolved = resolvePerson(id);
     return _people.byId[resolved]?.profile ??
-        Profile(id: resolved, name: '', version: 1);
+        Profile(
+          id: resolved,
+          name: _nameWhenBlocked(resolved) ?? '',
+          version: 1,
+        );
   }
 
   /// The short code of the person [id]'s Profile, when it is kept here
@@ -288,13 +306,15 @@ extension People on Store {
   /// one kept only when a key bound to it signed it, keys join only when
   /// a bound key signed them, and aliases only when a bound key made
   /// them. Its name is sanitised and its picture made again, or it is
-  /// refused. The own Profile is left to [OwnProfile.takeOwnProfile].
+  /// refused. The own Profile is left to [OwnProfile.takeOwnProfile]; a
+  /// blocked person's is refused (ADR 0021).
   PersonTaken takePerson(Object? json, {bool Function(String id)? allowed}) {
     final theirs = SignedProfile.fromJson(json);
     final checked = theirs == null ? null : _check(theirs);
     if (theirs == null || checked == null) return PersonTaken.refused;
     final id = checked.profile.id;
     if (isOwnPerson(id)) return PersonTaken.unchanged;
+    if (isBlocked(id)) return PersonTaken.refused;
     if (allowed != null &&
         !allowed(id) &&
         !theirs.aliases.any(
@@ -337,9 +357,17 @@ extension People on Store {
       if (bound.contains(a.by) && a.signed) aliases[(a.alias, a.by)] = a;
     }
     final kept = Profile.parse(held.sent.record);
+    // A record whose picture a block took out gives way to theirs.
     final newer =
         kept == null ||
-        _replaces(theirs.record, checked.profile, held.sent.record, kept);
+        (held.stripped
+            ? checked.profile.version >= kept.version
+            : _replaces(
+                theirs.record,
+                checked.profile,
+                held.sent.record,
+                kept,
+              ));
     final next = SignedProfile(
       record: newer ? theirs.record : held.sent.record,
       signer: newer ? theirs.signer : held.sent.signer,
@@ -348,7 +376,8 @@ extension People on Store {
       keys: keys,
       aliases: _sortedAliases(aliases.values),
     );
-    if (jsonEncode(next.toJson()) == jsonEncode(held.sent.toJson())) {
+    if (!(held.stripped && newer) &&
+        jsonEncode(next.toJson()) == jsonEncode(held.sent.toJson())) {
       return PersonTaken.unchanged;
     }
     _keepPerson(
@@ -356,6 +385,7 @@ extension People on Store {
       newer ? checked.shown : held.profile.picture,
       held.seen,
       verified: held.verified,
+      stripped: held.stripped && !newer,
     );
     return PersonTaken.updated;
   }
@@ -368,6 +398,7 @@ extension People on Store {
     Uint8List? shown,
     String seen, {
     bool verified = false,
+    bool stripped = false,
   }) {
     final id = Profile.parse(sent.record)?.id;
     if (id == null) return;
@@ -377,6 +408,7 @@ extension People on Store {
         'profile': sent.toJson(),
         'seen': seen,
         if (shown != null) 'shown': base64.encode(shown),
+        if (stripped) 'stripped': true,
         if (verified) 'verified': true,
       }),
     );
@@ -397,7 +429,13 @@ extension People on Store {
     final held = _people.byId[resolvePerson(id)];
     if (held == null || personCode(held.id) != code) return false;
     if (held.verified) return true;
-    _keepPerson(held.sent, held.profile.picture, held.seen, verified: true);
+    _keepPerson(
+      held.sent,
+      held.profile.picture,
+      held.seen,
+      verified: true,
+      stripped: held.stripped,
+    );
     profileChanged();
     return true;
   }
@@ -450,12 +488,15 @@ extension People on Store {
   /// another person kept here; to another person's Device, or sealed
   /// under an Area's key, the own Profile and the Profiles of the people
   /// the grants of [areas] name now, so only the people of an Area get
-  /// those of its people.
+  /// those of its people. A blocked person's Profile goes nowhere
+  /// (ADR 0021).
   List<Map<String, Object?>> profilesToSend({Set<String>? areas}) {
     final out = <String, Map<String, Object?>>{};
+    final blocked = blockedIds;
+    bool passes(_Held held) => !held.stripped && !blocked.contains(held.id);
     if (areas == null) {
       for (final held in _people.byId.values) {
-        out[held.id] = held.sent.toJson();
+        if (passes(held)) out[held.id] = held.sent.toJson();
       }
     } else {
       if (ownSignedProfile case final own?) {
@@ -475,7 +516,7 @@ extension People on Store {
         for (final named in grantsOf(area)?.profiles ?? const <String>[]) {
           if (isOwnPerson(named)) continue;
           final held = _people.byId[resolvePerson(named)];
-          if (held != null) out[held.id] = held.sent.toJson();
+          if (held != null && passes(held)) out[held.id] = held.sent.toJson();
         }
       }
     }

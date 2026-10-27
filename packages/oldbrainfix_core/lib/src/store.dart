@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -269,7 +270,7 @@ class Store {
   Entry append(String entity, String field, String? value, {DateTime? date}) {
     final now = clock().toUtc();
     final device = deviceId;
-    final vector = versionVector();
+    final vector = _heldVector();
     final dseq = (vector[device] ?? 0) + 1;
     final unit = conflictUnit(field);
     final ctx = unit == null ? null : _context(entity, unit, device, vector);
@@ -472,13 +473,167 @@ class Store {
     return result;
   }
 
+  /// How far this Device holds each Device's entries, as it tells other
+  /// Devices: the newest dseq held, raised to the newest a blocked
+  /// person's Device had refused, so nobody sends them again; after an
+  /// unblock, below the first refused one that is not back yet and lay in
+  /// a Shared Area this Device still holds a role in, so they are sent
+  /// again (ADR 0021).
+  Map<String, int> versionVector() {
+    final vector = _heldVector();
+    for (final (device, mark) in refusalMarks()) {
+      final held = vector[device] ?? 0;
+      if (!mark.released) {
+        if (mark.high > held) vector[device] = mark.high;
+        continue;
+      }
+      final missing = _firstWanted(device, mark);
+      if (missing == null || missing > held) continue;
+      if (missing - 1 > 0) {
+        vector[device] = missing - 1;
+      } else {
+        vector.remove(device);
+      }
+    }
+    return vector;
+  }
+
+  /// The first dseq of [mark]'s runs not held here whose scope this
+  /// Device holds a role in; null when there is none.
+  int? _firstWanted(String device, RefusalMark mark) {
+    for (final run in mark.runs) {
+      if (!_wants(run)) continue;
+      final missing = _firstMissing(device, run.from, run.to);
+      if (missing != null) return missing;
+    }
+    return null;
+  }
+
+  /// Whether what was refused in [run] can come back: it lay in a Shared
+  /// Area this Device holds a role in now.
+  bool _wants(RefusedRun run) =>
+      judged.areas[run.scope]?.grantOf(deviceId) != null;
+
   /// The newest dseq held from each Device.
-  Map<String, int> versionVector() => {
+  Map<String, int> _heldVector() => {
     for (final row in _db.select(
       'SELECT device, MAX(dseq) AS m FROM entries GROUP BY device',
     ))
       row['device'] as String: row['m'] as int,
   };
+
+  /// The lowest dseq of [device] from [low] to [high] not held; null when
+  /// all of them are.
+  int? _firstMissing(String device, int low, int high) {
+    var next = low;
+    for (final r in _db.select(
+      'SELECT dseq FROM entries WHERE device = ? AND dseq BETWEEN ? AND ? '
+      'ORDER BY dseq',
+      [device, low, high],
+    )) {
+      if (r['dseq'] as int != next) return next;
+      next++;
+    }
+    return next > high ? null : next;
+  }
+
+  // ------------------------------------------------------------ refusals
+
+  static const _refusedPrefix = 'refused:';
+
+  /// Which entries of each of a blocked person's Devices were refused
+  /// (ADR 0021), by device: a local setting of this Device, since each of
+  /// the user's Devices refuses on its own. [RefusalMark.released] once
+  /// the person was unblocked, until what was refused is back.
+  List<(String, RefusalMark)> refusalMarks() => [
+    for (final (key, value) in localSettingsWithPrefix(_refusedPrefix))
+      if (RefusalMark.parse(value) case final mark?)
+        (key.substring(_refusedPrefix.length), mark),
+  ];
+
+  RefusalMark? _refusalMark(String device) =>
+      RefusalMark.parse(localSetting('$_refusedPrefix$device') ?? '');
+
+  void _keepRefusalMark(String device, RefusalMark mark) {
+    if (mark.runs.isEmpty) {
+      removeLocalSetting('$_refusedPrefix$device');
+    } else {
+      setLocalSetting('$_refusedPrefix$device', mark.encode());
+    }
+  }
+
+  /// Notes that the entry ([device], [dseq]) was refused, its entity
+  /// lying in [scope] (an Area, or [personalScope]'s name): the mark of
+  /// [device] takes it in, and counts as refusing again.
+  void noteRefused(String device, int dseq, String scope) {
+    final held = _refusalMark(device);
+    final mark = (held ?? const RefusalMark(runs: [])).adding(dseq, scope);
+    if (held != null && held.encode() == mark.encode()) return;
+    _keepRefusalMark(device, mark);
+  }
+
+  /// Lets [device]'s mark go: what it refused is wanted again, until it
+  /// is all back ([dropFilledRefusals]). Returns whether it was refusing.
+  bool releaseRefusals(String device) {
+    final held = _refusalMark(device);
+    if (held == null || held.released) return false;
+    _keepRefusalMark(device, RefusalMark(runs: held.runs, released: true));
+    return true;
+  }
+
+  /// Makes [device]'s released mark refuse again.
+  void holdRefusals(String device) {
+    final held = _refusalMark(device);
+    if (held == null || !held.released) return;
+    _keepRefusalMark(device, RefusalMark(runs: held.runs));
+  }
+
+  /// Forgets, of every released mark, the runs that are back and those
+  /// that cannot come back: lying in no Shared Area this Device holds a
+  /// role in now. A mark with nothing left goes.
+  void dropFilledRefusals() {
+    for (final (device, mark) in refusalMarks()) {
+      if (!mark.released) continue;
+      final left = [
+        for (final run in mark.runs)
+          if (_wants(run) && _firstMissing(device, run.from, run.to) != null)
+            run,
+      ];
+      if (left.length == mark.runs.length) continue;
+      _keepRefusalMark(device, RefusalMark(runs: left, released: true));
+    }
+  }
+
+  /// Every entry [device] wrote that is held here, by dseq.
+  List<Entry> entriesOf(String device) => _entries(
+    'SELECT * FROM entries WHERE device = ? ORDER BY dseq',
+    [device],
+  );
+
+  /// Deletes the entries [dseqs] of [device] from the log: only a block
+  /// does (ADR 0021), for what a blocked person wrote. Nothing else ever
+  /// leaves the log.
+  void deleteEntries(String device, Iterable<int> dseqs) {
+    var deleted = 0;
+    for (final dseq in dseqs) {
+      _db.execute('DELETE FROM entries WHERE device = ? AND dseq = ?', [
+        device,
+        dseq,
+      ]);
+      deleted += _db.updatedRows;
+    }
+    if (deleted > 0) _changed();
+  }
+
+  /// The entities whose id starts with [prefix], sorted.
+  List<String> entitiesWithPrefix(String prefix) => [
+    for (final r in _db.select(
+      'SELECT DISTINCT entity FROM entries '
+      'WHERE $_applied AND substr(entity, 1, ?) = ? ORDER BY entity',
+      [prefix.length, prefix],
+    ))
+      r['entity'] as String,
+  ];
 
   /// Every entry of [entity] that counts, in log order: what no role in
   /// a Shared Area allows is left out ([judged]).
@@ -603,4 +758,84 @@ class Store {
 
   /// A fresh id for a new entity.
   static String newId() => idMaker();
+}
+
+/// The dseqs [from] to [to] of one Device, all refused, whose entities
+/// lay in [scope]: an Area, or `personal`.
+class RefusedRun {
+  final int from;
+  final int to;
+  final String scope;
+
+  const RefusedRun(this.from, this.to, this.scope);
+}
+
+/// Which entries of a blocked person's Device were refused here (ADR
+/// 0021): the [runs] of dseqs, by the scope their entities lay in, and
+/// whether the person was unblocked since, so those entries are wanted
+/// again.
+class RefusalMark {
+  final List<RefusedRun> runs;
+  final bool released;
+
+  const RefusalMark({required this.runs, this.released = false});
+
+  /// The newest dseq refused; 0 for none.
+  int get high => runs.fold(0, (m, r) => r.to > m ? r.to : m);
+
+  /// This mark refusing again, with [dseq] of [scope] among its runs.
+  RefusalMark adding(int dseq, String scope) {
+    final scopes = <int, String>{
+      for (final run in runs)
+        for (var n = run.from; n <= run.to; n++) n: run.scope,
+    };
+    scopes[dseq] = scope;
+    final sorted = scopes.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final next = <RefusedRun>[];
+    for (final MapEntry(key: n, value: scope) in sorted) {
+      final last = next.isEmpty ? null : next.last;
+      if (last != null && last.to == n - 1 && last.scope == scope) {
+        next[next.length - 1] = RefusedRun(last.from, n, scope);
+      } else {
+        next.add(RefusedRun(n, n, scope));
+      }
+    }
+    return RefusalMark(runs: next);
+  }
+
+  /// Keys sorted, no spaces, as both cores keep it.
+  String encode() => jsonEncode({
+    if (released) 'released': true,
+    'runs': [
+      for (final r in runs) {'from': r.from, 'scope': r.scope, 'to': r.to},
+    ],
+  });
+
+  /// The mark [text] holds; null when it is none.
+  static RefusalMark? parse(String text) {
+    try {
+      final json = jsonDecode(text);
+      if (json case {'runs': final List list}) {
+        final runs = <RefusedRun>[];
+        for (final r in list) {
+          if (r
+              case {
+                'from': final int from,
+                'scope': final String scope,
+                'to': final int to,
+              }
+              when from >= 1 && to >= from) {
+            runs.add(RefusedRun(from, to, scope));
+          } else {
+            return null;
+          }
+        }
+        return RefusalMark(runs: runs, released: json['released'] == true);
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
+  }
 }

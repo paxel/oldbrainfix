@@ -6,15 +6,20 @@ import 'package:crypto/crypto.dart';
 import 'package:image/image.dart' as img;
 import 'package:meta/meta.dart';
 
+import 'area_keys.dart';
 import 'backup.dart';
 import 'entry.dart';
+import 'folder_sync.dart';
 import 'notes.dart';
 import 'photos.dart';
+import 'routines.dart';
+import 'schedule.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
 
+part 'blocks.dart';
 part 'overrides.dart';
 part 'people.dart';
 

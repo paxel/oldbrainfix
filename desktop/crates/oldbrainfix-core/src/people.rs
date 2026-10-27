@@ -8,7 +8,10 @@
 //! sight an id is bound to the keys that came with it; later a record
 //! counts only when one of them signed it. `"verified":true` says the
 //! user compared its short code in person (#51); it stays on this
-//! Device and is kept through every newer record.
+//! Device and is kept through every newer record. `"stripped":true` says
+//! the person was blocked and their picture taken out of the record (ADR
+//! 0021), so its signature no longer holds and it is never passed on;
+//! any record of theirs at the same version or newer replaces it.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
@@ -71,6 +74,8 @@ pub(crate) struct Held {
     seen: String,
     /// Whether the user compared its short code in person.
     verified: bool,
+    /// Whether the picture was taken out of the record for a block.
+    stripped: bool,
 }
 
 /// Every kept Profile by id, and the ids they replaced.
@@ -148,6 +153,7 @@ fn read_held(raw: &str) -> Option<Held> {
         bound,
         seen,
         verified: json.get("verified") == Some(&Value::Bool(true)),
+        stripped: json.get("stripped") == Some(&Value::Bool(true)),
     })
 }
 
@@ -268,7 +274,12 @@ impl Store {
         let resolved = self.resolve_person(id)?;
         Ok(match self.people_index()?.by_id.get(&resolved) {
             Some(held) => held.profile.clone(),
-            None => placeholder(resolved),
+            None => {
+                let name = self.name_when_blocked(&resolved)?;
+                let mut shown = placeholder(resolved);
+                shown.name = name.unwrap_or_default();
+                shown
+            }
         })
     }
 
@@ -347,7 +358,8 @@ impl Store {
     /// bound to it signed it, keys join only when a bound key signed
     /// them, and aliases only when a bound key made them. Its name is
     /// sanitised and its picture made again, or it is refused. The own
-    /// Profile is left to [`OwnProfile::take`].
+    /// Profile is left to [`OwnProfile::take`]; a blocked person's is
+    /// refused (ADR 0021).
     pub fn take_person(
         &self,
         json: &Value,
@@ -362,6 +374,9 @@ impl Store {
         let id = checked.profile.id.clone();
         if self.is_own_person(&id)? {
             return Ok(PersonTaken::Unchanged);
+        }
+        if self.is_blocked(&id)? {
+            return Ok(PersonTaken::Refused);
         }
         let index = self.people_index()?;
         if let Some(allowed) = allowed
@@ -393,6 +408,7 @@ impl Store {
                 checked.shown.as_deref(),
                 &dart_iso(self.now()),
                 false,
+                false,
             )?;
             return Ok(PersonTaken::Added);
         };
@@ -419,8 +435,10 @@ impl Store {
                 aliases.insert(at, a.clone());
             }
         }
+        // A record whose picture a block took out gives way to theirs.
         let newer = match Profile::parse(&held.sent.record) {
             None => true,
+            Some(kept) if held.stripped => checked.profile.version >= kept.version,
             Some(kept) => replaces(&theirs.record, &checked.profile, &held.sent.record, &kept),
         };
         let from = if newer { &theirs } else { &held.sent };
@@ -433,7 +451,7 @@ impl Store {
             aliases: sorted_aliases(aliases.into_values().collect()),
             fresh: false,
         };
-        if next.to_json() == held.sent.to_json() {
+        if !(held.stripped && newer) && next.to_json() == held.sent.to_json() {
             return Ok(PersonTaken::Unchanged);
         }
         let shown = if newer {
@@ -442,7 +460,8 @@ impl Store {
             held.profile.picture.clone()
         };
         let seen = held.seen.clone();
-        self.keep_person(&next, shown.as_deref(), &seen, held.verified)?;
+        let stripped = held.stripped && !newer;
+        self.keep_person(&next, shown.as_deref(), &seen, held.verified, stripped)?;
         Ok(PersonTaken::Updated)
     }
 
@@ -452,6 +471,7 @@ impl Store {
         shown: Option<&[u8]>,
         seen: &str,
         verified: bool,
+        stripped: bool,
     ) -> Result<()> {
         let Some(id) = Profile::parse(&sent.record).map(|p| p.id) else {
             return Ok(());
@@ -460,12 +480,41 @@ impl Store {
         if let Some(shown) = shown {
             value["shown"] = json!(BASE64.encode(shown));
         }
+        if stripped {
+            value["stripped"] = json!(true);
+        }
         if verified {
             value["verified"] = json!(true);
         }
         self.set_local_setting(&format!("{PREFIX}{id}"), &value.to_string())?;
         *self.people.lock() = None;
         Ok(())
+    }
+
+    /// Takes the picture out of the Profile of the blocked person `id`
+    /// kept here (ADR 0021); returns whether there was one.
+    pub(crate) fn strip_person_picture(&self, id: &str) -> Result<bool> {
+        let index = self.people_index()?;
+        let Some(held) = index.by_id.get(id) else {
+            return Ok(false);
+        };
+        let Some(record) = Profile::parse(&held.sent.record) else {
+            return Ok(false);
+        };
+        if record.picture.is_none() && held.profile.picture.is_none() {
+            return Ok(false);
+        }
+        let bare = Profile {
+            picture: None,
+            ..record
+        };
+        let sent = SignedProfile {
+            record: bare.encode(),
+            fresh: false,
+            ..held.sent.clone()
+        };
+        self.keep_person(&sent, None, &held.seen, held.verified, true)?;
+        Ok(true)
     }
 
     /// Whether the user compared the short code of the person `id`'s
@@ -504,6 +553,7 @@ impl Store {
                 held.profile.picture.as_deref(),
                 &held.seen,
                 true,
+                held.stripped,
             )?;
         }
         Ok(true)
@@ -571,14 +621,19 @@ impl Store {
     /// To one of the user's own Devices (`areas` none) every Profile of
     /// another person kept here; to another person's Device, or sealed
     /// under an Area's key, the own Profile and the Profiles of the
-    /// people the grants of `areas` name now.
+    /// people the grants of `areas` name now. A blocked person's Profile
+    /// goes nowhere (ADR 0021).
     pub fn profiles_to_send(&self, areas: Option<&HashSet<String>>) -> Result<Vec<Value>> {
         let index = self.people_index()?;
+        let blocked = self.blocked_ids()?;
+        let passes = |held: &Held| !held.stripped && !blocked.contains(&held.profile.id);
         let mut out: BTreeMap<String, Value> = BTreeMap::new();
         match areas {
             None => {
                 for (id, held) in &index.by_id {
-                    out.insert(id.clone(), held.sent.to_json());
+                    if passes(held) {
+                        out.insert(id.clone(), held.sent.to_json());
+                    }
                 }
             }
             Some(areas) => {
@@ -598,7 +653,9 @@ impl Store {
                         if self.is_own_person(&named)? {
                             continue;
                         }
-                        if let Some(held) = index.by_id.get(&self.resolve_person(&named)?) {
+                        if let Some(held) = index.by_id.get(&self.resolve_person(&named)?)
+                            && passes(held)
+                        {
                             out.insert(held.profile.id.clone(), held.sent.to_json());
                         }
                     }

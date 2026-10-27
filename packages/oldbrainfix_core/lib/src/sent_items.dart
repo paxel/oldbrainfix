@@ -106,6 +106,15 @@ class SentItemNotForUs implements Exception {
   String toString() => 'SentItemNotForUs';
 }
 
+/// A Sent Item from a person the user blocked (ADR 0021): nothing of it
+/// is shown or kept.
+class SentItemFromBlocked implements Exception {
+  const SentItemFromBlocked();
+
+  @override
+  String toString() => 'SentItemFromBlocked';
+}
+
 /// A Section of a Sent Item: its text, the format it is in and the
 /// version of its structure (ADR 0018), and when it was captured.
 class SentSection {
@@ -612,8 +621,9 @@ class OpenedSentItem {
 /// Throws [NotASentItem] for a file that is none, damaged, not signed by
 /// the key it names or with a Profile not bound to that key,
 /// [SentItemNotForUs] for one encrypted to other
-/// Devices, and [SentItemNotFromSender] for one whose id came here from
-/// another key (ADR 0009).
+/// Devices, [SentItemFromBlocked] for one from a person the user blocked
+/// (ADR 0021), before anything of it is shown, and [SentItemNotFromSender]
+/// for one whose id came here from another key (ADR 0009).
 OpenedSentItem openSentItem(Store store, List<int> bytes) {
   if (bytes.length > maxSentItemBytes) throw const NotASentItem();
   final outer = _json(bytes);
@@ -639,6 +649,7 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
       item.from.publicKey,
     );
     if (sender == null) throw const NotASentItem();
+    if (_fromBlocked(store, item)) throw const SentItemFromBlocked();
     final held = _held(store, item);
     final (state, changes) = _judge(store, item, held);
     return OpenedSentItem(
@@ -687,8 +698,9 @@ String? acceptedNote(Store store, SentItem item) => _held(store, item)?.note;
 /// one kept (ADR 0017); with [verified] the user compared its short code
 /// in person ([People.verifyPerson]). Returns the Note it is held as;
 /// null when there was nothing to cancel. Throws [SentItemNotFromSender]
-/// as [openSentItem] does.
+/// and [SentItemFromBlocked] as [openSentItem] does.
 String? acceptSentItem(Store store, SentItem item, {bool verified = false}) {
+  if (_fromBlocked(store, item)) throw const SentItemFromBlocked();
   final held = _held(store, item);
   final (state, changes) = _judge(store, item, held);
   final now = store.clock().toUtc();
@@ -709,6 +721,38 @@ String? acceptSentItem(Store store, SentItem item, {bool verified = false}) {
   }
   _keepSender(store, item, verified: verified);
   return note;
+}
+
+/// Whether [item] comes from a person the user blocked: its Profile's id
+/// is blocked, or it is signed by a blocked person's Device.
+bool _fromBlocked(Store store, SentItem item) {
+  final id = Profile.parse(item.profile.record)?.id;
+  if (id != null && store.isBlocked(id)) return true;
+  return store.blockedDevices().contains(item.from.device);
+}
+
+/// "Decline and block" on the preview of [opened] (#90): keeps nothing of
+/// the item and blocks its sender ([Blocks.blockPerson]), keeping their
+/// Profile without its picture so the "Blocked" list names them. With
+/// [leaveAreas] as there, and the same [StateError] before anything is
+/// kept. Returns false, blocking nobody, for the own
+/// Profile's id and for an id kept here under another first key: a
+/// copied id would block whoever the Profile kept here is.
+bool blockSentItemSender(
+  Store store,
+  OpenedSentItem opened, {
+  bool leaveAreas = false,
+}) {
+  final id = opened.sender.id;
+  if (store.isOwnPerson(id)) return false;
+  final kept = store.personCode(id);
+  if (kept != null && kept != opened.code) return false;
+  if (!leaveAreas && store.areasToLeaveForBlocking(id).isNotEmpty) {
+    throw StateError('blocking $id leaves the Areas they manage');
+  }
+  store.takePeople([opened.item.profile.toJson()]);
+  store.blockPerson(id, leaveAreas: leaveAreas);
+  return true;
 }
 
 /// Keeps the sender's Profile [item] carries, through the same path as

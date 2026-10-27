@@ -4189,6 +4189,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.'**
   String get sharedRecordingFix;
+
+  /// On another person's Profile page: blocks them, so nothing they write is kept or shown on the user's Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get personBlock;
+
+  /// On a blocked person's Profile page: ends the block.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get personUnblock;
+
+  /// Line on a blocked person's Profile page.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked: nothing they write is kept or shown, only their check-offs.'**
+  String get personBlocked;
+
+  /// Title of the dialog that confirms blocking a person.
+  ///
+  /// In en, this message translates to:
+  /// **'Block {name}?'**
+  String personBlockQuestion(String name);
+
+  /// Body of the dialog that confirms blocking a person who manages no Shared Area the user is in.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything {name} wrote is deleted from your Devices, except their check-offs, and nothing more of theirs is kept. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.'**
+  String personBlockDetail(String name);
+
+  /// Body of the dialog that confirms blocking a person who manages Shared Areas the user is in; areas are their names, separated by commas.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything {name} wrote is deleted from your Devices, except their check-offs, and you leave {areas}, which they manage. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.'**
+  String personBlockLeaveDetail(String name, String areas);
+
+  /// Confirms blocking a person together with leaving the Shared Areas they manage.
+  ///
+  /// In en, this message translates to:
+  /// **'Block and leave'**
+  String get personBlockLeave;
+
+  /// Title of the dialog that confirms ending a block.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock {name}?'**
+  String personUnblockQuestion(String name);
+
+  /// No description provided for @personUnblockDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'What they wrote comes back with the next sync with a Device that still holds it.'**
+  String get personUnblockDetail;
+
+  /// The folded section of People that lists the blocked people.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get peopleBlocked;
+
+  /// In a Sent Item's preview: keeps nothing of it and blocks its sender.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline and block'**
+  String get sentItemBlock;
+
+  /// No description provided for @sentItemBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined and blocked: nothing was kept.'**
+  String get sentItemBlocked;
+
+  /// Announced instead of the preview of a Sent Item from a blocked person; shows nothing of it.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: this file comes from a person you blocked.'**
+  String get sentItemFromBlocked;
 }
 
 class _AppLocalizationsDelegate

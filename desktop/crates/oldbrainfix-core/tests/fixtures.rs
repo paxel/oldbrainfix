@@ -1968,6 +1968,130 @@ fn a_shared_area_goes_as_the_dart_core_runs_it() -> TestResult {
     Ok(())
 }
 
+// --------------------------------------------------------------- Blocks
+
+/// What blocking left on `store`, in the shape of the generator's
+/// `_blockState`: the entries it holds, the vector it tells, its refusal
+/// marks, its Profiles of other people as kept, the people blocked and
+/// shown, the photos of `photos` it holds and what it reads.
+fn block_state(store: &Store, photos: &[&str]) -> Result<Value, Box<dyn std::error::Error>> {
+    let pairs = |prefix: &str| -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+        Ok(store
+            .local_settings_with_prefix(prefix)?
+            .into_iter()
+            .map(|(key, value)| json!([key, value]))
+            .collect())
+    };
+    let vector: std::collections::BTreeMap<String, i64> =
+        store.version_vector()?.into_iter().collect();
+    let blocked: Vec<Value> = store
+        .blocked_people()?
+        .iter()
+        .map(|p| json!({"id": p.id, "name": p.name, "picture": p.picture.is_some()}))
+        .collect();
+    let shown: Vec<String> = store.people_shown()?.into_iter().map(|p| p.id).collect();
+    let held: Vec<&str> = photos
+        .iter()
+        .filter(|hash| store.photo(hash).is_some())
+        .copied()
+        .collect();
+    Ok(json!({
+        "entries": store.all_entries()?.iter().map(|e| e.id()).collect::<Vec<_>>(),
+        "vector": vector,
+        "refused": pairs("refused:")?,
+        "people": pairs("person:")?,
+        "blocked": blocked,
+        "shown": shown,
+        "photos": held,
+        "read": without_device(read(store)?),
+    }))
+}
+
+/// The entries of the log file `path`, as they came.
+fn entries_in(path: &Path) -> Result<Vec<WireEntry>, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    for line in lines_of(path)? {
+        out.push(serde_json::from_str(&line)?);
+    }
+    Ok(out)
+}
+
+#[test]
+fn blocking_a_person_goes_as_the_dart_core_runs_it() -> TestResult {
+    use oldbrainfix_core::{Error, ImportReport};
+    let dir = fixtures().join("block");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let at = |key: &str| -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+        Ok(parse_time(expected[key].as_str().ok_or("a time")?)?)
+    };
+    let text = |key: &str| -> Result<&str, Box<dyn std::error::Error>> {
+        Ok(expected[key].as_str().ok_or("a text")?)
+    };
+    let clock = held_clock(text("blockAt")?)?;
+    let held = clock.clone();
+    let ann = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    insert_lines(&ann, &dir.join("before.jsonl"))?;
+    for pair in read_json(&dir.join("settings.json"))?
+        .as_array()
+        .ok_or("settings")?
+    {
+        ann.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    let photo = text("photo")?;
+    ann.put_blob(
+        "photo",
+        photo,
+        &std::fs::read(dir.join("before/photos").join(photo))?,
+    )?;
+    let carol = text("carol")?;
+
+    // Carol manages the School: blocking her leaves it, and only so.
+    assert_eq!(
+        json!(ann.areas_to_leave_for_blocking(carol)?),
+        expected["leave"]
+    );
+    assert!(matches!(
+        ann.block_person(carol, false),
+        Err(Error::MustLeaveAreas(_))
+    ));
+    let mark = ann.current_seq()?;
+    ann.block_person(carol, true)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("block.jsonl"))?
+    );
+    assert_eq!(block_state(&ann, &[photo])?, expected["blocked"]);
+
+    // What Carol writes later: her check-off is kept, nothing else.
+    *clock.lock() = at("incomingAt")?;
+    ann.apply_entries(
+        &entries_in(&dir.join("incoming.jsonl"))?,
+        &[],
+        None,
+        &mut ImportReport::default(),
+    )?;
+    assert_eq!(block_state(&ann, &[photo])?, expected["incoming"]);
+
+    // Unblocked, what was refused is wanted again, and taken in again.
+    *clock.lock() = at("unblockAt")?;
+    let mark = ann.current_seq()?;
+    ann.unblock_person(carol)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("unblock.jsonl"))?
+    );
+    assert_eq!(block_state(&ann, &[photo])?, expected["unblocked"]);
+    // Carol's Device syncs: what they still share comes back, and
+    // nothing of hers is waited for any more.
+    let refetch = read_json(&dir.join("refetch.json"))?;
+    oldbrainfix_core::lan::answer_sync(&ann, &refetch, "Desk")?.ok_or("an answer")?;
+    assert_eq!(block_state(&ann, &[photo])?, expected["refetched"]);
+    Ok(())
+}
+
 // ----------------------------------------------------------- Sent Items
 
 /// Random bytes as the generator's `_counted` hands them out.

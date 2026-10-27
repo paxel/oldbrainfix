@@ -5,3 +5,7 @@ Like Catlog (its ADR 0001 and 0008), every change is an entry in a per-Device ap
 ## Considered Options
 
 - Plain rows with an updated-at timestamp, last writer wins, no signing (rejected: Catlog's sync could not be reused, and roles could not be enforced).
+
+## Blocks (ADR 0021)
+
+Amended by ADR 0021 (#90): the entries a blocked person's Devices wrote are deleted from the log, but their check-offs, grants and the filing of their Notes; it is the only deletion there is. The version vector a Device tells others counts what it refused.

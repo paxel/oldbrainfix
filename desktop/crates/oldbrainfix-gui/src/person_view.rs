@@ -2,7 +2,7 @@
 //! their own picture and name, their short code and whether the user
 //! compared it in person, with "Compare codes"; "Their Notes" (#53);
 //! then "Name and picture for me", the Override only the user sees, on
-//! their own Devices.
+//! their own Devices; last, Block, or Unblock for a blocked person (#90).
 
 use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Profile, Store};
@@ -27,6 +27,9 @@ pub enum PersonAction {
     CodesCompared(bool),
     /// Show All Notes with only theirs (#53).
     TheirNotes,
+    /// Ask whether to block them, or to end their block (#90).
+    Block,
+    Unblock,
 }
 
 /// Where comparing a person's short code stands.
@@ -48,6 +51,8 @@ pub struct PersonView {
     pub verified: bool,
     /// Whether the user gave them a picture.
     pub own_picture: bool,
+    /// Whether the user blocked them (ADR 0021).
+    pub blocked: bool,
 }
 
 impl PersonView {
@@ -61,13 +66,14 @@ impl PersonView {
             own_picture: store
                 .person_override(id)?
                 .is_some_and(|o| o.picture.is_some()),
+            blocked: store.is_blocked(id)?,
         })
     }
 }
 
 /// The person's Profile: their picture, name and code, verified or not,
 /// "Compare codes", and the name and picture for the user, with the
-/// field `name` for the name.
+/// field `name` for the name; then Block, or Unblock.
 pub fn form(
     ui: &mut Ui,
     t: &L10n,
@@ -92,6 +98,9 @@ pub fn form(
             }
         });
     });
+    if person.blocked {
+        ui.label(RichText::new(t.person_blocked()).color(text));
+    }
     let verified = if person.verified {
         t.person_verified()
     } else {
@@ -170,5 +179,14 @@ pub fn form(
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_for_me_name()));
     if field.lost_focus() {
         actions.push(PersonAction::Rename(name.clone()));
+    }
+    ui.separator();
+    let (label, asked) = if person.blocked {
+        (t.person_unblock(), PersonAction::Unblock)
+    } else {
+        (t.person_block(), PersonAction::Block)
+    };
+    if ui.button(RichText::new(label).color(text)).clicked() {
+        actions.push(asked);
     }
 }

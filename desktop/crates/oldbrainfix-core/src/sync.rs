@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::Result;
+use crate::blocks::wire_kept_from_blocked;
 use crate::entry::{Entry, WireEntry};
 use crate::notes::keys as note_keys;
 use crate::signing::{
@@ -149,7 +150,10 @@ impl Store {
     /// `applyEntries`: keys first, then every entry not held checked
     /// against its Device's key; what does not verify is refused and
     /// counted, never recorded. An entry of a later structure is kept and
-    /// passed on, but not applied nor returned.
+    /// passed on, but not applied nor returned. What a blocked person's
+    /// Device wrote is refused but their check-offs, its dseq noted so it
+    /// is not asked for again (ADR 0021), and what a Device found to be
+    /// theirs only now is deleted afterwards ([`Store::enforce_blocks`]).
     pub fn apply_entries(
         &self,
         entries: &[WireEntry],
@@ -157,10 +161,21 @@ impl Store {
         verified_device: Option<&str>,
         report: &mut ImportReport,
     ) -> Result<Vec<WireEntry>> {
-        let applied = self.apply_entries_only(entries, keys, verified_device, report)?;
-        // A photo or recording removed elsewhere goes here too (ADR
-        // 0020). Anything new may decide it, a grant or a filing as well.
+        let mut applied = self.apply_entries_only(entries, keys, verified_device, report)?;
+        // A block from another of the user's Devices, or a grant naming a
+        // blocked person, takes effect at once (ADR 0021); a photo or
+        // recording removed elsewhere goes here too (ADR 0020). Anything
+        // new may decide either, a grant or a filing as well.
         if !applied.is_empty() {
+            if self.enforce_blocks()? {
+                let mut kept = Vec::new();
+                for e in applied {
+                    if self.holds(&e.device, e.dseq)? {
+                        kept.push(e);
+                    }
+                }
+                applied = kept;
+            }
             self.drop_removed_blobs()?;
         }
         Ok(applied)
@@ -179,6 +194,8 @@ impl Store {
             let own_max = self.version_vector()?.get(&own).copied().unwrap_or(0);
             let own_key = self.signing_key()?.public_key().to_vec();
             let mut known: HashMap<String, Option<Vec<u8>>> = HashMap::new();
+            let refusing = self.blocked_devices()?;
+            let mut refused: Vec<&WireEntry> = Vec::new();
             let mut applied = Vec::new();
             for e in entries {
                 if self.holds(&e.device, e.dseq)? {
@@ -213,11 +230,32 @@ impl Store {
                     report.refuse(&e.author, &e.device);
                     continue;
                 }
+                // Checked first, so nobody moves the mark with a forged
+                // entry.
+                if refusing.contains(&e.device) && !wire_kept_from_blocked(e) {
+                    refused.push(e);
+                    continue;
+                }
                 // One of a later structure is kept and passed on, not
                 // applied.
                 if self.insert(e)? && e.applies() {
                     applied.push(e.clone());
                 }
+            }
+            // Where each refused entity lay, once what is kept of this
+            // batch is in: a Note by its filing, a Section by the Note it
+            // names.
+            let mut links: HashMap<&str, &str> = HashMap::new();
+            for e in &refused {
+                if e.field == note_keys::NOTE
+                    && let Some(note) = e.value.as_deref()
+                {
+                    links.insert(&e.entity, note);
+                }
+            }
+            for e in &refused {
+                let of = links.get(e.entity.as_str()).copied().unwrap_or(&e.entity);
+                self.note_refused(&e.device, e.dseq, &self.scope_of(of)?)?;
             }
             Ok(applied)
         })

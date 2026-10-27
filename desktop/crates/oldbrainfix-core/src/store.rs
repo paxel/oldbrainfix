@@ -101,6 +101,98 @@ impl Fields {
     }
 }
 
+/// The local settings of the refusal marks, before the device.
+const REFUSED_PREFIX: &str = "refused:";
+
+/// The dseqs `from` to `to` of one Device, all refused, whose entities
+/// lay in `scope`: an Area, or `personal`; the Dart core's `RefusedRun`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefusedRun {
+    pub from: i64,
+    pub to: i64,
+    pub scope: String,
+}
+
+/// Which entries of a blocked person's Device were refused here (ADR
+/// 0021), as the Dart core's `RefusalMark`: the runs of dseqs, by the
+/// scope their entities lay in, and whether the person was unblocked
+/// since, so those entries are wanted again.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RefusalMark {
+    pub runs: Vec<RefusedRun>,
+    pub released: bool,
+}
+
+impl RefusalMark {
+    /// The newest dseq refused; 0 for none.
+    pub fn high(&self) -> i64 {
+        self.runs.iter().map(|r| r.to).max().unwrap_or(0)
+    }
+
+    /// This mark refusing again, with `dseq` of `scope` among its runs.
+    pub fn adding(self, dseq: i64, scope: &str) -> RefusalMark {
+        let mut scopes: std::collections::BTreeMap<i64, String> = std::collections::BTreeMap::new();
+        for run in self.runs {
+            for n in run.from..=run.to {
+                scopes.insert(n, run.scope.clone());
+            }
+        }
+        scopes.insert(dseq, scope.to_string());
+        let mut runs: Vec<RefusedRun> = Vec::new();
+        for (n, scope) in scopes {
+            match runs.last_mut() {
+                Some(last) if last.to == n - 1 && last.scope == scope => last.to = n,
+                _ => runs.push(RefusedRun {
+                    from: n,
+                    to: n,
+                    scope,
+                }),
+            }
+        }
+        RefusalMark {
+            runs,
+            released: false,
+        }
+    }
+
+    /// Keys sorted, no spaces, as both cores keep it.
+    pub fn encode(&self) -> String {
+        let runs: Vec<serde_json::Value> = self
+            .runs
+            .iter()
+            .map(|r| serde_json::json!({"from": r.from, "scope": r.scope, "to": r.to}))
+            .collect();
+        let mut json = serde_json::json!({ "runs": runs });
+        if self.released {
+            json["released"] = serde_json::json!(true);
+        }
+        json.to_string()
+    }
+
+    /// The mark `text` holds; none when it is none.
+    pub fn parse(text: &str) -> Option<RefusalMark> {
+        let json: serde_json::Value = serde_json::from_str(text).ok()?;
+        let mut runs = Vec::new();
+        for r in json.get("runs")?.as_array()? {
+            let from = r.get("from")?.as_i64()?;
+            let to = r.get("to")?.as_i64()?;
+            let scope = r.get("scope")?.as_str()?;
+            if from < 1 || to < from {
+                return None;
+            }
+            runs.push(RefusedRun {
+                from,
+                to,
+                scope: scope.to_string(),
+            });
+        }
+        Some(RefusalMark {
+            runs,
+            released: json.get("released") == Some(&serde_json::Value::Bool(true)),
+        })
+    }
+}
+
 /// A Moment as the store keeps it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MomentRow {
@@ -425,7 +517,7 @@ impl Store {
         let db = self.db.lock();
         let now = self.now();
         let device = self.device_id()?;
-        let vector = self.version_vector()?;
+        let vector = self.held_vector()?;
         let dseq = vector.get(&device).copied().unwrap_or(0) + 1;
         let ctx = match conflict_unit(field) {
             Some(unit) => self.context(entity, unit, &device, &vector)?,
@@ -673,11 +765,234 @@ impl Store {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// The newest dseq held from each Device.
+    /// How far this Device holds each Device's entries, as it tells
+    /// other Devices, as the Dart core's `versionVector`: the newest dseq
+    /// held, raised to the newest a blocked person's Device had refused,
+    /// so nobody sends them again; after an unblock, below the first
+    /// refused one that is not back yet and lay in a Shared Area this
+    /// Device still holds a role in, so they are sent again (ADR 0021).
     pub fn version_vector(&self) -> Result<HashMap<String, i64>> {
+        let mut vector = self.held_vector()?;
+        for (device, mark) in self.refusal_marks()? {
+            let held = vector.get(&device).copied().unwrap_or(0);
+            if !mark.released {
+                if mark.high() > held {
+                    vector.insert(device, mark.high());
+                }
+                continue;
+            }
+            let Some(missing) = self.first_wanted(&device, &mark)? else {
+                continue;
+            };
+            if missing > held {
+                continue;
+            }
+            if missing - 1 > 0 {
+                vector.insert(device, missing - 1);
+            } else {
+                vector.remove(&device);
+            }
+        }
+        Ok(vector)
+    }
+
+    /// The first dseq of `mark`'s runs not held here whose scope this
+    /// Device holds a role in; none when there is none.
+    fn first_wanted(&self, device: &str, mark: &RefusalMark) -> Result<Option<i64>> {
+        for run in &mark.runs {
+            if !self.wants(run)? {
+                continue;
+            }
+            if let Some(missing) = self.first_missing(device, run.from, run.to)? {
+                return Ok(Some(missing));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Whether what was refused in `run` can come back: it lay in a
+    /// Shared Area this Device holds a role in now.
+    fn wants(&self, run: &RefusedRun) -> Result<bool> {
+        let own = self.device_id()?;
+        Ok(self
+            .judged()?
+            .areas
+            .get(&run.scope)
+            .is_some_and(|grants| grants.grant_of(&own).is_some()))
+    }
+
+    /// The newest dseq held from each Device.
+    fn held_vector(&self) -> Result<HashMap<String, i64>> {
         let db = self.db.lock();
         let mut stmt = db.prepare("SELECT device, MAX(dseq) AS m FROM entries GROUP BY device")?;
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The lowest dseq of `device` from `low` to `high` not held; none
+    /// when all of them are.
+    fn first_missing(&self, device: &str, low: i64, high: i64) -> Result<Option<i64>> {
+        let held: Vec<i64> = {
+            let db = self.db.lock();
+            let mut stmt = db.prepare(
+                "SELECT dseq FROM entries WHERE device = ? AND dseq BETWEEN ? AND ? ORDER BY dseq",
+            )?;
+            let rows = stmt.query_map(params![device, low, high], |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut next = low;
+        for dseq in held {
+            if dseq != next {
+                return Ok(Some(next));
+            }
+            next += 1;
+        }
+        Ok((next <= high).then_some(next))
+    }
+
+    // ---------------------------------------------------------- refusals
+
+    /// Which entries of each of a blocked person's Devices were refused
+    /// (ADR 0021), by device, as the Dart core's `refusalMarks`: a local
+    /// setting of this Device, since each of the user's Devices refuses
+    /// on its own. Released once the person was unblocked, until what was
+    /// refused is back.
+    pub fn refusal_marks(&self) -> Result<Vec<(String, RefusalMark)>> {
+        Ok(self
+            .local_settings_with_prefix(REFUSED_PREFIX)?
+            .into_iter()
+            .filter_map(|(key, value)| {
+                let device = key.strip_prefix(REFUSED_PREFIX)?.to_string();
+                RefusalMark::parse(&value).map(|mark| (device, mark))
+            })
+            .collect())
+    }
+
+    fn refusal_mark(&self, device: &str) -> Result<Option<RefusalMark>> {
+        Ok(self
+            .local_setting(&format!("{REFUSED_PREFIX}{device}"))?
+            .and_then(|value| RefusalMark::parse(&value)))
+    }
+
+    fn keep_refusal_mark(&self, device: &str, mark: &RefusalMark) -> Result<()> {
+        let key = format!("{REFUSED_PREFIX}{device}");
+        if mark.runs.is_empty() {
+            self.remove_local_setting(&key)
+        } else {
+            self.set_local_setting(&key, &mark.encode())
+        }
+    }
+
+    /// Notes that the entry (`device`, `dseq`) was refused, its entity
+    /// lying in `scope` (an Area, or the personal scope): the mark of
+    /// `device` takes it in, and counts as refusing again.
+    pub fn note_refused(&self, device: &str, dseq: i64, scope: &str) -> Result<()> {
+        let held = self.refusal_mark(device)?;
+        let mark = held.clone().unwrap_or_default().adding(dseq, scope);
+        if held.as_ref() == Some(&mark) {
+            return Ok(());
+        }
+        self.keep_refusal_mark(device, &mark)
+    }
+
+    /// Lets `device`'s mark go: what it refused is wanted again, until it
+    /// is all back ([`Store::drop_filled_refusals`]). Returns whether it
+    /// was refusing.
+    pub fn release_refusals(&self, device: &str) -> Result<bool> {
+        let Some(held) = self.refusal_mark(device)? else {
+            return Ok(false);
+        };
+        if held.released {
+            return Ok(false);
+        }
+        self.keep_refusal_mark(
+            device,
+            &RefusalMark {
+                released: true,
+                ..held
+            },
+        )?;
+        Ok(true)
+    }
+
+    /// Makes `device`'s released mark refuse again.
+    pub fn hold_refusals(&self, device: &str) -> Result<()> {
+        match self.refusal_mark(device)? {
+            Some(held) if held.released => self.keep_refusal_mark(
+                device,
+                &RefusalMark {
+                    released: false,
+                    ..held
+                },
+            ),
+            _ => Ok(()),
+        }
+    }
+
+    /// Forgets, of every released mark, the runs that are back and those
+    /// that cannot come back: lying in no Shared Area this Device holds a
+    /// role in now. A mark with nothing left goes.
+    pub fn drop_filled_refusals(&self) -> Result<()> {
+        for (device, mark) in self.refusal_marks()? {
+            if !mark.released {
+                continue;
+            }
+            let mut left = Vec::new();
+            for run in &mark.runs {
+                if self.wants(run)? && self.first_missing(&device, run.from, run.to)?.is_some() {
+                    left.push(run.clone());
+                }
+            }
+            if left.len() == mark.runs.len() {
+                continue;
+            }
+            self.keep_refusal_mark(
+                &device,
+                &RefusalMark {
+                    runs: left,
+                    released: true,
+                },
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Every entry `device` wrote that is held here, by dseq.
+    pub fn entries_of(&self, device: &str) -> Result<Vec<Entry>> {
+        self.entries(
+            "SELECT * FROM entries WHERE device = ? ORDER BY dseq",
+            params![device],
+        )
+    }
+
+    /// Deletes the entries `dseqs` of `device` from the log: only a block
+    /// does (ADR 0021), for what a blocked person wrote. Nothing else ever
+    /// leaves the log.
+    pub fn delete_entries(&self, device: &str, dseqs: &[i64]) -> Result<()> {
+        let mut deleted = 0;
+        {
+            let db = self.db.lock();
+            for dseq in dseqs {
+                deleted += db.execute(
+                    "DELETE FROM entries WHERE device = ? AND dseq = ?",
+                    params![device, dseq],
+                )?;
+            }
+        }
+        if deleted > 0 {
+            self.changed();
+        }
+        Ok(())
+    }
+
+    /// The entities whose id starts with `prefix`, sorted.
+    pub fn entities_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
+        let db = self.db.lock();
+        let mut stmt = db.prepare(&format!(
+            "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
+                 AND substr(entity, 1, ?) = ? ORDER BY entity"
+        ))?;
+        let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| r.get(0))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 

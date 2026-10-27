@@ -175,6 +175,8 @@ Future<int> openReceivedFile(
     announcements?.announce(t.sentItemNotForUs);
   } on SentItemNotFromSender {
     announcements?.announce(t.sentItemNotFromSender);
+  } on SentItemFromBlocked {
+    announcements?.announce(t.sentItemFromBlocked);
   }
   return 0;
 }
@@ -205,7 +207,8 @@ bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
 /// changes, "Tue 10:00 → Wed 14:00", and applies it to the Note accepted
 /// before; a cancellation moves that Note to the trash. Decline keeps
 /// nothing; one already up to date, or with nothing to cancel, only
-/// closes.
+/// closes. "Decline and block" keeps nothing and blocks the sender
+/// (#90); once the sender is blocked the preview closes.
 class SentItemScreen extends StatefulWidget {
   final Store store;
   final OpenedSentItem opened;
@@ -234,15 +237,29 @@ class _SentItemScreenState extends State<SentItemScreen> {
   Store get store => widget.store;
   late OpenedSentItem opened = widget.opened;
 
-  /// Shows the sender as the user sees them now.
+  /// Whether the item names the user's own Profile, which is not blocked.
+  late final _fromSelf = store.isOwnPerson(widget.opened.sender.id);
+
+  /// Shows the sender as the user sees them now; closes the preview,
+  /// showing nothing more of it, once the user blocked them.
   void _reopen() {
+    if (store.isBlocked(opened.sender.id)) return _closeBlocked(context);
     final reopen = widget.reopen;
     if (reopen == null) return;
     try {
-      opened = reopen();
+      final again = reopen();
+      setState(() => opened = again);
+    } on SentItemFromBlocked {
+      _closeBlocked(context);
     } on Exception {
       // Read once already; what showed stays.
     }
+  }
+
+  /// Closes the preview of an item whose sender is blocked now.
+  void _closeBlocked(BuildContext context) {
+    AnnouncementsScope.of(context)?.announce(context.t.sentItemFromBlocked);
+    Navigator.of(context).pop();
   }
 
   Future<void> _compare(String name) async {
@@ -286,6 +303,8 @@ class _SentItemScreenState extends State<SentItemScreen> {
       });
     } on SentItemNotFromSender {
       announcements?.announce(t.sentItemNotFromSender);
+    } on SentItemFromBlocked {
+      announcements?.announce(t.sentItemFromBlocked);
     }
     Navigator.of(context).pop();
   }
@@ -293,6 +312,27 @@ class _SentItemScreenState extends State<SentItemScreen> {
   void _decline(BuildContext context) {
     AnnouncementsScope.of(context)?.announce(context.t.sentItemDeclined);
     Navigator.of(context).pop();
+  }
+
+  /// Declines and blocks the sender after asking once, as their Profile
+  /// page does; an id copied from another person's Profile blocks
+  /// nobody, and the item is only declined.
+  Future<void> _declineAndBlock(String name) async {
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context);
+    var blocked = false;
+    final sure = await confirmBlock(
+      context,
+      store,
+      opened.sender.id,
+      name,
+      block: ({required leaveAreas}) =>
+          blocked = blockSentItemSender(store, opened, leaveAreas: leaveAreas),
+    );
+    if (!sure || !mounted) return;
+    announcements?.announce(blocked ? t.sentItemBlocked : t.sentItemDeclined);
+    navigator.pop();
   }
 
   @override
@@ -344,7 +384,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
                           ? null
                           : () async {
                               await openPerson(context, opened.sender.id);
-                              if (mounted) setState(_reopen);
+                              if (mounted) _reopen();
                             },
                       child: ProfileAvatar(
                         key: const ValueKey('sent-from-picture'),
@@ -439,6 +479,15 @@ class _SentItemScreenState extends State<SentItemScreen> {
                     ),
                   ],
                 ),
+                if (!_fromSelf) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    key: const ValueKey('block-sent'),
+                    onPressed: () => _declineAndBlock(name),
+                    icon: const Icon(Icons.block),
+                    label: Text(t.sentItemBlock),
+                  ),
+                ],
               ],
             ),
           ),

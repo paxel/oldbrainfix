@@ -2634,4 +2634,55 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get sharedRecordingFix =>
       'Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder teile sie noch einmal als m4a oder mp3.';
+
+  @override
+  String get personBlock => 'Blockieren';
+
+  @override
+  String get personUnblock => 'Blockierung aufheben';
+
+  @override
+  String get personBlocked =>
+      'Blockiert: Nichts, was diese Person schreibt, wird behalten oder gezeigt, nur ihre Erledigt-Haken.';
+
+  @override
+  String personBlockQuestion(String name) {
+    return '$name blockieren?';
+  }
+
+  @override
+  String personBlockDetail(String name) {
+    return 'Alles, was $name geschrieben hat, wird außer den Erledigt-Haken von deinen Geräten gelöscht, und nichts Neues dieser Person wird behalten. Ein geteilter Ordner kann noch verschlüsselte Dateien dieser Person enthalten, die die App nie öffnet; verlässt du den Ordner, sind sie fort.';
+  }
+
+  @override
+  String personBlockLeaveDetail(String name, String areas) {
+    return 'Alles, was $name geschrieben hat, wird außer den Erledigt-Haken von deinen Geräten gelöscht, und du verlässt, was diese Person verwaltet: $areas. Ein geteilter Ordner kann noch verschlüsselte Dateien dieser Person enthalten, die die App nie öffnet; verlässt du den Ordner, sind sie fort.';
+  }
+
+  @override
+  String get personBlockLeave => 'Blockieren und verlassen';
+
+  @override
+  String personUnblockQuestion(String name) {
+    return 'Blockierung von $name aufheben?';
+  }
+
+  @override
+  String get personUnblockDetail =>
+      'Was diese Person geschrieben hat, kommt mit der nächsten Synchronisierung mit einem Gerät zurück, das es noch hat.';
+
+  @override
+  String get peopleBlocked => 'Blockiert';
+
+  @override
+  String get sentItemBlock => 'Ablehnen und blockieren';
+
+  @override
+  String get sentItemBlocked =>
+      'Abgelehnt und blockiert: Nichts wurde behalten.';
+
+  @override
+  String get sentItemFromBlocked =>
+      'Abgewiesen: Diese Datei kommt von einer Person, die du blockiert hast.';
 }

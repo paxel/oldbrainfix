@@ -185,11 +185,13 @@ impl Store {
 
     /// People (#52): every Profile of another person kept here, as the
     /// user sees them, Overrides applied, by name; a Profile another one
-    /// kept here replaced shows only as that one.
+    /// kept here replaced shows only as that one, and a blocked person
+    /// only among [`Store::blocked_people`].
     pub fn people_shown(&self) -> Result<Vec<Profile>> {
+        let blocked = self.blocked_ids()?;
         let mut shown = Vec::new();
         for kept in self.kept_people()? {
-            if self.resolve_person(&kept.id)? == kept.id {
+            if self.resolve_person(&kept.id)? == kept.id && !blocked.contains(&kept.id) {
                 shown.push(self.person_shown(&kept.id)?);
             }
         }

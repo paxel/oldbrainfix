@@ -8,6 +8,7 @@ import 'announcements.dart';
 import 'l10n.dart';
 import 'notes_screen.dart';
 import 'photo_platform.dart';
+import 'place_names.dart';
 import 'profile.dart';
 import 'profile_platform.dart';
 import 'profile_screen.dart';
@@ -63,10 +64,78 @@ Future<void> openPerson(BuildContext context, String id) async {
   );
 }
 
+/// Asks once whether to block the person [id], shown as [name] (#90,
+/// ADR 0021), and blocks them on a yes. When they manage a Shared Area
+/// this Device is in, the dialog names the Areas blocking leaves. The
+/// block itself is [block], given whether to leave; it is asked again
+/// should an Area to leave come in between. Returns whether the person
+/// was blocked.
+Future<bool> confirmBlock(
+  BuildContext context,
+  Store store,
+  String id,
+  String name, {
+  required void Function({required bool leaveAreas}) block,
+}) async {
+  for (;;) {
+    final areas = store.areasToLeaveForBlocking(id);
+    final sure = await _askBlock(context, store, name, areas);
+    if (!sure || !context.mounted) return false;
+    try {
+      block(leaveAreas: areas.isNotEmpty);
+      return true;
+    } on StateError {
+      // An Area to leave came in by sync while the dialog was open.
+      if (!context.mounted) return false;
+    }
+  }
+}
+
+Future<bool> _askBlock(
+  BuildContext context,
+  Store store,
+  String name,
+  List<String> areas,
+) async {
+  final t = context.t;
+  final places = Places(store);
+  final names = [
+    for (final id in areas)
+      if (places.areaById(id) case final area?) areaName(t, area),
+  ].join(', ');
+  final sure = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(t.personBlockQuestion(name)),
+      content: Text(
+        areas.isEmpty
+            ? t.personBlockDetail(name)
+            : t.personBlockLeaveDetail(name, names),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(t.cancel),
+        ),
+        TextButton(
+          key: const ValueKey('block-confirm'),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(areas.isEmpty ? t.personBlock : t.personBlockLeave),
+        ),
+      ],
+    ),
+  );
+  return sure ?? false;
+}
+
 /// Another person's Profile (ADR 0017, #52): their own picture and name,
 /// their short code and whether the user compared it in person, with
 /// "Compare codes"; "Their Notes" (#53); then "Name and picture for
-/// me", the Override only the user sees, on their own Devices.
+/// me", the Override only the user sees, on their own Devices. The bar
+/// blocks them, or unblocks a blocked person (#90).
 class PersonScreen extends StatefulWidget {
   final Store store;
   final ProfilePlatform platform;
@@ -100,6 +169,7 @@ class _PersonScreenState extends State<PersonScreen> {
   late Profile _shown;
   String? _code;
   var _verified = false;
+  var _blocked = false;
 
   @override
   void initState() {
@@ -125,6 +195,7 @@ class _PersonScreenState extends State<PersonScreen> {
     _shown = store.personShown(widget.id);
     _code = store.personCode(widget.id);
     _verified = store.personVerified(widget.id);
+    _blocked = store.isBlocked(widget.id);
   }
 
   @override
@@ -205,6 +276,46 @@ class _PersonScreenState extends State<PersonScreen> {
     );
   }
 
+  /// Blocks the person after asking once (#90); the page shows it at
+  /// once, as the block tells the Profile listeners.
+  Future<void> _block(String name) async {
+    final store = widget.store;
+    await confirmBlock(
+      context,
+      store,
+      widget.id,
+      name,
+      block: ({required leaveAreas}) =>
+          store.blockPerson(widget.id, leaveAreas: leaveAreas),
+    );
+  }
+
+  /// Ends the block after asking once: what was refused comes back with
+  /// the next syncs.
+  Future<void> _unblock(String name) async {
+    final t = context.t;
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.personUnblockQuestion(name)),
+        content: Text(t.personUnblockDetail),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('unblock-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(t.personUnblock),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+    widget.store.unblockPerson(widget.id);
+  }
+
   /// Offers where the picture for the user comes from, where the finger
   /// is.
   Future<void> _pictureMenu(Offset at) async {
@@ -255,13 +366,33 @@ class _PersonScreenState extends State<PersonScreen> {
     final shown = _shown;
     final code = _code;
     final verified = _verified;
+    final blocked = _blocked;
     final theirName = profileDisplayName(t, theirs.name);
+    final shownName = profileDisplayName(t, shown.name);
     final text = Theme.of(context).textTheme;
     return PopScope(
       // The name typed last is kept when the page is left.
       onPopInvokedWithResult: (_, _) => _saveName(),
       child: Scaffold(
-        appBar: AppBar(title: Text(profileDisplayName(t, shown.name))),
+        appBar: AppBar(
+          title: Text(shownName),
+          actions: [
+            if (blocked)
+              IconButton(
+                key: const ValueKey('unblock-person'),
+                tooltip: t.personUnblock,
+                onPressed: () => _unblock(shownName),
+                icon: const Icon(Icons.how_to_reg_outlined),
+              )
+            else
+              IconButton(
+                key: const ValueKey('block-person'),
+                tooltip: t.personBlock,
+                onPressed: () => _block(shownName),
+                icon: const Icon(Icons.block),
+              ),
+          ],
+        ),
         body: SingleChildScrollView(
           padding: clearOfSystemBars(
             context,
@@ -299,6 +430,13 @@ class _PersonScreenState extends State<PersonScreen> {
                       letterSpacing: 1.5,
                     ),
                   ),
+                ),
+              if (blocked)
+                ListTile(
+                  key: const ValueKey('personBlocked'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  leading: const Icon(Icons.block),
+                  title: Text(t.personBlocked),
                 ),
               ListTile(
                 key: const ValueKey('personVerified'),
@@ -368,7 +506,9 @@ class _PersonScreenState extends State<PersonScreen> {
 }
 
 /// The People of the Profile page (#52): every Profile kept here, as
-/// the user sees them, each opening its Profile.
+/// the user sees them, each opening its Profile. The blocked people
+/// (#90) are left out and listed in a folded "Blocked" section below,
+/// closed until opened; whether it is open is a setting of this Device.
 class PeopleSection extends StatefulWidget {
   final Store store;
 
@@ -379,16 +519,33 @@ class PeopleSection extends StatefulWidget {
 }
 
 class _PeopleSectionState extends State<PeopleSection> {
+  /// The local setting that keeps the "Blocked" section open.
+  static const _blockedOpenKey = 'peopleBlockedOpen';
+
   /// The people as they show, read when their Profiles change rather than
   /// on every build, so a picture keeps its bytes and is not decoded
   /// again.
   late List<Profile> _people;
+  late List<Profile> _blocked;
+  late bool _blockedOpen;
 
   @override
   void initState() {
     super.initState();
     widget.store.addProfileListener(_changed);
-    _people = widget.store.peopleShown;
+    _read();
+  }
+
+  void _read() {
+    final store = widget.store;
+    _people = store.peopleShown;
+    _blocked = store.blockedPeople;
+    _blockedOpen = store.localSetting(_blockedOpenKey) == 'true';
+  }
+
+  void _setBlockedOpen(bool open) {
+    _blockedOpen = open;
+    widget.store.setLocalSetting(_blockedOpenKey, '$open');
   }
 
   @override
@@ -397,7 +554,7 @@ class _PeopleSectionState extends State<PeopleSection> {
     if (old.store == widget.store) return;
     old.store.removeProfileListener(_changed);
     widget.store.addProfileListener(_changed);
-    _people = widget.store.peopleShown;
+    _read();
   }
 
   @override
@@ -408,16 +565,17 @@ class _PeopleSectionState extends State<PeopleSection> {
 
   void _changed() {
     if (!mounted) return;
-    setState(() => _people = widget.store.peopleShown);
+    setState(_read);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final people = _people;
+    final blocked = _blocked;
     return SettingsSection(
       children: [
-        if (people.isEmpty)
+        if (people.isEmpty && blocked.isEmpty)
           ListTile(
             key: const ValueKey('peopleEmpty'),
             leading: const Icon(Icons.people_outline),
@@ -429,6 +587,25 @@ class _PeopleSectionState extends State<PeopleSection> {
             leading: ProfileAvatar(profile: person, size: 40),
             title: Text(profileDisplayName(t, person.name)),
             onTap: () => openPerson(context, person.id),
+          ),
+        if (blocked.isNotEmpty)
+          ExpansionTile(
+            key: const ValueKey('peopleBlocked'),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            leading: const Icon(Icons.block),
+            title: Text(t.peopleBlocked),
+            initiallyExpanded: _blockedOpen,
+            onExpansionChanged: _setBlockedOpen,
+            children: [
+              for (final person in blocked)
+                ListTile(
+                  key: ValueKey('blocked-${person.id}'),
+                  leading: ProfileAvatar(profile: person, size: 40),
+                  title: Text(profileDisplayName(t, person.name)),
+                  onTap: () => openPerson(context, person.id),
+                ),
+            ],
           ),
       ],
     );

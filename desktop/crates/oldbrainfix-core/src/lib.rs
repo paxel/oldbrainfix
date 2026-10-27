@@ -13,6 +13,7 @@
 pub mod alarms;
 pub mod backup;
 pub mod blobs;
+pub mod blocks;
 pub mod box_keys;
 pub mod bundle;
 pub mod conflicts;
@@ -64,7 +65,7 @@ pub use search::Search;
 pub use settings::DeviceSettings;
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
-pub use store::{Clock, Fields, IdMaker, MomentRow, Store};
+pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, Store};
 pub use sync::Moment;
 pub use text_format::StoredText;
 pub use transcript_prompts::TranscriptPrompts;

@@ -24,3 +24,7 @@ An older version reads the null as every version reads it: the hash is not among
 - Backups made before the removal still hold the bytes; restoring one restores the state it was made in.
 - A file another person removed outside any Shared Area is hidden, not deleted: its bytes stay on this Device.
 - A sync with one of the user's Devices met for the first time takes its removals but keeps the bytes until the next sync that brings anything: while the entries are taken in, that Device does not count as one of the user's own yet.
+
+## Blocks (ADR 0021)
+
+Amended by ADR 0021 (#90): blocking a person deletes the bytes of their photos and recordings that nothing else in the log refers to, with no removal entry; their copies in the shared folder stay.

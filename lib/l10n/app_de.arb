@@ -690,5 +690,18 @@
   "sharedRecordingFailedTitle": "Aufnahme nicht transkribiert",
   "sharedRecordingUnreadable": "In der geteilten Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.",
   "sharedRecordingUnsupported": "Dieses Telefon kann das Format der geteilten Datei nicht lesen.",
-  "sharedRecordingFix": "Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder teile sie noch einmal als m4a oder mp3."
+  "sharedRecordingFix": "Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder teile sie noch einmal als m4a oder mp3.",
+  "personBlock": "Blockieren",
+  "personUnblock": "Blockierung aufheben",
+  "personBlocked": "Blockiert: Nichts, was diese Person schreibt, wird behalten oder gezeigt, nur ihre Erledigt-Haken.",
+  "personBlockQuestion": "{name} blockieren?",
+  "personBlockDetail": "Alles, was {name} geschrieben hat, wird außer den Erledigt-Haken von deinen Geräten gelöscht, und nichts Neues dieser Person wird behalten. Ein geteilter Ordner kann noch verschlüsselte Dateien dieser Person enthalten, die die App nie öffnet; verlässt du den Ordner, sind sie fort.",
+  "personBlockLeaveDetail": "Alles, was {name} geschrieben hat, wird außer den Erledigt-Haken von deinen Geräten gelöscht, und du verlässt, was diese Person verwaltet: {areas}. Ein geteilter Ordner kann noch verschlüsselte Dateien dieser Person enthalten, die die App nie öffnet; verlässt du den Ordner, sind sie fort.",
+  "personBlockLeave": "Blockieren und verlassen",
+  "personUnblockQuestion": "Blockierung von {name} aufheben?",
+  "personUnblockDetail": "Was diese Person geschrieben hat, kommt mit der nächsten Synchronisierung mit einem Gerät zurück, das es noch hat.",
+  "peopleBlocked": "Blockiert",
+  "sentItemBlock": "Ablehnen und blockieren",
+  "sentItemBlocked": "Abgelehnt und blockiert: Nichts wurde behalten.",
+  "sentItemFromBlocked": "Abgewiesen: Diese Datei kommt von einer Person, die du blockiert hast."
 }

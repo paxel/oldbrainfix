@@ -1453,5 +1453,41 @@
   "sharedRecordingUnsupported": "This phone cannot decode the format of the shared file.",
   "@sharedRecordingUnsupported": {"description": "Cause of a shared recording that cannot be transcribed."},
   "sharedRecordingFix": "The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.",
-  "@sharedRecordingFix": {"description": "What to do about a shared recording that cannot be transcribed."}
+  "@sharedRecordingFix": {"description": "What to do about a shared recording that cannot be transcribed."},
+  "personBlock": "Block",
+  "@personBlock": {"description": "On another person's Profile page: blocks them, so nothing they write is kept or shown on the user's Devices."},
+  "personUnblock": "Unblock",
+  "@personUnblock": {"description": "On a blocked person's Profile page: ends the block."},
+  "personBlocked": "Blocked: nothing they write is kept or shown, only their check-offs.",
+  "@personBlocked": {"description": "Line on a blocked person's Profile page."},
+  "personBlockQuestion": "Block {name}?",
+  "@personBlockQuestion": {
+    "description": "Title of the dialog that confirms blocking a person.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "personBlockDetail": "Everything {name} wrote is deleted from your Devices, except their check-offs, and nothing more of theirs is kept. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.",
+  "@personBlockDetail": {
+    "description": "Body of the dialog that confirms blocking a person who manages no Shared Area the user is in.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "personBlockLeaveDetail": "Everything {name} wrote is deleted from your Devices, except their check-offs, and you leave {areas}, which they manage. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.",
+  "@personBlockLeaveDetail": {
+    "description": "Body of the dialog that confirms blocking a person who manages Shared Areas the user is in; areas are their names, separated by commas.",
+    "placeholders": {"name": {"type": "String"}, "areas": {"type": "String"}}
+  },
+  "personBlockLeave": "Block and leave",
+  "@personBlockLeave": {"description": "Confirms blocking a person together with leaving the Shared Areas they manage."},
+  "personUnblockQuestion": "Unblock {name}?",
+  "@personUnblockQuestion": {
+    "description": "Title of the dialog that confirms ending a block.",
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "personUnblockDetail": "What they wrote comes back with the next sync with a Device that still holds it.",
+  "peopleBlocked": "Blocked",
+  "@peopleBlocked": {"description": "The folded section of People that lists the blocked people."},
+  "sentItemBlock": "Decline and block",
+  "@sentItemBlock": {"description": "In a Sent Item's preview: keeps nothing of it and blocks its sender."},
+  "sentItemBlocked": "Declined and blocked: nothing was kept.",
+  "sentItemFromBlocked": "Refused: this file comes from a person you blocked.",
+  "@sentItemFromBlocked": {"description": "Announced instead of the preview of a Sent Item from a blocked person; shows nothing of it."}
 }

@@ -499,5 +499,94 @@ void main() {
       expect(find.byType(SentItemScreen), findsOneWidget);
       expect(find.text('Private'), findsOneWidget);
     });
+
+    group('blocking', () {
+      testWidgets('"Decline and block" keeps nothing and blocks the sender', (
+        tester,
+      ) async {
+        final annId = ann.ownProfile!.id;
+        files.waiting.add(fileFrom(Notes(ann).capture('Spam')));
+        await app(tester);
+        await tester.tap(find.byKey(const ValueKey('block-sent')));
+        await tester.pumpAndSettle();
+        expect(find.text('Block Ann?'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(phone.isBlocked(annId), isFalse);
+        expect(find.byType(SentItemScreen), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('block-sent')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('block-confirm')));
+        await tester.pumpAndSettle();
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(
+          announcements.visible,
+          'Declined and blocked: nothing was kept.',
+        );
+        expect(Notes(phone).all(), isEmpty);
+        expect(phone.isBlocked(annId), isTrue);
+        // Kept for the "Blocked" list, without her picture.
+        final blocked = phone.blockedPeople.single;
+        expect(blocked.name, 'Ann');
+        expect(blocked.picture, isNull);
+      });
+
+      testWidgets('a file from a blocked person shows nothing of it', (
+        tester,
+      ) async {
+        acceptedFromAnn();
+        phone.blockPerson(ann.ownProfile!.id);
+        await app(tester);
+        files.open(fileFrom(Notes(ann).capture('Party at mine')));
+        await tester.pumpAndSettle();
+        expect(
+          announcements.visible,
+          'Refused: this file comes from a person you blocked.',
+        );
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(find.textContaining('Party'), findsNothing);
+        expect(Notes(phone).all().map((n) => n.text), ['Dentist']);
+        expect(dir.listSync().whereType<File>(), isEmpty, reason: 'copy gone');
+      });
+
+      testWidgets('a block that comes while the preview is open refuses '
+          'Accept', (tester) async {
+        files.waiting.add(fileFrom(Notes(ann).capture('Party')));
+        await app(tester);
+        // As if another of the user's Devices blocked her, by sync.
+        phone.blockPerson(ann.ownProfile!.id);
+        await tester.tap(find.byKey(const ValueKey('accept-sent')));
+        await tester.pumpAndSettle();
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(
+          announcements.visible,
+          'Refused: this file comes from a person you blocked.',
+        );
+        expect(Notes(phone).all(), isEmpty);
+      });
+
+      testWidgets('blocking on the sender\'s Profile closes the preview', (
+        tester,
+      ) async {
+        acceptedFromAnn();
+        files.waiting.add(fileFrom(Notes(ann).capture('Party')));
+        await app(tester);
+        await tester.tap(find.byKey(const ValueKey('sent-from-picture')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('block-person')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('block-confirm')));
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(find.text('Party'), findsNothing);
+        expect(
+          announcements.visible,
+          'Refused: this file comes from a person you blocked.',
+        );
+      });
+    });
   });
 }

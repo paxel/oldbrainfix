@@ -2613,4 +2613,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sharedRecordingFix =>
       'The file stays in the Note as it is; type what it says into the Note, or share it again as m4a or mp3.';
+
+  @override
+  String get personBlock => 'Block';
+
+  @override
+  String get personUnblock => 'Unblock';
+
+  @override
+  String get personBlocked =>
+      'Blocked: nothing they write is kept or shown, only their check-offs.';
+
+  @override
+  String personBlockQuestion(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String personBlockDetail(String name) {
+    return 'Everything $name wrote is deleted from your Devices, except their check-offs, and nothing more of theirs is kept. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.';
+  }
+
+  @override
+  String personBlockLeaveDetail(String name, String areas) {
+    return 'Everything $name wrote is deleted from your Devices, except their check-offs, and you leave $areas, which they manage. A shared folder can still hold their encrypted files, which the app never opens; leaving the folder removes them.';
+  }
+
+  @override
+  String get personBlockLeave => 'Block and leave';
+
+  @override
+  String personUnblockQuestion(String name) {
+    return 'Unblock $name?';
+  }
+
+  @override
+  String get personUnblockDetail =>
+      'What they wrote comes back with the next sync with a Device that still holds it.';
+
+  @override
+  String get peopleBlocked => 'Blocked';
+
+  @override
+  String get sentItemBlock => 'Decline and block';
+
+  @override
+  String get sentItemBlocked => 'Declined and blocked: nothing was kept.';
+
+  @override
+  String get sentItemFromBlocked =>
+      'Refused: this file comes from a person you blocked.';
 }

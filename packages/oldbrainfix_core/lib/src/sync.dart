@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'area_keys.dart';
 import 'entry.dart';
 import 'notes.dart';
-import 'profiles.dart' show OverrideKeys, Overrides;
+import 'profiles.dart'
+    show BlockKeys, Blocks, OverrideKeys, Overrides, keptFromBlocked;
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
@@ -86,27 +88,44 @@ extension Sync on Store {
   /// cannot move the version vector past the real entry. An entry under
   /// this Device's own id beyond its own counter is forged and refused
   /// too. An entry of a later structure ([Entry.applies]) is kept and
-  /// passed on, but not applied nor returned.
+  /// passed on, but not applied nor returned. What a blocked person's
+  /// Device wrote is refused but their check-offs, its dseq noted so it
+  /// is not asked for again (ADR 0021), and what a Device found to be
+  /// theirs only now is deleted afterwards ([Blocks.enforceBlocks]).
   List<Entry> applyEntries(
     List<Entry> entries, {
     Iterable<KeyRecord> keys = const [],
     String? verifiedDevice,
     ImportReport? report,
   }) {
-    final applied = _applyEntries(
+    var applied = _applyEntries(
       entries,
       keys: keys,
       verifiedDevice: verifiedDevice,
       report: report,
     );
-    // An Override from another of the user's Devices shows at once
-    // wherever a person shows (#52).
-    if (applied.any((e) => e.entity.startsWith(OverrideKeys.prefix))) {
+    // A block from another of the user's Devices, or a grant naming a
+    // blocked person, takes effect at once (ADR 0021); a photo or
+    // recording removed elsewhere goes here too (ADR 0020). Anything new
+    // may decide either, a grant or a filing as well.
+    if (applied.isNotEmpty) {
+      if (enforceBlocks()) {
+        applied = [
+          for (final e in applied)
+            if (holds(e.device, e.dseq)) e,
+        ];
+      }
+      dropRemovedBlobs();
+    }
+    // An Override or a block from another of the user's Devices shows
+    // at once wherever a person shows (#52, #90).
+    if (applied.any(
+      (e) =>
+          e.entity.startsWith(OverrideKeys.prefix) ||
+          e.entity.startsWith(BlockKeys.prefix),
+    )) {
       profileChanged();
     }
-    // A photo or recording removed elsewhere goes here too (ADR 0020).
-    // Anything new may decide it, a grant or a filing as well.
-    if (applied.isNotEmpty) dropRemovedBlobs();
     return applied;
   }
 
@@ -121,6 +140,8 @@ extension Sync on Store {
     final ownMax = versionVector()[self] ?? 0;
     final own = signingKey.publicKey;
     final known = <String, List<int>?>{};
+    final refusing = blockedDevices();
+    final refused = <Entry>[];
     final applied = <Entry>[];
     for (final e in entries) {
       if (holds(e.device, e.dseq)) continue;
@@ -134,8 +155,22 @@ extension Sync on Store {
         report?.refuse(e.author, e.device);
         continue;
       }
+      // Checked first, so nobody moves the mark with a forged entry.
+      if (refusing.contains(e.device) && !keptFromBlocked(e)) {
+        refused.add(e);
+        continue;
+      }
       // One of a later structure is kept and passed on, not applied.
       if (insert(e) && e.applies) applied.add(e);
+    }
+    // Where each refused entity lay, once what is kept of this batch is
+    // in: a Note by its filing, a Section by the Note it names.
+    final links = {
+      for (final e in refused)
+        if (e.field == SectionKeys.note) e.entity: ?e.value,
+    };
+    for (final e in refused) {
+      noteRefused(e.device, e.dseq, scopeOf(links[e.entity] ?? e.entity));
     }
     return applied;
   });

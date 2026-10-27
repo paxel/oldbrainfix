@@ -577,7 +577,8 @@ fn segment_entries(
 
 /// Reads every other Device's segments sealed with a key held here, as
 /// the Dart core does; never filtered by the version vector. A manifest
-/// of a newer format is counted, and nothing of its writer read.
+/// of a newer format is counted, and nothing of its writer read. A
+/// blocked person's Devices' segments are never opened (ADR 0021).
 fn read_foreign(
     store: &Store,
     folder: &dyn SyncFolder,
@@ -585,6 +586,7 @@ fn read_foreign(
     remember: bool,
 ) -> Result<(Vec<WireEntry>, usize, usize)> {
     let own = store.device_id()?;
+    let blocked = store.blocked_devices()?;
     let mut fresh = Vec::new();
     let mut states = Vec::new();
     let mut unreadable = 0;
@@ -593,7 +595,7 @@ fn read_foreign(
         let Some(device) = name.strip_suffix(".manifest") else {
             continue;
         };
-        if device == own || device.is_empty() {
+        if device == own || device.is_empty() || blocked.contains(device) {
             continue;
         }
         let Ok(bytes) = folder.read("", &name) else {
@@ -1042,6 +1044,13 @@ impl Store {
     pub fn forget_sync_folder(&self) -> Result<()> {
         self.remove_local_setting(FOLDER_KEY)?;
         self.remove_local_setting(STATUS_KEY)?;
+        self.forget_folder_reads()
+    }
+
+    /// Forgets how far every other Device's segments were read, so the
+    /// next folder sync reads them whole; the store skips what it holds.
+    /// After an unblock that brings back what was refused (ADR 0021).
+    pub fn forget_folder_reads(&self) -> Result<()> {
         for (key, _) in self.local_settings_with_prefix(READ_PREFIX)? {
             self.remove_local_setting(&key)?;
         }

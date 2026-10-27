@@ -32,3 +32,7 @@ Amended by ADR 0017: a Sent Item carries the sender's signed Profile instead of 
 ## Text formats (ADR 0018)
 
 Amended by ADR 0018 (#58): the Note's text and every Section's text carry their format, `"format":"plain"` from this version, and the version of their structure as `v` when it is more than 1; a file without a format reads as plain, one without `v` as version 1. Accepting writes each text in its format, and an update never replaces a text in a format the receiver does not know unless it is the text the sender sent last.
+
+## Blocks (ADR 0021)
+
+Amended by ADR 0021 (#90): a Sent Item whose Profile id is blocked, or which a blocked person's Device signed, is refused before its preview and cannot be accepted. "Decline and block" keeps the sender's Profile without its picture.

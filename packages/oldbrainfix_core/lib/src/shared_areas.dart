@@ -199,8 +199,11 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         final signer = byDevice[e.device]?.last.grant;
         if (signer == null) return false;
         if (signer.role == AreaRole.manager) return true;
-        return grant != null &&
-            grant.role == AreaRole.member &&
+        // A person ends the grants of their own Devices: they leave.
+        if (grant == null) {
+          return byDevice[target]?.last.grant?.profile == signer.profile;
+        }
+        return grant.role == AreaRole.member &&
             grant.profile == signer.profile &&
             !byDevice.containsKey(target);
       }
@@ -523,6 +526,29 @@ extension SharedAreas on Store {
         if (grants.grantOf(device)?.profile == person) {
           append(areaId, ShareKeys.role(device), null);
         }
+      }
+    });
+  }
+
+  /// Leaves the Shared Area [areaId] (#90): ends the grant of every
+  /// Device of the user's there, this Device's last, so nothing more of
+  /// it comes or goes. What is here stays as it was. A Member may leave
+  /// too: a person may end the grants of their own Devices.
+  void leaveArea(String areaId) {
+    final grants = grantsOf(areaId);
+    if (grants == null) return;
+    final self = deviceId;
+    final mine = grants.grantOf(self)?.profile;
+    final devices = [
+      for (final device in grants.devices)
+        if (grants.grantOf(device) case final grant?
+            when grant.profile == mine || isOwnPerson(grant.profile))
+          device,
+    ]..sort((a, b) => (a == self ? 1 : 0) - (b == self ? 1 : 0));
+    if (devices.isEmpty) return;
+    batch(() {
+      for (final device in devices) {
+        append(areaId, ShareKeys.role(device), null);
       }
     });
   }

@@ -304,6 +304,13 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                 {
                     None => false,
                     Some(signer) if signer.role == AreaRole::Manager => true,
+                    // A person ends the grants of their own Devices: they
+                    // leave.
+                    Some(signer) if grant.is_none() => by_device
+                        .get(target)
+                        .and_then(|g| g.last())
+                        .and_then(|g| g.grant.as_ref())
+                        .is_some_and(|g| g.profile == signer.profile),
                     Some(signer) => grant.as_ref().is_some_and(|g| {
                         g.role == AreaRole::Member
                             && g.profile == signer.profile
@@ -728,6 +735,38 @@ impl Store {
                 if grants.grant_of(&device).map(|g| g.profile.as_str()) == Some(person) {
                     self.append(area, &role_field(&device), None, None)?;
                 }
+            }
+            Ok(())
+        })
+    }
+
+    /// Leaves the Shared Area `area` (#90), as the Dart core's
+    /// `leaveArea`: ends the grant of every Device of the user's there,
+    /// this Device's last, so nothing more of it comes or goes. What is
+    /// here stays as it was. A Member may leave too: a person may end the
+    /// grants of their own Devices.
+    pub fn leave_area(&self, area: &str) -> Result<()> {
+        let Some(grants) = self.grants_of(area)? else {
+            return Ok(());
+        };
+        let own_device = self.device_id()?;
+        let mine = grants.grant_of(&own_device).map(|g| g.profile.clone());
+        let mut devices = Vec::new();
+        for device in grants.devices() {
+            let Some(grant) = grants.grant_of(&device) else {
+                continue;
+            };
+            if Some(&grant.profile) == mine.as_ref() || self.is_own_person(&grant.profile)? {
+                devices.push(device);
+            }
+        }
+        devices.sort_by_key(|d| *d == own_device);
+        if devices.is_empty() {
+            return Ok(());
+        }
+        self.batch(|| {
+            for device in &devices {
+                self.append(area, &role_field(device), None, None)?;
             }
             Ok(())
         })

@@ -1,0 +1,618 @@
+{
+  "carol": "00000000000000000000000000000002",
+  "household": "area:00000000000000000000000000000003",
+  "school": "area:00000000000000000000000000000004",
+  "note": "note:00000000000000000000000000000007",
+  "cake": "routine:0000000000000000000000000000000a",
+  "photo": "384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d",
+  "leave": [
+    "area:00000000000000000000000000000004"
+  ],
+  "blockAt": "2026-01-03T09:00:00.000Z",
+  "incomingAt": "2026-01-03T12:00:00.000Z",
+  "unblockAt": "2026-01-04T09:00:00.000Z",
+  "blocked": {
+    "entries": [
+      "65b60673d6ed884bf01c2c222d82ada0:1",
+      "65b60673d6ed884bf01c2c222d82ada0:2",
+      "65b60673d6ed884bf01c2c222d82ada0:3",
+      "65b60673d6ed884bf01c2c222d82ada0:4",
+      "c945cbf2a5602002141e2fb9d17054d6:3",
+      "c945cbf2a5602002141e2fb9d17054d6:4",
+      "65b60673d6ed884bf01c2c222d82ada0:5",
+      "65b60673d6ed884bf01c2c222d82ada0:6",
+      "65b60673d6ed884bf01c2c222d82ada0:7",
+      "65b60673d6ed884bf01c2c222d82ada0:8",
+      "65b60673d6ed884bf01c2c222d82ada0:9",
+      "65b60673d6ed884bf01c2c222d82ada0:10",
+      "65b60673d6ed884bf01c2c222d82ada0:11",
+      "65b60673d6ed884bf01c2c222d82ada0:12",
+      "65b60673d6ed884bf01c2c222d82ada0:13",
+      "65b60673d6ed884bf01c2c222d82ada0:14",
+      "c945cbf2a5602002141e2fb9d17054d6:5",
+      "c945cbf2a5602002141e2fb9d17054d6:8",
+      "c945cbf2a5602002141e2fb9d17054d6:18",
+      "65b60673d6ed884bf01c2c222d82ada0:15",
+      "65b60673d6ed884bf01c2c222d82ada0:16",
+      "65b60673d6ed884bf01c2c222d82ada0:17",
+      "65b60673d6ed884bf01c2c222d82ada0:18",
+      "65b60673d6ed884bf01c2c222d82ada0:19",
+      "65b60673d6ed884bf01c2c222d82ada0:20",
+      "65b60673d6ed884bf01c2c222d82ada0:21",
+      "65b60673d6ed884bf01c2c222d82ada0:22"
+    ],
+    "vector": {
+      "65b60673d6ed884bf01c2c222d82ada0": 22,
+      "c945cbf2a5602002141e2fb9d17054d6": 18
+    },
+    "refused": [
+      [
+        "refused:c945cbf2a5602002141e2fb9d17054d6",
+        "{\"runs\":[{\"from\":1,\"scope\":\"area:00000000000000000000000000000004\",\"to\":2},{\"from\":6,\"scope\":\"area:00000000000000000000000000000003\",\"to\":7},{\"from\":9,\"scope\":\"area:00000000000000000000000000000003\",\"to\":9},{\"from\":13,\"scope\":\"area:00000000000000000000000000000003\",\"to\":17}]}"
+      ]
+    ],
+    "people": [
+      [
+        "person:00000000000000000000000000000002",
+        "{\"profile\":{\"aliases\":[],\"first\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"keys\":[],\"record\":\"{\\\"id\\\":\\\"00000000000000000000000000000002\\\",\\\"name\\\":\\\"Carol\\\",\\\"version\\\":2}\",\"sig\":\"i4RP5q2mQeagI8JR7XchV38WErvr736dCIit7m7zfceJE17wnFC0AexjfuUTwVRx289j2gsQ/EleM87uElf8Bw==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"},\"seen\":\"2026-01-01T10:00:04.000Z\",\"stripped\":true}"
+      ]
+    ],
+    "blocked": [
+      {
+        "id": "00000000000000000000000000000002",
+        "name": "Carol",
+        "picture": false
+      }
+    ],
+    "shown": [],
+    "photos": [],
+    "read": {
+      "now": "2026-01-03T09:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000003",
+          "name": "Household",
+          "starter": null,
+          "colour": null,
+          "icon": null,
+          "topics": []
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000005",
+          "text": "Buy milk",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:13.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000005"
+      ],
+      "unsorted": [],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000003": [
+          "note:00000000000000000000000000000005"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000005": []
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "removable": {},
+      "search": {
+        "": [
+          "note:00000000000000000000000000000005"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000005"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [],
+        "heading": [],
+        "format": []
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000003": []
+      },
+      "conflicts": []
+    }
+  },
+  "incoming": {
+    "entries": [
+      "65b60673d6ed884bf01c2c222d82ada0:1",
+      "65b60673d6ed884bf01c2c222d82ada0:2",
+      "65b60673d6ed884bf01c2c222d82ada0:3",
+      "65b60673d6ed884bf01c2c222d82ada0:4",
+      "c945cbf2a5602002141e2fb9d17054d6:3",
+      "c945cbf2a5602002141e2fb9d17054d6:4",
+      "65b60673d6ed884bf01c2c222d82ada0:5",
+      "65b60673d6ed884bf01c2c222d82ada0:6",
+      "65b60673d6ed884bf01c2c222d82ada0:7",
+      "65b60673d6ed884bf01c2c222d82ada0:8",
+      "65b60673d6ed884bf01c2c222d82ada0:9",
+      "65b60673d6ed884bf01c2c222d82ada0:10",
+      "65b60673d6ed884bf01c2c222d82ada0:11",
+      "65b60673d6ed884bf01c2c222d82ada0:12",
+      "65b60673d6ed884bf01c2c222d82ada0:13",
+      "65b60673d6ed884bf01c2c222d82ada0:14",
+      "c945cbf2a5602002141e2fb9d17054d6:5",
+      "c945cbf2a5602002141e2fb9d17054d6:8",
+      "c945cbf2a5602002141e2fb9d17054d6:18",
+      "65b60673d6ed884bf01c2c222d82ada0:15",
+      "65b60673d6ed884bf01c2c222d82ada0:16",
+      "65b60673d6ed884bf01c2c222d82ada0:17",
+      "65b60673d6ed884bf01c2c222d82ada0:18",
+      "65b60673d6ed884bf01c2c222d82ada0:19",
+      "65b60673d6ed884bf01c2c222d82ada0:20",
+      "65b60673d6ed884bf01c2c222d82ada0:21",
+      "65b60673d6ed884bf01c2c222d82ada0:22",
+      "c945cbf2a5602002141e2fb9d17054d6:19",
+      "c945cbf2a5602002141e2fb9d17054d6:22",
+      "c945cbf2a5602002141e2fb9d17054d6:23"
+    ],
+    "vector": {
+      "65b60673d6ed884bf01c2c222d82ada0": 22,
+      "c945cbf2a5602002141e2fb9d17054d6": 23
+    },
+    "refused": [
+      [
+        "refused:c945cbf2a5602002141e2fb9d17054d6",
+        "{\"runs\":[{\"from\":1,\"scope\":\"area:00000000000000000000000000000004\",\"to\":2},{\"from\":6,\"scope\":\"area:00000000000000000000000000000003\",\"to\":7},{\"from\":9,\"scope\":\"area:00000000000000000000000000000003\",\"to\":9},{\"from\":13,\"scope\":\"area:00000000000000000000000000000003\",\"to\":17},{\"from\":20,\"scope\":\"area:00000000000000000000000000000003\",\"to\":21}]}"
+      ]
+    ],
+    "people": [
+      [
+        "person:00000000000000000000000000000002",
+        "{\"profile\":{\"aliases\":[],\"first\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"keys\":[],\"record\":\"{\\\"id\\\":\\\"00000000000000000000000000000002\\\",\\\"name\\\":\\\"Carol\\\",\\\"version\\\":2}\",\"sig\":\"i4RP5q2mQeagI8JR7XchV38WErvr736dCIit7m7zfceJE17wnFC0AexjfuUTwVRx289j2gsQ/EleM87uElf8Bw==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"},\"seen\":\"2026-01-01T10:00:04.000Z\",\"stripped\":true}"
+      ]
+    ],
+    "blocked": [
+      {
+        "id": "00000000000000000000000000000002",
+        "name": "Carol",
+        "picture": false
+      }
+    ],
+    "shown": [],
+    "photos": [],
+    "read": {
+      "now": "2026-01-03T12:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000003",
+          "name": "Household",
+          "starter": null,
+          "colour": null,
+          "icon": null,
+          "topics": []
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000005",
+          "text": "Buy milk",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:13.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000005"
+      ],
+      "unsorted": [],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000003": [
+          "note:00000000000000000000000000000005"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000005": []
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "removable": {},
+      "search": {
+        "": [
+          "note:00000000000000000000000000000005"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000005"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [],
+        "heading": [],
+        "format": []
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000003": []
+      },
+      "conflicts": []
+    }
+  },
+  "unblocked": {
+    "entries": [
+      "65b60673d6ed884bf01c2c222d82ada0:1",
+      "65b60673d6ed884bf01c2c222d82ada0:2",
+      "65b60673d6ed884bf01c2c222d82ada0:3",
+      "65b60673d6ed884bf01c2c222d82ada0:4",
+      "c945cbf2a5602002141e2fb9d17054d6:3",
+      "c945cbf2a5602002141e2fb9d17054d6:4",
+      "65b60673d6ed884bf01c2c222d82ada0:5",
+      "65b60673d6ed884bf01c2c222d82ada0:6",
+      "65b60673d6ed884bf01c2c222d82ada0:7",
+      "65b60673d6ed884bf01c2c222d82ada0:8",
+      "65b60673d6ed884bf01c2c222d82ada0:9",
+      "65b60673d6ed884bf01c2c222d82ada0:10",
+      "65b60673d6ed884bf01c2c222d82ada0:11",
+      "65b60673d6ed884bf01c2c222d82ada0:12",
+      "65b60673d6ed884bf01c2c222d82ada0:13",
+      "65b60673d6ed884bf01c2c222d82ada0:14",
+      "c945cbf2a5602002141e2fb9d17054d6:5",
+      "c945cbf2a5602002141e2fb9d17054d6:8",
+      "c945cbf2a5602002141e2fb9d17054d6:18",
+      "65b60673d6ed884bf01c2c222d82ada0:15",
+      "65b60673d6ed884bf01c2c222d82ada0:16",
+      "65b60673d6ed884bf01c2c222d82ada0:17",
+      "65b60673d6ed884bf01c2c222d82ada0:18",
+      "65b60673d6ed884bf01c2c222d82ada0:19",
+      "65b60673d6ed884bf01c2c222d82ada0:20",
+      "65b60673d6ed884bf01c2c222d82ada0:21",
+      "65b60673d6ed884bf01c2c222d82ada0:22",
+      "c945cbf2a5602002141e2fb9d17054d6:19",
+      "c945cbf2a5602002141e2fb9d17054d6:22",
+      "c945cbf2a5602002141e2fb9d17054d6:23",
+      "65b60673d6ed884bf01c2c222d82ada0:23"
+    ],
+    "vector": {
+      "65b60673d6ed884bf01c2c222d82ada0": 23,
+      "c945cbf2a5602002141e2fb9d17054d6": 5
+    },
+    "refused": [
+      [
+        "refused:c945cbf2a5602002141e2fb9d17054d6",
+        "{\"released\":true,\"runs\":[{\"from\":6,\"scope\":\"area:00000000000000000000000000000003\",\"to\":7},{\"from\":9,\"scope\":\"area:00000000000000000000000000000003\",\"to\":9},{\"from\":13,\"scope\":\"area:00000000000000000000000000000003\",\"to\":17},{\"from\":20,\"scope\":\"area:00000000000000000000000000000003\",\"to\":21}]}"
+      ]
+    ],
+    "people": [
+      [
+        "person:00000000000000000000000000000002",
+        "{\"profile\":{\"aliases\":[],\"first\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"keys\":[],\"record\":\"{\\\"id\\\":\\\"00000000000000000000000000000002\\\",\\\"name\\\":\\\"Carol\\\",\\\"version\\\":2}\",\"sig\":\"i4RP5q2mQeagI8JR7XchV38WErvr736dCIit7m7zfceJE17wnFC0AexjfuUTwVRx289j2gsQ/EleM87uElf8Bw==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"},\"seen\":\"2026-01-01T10:00:04.000Z\",\"stripped\":true}"
+      ]
+    ],
+    "blocked": [],
+    "shown": [
+      "00000000000000000000000000000002"
+    ],
+    "photos": [],
+    "read": {
+      "now": "2026-01-04T09:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000003",
+          "name": "Household",
+          "starter": null,
+          "colour": null,
+          "icon": null,
+          "topics": []
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000005",
+          "text": "Buy milk",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:13.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        }
+      ],
+      "all": [
+        "note:00000000000000000000000000000005"
+      ],
+      "unsorted": [],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000003": [
+          "note:00000000000000000000000000000005"
+        ]
+      },
+      "sections": {
+        "note:00000000000000000000000000000005": []
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "removable": {},
+      "search": {
+        "": [
+          "note:00000000000000000000000000000005"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000005"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [],
+        "heading": [],
+        "format": []
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000003": []
+      },
+      "conflicts": []
+    }
+  },
+  "refetched": {
+    "entries": [
+      "65b60673d6ed884bf01c2c222d82ada0:1",
+      "65b60673d6ed884bf01c2c222d82ada0:2",
+      "65b60673d6ed884bf01c2c222d82ada0:3",
+      "65b60673d6ed884bf01c2c222d82ada0:4",
+      "c945cbf2a5602002141e2fb9d17054d6:3",
+      "c945cbf2a5602002141e2fb9d17054d6:4",
+      "65b60673d6ed884bf01c2c222d82ada0:5",
+      "65b60673d6ed884bf01c2c222d82ada0:6",
+      "65b60673d6ed884bf01c2c222d82ada0:7",
+      "65b60673d6ed884bf01c2c222d82ada0:8",
+      "65b60673d6ed884bf01c2c222d82ada0:9",
+      "65b60673d6ed884bf01c2c222d82ada0:10",
+      "65b60673d6ed884bf01c2c222d82ada0:11",
+      "65b60673d6ed884bf01c2c222d82ada0:12",
+      "65b60673d6ed884bf01c2c222d82ada0:13",
+      "65b60673d6ed884bf01c2c222d82ada0:14",
+      "c945cbf2a5602002141e2fb9d17054d6:5",
+      "c945cbf2a5602002141e2fb9d17054d6:8",
+      "c945cbf2a5602002141e2fb9d17054d6:18",
+      "65b60673d6ed884bf01c2c222d82ada0:15",
+      "65b60673d6ed884bf01c2c222d82ada0:16",
+      "65b60673d6ed884bf01c2c222d82ada0:17",
+      "65b60673d6ed884bf01c2c222d82ada0:18",
+      "65b60673d6ed884bf01c2c222d82ada0:19",
+      "65b60673d6ed884bf01c2c222d82ada0:20",
+      "65b60673d6ed884bf01c2c222d82ada0:21",
+      "65b60673d6ed884bf01c2c222d82ada0:22",
+      "c945cbf2a5602002141e2fb9d17054d6:19",
+      "c945cbf2a5602002141e2fb9d17054d6:22",
+      "c945cbf2a5602002141e2fb9d17054d6:23",
+      "65b60673d6ed884bf01c2c222d82ada0:23",
+      "c945cbf2a5602002141e2fb9d17054d6:6",
+      "c945cbf2a5602002141e2fb9d17054d6:7",
+      "c945cbf2a5602002141e2fb9d17054d6:9",
+      "c945cbf2a5602002141e2fb9d17054d6:13",
+      "c945cbf2a5602002141e2fb9d17054d6:14",
+      "c945cbf2a5602002141e2fb9d17054d6:15",
+      "c945cbf2a5602002141e2fb9d17054d6:16",
+      "c945cbf2a5602002141e2fb9d17054d6:17",
+      "c945cbf2a5602002141e2fb9d17054d6:20",
+      "c945cbf2a5602002141e2fb9d17054d6:21"
+    ],
+    "vector": {
+      "65b60673d6ed884bf01c2c222d82ada0": 23,
+      "c945cbf2a5602002141e2fb9d17054d6": 23
+    },
+    "refused": [],
+    "people": [
+      [
+        "person:00000000000000000000000000000002",
+        "{\"profile\":{\"aliases\":[],\"first\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"keys\":[],\"record\":\"{\\\"id\\\":\\\"00000000000000000000000000000002\\\",\\\"name\\\":\\\"Carol\\\",\\\"version\\\":2}\",\"sig\":\"i4RP5q2mQeagI8JR7XchV38WErvr736dCIit7m7zfceJE17wnFC0AexjfuUTwVRx289j2gsQ/EleM87uElf8Bw==\",\"signer\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\"},\"seen\":\"2026-01-01T10:00:04.000Z\",\"stripped\":true}"
+      ]
+    ],
+    "blocked": [],
+    "shown": [
+      "00000000000000000000000000000002"
+    ],
+    "photos": [],
+    "read": {
+      "now": "2026-01-04T09:00:00.000Z",
+      "areas": [
+        {
+          "id": "area:00000000000000000000000000000003",
+          "name": "Household",
+          "starter": null,
+          "colour": null,
+          "icon": null,
+          "topics": []
+        }
+      ],
+      "notes": [
+        {
+          "id": "note:00000000000000000000000000000005",
+          "text": "Buy milk",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:13.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        },
+        {
+          "id": "note:00000000000000000000000000000007",
+          "text": "Rude words",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:26.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": true,
+          "photos": [
+            "384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
+          ],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {
+            "384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d": "Rude picture"
+          },
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        },
+        {
+          "id": "note:0000000000000000000000000000000b",
+          "text": "Ruder words",
+          "textFormat": "plain",
+          "textVersion": 1,
+          "textEditable": true,
+          "captured": "2026-01-01T10:00:52.000Z",
+          "place": "area:00000000000000000000000000000003",
+          "importance": "normal",
+          "trashed": null,
+          "mergedInto": null,
+          "spawned": false,
+          "photos": [],
+          "recordings": [],
+          "transcripts": {},
+          "photoTexts": {},
+          "removedPhotos": [],
+          "removedRecordings": [],
+          "wordless": "photo"
+        }
+      ],
+      "all": [
+        "note:0000000000000000000000000000000b",
+        "note:00000000000000000000000000000007",
+        "note:00000000000000000000000000000005"
+      ],
+      "unsorted": [],
+      "trashed": [],
+      "inside": {
+        "area:00000000000000000000000000000003": [
+          "note:0000000000000000000000000000000b",
+          "note:00000000000000000000000000000007",
+          "note:00000000000000000000000000000005"
+        ]
+      },
+      "sections": {
+        "note:0000000000000000000000000000000b": [],
+        "note:00000000000000000000000000000007": [],
+        "note:00000000000000000000000000000005": [
+          {
+            "id": "section:00000000000000000000000000000009",
+            "noteId": "note:00000000000000000000000000000005",
+            "text": "Rude too",
+            "textFormat": "plain",
+            "textVersion": 1,
+            "textEditable": true,
+            "captured": "2026-01-01T10:00:37.000Z",
+            "photos": [],
+            "recordings": [],
+            "transcripts": {},
+            "photoTexts": {},
+            "removedPhotos": [],
+            "removedRecordings": []
+          }
+        ]
+      },
+      "untranscribed": [],
+      "unreadPhotos": [],
+      "removable": {
+        "note:00000000000000000000000000000007": [
+          "photo/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
+        ]
+      },
+      "search": {
+        "": [
+          "note:0000000000000000000000000000000b",
+          "note:00000000000000000000000000000007",
+          "note:00000000000000000000000000000005"
+        ],
+        "sauce": [],
+        "MILK": [
+          "note:00000000000000000000000000000005"
+        ],
+        "receipt": [],
+        "dentist": [],
+        "x-ray": [],
+        "müller": [],
+        "called": [],
+        "loop": [],
+        " e ": [
+          "note:0000000000000000000000000000000b",
+          "note:00000000000000000000000000000007",
+          "note:00000000000000000000000000000005"
+        ],
+        "heading": [],
+        "format": []
+      },
+      "searchWithin": {
+        "area:00000000000000000000000000000003": [
+          "note:0000000000000000000000000000000b",
+          "note:00000000000000000000000000000007",
+          "note:00000000000000000000000000000005"
+        ]
+      },
+      "conflicts": []
+    }
+  }
+}
