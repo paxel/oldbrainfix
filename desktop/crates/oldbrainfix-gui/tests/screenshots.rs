@@ -55,9 +55,9 @@ fn demo() -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
     let work = places.add_area("Work")?;
     places.set_icon(&work.id, Some("work"))?;
     places.set_colour(&work.id, Some("5C6BC0"))?;
-    let health = places.add_area("Health")?;
-    places.set_icon(&health.id, Some("health"))?;
-    places.set_colour(&health.id, Some("C0504D"))?;
+    let car = places.add_area("Car")?;
+    places.set_icon(&car.id, Some("car"))?;
+    places.set_colour(&car.id, Some("C0504D"))?;
 
     let notes = Notes::new(&store);
     let mut ids = Vec::new();
@@ -83,8 +83,8 @@ fn demo() -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
             Some(work.id.as_str()),
         ),
         (
-            "Dentist said to come back in six months, call in April",
-            Some(health.id.as_str()),
+            "Winter tyres are in the cellar, left shelf, with the wheel bolts",
+            Some(car.id.as_str()),
         ),
         (
             "Where did I put the warranty for the washing machine?",
@@ -105,9 +105,13 @@ fn demo() -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
     let at = |h, m| ClockTime::new(h, m).ok_or("a time");
     let daily = oldbrainfix_core::Recurrence::parse("FREQ=DAILY")?;
     let weekly = oldbrainfix_core::Recurrence::parse("FREQ=WEEKLY;BYDAY=MO")?;
-    let pills = notes.capture("Take the blood pressure pill", Some(&health.id), None)?;
-    let schedule = Schedule::new(monday, &[at(8, 0)?, at(20, 0)?], Some(daily));
-    routines.spawn(&pills.id, &schedule.ok_or("schedule")?)?;
+    let snack = notes.capture(
+        "Snack: an apple and a handful of nuts",
+        Some(&household.id),
+        None,
+    )?;
+    let schedule = Schedule::new(monday, &[at(8, 0)?, at(15, 0)?], Some(daily));
+    routines.spawn(&snack.id, &schedule.ok_or("schedule")?)?;
     let bins = notes.capture("Put the bins out", Some(&household.id), None)?;
     let schedule = Schedule::new(monday, &[at(19, 0)?], Some(weekly));
     routines.spawn(&bins.id, &schedule.ok_or("schedule")?)?;
@@ -120,8 +124,8 @@ fn demo() -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
     )?;
 
     *now.lock() = parse_time("2026-10-26T08:30:00.000Z")?;
-    let pill = routines.of_note(&pills.id)?;
-    if let Some(routine) = pill.first() {
+    let snacks = routines.of_note(&snack.id)?;
+    if let Some(routine) = snacks.first() {
         let morning = oldbrainfix_core::Occurrence::new(monday, Some(at(8, 0)?));
         routines.mark_done(&routine.id, &morning, None)?;
     }

@@ -35,13 +35,13 @@ final _now = DateTime(2026, 10, 27, 9, 40);
 
 /// The texts of the store in one language.
 typedef _Texts = ({
-  String pills,
+  String snack,
   String walk,
   String plants,
   String timesheet,
   String callAnna,
   String bins,
-  String dentist,
+  String carService,
   List<String> unsorted,
   String boiler,
   List<String> boilerParts,
@@ -54,13 +54,13 @@ typedef _Texts = ({
 });
 
 const _en = (
-  pills: 'Blood pressure pill',
+  snack: 'Snack: an apple and a handful of nuts',
   walk: 'Walk round the block, 20 minutes',
   plants: 'Water the plants on the balcony',
   timesheet: 'Send the timesheet to Sarah',
   callAnna: 'Call Anna about Saturday',
   bins: 'Put the paper bin out',
-  dentist: 'Dentist, Dr Weber, bring the bonus booklet',
+  carService: 'Car service at Weber\'s garage, bring the service booklet',
   unsorted: [
     'Batteries for the smoke alarm, 9 V',
     'Parked on level 3, row F',
@@ -81,13 +81,13 @@ const _en = (
 );
 
 const _de = (
-  pills: 'Blutdrucktablette',
+  snack: 'Snack: ein Apfel und eine Handvoll Nüsse',
   walk: 'Runde um den Block, 20 Minuten',
   plants: 'Pflanzen auf dem Balkon gießen',
   timesheet: 'Stundenzettel an Sarah schicken',
   callAnna: 'Anna wegen Samstag anrufen',
   bins: 'Papiertonne rausstellen',
-  dentist: 'Zahnarzt, Dr. Weber, Bonusheft mitnehmen',
+  carService: 'Inspektion im Autohaus Weber, Serviceheft mitnehmen',
   unsorted: [
     'Batterien für den Rauchmelder, 9 V',
     'Geparkt auf Ebene 3, Reihe F',
@@ -107,13 +107,13 @@ const _de = (
   home: 'Zuhause',
 );
 
-/// A store seeded with a believable household, work and health life in
+/// A store seeded with a believable household, work and car life in
 /// [texts], as of [_now].
 class _Seeded {
   final Store store;
-  final Routine pills;
+  final Routine snack;
 
-  _Seeded._(this.store, this.pills);
+  _Seeded._(this.store, this.snack);
 
   factory _Seeded(_Texts x) {
     // Each Note and Done at its own moment while seeding, then [_now].
@@ -121,11 +121,11 @@ class _Seeded {
     final store = Store.inMemory(clock: () => clock)
       ..starterSetOffered = true
       ..alarmSetupDone = true;
-    final pills = _seed(store, x, (at) => clock = at);
+    final snack = _seed(store, x, (at) => clock = at);
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
     Alarms(store).markSeen();
-    return _Seeded._(store, pills);
+    return _Seeded._(store, snack);
   }
 
   static Routine _seed(
@@ -136,22 +136,23 @@ class _Seeded {
     final places = Places(store);
     final notes = Notes(store);
     final routines = Routines(store);
-    places.plantStarterSet({'household', 'work', 'health', 'medication'});
+    places.plantStarterSet({'household', 'kitchen', 'work', 'car', 'service'});
     Area area(String slug) =>
         places.areas().firstWhere((a) => a.starter == slug);
     final household = area('household');
     final work = area('work');
-    final health = area('health');
-    final medication = places
-        .topics(health.id)
-        .firstWhere((t) => t.starter == 'medication');
+    final car = area('car');
+    Topic topic(Area of, String slug) =>
+        places.topics(of.id).firstWhere((t) => t.starter == slug);
+    final kitchen = topic(household, 'kitchen');
+    final service = topic(car, 'service');
     places
       ..setColour(household.id, '2E7D32')
       ..setIcon(household.id, 'home')
       ..setColour(work.id, '1565C0')
       ..setIcon(work.id, 'work')
-      ..setColour(health.id, 'C62828')
-      ..setIcon(health.id, 'health');
+      ..setColour(car.id, 'C62828')
+      ..setIcon(car.id, 'car');
     final home = NamedPlaces(store)
         .add(x.home, Coordinates(52.5200, 13.4050), radius: 100);
 
@@ -172,23 +173,23 @@ class _Seeded {
     ClockTime at(int h, [int m = 0]) => ClockTime(h, m);
     final daily = Recurrence.parse('FREQ=DAILY');
 
-    // The pills, twice a day since 1 October; two evening doses
+    // The snack, twice a day since 1 October; two afternoon snacks
     // forgotten.
-    final pillsNote = capture(
+    final snackNote = capture(
       DateTime(2026, 9, 30, 19, 12),
-      x.pills,
-      place: medication.id,
+      x.snack,
+      place: kitchen.id,
     );
-    final pills = routines.spawn(
-      pillsNote.id,
-      Schedule(start: day(1), times: [at(8), at(20)], rule: daily),
+    final snack = routines.spawn(
+      snackNote.id,
+      Schedule(start: day(1), times: [at(9), at(15)], rule: daily),
     );
     for (var d = 1; d <= 27; d++) {
-      for (final hour in [8, 20]) {
-        if (d == 27 && hour == 20) continue;
-        if ((d == 9 && hour == 20) || (d == 22 && hour == 20)) continue;
+      for (final hour in [9, 15]) {
+        if (d == 27 && hour == 15) continue;
+        if ((d == 9 && hour == 15) || (d == 22 && hour == 15)) continue;
         routines.markDone(
-          pills.id,
+          snack.id,
           Occurrence(day(d), at(hour)),
           at: DateTime(2026, 10, d, hour, 4 + d % 9),
         );
@@ -199,7 +200,7 @@ class _Seeded {
     final walkNote = capture(
       DateTime(2026, 10, 18, 21, 30),
       x.walk,
-      place: health.id,
+      place: household.id,
     );
     final walk = routines.spawn(
       walkNote.id,
@@ -243,7 +244,7 @@ class _Seeded {
       ),
     );
 
-    // Reminders: the bin today, the dentist and Anna tomorrow.
+    // Reminders: the bin today, the car service and Anna tomorrow.
     final annaNote = capture(DateTime(2026, 10, 26, 20, 15), x.callAnna);
     routines.spawn(annaNote.id, Schedule(start: day(28), times: [at(12, 30)]));
     final binsNote = capture(
@@ -253,13 +254,13 @@ class _Seeded {
       atHome: true,
     );
     routines.spawn(binsNote.id, Schedule(start: day(27), times: [at(18)]));
-    final dentistNote = capture(
+    final carServiceNote = capture(
       DateTime(2026, 10, 20, 10, 3),
-      x.dentist,
-      place: health.id,
+      x.carService,
+      place: service.id,
     );
     routines.spawn(
-      dentistNote.id,
+      carServiceNote.id,
       Schedule(start: day(28), times: [at(10, 15)]),
     );
 
@@ -302,7 +303,7 @@ class _Seeded {
     capture(DateTime(2026, 10, 26, 17, 58), x.unsorted[0]);
     capture(DateTime(2026, 10, 26, 19, 4), x.unsorted[1]);
     capture(DateTime(2026, 10, 27, 8, 31), x.unsorted[2]);
-    return pills;
+    return snack;
   }
 }
 
@@ -469,7 +470,7 @@ void main() {
 
       frame('5-routine.png', (tester) async {
         await start(tester, _Seeded(texts));
-        await tap(tester, find.text(texts.pills).first);
+        await tap(tester, find.text(texts.snack).first);
         expect(find.byType(RoutineEditorScreen), findsOneWidget);
       });
 
@@ -477,10 +478,10 @@ void main() {
         final seeded = _Seeded(texts);
         final alarms = FakeAlarms()
           ..ringingNow = Ringing(
-            routineId: seeded.pills.id,
-            occurrenceKey: Occurrence(Day(2026, 10, 27), ClockTime(20, 0)).key,
-            title: texts.pills,
-            body: '20:00',
+            routineId: seeded.snack.id,
+            occurrenceKey: Occurrence(Day(2026, 10, 27), ClockTime(15, 0)).key,
+            title: texts.snack,
+            body: '15:00',
           );
         await start(tester, seeded, alarms: alarms);
         expect(find.byType(RingScreen), findsOneWidget);
@@ -488,7 +489,7 @@ void main() {
 
       frame('7-history.png', (tester) async {
         final t = await start(tester, _Seeded(texts));
-        await tap(tester, find.text(texts.pills).first);
+        await tap(tester, find.text(texts.snack).first);
         await tap(tester, find.byTooltip(t.historyTitle));
         expect(find.byType(RoutineHistoryScreen), findsOneWidget);
       });
