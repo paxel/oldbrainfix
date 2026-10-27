@@ -7,6 +7,7 @@ import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'open_capture.dart';
 import 'reveal.dart';
 
 void main() {
@@ -308,7 +309,7 @@ void main() {
     testWidgets('a captured Note\'s card offers a Reminder; it leaves '
         'Unsorted and shows on the Agenda', (tester) async {
       await start(tester);
-      await tap(tester, find.byTooltip('Capture a Note'));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'call the plumber');
       await tap(tester, find.text('Save'));
 
@@ -343,7 +344,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await tap(tester, find.byTooltip('Capture a Note'));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'milk');
       await tap(tester, find.text('Save'));
       final binding = tester.binding;
