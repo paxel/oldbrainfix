@@ -54,3 +54,4 @@ key.properties
 
 # The documentation site, built by tool/site/build.js
 /site-dist/
+.claude/agent-memory/obf-phone-ui
