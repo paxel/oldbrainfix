@@ -11,6 +11,7 @@ import 'fake_location.dart';
 import 'fake_photos.dart';
 import 'open_settings.dart';
 import 'reveal.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -49,7 +50,7 @@ void main() {
   }
 
   Future<void> capture(WidgetTester tester, String text) async {
-    await tap(tester, find.byIcon(Icons.add));
+    await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), text);
     await tap(tester, find.text('Save'));
   }

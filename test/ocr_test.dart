@@ -14,6 +14,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_ocr.dart';
 import 'fake_photos.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -84,7 +85,7 @@ void main() {
         ..texts[onePixelPng.length] = 'Level 3, row F'
         ..readGate = Completer<void>();
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tap(tester, find.byIcon(Icons.photo_camera_outlined));
       await tap(tester, find.byKey(const ValueKey('nudge10')));
 
@@ -114,7 +115,7 @@ void main() {
       ocr.texts[otherPng.length] = 'Parking P4';
       photos.nextPicked = [otherPng];
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tap(tester, find.byKey(const ValueKey('captureGallery')));
       await tap(tester, find.text('Save'));
 

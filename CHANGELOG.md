@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone, text Capture has a Gallery button next to Photo and Voice that picks one or more pictures from the phone into the Note as its photos, each with its Photo Text.
 
 ### Changed
+- On the phone, "+" on the Agenda, also while the app is locked, fans out Text, Voice, Photo and Gallery instead of opening text Capture at once, and closes again on a second tap, a tap outside or Back.
 - On the phone and the desktop, the unit of a Routine's "every N", its Re-nag and Escalation, and the Device's Re-nag and Nudge repeat in Settings are columns of radio buttons instead of dropdowns, with a value set elsewhere kept as an extra option.
 - On the phone and the desktop, the app starts faster with a speech model: its checksum is computed once when it is downloaded or picked, and again only when the file's size or modification time changes.
 - On the phone and the desktop, restoring a Backup brings back the playback speed of voice recordings chosen on the Device it was made on.

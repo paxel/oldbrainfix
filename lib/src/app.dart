@@ -16,6 +16,7 @@ import 'bundle_platform.dart';
 import 'conflicts_screen.dart';
 import 'calendar_mirror.dart';
 import 'calendar_platform.dart';
+import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
@@ -651,8 +652,16 @@ class _HomeState extends State<_Home> {
   }
 
   /// Capture from the lock screen, the same as "+" on the Agenda.
-  void _capture() =>
-      unawaited(captureNote(context, widget.notes, onChanged: () {}));
+  void _capture(CaptureWay way) => unawaited(
+    captureNote(
+      context,
+      widget.notes,
+      voice: way == CaptureWay.voice,
+      photo: way == CaptureWay.photo,
+      gallery: way == CaptureWay.gallery,
+      onChanged: () {},
+    ),
+  );
 
   /// Opens the Nudge screen when the Nudge's notification was tapped.
   void _nudgeOpened() {

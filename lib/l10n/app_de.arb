@@ -8,6 +8,8 @@
   "photo": "Foto",
   "voice": "Sprache",
   "gallery": "Galerie",
+  "text": "Text",
+  "captureFanClose": "Schließen",
   "photoMissing": "Foto nicht auf diesem Gerät",
   "morePhotos": "+{count}",
   "save": "Speichern",

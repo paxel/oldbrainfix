@@ -11,6 +11,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_photos.dart';
 import 'fake_voice.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -40,7 +41,7 @@ void main() {
       OldBrainFixApp(store: store, photos: photos, voice: voice),
     );
     await tester.pumpAndSettle();
-    await tap(tester, find.byIcon(Icons.add));
+    await openTextCapture(tester);
     expect(find.byType(CaptureScreen), findsOneWidget);
   }
 

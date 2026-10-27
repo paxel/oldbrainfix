@@ -33,6 +33,7 @@ Future<void> captureNote(
   SharedItem? shared,
   bool voice = false,
   bool photo = false,
+  bool gallery = false,
   required VoidCallback onChanged,
   ValueChanged<String>? onCaptured,
 }) async {
@@ -54,6 +55,7 @@ Future<void> captureNote(
         shared: shared,
         startVoice: voice,
         startPhoto: photo,
+        startGallery: gallery,
       ),
     ),
   );
@@ -123,6 +125,10 @@ class CaptureScreen extends StatefulWidget {
   /// with the photo.
   final bool startPhoto;
 
+  /// Opens the system's picture picker at once; back from it, the screen
+  /// is text Capture with the pictures picked.
+  final bool startGallery;
+
   const CaptureScreen({
     super.key,
     required this.notes,
@@ -134,6 +140,7 @@ class CaptureScreen extends StatefulWidget {
     this.shared,
     this.startVoice = false,
     this.startPhoto = false,
+    this.startGallery = false,
   });
 
   @override
@@ -208,6 +215,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openVoice());
     } else if (widget.startPhoto && widget.photos.available) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _takePhoto());
+    } else if (widget.startGallery && widget.photos.pickable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _pickPhotos());
     }
   }
 
@@ -431,7 +440,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
                               child: TextField(
                                 controller: _text,
                                 autofocus:
-                                    !widget.startVoice && !widget.startPhoto,
+                                    !widget.startVoice &&
+                                    !widget.startPhoto &&
+                                    !widget.startGallery,
                                 maxLines: null,
                                 decoration: InputDecoration(
                                   hintText:

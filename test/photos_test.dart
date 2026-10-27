@@ -17,6 +17,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -56,14 +57,14 @@ void main() {
     testWidgets('is not offered where there is none', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       expect(find.byType(CaptureScreen), findsOneWidget);
       expect(camera, findsNothing);
     });
 
     testWidgets('takes a photo Note with the Nudge picked', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tap(tester, camera);
 
       expect(photos.taken, 1);
@@ -90,7 +91,7 @@ void main() {
 
     testWidgets('a few words go with the photo into one Note', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'this shelf');
       await tap(tester, camera);
       photos.nextPhoto = otherPng;
@@ -105,7 +106,7 @@ void main() {
     testWidgets('backing out of the camera captures nothing', (tester) async {
       photos.nextPhoto = null;
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tap(tester, camera);
       await tap(tester, find.text('Save'));
 
@@ -118,7 +119,7 @@ void main() {
       final shot = Completer<Uint8List?>();
       photos.camera = shot;
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'parking spot');
       await tester.tap(camera);
       await tester.pump();

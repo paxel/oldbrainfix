@@ -10,7 +10,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   system's navigation buttons and gestures; app navigation there only
   causes wrong taps.
 - The Agenda carries two floating buttons: **"+"** captures a Note and
-  **the magnifier** opens the notes browser. Nothing else floats.
+  **the magnifier** opens the notes browser. Nothing else floats, except
+  the ways "+" fans out while it is open (see Capture).
 - Settings, Backups and Sync are reached only through the **Profile
   picture in the Agenda's top corner**, where the settings gear was. It
   opens the Profile page: picture, name and short code; Backups and
@@ -63,10 +64,16 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - **Capture never asks anything and never needs unlocking.** The App
   Lock and Area Locks guard browsing, not Capture.
-- "+" opens text capture directly; the mic and camera buttons on that
-  screen switch to voice or photo. Every quick entry point (widget,
-  tile, shortcut, hardware button) opens its capture screen directly,
-  with no screen in between.
+- **The Agenda's "+" fans out Text, Voice, Photo and Gallery**, and so
+  does the lock screen's, each an icon with
+  its words, upward from the button; it is not a bottom sheet. While
+  the fan is open, "+" reads as close; a second tap on it, a tap
+  outside or Back closes the fan. Text opens text capture, Voice starts
+  recording at once, Photo opens the camera, Gallery opens the system's
+  picture picker and continues as a photo Note. The text capture screen
+  keeps its Photo, Voice and Gallery buttons. Every other quick entry
+  point (widget, tile, shortcut, hardware button) opens its capture
+  screen directly, with no fan and no screen in between.
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence.
 - Every capture screen shows three buttons at the bottom: remind me in

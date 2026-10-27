@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
+import 'capture_fan.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'system_bars.dart';
 
 /// What stands in front of the Agenda while the App Lock is locked: the
 /// PIN, a button for biometrics or the screen lock where they are on,
-/// and "+" to capture, which never needs unlocking (UI laws, "Capture").
+/// and "+" to capture, which fans out its ways as on the Agenda and
+/// never needs unlocking (UI laws, "Capture").
 class LockScreen extends StatefulWidget {
   final AppLock lock;
 
-  /// Opens Capture, as "+" on the Agenda does.
-  final VoidCallback onCapture;
+  /// Opens Capture the way picked in the fan of "+", as on the Agenda.
+  final ValueChanged<CaptureWay> onCapture;
 
   const LockScreen({super.key, required this.lock, required this.onCapture});
 
@@ -25,10 +27,21 @@ class _LockScreenState extends State<LockScreen> {
   final _pin = TextEditingController();
   var _wrong = false;
 
+  /// Where "+" sits, so the fan opens from it.
+  final _plus = GlobalKey();
+
   @override
   void dispose() {
     _pin.dispose();
     super.dispose();
+  }
+
+  /// Fans out the ways to capture from "+" and opens the one picked.
+  Future<void> _capture() async {
+    final fan = captureFanFor(context, _plus);
+    if (fan == null) return;
+    final way = await Navigator.of(context).push(fan);
+    if (way != null && mounted) widget.onCapture(way);
   }
 
   void _check() {
@@ -105,9 +118,10 @@ class _LockScreenState extends State<LockScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        key: _plus,
         heroTag: 'lockedCapture',
         tooltip: t.captureTooltip,
-        onPressed: widget.onCapture,
+        onPressed: _capture,
         child: const Icon(Icons.add),
       ),
     );

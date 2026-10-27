@@ -18,6 +18,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_speech.dart';
 import 'fake_voice.dart';
 import 'open_settings.dart';
+import 'open_capture.dart';
 
 /// Stand-ins for two recordings, told apart by their last byte.
 final first = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
@@ -627,7 +628,7 @@ void main() {
         ..transcripts[1] = 'call the garage'
         ..transcribeGate = Completer<void>();
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tap(tester, find.byIcon(Icons.mic_none));
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
 

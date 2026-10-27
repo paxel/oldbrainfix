@@ -11,6 +11,7 @@ import 'areas_screen.dart';
 import 'browser.dart';
 import 'calendar_export_screen.dart';
 import 'calendar_platform.dart';
+import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'l10n.dart';
@@ -39,7 +40,8 @@ typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 /// the five days after the same way, each under its weekday and date.
 /// Each is checked off as Done on its own, the coming days' already
 /// today. "+"
-/// captures a Note, whose card then shows on top with its enrich options
+/// fans out Text, Voice, Photo and Gallery to capture a Note, whose card
+/// then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
 /// the notes browser; the app bar makes a Routine without a Note, opens
 /// the calendar export, and has the gear in its corner, the only way to
@@ -121,6 +123,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// Set while a share or a requested capture is open, so two never
   /// stack.
   var _opening = false;
+
+  /// Where "+" sits, so the fan opens from it.
+  final _plus = GlobalKey();
 
   @override
   void initState() {
@@ -250,14 +255,28 @@ class _AgendaScreenState extends State<AgendaScreen> {
     });
   }
 
+  /// Fans out the ways to capture from "+", the ones this Device has,
+  /// and opens the capture screen of the way picked.
   Future<void> _capture() async {
+    final fan = captureFanFor(context, _plus);
+    if (fan == null) return;
+    final way = await Navigator.of(context).push(fan);
+    if (way == null || !mounted) return;
     await captureNote(
       context,
       widget.notes,
+      voice: way == CaptureWay.voice,
+      photo: way == CaptureWay.photo,
+      gallery: way == CaptureWay.gallery,
       onCaptured: (id) => _capturedId = id,
       onChanged: _reloadIfMounted,
     );
   }
+
+  /// Closes the fan of "+", here or on the lock screen, when it is open,
+  /// before a share or a quick entry point opens Capture over it.
+  void _closeFan() =>
+      Navigator.of(context).popUntil((route) => route is! CaptureFanRoute);
 
   /// Opens Capture for each share waiting, one after the other, then
   /// the capture screen an entry point asked for, the same as "+" with
@@ -271,6 +290,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         final shared = await photos.takeShared();
         if (!mounted) return;
         if (shared != null) {
+          _closeFan();
           await captureNote(
             context,
             widget.notes,
@@ -282,6 +302,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
         }
         final mode = await widget.requests.take();
         if (mode == null || !mounted) return;
+        _closeFan();
         await captureNote(
           context,
           widget.notes,
@@ -587,6 +608,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ),
             const SizedBox(height: 16),
             FloatingActionButton(
+              key: _plus,
               heroTag: 'capture',
               tooltip: t.captureTooltip,
               onPressed: _capture,

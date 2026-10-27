@@ -8,6 +8,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon hat die Text-Erfassung neben „Foto“ und „Sprache“ einen Knopf „Galerie“, der ein oder mehrere Bilder vom Telefon als Fotos in die Notiz übernimmt, jedes mit seinem erkannten Text.
 
 ### Geändert
+- Auf dem Telefon fächert „+“ in der Agenda, auch solange die App gesperrt ist, „Text“, „Sprache“, „Foto“ und „Galerie“ auf, statt sofort die Text-Erfassung zu öffnen, und schließt sich wieder bei einem zweiten Tippen, einem Tippen daneben oder mit „Zurück“.
 - Auf dem Telefon und dem Desktop sind die Einheit von „Alle N“ einer Routine, ihr erneutes Erinnern und ihre Eskalation sowie in den Einstellungen das erneute Erinnern und das erneute Stupsen des Geräts Spalten von Optionsfeldern statt Auswahllisten, und ein anderswo gesetzter Wert bleibt als zusätzliche Option erhalten.
 - Auf dem Telefon und dem Desktop startet die App mit einem Sprachmodell schneller: Seine Prüfsumme wird einmal beim Herunterladen oder Auswählen berechnet und erst wieder, wenn sich Größe oder Änderungszeit der Datei ändern.
 - Auf dem Telefon und dem Desktop bringt das Wiederherstellen einer Sicherung die Wiedergabegeschwindigkeit von Sprachaufnahmen zurück, die auf dem Gerät gewählt war, auf dem die Sicherung erstellt wurde.

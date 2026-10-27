@@ -23,6 +23,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../fake_alarms.dart';
 import '../fake_photos.dart';
 import '../fake_voice.dart';
+import '../open_capture.dart';
 
 /// The frame in physical pixels and the density of a common phone:
 /// 432 × 768 logical pixels, which 2.5 scales to exactly 1080 × 1920.
@@ -447,7 +448,7 @@ void main() {
 
       frame('2-capture.png', (tester) async {
         final t = await start(tester, _Seeded(texts));
-        await tap(tester, find.byTooltip(t.captureTooltip));
+        await openTextCapture(tester);
         await tester.enterText(find.byType(TextField), texts.captureText);
         await tester.pumpAndSettle();
         expect(find.text(t.voice), findsOneWidget);

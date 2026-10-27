@@ -31,6 +31,7 @@ import 'fake_lock.dart';
 import 'fake_mirror.dart';
 import 'fake_photos.dart';
 import 'open_settings.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -198,7 +199,7 @@ void main() {
     testWidgets('lets "+" capture without unlocking', (tester) async {
       await start(tester);
 
-      await tap(tester, find.byTooltip(en.captureTooltip));
+      await openTextCapture(tester);
       expect(find.byType(CaptureScreen), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'buy stamps');
       await back(tester);
@@ -206,6 +207,23 @@ void main() {
       expect(notes.all().single.text, 'buy stamps');
       expect(lockScreen, findsOneWidget);
       expect(find.text('buy stamps'), findsNothing);
+    });
+
+    testWidgets('fans out the ways of "+" as on the Agenda', (tester) async {
+      photos.nextPhoto = onePixelPng;
+      await start(tester);
+
+      await tap(tester, find.byIcon(Icons.add));
+      for (final way in ['text', 'photo', 'gallery']) {
+        expect(fanEntry(way), findsOneWidget);
+      }
+      await tap(tester, fanEntry('photo'));
+
+      expect(photos.taken, 1);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      await back(tester);
+      expect(notes.all().single.photos, hasLength(1));
+      expect(lockScreen, findsOneWidget);
     });
 
     testWidgets('lets a share open Capture without unlocking', (tester) async {
@@ -279,7 +297,7 @@ void main() {
       await tap(tester, find.byTooltip(en.allNotesTitle));
       await back(tester);
       await back(tester);
-      await tap(tester, find.byTooltip(en.captureTooltip));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'long thought');
 
       await away(tester, const Duration(minutes: 5));

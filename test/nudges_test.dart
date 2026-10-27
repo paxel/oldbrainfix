@@ -13,6 +13,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_alarms.dart';
 import 'open_settings.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -67,7 +68,7 @@ void main() {
     testWidgets('shows "remind me in" 10 min, 30 min and 1 h at the bottom, '
         'not as a bar', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
 
       expect(find.text('Remind me to sort it in'), findsOneWidget);
       for (final key in ['nudge10', 'nudge30', 'nudge60']) {
@@ -98,7 +99,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
       await tap(tester, find.byKey(const ValueKey('nudge10')));
 
@@ -117,7 +118,7 @@ void main() {
 
     testWidgets('Save without a choice means 1 h', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'call the plumber');
       await tap(tester, find.text('Save'));
 
@@ -170,7 +171,7 @@ void main() {
 
     testWidgets('by Back saves the Note, nudged in 1 h', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -184,7 +185,7 @@ void main() {
 
     testWidgets('by Back with nothing typed captures nothing', (tester) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.byType(CaptureScreen), findsNothing);
@@ -195,7 +196,7 @@ void main() {
       tester,
     ) async {
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       await background(tester);
       expect(notes.all(), isEmpty, reason: 'nothing typed yet');
 

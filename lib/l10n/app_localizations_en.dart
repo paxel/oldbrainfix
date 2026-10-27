@@ -34,6 +34,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gallery => 'Gallery';
 
   @override
+  String get text => 'Text';
+
+  @override
+  String get captureFanClose => 'Close';
+
+  @override
   String get photoMissing => 'Photo not on this device';
 
   @override

@@ -13,6 +13,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'fake_voice.dart';
 import 'reveal.dart';
+import 'open_capture.dart';
 
 /// Stand-ins for two recordings: the app keeps any bytes as they are.
 final first = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
@@ -49,7 +50,7 @@ void main() {
 
   /// Opens text Capture from the Agenda's +.
   Future<void> openCapture(WidgetTester tester) async {
-    await tap(tester, find.byIcon(Icons.add));
+    await openTextCapture(tester);
     expect(find.byType(CaptureScreen), findsOneWidget);
   }
 

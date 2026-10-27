@@ -146,6 +146,18 @@ abstract class AppLocalizations {
   /// **'Gallery'**
   String get gallery;
 
+  /// No description provided for @text.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get text;
+
+  /// No description provided for @captureFanClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get captureFanClose;
+
   /// No description provided for @photoMissing.
   ///
   /// In en, this message translates to:

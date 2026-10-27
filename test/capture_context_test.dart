@@ -9,6 +9,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'fake_location.dart';
 import 'open_settings.dart';
 import 'reveal.dart';
+import 'open_capture.dart';
 
 void main() {
   late Store store;
@@ -50,7 +51,7 @@ void main() {
   }
 
   Future<void> capture(WidgetTester tester, String text) async {
-    await tap(tester, find.byIcon(Icons.add));
+    await openTextCapture(tester);
     await tester.enterText(find.byType(TextField), text);
     await tap(tester, find.text('Save'));
   }
@@ -121,7 +122,7 @@ void main() {
       location.allowed = false;
       named.add('Home', home, radius: 100);
       await start(tester);
-      await tap(tester, find.byIcon(Icons.add));
+      await openTextCapture(tester);
       expect(find.byType(AlertDialog), findsNothing, reason: 'not in Capture');
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
       await tap(tester, find.text('Save'));

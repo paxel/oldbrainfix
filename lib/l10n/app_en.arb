@@ -8,6 +8,8 @@
   "photo": "Photo",
   "voice": "Voice",
   "gallery": "Gallery",
+  "text": "Text",
+  "captureFanClose": "Close",
   "photoMissing": "Photo not on this device",
   "morePhotos": "+{count}",
   "@morePhotos": {
