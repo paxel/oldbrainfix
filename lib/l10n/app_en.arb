@@ -1489,5 +1489,15 @@
   "@sentItemBlock": {"description": "In a Sent Item's preview: keeps nothing of it and blocks its sender."},
   "sentItemBlocked": "Declined and blocked: nothing was kept.",
   "sentItemFromBlocked": "Refused: this file comes from a person you blocked.",
-  "@sentItemFromBlocked": {"description": "Announced instead of the preview of a Sent Item from a blocked person; shows nothing of it."}
+  "@sentItemFromBlocked": {"description": "Announced instead of the preview of a Sent Item from a blocked person; shows nothing of it."},
+  "sentItemStranger": "An unknown person: not among your People.",
+  "@sentItemStranger": {"description": "In the hidden preview of a stranger's Sent Item, under who it is from."},
+  "sentItemHidden": "What they sent stays hidden until you tap Show.",
+  "sentItemShow": "Show",
+  "@sentItemShow": {"description": "Reveals what a stranger's Sent Item holds."},
+  "sentItemGone": "This Sent Item is no longer waiting: it was accepted or declined.",
+  "sentItemsWaiting": "{count, plural, =1{1 Sent Item waiting} other{{count} Sent Items waiting}}",
+  "@sentItemsWaiting": {"description": "Agenda line while strangers' Sent Items wait to be shown, accepted or declined.", "placeholders": {"count": {"type": "int"}}},
+  "sentItemsWaitingTitle": "Sent Items waiting",
+  "sentItemsNoneWaiting": "No Sent Items are waiting."
 }

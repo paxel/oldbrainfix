@@ -14,6 +14,7 @@ import 'calendar_platform.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
+import 'held_sent_items_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
@@ -48,7 +49,9 @@ typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 /// Settings. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
-/// the "x Unsorted" banner while Notes are Unsorted, opening them. At local
+/// the "x Unsorted" banner while Notes are Unsorted, opening them, and
+/// the "x Sent Items waiting" line while strangers' Sent Items wait to
+/// be shown, accepted or declined, opening their list. At local
 /// midnight the Agenda moves on to the new day, and whenever an
 /// Occurrence becomes Missed the summary takes it in. Whatever another
 /// app shares in opens in Capture over the Agenda, filled in and
@@ -110,6 +113,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// The days after tomorrow, each with its rows.
   List<({Day day, List<_PlacedRow> rows})> _later = const [];
   var _unsorted = 0;
+
+  /// How many strangers' Sent Items wait (#91).
+  var _waiting = 0;
 
   /// The Note captured last from here, shown on top until it is let go.
   String? _capturedId;
@@ -196,6 +202,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
     ];
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
+    // Counted from the pending sets, without reading each held file.
+    _waiting = widget.notes.store.pendingSets
+        .where((s) => s.kind == sentItemPendingKind)
+        .length;
     _armTimer();
     final captured = _capturedId == null
         ? null
@@ -340,6 +350,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Future<void> _openUnsorted() async {
     await openUnsorted(context, widget.notes, widget.places);
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _openHeld() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HeldSentItemsScreen(store: widget.notes.store),
+      ),
+    );
     if (!mounted) return;
     _reload();
   }
@@ -543,7 +563,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 onSeen: _seen,
               ),
             if (_unsorted > 0)
-              _UnsortedBanner(count: _unsorted, onTap: _openUnsorted),
+              _CountBanner(
+                bannerKey: const ValueKey('unsortedBanner'),
+                icon: Icons.move_to_inbox,
+                text: t.unsortedBanner(_unsorted),
+                onTap: _openUnsorted,
+              ),
+            if (_waiting > 0)
+              _CountBanner(
+                bannerKey: const ValueKey('sentItemsWaiting'),
+                icon: Icons.mark_email_unread_outlined,
+                text: t.sentItemsWaiting(_waiting),
+                onTap: _openHeld,
+              ),
             if (captured != null) ...[
               _Heading(t.justCaptured),
               NoteCard(
@@ -660,12 +692,21 @@ class _AlarmsBanner extends StatelessWidget {
   }
 }
 
-/// "x Unsorted" while Notes wait to be sorted; tapping it opens them.
-class _UnsortedBanner extends StatelessWidget {
-  final int count;
+/// "x Unsorted" while Notes wait to be sorted, or "x Sent Items
+/// waiting"; tapping it opens them.
+class _CountBanner extends StatelessWidget {
+  /// Finds the banner itself.
+  final Key bannerKey;
+  final IconData icon;
+  final String text;
   final VoidCallback onTap;
 
-  const _UnsortedBanner({required this.count, required this.onTap});
+  const _CountBanner({
+    required this.bannerKey,
+    required this.icon,
+    required this.text,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +714,7 @@ class _UnsortedBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Material(
-        key: const ValueKey('unsortedBanner'),
+        key: bannerKey,
         color: scheme.secondaryContainer,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
@@ -683,11 +724,11 @@ class _UnsortedBanner extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(Icons.move_to_inbox, color: scheme.onSecondaryContainer),
+                Icon(icon, color: scheme.onSecondaryContainer),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    context.t.unsortedBanner(count),
+                    text,
                     style: TextStyle(color: scheme.onSecondaryContainer),
                   ),
                 ),

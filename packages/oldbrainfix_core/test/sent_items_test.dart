@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
+import 'profiles_test.dart' show halves;
 import 'sync_test.dart' show ticking;
 import 'sync_test.dart' as sync;
 
@@ -350,6 +351,137 @@ void main() {
         );
       }
       expect(ben.allEntries(), hasLength(count));
+    });
+  });
+
+  group("a stranger's Sent Item", () {
+    /// The pending sets of [store], as their files hold them.
+    List<String> sets(Store store) => [
+      for (final s in store.pendingSets) s.encode(),
+    ];
+
+    test('is held unseen until "Show", and accepting writes it then', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann')
+        ..setOwnProfilePicture(squareProfilePicture(halves(40, 30)));
+      final ben = device(clock, 'Ben');
+      final note = Notes(ann).capture('Dentist');
+      Notes(ann).amend(note.id, 'Room 3');
+      Routines(ann).spawn(
+        note.id,
+        Schedule(start: Day(2026, 3, 6), times: [ClockTime(9, 30)]),
+      );
+      final file = sendNote(ann, note.id);
+      final before = ben.allEntries().length;
+
+      final held = receiveSentItem(ben, file) as HeldSentItem;
+      // Only who it is from: no picture, nothing of what it holds.
+      expect(held.sender.id, ann.ownProfile!.id);
+      expect(held.sender.name, 'Ann');
+      expect(held.sender.picture, isNull);
+      final set = ben.pendingSet(held.id)!;
+      expect(set.kind, sentItemPendingKind);
+      expect(set.shown, isFalse);
+      expect(set.changes, isEmpty);
+      expect(base64.decode(set.payload!), file);
+      // Nothing of it is in the log, the lists or People.
+      expect(ben.allEntries(), hasLength(before));
+      expect(Notes(ben).all(), isEmpty);
+      expect(_people(ben), isEmpty);
+      expect([for (final h in heldSentItems(ben)) h.id], [held.id]);
+      expect(heldSentItem(ben, held.id)?.sender.name, 'Ann');
+      // The same item again is the one held.
+      final again = receiveSentItem(ben, file) as HeldSentItem;
+      expect(again.id, held.id);
+      expect(ben.pendingSets, hasLength(1));
+
+      final shown = showHeldSentItem(ben, held.id)!;
+      expect(shown.item.text, 'Dentist');
+      expect(shown.trust, SenderTrust.unknown);
+      expect(shown.state, SentItemState.fresh);
+      expect(ben.allEntries(), hasLength(before), reason: 'still held');
+      expect(heldSentItems(ben), hasLength(1));
+
+      final accepted = acceptHeldSentItem(ben, held.id)!;
+      final got = Notes(ben).byId(accepted)!;
+      expect(got.text, 'Dentist');
+      expect(got.isUnsorted, isTrue);
+      expect(
+        [for (final s in Notes(ben).sections(accepted)) s.text],
+        ['Room 3'],
+      );
+      expect(Routines(ben).ofNote(accepted), hasLength(1));
+      // Captured when accepted, not when it came.
+      expect(got.captured.isAfter(held.held), isTrue);
+      expect(ben.keptPeople.map((p) => p.id), [ann.ownProfile!.id]);
+      expect(ben.pendingSets, isEmpty);
+      expect(heldSentItems(ben), isEmpty);
+      expect(ben.localSettingsWithPrefix(Store.acceptedPendingPrefix), isEmpty);
+      expect(showHeldSentItem(ben, held.id), isNull);
+      expect(
+        () => acceptHeldSentItem(ben, held.id),
+        throwsA(isA<StateError>()),
+      );
+
+      // Known now: the next one from her previews as before.
+      final next = receiveSentItem(
+        ben,
+        sendNote(ann, Notes(ann).capture('Later').id),
+      );
+      expect(next, isA<OpenedSentItem>());
+      expect((next as OpenedSentItem).trust, SenderTrust.known);
+      expect(ben.pendingSets, isEmpty);
+    });
+
+    test('Decline deletes it; Accept works before "Show" too', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final log = ben.allEntries().length;
+      final first = receiveSentItem(
+        ben,
+        sendNote(ann, Notes(ann).capture('One').id),
+      );
+      final second = receiveSentItem(
+        ben,
+        sendNote(ann, Notes(ann).capture('Two').id),
+      );
+      first as HeldSentItem;
+      second as HeldSentItem;
+      expect([for (final h in heldSentItems(ben)) h.id], [first.id, second.id]);
+
+      expect(ben.declinePending(first.id), isTrue);
+      expect(heldSentItem(ben, first.id), isNull);
+      expect(ben.allEntries(), hasLength(log));
+      expect(_people(ben), isEmpty);
+      expect(sets(ben), hasLength(1));
+
+      final note = acceptHeldSentItem(ben, second.id)!;
+      expect(Notes(ben).byId(note)!.text, 'Two');
+      expect(ben.pendingSets, isEmpty);
+    });
+
+    test('Accept judges it against the log as it is then', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final file = sendNote(ann, Notes(ann).capture('Dentist').id);
+      final held = receiveSentItem(ben, file) as HeldSentItem;
+      // Accepted meanwhile, as another of Ben's Devices may have.
+      final note = acceptSentItem(ben, openSentItem(ben, file).item)!;
+      final count = ben.allEntries().length;
+      expect(showHeldSentItem(ben, held.id)!.state, SentItemState.upToDate);
+      expect(acceptHeldSentItem(ben, held.id), note);
+      expect(ben.allEntries(), hasLength(count), reason: 'no second Note');
+      expect(ben.pendingSets, isEmpty);
+    });
+
+    test('one from oneself, or a known person, is not held', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final file = sendNote(ann, Notes(ann).capture('Mine').id);
+      expect(receiveSentItem(ann, file), isA<OpenedSentItem>());
+      expect(ann.pendingSets, isEmpty);
     });
   });
 

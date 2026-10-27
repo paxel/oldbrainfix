@@ -87,7 +87,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 ## Agenda
 
 - Order: the Missed Summary card, then the "x Unsorted" banner, then
-  today's all-day Occurrences, then today's timed Occurrences by time.
+  the "x Sent Items waiting" line while a stranger's Sent Item waits for
+  "Show", then today's all-day Occurrences, then today's timed
+  Occurrences by time.
 - After a visible gap comes tomorrow, in dimmer colours, then the five
   days after it, each under its weekday and date, dimmed alike. Every
   day shows, an empty one with "Nothing planned". The later days'

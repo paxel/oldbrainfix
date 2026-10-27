@@ -103,6 +103,11 @@
   ],
   "acceptedAgain": "note:00000000000000000000000000000401",
   "stateAgain": "upToDate",
+  "held": {
+    "id": "000000000000000000000000000003f1",
+    "sender": "Ada",
+    "at": "2026-01-04T17:00:00.000Z"
+  },
   "update": {
     "version": 2,
     "state": "update",

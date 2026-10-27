@@ -464,6 +464,31 @@ void main() {
       );
     });
 
+    test('a stranger\'s one held until "Show" goes with the block', () {
+      final mallory = device(clock, 'Mallory');
+      final file = sendNote(mallory, Notes(mallory).capture('Rude').id);
+      final held = receiveSentItem(ann, file) as HeldSentItem;
+      expect(ann.pendingSets, hasLength(1));
+      ann.blockPerson(held.sender.id);
+      expect(ann.pendingSets, isEmpty, reason: 'nothing of hers stored');
+      expect(heldSentItems(ann), isEmpty);
+      expect(
+        () => receiveSentItem(ann, file),
+        throwsA(isA<SentItemFromBlocked>()),
+      );
+    });
+
+    test('"Decline and block" on a held one, before "Show"', () {
+      final mallory = device(clock, 'Mallory');
+      final file = sendNote(mallory, Notes(mallory).capture('Rude').id);
+      final held = receiveSentItem(ann, file) as HeldSentItem;
+      expect(blockHeldSentItemSender(ann, held.id), isTrue);
+      expect(ann.isBlocked(held.sender.id), isTrue);
+      expect(ann.blockedPeople.map((p) => p.name), ['Mallory']);
+      expect(ann.pendingSets, isEmpty);
+      expect(Notes(ann).all(), isEmpty);
+    });
+
     test('"Decline and block" blocks nobody for a copied id', () {
       household();
       // Mallory sends under Carol's id with a key of her own.

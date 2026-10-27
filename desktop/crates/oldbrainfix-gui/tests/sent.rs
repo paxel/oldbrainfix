@@ -6,10 +6,14 @@
 //! update shows what changes and applies it, a cancellation trashes the
 //! Note, and one signed by another key is refused. The preview shows
 //! the sender's Profile; accepting keeps it, its picture shows on the
-//! Note, and comparing its short code marks it verified (#51).
+//! Note, and comparing its short code marks it verified (#51). A
+//! stranger's item shows only who it is from until "Show", is accepted,
+//! declined or blocked before it too, and waits behind the Agenda's
+//! "x Sent Items waiting" until decided (#91).
 
 use std::sync::{Arc, Mutex};
 
+use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::profile::{self, SignedProfile};
@@ -191,6 +195,12 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     drop_file(&mut harness, &file);
     assert!(harness.state().previewing());
     assert!(shows(&harness, "From Ann"));
+    // From a stranger: nothing of it before "Show".
+    assert!(shows(&harness, "An unknown person: not among your People."));
+    assert!(!shows(&harness, "Blood test"));
+    assert!(!shows(&harness, &code(&ann)?));
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
     assert!(shows(
         &harness,
         &format!(
@@ -207,13 +217,16 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     assert!(shows(&harness, "Declined: nothing was kept."));
     assert!(Notes::new(harness.state().store()).all()?.is_empty());
     assert!(harness.state().store().kept_people()?.is_empty());
+    assert!(harness.state().store().pending_sets()?.is_empty());
 
-    // Handed over by `oldbrainfix open`: shown at the next frame.
+    // Handed over by `oldbrainfix open`: shown at the next frame, and
+    // accepted before "Show".
     if let Ok(mut held) = handed.lock() {
         held.push(file.clone());
     }
     harness.run();
     assert!(harness.state().previewing());
+    assert!(!shows(&harness, "Blood test"));
     harness.get_by_label("Accept").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Added to Unsorted, with its alarms on."));
@@ -232,9 +245,12 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     harness.run();
     assert!(shows(&harness, "Written by Ann"));
 
-    // Opened again: accepted before, nothing new.
+    assert!(harness.state().store().pending_sets()?.is_empty());
+
+    // Opened again: accepted before, nothing new; Ann is known now.
     drop_file(&mut harness, &file);
     assert!(shows(&harness, "Already up to date"));
+    assert!(harness.query_by_label("Show").is_none());
     harness.get_by_label("Close").click_accesskit();
     harness.run();
     assert_eq!(Notes::new(harness.state().store()).all()?.len(), 1);
@@ -420,6 +436,8 @@ fn comparing_the_short_code_marks_the_senders_profile_verified_on_accept() -> Te
     let mut harness = window(app);
     drop_file(&mut harness, &first);
     assert!(shows(&harness, "From Ann"));
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
     let hint = format!(
         "Ask Ann, in person, to read out the code on their Profile page. It must be {}.",
         code(&ann)?
@@ -444,8 +462,12 @@ fn comparing_the_short_code_marks_the_senders_profile_verified_on_accept() -> Te
     harness.run();
     assert!(harness.state().store().kept_people()?.is_empty());
 
-    // Matched and accepted: kept and verified, with her picture.
+    // Matched and accepted: kept and verified, with her picture. "Show"
+    // was not remembered: the item is hidden again.
     drop_file(&mut harness, &first);
+    assert!(!shows(&harness, "Not verified: this Profile is new here."));
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
     assert!(shows(&harness, "Not verified: this Profile is new here."));
     harness.get_by_label("Compare codes").click_accesskit();
     harness.run();
@@ -461,5 +483,207 @@ fn comparing_the_short_code_marks_the_senders_profile_verified_on_accept() -> Te
     drop_file(&mut harness, &second);
     assert!(shows(&harness, "Verified: code compared in person."));
     assert!(harness.query_by_label("Compare codes").is_none());
+    Ok(())
+}
+
+/// A Sent Item from Ann, a stranger here, with a Routine at 08:15,
+/// saved in `dir`.
+fn from_stranger(
+    dir: &tempfile::TempDir,
+) -> Result<(Store, std::path::PathBuf), Box<dyn std::error::Error>> {
+    let ann = store(3, "Ann")?;
+    let note = Notes::new(&ann).capture("Blood test", None, None)?;
+    let schedule = Schedule::new(
+        Day::new(2026, 11, 2),
+        &[ClockTime::new(8, 15).ok_or("time")?],
+        None,
+    )
+    .ok_or("schedule")?;
+    Routines::new(&ann).spawn(&note.id, &schedule)?;
+    let file = dir.path().join("from-ann.oldbrain");
+    std::fs::write(&file, ann.send_note(&note.id, None, false)?)?;
+    Ok((ann, file))
+}
+
+#[test]
+fn a_strangers_sent_item_waits_hidden_behind_the_agenda_line() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (ann, file) = from_stranger(&dir)?;
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    assert!(!shows(&harness, "waiting"));
+
+    // Hidden: only who it is from, no picture, code or content.
+    drop_file(&mut harness, &file);
+    assert!(shows(&harness, "From Ann"));
+    assert!(shows(&harness, "An unknown person: not among your People."));
+    assert!(shows(
+        &harness,
+        "What they sent stays hidden until you tap Show."
+    ));
+    assert!(!shows(&harness, "Blood test"));
+    assert!(!shows(&harness, "08:15"));
+    assert!(!shows(&harness, &code(&ann)?));
+    assert!(!shows(&harness, "Compare codes"));
+    let store = harness.state().store();
+    assert_eq!(store.pending_sets()?.len(), 1);
+    assert!(Notes::new(store).all()?.is_empty());
+    assert!(store.kept_people()?.is_empty());
+
+    // Left undecided, it waits behind the Agenda's line.
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!harness.state().previewing());
+    assert_eq!(harness.state().store().pending_sets()?.len(), 1);
+    harness
+        .get_by_role_and_label(Role::Button, "1 Sent Item waiting")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::SentItemsWaiting);
+    assert!(shows(&harness, "Sent Items waiting"));
+    harness
+        .get_by_role_and_label(Role::Button, "From Ann")
+        .click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "An unknown person"));
+    assert!(!shows(&harness, "Blood test"));
+
+    // "Show": today's preview, Compare codes included; still held.
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Blood test"));
+    assert!(shows(&harness, "08:15"));
+    assert!(shows(&harness, &code(&ann)?));
+    assert!(shows(&harness, "Compare codes"));
+    assert_eq!(harness.state().store().pending_sets()?.len(), 1);
+
+    // Not remembered: opened again, it is hidden again.
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    assert!(!harness.state().previewing());
+    harness
+        .get_by_role_and_label(Role::Button, "From Ann")
+        .click_accesskit();
+    harness.run();
+    assert!(harness.state().previewing());
+    assert!(!shows(&harness, "Blood test"));
+
+    // Decline before "Show": nothing kept, nothing waiting.
+    harness.get_by_label("Decline").click_accesskit();
+    harness.run();
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Declined: nothing was kept.")
+    );
+    let store = harness.state().store();
+    assert!(store.pending_sets()?.is_empty());
+    assert!(Notes::new(store).all()?.is_empty());
+    assert!(store.kept_people()?.is_empty());
+    assert!(shows(&harness, "No Sent Items are waiting."));
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    assert!(!shows(&harness, "waiting"));
+    Ok(())
+}
+
+#[test]
+fn a_strangers_sent_item_shown_is_accepted_from_where_it_waits() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (_ann, file) = from_stranger(&dir)?;
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &file);
+    // The same file again is the one held, not a second.
+    harness.key_press(egui::Key::Escape);
+    harness.run();
+    drop_file(&mut harness, &file);
+    assert_eq!(harness.state().store().pending_sets()?.len(), 1);
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
+    harness.get_by_label("Accept").click_accesskit();
+    harness.run();
+    assert_eq!(
+        harness.state().notice(),
+        Some("Added to Unsorted, with its alarms on.")
+    );
+    let store = harness.state().store();
+    assert!(store.pending_sets()?.is_empty());
+    let got = Notes::new(store).unsorted()?;
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].text, "Blood test");
+    assert_eq!(Routines::new(store).of_note(&got[0].id)?.len(), 1);
+    assert!(!shows(&harness, "waiting"));
+    Ok(())
+}
+
+#[test]
+fn decline_and_block_before_show_blocks_the_stranger() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (ann, file) = from_stranger(&dir)?;
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("profile")?.id;
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &file);
+    harness.get_by_label("Decline and block").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Block Ann?"));
+    // Cancel goes back to the hidden preview.
+    harness.get_by_label("Cancel").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "An unknown person"));
+    harness.get_by_label("Decline and block").click_accesskit();
+    harness.run();
+    harness.get_by_label("Block").click_accesskit();
+    harness.run();
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Declined and blocked: nothing was kept.")
+    );
+    let store = harness.state().store();
+    assert!(store.is_blocked(&ann_id)?);
+    assert!(store.pending_sets()?.is_empty());
+    assert!(Notes::new(store).all()?.is_empty());
+
+    // Another of hers shows nothing.
+    drop_file(&mut harness, &file);
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Refused: this file comes from a person you blocked.")
+    );
+    Ok(())
+}
+
+#[test]
+fn decline_and_block_after_show_blocks_the_stranger() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let (ann, file) = from_stranger(&dir)?;
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("profile")?.id;
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &file);
+    harness.get_by_label("Show").click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Blood test"));
+    harness.get_by_label("Decline and block").click_accesskit();
+    harness.run();
+    harness.get_by_label("Block").click_accesskit();
+    harness.run();
+    assert!(!harness.state().previewing());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Declined and blocked: nothing was kept.")
+    );
+    let store = harness.state().store();
+    assert!(store.is_blocked(&ann_id)?);
+    assert!(store.pending_sets()?.is_empty());
+    assert!(Notes::new(store).all()?.is_empty());
     Ok(())
 }

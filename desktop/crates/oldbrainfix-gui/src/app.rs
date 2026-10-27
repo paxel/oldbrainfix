@@ -4,9 +4,10 @@
 //! Routine's editor on the right.
 //!
 //! The window opens on the Agenda (UI laws, "Agenda"): the Missed
-//! Summary until "Seen", the "x Unsorted" banner, today's all-day and
-//! then timed Occurrences, a gap, and tomorrow's dimmed, then the five
-//! days after it under their weekdays and dates, all of them checkable. Its gear leads to this Device's Settings, its alarm button
+//! Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
+//! waiting" line while a stranger's Sent Item waits for "Show", today's
+//! all-day and then timed Occurrences, a gap, and tomorrow's dimmed,
+//! then the five days after it under their weekdays and dates, all of them checkable. Its gear leads to this Device's Settings, its alarm button
 //! to a new Routine. A Note spawns Routines and Reminders from its
 //! editor; deleting a Note that spawned some asks whether they go too.
 //!
@@ -29,8 +30,9 @@
 //! that cannot be transcribed here is kept and announced; a sync bundle
 //! dropped there is imported, what came in announced at the top; a
 //! Sent Item dropped there, opened or handed over by `oldbrainfix open`
-//! shows its preview to accept or decline. A Note is sent from its
-//! editor, saved where the user says.
+//! shows its preview to accept or decline, a stranger's hidden until
+//! "Show" and waiting behind the Agenda's "x Sent Items waiting" until
+//! decided. A Note is sent from its editor, saved where the user says.
 //! The editor shows a Note's photos and plays its recordings, with their
 //! Transcripts. Transcripts and Photo Texts are made in the background
 //! and found by the search over All Notes, an Area or a Topic.
@@ -50,7 +52,9 @@ use egui::{
 };
 use oldbrainfix_core::backup;
 use oldbrainfix_core::profile::ProfileChoice;
-use oldbrainfix_core::sent::{self, OpenError, Opened, Recipient, SenderTrust, SentItemState};
+use oldbrainfix_core::sent::{
+    self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
+};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
     Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
@@ -102,6 +106,9 @@ pub enum Selection {
     About,
     /// Every third-party component and its licence, reached from About.
     Licences,
+    /// The strangers' Sent Items waiting for "Show", Accept or Decline
+    /// (#91), reached from the Agenda's "x Sent Items waiting" line.
+    SentItemsWaiting,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -141,6 +148,9 @@ struct AgendaView {
     later: Vec<(Day, Vec<Row>)>,
     missed: MissedSummary,
     unsorted: usize,
+    /// How many strangers' Sent Items wait (#91), counted from the
+    /// pending sets without reading their files.
+    waiting: usize,
 }
 
 /// What this Device may do to the selected Note in a Shared Area
@@ -198,6 +208,8 @@ struct View {
     routines: Vec<Routine>,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
+    /// The strangers' Sent Items waiting, while their list shows.
+    held: Vec<HeldSentItem>,
     /// The Routines and Reminders in the trash on their own, with their
     /// Notes, while the trash shows.
     trashed_routines: Vec<(Routine, Option<Note>)>,
@@ -280,11 +292,21 @@ enum Dialog {
     /// The preview of a Sent Item opened here, with what comparing its
     /// sender's short code came to; whether its sender may be blocked,
     /// not the user's own Profile, and, while "Decline and block" asks,
-    /// the Shared Areas blocking them leaves (#90).
+    /// the Shared Areas blocking them leaves (#90). A stranger's item
+    /// shown with "Show" names the pending set it is held in (#91):
+    /// Accept, Decline and Close decide that one.
     SentItem {
         opened: Box<Opened>,
         compared: Compared,
         may_block: bool,
+        blocking: Option<Vec<String>>,
+        held: Option<String>,
+    },
+    /// A stranger's Sent Item held until "Show" (#91): only who it is
+    /// from, and, while "Decline and block" asks, the Shared Areas
+    /// blocking them leaves.
+    HeldSentItem {
+        held: HeldSentItem,
         blocking: Option<Vec<String>>,
     },
     /// The people of the Shared Area `area`.
@@ -448,6 +470,10 @@ enum Action {
     /// Accepts the Sent Item previewed, or declines it.
     AcceptSent,
     DeclineSent,
+    /// Shows what the stranger's Sent Item held in the dialog holds.
+    ShowSent,
+    /// Opens the stranger's Sent Item held as this pending set, hidden.
+    OpenHeld(String),
     /// Asks whether to decline the Sent Item previewed and block its
     /// sender (#90).
     AskBlockSender,
@@ -969,9 +995,12 @@ impl App {
         self.handed = Some(handed);
     }
 
-    /// Whether a Sent Item's preview shows.
+    /// Whether a Sent Item's preview shows, a stranger's hidden one too.
     pub fn previewing(&self) -> bool {
-        matches!(self.dialog, Some(Dialog::SentItem { .. }))
+        matches!(
+            self.dialog,
+            Some(Dialog::SentItem { .. } | Dialog::HeldSentItem { .. })
+        )
     }
 
     /// What a bundle saved or imported did, as announced.
@@ -1015,8 +1044,9 @@ impl App {
         Ok(())
     }
 
-    /// Opens the file at `path`: a Sent Item shows its preview, anything
-    /// else is imported as a bundle.
+    /// Opens the file at `path`: a Sent Item shows its preview, a
+    /// stranger's held and hidden until "Show" (#91); anything else is
+    /// imported as a bundle.
     fn open_file(&mut self, path: &std::path::Path) {
         let small = std::fs::metadata(path).is_ok_and(|m| m.len() <= sent::MAX_BYTES as u64);
         let bytes = if small {
@@ -1028,30 +1058,99 @@ impl App {
             self.import_bundle(path);
             return;
         }
-        match self.store.open_sent_item(&bytes) {
-            Ok(Ok(opened)) => {
-                let may_block = matches!(self.store.is_own_person(&opened.sender.id), Ok(false));
-                self.dialog = Some(Dialog::SentItem {
-                    opened: Box::new(opened),
-                    compared: Compared::Not,
-                    may_block,
+        match self.store.receive_sent_item(&bytes) {
+            Ok(Ok(Received::Opened(opened))) => self.preview(opened, None),
+            Ok(Ok(Received::Held(held))) => {
+                self.dialog = Some(Dialog::HeldSentItem {
+                    held,
                     blocking: None,
                 });
             }
-            Ok(Err(OpenError::NotForUs)) => {
-                self.notice = Some(self.t.sent_item_not_for_us().to_string());
-            }
-            Ok(Err(OpenError::NotASentItem)) => {
-                self.notice = Some(self.t.sent_item_unreadable().to_string());
-            }
-            Ok(Err(OpenError::NotFromSender)) => {
-                self.notice = Some(self.t.sent_item_not_from_sender().to_string());
-            }
-            Ok(Err(OpenError::FromBlocked)) => {
-                self.notice = Some(self.t.sent_item_from_blocked().to_string());
-            }
+            Ok(Err(e)) => self.notice = Some(refused(&self.t, e).to_string()),
             Err(e) => self.notice = Some(format!("{} ({e})", self.t.sent_item_unreadable())),
         }
+    }
+
+    /// Shows the preview of `opened`, held as the pending set `held` when
+    /// a stranger's item was shown with "Show".
+    fn preview(&mut self, opened: Box<Opened>, held: Option<String>) {
+        let may_block = matches!(self.store.is_own_person(&opened.sender.id), Ok(false));
+        self.dialog = Some(Dialog::SentItem {
+            opened,
+            compared: Compared::Not,
+            may_block,
+            blocking: None,
+            held,
+        });
+    }
+
+    /// "Show" on the stranger's Sent Item the dialog holds back: its
+    /// preview, Compare codes included. Not remembered: opened again, it
+    /// is hidden again.
+    fn show_held(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::HeldSentItem { held, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        let id = held.id.clone();
+        match self.store.show_held_sent_item(&id)? {
+            Some(Ok(opened)) => self.preview(Box::new(opened), Some(id)),
+            Some(Err(e)) => {
+                self.dialog = None;
+                self.notice = Some(refused(&self.t, e).to_string());
+            }
+            None => {
+                self.dialog = None;
+                self.notice = Some(self.t.sent_item_gone().to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens the stranger's Sent Item held as `id`, hidden until "Show".
+    fn open_held(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        match self.store.held_sent_item(id)? {
+            Some(held) => {
+                self.dialog = Some(Dialog::HeldSentItem {
+                    held,
+                    blocking: None,
+                });
+            }
+            None => self.notice = Some(self.t.sent_item_gone().to_string()),
+        }
+        Ok(())
+    }
+
+    /// Accepts the stranger's Sent Item held as `id`, shown or not,
+    /// `verified` when the codes were compared, judged against the log
+    /// now; announces what came of it. One gone meanwhile, or refused
+    /// now, as from a person blocked since, is announced, not failed.
+    fn accept_held(&mut self, id: &str, verified: bool) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let state = match self.store.show_held_sent_item(id)? {
+            Some(Ok(opened)) => opened.state,
+            Some(Err(e)) => {
+                self.notice = Some(refused(&t, e).to_string());
+                return Ok(());
+            }
+            None => {
+                self.notice = Some(t.sent_item_gone().to_string());
+                return Ok(());
+            }
+        };
+        let said = match self.store.accept_held_sent_item(id, verified) {
+            Ok(None) => t.sent_item_nothing_to_cancel(),
+            Ok(Some(_)) => match state {
+                SentItemState::Update => t.sent_item_applied(),
+                SentItemState::Cancel => t.sent_item_trashed(),
+                _ => t.sent_item_accepted(),
+            },
+            Err(oldbrainfix_core::Error::FromBlocked) => t.sent_item_from_blocked(),
+            // Decided meanwhile.
+            Err(oldbrainfix_core::Error::Invalid(_)) => t.sent_item_gone(),
+            Err(e) => return Err(e),
+        };
+        self.notice = Some(said.to_string());
+        Ok(())
     }
 
     /// Saves the Note of the send dialog as a Sent Item where the user
@@ -1376,7 +1475,8 @@ impl App {
             | Selection::Settings
             | Selection::Sync
             | Selection::About
-            | Selection::Licences => Vec::new(),
+            | Selection::Licences
+            | Selection::SentItemsWaiting => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -1496,6 +1596,14 @@ impl App {
                         .collect::<oldbrainfix_core::Result<_>>()?,
                     missed: Alarms::new(&self.store).missed(wall)?,
                     unsorted: notes.unsorted()?.len(),
+                    // Counted from the pending sets, without reading each
+                    // held file.
+                    waiting: self
+                        .store
+                        .pending_sets()?
+                        .iter()
+                        .filter(|s| s.kind == sent::PENDING_KIND)
+                        .count(),
                 })
             }
             _ => None,
@@ -1527,6 +1635,12 @@ impl App {
             detail,
             routines: note_routines,
             agenda,
+            // Each read checks every held file again: only while listed.
+            held: if self.selection == Selection::SentItemsWaiting {
+                self.store.held_sent_items()?
+            } else {
+                Vec::new()
+            },
             trashed_routines,
             profile: OwnProfile::new(&self.store).get()?,
             profile_code: OwnProfile::new(&self.store).code()?,
@@ -1928,11 +2042,16 @@ impl App {
                 });
             }
             Action::SendNote => self.send_note()?,
-            Action::AcceptSent => {
-                if let Some(Dialog::SentItem {
+            Action::AcceptSent => match self.dialog.take() {
+                Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
+                Some(Dialog::SentItem {
+                    compared,
+                    held: Some(id),
+                    ..
+                }) => self.accept_held(&id, compared == Compared::Match)?,
+                Some(Dialog::SentItem {
                     opened, compared, ..
-                }) = self.dialog.take()
-                {
+                }) => {
                     // The alerts plan its alarms once the action is done.
                     let accepted = self
                         .store
@@ -1950,22 +2069,43 @@ impl App {
                     };
                     self.notice = Some(said.to_string());
                 }
-            }
+                other => self.dialog = other,
+            },
             Action::DeclineSent => {
-                let previewed = matches!(&self.dialog, Some(Dialog::SentItem { opened, .. }) if acceptable(opened.state));
-                self.dialog = None;
+                let previewed = match &self.dialog {
+                    Some(Dialog::SentItem { opened, .. }) => acceptable(opened.state),
+                    Some(Dialog::HeldSentItem { .. }) => true,
+                    _ => false,
+                };
+                // A stranger's item goes, Close on one with nothing to
+                // accept included.
+                if let Some(
+                    Dialog::SentItem { held: Some(id), .. }
+                    | Dialog::HeldSentItem {
+                        held: HeldSentItem { id, .. },
+                        ..
+                    },
+                ) = self.dialog.take()
+                {
+                    self.store.decline_pending(&id)?;
+                }
                 if previewed {
                     self.notice = Some(self.t.sent_item_declined().to_string());
                 }
             }
-            Action::AskBlockSender => {
-                if let Some(Dialog::SentItem {
+            Action::ShowSent => self.show_held()?,
+            Action::OpenHeld(id) => self.open_held(&id)?,
+            Action::AskBlockSender => match &mut self.dialog {
+                Some(Dialog::SentItem {
                     opened, blocking, ..
-                }) = &mut self.dialog
-                {
+                }) => {
                     *blocking = Some(self.store.areas_to_leave_for_blocking(&opened.sender.id)?);
                 }
-            }
+                Some(Dialog::HeldSentItem { held, blocking }) => {
+                    *blocking = Some(self.store.areas_to_leave_for_blocking(&held.sender.id)?);
+                }
+                _ => {}
+            },
             Action::Block => self.block()?,
             Action::Unblock => {
                 if let Some(Dialog::Person { id, asking, .. }) = &mut self.dialog {
@@ -1974,7 +2114,9 @@ impl App {
                 }
             }
             Action::CancelBlock => match &mut self.dialog {
-                Some(Dialog::SentItem { blocking, .. }) => *blocking = None,
+                Some(Dialog::SentItem { blocking, .. } | Dialog::HeldSentItem { blocking, .. }) => {
+                    *blocking = None
+                }
                 Some(Dialog::Person { asking, .. }) => *asking = None,
                 _ => {}
             },
@@ -2213,7 +2355,7 @@ impl App {
     fn back(&self) -> Option<Selection> {
         match &self.selection {
             Selection::All | Selection::Agenda => None,
-            Selection::Profile => Some(Selection::Agenda),
+            Selection::Profile | Selection::SentItemsWaiting => Some(Selection::Agenda),
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
@@ -2613,6 +2755,7 @@ impl App {
             Selection::Sync => self.t.sync_title().to_string(),
             Selection::About => self.t.about_title().to_string(),
             Selection::Licences => self.t.open_source_licenses().to_string(),
+            Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -2731,6 +2874,7 @@ impl App {
                 return;
             }
             Selection::Licences => return about_view::licences_page(ui, &self.t),
+            Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::Sync => {
                 let wall = self.wall.clone();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
@@ -3330,10 +3474,22 @@ impl App {
                         compared,
                         may_block,
                         blocking: None,
+                        ..
                     } => {
                         let shown = (opened.as_ref(), *compared, *may_block);
                         sent_item_form(ui, &t, tones, (shown, pictures), actions);
                     }
+                    Dialog::HeldSentItem {
+                        held,
+                        blocking: Some(areas),
+                    } => {
+                        let name = profile_view::display_name(&t, &held.sender.name);
+                        block_form(ui, &t, name, &area_names(&t, view, areas), actions);
+                    }
+                    Dialog::HeldSentItem {
+                        held,
+                        blocking: None,
+                    } => held_sent_item_form(ui, &t, tones, held, actions),
                     Dialog::People { area } => {
                         let manages = view.access.get(area) == Some(&AreaAccess::Manager);
                         let people = view.people.get(area).map(Vec::as_slice).unwrap_or(&[]);
@@ -3443,6 +3599,9 @@ impl App {
                 Dialog::SentItem {
                     blocking: Some(_), ..
                 }
+                | Dialog::HeldSentItem {
+                    blocking: Some(_), ..
+                }
                 | Dialog::Person {
                     asking: Some(_), ..
                 } => Action::CancelBlock,
@@ -3452,8 +3611,8 @@ impl App {
     }
 
     /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
-    /// Summary until "Seen", the "x Unsorted" banner, today's
-    /// Occurrences, a gap, and tomorrow's dimmed, then the five days after
+    /// Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
+    /// waiting" line opening their list, today's Occurrences, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. The Profile picture in the
     /// corner, where the settings gear was, leads to the Profile page.
@@ -3492,29 +3651,17 @@ impl App {
                     missed_card(ui, &t, tones, &agenda.missed, actions);
                 }
                 if agenda.unsorted > 0 {
-                    let banner = embossed(ui, tones, false, None, |ui| {
-                        ui.horizontal(|ui| {
-                            icons::show(ui, icons::INBOX, 20.0, tones.accent);
-                            ui.label(
-                                RichText::new(t.unsorted_banner(agenda.unsorted as i64))
-                                    .color(text),
-                            );
-                        });
-                    });
-                    let banner =
-                        ui.interact(banner.rect, Id::new("unsorted banner"), Sense::click());
-                    banner.widget_info(|| {
-                        WidgetInfo::labeled(
-                            WidgetType::Button,
-                            true,
-                            t.unsorted_banner(agenda.unsorted as i64),
-                        )
-                    });
-                    if banner
-                        .on_hover_cursor(egui::CursorIcon::PointingHand)
-                        .clicked()
-                    {
+                    let said = t.unsorted_banner(agenda.unsorted as i64);
+                    let id = Id::new("unsorted banner");
+                    if count_banner(ui, tones, (id, icons::INBOX), &said) {
                         actions.push(Action::Select(Selection::Unsorted));
+                    }
+                }
+                if agenda.waiting > 0 {
+                    let said = t.sent_items_waiting(agenda.waiting as i64);
+                    let id = Id::new("sent items waiting");
+                    if count_banner(ui, tones, (id, icons::MAIL_UNREAD), &said) {
+                        actions.push(Action::Select(Selection::SentItemsWaiting));
                     }
                 }
                 ui.label(
@@ -3748,8 +3895,9 @@ impl App {
 
     /// Blocks the person the dialog asks about (#90), leaving the Shared
     /// Areas it named; asks again, naming them, should one have come in
-    /// by sync since. From a Sent Item's preview the item is declined and
-    /// the preview closes; a person's Profile stays and shows the block.
+    /// by sync since. From a Sent Item's preview, a stranger's hidden one
+    /// too, the item is declined and the preview closes; a person's
+    /// Profile stays and shows the block.
     fn block(&mut self) -> oldbrainfix_core::Result<()> {
         let done = match &mut self.dialog {
             Some(Dialog::Person {
@@ -3767,8 +3915,30 @@ impl App {
             Some(Dialog::SentItem {
                 opened,
                 blocking: Some(areas),
+                held,
                 ..
-            }) => match self.store.block_sent_item_sender(opened, !areas.is_empty()) {
+            }) => {
+                let leave = !areas.is_empty();
+                let blocked = match held {
+                    Some(id) => self.store.block_held_sent_item_sender(id, leave),
+                    None => self.store.block_sent_item_sender(opened, leave),
+                };
+                match blocked {
+                    Ok(blocked) => Some(blocked),
+                    Err(oldbrainfix_core::Error::MustLeaveAreas(more)) => {
+                        *areas = more;
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+            Some(Dialog::HeldSentItem {
+                held,
+                blocking: Some(areas),
+            }) => match self
+                .store
+                .block_held_sent_item_sender(&held.id, !areas.is_empty())
+            {
                 Ok(blocked) => Some(blocked),
                 Err(oldbrainfix_core::Error::MustLeaveAreas(more)) => {
                     *areas = more;
@@ -3945,6 +4115,45 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// The strangers' Sent Items waiting (#91), the oldest first: who
+    /// each is from and when it came, nothing of what it holds. A click
+    /// opens its preview, hidden until "Show"; those left undecided, or
+    /// by a restart, wait here until Accept or Decline.
+    fn held_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        ui.heading(RichText::new(t.sent_items_waiting_title()).color(text));
+        ui.add_space(8.0);
+        if self.view.held.is_empty() {
+            ui.label(RichText::new(t.sent_items_none_waiting()).color(weak));
+            return;
+        }
+        egui::ScrollArea::vertical()
+            .id_salt("sent items waiting")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 12.0;
+                ui.add_space(4.0);
+                for held in &self.view.held {
+                    let from = t.sent_item_from(profile_view::display_name(&t, &held.sender.name));
+                    let id = Id::new(("held", &held.id));
+                    let clicked = clickable_card(ui, tones, (id, &from), |ui| {
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::MAIL_UNREAD, 20.0, tones.accent);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&from).color(text));
+                                ui.label(RichText::new(when(&t, held.held)).small().color(weak));
+                            });
+                        });
+                    });
+                    if clicked {
+                        actions.push(Action::OpenHeld(held.id.clone()));
+                    }
+                }
+            });
     }
 
     /// This Device's settings (ADR 0008): its notifications and login
@@ -4496,6 +4705,16 @@ fn send_form(
     });
 }
 
+/// What a Sent Item refused as `error` is announced as.
+fn refused(t: &L10n, error: OpenError) -> &'static str {
+    match error {
+        OpenError::NotForUs => t.sent_item_not_for_us(),
+        OpenError::NotASentItem => t.sent_item_unreadable(),
+        OpenError::NotFromSender => t.sent_item_not_from_sender(),
+        OpenError::FromBlocked => t.sent_item_from_blocked(),
+    }
+}
+
 /// Whether accepting a Sent Item in `state` does anything: a new one,
 /// an update or a cancellation.
 fn acceptable(state: SentItemState) -> bool {
@@ -4710,6 +4929,80 @@ fn sent_item_form(
                 ui.label(RichText::new(&section.text).color(text));
             }
         });
+}
+
+/// A card with `icon` and `said` on the Agenda, "x Unsorted" or "x Sent
+/// Items waiting"; whether it was clicked.
+fn count_banner(ui: &mut Ui, tones: Tones, (id, icon): (Id, char), said: &str) -> bool {
+    let text = ui.visuals().text_color();
+    clickable_card(ui, tones, (id, said), |ui| {
+        ui.horizontal(|ui| {
+            icons::show(ui, icon, 20.0, tones.accent);
+            ui.label(RichText::new(said).color(text));
+        });
+    })
+}
+
+/// An embossed card holding `content` that is clicked as a whole, a
+/// button with `id` labelled `label`; whether it was clicked.
+fn clickable_card(
+    ui: &mut Ui,
+    tones: Tones,
+    (id, label): (Id, &str),
+    content: impl FnOnce(&mut Ui),
+) -> bool {
+    let card = embossed(ui, tones, false, None, content);
+    let card = ui.interact(card.rect, id, Sense::click());
+    card.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
+    card.on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
+}
+
+/// The preview of a stranger's Sent Item held until "Show" (#91, ADR
+/// 0015, 0022): only who it is from and that they are unknown here, not
+/// their picture or short code, nothing of what it holds. "Show" opens
+/// the preview as for anybody else; Accept, Decline and "Decline and
+/// block" work before it too. Leaving decides nothing: the item waits
+/// behind the Agenda's "x Sent Items waiting".
+fn held_sent_item_form(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    held: &HeldSentItem,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let name = profile_view::display_name(t, &held.sender.name);
+    title(ui, &t.sent_item_from(name));
+    ui.label(RichText::new(t.sent_item_stranger()).color(tones.accent));
+    ui.label(RichText::new(t.sent_item_hidden()).color(text));
+    let wide = |ui: &mut Ui, label: RichText| {
+        ui.add_sized([ui.available_width(), 32.0], egui::Button::new(label))
+            .clicked()
+    };
+    if wide(ui, RichText::new(t.sent_item_show()).strong().color(text)) {
+        actions.push(Action::ShowSent);
+    }
+    ui.horizontal(|ui| {
+        if ui
+            .button(RichText::new(t.sent_item_accept()).color(text))
+            .clicked()
+        {
+            actions.push(Action::AcceptSent);
+        }
+        if ui
+            .button(RichText::new(t.sent_item_decline()).color(text))
+            .clicked()
+        {
+            actions.push(Action::DeclineSent);
+        }
+    });
+    if ui
+        .button(RichText::new(t.sent_item_block()).color(text))
+        .clicked()
+    {
+        actions.push(Action::AskBlockSender);
+    }
 }
 
 /// The people of a Shared Area with their roles; a Manager changes them

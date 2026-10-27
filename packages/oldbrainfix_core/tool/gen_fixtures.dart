@@ -1926,12 +1926,30 @@ void _sentFixture(Directory root) {
         fromSealed.item.encode() != fromSigned.item.encode()) {
       throw StateError('Ben did not read the same Sent Item twice');
     }
+    // Ben does not know Ada yet: her item is held unseen until "Show"
+    // (#91), once for both files, and accepted from there.
+    ids = 0x3f0;
+    _held = DateTime.utc(2026, 1, 4, 17);
+    final held = receiveSentItem(ben, sealed);
+    if (held is! HeldSentItem) throw StateError('Ben did not hold it');
+    final again = receiveSentItem(ben, signed);
+    if (again is! HeldSentItem || again.id != held.id) {
+      throw StateError('Ben did not hold it once');
+    }
+    _write(File('${out.path}/held.json'), ben.pendingSet(held.id)!.encode());
+    if (showHeldSentItem(ben, held.id)?.item.encode() !=
+        fromSigned.item.encode()) {
+      throw StateError('Ben does not see what is held');
+    }
     ids = 0x400;
     _held = DateTime.utc(2026, 1, 4, 18);
     mark = ben.currentSeq();
     final accepted =
-        acceptSentItem(ben, fromSealed.item) ??
+        acceptHeldSentItem(ben, held.id) ??
         (throw StateError('Ben did not accept it'));
+    if (ben.pendingSets.isNotEmpty) {
+      throw StateError('the held Sent Item outlived its Accept');
+    }
     _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
     final opened = fromSigned.item;
     final first = {
@@ -2107,6 +2125,7 @@ void _sentFixture(Directory root) {
         ...first,
         'acceptedAgain': acceptedAgain.accepted,
         'stateAgain': acceptedAgain.state.name,
+        'held': {'id': held.id, 'sender': held.sender.name, 'at': held.held.toIso8601String()},
         'update': {
           'version': toUpdate.item.version,
           'state': toUpdate.state.name,
@@ -3990,7 +4009,9 @@ Future<void> main(List<String> args) async {
     'ids counted from 0x301, at a held clock), the file signed only '
     '(`signed.$sentItemExtension`) and encrypted to Ben\'s X25519 key '
     '(`sealed.$sentItemExtension`, random bytes counted from 4001 on), '
-    'what Ben accepting wrote (`accepted.jsonl`, ids counted from 0x401), '
+    'Ben, who does not know Ada, holding it unseen until "Show" as a '
+    'pending set (`held.json`, once for both files, its id counted from '
+    '0x3f1), what accepting it wrote (`accepted.jsonl`, ids counted from 0x401), '
     'keeping her Profile; then Ben makes it his own (`receiver.jsonl`, from '
     '0x501), Ada changes it (`changed.jsonl`, from 0x601), renames herself '
     'and sends an update (`update.jsonl`, `update.$sentItemExtension`), '

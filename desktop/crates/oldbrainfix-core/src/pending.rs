@@ -60,7 +60,7 @@ pub struct PendingEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PendingChange {
     Draft(PendingDraft),
-    Entry(PendingEntry),
+    Entry(Box<PendingEntry>),
 }
 
 impl PendingChange {
@@ -81,10 +81,10 @@ impl PendingChange {
     fn parse(json: &Value) -> Option<PendingChange> {
         let mark = json.get("mark")?.as_i64()?;
         if let Some(line) = json.get("entry") {
-            return Some(PendingChange::Entry(PendingEntry {
+            return Some(PendingChange::Entry(Box::new(PendingEntry {
                 entry: WireEntry::parse(line.as_str()?)?,
                 mark,
-            }));
+            })));
         }
         let text = |key: &str| -> Option<Option<String>> {
             match json.get(key) {
@@ -139,7 +139,7 @@ impl PendingSet {
         self.changes
             .iter()
             .filter_map(|c| match c {
-                PendingChange::Entry(r) => Some(r),
+                PendingChange::Entry(r) => Some(r.as_ref()),
                 PendingChange::Draft(_) => None,
             })
             .collect()
@@ -548,10 +548,11 @@ impl Store {
             .collect();
         let mark = self.current_seq()?;
         for e in &taken {
-            set.changes.push(PendingChange::Entry(PendingEntry {
-                entry: e.clone(),
-                mark,
-            }));
+            set.changes
+                .push(PendingChange::Entry(Box::new(PendingEntry {
+                    entry: e.clone(),
+                    mark,
+                })));
         }
         self.keep_pending_set(set)?;
         Ok(taken)

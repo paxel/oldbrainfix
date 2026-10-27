@@ -64,3 +64,5 @@ A blocked Manager's Routines, Reminders, Area and Topic names would go half miss
 ## Pending Changes (ADR 0022)
 
 Amended by ADR 0022 (#111): a blocked person's entries never enter a pending set. Her Devices are judged by the grants of the log and of the set together, and a block takes her entries out of every set already held. Neither is noted as a refusal mark.
+
+Amended for #91: a block also deletes every stranger's Sent Item held until "Show" (ADR 0015) whose Profile id is blocked or which one of her Devices signed, and "Decline and block" works on such an item before "Show".

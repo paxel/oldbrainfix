@@ -2663,4 +2663,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sentItemFromBlocked =>
       'Refused: this file comes from a person you blocked.';
+
+  @override
+  String get sentItemStranger => 'An unknown person: not among your People.';
+
+  @override
+  String get sentItemHidden =>
+      'What they sent stays hidden until you tap Show.';
+
+  @override
+  String get sentItemShow => 'Show';
+
+  @override
+  String get sentItemGone =>
+      'This Sent Item is no longer waiting: it was accepted or declined.';
+
+  @override
+  String sentItemsWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Sent Items waiting',
+      one: '1 Sent Item waiting',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sentItemsWaitingTitle => 'Sent Items waiting';
+
+  @override
+  String get sentItemsNoneWaiting => 'No Sent Items are waiting.';
 }

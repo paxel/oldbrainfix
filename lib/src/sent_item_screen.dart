@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'bundle_platform.dart';
 import 'l10n.dart';
@@ -159,16 +160,29 @@ Future<int> openReceivedFile(
     // Gone already.
   }
   try {
-    final opened = openSentItem(store, bytes);
-    await navigator.push(
-      MaterialPageRoute<void>(
-        builder: (_) => SentItemScreen(
-          store: store,
-          opened: opened,
-          reopen: () => openSentItem(store, bytes),
-        ),
-      ),
-    );
+    // A stranger's is held, and shows nothing of it until "Show" (#91).
+    switch (receiveSentItem(store, bytes)) {
+      case final OpenedSentItem opened:
+        await navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => SentItemScreen(
+              store: store,
+              opened: opened,
+              reopen: () => switch (receiveSentItem(store, bytes)) {
+                final OpenedSentItem again => again,
+                // Held now: what showed stays.
+                HeldSentItem() => throw const NotASentItem(),
+              },
+            ),
+          ),
+        );
+      case final HeldSentItem held:
+        await navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => HeldSentItemScreen(store: store, held: held),
+          ),
+        );
+    }
   } on NotASentItem {
     announcements?.announce(t.sentItemUnreadable);
   } on SentItemNotForUs {
@@ -208,10 +222,16 @@ bool isSentItemFile(String path) => looksLikeSentItem(_small(path));
 /// before; a cancellation moves that Note to the trash. Decline keeps
 /// nothing; one already up to date, or with nothing to cancel, only
 /// closes. "Decline and block" keeps nothing and blocks the sender
-/// (#90); once the sender is blocked the preview closes.
+/// (#90); once the sender is blocked the preview closes. A stranger's
+/// item shown from where it is held ([held]) is decided there: Accept,
+/// Decline, Close and "Decline and block" each end the held set.
 class SentItemScreen extends StatefulWidget {
   final Store store;
   final OpenedSentItem opened;
+
+  /// The pending set a stranger's item is held in (#91), when it was
+  /// shown from there.
+  final String? held;
 
   /// Reads the item again, as it shows after the sender's Profile was
   /// opened and an Override set there (#52).
@@ -221,6 +241,7 @@ class SentItemScreen extends StatefulWidget {
     super.key,
     required this.store,
     required this.opened,
+    this.held,
     this.reopen,
   });
 
@@ -290,12 +311,13 @@ class _SentItemScreenState extends State<SentItemScreen> {
   void _accept(BuildContext context) {
     final announcements = AnnouncementsScope.of(context);
     final t = context.t;
+    final verified = _compared == _Compared.match;
     try {
-      acceptSentItem(
-        store,
-        opened.item,
-        verified: _compared == _Compared.match,
-      );
+      if (widget.held case final held?) {
+        acceptHeldSentItem(store, held, verified: verified);
+      } else {
+        acceptSentItem(store, opened.item, verified: verified);
+      }
       announcements?.announce(switch (opened.state) {
         SentItemState.update => t.sentItemApplied,
         SentItemState.cancel => t.sentItemTrashed,
@@ -305,12 +327,30 @@ class _SentItemScreenState extends State<SentItemScreen> {
       announcements?.announce(t.sentItemNotFromSender);
     } on SentItemFromBlocked {
       announcements?.announce(t.sentItemFromBlocked);
+    } on NotASentItem {
+      announcements?.announce(t.sentItemUnreadable);
+    } on SentItemNotForUs {
+      announcements?.announce(t.sentItemNotForUs);
+    } on StateError {
+      // The held item went meanwhile: a block drops it too.
+      announcements?.announce(
+        store.isBlocked(opened.sender.id)
+            ? t.sentItemFromBlocked
+            : t.sentItemGone,
+      );
     }
     Navigator.of(context).pop();
   }
 
   void _decline(BuildContext context) {
+    if (widget.held case final held?) store.declinePending(held);
     AnnouncementsScope.of(context)?.announce(context.t.sentItemDeclined);
+    Navigator.of(context).pop();
+  }
+
+  /// Closes an item with nothing to accept; a held one goes with it.
+  void _close(BuildContext context) {
+    if (widget.held case final held?) store.declinePending(held);
     Navigator.of(context).pop();
   }
 
@@ -327,8 +367,14 @@ class _SentItemScreenState extends State<SentItemScreen> {
       store,
       opened.sender.id,
       name,
-      block: ({required leaveAreas}) =>
-          blocked = blockSentItemSender(store, opened, leaveAreas: leaveAreas),
+      block: ({required leaveAreas}) => blocked = switch (widget.held) {
+        final held? => blockHeldSentItemSender(
+          store,
+          held,
+          leaveAreas: leaveAreas,
+        ),
+        null => blockSentItemSender(store, opened, leaveAreas: leaveAreas),
+      },
     );
     if (!sure || !mounted) return;
     announcements?.announce(blocked ? t.sentItemBlocked : t.sentItemDeclined);
@@ -469,9 +515,8 @@ class _SentItemScreenState extends State<SentItemScreen> {
                       ),
                     OutlinedButton.icon(
                       key: const ValueKey('decline-sent'),
-                      onPressed: () => accept == null
-                          ? Navigator.of(context).pop()
-                          : _decline(context),
+                      onPressed: () =>
+                          accept == null ? _close(context) : _decline(context),
                       icon: const Icon(Icons.close),
                       label: Text(
                         accept == null ? t.sentItemClose : t.sentItemDecline,
@@ -576,6 +621,186 @@ class _SentItemScreenState extends State<SentItemScreen> {
                   ],
                 ),
               ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What a refused Sent Item is announced as; null for anything else.
+String? _refused(AppLocalizations t, Exception error) => switch (error) {
+  NotASentItem() => t.sentItemUnreadable,
+  SentItemNotForUs() => t.sentItemNotForUs,
+  SentItemNotFromSender() => t.sentItemNotFromSender,
+  SentItemFromBlocked() => t.sentItemFromBlocked,
+  _ => null,
+};
+
+/// The preview of a stranger's Sent Item, held until "Show" (#91, ADR
+/// 0015, 0022): only who it is from and that they are unknown here, not
+/// their picture or short code, nothing of what it holds. "Show" opens
+/// the preview as for anybody else, Compare codes included; it is not
+/// remembered, so the item is hidden again the next time it opens.
+/// Accept, Decline and "Decline and block" work before "Show" too;
+/// leaving decides nothing, and the item waits on the Agenda.
+class HeldSentItemScreen extends StatefulWidget {
+  final Store store;
+  final HeldSentItem held;
+
+  const HeldSentItemScreen({
+    super.key,
+    required this.store,
+    required this.held,
+  });
+
+  @override
+  State<HeldSentItemScreen> createState() => _HeldSentItemScreenState();
+}
+
+class _HeldSentItemScreenState extends State<HeldSentItemScreen> {
+  /// The preview after "Show".
+  OpenedSentItem? _shown;
+
+  Store get store => widget.store;
+  String get _id => widget.held.id;
+
+  /// Announces [text] and closes.
+  void _leave(String text) {
+    AnnouncementsScope.of(context)?.announce(text);
+    Navigator.of(context).pop();
+  }
+
+  /// Announces why the item cannot go on, as [error] says, and closes.
+  void _refuse(Object error) {
+    final t = context.t;
+    _leave(switch (error) {
+      // Decided meanwhile; a block drops it too.
+      StateError() when store.isBlocked(widget.held.sender.id) =>
+        t.sentItemFromBlocked,
+      StateError() => t.sentItemGone,
+      final Exception e => _refused(t, e) ?? t.sentItemUnreadable,
+      _ => t.sentItemUnreadable,
+    });
+  }
+
+  void _show() {
+    try {
+      final shown = showHeldSentItem(store, _id);
+      if (shown == null) return _leave(context.t.sentItemGone);
+      setState(() => _shown = shown);
+    } on Exception catch (e) {
+      _refuse(e);
+    }
+  }
+
+  void _accept() {
+    final t = context.t;
+    try {
+      final note = acceptHeldSentItem(store, _id);
+      _leave(note == null ? t.sentItemNothingToCancel : t.sentItemAccepted);
+    } on StateError catch (e) {
+      _refuse(e);
+    } on Exception catch (e) {
+      _refuse(e);
+    }
+  }
+
+  void _decline() {
+    store.declinePending(_id);
+    _leave(context.t.sentItemDeclined);
+  }
+
+  /// Declines and blocks the sender after asking once, as the preview
+  /// after "Show" does.
+  Future<void> _declineAndBlock(String name) async {
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context);
+    var blocked = false;
+    final sure = await confirmBlock(
+      context,
+      store,
+      widget.held.sender.id,
+      name,
+      block: ({required leaveAreas}) =>
+          blocked = blockHeldSentItemSender(store, _id, leaveAreas: leaveAreas),
+    );
+    if (!sure || !mounted) return;
+    announcements?.announce(blocked ? t.sentItemBlocked : t.sentItemDeclined);
+    navigator.pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_shown case final shown?) {
+      return SentItemScreen(
+        store: store,
+        opened: shown,
+        held: _id,
+        reopen: () =>
+            showHeldSentItem(store, _id) ?? (throw const NotASentItem()),
+      );
+    }
+    final t = context.t;
+    final name = profileDisplayName(t, widget.held.sender.name);
+    return Scaffold(
+      appBar: AppBar(title: Text(t.sentItemTitle)),
+      body: ListView(
+        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+        children: [
+          EditorPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  t.sentItemFrom(name),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                _Line(icon: Icons.gpp_maybe_outlined, text: t.sentItemStranger),
+                _Line(
+                  icon: Icons.visibility_off_outlined,
+                  text: t.sentItemHidden,
+                ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  key: const ValueKey('show-sent'),
+                  onPressed: _show,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: Text(t.sentItemShow),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('accept-sent'),
+                        onPressed: _accept,
+                        icon: const Icon(Icons.check),
+                        label: Text(t.sentItemAccept),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const ValueKey('decline-sent'),
+                        onPressed: _decline,
+                        icon: const Icon(Icons.close),
+                        label: Text(t.sentItemDecline),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const ValueKey('block-sent'),
+                  onPressed: () => _declineAndBlock(name),
+                  icon: const Icon(Icons.block),
+                  label: Text(t.sentItemBlock),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

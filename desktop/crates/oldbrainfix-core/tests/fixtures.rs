@@ -2208,12 +2208,41 @@ fn a_sent_item_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     assert_eq!(json!(routines), want["routines"]);
     assert_eq!(got.encode(), item.encode());
 
+    // Ben does not know Ada yet: her item is held unseen until "Show",
+    // once for both files, the same pending file byte for byte, and
+    // accepted from there (#91).
+    let want = &expected["held"];
+    counted_ids(&mut ben, 0x3f0);
+    at("2026-01-04T17:00:00.000Z")?;
+    let Ok(sent::Received::Held(held)) = ben.receive_sent_item(&sealed)? else {
+        return Err("Ben did not hold it".into());
+    };
+    let Ok(sent::Received::Held(again)) = ben.receive_sent_item(&signed)? else {
+        return Err("Ben did not hold it again".into());
+    };
+    assert_eq!(again.id, held.id);
+    assert_eq!(held.id, want["id"].as_str().ok_or("id")?);
+    assert_eq!(held.sender.name, want["sender"].as_str().ok_or("sender")?);
+    assert_eq!(held.sender.picture, None);
+    assert_eq!(dart_iso(held.held), want["at"].as_str().ok_or("at")?);
+    assert_eq!(
+        ben.pending_set(&held.id)?.ok_or("the held set")?.encode()?,
+        std::fs::read_to_string(dir.join("held.json"))?
+    );
+    let shown = ben
+        .show_held_sent_item(&held.id)?
+        .ok_or("held")?
+        .map_err(|_| "shown")?;
+    assert_eq!(shown.item.encode(), plain.item.encode());
+
+    at("2026-01-04T18:00:00.000Z")?;
     counted_ids(&mut ben, 0x400);
     let mark = ben.current_seq()?;
     assert_eq!(plain.state.name(), expected["state"]);
     let accepted = ben
-        .accept_sent_item(&opened.item, false)?
+        .accept_held_sent_item(&held.id, false)?
         .ok_or("accepted")?;
+    assert!(ben.pending_sets()?.is_empty());
     assert_eq!(accepted, expected["accepted"].as_str().ok_or("accepted")?);
     assert_eq!(
         lines_after(&ben, mark)?,

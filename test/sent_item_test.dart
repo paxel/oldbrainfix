@@ -90,6 +90,13 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 
+  /// Taps "Show" on the hidden preview of a stranger's Sent Item.
+  Future<void> show(WidgetTester tester) async {
+    expect(find.byType(HeldSentItemScreen), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('show-sent')));
+    await tester.pumpAndSettle();
+  }
+
   /// [bytes] as a file other apps hand over.
   String fileOf(List<int> bytes) {
     final path = '${dir.path}/in-${DateTime.now().microsecondsSinceEpoch}';
@@ -224,6 +231,7 @@ void main() {
       );
       files.waiting.add(fileFrom(note));
       await app(tester);
+      await show(tester);
 
       expect(find.byType(SentItemScreen), findsOneWidget);
       expect(find.text('From Ann'), findsOneWidget);
@@ -279,6 +287,7 @@ void main() {
       await app(tester);
       files.open(fileFrom(Notes(ann).capture('Secret'), to: to));
       await tester.pumpAndSettle();
+      await show(tester);
       expect(find.text('It came encrypted to this Device.'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('compare-codes')));
       await tester.pumpAndSettle();
@@ -290,6 +299,7 @@ void main() {
       expect(Notes(phone).all(), isEmpty);
       expect(phone.localSettingsWithPrefix('person:'), isEmpty);
       expect(dir.listSync().whereType<File>(), isEmpty, reason: 'copy gone');
+      expect(heldSentItems(phone), isEmpty, reason: 'nothing held either');
 
       // Her Profile kept before stays as it was.
       acceptedFromAnn();
@@ -314,6 +324,7 @@ void main() {
       final code = ann.ownProfileCode!;
       files.waiting.add(fileFrom(Notes(ann).capture('Dentist')));
       await app(tester);
+      await show(tester);
       await tester.tap(find.byKey(const ValueKey('compare-codes')));
       await tester.pumpAndSettle();
       expect(
@@ -496,8 +507,214 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('lockPin')), '2468');
       await tester.tap(find.byKey(const ValueKey('unlockPin')));
       await tester.pumpAndSettle();
+      expect(find.text('Private'), findsNothing);
+      await show(tester);
       expect(find.byType(SentItemScreen), findsOneWidget);
       expect(find.text('Private'), findsOneWidget);
+    });
+
+    group("a stranger's", () {
+      /// The hidden preview, and nothing in it of what Ann sent.
+      void expectHidden() {
+        final screen = find.byType(HeldSentItemScreen);
+        expect(screen, findsOneWidget);
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(find.text('From Ann'), findsOneWidget);
+        expect(
+          find.text('An unknown person: not among your People.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Dentist'), findsNothing);
+        expect(find.textContaining('09:30'), findsNothing);
+        expect(find.textContaining(ann.ownProfileCode!), findsNothing);
+        expect(find.textContaining('unencrypted'), findsNothing);
+        expect(
+          find.descendant(of: screen, matching: find.byType(Image)),
+          findsNothing,
+        );
+        expect(find.byKey(const ValueKey('compare-codes')), findsNothing);
+      }
+
+      /// Ann's Note with a Reminder at 09:30, as a file.
+      String dentist() {
+        final note = Notes(ann).capture('Dentist on Friday');
+        Routines(ann).spawn(
+          note.id,
+          Schedule(start: Day(2026, 10, 30), times: [ClockTime(9, 30)]),
+        );
+        return fileFrom(note);
+      }
+
+      testWidgets('shows only who sent it until "Show", and waits on the '
+          'Agenda when left', (tester) async {
+        files.waiting.add(dentist());
+        await app(tester);
+        expectHidden();
+        expect(heldSentItems(phone), hasLength(1));
+        expect(Notes(phone).all(), isEmpty);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        final line = find.byKey(const ValueKey('sentItemsWaiting'));
+        expect(
+          find.descendant(of: line, matching: find.text('1 Sent Item waiting')),
+          findsOneWidget,
+        );
+        await tester.tap(line);
+        await tester.pumpAndSettle();
+        expect(find.text('Sent Items waiting'), findsOneWidget);
+        expect(find.text('From Ann'), findsOneWidget);
+        await tester.tap(find.text('From Ann'));
+        await tester.pumpAndSettle();
+        expectHidden();
+
+        await show(tester);
+        expect(find.byType(SentItemScreen), findsOneWidget);
+        expect(find.text('Dentist on Friday'), findsOneWidget);
+        expect(find.textContaining('09:30'), findsOneWidget);
+        expect(find.byKey(const ValueKey('compare-codes')), findsOneWidget);
+
+        // "Show" is not remembered.
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('From Ann'));
+        await tester.pumpAndSettle();
+        expectHidden();
+        expect(Notes(phone).all(), isEmpty);
+
+        // Declined from there, the list is empty, and so is the Agenda.
+        await tester.tap(find.byKey(const ValueKey('decline-sent')));
+        await tester.pumpAndSettle();
+        expect(find.text('No Sent Items are waiting.'), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
+
+      testWidgets('one held before a restart waits on the Agenda', (
+        tester,
+      ) async {
+        final bytes = File(dentist()).readAsBytesSync();
+        expect(receiveSentItem(phone, bytes), isA<HeldSentItem>());
+        await app(tester);
+        expect(find.byType(HeldSentItemScreen), findsNothing);
+        await tester.tap(find.text('1 Sent Item waiting'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('From Ann'));
+        await tester.pumpAndSettle();
+        expectHidden();
+      });
+
+      testWidgets('the same file twice is held once', (tester) async {
+        final bytes = File(dentist()).readAsBytesSync();
+        receiveSentItem(phone, bytes);
+        await app(tester);
+        files.open(fileOf(bytes));
+        await tester.pumpAndSettle();
+        expectHidden();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('1 Sent Item waiting'), findsOneWidget);
+        expect(heldSentItems(phone), hasLength(1));
+      });
+
+      testWidgets('Accept before "Show" takes it in', (tester) async {
+        files.waiting.add(dentist());
+        await app(tester);
+        await tester.tap(find.byKey(const ValueKey('accept-sent')));
+        await tester.pumpAndSettle();
+        expect(find.byType(HeldSentItemScreen), findsNothing);
+        expect(announcements.visible, 'Added to Unsorted, with its alarms on.');
+        expect(Notes(phone).unsorted().single.text, 'Dentist on Friday');
+        final annId = ann.ownProfile!.id;
+        expect(phone.keptPeople.map((p) => p.id), [annId]);
+        expect(phone.personVerified(annId), isFalse);
+        expect(heldSentItems(phone), isEmpty);
+        expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
+
+      testWidgets('codes compared after "Show" verify her on accept', (
+        tester,
+      ) async {
+        files.waiting.add(dentist());
+        await app(tester);
+        await show(tester);
+        await tester.tap(find.byKey(const ValueKey('compare-codes')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('codes-match')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('accept-sent')));
+        await tester.pumpAndSettle();
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(Notes(phone).unsorted().single.text, 'Dentist on Friday');
+        expect(phone.personVerified(ann.ownProfile!.id), isTrue);
+        expect(heldSentItems(phone), isEmpty);
+        expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
+
+      testWidgets('Decline before "Show" keeps nothing', (tester) async {
+        files.waiting.add(dentist());
+        await app(tester);
+        await tester.tap(find.byKey(const ValueKey('decline-sent')));
+        await tester.pumpAndSettle();
+        expect(find.byType(HeldSentItemScreen), findsNothing);
+        expect(announcements.visible, 'Declined: nothing was kept.');
+        expect(Notes(phone).all(), isEmpty);
+        expect(phone.keptPeople, isEmpty);
+        expect(heldSentItems(phone), isEmpty);
+        expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
+
+      testWidgets('"Decline and block" before "Show" blocks her', (
+        tester,
+      ) async {
+        final annId = ann.ownProfile!.id;
+        files.waiting.add(dentist());
+        await app(tester);
+        await tester.tap(find.byKey(const ValueKey('block-sent')));
+        await tester.pumpAndSettle();
+        expect(find.text('Block Ann?'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('block-confirm')));
+        await tester.pumpAndSettle();
+        expect(find.byType(HeldSentItemScreen), findsNothing);
+        expect(
+          announcements.visible,
+          'Declined and blocked: nothing was kept.',
+        );
+        expect(phone.isBlocked(annId), isTrue);
+        expect(Notes(phone).all(), isEmpty);
+        expect(heldSentItems(phone), isEmpty);
+      });
+
+      testWidgets('a block that comes before Accept refuses it', (
+        tester,
+      ) async {
+        files.waiting.add(dentist());
+        await app(tester);
+        phone.blockPerson(ann.ownProfile!.id);
+        await tester.tap(find.byKey(const ValueKey('accept-sent')));
+        await tester.pumpAndSettle();
+        expect(find.byType(HeldSentItemScreen), findsNothing);
+        expect(
+          announcements.visible,
+          'Refused: this file comes from a person you blocked.',
+        );
+        expect(Notes(phone).all(), isEmpty);
+      });
+
+      testWidgets('a cancellation with nothing to cancel goes on Close', (
+        tester,
+      ) async {
+        files.waiting.add(fileFrom(Notes(ann).capture('Party'), cancel: true));
+        await app(tester);
+        await show(tester);
+        expect(find.textContaining('Nothing to cancel'), findsOneWidget);
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SentItemScreen), findsNothing);
+        expect(heldSentItems(phone), isEmpty);
+        expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
     });
 
     group('blocking', () {
@@ -507,6 +724,7 @@ void main() {
         final annId = ann.ownProfile!.id;
         files.waiting.add(fileFrom(Notes(ann).capture('Spam')));
         await app(tester);
+        await show(tester);
         await tester.tap(find.byKey(const ValueKey('block-sent')));
         await tester.pumpAndSettle();
         expect(find.text('Block Ann?'), findsOneWidget);
@@ -554,6 +772,7 @@ void main() {
           'Accept', (tester) async {
         files.waiting.add(fileFrom(Notes(ann).capture('Party')));
         await app(tester);
+        await show(tester);
         // As if another of the user's Devices blocked her, by sync.
         phone.blockPerson(ann.ownProfile!.id);
         await tester.tap(find.byKey(const ValueKey('accept-sent')));

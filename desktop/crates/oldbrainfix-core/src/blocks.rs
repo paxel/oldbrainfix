@@ -332,8 +332,8 @@ impl Store {
     /// longer blocked has its refusals released, so what was refused is
     /// asked for again, the shared folder read whole again too. The
     /// shared folder itself is not touched, and nothing of theirs waits
-    /// in a pending set (ADR 0022). Returns whether anything was deleted
-    /// or let go.
+    /// in a pending set (ADR 0022), a Sent Item held until "Show" (#91)
+    /// neither. Returns whether anything was deleted or let go.
     pub fn enforce_blocks(&self) -> Result<bool> {
         let blocked = self.blocked_ids()?;
         let marks = self.refusal_marks()?;
@@ -394,8 +394,10 @@ impl Store {
             for id in ids {
                 changed |= self.strip_person_picture(id)?;
             }
-            // Nor does anything of theirs wait in a pending set.
+            // Nor does anything of theirs wait in a pending set, a Sent
+            // Item held until "Show" neither.
             changed |= self.drop_blocked_from_pending()?;
+            changed |= self.drop_held_from_blocked()?;
             Ok(changed)
         })?;
         let mut dropped = false;
@@ -418,7 +420,7 @@ mod tests {
         Joining, answer_sync, answer_sync_inviting, apply_answer, apply_answer_as, sync_request,
         sync_request_as,
     };
-    use crate::sent::OpenError;
+    use crate::sent::{OpenError, Received};
     use crate::shared::Invite;
     use crate::signing::{ImportReport, SigningKey};
     use crate::store::tests::ticking;
@@ -1008,6 +1010,44 @@ mod tests {
             ann.open_sent_item(&file)?.err(),
             Some(OpenError::FromBlocked)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_strangers_one_held_until_show_goes_with_the_block() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let mallory = device(9, "Mallory")?;
+        let rude = Notes::new(&mallory).capture("Rude", None, None)?;
+        let file = mallory.send_note(&rude.id, None, false)?;
+        let Ok(Received::Held(held)) = ann.receive_sent_item(&file)? else {
+            return Err("held".into());
+        };
+        assert_eq!(ann.pending_sets()?.len(), 1);
+        ann.block_person(&held.sender.id, false)?;
+        assert!(ann.pending_sets()?.is_empty(), "nothing of hers stored");
+        assert!(ann.held_sent_items()?.is_empty());
+        assert_eq!(
+            ann.receive_sent_item(&file)?.err(),
+            Some(OpenError::FromBlocked)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn decline_and_block_on_a_held_one_before_show() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let mallory = device(9, "Mallory")?;
+        let rude = Notes::new(&mallory).capture("Rude", None, None)?;
+        let file = mallory.send_note(&rude.id, None, false)?;
+        let Ok(Received::Held(held)) = ann.receive_sent_item(&file)? else {
+            return Err("held".into());
+        };
+        assert!(ann.block_held_sent_item_sender(&held.id, false)?);
+        assert!(ann.is_blocked(&held.sender.id)?);
+        let names: Vec<String> = ann.blocked_people()?.into_iter().map(|p| p.name).collect();
+        assert_eq!(names, ["Mallory"]);
+        assert!(ann.pending_sets()?.is_empty());
+        assert!(Notes::new(&ann).all()?.is_empty());
         Ok(())
     }
 

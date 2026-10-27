@@ -22,10 +22,11 @@ use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of, wrap_key, x25
 use crate::entry::{dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, SEAL_NONCE_BYTES, seal, unseal};
 use crate::notes::keys as note_keys;
-use crate::profile::{Profile, SignedProfile, short_code};
+use crate::pending::PendingSet;
+use crate::profile::{Profile, SentProfile, SignedProfile, short_code};
 use crate::routines::keys as routine_keys;
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
-use crate::store::{Fields, Store};
+use crate::store::{ACCEPTED_PENDING_PREFIX, Fields, Store};
 use crate::text_format::{self, StoredText};
 use crate::{Error, Notes, Result, Routine, Routines, Schedule};
 
@@ -475,12 +476,28 @@ impl Store {
     /// own Profile's id and for an id kept here under another first key:
     /// a copied id would block whoever the Profile kept here is.
     pub fn block_sent_item_sender(&self, opened: &Opened, leave_areas: bool) -> Result<bool> {
-        let id = &opened.sender.id;
+        self.block_sender(
+            &opened.sender.id,
+            &opened.code,
+            &opened.item.profile,
+            leave_areas,
+        )
+    }
+
+    /// Blocks the sender `id` of a Sent Item carrying `profile`, whose
+    /// short code is `code`, as [`Store::block_sent_item_sender`] says.
+    fn block_sender(
+        &self,
+        id: &str,
+        code: &str,
+        profile: &SignedProfile,
+        leave_areas: bool,
+    ) -> Result<bool> {
         if self.is_own_person(id)? {
             return Ok(false);
         }
         if let Some(kept) = self.person_code(id)?
-            && kept != opened.code
+            && kept != code
         {
             return Ok(false);
         }
@@ -490,7 +507,7 @@ impl Store {
                 return Err(Error::MustLeaveAreas(areas));
             }
         }
-        self.take_person(&opened.item.profile.to_json(), None)?;
+        self.take_person(&profile.to_json(), None)?;
         self.block_person(id, leave_areas)?;
         Ok(true)
     }
@@ -514,6 +531,19 @@ impl Store {
     /// cancel. One whose id came here from another key only is refused,
     /// and one from a person the user blocked is [`Error::FromBlocked`].
     pub fn accept_sent_item(&self, item: &SentItem, verified: bool) -> Result<Option<String>> {
+        self.accept(item, verified, None)
+    }
+
+    /// [`Store::accept_sent_item`], all of it written in one transaction;
+    /// with `pending` the Accept of that pending set is marked in the
+    /// same one (ADR 0022) and the set is gone after, whatever accepting
+    /// came to.
+    fn accept(
+        &self,
+        item: &SentItem,
+        verified: bool,
+        pending: Option<&str>,
+    ) -> Result<Option<String>> {
         if self.sent_by_blocked(item)? {
             return Err(Error::FromBlocked);
         }
@@ -525,21 +555,46 @@ impl Store {
         }
         let (state, changes) = self.judge(item, held.as_ref())?;
         let now = self.now();
-        let note = match (state, held, changes) {
-            (SentItemState::Fresh, _, _) => self.accept_new(item)?,
-            (SentItemState::Update, Some(held), Some(changes)) => {
-                self.apply(&held.note, item, &changes, now)?;
-                held.note
-            }
-            (SentItemState::Cancel, Some(held), _) => {
-                self.cancel(&held.note, item, now)?;
-                held.note
-            }
-            (SentItemState::UpToDate, Some(held), _) => return Ok(Some(held.note)),
-            _ => return Ok(None),
+        let writes = matches!(
+            state,
+            SentItemState::Fresh | SentItemState::Update | SentItemState::Cancel
+        );
+        let mut note = match (state, &held) {
+            (SentItemState::UpToDate, Some(held)) => Some(held.note.clone()),
+            _ => None,
         };
-        self.keep_sender(item, verified)?;
-        Ok(Some(note))
+        if writes || pending.is_some() {
+            note = self.batch(|| {
+                let written = if writes {
+                    match (state, held, changes) {
+                        (SentItemState::Fresh, _, _) => Some(self.accept_new(item)?),
+                        (SentItemState::Update, Some(held), Some(changes)) => {
+                            self.apply(&held.note, item, &changes, now)?;
+                            Some(held.note)
+                        }
+                        (SentItemState::Cancel, Some(held), _) => {
+                            self.cancel(&held.note, item, now)?;
+                            Some(held.note)
+                        }
+                        _ => None,
+                    }
+                } else {
+                    note
+                };
+                if let Some(id) = pending {
+                    // A restart before the file is gone finds it accepted.
+                    self.set_local_setting(&format!("{ACCEPTED_PENDING_PREFIX}{id}"), "accepted")?;
+                }
+                Ok(written)
+            })?;
+        }
+        if let Some(id) = pending {
+            self.forget_pending_set(id)?;
+        }
+        if writes && note.is_some() {
+            self.keep_sender(item, verified)?;
+        }
+        Ok(note)
     }
 
     /// Keeps the sender's Profile `item` carries, through the same path
@@ -747,20 +802,17 @@ impl Store {
         let id = format!("note:{}", self.new_id()?);
         let now = self.now();
         let at = Some(now);
-        self.batch(|| {
-            self.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
-            self.append(&id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            self.append(&id, note_keys::TEXT, Some(&stored(item)), at)?;
-            self.append(&id, keys::RECEIVED, Some(&link(item)), at)?;
-            for s in &item.sections {
-                self.write_section(&id, s)?;
-            }
-            // Written as they are, not spawned: the Note stays in Unsorted.
-            for r in &item.routines {
-                self.write_routine(&id, r)?;
-            }
-            Ok(())
-        })?;
+        self.append(&id, note_keys::TYPE, Some(note_keys::TYPE_NOTE), at)?;
+        self.append(&id, note_keys::CAPTURED, Some(&dart_iso(now)), at)?;
+        self.append(&id, note_keys::TEXT, Some(&stored(item)), at)?;
+        self.append(&id, keys::RECEIVED, Some(&link(item)), at)?;
+        for s in &item.sections {
+            self.write_section(&id, s)?;
+        }
+        // Written as they are, not spawned: the Note stays in Unsorted.
+        for r in &item.routines {
+            self.write_routine(&id, r)?;
+        }
         Ok(id)
     }
 
@@ -775,39 +827,37 @@ impl Store {
     ) -> Result<()> {
         let at = dart_iso(now);
         let routines = Routines::new(self);
-        self.batch(|| {
-            if changes.restores {
-                self.append(note_id, note_keys::TRASHED, None, None)?;
-                let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
-                ids.sort();
-                for id in ids {
-                    if routines
-                        .by_id(&id)?
-                        .is_some_and(|r| r.trashed_with.as_deref() == Some(note_id))
-                    {
-                        self.append(&id, routine_keys::TRASHED, None, None)?;
-                        self.append(&id, routine_keys::TRASHED_WITH, None, None)?;
-                    }
+        if changes.restores {
+            self.append(note_id, note_keys::TRASHED, None, None)?;
+            let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
+            ids.sort();
+            for id in ids {
+                if routines
+                    .by_id(&id)?
+                    .is_some_and(|r| r.trashed_with.as_deref() == Some(note_id))
+                {
+                    self.append(&id, routine_keys::TRASHED, None, None)?;
+                    self.append(&id, routine_keys::TRASHED_WITH, None, None)?;
                 }
             }
-            if changes.text_before.is_some() {
-                self.append(note_id, note_keys::TEXT, Some(&stored(item)), Some(now))?;
-            }
-            self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
-            for s in &changes.sections_added {
-                self.write_section(note_id, s)?;
-            }
-            for r in &changes.rescheduled {
-                routines.write_schedule(&r.routine, &r.after)?;
-            }
-            for r in &changes.routines_added {
-                self.write_routine(note_id, r)?;
-            }
-            for r in &changes.routines_removed {
-                self.append(&r.id, routine_keys::TRASHED, Some(&at), None)?;
-            }
-            Ok(())
-        })
+        }
+        if changes.text_before.is_some() {
+            self.append(note_id, note_keys::TEXT, Some(&stored(item)), Some(now))?;
+        }
+        self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
+        for s in &changes.sections_added {
+            self.write_section(note_id, s)?;
+        }
+        for r in &changes.rescheduled {
+            routines.write_schedule(&r.routine, &r.after)?;
+        }
+        for r in &changes.routines_added {
+            self.write_routine(note_id, r)?;
+        }
+        for r in &changes.routines_removed {
+            self.append(&r.id, routine_keys::TRASHED, Some(&at), None)?;
+        }
+        Ok(())
     }
 
     /// Moves the Note `note_id` to the trash for the cancellation `item`,
@@ -830,15 +880,13 @@ impl Store {
                 ids.insert(id);
             }
         }
-        self.batch(|| {
-            self.append(note_id, note_keys::TRASHED, Some(&at), None)?;
-            for id in &ids {
-                self.append(id, routine_keys::TRASHED, Some(&at), None)?;
-                self.append(id, routine_keys::TRASHED_WITH, Some(note_id), None)?;
-            }
-            self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
-            Ok(())
-        })
+        self.append(note_id, note_keys::TRASHED, Some(&at), None)?;
+        for id in &ids {
+            self.append(id, routine_keys::TRASHED, Some(&at), None)?;
+            self.append(id, routine_keys::TRASHED_WITH, Some(note_id), None)?;
+        }
+        self.append(note_id, keys::RECEIVED, Some(&link(item)), Some(now))?;
+        Ok(())
     }
 
     /// A Section of the Note `note_id` holding `section`.
@@ -1120,6 +1168,44 @@ impl Store {
     /// One from a person the user blocked is [`OpenError::FromBlocked`]
     /// before anything of it is shown (ADR 0021).
     pub fn open_sent_item(&self, bytes: &[u8]) -> Result<std::result::Result<Opened, OpenError>> {
+        let read = match self.read_file(bytes)? {
+            Ok(read) => read,
+            Err(e) => return Ok(Err(e)),
+        };
+        let ReadFile {
+            item,
+            encrypted,
+            sender,
+        } = read;
+        let trust = if sender.verified {
+            SenderTrust::Verified
+        } else if sender.kept {
+            SenderTrust::Known
+        } else {
+            SenderTrust::Unknown
+        };
+        let (held, foreign) = self.held(&item)?;
+        if held.is_none() && foreign {
+            return Ok(Err(OpenError::NotFromSender));
+        }
+        let (state, changes) = self.judge(&item, held.as_ref())?;
+        Ok(Ok(Opened {
+            item,
+            encrypted,
+            sender: sender.profile,
+            code: sender.code,
+            trust,
+            accepted: held.map(|h| h.note),
+            state,
+            changes,
+        }))
+    }
+
+    /// What the file `bytes` holds, decrypted and checked as
+    /// [`Store::open_sent_item`] checks it, with the sender's Profile;
+    /// what accepting it would do is not judged, so it is never
+    /// [`OpenError::NotFromSender`].
+    fn read_file(&self, bytes: &[u8]) -> Result<std::result::Result<ReadFile, OpenError>> {
         if bytes.len() > MAX_BYTES {
             return Ok(Err(OpenError::NotASentItem));
         }
@@ -1169,27 +1255,10 @@ impl Store {
         if self.sent_by_blocked(&item)? {
             return Ok(Err(OpenError::FromBlocked));
         }
-        let trust = if sender.verified {
-            SenderTrust::Verified
-        } else if sender.kept {
-            SenderTrust::Known
-        } else {
-            SenderTrust::Unknown
-        };
-        let (held, foreign) = self.held(&item)?;
-        if held.is_none() && foreign {
-            return Ok(Err(OpenError::NotFromSender));
-        }
-        let (state, changes) = self.judge(&item, held.as_ref())?;
-        Ok(Ok(Opened {
+        Ok(Ok(ReadFile {
             item,
             encrypted,
-            sender: sender.profile,
-            code: sender.code,
-            trust,
-            accepted: held.map(|h| h.note),
-            state,
-            changes,
+            sender,
         }))
     }
 
@@ -1226,6 +1295,238 @@ impl Store {
             return Ok(unseal(&content, body, SEALED_AAD));
         }
         Ok(None)
+    }
+}
+
+/// What a Sent Item file holds, checked, before what accepting it would
+/// do is judged.
+struct ReadFile {
+    item: SentItem,
+    encrypted: bool,
+    sender: SentProfile,
+}
+
+/// The kind of pending set a stranger's Sent Item is held in (ADR 0022).
+pub const PENDING_KIND: &str = "sent-item";
+
+/// A Sent Item from a stranger, a person whose Profile is not kept here
+/// ([`SenderTrust::Unknown`]), held as Pending Changes until the user
+/// asks to see it (#91, ADR 0022), as the Dart core's `HeldSentItem`: it
+/// shows only who it is from, nothing of what it holds, not the sender's
+/// picture either. [`Store::show_held_sent_item`] opens it;
+/// [`Store::accept_held_sent_item`] accepts it and
+/// [`Store::decline_pending`] declines it, before "Show" too.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldSentItem {
+    /// The pending set it is held in.
+    pub id: String,
+    /// The sender's Profile as the file carries it: its id and its name,
+    /// sanitised, without the picture.
+    pub sender: Profile,
+    /// When it came here.
+    pub held: DateTime<Utc>,
+}
+
+/// What [`Store::receive_sent_item`] came to: a preview as
+/// [`Store::open_sent_item`] gives it, or a stranger's Sent Item held
+/// until "Show".
+#[derive(Debug, Clone, PartialEq)]
+pub enum Received {
+    Opened(Box<Opened>),
+    Held(HeldSentItem),
+}
+
+/// A stranger's Sent Item held in `set`, from `sender`.
+fn held_of(set: &PendingSet, sender: &Profile) -> HeldSentItem {
+    HeldSentItem {
+        id: set.id.clone(),
+        sender: Profile {
+            id: sender.id.clone(),
+            name: sender.name.clone(),
+            picture: None,
+            version: sender.version,
+        },
+        held: set.made,
+    }
+}
+
+/// The file bytes a held `set` keeps; none when they do not decode.
+fn file_of(set: &PendingSet) -> Option<Vec<u8>> {
+    BASE64
+        .decode(set.payload.as_deref().unwrap_or_default())
+        .ok()
+}
+
+/// A stranger's Sent Item, as the Dart core's `receiveSentItem`,
+/// `heldSentItems`, `showHeldSentItem`, `acceptHeldSentItem` and
+/// `blockHeldSentItemSender` keep and decide it.
+impl Store {
+    /// Reads the Sent Item in `bytes` as [`Store::open_sent_item`] does
+    /// and returns its preview, unless it comes from a stranger
+    /// ([`SenderTrust::Unknown`]): that one is held as a pending set,
+    /// never shown, and returned as a [`HeldSentItem`], so nothing of it
+    /// shows before "Show" and it waits through a restart. The same item
+    /// received again is the one held already.
+    pub fn receive_sent_item(
+        &self,
+        bytes: &[u8],
+    ) -> Result<std::result::Result<Received, OpenError>> {
+        let opened = match self.open_sent_item(bytes)? {
+            Ok(opened) => opened,
+            Err(e) => return Ok(Err(e)),
+        };
+        if opened.trust != SenderTrust::Unknown {
+            return Ok(Ok(Received::Opened(Box::new(opened))));
+        }
+        let signed = opened.item.encode();
+        for set in self.held_sets()? {
+            if self
+                .read_held(&set)?
+                .is_some_and(|read| read.item.encode() == signed)
+            {
+                return Ok(Ok(Received::Held(held_of(&set, &opened.sender))));
+            }
+        }
+        let id = self.open_pending(PENDING_KIND, false, Some(&BASE64.encode(bytes)))?;
+        let set = self
+            .pending_set(&id)?
+            .ok_or_else(|| Error::Invalid(format!("no pending set {id}")))?;
+        Ok(Ok(Received::Held(held_of(&set, &opened.sender))))
+    }
+
+    /// The strangers' Sent Items held here, the oldest first, those a
+    /// restart left too; one that no longer reads, as from a person
+    /// blocked since, is left out.
+    pub fn held_sent_items(&self) -> Result<Vec<HeldSentItem>> {
+        let mut out = Vec::new();
+        for set in self.held_sets()? {
+            if let Some(read) = self.read_held(&set)? {
+                out.push(held_of(&set, &read.sender.profile));
+            }
+        }
+        Ok(out)
+    }
+
+    /// The stranger's Sent Item held as the pending set `id`; `None`
+    /// when it is gone, accepted or declined, or no longer reads.
+    pub fn held_sent_item(&self, id: &str) -> Result<Option<HeldSentItem>> {
+        let Some(set) = self.held_set(id)? else {
+            return Ok(None);
+        };
+        Ok(self
+            .read_held(&set)?
+            .map(|read| held_of(&set, &read.sender.profile)))
+    }
+
+    /// "Show" on the stranger's Sent Item held as `id`: its preview, as
+    /// [`Store::open_sent_item`] gives it, judged against the log now.
+    /// It stays held, for Accept or Decline. `None` when it is gone; one
+    /// from a person blocked since is declined first.
+    pub fn show_held_sent_item(
+        &self,
+        id: &str,
+    ) -> Result<Option<std::result::Result<Opened, OpenError>>> {
+        let Some(set) = self.held_set(id)? else {
+            return Ok(None);
+        };
+        Ok(Some(self.open_held(&set)?))
+    }
+
+    /// Accepts the stranger's Sent Item held as `id`, before "Show" too,
+    /// as [`Store::accept_sent_item`] accepts it, judged against the log
+    /// now: the item is written and the Accept marked in one
+    /// transaction, and the set is gone after. Returns what
+    /// [`Store::accept_sent_item`] does; a set that is gone, or a file
+    /// that no longer reads, is [`Error::Invalid`], and one from a
+    /// person blocked since is declined and [`Error::FromBlocked`].
+    pub fn accept_held_sent_item(&self, id: &str, verified: bool) -> Result<Option<String>> {
+        let set = self
+            .held_set(id)?
+            .ok_or_else(|| Error::Invalid(format!("no held Sent Item {id}")))?;
+        match self.open_held(&set)? {
+            Ok(opened) => self.accept(&opened.item, verified, Some(id)),
+            Err(OpenError::FromBlocked) => Err(Error::FromBlocked),
+            Err(OpenError::NotFromSender) => Err(Error::Invalid(
+                "a Sent Item of this id came from another key".into(),
+            )),
+            Err(e) => Err(Error::Invalid(format!("no Sent Item: {e:?}"))),
+        }
+    }
+
+    /// "Decline and block" on the stranger's Sent Item held as `id`,
+    /// before "Show" too: declines it and blocks its sender as
+    /// [`Store::block_sent_item_sender`] does, with the same
+    /// [`Error::MustLeaveAreas`] before anything changes. Returns whether
+    /// anybody was blocked; the item is declined either way.
+    pub fn block_held_sent_item_sender(&self, id: &str, leave_areas: bool) -> Result<bool> {
+        let Some(set) = self.held_set(id)? else {
+            return Ok(false);
+        };
+        let blocked = match self.read_held(&set)? {
+            Some(read) => self.block_sender(
+                &read.sender.profile.id,
+                &read.sender.code,
+                &read.item.profile,
+                leave_areas,
+            )?,
+            None => false,
+        };
+        self.decline_pending(id)?;
+        Ok(blocked)
+    }
+
+    /// Deletes every stranger's Sent Item held here from a person the
+    /// user blocked (ADR 0021): their Profile's id is blocked, or one of
+    /// their Devices signed it. Returns whether any went.
+    pub(crate) fn drop_held_from_blocked(&self) -> Result<bool> {
+        let mut dropped = false;
+        for set in self.held_sets()? {
+            let Some(bytes) = file_of(&set) else {
+                continue;
+            };
+            if let Err(OpenError::FromBlocked) = self.read_file(&bytes)? {
+                self.forget_pending_set(&set.id)?;
+                dropped = true;
+            }
+        }
+        Ok(dropped)
+    }
+
+    /// The pending sets holding strangers' Sent Items, as their files
+    /// hold them now, the oldest first.
+    fn held_sets(&self) -> Result<Vec<PendingSet>> {
+        Ok(self
+            .pending_sets()?
+            .into_iter()
+            .filter(|s| s.kind == PENDING_KIND)
+            .collect())
+    }
+
+    /// The pending set `id` when it holds a stranger's Sent Item.
+    fn held_set(&self, id: &str) -> Result<Option<PendingSet>> {
+        Ok(self.pending_set(id)?.filter(|s| s.kind == PENDING_KIND))
+    }
+
+    /// What the held `set` holds, read as [`Store::read_file`] reads it;
+    /// `None` for a set that does not read.
+    fn read_held(&self, set: &PendingSet) -> Result<Option<ReadFile>> {
+        let Some(bytes) = file_of(set) else {
+            return Ok(None);
+        };
+        Ok(self.read_file(&bytes)?.ok())
+    }
+
+    /// The held `set` opened as [`Store::open_sent_item`] opens it; one
+    /// from a person blocked since is declined.
+    fn open_held(&self, set: &PendingSet) -> Result<std::result::Result<Opened, OpenError>> {
+        let Some(bytes) = file_of(set) else {
+            return Ok(Err(OpenError::NotASentItem));
+        };
+        let opened = self.open_sent_item(&bytes)?;
+        if matches!(opened, Err(OpenError::FromBlocked)) {
+            self.decline_pending(&set.id)?;
+        }
+        Ok(opened)
     }
 }
 
@@ -1762,6 +2063,172 @@ mod tests {
         ben.accept_sent_item(&cancel.item, false)?;
         assert_eq!(ben.person_shown(&ann_id)?.name, "Ann L.");
         assert!(ben.person_verified(&ann_id)?);
+        Ok(())
+    }
+
+    /// The stranger's Sent Item `received` holds.
+    fn held(received: std::result::Result<Received, OpenError>) -> Made<HeldSentItem> {
+        match received {
+            Ok(Received::Held(held)) => Ok(held),
+            other => Err(format!("not held: {other:?}").into()),
+        }
+    }
+
+    type Made<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+    #[test]
+    fn a_strangers_one_is_held_unseen_until_show_and_accepting_writes_it_then() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        OwnProfile::new(&ann).set_picture(Some(
+            include_bytes!("../../../fixtures/shared/override.jpg").to_vec(),
+        ))?;
+        let note = Notes::new(&ann).capture("Dentist", None, None)?;
+        Notes::new(&ann).amend(&note.id, "Room 3")?;
+        let schedule = Schedule::new(
+            Day::parse("2026-03-06").ok_or("day")?,
+            &[ClockTime::parse("09:30").ok_or("time")?],
+            None,
+        )
+        .ok_or("schedule")?;
+        Routines::new(&ann).spawn(&note.id, &schedule)?;
+        let file = ann.send_note(&note.id, None, false)?;
+        let before = ben.all_entries()?.len();
+
+        let got = held(ben.receive_sent_item(&file)?)?;
+        // Only who it is from: no picture, nothing of what it holds.
+        assert_eq!(got.sender.id, own_id(&ann)?);
+        assert_eq!(got.sender.name, "Ann");
+        assert_eq!(got.sender.picture, None);
+        let set = ben.pending_set(&got.id)?.ok_or("the set")?;
+        assert_eq!(set.kind, PENDING_KIND);
+        assert!(!set.shown);
+        assert!(set.changes.is_empty());
+        assert_eq!(
+            BASE64.decode(set.payload.as_deref().ok_or("payload")?)?,
+            file
+        );
+        // Nothing of it is in the log, the lists or People.
+        assert_eq!(ben.all_entries()?.len(), before);
+        assert!(Notes::new(&ben).all()?.is_empty());
+        assert!(people(&ben)?.is_empty());
+        let ids: Vec<String> = ben.held_sent_items()?.into_iter().map(|h| h.id).collect();
+        assert_eq!(ids, std::slice::from_ref(&got.id));
+        assert_eq!(
+            ben.held_sent_item(&got.id)?
+                .map(|h| h.sender.name)
+                .as_deref(),
+            Some("Ann")
+        );
+        // The same item again is the one held.
+        assert_eq!(held(ben.receive_sent_item(&file)?)?.id, got.id);
+        assert_eq!(ben.pending_sets()?.len(), 1);
+
+        let shown = ben
+            .show_held_sent_item(&got.id)?
+            .ok_or("held")?
+            .map_err(|e| format!("{e:?}"))?;
+        assert_eq!(shown.item.text, "Dentist");
+        assert_eq!(shown.trust, SenderTrust::Unknown);
+        assert_eq!(shown.state, SentItemState::Fresh);
+        assert_eq!(ben.all_entries()?.len(), before, "still held");
+
+        let accepted = ben
+            .accept_held_sent_item(&got.id, false)?
+            .ok_or("accepted")?;
+        let note = Notes::new(&ben).by_id(&accepted)?.ok_or("the Note")?;
+        assert_eq!(note.text, "Dentist");
+        assert!(note.is_unsorted());
+        let sections: Vec<String> = Notes::new(&ben)
+            .sections(&accepted)?
+            .into_iter()
+            .map(|s| s.text)
+            .collect();
+        assert_eq!(sections, ["Room 3"]);
+        assert_eq!(Routines::new(&ben).of_note(&accepted)?.len(), 1);
+        // Captured when accepted, not when it came.
+        assert!(note.captured > got.held);
+        assert_eq!(ben.person_shown(&own_id(&ann)?)?.name, "Ann");
+        assert!(ben.pending_sets()?.is_empty());
+        assert!(ben.held_sent_items()?.is_empty());
+        assert!(
+            ben.local_settings_with_prefix(crate::store::ACCEPTED_PENDING_PREFIX)?
+                .is_empty()
+        );
+        assert_eq!(ben.show_held_sent_item(&got.id)?, None);
+        assert!(ben.accept_held_sent_item(&got.id, false).is_err());
+
+        // Known now: the next one from her previews as before.
+        let later = Notes::new(&ann).capture("Later", None, None)?;
+        match ben.receive_sent_item(&ann.send_note(&later.id, None, false)?)? {
+            Ok(Received::Opened(opened)) => assert_eq!(opened.trust, SenderTrust::Known),
+            other => return Err(format!("not a preview: {other:?}").into()),
+        }
+        assert!(ben.pending_sets()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn decline_deletes_a_held_one_and_accept_works_before_show() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let log = ben.all_entries()?.len();
+        let one = Notes::new(&ann).capture("One", None, None)?;
+        let two = Notes::new(&ann).capture("Two", None, None)?;
+        let first = held(ben.receive_sent_item(&ann.send_note(&one.id, None, false)?)?)?;
+        let second = held(ben.receive_sent_item(&ann.send_note(&two.id, None, false)?)?)?;
+        let ids: Vec<String> = ben.held_sent_items()?.into_iter().map(|h| h.id).collect();
+        assert_eq!(ids, [first.id.clone(), second.id.clone()]);
+
+        assert!(ben.decline_pending(&first.id)?);
+        assert_eq!(ben.held_sent_item(&first.id)?, None);
+        assert_eq!(ben.all_entries()?.len(), log);
+        assert!(people(&ben)?.is_empty());
+        assert_eq!(ben.pending_sets()?.len(), 1);
+
+        let note = ben
+            .accept_held_sent_item(&second.id, false)?
+            .ok_or("accepted")?;
+        assert_eq!(
+            Notes::new(&ben).by_id(&note)?.map(|n| n.text).as_deref(),
+            Some("Two")
+        );
+        assert!(ben.pending_sets()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn accept_judges_a_held_one_against_the_log_as_it_is_then() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let note = Notes::new(&ann).capture("Dentist", None, None)?;
+        let file = ann.send_note(&note.id, None, false)?;
+        let got = held(ben.receive_sent_item(&file)?)?;
+        // Accepted meanwhile, as another of Ben's Devices may have.
+        let opened = ben.open_sent_item(&file)?.map_err(|_| "opened")?;
+        let accepted = ben.accept_sent_item(&opened.item, false)?;
+        let count = ben.all_entries()?.len();
+        let shown = ben
+            .show_held_sent_item(&got.id)?
+            .ok_or("held")?
+            .map_err(|e| format!("{e:?}"))?;
+        assert_eq!(shown.state, SentItemState::UpToDate);
+        assert_eq!(ben.accept_held_sent_item(&got.id, false)?, accepted);
+        assert_eq!(ben.all_entries()?.len(), count, "no second Note");
+        assert!(ben.pending_sets()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn one_from_oneself_or_a_known_person_is_not_held() -> TestResult {
+        let ann = device(1);
+        let note = Notes::new(&ann).capture("Mine", None, None)?;
+        let file = ann.send_note(&note.id, None, false)?;
+        assert!(matches!(
+            ann.receive_sent_item(&file)?,
+            Ok(Received::Opened(_))
+        ));
+        assert!(ann.pending_sets()?.is_empty());
         Ok(())
     }
 }

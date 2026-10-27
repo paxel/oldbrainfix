@@ -6,6 +6,7 @@ import 'box_keys.dart';
 import 'entry.dart';
 import 'notes.dart';
 import 'pairing.dart';
+import 'pending.dart';
 import 'profiles.dart';
 import 'routines.dart';
 import 'schedule.dart';
@@ -583,7 +584,7 @@ class SentItemChanges {
 }
 
 /// A Sent Item opened here, to preview.
-class OpenedSentItem {
+class OpenedSentItem extends ReceivedSentItem {
   final SentItem item;
 
   /// Whether it came encrypted to this Device.
@@ -625,6 +626,33 @@ class OpenedSentItem {
 /// (ADR 0021), before anything of it is shown, and [SentItemNotFromSender]
 /// for one whose id came here from another key (ADR 0009).
 OpenedSentItem openSentItem(Store store, List<int> bytes) {
+  final (:item, :encrypted, :sender) = _read(store, bytes);
+  final held = _held(store, item);
+  final (state, changes) = _judge(store, item, held);
+  return OpenedSentItem(
+    item: item,
+    encrypted: encrypted,
+    sender: sender.profile,
+    code: sender.code,
+    trust: sender.verified
+        ? SenderTrust.verified
+        : sender.kept
+        ? SenderTrust.known
+        : SenderTrust.unknown,
+    accepted: held?.note,
+    state: state,
+    changes: changes,
+  );
+}
+
+/// What the file [bytes] holds, decrypted and checked as [openSentItem]
+/// checks it, with the sender's Profile; what accepting it would do is
+/// not judged. Throws as [openSentItem] does, but for
+/// [SentItemNotFromSender].
+({SentItem item, bool encrypted, SentProfile sender}) _read(
+  Store store,
+  List<int> bytes,
+) {
   if (bytes.length > maxSentItemBytes) throw const NotASentItem();
   final outer = _json(bytes);
   var encrypted = false;
@@ -650,24 +678,210 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
     );
     if (sender == null) throw const NotASentItem();
     if (_fromBlocked(store, item)) throw const SentItemFromBlocked();
-    final held = _held(store, item);
-    final (state, changes) = _judge(store, item, held);
-    return OpenedSentItem(
-      item: item,
-      encrypted: encrypted,
-      sender: sender.profile,
-      code: sender.code,
-      trust: sender.verified
-          ? SenderTrust.verified
-          : sender.kept
-          ? SenderTrust.known
-          : SenderTrust.unknown,
-      accepted: held?.note,
-      state: state,
-      changes: changes,
-    );
+    return (item: item, encrypted: encrypted, sender: sender);
   }
   throw const NotASentItem();
+}
+
+// ------------------------------------------------- a stranger's Sent Item
+
+/// The kind of pending set a stranger's Sent Item is held in (ADR 0022).
+const sentItemPendingKind = 'sent-item';
+
+/// What [receiveSentItem] came to: a preview as [openSentItem] gives it,
+/// or a stranger's Sent Item held until "Show".
+sealed class ReceivedSentItem {
+  const ReceivedSentItem();
+}
+
+/// A Sent Item from a stranger, a person whose Profile is not kept here
+/// ([SenderTrust.unknown]), held as Pending Changes until the user asks
+/// to see it (#91, ADR 0022): it shows only who it is from, nothing of
+/// what it holds, not the sender's picture either.
+/// [showHeldSentItem] opens it; [acceptHeldSentItem] accepts it and
+/// [PendingChanges.declinePending] declines it, before "Show" too.
+class HeldSentItem extends ReceivedSentItem {
+  /// The pending set it is held in.
+  final String id;
+
+  /// The sender's Profile as the file carries it: its id and its name,
+  /// sanitised, without the picture.
+  final Profile sender;
+
+  /// When it came here.
+  final DateTime held;
+
+  const HeldSentItem({
+    required this.id,
+    required this.sender,
+    required this.held,
+  });
+}
+
+/// Reads the Sent Item in [bytes] as [openSentItem] does and returns its
+/// preview, unless it comes from a stranger ([SenderTrust.unknown]): that
+/// one is held as a pending set, never shown, and returned as a
+/// [HeldSentItem], so nothing of it shows before "Show" and it waits
+/// through a restart. The same item received again is the one held
+/// already. Throws as [openSentItem] does.
+ReceivedSentItem receiveSentItem(Store store, List<int> bytes) {
+  final opened = openSentItem(store, bytes);
+  if (opened.trust != SenderTrust.unknown) return opened;
+  final signed = opened.item.encode();
+  for (final set in _heldSets(store)) {
+    if (_readHeld(store, set)?.item.encode() == signed) {
+      return _heldOf(set, opened.sender);
+    }
+  }
+  final id = store.openPending(
+    sentItemPendingKind,
+    shown: false,
+    payload: base64.encode(bytes),
+  );
+  final set = store.pendingSet(id) ?? (throw StateError('no pending set $id'));
+  return _heldOf(set, opened.sender);
+}
+
+/// The strangers' Sent Items held here, the oldest first, those a restart
+/// left too; one that no longer reads, as from a person blocked since,
+/// is left out.
+List<HeldSentItem> heldSentItems(Store store) => [
+  for (final set in _heldSets(store))
+    if (_readHeld(store, set) case final read?)
+      _heldOf(set, read.sender.profile),
+];
+
+/// The stranger's Sent Item held as the pending set [id]; null when it is
+/// gone, accepted or declined, or no longer reads.
+HeldSentItem? heldSentItem(Store store, String id) {
+  final set = _heldSet(store, id);
+  if (set == null) return null;
+  final read = _readHeld(store, set);
+  return read == null ? null : _heldOf(set, read.sender.profile);
+}
+
+/// "Show" on the stranger's Sent Item held as [id]: its preview, as
+/// [openSentItem] gives it, judged against the log now. It stays held,
+/// for Accept or Decline. Null when it is gone. Throws as [openSentItem]
+/// does; one from a person blocked since is declined first.
+OpenedSentItem? showHeldSentItem(Store store, String id) {
+  final set = _heldSet(store, id);
+  if (set == null) return null;
+  return _openHeld(store, set);
+}
+
+/// Accepts the stranger's Sent Item held as [id], before "Show" too, as
+/// [acceptSentItem] accepts it, judged against the log now: the item is
+/// written and the Accept marked in one transaction, and the set is gone
+/// after. Returns what [acceptSentItem] does. Throws a [StateError] when
+/// the set is gone, and otherwise as [openSentItem]; one from a person
+/// blocked since is declined first.
+String? acceptHeldSentItem(Store store, String id, {bool verified = false}) {
+  final set =
+      _heldSet(store, id) ?? (throw StateError('no held Sent Item $id'));
+  final opened = _openHeld(store, set);
+  return _accept(store, opened.item, verified: verified, pending: id);
+}
+
+/// "Decline and block" on the stranger's Sent Item held as [id], before
+/// "Show" too: declines it and blocks its sender as
+/// [blockSentItemSender] does, with the same [StateError] before anything
+/// changes when blocking leaves Areas not to be left. Returns whether
+/// anybody was blocked; the item is declined either way.
+bool blockHeldSentItemSender(
+  Store store,
+  String id, {
+  bool leaveAreas = false,
+}) {
+  final set = _heldSet(store, id);
+  if (set == null) return false;
+  final read = _readHeld(store, set);
+  var blocked = false;
+  if (read != null) {
+    blocked = _blockSender(
+      store,
+      read.sender.profile.id,
+      read.sender.code,
+      read.item.profile,
+      leaveAreas: leaveAreas,
+    );
+  }
+  store.declinePending(id);
+  return blocked;
+}
+
+/// Deletes every stranger's Sent Item held here from a person the user
+/// blocked (ADR 0021): their Profile's id is blocked, or one of their
+/// Devices signed it. Returns whether any went.
+bool dropHeldFromBlocked(Store store) {
+  var dropped = false;
+  for (final set in _heldSets(store)) {
+    try {
+      _readSet(store, set);
+    } on SentItemFromBlocked {
+      store.forgetPendingSet(set.id);
+      dropped = true;
+    } on Exception {
+      // Not this rule's to judge.
+    }
+  }
+  return dropped;
+}
+
+/// The pending sets holding strangers' Sent Items, as their files hold
+/// them now, the oldest first.
+Iterable<PendingSet> _heldSets(Store store) =>
+    store.pendingSets.where((s) => s.kind == sentItemPendingKind);
+
+/// The pending set [id] when it holds a stranger's Sent Item.
+PendingSet? _heldSet(Store store, String id) => switch (store.pendingSet(id)) {
+  final set? when set.kind == sentItemPendingKind => set,
+  _ => null,
+};
+
+HeldSentItem _heldOf(PendingSet set, Profile sender) => HeldSentItem(
+  id: set.id,
+  sender: Profile(id: sender.id, name: sender.name, version: sender.version),
+  held: set.made,
+);
+
+/// What the held [set] holds, read as [_read] reads it.
+({SentItem item, bool encrypted, SentProfile sender}) _readSet(
+  Store store,
+  PendingSet set,
+) {
+  final Uint8List bytes;
+  try {
+    bytes = base64.decode(set.payload ?? '');
+  } on FormatException {
+    throw const NotASentItem();
+  }
+  return _read(store, bytes);
+}
+
+/// [_readSet], null for a set that does not read.
+({SentItem item, bool encrypted, SentProfile sender})? _readHeld(
+  Store store,
+  PendingSet set,
+) {
+  try {
+    return _readSet(store, set);
+  } on Exception {
+    return null;
+  }
+}
+
+/// The held [set] opened as [openSentItem] opens it; one from a person
+/// blocked since is declined, and [SentItemFromBlocked] thrown.
+OpenedSentItem _openHeld(Store store, PendingSet set) {
+  try {
+    return openSentItem(store, base64.decode(set.payload ?? ''));
+  } on SentItemFromBlocked {
+    store.declinePending(set.id);
+    rethrow;
+  } on FormatException {
+    throw const NotASentItem();
+  }
 }
 
 /// Whether [bytes] look like a Sent Item rather than a bundle: a JSON
@@ -699,27 +913,57 @@ String? acceptedNote(Store store, SentItem item) => _held(store, item)?.note;
 /// in person ([People.verifyPerson]). Returns the Note it is held as;
 /// null when there was nothing to cancel. Throws [SentItemNotFromSender]
 /// and [SentItemFromBlocked] as [openSentItem] does.
-String? acceptSentItem(Store store, SentItem item, {bool verified = false}) {
+String? acceptSentItem(Store store, SentItem item, {bool verified = false}) =>
+    _accept(store, item, verified: verified);
+
+/// [acceptSentItem], all of it written in one transaction; with [pending]
+/// the Accept of that pending set is marked in the same one (ADR 0022)
+/// and the set is gone after, whatever accepting came to.
+String? _accept(
+  Store store,
+  SentItem item, {
+  required bool verified,
+  String? pending,
+}) {
   if (_fromBlocked(store, item)) throw const SentItemFromBlocked();
   final held = _held(store, item);
   final (state, changes) = _judge(store, item, held);
   final now = store.clock().toUtc();
-  final String note;
-  switch ((state, held, changes)) {
-    case (SentItemState.fresh, _, _):
-      note = _acceptNew(store, item);
-    case (SentItemState.update, final held?, final changes?):
-      _apply(store, held.note, item, changes, now);
-      note = held.note;
-    case (SentItemState.cancel, final held?, _):
-      _cancel(store, held.note, item, now);
-      note = held.note;
-    case (SentItemState.upToDate, final held?, _):
-      return held.note;
-    default:
-      return null;
+  String? write() {
+    switch ((state, held, changes)) {
+      case (SentItemState.fresh, _, _):
+        return _acceptNew(store, item);
+      case (SentItemState.update, final held?, final changes?):
+        _apply(store, held.note, item, changes, now);
+        return held.note;
+      case (SentItemState.cancel, final held?, _):
+        _cancel(store, held.note, item, now);
+        return held.note;
+      default:
+        return null;
+    }
   }
-  _keepSender(store, item, verified: verified);
+
+  final writes = switch (state) {
+    SentItemState.fresh || SentItemState.update || SentItemState.cancel => true,
+    SentItemState.upToDate || SentItemState.nothingToCancel => false,
+  };
+  var note = state == SentItemState.upToDate ? held?.note : null;
+  if (writes || pending != null) {
+    note = store.batch(() {
+      final written = writes ? write() : note;
+      if (pending != null) {
+        // A restart before the file is gone finds it accepted.
+        store.setLocalSetting(
+          '${Store.acceptedPendingPrefix}$pending',
+          'accepted',
+        );
+      }
+      return written;
+    });
+  }
+  if (pending != null) store.forgetPendingSet(pending);
+  if (writes && note != null) _keepSender(store, item, verified: verified);
   return note;
 }
 
@@ -742,15 +986,30 @@ bool blockSentItemSender(
   Store store,
   OpenedSentItem opened, {
   bool leaveAreas = false,
+}) => _blockSender(
+  store,
+  opened.sender.id,
+  opened.code,
+  opened.item.profile,
+  leaveAreas: leaveAreas,
+);
+
+/// Blocks the sender [id] of a Sent Item carrying [profile], whose short
+/// code is [code], as [blockSentItemSender] says.
+bool _blockSender(
+  Store store,
+  String id,
+  String code,
+  SignedProfile profile, {
+  required bool leaveAreas,
 }) {
-  final id = opened.sender.id;
   if (store.isOwnPerson(id)) return false;
   final kept = store.personCode(id);
-  if (kept != null && kept != opened.code) return false;
+  if (kept != null && kept != code) return false;
   if (!leaveAreas && store.areasToLeaveForBlocking(id).isNotEmpty) {
     throw StateError('blocking $id leaves the Areas they manage');
   }
-  store.takePeople([opened.item.profile.toJson()]);
+  store.takePeople([profile.toJson()]);
   store.blockPerson(id, leaveAreas: leaveAreas);
   return true;
 }
@@ -931,19 +1190,17 @@ String _link(SentItem item) => jsonEncode({
 String _acceptNew(Store store, SentItem item) {
   final id = 'note:${Store.newId()}';
   final now = store.clock().toUtc();
-  store.batch(() {
-    store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
-    store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
-    store.append(id, NoteKeys.text, _stored(item), date: now);
-    store.append(id, SentKeys.received, _link(item), date: now);
-    for (final s in item.sections) {
-      _writeSection(store, id, s);
-    }
-    // Written as they are, not spawned: the Note stays in Unsorted.
-    for (final r in item.routines) {
-      _writeRoutine(store, id, r);
-    }
-  });
+  store.append(id, NoteKeys.type, NoteKeys.typeNote, date: now);
+  store.append(id, NoteKeys.captured, now.toIso8601String(), date: now);
+  store.append(id, NoteKeys.text, _stored(item), date: now);
+  store.append(id, SentKeys.received, _link(item), date: now);
+  for (final s in item.sections) {
+    _writeSection(store, id, s);
+  }
+  // Written as they are, not spawned: the Note stays in Unsorted.
+  for (final r in item.routines) {
+    _writeRoutine(store, id, r);
+  }
   return id;
 }
 
@@ -960,33 +1217,31 @@ void _apply(
 ) {
   final at = now.toIso8601String();
   final routines = Routines(store);
-  store.batch(() {
-    if (changes.restores) {
-      store.append(noteId, NoteKeys.trashed, null);
-      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
-        final routine = routines.byId(id);
-        if (routine == null || routine.trashedWith != noteId) continue;
-        store.append(id, RoutineKeys.trashed, null);
-        store.append(id, RoutineKeys.trashedWith, null);
-      }
+  if (changes.restores) {
+    store.append(noteId, NoteKeys.trashed, null);
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
+      final routine = routines.byId(id);
+      if (routine == null || routine.trashedWith != noteId) continue;
+      store.append(id, RoutineKeys.trashed, null);
+      store.append(id, RoutineKeys.trashedWith, null);
     }
-    if (changes.textBefore != null) {
-      store.append(noteId, NoteKeys.text, _stored(item), date: now);
-    }
-    store.append(noteId, SentKeys.received, _link(item), date: now);
-    for (final s in changes.sectionsAdded) {
-      _writeSection(store, noteId, s);
-    }
-    for (final r in changes.rescheduled) {
-      _writeSchedule(store, r.routine, r.after);
-    }
-    for (final r in changes.routinesAdded) {
-      _writeRoutine(store, noteId, r);
-    }
-    for (final r in changes.routinesRemoved) {
-      store.append(r.id, RoutineKeys.trashed, at);
-    }
-  });
+  }
+  if (changes.textBefore != null) {
+    store.append(noteId, NoteKeys.text, _stored(item), date: now);
+  }
+  store.append(noteId, SentKeys.received, _link(item), date: now);
+  for (final s in changes.sectionsAdded) {
+    _writeSection(store, noteId, s);
+  }
+  for (final r in changes.rescheduled) {
+    _writeSchedule(store, r.routine, r.after);
+  }
+  for (final r in changes.routinesAdded) {
+    _writeRoutine(store, noteId, r);
+  }
+  for (final r in changes.routinesRemoved) {
+    store.append(r.id, RoutineKeys.trashed, at);
+  }
 }
 
 /// Moves the Note [noteId] to the trash for the cancellation [item], at
@@ -1002,14 +1257,12 @@ void _cancel(Store store, String noteId, SentItem item, DateTime now) {
           when r.noteId == noteId && !r.isTrashed)
         id,
   }.toList()..sort();
-  store.batch(() {
-    store.append(noteId, NoteKeys.trashed, at);
-    for (final id in ids) {
-      store.append(id, RoutineKeys.trashed, at);
-      store.append(id, RoutineKeys.trashedWith, noteId);
-    }
-    store.append(noteId, SentKeys.received, _link(item), date: now);
-  });
+  store.append(noteId, NoteKeys.trashed, at);
+  for (final id in ids) {
+    store.append(id, RoutineKeys.trashed, at);
+    store.append(id, RoutineKeys.trashedWith, noteId);
+  }
+  store.append(noteId, SentKeys.received, _link(item), date: now);
 }
 
 /// A Section of the Note [noteId] holding [section].

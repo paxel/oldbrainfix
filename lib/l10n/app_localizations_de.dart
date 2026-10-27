@@ -2685,4 +2685,36 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get sentItemFromBlocked =>
       'Abgewiesen: Diese Datei kommt von einer Person, die du blockiert hast.';
+
+  @override
+  String get sentItemStranger =>
+      'Eine unbekannte Person: nicht unter deinen Personen.';
+
+  @override
+  String get sentItemHidden =>
+      'Was sie gesendet hat, bleibt verborgen, bis du auf „Zeigen“ tippst.';
+
+  @override
+  String get sentItemShow => 'Zeigen';
+
+  @override
+  String get sentItemGone =>
+      'Diese gesendete Notiz wartet nicht mehr: Sie wurde angenommen oder abgelehnt.';
+
+  @override
+  String sentItemsWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count gesendete Notizen warten',
+      one: '1 gesendete Notiz wartet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sentItemsWaitingTitle => 'Wartende gesendete Notizen';
+
+  @override
+  String get sentItemsNoneWaiting => 'Keine gesendeten Notizen warten.';
 }

@@ -15,6 +15,7 @@ import 'pending.dart';
 import 'photos.dart';
 import 'routines.dart';
 import 'schedule.dart';
+import 'sent_items.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';

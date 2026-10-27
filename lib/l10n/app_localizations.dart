@@ -4267,6 +4267,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refused: this file comes from a person you blocked.'**
   String get sentItemFromBlocked;
+
+  /// In the hidden preview of a stranger's Sent Item, under who it is from.
+  ///
+  /// In en, this message translates to:
+  /// **'An unknown person: not among your People.'**
+  String get sentItemStranger;
+
+  /// No description provided for @sentItemHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'What they sent stays hidden until you tap Show.'**
+  String get sentItemHidden;
+
+  /// Reveals what a stranger's Sent Item holds.
+  ///
+  /// In en, this message translates to:
+  /// **'Show'**
+  String get sentItemShow;
+
+  /// No description provided for @sentItemGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This Sent Item is no longer waiting: it was accepted or declined.'**
+  String get sentItemGone;
+
+  /// Agenda line while strangers' Sent Items wait to be shown, accepted or declined.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Sent Item waiting} other{{count} Sent Items waiting}}'**
+  String sentItemsWaiting(int count);
+
+  /// No description provided for @sentItemsWaitingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent Items waiting'**
+  String get sentItemsWaitingTitle;
+
+  /// No description provided for @sentItemsNoneWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'No Sent Items are waiting.'**
+  String get sentItemsNoneWaiting;
 }
 
 class _AppLocalizationsDelegate

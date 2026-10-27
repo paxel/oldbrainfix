@@ -36,3 +36,7 @@ Amended by ADR 0018 (#58): the Note's text and every Section's text carry their 
 ## Blocks (ADR 0021)
 
 Amended by ADR 0021 (#90): a Sent Item whose Profile id is blocked, or which a blocked person's Device signed, is refused before its preview and cannot be accepted. "Decline and block" keeps the sender's Profile without its picture.
+
+## A stranger's Sent Item (ADR 0022)
+
+Amended by #91: a Sent Item whose sender's Profile is not kept here (unknown, not verified or known) is held as Pending Changes, never shown (ADR 0022), until the user taps "Show". Until then the preview shows only the sender's name and that they are unknown: no text, Section, Routine or time, and not their picture either. Receiving the same item again finds the one held. Accept and Decline work before "Show" as after it: Accept checks the file again and judges it against the log as it is then, so the Note is captured at Accept and an item accepted meanwhile on another of the user's Devices writes nothing twice; Decline deletes the held file. A held item waits through a restart until it is decided. A Sent Item from a known or verified sender, or from the user's own Profile, previews as before.

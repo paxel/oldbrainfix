@@ -222,8 +222,9 @@ extension Blocks on Store {
   /// Profile's picture is taken out. A Device no longer blocked has its
   /// refusals released, so what was refused is asked for again, the
   /// shared folder read whole again too. The shared folder itself is not
-  /// touched, and nothing of theirs waits in a pending set (ADR 0022).
-  /// Returns whether anything was deleted or let go.
+  /// touched, and nothing of theirs waits in a pending set (ADR 0022),
+  /// a Sent Item held until "Show" (#91) neither. Returns whether
+  /// anything was deleted or let go.
   bool enforceBlocks() {
     final blocked = blockedIds;
     final marks = refusalMarks();
@@ -266,8 +267,10 @@ extension Blocks on Store {
       for (final id in blocked) {
         if (_stripPicture(id)) changed = true;
       }
-      // Nor does anything of theirs wait in a pending set.
+      // Nor does anything of theirs wait in a pending set, a Sent Item
+      // held until "Show" neither.
       if (dropBlockedFromPending()) changed = true;
+      if (dropHeldFromBlocked(this)) changed = true;
     });
     for (final ref in refs.toList()..sort()) {
       if (knowsBlob(ref)) continue;

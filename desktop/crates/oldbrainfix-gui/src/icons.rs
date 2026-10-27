@@ -37,6 +37,7 @@ pub const SEARCH: char = '\u{e567}';
 pub const PHOTO: char = '\u{e4b4}';
 pub const FOLDER_OPEN: char = '\u{e2a4}';
 pub const PERSON: char = '\u{e491}';
+pub const MAIL_UNREAD: char = '\u{f1b6}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
