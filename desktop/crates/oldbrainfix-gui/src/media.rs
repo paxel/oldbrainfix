@@ -16,7 +16,7 @@
 
 use std::io::Cursor;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -217,16 +217,18 @@ impl Recorder for MicRecorder {
 /// sounds. Device-only.
 pub struct SpeakerPlayer {
     playing: Option<(rodio::MixerDeviceSink, rodio::Player)>,
-    /// How fast recordings play, 1 being normal speed. rodio plays
-    /// faster by playing the samples faster, so the voice rises with it.
-    speed: f64,
+    /// How fast recordings play, 1 being normal speed, as an `f32`'s
+    /// bits, shared with the [`Stretch`] playing: it keeps the pitch, so
+    /// rodio's own speed, which plays the samples faster and raises the
+    /// voice with it, stays at 1.
+    speed: Arc<AtomicU32>,
 }
 
 impl Default for SpeakerPlayer {
     fn default() -> Self {
         SpeakerPlayer {
             playing: None,
-            speed: 1.0,
+            speed: Arc::new(AtomicU32::new(1.0f32.to_bits())),
         }
     }
 }
@@ -234,17 +236,16 @@ impl Default for SpeakerPlayer {
 impl Player for SpeakerPlayer {
     fn play(&mut self, bytes: Vec<u8>) -> bool {
         self.stop();
+        let Ok(decoder) = rodio::Decoder::new(Cursor::new(bytes)) else {
+            return false;
+        };
         let Ok(sink) = rodio::DeviceSinkBuilder::open_default_sink() else {
             return false;
         };
-        match rodio::play(sink.mixer(), Cursor::new(bytes)) {
-            Ok(player) => {
-                player.set_speed(self.speed as f32);
-                self.playing = Some((sink, player));
-                true
-            }
-            Err(_) => false,
-        }
+        let player = rodio::Player::connect_new(sink.mixer());
+        player.append(Stretch::new(decoder, self.speed.clone()));
+        self.playing = Some((sink, player));
+        true
     }
 
     fn stop(&mut self) {
@@ -258,10 +259,250 @@ impl Player for SpeakerPlayer {
     }
 
     fn set_speed(&mut self, speed: f64) {
-        self.speed = speed;
-        if let Some((_, player)) = &self.playing {
-            player.set_speed(speed as f32);
+        self.speed
+            .store((speed as f32).to_bits(), Ordering::Relaxed);
+    }
+}
+
+/// A recording played faster or slower at the same pitch, by WSOLA
+/// (waveform-similarity overlap-add): it plays the recording in pieces
+/// of [`STRETCH_PIECE`], each overlapping the one before by half, and
+/// moves through the recording faster or slower than it plays; each
+/// piece is taken where it best continues the one before, within
+/// [`STRETCH_SEARCH`], so the waves join without a crackle.
+///
+/// The speed is read before every piece, so a new one applies at once.
+/// At normal speed the recording plays unchanged.
+struct Stretch<S: rodio::Source> {
+    source: S,
+    channels: usize,
+    channel_count: rodio::ChannelCount,
+    rate: rodio::SampleRate,
+    speed: Arc<AtomicU32>,
+    /// Frames heard from `source` and still needed, interleaved; the
+    /// first is frame `base` of the recording.
+    heard: Vec<rodio::Sample>,
+    base: usize,
+    /// Whether `source` ended.
+    ended: bool,
+    /// The fade of a piece, a Hann window: two halves overlapping add
+    /// up to 1.
+    fade: Vec<rodio::Sample>,
+    /// Half a piece, in frames: how much each piece plays.
+    half: usize,
+    /// How far a piece may move to continue the one before, in frames.
+    search: usize,
+    /// How many frames apart the waves are compared, to save time at
+    /// high sample rates.
+    stride: usize,
+    /// Where the last piece started in the recording, in frames.
+    last: isize,
+    /// Where the next piece would start at the speed alone.
+    nominal: f64,
+    /// The faded second half of the last piece, to add to the next.
+    tail: Vec<rodio::Sample>,
+    /// What plays next, and how much of it played.
+    out: Vec<rodio::Sample>,
+    at: usize,
+    done: bool,
+}
+
+/// How long a piece of a recording played faster or slower is.
+const STRETCH_PIECE: Duration = Duration::from_millis(30);
+
+/// How far a piece may move to continue the one before: longer than
+/// the wave of the lowest voice.
+const STRETCH_SEARCH: Duration = Duration::from_millis(12);
+
+impl<S: rodio::Source> Stretch<S> {
+    fn new(source: S, speed: Arc<AtomicU32>) -> Self {
+        let channel_count = source.channels();
+        let rate = source.sample_rate();
+        let channels = usize::from(channel_count.get());
+        let per_second = rate.get() as f64;
+        let half = ((STRETCH_PIECE.as_secs_f64() * per_second / 2.0).round() as usize).max(1);
+        let search = (STRETCH_SEARCH.as_secs_f64() * per_second).round() as usize;
+        let piece = 2 * half;
+        let fade = (0..piece)
+            .map(|i| {
+                let phase = 2.0 * std::f64::consts::PI * i as f64 / piece as f64;
+                (0.5 - 0.5 * phase.cos()) as rodio::Sample
+            })
+            .collect();
+        let mut stretch = Stretch {
+            source,
+            channels,
+            channel_count,
+            rate,
+            speed,
+            heard: Vec::new(),
+            base: 0,
+            ended: false,
+            fade,
+            half,
+            search,
+            stride: (rate.get() / 16_000).max(1) as usize,
+            // A piece before the recording, silent but for its second
+            // half, so that the recording starts at full strength.
+            last: -(half as isize),
+            nominal: -(half as f64),
+            tail: vec![0.0; half * channels],
+            out: Vec::new(),
+            at: 0,
+            done: false,
+        };
+        // The silent piece's second half is the recording's start.
+        stretch.hear(half as isize);
+        for i in 0..half {
+            for c in 0..channels {
+                stretch.tail[i * channels + c] =
+                    stretch.fade[half + i] * stretch.sample(i as isize, c);
+            }
         }
+        stretch
+    }
+
+    /// The frames heard so far.
+    fn frames(&self) -> usize {
+        self.base + self.heard.len() / self.channels
+    }
+
+    /// Hears `source` up to frame `until`, or to its end.
+    fn hear(&mut self, until: isize) {
+        while !self.ended && (self.frames() as isize) < until {
+            for channel in 0..self.channels {
+                match self.source.next() {
+                    Some(sample) => self.heard.push(sample),
+                    None => {
+                        self.ended = true;
+                        // A cut-off last frame is filled with silence.
+                        if channel > 0 {
+                            self.heard
+                                .resize(self.heard.len() + self.channels - channel, 0.0);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Channel `channel` of frame `frame`; silence outside the recording.
+    fn sample(&self, frame: isize, channel: usize) -> rodio::Sample {
+        if frame < self.base as isize {
+            return 0.0;
+        }
+        let index = (frame as usize - self.base) * self.channels + channel;
+        self.heard.get(index).copied().unwrap_or(0.0)
+    }
+
+    /// Frame `frame` with its channels mixed into one.
+    fn mono(&self, frame: isize) -> rodio::Sample {
+        (0..self.channels).map(|c| self.sample(frame, c)).sum()
+    }
+
+    /// Where the piece that best continues the last one starts, near
+    /// `nominal`.
+    fn best_start(&self, nominal: isize) -> isize {
+        let follow = self.last + self.half as isize;
+        let lowest = (nominal - self.search as isize).max(0);
+        let highest = (nominal + self.search as isize).max(lowest);
+        let mut best = (follow.clamp(lowest, highest), rodio::Sample::MIN);
+        for start in lowest..=highest {
+            let (mut similarity, mut energy) = (0.0, 0.0);
+            for i in (0..self.half as isize).step_by(self.stride) {
+                let candidate = self.mono(start + i);
+                similarity += candidate * self.mono(follow + i);
+                energy += candidate * candidate;
+            }
+            let score = similarity / (energy + 1e-9).sqrt();
+            if score > best.1 {
+                best = (start, score);
+            }
+        }
+        best.0
+    }
+
+    /// Plays the next half piece into `out`; false at the end.
+    fn next_piece(&mut self) -> bool {
+        let speed = f32::from_bits(self.speed.load(Ordering::Relaxed)).clamp(0.25, 4.0);
+        let half = self.half as isize;
+        let start = if (speed - 1.0).abs() < 1e-3 {
+            // At normal speed every piece follows the last unchanged.
+            let start = self.last + half;
+            self.nominal = start as f64;
+            start
+        } else {
+            self.nominal += f64::from(speed) * self.half as f64;
+            let nominal = self.nominal.round() as isize;
+            self.hear(nominal.max(self.last + half) + self.search as isize + 2 * half);
+            self.best_start(nominal)
+        };
+        self.hear(start + 2 * half);
+        self.out.clear();
+        self.at = 0;
+        if self.ended && start >= self.frames() as isize {
+            // The last piece's fade-out.
+            self.out.append(&mut self.tail);
+            return !self.out.is_empty();
+        }
+        for i in 0..self.half {
+            for c in 0..self.channels {
+                let rising = self.fade[i] * self.sample(start + i as isize, c);
+                self.out.push(self.tail[i * self.channels + c] + rising);
+            }
+        }
+        for i in 0..self.half {
+            for c in 0..self.channels {
+                let falling = self.fade[self.half + i] * self.sample(start + half + i as isize, c);
+                self.tail[i * self.channels + c] = falling;
+            }
+        }
+        self.last = start;
+        // Forgets what no later piece reaches back to.
+        let needed = (self.last + half).min(self.nominal.floor() as isize - self.search as isize);
+        let forget = needed.max(0) as usize;
+        if forget > self.base + 4 * self.half {
+            let frames = (forget - self.base).min(self.heard.len() / self.channels);
+            self.heard.drain(..frames * self.channels);
+            self.base += frames;
+        }
+        true
+    }
+}
+
+impl<S: rodio::Source> Iterator for Stretch<S> {
+    type Item = rodio::Sample;
+
+    fn next(&mut self) -> Option<rodio::Sample> {
+        while self.at >= self.out.len() {
+            if self.done || !self.next_piece() {
+                self.done = true;
+                return None;
+            }
+        }
+        let sample = self.out[self.at];
+        self.at += 1;
+        Some(sample)
+    }
+}
+
+impl<S: rodio::Source> rodio::Source for Stretch<S> {
+    fn current_span_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn channels(&self) -> rodio::ChannelCount {
+        self.channel_count
+    }
+
+    fn sample_rate(&self) -> rodio::SampleRate {
+        self.rate
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        // It depends on the speed, which may change while it plays.
+        None
     }
 }
 
@@ -357,6 +598,129 @@ mod tests {
         // Beyond full scale is clipped, not wrapped.
         assert_eq!(i16::from_le_bytes([bytes[50], bytes[51]]), 32767);
         assert_eq!(i16::from_le_bytes([bytes[48], bytes[49]]), -32767);
+    }
+
+    /// `seconds` of a tone of `hertz`, as a recording, decoded as the
+    /// speakers decode it.
+    fn tone(hertz: f32, seconds: f32) -> Option<rodio::Decoder<Cursor<Vec<u8>>>> {
+        let rate = SAMPLE_RATE as f32;
+        let samples: Vec<f32> = (0..(seconds * rate) as usize)
+            .map(|i| 0.5 * (2.0 * std::f32::consts::PI * hertz * i as f32 / rate).sin())
+            .collect();
+        rodio::Decoder::new(Cursor::new(wav(&samples))).ok()
+    }
+
+    /// The pitch of `samples` at [`SAMPLE_RATE`], from its rising zero
+    /// crossings, leaving out the first and last tenth.
+    fn hertz(samples: &[f32]) -> f32 {
+        let middle = &samples[samples.len() / 10..samples.len() * 9 / 10];
+        let rising = middle
+            .windows(2)
+            .filter(|w| w[0] < 0.0 && w[1] >= 0.0)
+            .count();
+        rising as f32 * SAMPLE_RATE as f32 / middle.len() as f32
+    }
+
+    fn stretched(speed: f32) -> Vec<f32> {
+        let Some(decoded) = tone(440.0, 2.0) else {
+            return Vec::new();
+        };
+        Stretch::new(decoded, Arc::new(AtomicU32::new(speed.to_bits()))).collect()
+    }
+
+    #[test]
+    fn faster_or_slower_playback_keeps_the_pitch_and_the_loudness() {
+        let heard = 2 * SAMPLE_RATE as usize;
+        for speed in [0.5f32, 0.75, 1.5, 2.0] {
+            let played = stretched(speed);
+            let expected = heard as f32 / speed;
+            let off = (played.len() as f32 - expected).abs();
+            assert!(
+                off < expected * 0.02 + 480.0,
+                "{speed}: {} samples",
+                played.len()
+            );
+            let pitch = hertz(&played);
+            assert!((pitch - 440.0).abs() < 440.0 * 0.02, "{speed}: {pitch} Hz");
+            // Pieces joined out of step would cancel each other out.
+            let full = 0.5 / 2f32.sqrt();
+            let middle = &played[played.len() / 10..played.len() * 9 / 10];
+            for window in middle.as_chunks::<320>().0 {
+                let loudness = (window.iter().map(|s| s * s).sum::<f32>() / 320.0).sqrt();
+                assert!((loudness - full).abs() < full * 0.1, "{speed}: {loudness}");
+            }
+        }
+    }
+
+    #[test]
+    fn at_normal_speed_the_recording_plays_unchanged() {
+        let Some(decoded) = tone(440.0, 2.0) else {
+            panic!("the tone decodes");
+        };
+        let heard: Vec<f32> = decoded.collect();
+        let played = stretched(1.0);
+        assert!(played.len() >= heard.len() && played.len() < heard.len() + 480);
+        for (i, (a, b)) in heard.iter().zip(&played).enumerate() {
+            assert!((a - b).abs() < 1e-5, "{i}: {a} {b}");
+        }
+        assert!(played[heard.len()..].iter().all(|s| s.abs() < 1e-5));
+    }
+
+    #[test]
+    fn a_stereo_recording_keeps_each_channels_pitch() {
+        let (rate, frames) = (48_000usize, 96_000usize);
+        let wave = |hertz: f32, i: usize| {
+            0.5 * (2.0 * std::f32::consts::PI * hertz * i as f32 / rate as f32).sin()
+        };
+        let samples: Vec<f32> = (0..frames)
+            .flat_map(|i| [wave(440.0, i), wave(660.0, i)])
+            .collect();
+        let (Some(channels), Some(per_second)) = (
+            std::num::NonZero::new(2u16),
+            std::num::NonZero::new(rate as u32),
+        ) else {
+            panic!("two channels at 48 kHz");
+        };
+        let decoded = rodio::buffer::SamplesBuffer::new(channels, per_second, samples);
+        let played: Vec<f32> =
+            Stretch::new(decoded, Arc::new(AtomicU32::new(2.0f32.to_bits()))).collect();
+        assert_eq!(played.len() % 2, 0);
+        for (channel, expected) in [(0, 440.0), (1, 660.0)] {
+            let one: Vec<f32> = played.iter().skip(channel).step_by(2).copied().collect();
+            assert!(
+                (one.len() as f32 - 48_000.0).abs() < 2_000.0,
+                "{}",
+                one.len()
+            );
+            // [`hertz`] counts at 16 kHz; this is three times that.
+            let pitch = 3.0 * hertz(&one);
+            assert!(
+                (pitch - expected).abs() < expected * 0.02,
+                "{channel}: {pitch} Hz"
+            );
+        }
+    }
+
+    #[test]
+    fn a_new_speed_applies_to_the_recording_playing() {
+        let Some(decoded) = tone(440.0, 2.0) else {
+            panic!("the tone decodes");
+        };
+        let speed = Arc::new(AtomicU32::new(1.0f32.to_bits()));
+        let mut playing = Stretch::new(decoded, speed.clone());
+        let first: Vec<f32> = playing.by_ref().take(SAMPLE_RATE as usize).collect();
+        speed.store(2.0f32.to_bits(), Ordering::Relaxed);
+        let rest: Vec<f32> = playing.collect();
+        // One second at normal speed, the other at double, but for the
+        // piece already playing and the last one's fade-out.
+        let expected = SAMPLE_RATE as f32 / 2.0;
+        assert!(
+            (rest.len() as f32 - expected).abs() < 960.0,
+            "{}",
+            rest.len()
+        );
+        assert!((hertz(&first) - 440.0).abs() < 9.0);
+        assert!((hertz(&rest) - 440.0).abs() < 9.0, "{}", hertz(&rest));
     }
 
     #[test]

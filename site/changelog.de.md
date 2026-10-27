@@ -13,6 +13,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon und dem Desktop fragt der Papierkorb-Knopf im Notiz-Editor einmal nach, bevor die Notiz gelöscht wird, mit demselben Dialog wie „Löschen“ auf der Notizkarte, einschließlich der Wahl, ihre Routinen und Erinnerungen zu behalten oder mitzulöschen.
 - Auf dem Telefon und dem Desktop heißt eine Sprachnotiz ohne Worte überall dort, wo nur ihre Worte Platz haben, etwa in der Agenda, im Startbildschirm-Widget, auf der Verpasst-Karte und in Alarmen, „Sprachaufnahme“ statt „Foto“.
 - Auf dem Telefon und dem Desktop zeigt ein neues Transkript, in dem Whisper nur die ihm vorgegebenen Wörter wiederholt, den deutschen Einleitungssatz oder die Liste der Namen von Bereichen und Themen, stattdessen „Keine Worte erkannt.“, und eine solche Wiederholung vor oder nach echter Sprache wird aus dem Transkript weggelassen.
+- Auf dem Desktop behalten schneller oder langsamer abgespielte Sprachaufnahmen die Tonhöhe der Stimme, wie auf dem Telefon.
 
 ## [0.1.1] - 2026-10-27
 
