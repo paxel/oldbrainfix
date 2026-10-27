@@ -10,8 +10,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, SigningKey, Store, WireEntry,
-    parse_time,
+    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, Schedule, SigningKey, Store,
+    WireEntry, parse_time,
 };
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::{App, Selection};
@@ -36,7 +36,12 @@ fn store(now: &str) -> Result<Store, Box<dyn std::error::Error>> {
 
 /// The window at `now`, in `locale`, on the Agenda.
 fn harness(now: &str, locale: &str) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
-    let mut app = App::new(store(now)?, locale);
+    Ok(window(store(now)?, locale))
+}
+
+/// The window over `store`, in `locale`, on the Agenda.
+fn window(store: Store, locale: &str) -> Harness<'static, App> {
+    let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(berlin));
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 2400.0))
@@ -48,7 +53,7 @@ fn harness(now: &str, locale: &str) -> Result<Harness<'static, App>, Box<dyn std
             app,
         );
     harness.run();
-    Ok(harness)
+    harness
 }
 
 fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
@@ -126,6 +131,60 @@ fn at(day: Day, hour: u32) -> Occurrence {
     Occurrence::new(day, ClockTime::new(hour, 0))
 }
 
+/// An empty store at `now` with one Reminder, `Dentist` on 2 November at
+/// 09:00.
+fn dentist_store(now: &str) -> Result<Store, Box<dyn std::error::Error>> {
+    let now = parse_time(now)?;
+    let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([9; 32])))?;
+    let nine = ClockTime::new(9, 0).into_iter().collect::<Vec<_>>();
+    let once = Schedule::new(Day::new(2026, 11, 2), &nine, None).ok_or("a schedule")?;
+    Routines::new(&store).create("Dentist", &once)?;
+    Ok(store)
+}
+
+#[test]
+fn the_agenda_shows_the_week_each_later_day_under_its_weekday_and_date() -> TestResult {
+    // Wednesday noon in Europe; the week crosses the month end.
+    let mut harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "en");
+    let days = [
+        "Today",
+        "Tomorrow",
+        "Friday, 30 Oct",
+        "Saturday, 31 Oct",
+        "Sunday, 1 Nov",
+        "Monday, 2 Nov",
+        "Tuesday, 3 Nov",
+    ];
+    for pair in days.windows(2) {
+        assert!(top(&harness, pair[0]) < top(&harness, pair[1]), "{pair:?}");
+    }
+    assert!(!shows(&harness, "Wednesday, 4 Nov"));
+    // Every day shows; an empty one after tomorrow says so.
+    assert!(shows(&harness, "Nothing due tomorrow."));
+    assert_eq!(harness.query_all_by_label("Nothing planned").count(), 4);
+    let dentist = top(&harness, "Done: 09:00 Dentist");
+    assert!(top(&harness, "Monday, 2 Nov") < dentist);
+    assert!(dentist < top(&harness, "Tuesday, 3 Nov"));
+
+    // A later day's Occurrence is checked off today.
+    harness.get_by_label("Done: 09:00 Dentist").click();
+    harness.run();
+    let routines = Routines::new(harness.state().store());
+    let reminder = routines.all()?.into_iter().next().ok_or("the Reminder")?;
+    assert!(reminder.done_at(&at(Day::new(2026, 11, 2), 9)).is_some());
+    Ok(())
+}
+
+#[test]
+fn the_weeks_days_read_in_german() -> TestResult {
+    let harness = window(dentist_store("2026-10-28T11:00:00.000Z")?, "de");
+    for label in ["Freitag, 30. Okt.", "Sonntag, 1. Nov.", "Montag, 2. Nov."] {
+        assert!(shows(&harness, label), "{label}");
+    }
+    assert_eq!(harness.query_all_by_label("Nichts geplant").count(), 4);
+    Ok(())
+}
+
 #[test]
 fn the_agenda_shows_missed_unsorted_today_and_tomorrow_in_that_order() -> TestResult {
     // Sunday noon in Europe, the day the clock went back.
@@ -144,15 +203,18 @@ fn the_agenda_shows_missed_unsorted_today_and_tomorrow_in_that_order() -> TestRe
     assert!(top(&harness, "Missed") < banner(&harness));
     assert!(banner(&harness) < top(&harness, "Today"));
     assert!(top(&harness, "Today") < top(&harness, "Tomorrow"));
-    // Today: the weekend's all-day row first, then the pills by time.
+    // Today: the weekend's all-day row first, then the pills by time;
+    // the weekend comes again on Saturday and Sunday.
     let weekend = harness
-        .get_by_role_and_label(Role::Button, "Water the plants")
+        .query_all_by_role_and_label(Role::Button, "Water the plants")
+        .next()
+        .ok_or("today's plants")?
         .rect();
     let pills: Vec<_> = harness
         .query_all_by_label("Done: 08:00 Take the pills")
         .map(|n| n.rect().top())
         .collect();
-    assert_eq!(pills.len(), 2, "today and tomorrow");
+    assert_eq!(pills.len(), 7, "every day of the week");
     assert!(weekend.top() < pills[0]);
     assert!(pills[0] < top(&harness, "Tomorrow"));
     assert!(top(&harness, "Tomorrow") < pills[1]);
@@ -378,8 +440,11 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     // restored from the trash.
     harness.get_by_label("Agenda").click();
     harness.run();
+    // Every other day of the week has its row; any opens the Routine.
     harness
-        .get_by_role_and_label(Role::Button, "Night meds")
+        .query_all_by_role_and_label(Role::Button, "Night meds")
+        .next()
+        .ok_or("a Night meds row")?
         .click();
     harness.run();
     assert!(shows(&harness, "Routine"));

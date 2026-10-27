@@ -90,11 +90,21 @@ fn places_sit_left_of_the_notes_and_filter_them() -> TestResult {
     assert!(shows(&harness, "Descale the kettle"));
     assert!(!shows(&harness, "Sort the cellar"));
 
-    // An Area holds its Topics' Notes.
+    // An Area lists only its Notes without a Topic (#95) ...
     harness.get_by_label("Household").click();
     harness.run();
-    assert!(shows(&harness, "Descale the kettle"));
     assert!(shows(&harness, "Sort the cellar"));
+    assert!(!shows(&harness, "Descale the kettle"));
+    // ... and its search also finds its Topics' Notes, each naming its
+    // Topic.
+    harness.state_mut().set_query("kettle");
+    harness.run();
+    assert!(shows(&harness, "Descale the kettle"));
+    assert!(shows(&harness, "Household / Kitchen"));
+    assert!(!shows(&harness, "Sort the cellar"));
+    harness.state_mut().set_query("");
+    harness.run();
+    assert!(!shows(&harness, "Descale the kettle"));
 
     // The Note whose Topic vanished is Unsorted again.
     harness.get_by_label("Unsorted").click();

@@ -5,8 +5,8 @@
 //!
 //! The window opens on the Agenda (UI laws, "Agenda"): the Missed
 //! Summary until "Seen", the "x Unsorted" banner, today's all-day and
-//! then timed Occurrences, a gap, and tomorrow's dimmed, all of them
-//! checkable. Its gear leads to this Device's Settings, its alarm button
+//! then timed Occurrences, a gap, and tomorrow's dimmed, then the five
+//! days after it under their weekdays and dates, all of them checkable. Its gear leads to this Device's Settings, its alarm button
 //! to a new Routine. A Note spawns Routines and Reminders from its
 //! editor; deleting a Note that spawned some asks whether they go too.
 //!
@@ -72,7 +72,7 @@ use crate::names::{area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView};
 use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
-use crate::schedule_text::{day_text, occurrence_time, schedule_text};
+use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::speech::SpeechModel;
 use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text};
 use crate::theme::{self, AREA_PALETTE, Tones};
@@ -80,8 +80,8 @@ use crate::theme::{self, AREA_PALETTE, Tones};
 /// What the middle pane shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
-    /// Today's and tomorrow's Occurrences, the Missed Summary and the
-    /// Unsorted count.
+    /// The Occurrences of today and the six days after, the Missed
+    /// Summary and the Unsorted count.
     Agenda,
     /// The user's own Profile with Backups, the user's Devices and the
     /// way to this Device's settings, reached from the Profile picture in
@@ -99,7 +99,8 @@ pub enum Selection {
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
-    /// The Area or Topic with this id; an Area holds its Topics' Notes.
+    /// The Area or Topic with this id; an Area lists its Notes without a
+    /// Topic, and its search also finds its Topics' Notes.
     Place(String),
     Trash,
 }
@@ -130,6 +131,8 @@ struct Row {
 struct AgendaView {
     today: Vec<Row>,
     tomorrow: Vec<Row>,
+    /// The days after tomorrow, each with its rows.
+    later: Vec<(Day, Vec<Row>)>,
     missed: MissedSummary,
     unsorted: usize,
 }
@@ -1292,9 +1295,21 @@ impl App {
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
             Selection::Unsorted => self.store.notes_by(notes.unsorted()?, &self.people)?,
-            Selection::Place(id) => self
-                .store
-                .notes_by(search.notes(&self.query, Some(id))?, &self.people)?,
+            Selection::Place(id) => {
+                let found = search.notes(&self.query, Some(id))?;
+                // A Topic's Notes show inside the Topic; a search in its
+                // Area still finds them, their cards naming the Topic.
+                let area = areas.iter().any(|(a, _)| a.id == *id);
+                let found = if self.query.trim().is_empty() && area {
+                    found
+                        .into_iter()
+                        .filter(|n| n.place.as_deref() == Some(id.as_str()))
+                        .collect()
+                } else {
+                    found
+                };
+                self.store.notes_by(found, &self.people)?
+            }
             Selection::Trash => notes.trashed()?,
         };
         let store = &self.store;
@@ -1364,7 +1379,7 @@ impl App {
         let agenda = match self.selection {
             Selection::Agenda => {
                 let wall = &*self.wall;
-                let agenda = routines.agenda(wall)?;
+                let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
                 let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
                     let area = match &row.note {
                         Some(note) => place(note.clone())?.area,
@@ -1372,7 +1387,17 @@ impl App {
                     };
                     Ok(Row { row, area })
                 };
+                let mut later = Vec::new();
+                for (i, rows) in agenda.later_rows.iter().enumerate() {
+                    let rows = rows
+                        .iter()
+                        .cloned()
+                        .map(row)
+                        .collect::<oldbrainfix_core::Result<_>>()?;
+                    later.push((agenda.later(i), rows));
+                }
                 Some(AgendaView {
+                    later,
                     today: agenda
                         .today_rows
                         .into_iter()
@@ -3174,8 +3199,9 @@ impl App {
 
     /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
     /// Summary until "Seen", the "x Unsorted" banner, today's
-    /// Occurrences, a gap, and tomorrow's dimmed; each checkable on its
-    /// own, a click on one opens its Routine. The Profile picture in the
+    /// Occurrences, a gap, and tomorrow's dimmed, then the five days after
+    /// the same way, each under its weekday and date; each checkable on
+    /// its own, a click on one opens its Routine. The Profile picture in the
     /// corner, where the settings gear was, leads to the Profile page.
     fn agenda_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
@@ -3271,6 +3297,29 @@ impl App {
                         agenda_row(ui, &t, tones, row, actions);
                     }
                 });
+                // The days after, each under its weekday and date; one
+                // with nothing due still shows.
+                for (day, rows) in &agenda.later {
+                    ui.add_space(4.0);
+                    ui.scope(|ui| {
+                        ui.multiply_opacity(TOMORROW_OPACITY);
+                        ui.label(
+                            RichText::new(agenda_day_text(&t, *day))
+                                .strong()
+                                .size(16.0)
+                                .color(text),
+                        );
+                        if rows.is_empty() {
+                            ui.label(
+                                RichText::new(t.nothing_planned())
+                                    .color(ui.visuals().weak_text_color()),
+                            );
+                        }
+                        for row in rows {
+                            agenda_row(ui, &t, tones, row, actions);
+                        }
+                    });
+                }
                 ui.add_space(8.0);
             });
         if output.state.offset.y != self.scrolled {
@@ -4389,9 +4438,13 @@ fn merge_form(
         });
     cancel(ui, t, actions);
 }
-/// How much tomorrow is faded on the Agenda (the phone's
-/// `tomorrowOpacity`).
+/// How much tomorrow and the days after are faded on the Agenda (the
+/// phone's `tomorrowOpacity`).
 pub const TOMORROW_OPACITY: f32 = 0.55;
+
+/// How many days the Agenda shows, today included (the phone's
+/// `AgendaScreen.days`).
+const AGENDA_DAYS: usize = 7;
 
 /// The name `person`'s Profile shows (`names`, by Profile id), or "No
 /// name".
@@ -4816,10 +4869,11 @@ struct Media<'a> {
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
 }
 
-/// What the editor shows of `media`: the photos, the recordings with
-/// their play buttons and playback `speed` while `can_play`, the button under each one the
-/// Device may remove while its text stays, and the texts of those
-/// removed where the files were (ADR 0020).
+/// What the editor shows of `media`: the photos with their Photo Texts,
+/// the recordings with their play buttons and playback `speed` while
+/// `can_play`, the button under each one the Device may remove while its
+/// text stays, and the texts of those removed where the files were
+/// (ADR 0020).
 fn editor_media(
     ui: &mut Ui,
     t: &L10n,
@@ -4837,7 +4891,7 @@ fn editor_media(
         hash,
         photo,
     };
-    if let Some(hash) = media_view::photos(ui, t, cache, store, photos, &may) {
+    if let Some(hash) = media_view::photos(ui, t, (cache, store), photos, photo_texts, &may) {
         actions.push(ask(hash, true));
     }
     let asked = media_view::recordings(

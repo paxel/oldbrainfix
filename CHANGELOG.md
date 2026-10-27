@@ -15,6 +15,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the phone and the desktop, a voice Note without words is titled "Voice recording" instead of "Photo" wherever only its words fit, such as the Agenda, the home-screen widget, the Missed Summary and alarms.
 - On the phone and the desktop, a new Transcript in which Whisper only repeats the words it was given, the German lead-in or the list of Area and Topic names, shows "No words heard." instead, and such a repeat before or after real speech is left out of the Transcript.
 - On the desktop, voice recordings played faster or slower keep the pitch of the voice, as on the phone.
+- On the desktop, an Area lists only its Notes without a Topic, as on the phone; a search in the Area still finds the Notes of its Topics.
+- On the desktop, the Agenda shows the whole week, as on the phone: after tomorrow come the five following days, each under its weekday and date, an empty day as "Nothing planned".
+- On the desktop, the Note editor shows a photo's Photo Text under the photo, as on the phone, not only after the photo is removed.
 
 ---
 

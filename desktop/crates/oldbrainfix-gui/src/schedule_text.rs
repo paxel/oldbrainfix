@@ -37,6 +37,49 @@ pub fn day_text(t: &L10n, day: Day) -> String {
     }
 }
 
+/// The full name of `weekday`, 1 for Monday to 7 for Sunday.
+fn weekday_long(t: &L10n, weekday: u32) -> &'static str {
+    match weekday {
+        1 => t.weekday_long_mon(),
+        2 => t.weekday_long_tue(),
+        3 => t.weekday_long_wed(),
+        4 => t.weekday_long_thu(),
+        5 => t.weekday_long_fri(),
+        6 => t.weekday_long_sat(),
+        _ => t.weekday_long_sun(),
+    }
+}
+
+/// The short name of `month`, 1 for January to 12 for December.
+fn month_short(t: &L10n, month: u32) -> &'static str {
+    match month {
+        1 => t.month_short_jan(),
+        2 => t.month_short_feb(),
+        3 => t.month_short_mar(),
+        4 => t.month_short_apr(),
+        5 => t.month_short_may(),
+        6 => t.month_short_jun(),
+        7 => t.month_short_jul(),
+        8 => t.month_short_aug(),
+        9 => t.month_short_sep(),
+        10 => t.month_short_oct(),
+        11 => t.month_short_nov(),
+        _ => t.month_short_dec(),
+    }
+}
+
+/// `day` as the heading of a day after tomorrow on the Agenda, as the
+/// phone's `agendaDay` writes it: `Thursday, 29 Oct` or
+/// `Donnerstag, 29. Okt.`
+pub fn agenda_day_text(t: &L10n, day: Day) -> String {
+    let weekday = weekday_long(t, day.weekday());
+    let month = month_short(t, day.month);
+    match t.locale() {
+        "de" => format!("{weekday}, {}. {month}", day.day),
+        _ => format!("{weekday}, {} {month}", day.day),
+    }
+}
+
 /// When an Occurrence is due: its time, or "All day".
 pub fn occurrence_time(t: &L10n, occurrence: &Occurrence) -> String {
     match occurrence.time {
@@ -113,6 +156,12 @@ mod tests {
         let day = Day::new(2026, 10, 26);
         assert_eq!(day_text(&en, day), "Mon, 10/26/2026");
         assert_eq!(day_text(&de, day), "Mo., 26.10.2026");
+        let thursday = Day::new(2026, 10, 29);
+        assert_eq!(agenda_day_text(&en, thursday), "Thursday, 29 Oct");
+        assert_eq!(agenda_day_text(&de, thursday), "Donnerstag, 29. Okt.");
+        let sunday = Day::new(2026, 11, 1);
+        assert_eq!(agenda_day_text(&en, sunday), "Sunday, 1 Nov");
+        assert_eq!(agenda_day_text(&de, sunday), "Sonntag, 1. Nov.");
         let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
         let weekly = Recurrence::parse("FREQ=WEEKLY;BYDAY=SA,MO").ok();
         let schedule = Schedule::new(day, &eight, weekly);

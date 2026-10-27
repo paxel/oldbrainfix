@@ -1,7 +1,8 @@
 //! How photos, voice recordings, their Transcripts and the speech model
-//! show in the window and the capture popup: photos as pictures, a play
-//! button per recording with its Transcript under it, the texts of those
-//! removed while their texts stay (ADR 0020), the microphone's
+//! show in the window and the capture popup: photos as pictures, in the
+//! editor with their Photo Texts under them, a play button per recording
+//! with its Transcript under it, the texts of those removed while their
+//! texts stay (ADR 0020), the microphone's
 //! button and the one big stop button (UI laws, "Capture"), and the
 //! speech model's card in the Settings.
 
@@ -89,14 +90,16 @@ pub fn thumbnails(
 }
 
 /// The photos `hashes` one under the other, as wide as there is room,
-/// each one `removable` with the button that removes it and keeps its
-/// Photo Text (ADR 0020). The hash whose button was clicked comes back.
+/// each with its Photo Text from `photo_texts` under it, as the phone's
+/// editor shows it, and each one `removable` with the button that
+/// removes it and keeps its Photo Text (ADR 0020). The hash whose button
+/// was clicked comes back.
 pub fn photos(
     ui: &mut Ui,
     t: &L10n,
-    cache: &mut PhotoCache,
-    store: &Store,
+    (cache, store): (&mut PhotoCache, &Store),
     hashes: &[String],
+    photo_texts: &BTreeMap<String, String>,
     removable: &dyn Fn(&str) -> bool,
 ) -> Option<String> {
     let text = ui.visuals().text_color();
@@ -120,6 +123,10 @@ pub fn photos(
                     ui.label(RichText::new(t.photo_missing()).color(weak));
                 });
             }
+        }
+        // A photo without text, or not read yet, shows none.
+        if let Some(said) = photo_texts.get(hash).filter(|s| !s.trim().is_empty()) {
+            ui.label(RichText::new(said).color(weak));
         }
         if removable(hash)
             && ui

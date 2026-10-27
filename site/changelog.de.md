@@ -14,6 +14,9 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Telefon und dem Desktop heißt eine Sprachnotiz ohne Worte überall dort, wo nur ihre Worte Platz haben, etwa in der Agenda, im Startbildschirm-Widget, auf der Verpasst-Karte und in Alarmen, „Sprachaufnahme“ statt „Foto“.
 - Auf dem Telefon und dem Desktop zeigt ein neues Transkript, in dem Whisper nur die ihm vorgegebenen Wörter wiederholt, den deutschen Einleitungssatz oder die Liste der Namen von Bereichen und Themen, stattdessen „Keine Worte erkannt.“, und eine solche Wiederholung vor oder nach echter Sprache wird aus dem Transkript weggelassen.
 - Auf dem Desktop behalten schneller oder langsamer abgespielte Sprachaufnahmen die Tonhöhe der Stimme, wie auf dem Telefon.
+- Auf dem Desktop zeigt ein Bereich nur seine Notizen ohne Thema, wie auf dem Telefon; eine Suche im Bereich findet weiter die Notizen seiner Themen.
+- Auf dem Desktop zeigt die Agenda die ganze Woche, wie auf dem Telefon: Nach morgen folgen die fünf nächsten Tage, jeder unter seinem Wochentag und Datum, ein leerer Tag mit „Nichts geplant“.
+- Auf dem Desktop zeigt der Notiz-Editor den erkannten Text eines Fotos unter dem Foto, wie auf dem Telefon, und nicht erst, nachdem das Foto entfernt wurde.
 
 ## [0.1.1] - 2026-10-27
 

@@ -103,12 +103,22 @@ impl AgendaRow {
 }
 
 /// The Agenda's content (CONTEXT.md): today's Occurrences, all-day first
-/// and then by time, and tomorrow's the same way.
+/// and then by time, tomorrow's the same way, and those of the days
+/// after when asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Agenda {
     pub today: Day,
     pub today_rows: Vec<AgendaRow>,
     pub tomorrow_rows: Vec<AgendaRow>,
+    /// The rows of each day after tomorrow, one list per day, in order.
+    pub later_rows: Vec<Vec<AgendaRow>>,
+}
+
+impl Agenda {
+    /// The day of `later_rows[index]`.
+    pub fn later(&self, index: usize) -> Day {
+        self.today.add_days(2 + index as i64)
+    }
 }
 
 /// Spawning, changing and checking off Routines and Reminders.
@@ -436,8 +446,15 @@ impl<'a> Routines<'a> {
         Ok(out)
     }
 
-    /// The Agenda at the store's now, with days as `wall` shows them.
+    /// The Agenda at the store's now, with days as `wall` shows them:
+    /// today and tomorrow.
     pub fn agenda(&self, wall: &WallClock) -> Result<Agenda> {
+        self.agenda_over(wall, 2)
+    }
+
+    /// The Agenda at the store's now, with days as `wall` shows them,
+    /// over `days` days from today; never fewer than today and tomorrow.
+    pub fn agenda_over(&self, wall: &WallClock, days: usize) -> Result<Agenda> {
         let today = Day::today(self.store.now(), wall);
         let routines = self.all_with_notes()?;
         let rows_on = |day: Day| {
@@ -462,6 +479,9 @@ impl<'a> Routines<'a> {
             today,
             today_rows: rows_on(today),
             tomorrow_rows: rows_on(today.add_days(1)),
+            later_rows: (2..days)
+                .map(|i| rows_on(today.add_days(i as i64)))
+                .collect(),
         })
     }
 
@@ -599,6 +619,45 @@ mod tests {
         assert_eq!(routines.all()?.len(), 1);
         routines.trash_note(&note.id, false)?;
         assert_eq!(routines.all()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn over_a_week_the_days_after_tomorrow_cross_a_month_end() -> Result<()> {
+        let now = parse_time("2026-10-28T11:00:00.000Z")?;
+        let store = Store::in_memory(Box::new(move || now), || {
+            Ok(crate::signing::SigningKey::from_seed([1; 32]))
+        })?;
+        let routines = Routines::new(&store);
+        routines.create("pills", &daily_at_eight())?;
+        let Some(once) = Schedule::new(Day::new(2026, 11, 2), &[], None) else {
+            panic!("a schedule");
+        };
+        routines.create("dentist", &once)?;
+        let wall = |at: DateTime<Utc>| at.naive_utc();
+        assert!(routines.agenda(&wall)?.later_rows.is_empty());
+        let agenda = routines.agenda_over(&wall, 7)?;
+        assert_eq!(agenda.today, Day::new(2026, 10, 28));
+        assert_eq!(agenda.later_rows.len(), 5);
+        let days: Vec<String> = (0..5).map(|i| agenda.later(i).to_string()).collect();
+        assert_eq!(
+            days,
+            [
+                "2026-10-30",
+                "2026-10-31",
+                "2026-11-01",
+                "2026-11-02",
+                "2026-11-03"
+            ]
+        );
+        let texts = |rows: &[AgendaRow]| -> Vec<String> {
+            rows.iter()
+                .map(|r| r.note.as_ref().map_or(String::new(), |n| n.text.clone()))
+                .collect()
+        };
+        assert_eq!(texts(&agenda.later_rows[1]), ["pills"]);
+        // All-day first, then by time.
+        assert_eq!(texts(&agenda.later_rows[3]), ["dentist", "pills"]);
         Ok(())
     }
 }

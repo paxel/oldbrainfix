@@ -748,6 +748,12 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     harness.state_mut().select_note(SHED);
     harness.run();
     let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
+    // The editor shows the Photo Text under its photo, above its button
+    // (#97); the card shows the photo alone.
+    let spare = "Spare key under the pot";
+    assert_eq!(harness.query_all_by_label(spare).count(), 1);
+    let button = harness.get_by_label("Remove photo, keep text").rect();
+    assert!(harness.get_by_label(spare).rect().bottom() <= button.top());
     // Cancel keeps it.
     harness.get_by_label("Remove photo, keep text").click();
     harness.run();
@@ -778,7 +784,8 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     assert_eq!(shed.photos.len(), 2);
     assert_eq!(shed.removed_photos, vec![photo.to_string()]);
     assert!(store.photo(photo).is_none(), "its bytes go");
-    assert!(shows(&harness, "Spare key under the pot"));
+    // On the card and in the editor.
+    assert_eq!(harness.query_all_by_label(spare).count(), 2);
     assert!(!shows(&harness, "Remove photo, keep text"));
     // Search still finds it.
     type_into(&mut harness, "Search all Notes", "spare key");
