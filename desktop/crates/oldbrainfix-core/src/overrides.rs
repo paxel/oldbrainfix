@@ -134,7 +134,8 @@ impl Store {
     /// Devices wrote (`written_by_own`); none when none did. In a Shared
     /// Area another person's Device can write any field of a Note, so a
     /// link one's own Devices keep is read this way. `own` remembers,
-    /// across calls, which Devices are one's own.
+    /// across calls, which Devices are one's own. Read from the log alone:
+    /// a pending change (ADR 0022) is trusted for nothing.
     pub(crate) fn own_current(
         &self,
         entity: &str,
@@ -142,7 +143,7 @@ impl Store {
         own: &mut HashMap<String, bool>,
     ) -> Result<Option<String>> {
         let mut held: Option<Entry> = None;
-        for e in self.history(entity)? {
+        for e in self.logged_history(entity)? {
             if e.field != field || !self.written_by_own_in(&e.device, own)? {
                 continue;
             }

@@ -231,7 +231,8 @@ impl Store {
     }
 
     /// The scope `entity` is sealed under, from where it is now, as the
-    /// Dart core's `scopeOf`.
+    /// Dart core's `scopeOf`. Read from the log alone: a pending change
+    /// (ADR 0022) moves nothing into an Area before it is accepted.
     pub fn scope_of(&self, entity: &str) -> Result<String> {
         if entity.starts_with("area:") {
             return Ok(entity.to_string());
@@ -243,7 +244,7 @@ impl Store {
             Some("routine") => routine_keys::NOTE,
             _ => return Ok(PERSONAL_SCOPE.to_string()),
         };
-        match self.current(entity, field)? {
+        match self.logged(entity, field)? {
             Some(next) if rank(&next) < rank(entity) => self.scope_of(&next),
             _ => Ok(PERSONAL_SCOPE.to_string()),
         }

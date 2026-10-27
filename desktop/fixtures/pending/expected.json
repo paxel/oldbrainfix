@@ -1,0 +1,534 @@
+{
+  "times": [
+    "2026-01-02T09:00:00.000Z",
+    "2026-01-02T09:01:00.000Z",
+    "2026-01-02T09:02:00.000Z",
+    "2026-01-02T09:03:00.000Z",
+    "2026-01-02T09:04:00.000Z",
+    "2026-01-02T09:05:00.000Z",
+    "2026-01-02T09:06:00.000Z",
+    "2026-01-02T09:07:00.000Z",
+    "2026-01-02T09:08:00.000Z",
+    "2026-01-02T09:09:00.000Z",
+    "2026-01-02T09:10:00.000Z",
+    "2026-01-02T09:11:00.000Z",
+    "2026-01-02T09:12:00.000Z",
+    "2026-01-02T09:13:00.000Z"
+  ],
+  "ai": "00000000000000000000000000000801",
+  "bundle": "00000000000000000000000000000803",
+  "other": "00000000000000000000000000000804",
+  "eggs": "note:00000000000000000000000000000802",
+  "milk": "note:00000000000000000000000000000001",
+  "bread": "note:00000000000000000000000000000002",
+  "routine": "routine:00000000000000000000000000000004",
+  "household": "area:00000000000000000000000000000003",
+  "shown": {
+    "now": "2026-01-02T09:09:00.000Z",
+    "device": "65b60673d6ed884bf01c2c222d82ada0",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000003",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000001",
+        "text": "Milk, two litres",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:01.000Z",
+        "place": "area:00000000000000000000000000000003",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Brown bread",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:05.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000005",
+        "text": "Call Bob back",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:19.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000802",
+        "text": "Eggs",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-02T09:03:00.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000802",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000802"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "sections": {
+      "note:00000000000000000000000000000802": [],
+      "note:00000000000000000000000000000005": [],
+      "note:00000000000000000000000000000002": [],
+      "note:00000000000000000000000000000001": []
+    },
+    "untranscribed": [],
+    "unreadPhotos": [],
+    "removable": {},
+    "search": {
+      "": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000005",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000001"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "heading": [],
+      "format": []
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "conflicts": []
+  },
+  "routineShown": {
+    "$type": "routine",
+    "note": "note:00000000000000000000000000000001",
+    "start": "2026-01-03",
+    "times": "08:00",
+    "rule": "FREQ=DAILY"
+  },
+  "declined": {
+    "now": "2026-01-02T09:10:00.000Z",
+    "device": "65b60673d6ed884bf01c2c222d82ada0",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000003",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000001",
+        "text": "Milk, two litres",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:01.000Z",
+        "place": "area:00000000000000000000000000000003",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Brown bread",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:05.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000005",
+        "text": "Call Bob back",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:19.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000802",
+        "text": "Eggs",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-02T09:03:00.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000802",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000802"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "sections": {
+      "note:00000000000000000000000000000802": [],
+      "note:00000000000000000000000000000005": [],
+      "note:00000000000000000000000000000002": [],
+      "note:00000000000000000000000000000001": []
+    },
+    "untranscribed": [],
+    "unreadPhotos": [],
+    "removable": {},
+    "search": {
+      "": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000005",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000001"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "heading": [],
+      "format": []
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "conflicts": []
+  },
+  "routineDeclined": {
+    "$type": "routine",
+    "note": "note:00000000000000000000000000000001",
+    "start": "2026-01-03",
+    "times": "08:00",
+    "rule": "FREQ=DAILY"
+  },
+  "aiKept": [
+    [
+      "note:00000000000000000000000000000001",
+      "text",
+      "{\"format\":\"plain\",\"text\":\"Oat milk\"}",
+      "{\"format\":\"plain\",\"text\":\"Milk, two litres\"}"
+    ],
+    [
+      "routine:00000000000000000000000000000004",
+      "rule",
+      "FREQ=WEEKLY",
+      "FREQ=DAILY"
+    ]
+  ],
+  "bundleKept": [
+    [
+      "note:00000000000000000000000000000002",
+      "text",
+      "{\"format\":\"plain\",\"text\":\"Bread from Bob\"}",
+      "{\"format\":\"plain\",\"text\":\"Brown bread\"}"
+    ]
+  ],
+  "taken": [
+    "c945cbf2a5602002141e2fb9d17054d6:1",
+    "c945cbf2a5602002141e2fb9d17054d6:2",
+    "c945cbf2a5602002141e2fb9d17054d6:3",
+    "c945cbf2a5602002141e2fb9d17054d6:4"
+  ],
+  "accepted": {
+    "now": "2026-01-02T09:13:00.000Z",
+    "device": "65b60673d6ed884bf01c2c222d82ada0",
+    "areas": [
+      {
+        "id": "area:00000000000000000000000000000003",
+        "name": "Household",
+        "starter": null,
+        "colour": null,
+        "icon": null,
+        "topics": []
+      }
+    ],
+    "notes": [
+      {
+        "id": "note:00000000000000000000000000000001",
+        "text": "Milk, two litres",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:01.000Z",
+        "place": "area:00000000000000000000000000000003",
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000002",
+        "text": "Brown bread",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:05.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000005",
+        "text": "Call Bob back",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:19.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000802",
+        "text": "Eggs",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-02T09:03:00.000Z",
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": false,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "wordless": "photo"
+      }
+    ],
+    "all": [
+      "note:00000000000000000000000000000802",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "unsorted": [
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000005",
+      "note:00000000000000000000000000000802"
+    ],
+    "trashed": [],
+    "inside": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "sections": {
+      "note:00000000000000000000000000000802": [],
+      "note:00000000000000000000000000000005": [],
+      "note:00000000000000000000000000000002": [],
+      "note:00000000000000000000000000000001": []
+    },
+    "untranscribed": [],
+    "unreadPhotos": [],
+    "removable": {},
+    "search": {
+      "": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000005",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "sauce": [],
+      "MILK": [
+        "note:00000000000000000000000000000001"
+      ],
+      "receipt": [],
+      "dentist": [],
+      "x-ray": [],
+      "müller": [],
+      "called": [],
+      "loop": [],
+      " e ": [
+        "note:00000000000000000000000000000802",
+        "note:00000000000000000000000000000002",
+        "note:00000000000000000000000000000001"
+      ],
+      "heading": [],
+      "format": []
+    },
+    "searchWithin": {
+      "area:00000000000000000000000000000003": [
+        "note:00000000000000000000000000000001"
+      ]
+    },
+    "conflicts": []
+  },
+  "routineAccepted": {
+    "$type": "routine",
+    "note": "note:00000000000000000000000000000001",
+    "start": "2026-01-03",
+    "times": "08:00",
+    "rule": "FREQ=DAILY"
+  }
+}

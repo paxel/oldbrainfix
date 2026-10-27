@@ -11,6 +11,7 @@ import 'backup.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
 import 'notes.dart';
+import 'pending.dart';
 import 'photos.dart';
 import 'routines.dart';
 import 'schedule.dart';

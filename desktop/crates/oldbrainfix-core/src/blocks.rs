@@ -16,7 +16,7 @@ use crate::notes::keys as note_keys;
 use crate::profile::{Profile, sanitize_name};
 use crate::routines::keys as routine_keys;
 use crate::schedule::Occurrence;
-use crate::shared::{AreaRole, Grant, ROLE_PREFIX};
+use crate::shared::{AreaRole, Grant, JudgedLog, ROLE_PREFIX};
 use crate::store::Store;
 use crate::sync::{BLOB_KINDS, split_blob_ref};
 use crate::{Error, Result};
@@ -290,13 +290,18 @@ impl Store {
     /// never this Device nor one of the user's own. A Profile's binding
     /// does not count, since any key bound to it can bind another.
     pub fn blocked_devices(&self) -> Result<HashSet<String>> {
+        self.blocked_devices_by(&*self.judged()?)
+    }
+
+    /// [`Store::blocked_devices`] by the grants of `judged`: the log with
+    /// a pending set on top (ADR 0022).
+    pub fn blocked_devices_by(&self, judged: &JudgedLog) -> Result<HashSet<String>> {
         let blocked = self.blocked_ids()?;
         let mut out = HashSet::new();
         if blocked.is_empty() {
             return Ok(out);
         }
         let own_device = self.device_id()?;
-        let judged = self.judged()?;
         for grants in judged.areas.values() {
             for device in grants.devices() {
                 if device == own_device || out.contains(&device) {
@@ -326,8 +331,9 @@ impl Store {
     /// refers to go; their Profile's picture is taken out. A Device no
     /// longer blocked has its refusals released, so what was refused is
     /// asked for again, the shared folder read whole again too. The
-    /// shared folder itself is not touched. Returns whether anything was
-    /// deleted or let go.
+    /// shared folder itself is not touched, and nothing of theirs waits
+    /// in a pending set (ADR 0022). Returns whether anything was deleted
+    /// or let go.
     pub fn enforce_blocks(&self) -> Result<bool> {
         let blocked = self.blocked_ids()?;
         let marks = self.refusal_marks()?;
@@ -388,6 +394,8 @@ impl Store {
             for id in ids {
                 changed |= self.strip_person_picture(id)?;
             }
+            // Nor does anything of theirs wait in a pending set.
+            changed |= self.drop_blocked_from_pending()?;
             Ok(changed)
         })?;
         let mut dropped = false;
@@ -1104,6 +1112,87 @@ mod tests {
         ] {
             assert!(!kept_from_blocked(&e), "{e:?}");
         }
+    }
+
+    /// The entries the pending set `id` of `store` holds from others.
+    fn pending_entries(store: &Store, id: &str) -> Made<Vec<WireEntry>> {
+        Ok(store
+            .pending_set(id)?
+            .ok_or("the set")?
+            .received()
+            .into_iter()
+            .map(|r| r.entry.clone())
+            .collect())
+    }
+
+    #[test]
+    fn her_entries_never_enter_a_pending_set_and_leave_one_at_the_block() -> TestResult {
+        let h = household()?;
+        let (ann, carol) = (&h.ann, &h.carol);
+        let milk = Notes::new(ann).capture("Milk", Some(&h.area), None)?;
+        let bins = Routines::new(ann).spawn(&milk.id, &pills()?)?;
+        exchange(carol, ann, true)?;
+        let early = ann.open_pending("bundle", true, None)?;
+        let rude = Notes::new(carol).capture("Rude", Some(&h.area), None)?;
+        let theirs = wire(&carol.entries_since(&ann.version_vector()?)?);
+        ann.receive_pending(&early, &theirs, &[], &mut ImportReport::default())?;
+        assert!(text_of(ann, &rude.id)?.is_some());
+
+        ann.block_person(&own_id(carol)?, false)?;
+
+        assert_eq!(text_of(ann, &rude.id)?, None);
+        let left = pending_entries(ann, &early)?;
+        assert!(!left.is_empty());
+        assert!(left.iter().all(wire_kept_from_blocked));
+        Notes::new(carol).capture("Ruder", Some(&h.area), None)?;
+        Routines::new(carol).mark_done(&bins.id, &at(1)?, None)?;
+        let late = ann.open_pending("bundle", true, None)?;
+        let theirs = wire(&carol.entries_since(&ann.version_vector()?)?);
+        let taken = ann.receive_pending(&late, &theirs, &[], &mut ImportReport::default())?;
+        assert!(taken.iter().all(wire_kept_from_blocked));
+        let done = routine_keys::done(&at(1)?);
+        assert!(taken.iter().any(|e| e.field == done));
+        assert!(!taken.iter().any(|e| e.field == note_keys::TEXT));
+        Ok(())
+    }
+
+    #[test]
+    fn her_device_named_only_by_a_grant_in_a_pending_set_is_refused_too() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let bob = device(2, "Bob")?;
+        let carol = device(4, "Carol")?;
+        // Ann blocks Carol, whom she knows from no Area.
+        ann.block_person(&own_id(&carol)?, false)?;
+        let school = bob.share(&Places::new(&bob).add_area("School")?.id)?;
+        invite(&bob, &carol, &school)?;
+        let rude = Notes::new(&carol).capture("Rude", Some(&school), None)?;
+        exchange(&carol, &bob, true)?;
+        let offer = ann.open_pending("area-offer", false, None)?;
+
+        ann.receive_pending(
+            &offer,
+            &wire(&bob.entries_since(&HashMap::new())?),
+            &bob.key_records()?,
+            &mut ImportReport::default(),
+        )?;
+
+        let held = pending_entries(&ann, &offer)?;
+        let hers = carol.device_id()?;
+        assert!(held.iter().any(|e| e.entity == school));
+        assert!(
+            held.iter()
+                .filter(|e| e.device == hers)
+                .all(wire_kept_from_blocked)
+        );
+        assert!(held.iter().any(|e| e.entity == rude.id));
+        assert!(
+            !held
+                .iter()
+                .any(|e| e.entity == rude.id && e.field == note_keys::TEXT)
+        );
+        // The log's own judgement knows nothing of the offer.
+        assert!(ann.blocked_devices()?.is_empty());
+        Ok(())
     }
 
     #[test]

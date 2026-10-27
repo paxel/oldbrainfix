@@ -2774,3 +2774,164 @@ fn transcripts_are_guarded_as_the_dart_core_guards_them() -> TestResult {
     }
     Ok(())
 }
+
+// ------------------------------------------------------ Pending Changes
+
+#[test]
+fn pending_changes_go_as_the_dart_core_takes_them() -> TestResult {
+    use oldbrainfix_core::routines::keys as routine_keys;
+    use oldbrainfix_core::{AcceptedChanges, ImportReport, KeyRecord, StoredText};
+    let dir = fixtures().join("pending");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let text = |key: &str| -> Result<&str, Box<dyn std::error::Error>> {
+        Ok(expected[key].as_str().ok_or("a text")?)
+    };
+    let times: Vec<DateTime<Utc>> = expected["times"]
+        .as_array()
+        .ok_or("times")?
+        .iter()
+        .map(|t| Ok(parse_time(t.as_str().ok_or("a time")?)?))
+        .collect::<Result<_, Box<dyn std::error::Error>>>()?;
+    let clock = held_clock(expected["times"][0].as_str().ok_or("a time")?)?;
+    let held = clock.clone();
+    let mut ann = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    ann.set_local_setting("author", "Ada")?;
+    insert_lines(&ann, &dir.join("before.jsonl"))?;
+    counted_ids(&mut ann, 0x800);
+    let received = entries_in(&dir.join("received.jsonl"))?;
+    let bob = KeyRecord::from_json(&read_json(&dir.join("key.json"))?).ok_or("a key record")?;
+    let (milk, bread, routine) = (text("milk")?, text("bread")?, text("routine")?);
+    let plain = |s: &str| StoredText::plain(s).encode();
+    let mut step = 0;
+    let mut tick = || {
+        *clock.lock() = times[step];
+        step += 1;
+    };
+    let before = ann.current_seq()?;
+
+    // The AI Task's changes, and the user's own edits among them.
+    tick();
+    let ai = ann.open_pending("ai-task", true, None)?;
+    assert_eq!(ai, text("ai")?);
+    tick();
+    ann.draft_pending(&ai, milk, note_keys::TEXT, Some(&plain("Oat milk")), None)?;
+    tick();
+    ann.draft_pending(&ai, milk, note_keys::PLACE, Some(text("household")?), None)?;
+    tick();
+    let eggs = format!("note:{}", ann.new_id()?);
+    assert_eq!(eggs, text("eggs")?);
+    let captured = dart_iso(ann.now());
+    ann.draft_pending(
+        &ai,
+        &eggs,
+        note_keys::TYPE,
+        Some(note_keys::TYPE_NOTE),
+        None,
+    )?;
+    ann.draft_pending(&ai, &eggs, note_keys::CAPTURED, Some(&captured), None)?;
+    ann.draft_pending(&ai, &eggs, note_keys::TEXT, Some(&plain("Eggs")), None)?;
+    tick();
+    ann.draft_pending(&ai, routine, routine_keys::RULE, Some("FREQ=WEEKLY"), None)?;
+    tick();
+    Notes::new(&ann).edit(milk, "Milk, two litres")?;
+    tick();
+    ann.append(routine, routine_keys::START, Some("2026-01-03"), None)?;
+
+    // A bundle with Bob's entries, and an edit of the Note he edited.
+    tick();
+    let bundle = ann.open_pending("bundle", true, None)?;
+    assert_eq!(bundle, text("bundle")?);
+    ann.receive_pending(&bundle, &received, &[bob], &mut ImportReport::default())?;
+    tick();
+    Notes::new(&ann).edit(bread, "Brown bread")?;
+    assert_eq!(
+        lines_after(&ann, before)?,
+        lines_of(&dir.join("edits.jsonl"))?
+    );
+    let ai_file = std::fs::read_to_string(dir.join("ai.json"))?;
+    let bundle_file = std::fs::read_to_string(dir.join("bundle.json"))?;
+    assert_eq!(ann.pending_set(&ai)?.ok_or("a set")?.encode()?, ai_file);
+    assert_eq!(
+        ann.pending_set(&bundle)?.ok_or("a set")?.encode()?,
+        bundle_file
+    );
+    let fields = |store: &Store| -> Result<Value, Box<dyn std::error::Error>> {
+        Ok(Value::Object(
+            store
+                .current_fields(routine)?
+                .iter()
+                .map(|(k, v)| (k.to_string(), json!(v)))
+                .collect(),
+        ))
+    };
+    tick();
+    assert_eq!(read(&ann)?, expected["shown"]);
+    assert_eq!(fields(&ann)?, expected["routineShown"]);
+
+    // Restarted from the files the Dart core wrote, it reads the same.
+    {
+        let tmp = tempfile::tempdir()?;
+        let pending = tmp.path().join("pending");
+        std::fs::create_dir_all(&pending)?;
+        std::fs::write(pending.join(format!("{ai}.json")), &ai_file)?;
+        std::fs::write(pending.join(format!("{bundle}.json")), &bundle_file)?;
+        let held = clock.clone();
+        let again = Store::open(
+            &tmp.path().join("oldbrainfix.db"),
+            Box::new(move || *held.lock()),
+            || Ok(writer_key()),
+        )?;
+        again.set_local_setting("author", "Ada")?;
+        insert_lines(&again, &dir.join("before.jsonl"))?;
+        insert_lines(&again, &dir.join("edits.jsonl"))?;
+        assert_eq!(again.pending_sets()?.len(), 2);
+        assert_eq!(read(&again)?, expected["shown"]);
+        assert_eq!(fields(&again)?, expected["routineShown"]);
+    }
+
+    // A third set, declined: the log stays as it was.
+    tick();
+    let other = ann.open_pending("ai-task", true, None)?;
+    assert_eq!(other, text("other")?);
+    ann.draft_pending(&other, bread, note_keys::TEXT, Some(&plain("Never")), None)?;
+    assert!(ann.decline_pending(&other)?);
+    assert_eq!(read(&ann)?, expected["declined"]);
+    assert_eq!(fields(&ann)?, expected["routineDeclined"]);
+
+    let kept = |accepted: &AcceptedChanges| -> Value {
+        json!(
+            accepted
+                .kept
+                .iter()
+                .map(|k| json!([k.entity, k.field, k.pending, k.kept]))
+                .collect::<Vec<_>>()
+        )
+    };
+    tick();
+    let mark = ann.current_seq()?;
+    let accepted = ann.accept_pending(&ai)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("accept-ai.jsonl"))?
+    );
+    assert_eq!(kept(&accepted), expected["aiKept"]);
+    tick();
+    let mark = ann.current_seq()?;
+    let accepted = ann.accept_pending(&bundle)?;
+    assert_eq!(
+        lines_after(&ann, mark)?,
+        lines_of(&dir.join("accept-bundle.jsonl"))?
+    );
+    assert_eq!(kept(&accepted), expected["bundleKept"]);
+    let taken: Vec<String> = accepted
+        .taken
+        .iter()
+        .map(|e| format!("{}:{}", e.device, e.dseq))
+        .collect();
+    assert_eq!(json!(taken), expected["taken"]);
+    tick();
+    assert_eq!(read(&ann)?, expected["accepted"]);
+    assert_eq!(fields(&ann)?, expected["routineAccepted"]);
+    assert!(ann.pending_sets()?.is_empty());
+    Ok(())
+}

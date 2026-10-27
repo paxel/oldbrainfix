@@ -156,6 +156,10 @@ _Avoid_: ban, mute, ignore
 Two versions of the same user-edited field written on different Devices without either having seen the other. The newest shows meanwhile; the user picks which one stays.
 _Avoid_: clash, merge conflict
 
+**Pending Changes**:
+Changes the user sees as if they were kept, which are kept only once the user accepts them; declining leaves nothing behind. What the user edits in the meantime wins on Accept. Used for an AI Task, an Area offered from afar, a stranger's Sent Item until "Show", and a bundle with a lot in it.
+_Avoid_: draft, staging, preview (a preview shows without keeping anything)
+
 ### Privacy
 
 **App Lock**:

@@ -192,13 +192,15 @@ extension Blocks on Store {
   /// The Devices of the people blocked now: those a grant in a Shared
   /// Area names one of them for (its last grant that named anyone),
   /// never this Device nor one of the user's own. A Profile's binding
-  /// does not count, since any key bound to it can bind another.
-  Set<String> blockedDevices() {
+  /// does not count, since any key bound to it can bind another. The
+  /// grants are the log's, or those of [by] where it is given: the log
+  /// with a pending set on top (ADR 0022).
+  Set<String> blockedDevices([JudgedLog? by]) {
     final blocked = blockedIds;
     if (blocked.isEmpty) return const {};
     final self = deviceId;
     final out = <String>{};
-    for (final grants in judged.areas.values) {
+    for (final grants in (by ?? judged).areas.values) {
       for (final device in grants.devices) {
         if (device == self || out.contains(device)) continue;
         final person = grants.personOf(device);
@@ -220,7 +222,8 @@ extension Blocks on Store {
   /// Profile's picture is taken out. A Device no longer blocked has its
   /// refusals released, so what was refused is asked for again, the
   /// shared folder read whole again too. The shared folder itself is not
-  /// touched. Returns whether anything was deleted or let go.
+  /// touched, and nothing of theirs waits in a pending set (ADR 0022).
+  /// Returns whether anything was deleted or let go.
   bool enforceBlocks() {
     final blocked = blockedIds;
     final marks = refusalMarks();
@@ -263,6 +266,8 @@ extension Blocks on Store {
       for (final id in blocked) {
         if (_stripPicture(id)) changed = true;
       }
+      // Nor does anything of theirs wait in a pending set.
+      if (dropBlockedFromPending()) changed = true;
     });
     for (final ref in refs.toList()..sort()) {
       if (knowsBlob(ref)) continue;

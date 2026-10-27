@@ -9,3 +9,7 @@ Unlike Catlog, which writes a `$conflict:<field>` entry when an import detects c
 ## Text formats (ADR 0018)
 
 Amended by ADR 0018 (#58): a Note's or Section's text carries its format in the same value, so text and format conflict as one unit. A text written before its format was recorded counts as the same text marked plain. A Conflict one of whose versions is in a format or a structure version (`v`) the Device does not know is not resolved there.
+
+## Pending Changes (ADR 0022)
+
+Amended by ADR 0022 (#111): an edit's causal context counts the entries of the shown pending sets as seen, since the user saw them when they wrote.

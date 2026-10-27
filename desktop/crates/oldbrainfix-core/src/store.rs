@@ -11,6 +11,12 @@
 //! Photo and voice recording bytes live outside the log, content-addressed
 //! by SHA-256: `photos` and `audio` directories next to the database file,
 //! as the Dart core keeps them, or memory for an in-memory store.
+//!
+//! Pending Changes (ADR 0022) lie beside it, in a `pending` directory:
+//! every read of what the log holds now ([`Store::history`],
+//! [`Store::current_fields`] and the lists of entities and fields) sees
+//! the shown sets on top of it; what is held, passed on, numbered or
+//! trusted reads the log alone.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -26,6 +32,10 @@ use sha2::{Digest, Sha256};
 use crate::blobs::{Blobs, FileBlobs, MemoryBlobs};
 use crate::conflicts::{conflict_unit, conflict_unit_fields, encode_context};
 use crate::entry::{Entry, WireEntry, dart_iso, parse_time};
+use crate::pending::{
+    FilePendingFiles, GiveWay, MemoryPendingFiles, PendingChange, PendingFiles, PendingSet,
+    PendingState,
+};
 use crate::photos::strip_jpeg_metadata;
 use crate::shared::{JudgedLog, judge_log};
 use crate::signing::{SigningKey, device_id_from_key, entry_bytes};
@@ -222,6 +232,11 @@ pub struct Store {
     pub(crate) people: Mutex<Option<Arc<crate::people::PeopleIndex>>>,
     /// The own Profile's ids and keys, with what they were read from.
     pub(crate) own_keys: Mutex<Option<Arc<crate::people::OwnKeys>>>,
+    /// Where the pending sets' files lie.
+    pending_files: Box<dyn PendingFiles>,
+    /// The pending sets held, and what is worked out from the shown ones
+    /// after every change. Never held while the connection is taken.
+    pending: Mutex<PendingState>,
 }
 
 impl Store {
@@ -235,14 +250,30 @@ impl Store {
         let dir = path.parent().unwrap_or(Path::new("."));
         let photos = Box::new(FileBlobs::new(dir.join("photos"))?);
         let audio = Box::new(FileBlobs::new(dir.join("audio"))?);
-        Self::init(Connection::open(path)?, clock, new_key, photos, audio)
+        let pending = Box::new(FilePendingFiles::new(dir.join("pending")));
+        Self::init(
+            Connection::open(path)?,
+            clock,
+            new_key,
+            photos,
+            audio,
+            pending,
+        )
     }
 
     /// Opens a throwaway in-memory store (tests).
     pub fn in_memory(clock: Clock, new_key: impl FnOnce() -> Result<SigningKey>) -> Result<Store> {
         let photos = Box::<MemoryBlobs>::default();
         let audio = Box::<MemoryBlobs>::default();
-        Self::init(Connection::open_in_memory()?, clock, new_key, photos, audio)
+        let pending = Box::<MemoryPendingFiles>::default();
+        Self::init(
+            Connection::open_in_memory()?,
+            clock,
+            new_key,
+            photos,
+            audio,
+            pending,
+        )
     }
 
     fn init(
@@ -251,6 +282,7 @@ impl Store {
         new_key: impl FnOnce() -> Result<SigningKey>,
         photos: Box<dyn Blobs>,
         audio: Box<dyn Blobs>,
+        pending_files: Box<dyn PendingFiles>,
     ) -> Result<Store> {
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
@@ -293,12 +325,15 @@ impl Store {
             generation: std::sync::atomic::AtomicU64::new(0),
             people: Mutex::new(None),
             own_keys: Mutex::new(None),
+            pending_files,
+            pending: Mutex::new(PendingState::default()),
         };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;
             store.set_local_setting("device", &device_id_from_key(&key.public_key()))?;
             store.set_local_setting("signseed", &key.seed_hex())?;
         }
+        store.load_pending()?;
         Ok(store)
     }
 
@@ -336,11 +371,16 @@ impl Store {
         self.generation
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         *judged = None;
+        let mut pending = self.pending.lock();
+        pending.overlay = None;
+        pending.judged = None;
     }
 
     /// What the roles of the Shared Areas allow (ADR 0013), worked out
     /// from the whole log after every change, as the Dart core's
     /// `judged`; nothing to work out while no Area was ever shared.
+    /// Pending Changes never count here: this is what decides who may do
+    /// what, what is refused and what is deleted.
     pub fn judged(&self) -> Result<Arc<JudgedLog>> {
         if let Some(held) = self.judged.lock().as_ref() {
             return Ok(held.clone());
@@ -564,7 +604,9 @@ impl Store {
 
     /// The causal context of a write to `unit` on `entity` by `device`
     /// holding `vector`: how far it has seen every other Device that
-    /// wrote the unit here; `None` when nobody wrote it yet.
+    /// wrote the unit here; `None` when nobody wrote it yet. What the
+    /// shown pending sets hold of other Devices counts as seen (ADR
+    /// 0022): the user saw it when they wrote.
     fn context(
         &self,
         entity: &str,
@@ -573,7 +615,16 @@ impl Store {
         vector: &HashMap<String, i64>,
     ) -> Result<Option<String>> {
         let fields = conflict_unit_fields(unit);
-        let writers: Vec<String> = {
+        let shown = self.shown()?;
+        let received: Vec<&Entry> = shown.iter().filter(|e| e.device != device).collect();
+        let mut seen = vector.clone();
+        for e in &received {
+            let held = seen.entry(e.device.clone()).or_insert(0);
+            if e.dseq > *held {
+                *held = e.dseq;
+            }
+        }
+        let mut writers: Vec<String> = {
             let db = self.db.lock();
             let marks = vec!["?"; fields.len()].join(", ");
             let mut stmt = db.prepare(&format!(
@@ -585,6 +636,14 @@ impl Store {
             let rows = stmt.query_map(rusqlite::params_from_iter(args), |r| r.get(0))?;
             rows.collect::<rusqlite::Result<_>>()?
         };
+        for e in &received {
+            if e.entity == entity
+                && fields.contains(&e.field.as_str())
+                && !writers.contains(&e.device)
+            {
+                writers.push(e.device.clone());
+            }
+        }
         if writers.is_empty() {
             return Ok(None);
         }
@@ -592,7 +651,7 @@ impl Store {
             .into_iter()
             .filter(|d| d != device)
             .map(|d| {
-                let n = vector.get(&d).copied().unwrap_or(0);
+                let n = seen.get(&d).copied().unwrap_or(0);
                 (d, n)
             })
             .collect();
@@ -602,15 +661,29 @@ impl Store {
     /// Which Device wrote which of `fields` on which entity, as (entity,
     /// field, device), each once.
     pub fn writers_of(&self, fields: &[&str]) -> Result<Vec<(String, String, String)>> {
-        let db = self.db.lock();
-        let marks = vec!["?"; fields.len()].join(", ");
-        let mut stmt = db.prepare(&format!(
-            "SELECT DISTINCT entity, field, device FROM entries WHERE {APPLIED} AND field IN ({marks})"
-        ))?;
-        let rows = stmt.query_map(rusqlite::params_from_iter(fields.iter()), |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let mut logged: Vec<(String, String, String)> = {
+            let db = self.db.lock();
+            let marks = vec!["?"; fields.len()].join(", ");
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT entity, field, device FROM entries WHERE {APPLIED} AND field IN ({marks})"
+            ))?;
+            let rows = stmt.query_map(rusqlite::params_from_iter(fields.iter()), |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut seen: std::collections::HashSet<(String, String, String)> =
+            logged.iter().cloned().collect();
+        for e in self.shown()?.iter() {
+            if !fields.contains(&e.field.as_str()) {
+                continue;
+            }
+            let key = (e.entity.clone(), e.field.clone(), e.device.clone());
+            if seen.insert(key.clone()) {
+                logged.push(key);
+            }
+        }
+        Ok(logged)
     }
 
     /// Takes in an entry another Device wrote, as it is; one already held
@@ -674,20 +747,36 @@ impl Store {
     /// The (entity, field) pairs whose field starts with `prefix`, by
     /// entity and field.
     pub fn fields_with_prefix(&self, prefix: &str) -> Result<Vec<(String, String)>> {
-        let db = self.db.lock();
-        let mut stmt = db.prepare(&format!(
-            "SELECT DISTINCT entity, field FROM entries WHERE {APPLIED} \
-                 AND substr(field, 1, ?) = ? ORDER BY entity, field"
-        ))?;
-        let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| {
-            Ok((r.get(0)?, r.get(1)?))
-        })?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let mut logged: Vec<(String, String)> = {
+            let db = self.db.lock();
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT entity, field FROM entries WHERE {APPLIED} \
+                     AND substr(field, 1, ?) = ? ORDER BY entity, field"
+            ))?;
+            let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut seen: std::collections::HashSet<(String, String)> =
+            logged.iter().cloned().collect();
+        let mut more = false;
+        for e in self.shown()?.iter() {
+            if e.field.starts_with(prefix) && seen.insert((e.entity.clone(), e.field.clone())) {
+                logged.push((e.entity.clone(), e.field.clone()));
+                more = true;
+            }
+        }
+        // As SQLite orders text: by its bytes.
+        if more {
+            logged.sort();
+        }
+        Ok(logged)
     }
 
     /// Whether any entry ever wrote `field`.
     pub fn mentions(&self, field: &str) -> Result<bool> {
-        Ok(self
+        let logged = self
             .db
             .lock()
             .query_row(
@@ -696,7 +785,8 @@ impl Store {
                 |_| Ok(()),
             )
             .optional()?
-            .is_some())
+            .is_some();
+        Ok(logged || self.shown()?.iter().any(|e| e.field == field))
     }
 
     /// The log's high-water mark: the local handle of the newest entry, 0
@@ -987,18 +1077,57 @@ impl Store {
 
     /// The entities whose id starts with `prefix`, sorted.
     pub fn entities_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
-        let db = self.db.lock();
-        let mut stmt = db.prepare(&format!(
-            "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
-                 AND substr(entity, 1, ?) = ? ORDER BY entity"
-        ))?;
-        let rows = stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| r.get(0))?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        let mut logged: Vec<String> = {
+            let db = self.db.lock();
+            let mut stmt = db.prepare(&format!(
+                "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
+                     AND substr(entity, 1, ?) = ? ORDER BY entity"
+            ))?;
+            let rows =
+                stmt.query_map(params![prefix.chars().count() as i64, prefix], |r| r.get(0))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
+        let mut seen: std::collections::HashSet<String> = logged.iter().cloned().collect();
+        let mut more = false;
+        for e in self.shown()?.iter() {
+            if e.entity.starts_with(prefix) && seen.insert(e.entity.clone()) {
+                logged.push(e.entity.clone());
+                more = true;
+            }
+        }
+        if more {
+            logged.sort();
+        }
+        Ok(logged)
     }
 
-    /// Every entry of `entity` that counts, in log order: what no role
-    /// in a Shared Area allows is left out ([`Store::judged`]).
+    /// Every entry of `entity` that counts, in log order, then those of
+    /// the shown pending sets: what no role in a Shared Area allows is
+    /// left out, judged with those sets too.
     pub fn history(&self, entity: &str) -> Result<Vec<Entry>> {
+        let shown = self.shown()?;
+        if shown.is_empty() {
+            return self.logged_history(entity);
+        }
+        let mut all = self.entries(
+            &format!("SELECT * FROM entries WHERE {APPLIED} AND entity = ? ORDER BY seq"),
+            params![entity],
+        )?;
+        all.extend(shown.iter().filter(|e| e.entity == entity).cloned());
+        let judged = self.display_judged(&shown)?;
+        if judged.ignored.is_empty() {
+            return Ok(all);
+        }
+        Ok(all
+            .into_iter()
+            .filter(|e| !judged.ignored.contains(&e.id()))
+            .collect())
+    }
+
+    /// Every entry of `entity` in the log that counts, in log order, no
+    /// pending change among them: what decides where an entity is
+    /// sealed, and what the user's own Devices wrote.
+    pub fn logged_history(&self, entity: &str) -> Result<Vec<Entry>> {
         let all = self.entries(
             &format!("SELECT * FROM entries WHERE {APPLIED} AND entity = ? ORDER BY seq"),
             params![entity],
@@ -1011,6 +1140,21 @@ impl Store {
             .into_iter()
             .filter(|e| !judged.ignored.contains(&e.id()))
             .collect())
+    }
+
+    /// The value of `field` on `entity` in the log alone, latest wins.
+    pub fn logged(&self, entity: &str, field: &str) -> Result<Option<String>> {
+        let mut held: Option<Entry> = None;
+        for e in self.logged_history(entity)? {
+            if e.field == field
+                && held
+                    .as_ref()
+                    .is_none_or(|h| Self::latest_wins(&e, h) == Ordering::Greater)
+            {
+                held = Some(e);
+            }
+        }
+        Ok(held.and_then(|e| e.value))
     }
 
     /// Every entry of `entities` as it is, none left out, by (device,
@@ -1057,7 +1201,7 @@ impl Store {
 
     /// Entities whose current `$type` is `ty`.
     pub fn entities_of_type(&self, ty: &str) -> Result<Vec<String>> {
-        let ids: Vec<String> = {
+        let mut ids: Vec<String> = {
             let db = self.db.lock();
             let mut stmt = db.prepare(&format!(
                 "SELECT DISTINCT entity FROM entries WHERE {APPLIED} \
@@ -1066,6 +1210,11 @@ impl Store {
             let rows = stmt.query_map([ty], |r| r.get(0))?;
             rows.collect::<rusqlite::Result<_>>()?
         };
+        for e in self.shown()?.iter() {
+            if e.field == "$type" && e.value.as_deref() == Some(ty) && !ids.contains(&e.entity) {
+                ids.push(e.entity.clone());
+            }
+        }
         let mut out = Vec::new();
         for id in ids {
             if self.current(&id, "$type")?.as_deref() == Some(ty) {
@@ -1092,26 +1241,256 @@ impl Store {
         let mut out = Vec::new();
         for row in rows {
             let (seq, wire) = row?;
-            out.push(Entry {
-                seq,
-                extra: wire.extra,
-                raw: wire.raw,
-                date_at: parse_time(&wire.date)?,
-                recorded_at: parse_time(&wire.recorded)?,
-                device: wire.device,
-                dseq: wire.dseq,
-                entity: wire.entity,
-                field: wire.field,
-                value: wire.value,
-                date: wire.date,
-                author: wire.author,
-                recorded: wire.recorded,
-                sig: wire.sig,
-                ctx: wire.ctx,
-            });
+            out.push(entry_of(seq, wire)?);
         }
         Ok(out)
     }
+
+    // ----------------------------------------------------------- pending
+
+    /// Keeps `set` in its file and shows it where it is shown.
+    pub(crate) fn keep_pending_set(&self, set: PendingSet) -> Result<()> {
+        self.pending_files.write(&set.id, &set.encode()?)?;
+        self.pending.lock().sets.insert(set.id.clone(), set);
+        self.changed();
+        Ok(())
+    }
+
+    /// Deletes the set `id` and its file, and the mark of its Accept.
+    pub(crate) fn forget_pending_set(&self, id: &str) -> Result<()> {
+        self.pending_files.remove(id)?;
+        self.remove_local_setting(&format!("{ACCEPTED_PENDING_PREFIX}{id}"))?;
+        let removed = self.pending.lock().sets.remove(id).is_some();
+        if removed {
+            self.changed();
+        }
+        Ok(())
+    }
+
+    /// The pending sets, the oldest first.
+    pub(crate) fn sorted_pending_sets(&self) -> Vec<PendingSet> {
+        let mut sets: Vec<PendingSet> = self.pending.lock().sets.values().cloned().collect();
+        sets.sort_by(|a, b| a.made.cmp(&b.made).then_with(|| a.id.cmp(&b.id)));
+        sets
+    }
+
+    /// The set `id` as its file holds it now, and so as this store shows
+    /// it from now on, as the Dart core's `freshPendingSet`: another store
+    /// open on the same file may have changed or ended it. `None` when it
+    /// is gone, or accepted and its file not deleted yet.
+    pub(crate) fn fresh_pending_set(&self, id: &str) -> Result<Option<PendingSet>> {
+        let text = match self.local_setting(&format!("{ACCEPTED_PENDING_PREFIX}{id}"))? {
+            Some(_) => None,
+            None => self.pending_files.read(id)?,
+        };
+        let fresh = text
+            .as_deref()
+            .and_then(PendingSet::parse)
+            .filter(|set| set.id == id);
+        self.cache_pending(id, fresh.clone())?;
+        Ok(fresh)
+    }
+
+    /// Every pending set as the files hold them now, the oldest first.
+    pub(crate) fn fresh_pending_sets(&self) -> Result<Vec<PendingSet>> {
+        let files = self.pending_files.read_all()?;
+        let held: Vec<String> = self.pending.lock().sets.keys().cloned().collect();
+        for id in held {
+            if !files.contains_key(&id) {
+                self.cache_pending(&id, None)?;
+            }
+        }
+        for (id, text) in &files {
+            let set = match self.local_setting(&format!("{ACCEPTED_PENDING_PREFIX}{id}"))? {
+                Some(_) => None,
+                None => PendingSet::parse(text).filter(|set| &set.id == id),
+            };
+            self.cache_pending(id, set)?;
+        }
+        Ok(self.sorted_pending_sets())
+    }
+
+    /// Shows `set` as the set `id` from now on, none for `None`.
+    fn cache_pending(&self, id: &str, set: Option<PendingSet>) -> Result<()> {
+        let changed = {
+            let mut held = self.pending.lock();
+            match set {
+                None => held.sets.remove(id).is_some(),
+                Some(set) => match held.sets.get(id) {
+                    Some(old) if old.encode()? == set.encode()? => false,
+                    _ => {
+                        held.sets.insert(id.to_string(), set);
+                        true
+                    }
+                },
+            }
+        };
+        if changed {
+            self.changed();
+        }
+        Ok(())
+    }
+
+    /// Takes in the sets a restart left. One accepted before its file
+    /// was gone is gone now; a file that is no set this version reads
+    /// stays on disk, unread.
+    fn load_pending(&self) -> Result<()> {
+        let files = self.pending_files.read_all()?;
+        for (id, text) in &files {
+            if self
+                .local_setting(&format!("{ACCEPTED_PENDING_PREFIX}{id}"))?
+                .is_some()
+            {
+                self.forget_pending_set(id)?;
+                continue;
+            }
+            if let Some(set) = PendingSet::parse(text)
+                && &set.id == id
+            {
+                self.pending.lock().sets.insert(id.clone(), set);
+            }
+        }
+        for (key, _) in self.local_settings_with_prefix(ACCEPTED_PENDING_PREFIX)? {
+            let id = &key[ACCEPTED_PENDING_PREFIX.len()..];
+            if !files.contains_key(id) {
+                self.remove_local_setting(&key)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The changes of the shown pending sets as entries, as the Dart
+    /// core's `_shown`: oldest set first, each in the order its changes
+    /// came; a draft as this Device's, numbered below zero, so it is
+    /// numbered nowhere; a received entry as it came, unless the log
+    /// holds it by now. Only what this version applies, and nothing an
+    /// edit of the user's own made since gives way to at Accept
+    /// ([`Store::gives_way`]): the reads show what Accept will keep.
+    pub(crate) fn shown(&self) -> Result<Arc<Vec<Entry>>> {
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        {
+            let held = self.pending.lock();
+            if let Some(overlay) = &held.overlay {
+                return Ok(overlay.clone());
+            }
+            if held.sets.is_empty() {
+                return Ok(Arc::new(Vec::new()));
+            }
+        }
+        let device = self.device_id()?;
+        let author = self.author()?;
+        let mut drafted = 0;
+        let mut out = Vec::new();
+        let mut by = GiveWay::default();
+        for set in self.sorted_pending_sets() {
+            if !set.shown {
+                continue;
+            }
+            by.ids = set
+                .received()
+                .iter()
+                .map(|r| format!("{}:{}", r.entry.device, r.entry.dseq))
+                .collect();
+            for change in set.changes {
+                match change {
+                    PendingChange::Draft(d) => {
+                        if self.gives_way(&d.entity, &d.field, d.mark, &mut by)? {
+                            continue;
+                        }
+                        drafted += 1;
+                        let date = d.date.unwrap_or(d.made);
+                        out.push(Entry {
+                            seq: 0,
+                            device: device.clone(),
+                            dseq: -drafted,
+                            entity: d.entity,
+                            field: d.field,
+                            value: d.value,
+                            date: dart_iso(date),
+                            author: author.clone(),
+                            recorded: dart_iso(d.made),
+                            sig: None,
+                            ctx: None,
+                            extra: serde_json::Map::new(),
+                            raw: None,
+                            date_at: date,
+                            recorded_at: d.made,
+                        });
+                    }
+                    PendingChange::Entry(r) => {
+                        if r.entry.applies()
+                            && !self.holds(&r.entry.device, r.entry.dseq)?
+                            && !self.gives_way(&r.entry.entity, &r.entry.field, r.mark, &mut by)?
+                        {
+                            out.push(entry_of(0, r.entry)?);
+                        }
+                    }
+                }
+            }
+        }
+        let overlay = Arc::new(out);
+        let mut held = self.pending.lock();
+        if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
+            held.overlay = Some(overlay.clone());
+        }
+        Ok(overlay)
+    }
+
+    /// What the roles allow with the shown pending sets on top of the
+    /// log: what the reads leave out, nothing else.
+    fn display_judged(&self, shown: &[Entry]) -> Result<Arc<JudgedLog>> {
+        if shown.is_empty() {
+            return self.judged();
+        }
+        let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
+        if let Some(held) = self.pending.lock().judged.as_ref() {
+            return Ok(held.clone());
+        }
+        let logged = self.judged()?;
+        let roles = shown
+            .iter()
+            .any(|e| e.field.starts_with(crate::shared::ROLE_PREFIX));
+        let judged = if !roles && logged.areas.is_empty() && logged.ignored.is_empty() {
+            logged
+        } else {
+            let mut all = self.entries(
+                &format!("SELECT * FROM entries WHERE {APPLIED} ORDER BY seq"),
+                params![],
+            )?;
+            all.extend(shown.iter().cloned());
+            Arc::new(judge_log(&all))
+        };
+        let mut held = self.pending.lock();
+        if self.generation.load(std::sync::atomic::Ordering::SeqCst) == generation {
+            held.judged = Some(judged.clone());
+        }
+        Ok(judged)
+    }
+}
+
+/// The local setting that says a pending set was accepted, written with
+/// what Accept wrote: a restart before its file is gone deletes it.
+pub const ACCEPTED_PENDING_PREFIX: &str = "pending:";
+
+/// `wire` as the store reads it, at the local handle `seq`.
+pub(crate) fn entry_of(seq: i64, wire: WireEntry) -> Result<Entry> {
+    Ok(Entry {
+        seq,
+        extra: wire.extra,
+        raw: wire.raw,
+        date_at: parse_time(&wire.date)?,
+        recorded_at: parse_time(&wire.recorded)?,
+        device: wire.device,
+        dseq: wire.dseq,
+        entity: wire.entity,
+        field: wire.field,
+        value: wire.value,
+        date: wire.date,
+        author: wire.author,
+        recorded: wire.recorded,
+        sig: wire.sig,
+        ctx: wire.ctx,
+    })
 }
 
 fn raw_row(r: &Row) -> rusqlite::Result<(i64, WireEntry)> {

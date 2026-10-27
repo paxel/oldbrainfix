@@ -60,3 +60,7 @@ A blocked Manager's Routines, Reminders, Area and Topic names would go half miss
 - ADR 0015: a Sent Item from a blocked person is refused before its preview.
 - ADR 0017: a blocked person's Profile is kept without its picture, not passed on, and not updated while blocked.
 - ADR 0020: a blocked person's photos and recordings are deleted at the block, with no removal entry; their copies in the shared folder stay.
+
+## Pending Changes (ADR 0022)
+
+Amended by ADR 0022 (#111): a blocked person's entries never enter a pending set. Her Devices are judged by the grants of the log and of the set together, and a block takes her entries out of every set already held. Neither is noted as a refusal mark.

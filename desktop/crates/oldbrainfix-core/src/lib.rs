@@ -27,6 +27,7 @@ pub mod notes;
 pub mod nudges;
 pub mod overrides;
 pub mod pairing;
+pub mod pending;
 pub mod people;
 pub mod photos;
 pub mod places;
@@ -53,6 +54,9 @@ pub use notes::{Blob, Importance, Note, Notes, Section, Wordless};
 pub use nudges::{PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
 pub use pairing::PairedDevice;
+pub use pending::{
+    AcceptedChanges, KeptEdit, PendingChange, PendingDraft, PendingEntry, PendingSet,
+};
 pub use people::{PersonFilter, PersonTaken};
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};

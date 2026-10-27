@@ -4,11 +4,13 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:meta/meta.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'blobs.dart';
 import 'conflicts.dart';
 import 'entry.dart';
+import 'pending.dart';
 import 'photos.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
@@ -22,15 +24,21 @@ import 'signing.dart';
 /// Photo and voice recording bytes live outside the log, content-addressed
 /// by SHA-256: `photos` and `audio` directories next to the database file,
 /// or memory for [Store.inMemory].
+///
+/// Pending Changes (ADR 0022) lie beside it, in a `pending` directory:
+/// every read of what the log holds now ([history], [currentFields] and
+/// the lists of entities and fields) sees the shown sets on top of it;
+/// what is held, passed on, numbered or trusted reads the log alone.
 class Store {
   final Database _db;
   final Blobs _photos;
   final Blobs _audio;
+  final PendingFiles _pendingFiles;
 
   /// Where the store reads "now" for [Entry.recorded] and default dates.
   final DateTime Function() clock;
 
-  Store._(this._db, this.clock, this._photos, this._audio);
+  Store._(this._db, this.clock, this._photos, this._audio, this._pendingFiles);
 
   final _listeners = <void Function()>[];
   var _inBatch = false;
@@ -62,6 +70,8 @@ class Store {
 
   void _changed() {
     _judged = null;
+    _overlay = null;
+    _shownJudged = null;
     if (_inBatch) return;
     for (final listener in List.of(_listeners)) {
       listener();
@@ -80,6 +90,7 @@ class Store {
     newKey,
     FileBlobs('${File(path).parent.path}/photos'),
     FileBlobs('${File(path).parent.path}/audio'),
+    FilePendingFiles('${File(path).parent.path}/pending'),
   );
 
   /// Opens a throwaway in-memory store (tests).
@@ -92,6 +103,7 @@ class Store {
     newKey,
     MemoryBlobs(),
     MemoryBlobs(),
+    MemoryPendingFiles(),
   );
 
   static Store _init(
@@ -100,6 +112,7 @@ class Store {
     SigningKey Function() newKey,
     Blobs photos,
     Blobs audio,
+    PendingFiles pending,
   ) {
     // The background sync may hold the file a moment while the app opens:
     // a write waits for it instead of failing.
@@ -149,12 +162,13 @@ class Store {
       db.execute('ALTER TABLE entries ADD COLUMN raw TEXT');
       db.execute('ALTER TABLE entries ADD COLUMN v INTEGER');
     }
-    final store = Store._(db, clock, photos, audio);
+    final store = Store._(db, clock, photos, audio, pending);
     if (store.localSetting('device') == null) {
       final key = newKey();
       store.setLocalSetting('device', deviceIdFromKey(key.publicKey));
       store.setLocalSetting('signseed', key.seedHex);
     }
+    store._loadPending();
     return store;
   }
 
@@ -314,7 +328,9 @@ class Store {
 
   /// The causal context of a write to [unit] on [entity] by [device]
   /// holding [vector]: how far it has seen every other Device that wrote
-  /// the unit here; null when nobody wrote it yet.
+  /// the unit here; null when nobody wrote it yet. What the shown pending
+  /// sets hold of other Devices counts as seen (ADR 0022): the user saw
+  /// it when they wrote.
   String? _context(
     String entity,
     String unit,
@@ -322,6 +338,14 @@ class Store {
     Map<String, int> vector,
   ) {
     final fields = conflictUnitFields(unit);
+    final seen = Map.of(vector);
+    final received = [
+      for (final e in _shown)
+        if (e.device != device) e,
+    ];
+    for (final e in received) {
+      if (e.dseq > (seen[e.device] ?? 0)) seen[e.device] = e.dseq;
+    }
     final writers = {
       for (final r in _db.select(
         'SELECT DISTINCT device FROM entries WHERE $_applied AND entity = ? '
@@ -330,11 +354,13 @@ class Store {
         [entity, ...fields],
       ))
         r['device'] as String,
+      for (final e in received)
+        if (e.entity == entity && fields.contains(e.field)) e.device,
     };
     if (writers.isEmpty) return null;
     return encodeContext({
       for (final d in writers)
-        if (d != device) d: vector[d] ?? 0,
+        if (d != device) d: seen[d] ?? 0,
     });
   }
 
@@ -381,33 +407,57 @@ class Store {
 
   /// The (entity, field) pairs whose field starts with [prefix], by
   /// entity and field.
-  List<(String, String)> fieldsWithPrefix(String prefix) => [
-    for (final r in _db.select(
-      'SELECT DISTINCT entity, field FROM entries '
-      'WHERE $_applied AND substr(field, 1, ?) = ? '
-      'ORDER BY entity, field',
-      [prefix.length, prefix],
-    ))
-      (r['entity'] as String, r['field'] as String),
-  ];
+  List<(String, String)> fieldsWithPrefix(String prefix) {
+    final logged = [
+      for (final r in _db.select(
+        'SELECT DISTINCT entity, field FROM entries '
+        'WHERE $_applied AND substr(field, 1, ?) = ? '
+        'ORDER BY entity, field',
+        [prefix.length, prefix],
+      ))
+        (r['entity'] as String, r['field'] as String),
+    ];
+    final seen = logged.toSet();
+    final pending = [
+      for (final e in _shown)
+        if (e.field.startsWith(prefix) && seen.add((e.entity, e.field)))
+          (e.entity, e.field),
+    ];
+    if (pending.isEmpty) return logged;
+    return [...logged, ...pending]..sort((a, b) {
+      final byEntity = _compareBytes(a.$1, b.$1);
+      return byEntity != 0 ? byEntity : _compareBytes(a.$2, b.$2);
+    });
+  }
 
   /// Which Device wrote which of [fields] on which entity, as (entity,
   /// field, device), each once.
-  List<(String, String, String)> writersOf(List<String> fields) => [
-    for (final r in _db.select(
-      'SELECT DISTINCT entity, field, device FROM entries '
-      'WHERE $_applied AND field IN '
-      '(${List.filled(fields.length, '?').join(', ')})',
-      fields,
-    ))
-      (r['entity'] as String, r['field'] as String, r['device'] as String),
-  ];
+  List<(String, String, String)> writersOf(List<String> fields) {
+    final logged = [
+      for (final r in _db.select(
+        'SELECT DISTINCT entity, field, device FROM entries '
+        'WHERE $_applied AND field IN '
+        '(${List.filled(fields.length, '?').join(', ')})',
+        fields,
+      ))
+        (r['entity'] as String, r['field'] as String, r['device'] as String),
+    ];
+    final seen = logged.toSet();
+    return [
+      ...logged,
+      for (final e in _shown)
+        if (fields.contains(e.field) && seen.add((e.entity, e.field, e.device)))
+          (e.entity, e.field, e.device),
+    ];
+  }
 
   /// Whether any entry ever wrote [field].
-  bool mentions(String field) => _db.select(
-    'SELECT 1 FROM entries WHERE $_applied AND field = ? LIMIT 1',
-    [field],
-  ).isNotEmpty;
+  bool mentions(String field) =>
+      _db.select(
+        'SELECT 1 FROM entries WHERE $_applied AND field = ? LIMIT 1',
+        [field],
+      ).isNotEmpty ||
+      _shown.any((e) => e.field == field);
 
   /// The log's high-water mark: the local handle of the newest entry, 0
   /// for an empty log. `seq` is AUTOINCREMENT, so a mark keeps meaning
@@ -537,6 +587,181 @@ class Store {
     return next > high ? null : next;
   }
 
+  // ------------------------------------------------------------- pending
+
+  /// The local setting that says a pending set was accepted, written with
+  /// what Accept wrote: a restart before its file is gone deletes it.
+  static const acceptedPendingPrefix = 'pending:';
+
+  final _pending = <String, PendingSet>{};
+  List<Entry>? _overlay;
+  JudgedLog? _shownJudged;
+
+  /// The set [id] as its file holds it now, and so as this store shows
+  /// it from now on: another store open on the same file, such as the
+  /// phone's background sync, may have changed or ended it. Null when it
+  /// is gone, or accepted and its file not deleted yet.
+  @internal
+  PendingSet? freshPendingSet(String id) {
+    final text = localSetting('$acceptedPendingPrefix$id') == null
+        ? _pendingFiles.read(id)
+        : null;
+    final set = text == null ? null : PendingSet.parse(text);
+    final fresh = set != null && set.id == id ? set : null;
+    _cachePending(id, fresh);
+    return fresh;
+  }
+
+  /// Every pending set as the files hold them now, the oldest first.
+  @internal
+  List<PendingSet> freshPendingSets() {
+    final files = _pendingFiles.readAll();
+    for (final id in _pending.keys.toList()) {
+      if (!files.containsKey(id)) _cachePending(id, null);
+    }
+    for (final MapEntry(key: id, value: text) in files.entries) {
+      final set = localSetting('$acceptedPendingPrefix$id') == null
+          ? PendingSet.parse(text)
+          : null;
+      _cachePending(id, set != null && set.id == id ? set : null);
+    }
+    return sortedPendingSets();
+  }
+
+  /// Shows [set] as the set [id] from now on, none for null. What the
+  /// reads worked out goes; nobody is told, since this comes from a read.
+  void _cachePending(String id, PendingSet? set) {
+    final held = _pending[id];
+    if (set == null) {
+      if (held == null) return;
+      _pending.remove(id);
+    } else {
+      if (held != null && held.encode() == set.encode()) return;
+      _pending[id] = set;
+    }
+    _overlay = null;
+    _shownJudged = null;
+  }
+
+  /// The pending sets, the oldest first.
+  @internal
+  List<PendingSet> sortedPendingSets() =>
+      _pending.values.toList()..sort((a, b) {
+        final byMade = a.made.compareTo(b.made);
+        return byMade != 0 ? byMade : a.id.compareTo(b.id);
+      });
+
+  /// Keeps [set] in its file and shows it where it is shown.
+  @internal
+  void keepPendingSet(PendingSet set) {
+    _pendingFiles.write(set.id, set.encode());
+    _pending[set.id] = set;
+    _changed();
+  }
+
+  /// Deletes the set [id] and its file, and the mark of its Accept.
+  @internal
+  void forgetPendingSet(String id) {
+    _pendingFiles.remove(id);
+    removeLocalSetting('$acceptedPendingPrefix$id');
+    if (_pending.remove(id) != null) _changed();
+  }
+
+  /// Takes in the sets a restart left. One accepted before its file was
+  /// gone is gone now; a file that is no set this version reads stays on
+  /// disk, unread.
+  void _loadPending() {
+    final files = _pendingFiles.readAll();
+    for (final MapEntry(key: id, value: text) in files.entries) {
+      if (localSetting('$acceptedPendingPrefix$id') != null) {
+        forgetPendingSet(id);
+        continue;
+      }
+      final set = PendingSet.parse(text);
+      if (set != null && set.id == id) _pending[id] = set;
+    }
+    for (final (key, _) in localSettingsWithPrefix(acceptedPendingPrefix)) {
+      final id = key.substring(acceptedPendingPrefix.length);
+      if (!files.containsKey(id)) removeLocalSetting(key);
+    }
+  }
+
+  /// The changes of the shown pending sets as entries, oldest set first,
+  /// each set in the order its changes came: a draft as this Device's,
+  /// numbered below zero, so it is numbered nowhere; a received entry
+  /// as it came, unless the log holds it by now. Only what this version
+  /// applies, and nothing an edit of the user's own made since gives way
+  /// to at Accept ([PendingChanges.givesWay]): the reads show what Accept
+  /// will keep.
+  List<Entry> get _shown => _overlay ??= () {
+    if (_pending.isEmpty) return const <Entry>[];
+    final self = deviceId;
+    final name = author;
+    final own = <String, bool>{};
+    final histories = <String, List<Entry>>{};
+    var drafted = 0;
+    final out = <Entry>[];
+    for (final set in sortedPendingSets()) {
+      if (!set.shown) continue;
+      final ids = {for (final r in set.received) r.entry.id};
+      bool givesWay(String entity, String field, int mark) => PendingChanges(
+        this,
+      ).givesWay(entity, field, mark, ids: ids, own: own, histories: histories);
+      for (final change in set.changes) {
+        switch (change) {
+          case PendingDraft():
+            if (givesWay(change.entity, change.field, change.mark)) continue;
+            drafted++;
+            out.add(
+              Entry(
+                seq: 0,
+                device: self,
+                dseq: -drafted,
+                entity: change.entity,
+                field: change.field,
+                value: change.value,
+                date: change.effectiveDate,
+                author: name,
+                recorded: change.made,
+              ),
+            );
+          case PendingEntry(:final entry):
+            if (entry.applies &&
+                !holds(entry.device, entry.dseq) &&
+                !givesWay(entry.entity, entry.field, change.mark)) {
+              out.add(entry);
+            }
+        }
+      }
+    }
+    return out;
+  }();
+
+  /// What the roles allow with the shown pending sets on top of the log:
+  /// what the reads leave out, nothing else.
+  JudgedLog get _displayJudged {
+    final shown = _shown;
+    if (shown.isEmpty) return judged;
+    return _shownJudged ??=
+        !shown.any((e) => e.field.startsWith('role:')) &&
+            identical(judged, JudgedLog.none)
+        ? JudgedLog.none
+        : judgeLog([
+            ..._entries('SELECT * FROM entries WHERE $_applied ORDER BY seq'),
+            ...shown,
+          ]);
+  }
+
+  /// [a] against [b] by their UTF-8 bytes, as SQLite orders text.
+  static int _compareBytes(String a, String b) {
+    final x = utf8.encode(a);
+    final y = utf8.encode(b);
+    for (var i = 0; i < x.length && i < y.length; i++) {
+      if (x[i] != y[i]) return x[i] - y[i];
+    }
+    return x.length - y.length;
+  }
+
   // ------------------------------------------------------------ refusals
 
   static const _refusedPrefix = 'refused:';
@@ -626,18 +851,50 @@ class Store {
   }
 
   /// The entities whose id starts with [prefix], sorted.
-  List<String> entitiesWithPrefix(String prefix) => [
-    for (final r in _db.select(
-      'SELECT DISTINCT entity FROM entries '
-      'WHERE $_applied AND substr(entity, 1, ?) = ? ORDER BY entity',
-      [prefix.length, prefix],
-    ))
-      r['entity'] as String,
-  ];
+  List<String> entitiesWithPrefix(String prefix) {
+    final logged = [
+      for (final r in _db.select(
+        'SELECT DISTINCT entity FROM entries '
+        'WHERE $_applied AND substr(entity, 1, ?) = ? ORDER BY entity',
+        [prefix.length, prefix],
+      ))
+        r['entity'] as String,
+    ];
+    final seen = logged.toSet();
+    final pending = [
+      for (final e in _shown)
+        if (e.entity.startsWith(prefix) && seen.add(e.entity)) e.entity,
+    ];
+    if (pending.isEmpty) return logged;
+    return [...logged, ...pending]..sort(_compareBytes);
+  }
 
-  /// Every entry of [entity] that counts, in log order: what no role in
-  /// a Shared Area allows is left out ([judged]).
+  /// Every entry of [entity] that counts, in log order, then those of
+  /// the shown pending sets: what no role in a Shared Area allows is left
+  /// out, judged with those sets too.
   List<Entry> history(String entity) {
+    final shown = _shown;
+    if (shown.isEmpty) return loggedHistory(entity);
+    final all = [
+      ..._entries(
+        'SELECT * FROM entries WHERE $_applied AND entity = ? ORDER BY seq',
+        [entity],
+      ),
+      for (final e in shown)
+        if (e.entity == entity) e,
+    ];
+    final ignored = _displayJudged.ignored;
+    if (ignored.isEmpty) return all;
+    return [
+      for (final e in all)
+        if (!ignored.contains(e.id)) e,
+    ];
+  }
+
+  /// Every entry of [entity] in the log that counts, in log order, no
+  /// pending change among them: what decides where an entity is sealed,
+  /// and what the user's own Devices wrote.
+  List<Entry> loggedHistory(String entity) {
     final all = _entries(
       'SELECT * FROM entries WHERE $_applied AND entity = ? ORDER BY seq',
       [entity],
@@ -648,6 +905,15 @@ class Store {
       for (final e in all)
         if (!ignored.contains(e.id)) e,
     ];
+  }
+
+  /// The value of [field] on [entity] in the log alone, latest wins.
+  String? logged(String entity, String field) {
+    Entry? held;
+    for (final e in loggedHistory(entity)) {
+      if (e.field == field && (held == null || _newer(e, held))) held = e;
+    }
+    return held?.value;
   }
 
   /// Every entry of [entities] as it is, none left out, by (device,
@@ -664,7 +930,8 @@ class Store {
 
   /// What the roles of the Shared Areas allow (ADR 0013), worked out
   /// from the whole log after every change; nothing to work out while no
-  /// Area was ever shared.
+  /// Area was ever shared. Pending Changes never count here: this is
+  /// what decides who may do what, what is refused and what is deleted.
   JudgedLog get judged => _judged ??=
       _db
           .select(
@@ -698,13 +965,16 @@ class Store {
 
   /// Entities whose current `$type` is [type].
   List<String> entitiesOfType(String type) {
-    final ids = _db
-        .select(
-          'SELECT DISTINCT entity FROM entries WHERE $_applied '
-          r"AND field = '$type' AND value = ?",
-          [type],
-        )
-        .map((r) => r['entity'] as String);
+    final ids = {
+      for (final r in _db.select(
+        'SELECT DISTINCT entity FROM entries WHERE $_applied '
+        r"AND field = '$type' AND value = ?",
+        [type],
+      ))
+        r['entity'] as String,
+      for (final e in _shown)
+        if (e.field == r'$type' && e.value == type) e.entity,
+    };
     return [
       for (final id in ids)
         if (current(id, r'$type') == type) id,

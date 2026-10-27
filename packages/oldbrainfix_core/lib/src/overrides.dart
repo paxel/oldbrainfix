@@ -95,12 +95,13 @@ extension Overrides on Store {
   /// Devices wrote ([writtenByOwn]); null when none did. In a Shared
   /// Area another person's Device can write any field of a Note, so a
   /// link one's own Devices keep is read this way. [own] remembers, across
-  /// calls, which Devices are one's own.
+  /// calls, which Devices are one's own. Read from the log alone: a
+  /// pending change (ADR 0022) is trusted for nothing.
   @internal
   String? currentByOwn(String entity, String field, [Map<String, bool>? own]) {
     own ??= {};
     Entry? held;
-    for (final e in history(entity)) {
+    for (final e in loggedHistory(entity)) {
       if (e.field != field) continue;
       if (!own.putIfAbsent(e.device, () => writtenByOwn(e.device))) continue;
       if (held == null || Store.latestWins(e, held) > 0) held = e;

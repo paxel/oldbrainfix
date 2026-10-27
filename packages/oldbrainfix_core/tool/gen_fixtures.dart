@@ -2704,6 +2704,160 @@ void _blockFixture(Directory root) {
   }
 }
 
+/// Pending Changes (ADR 0022, #111): Ann's AI Task drafts changes and a
+/// bundle brings Bob's entries; Ann edits some of the same fields
+/// herself meanwhile, declines a third set and accepts the two. Every
+/// step at a held clock, so the desktop core can take the same steps.
+void _pendingFixture(Directory root) {
+  final out = Directory('${root.path}/pending');
+  final ann = _store();
+  final bob = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Bob');
+  try {
+    final milk = Notes(ann).capture('Milk');
+    final bread = Notes(ann).capture('Bread');
+    final household = Places(ann).addArea('Household').id;
+    final routine = Routines(ann).spawn(
+      milk.id,
+      Schedule(
+        start: Day(2026, 1, 2),
+        times: [ClockTime(8, 0)],
+        rule: Recurrence.parse('FREQ=DAILY'),
+      ),
+    );
+    _write(File('${out.path}/before.jsonl'), _log(ann));
+    bob.applyEntries(ann.entriesSince({}), keys: ann.keyRecords());
+    var mark = bob.currentSeq();
+    Notes(bob).edit(bread.id, 'Bread from Bob');
+    Notes(bob).capture('Call Bob back');
+    _writeAfter(bob, mark, File('${out.path}/received.jsonl'));
+    _write(
+      File('${out.path}/key.json'),
+      '${_json.convert(bob.ownKeyRecord.toJson())}\n',
+    );
+
+    var ids = 0x800;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final times = [
+      for (var minute = 0; minute < 14; minute++)
+        DateTime.utc(2026, 1, 2, 9, minute),
+    ];
+    var step = 0;
+    void tick() => _held = times[step++];
+    final before = ann.currentSeq();
+
+    // The AI Task's changes, and the user's own edits among them.
+    tick();
+    final ai = ann.openPending('ai-task', shown: true);
+    tick();
+    ann.draftPending(
+      ai,
+      milk.id,
+      NoteKeys.text,
+      StoredText.plain('Oat milk').encode(),
+    );
+    tick();
+    ann.draftPending(ai, milk.id, NoteKeys.place, household);
+    tick();
+    final eggs = 'note:${Store.newId()}';
+    ann.draftPending(ai, eggs, NoteKeys.type, NoteKeys.typeNote);
+    ann.draftPending(ai, eggs, NoteKeys.captured, _held!.toIso8601String());
+    ann.draftPending(
+      ai,
+      eggs,
+      NoteKeys.text,
+      StoredText.plain('Eggs').encode(),
+    );
+    tick();
+    ann.draftPending(ai, routine.id, RoutineKeys.rule, 'FREQ=WEEKLY');
+    tick();
+    Notes(ann).edit(milk.id, 'Milk, two litres');
+    tick();
+    ann.append(routine.id, RoutineKeys.start, '2026-01-03');
+
+    // A bundle with Bob's entries, and an edit of the Note he edited.
+    tick();
+    final bundle = ann.openPending('bundle', shown: true);
+    ann.receivePending(
+      bundle,
+      bob.entriesAfter(mark),
+      keys: [bob.ownKeyRecord],
+    );
+    tick();
+    Notes(ann).edit(bread.id, 'Brown bread');
+    _writeAfter(ann, before, File('${out.path}/edits.jsonl'));
+    _write(File('${out.path}/ai.json'), ann.pendingSet(ai)!.encode());
+    _write(File('${out.path}/bundle.json'), ann.pendingSet(bundle)!.encode());
+    tick();
+    final shown = _expected(ann);
+    final routineShown = ann.currentFields(routine.id);
+
+    // A third set, declined: the log stays as it was.
+    tick();
+    final other = ann.openPending('ai-task', shown: true);
+    ann.draftPending(
+      other,
+      bread.id,
+      NoteKeys.text,
+      StoredText.plain('Never').encode(),
+    );
+    ann.declinePending(other);
+    final declined = _expected(ann);
+    final routineDeclined = ann.currentFields(routine.id);
+
+    List<List<String?>> kept(AcceptedChanges accepted) => [
+      for (final k in accepted.kept) [k.entity, k.field, k.pending, k.kept],
+    ];
+    tick();
+    mark = ann.currentSeq();
+    final aiAccepted = ann.acceptPending(ai);
+    _writeAfter(ann, mark, File('${out.path}/accept-ai.jsonl'));
+    tick();
+    mark = ann.currentSeq();
+    final bundleAccepted = ann.acceptPending(bundle);
+    _writeAfter(ann, mark, File('${out.path}/accept-bundle.jsonl'));
+    tick();
+    final accepted = _expected(ann);
+    final routineAccepted = ann.currentFields(routine.id);
+    if (jsonEncode(routineShown) != jsonEncode(routineAccepted) ||
+        aiAccepted.kept.length != 2 ||
+        bundleAccepted.kept.length != 1 ||
+        ann.conflicts().isNotEmpty ||
+        Notes(ann).byId(bread.id)?.text != 'Brown bread') {
+      throw StateError('the pending fixture did not keep the own edits');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'times': [for (final t in times) t.toIso8601String()],
+        'ai': ai,
+        'bundle': bundle,
+        'other': other,
+        'eggs': eggs,
+        'milk': milk.id,
+        'bread': bread.id,
+        'routine': routine.id,
+        'household': household,
+        'shown': shown,
+        'routineShown': routineShown,
+        'declined': declined,
+        'routineDeclined': routineDeclined,
+        'aiKept': kept(aiAccepted),
+        'bundleKept': kept(bundleAccepted),
+        'taken': [for (final e in bundleAccepted.taken) e.id],
+        'accepted': accepted,
+        'routineAccepted': routineAccepted,
+      })}\n',
+    );
+  } finally {
+    _held = null;
+    ann.close();
+    bob.close();
+  }
+}
+
 /// The Profiles of other people [store] keeps, as both cores keep them:
 /// signed as received, by id.
 Map<String, Object?> _people(Store store) => {
@@ -3883,7 +4037,22 @@ Future<void> main(List<String> args) async {
     'back what they still share and neither the School Ann left nor a Note '
     'Carol kept to herself; after each step the entries Ann holds, the '
     'vector she tells, her refusal marks, the Profiles she keeps, the '
-    'people blocked, the photo and what she reads (`expected.json`).\n',
+    'people blocked, the photo and what she reads (`expected.json`).\n'
+    '- `pending/`: Pending Changes (ADR 0022): Ann\'s log '
+    '(`before.jsonl`); Bob, who holds it, edits her Note and writes one of '
+    'his own (`received.jsonl`, with his key record in `key.json`). At '
+    'held clocks (`times`), ids counted from 0x801, Ann opens an AI Task\'s '
+    'set and drafts a text, a filing, a new Note and a Routine\'s rule; '
+    'she edits that text and the Routine\'s start herself; she opens a '
+    'set for a bundle and takes Bob\'s entries into it, then edits the '
+    'Note he edited (her edits: `edits.jsonl`). Both sets\' files '
+    '(`ai.json`, `bundle.json`), what she reads with them on top of her '
+    'log (`shown`), the Routine\'s fields, which keep the schedule she '
+    'edited herself (`routineShown`), a third set declined, which leaves '
+    'the log as it was, '
+    'Accept of each (`accept-ai.jsonl`, `accept-bundle.jsonl`) with the '
+    'fields her own edits kept, and what she reads after '
+    '(`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -3920,6 +4089,7 @@ Future<void> main(List<String> args) async {
   _profilesFixture(root);
   _versionsFixture(root);
   _blockFixture(root);
+  _pendingFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {
