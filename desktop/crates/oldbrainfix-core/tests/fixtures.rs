@@ -1579,7 +1579,7 @@ fn zip_files(path: &Path) -> Result<Vec<Named>, Box<dyn std::error::Error>> {
         let mut file = archive.by_index(i)?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
-        out.push((file.name().to_string(), bytes));
+        out.push((file.name()?.into_owned(), bytes));
     }
     out.sort();
     Ok(out)

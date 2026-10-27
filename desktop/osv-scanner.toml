@@ -1,0 +1,42 @@
+# OSV-Scanner's exceptions for desktop/Cargo.lock (the Security workflow,
+# .github/workflows/security.yml). Each one says why the desktop app is not
+# exposed and why no update removes the crate. When its date passes, the
+# weekly run fails again: that is the review. Check the advisory and the
+# parent crates again, then remove the entry or move the date with a reason.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+ignoreUntil = 2027-04-27
+reason = """ttf-parser is unmaintained; no vulnerability is described. \
+It comes only through winit 0.30 -> sctk-adwaita 0.10 -> ab_glyph, which draws \
+the window title bar on Wayland desktops without server-side decorations. The \
+font it parses is the system title-bar font (gsettings and fc-match) or \
+sctk-adwaita's embedded Cantarell, never a file from a bundle, a Backup or \
+another person. The app's own text is drawn by egui without ttf-parser. \
+winit 0.30.13, the latest, requires sctk-adwaita ^0.10.1, and ab_glyph 0.2.32, \
+the latest, still uses ttf-parser."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0371"
+ignoreUntil = 2027-04-27
+reason = """zbus_names is unmaintained because it moved into zbus 6; no \
+vulnerability is described. It is part of zbus 5, which talks to the user's own \
+session bus (accessibility through accesskit_unix and atspi, the tray, \
+notifications, the portals). zbus 5 is used directly by oldbrainfix-gui and by \
+accesskit_unix 0.24.1, atspi 0.30.0, ashpd 0.13.13, ksni 0.3.7 and \
+notify-rust 4.18.2, all their latest releases, so no update drops it yet."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0370"
+ignoreUntil = 2027-04-27
+reason = """zvariant is unmaintained because it moved into zbus 6; no \
+vulnerability is described. Same as RUSTSEC-2026-0371: part of zbus 5, which \
+oldbrainfix-gui and the latest accesskit_unix, atspi, ashpd, ksni and \
+notify-rust still use."""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0372"
+ignoreUntil = 2027-04-27
+reason = """zvariant_derive is unmaintained because it moved into zbus 6; no \
+vulnerability is described. A proc macro of zbus 5, run at compile time only. \
+Same as RUSTSEC-2026-0371."""

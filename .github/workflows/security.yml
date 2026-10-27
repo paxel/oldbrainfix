@@ -1,8 +1,10 @@
-# Fails only when a dependency has a known vulnerability (OSV database, from
+# Fails when a dependency has a known advisory (OSV database, from
 # pubspec.lock, packages/oldbrainfix_core/pubspec.lock, desktop/Cargo.lock and
 # android/ocr/Cargo.lock). Runs weekly and on demand, because new advisories
 # appear without any change in this repo.
-# Warnings such as unmaintained or yanked packages are reported but never fail it.
+# Notices that a crate is unmaintained fail it too. An advisory the app is not
+# exposed to and no update removes is ignored in the osv-scanner.toml beside
+# its lockfile, with the reason and a date when the run fails again for review.
 name: Security
 
 on:

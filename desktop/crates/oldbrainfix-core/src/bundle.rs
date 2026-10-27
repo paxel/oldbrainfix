@@ -278,7 +278,10 @@ impl ZipReadFolder {
             if !file.is_file() {
                 continue;
             }
-            let path = file.name().to_string();
+            // A name that does not decode is none of ours.
+            let Ok(path) = file.name().map(|name| name.into_owned()) else {
+                continue;
+            };
             let parts: Vec<&str> = path.split('/').collect();
             let (dir, name) = match parts.as_slice() {
                 [name] => ("", *name),
