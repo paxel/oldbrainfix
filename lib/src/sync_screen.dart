@@ -38,16 +38,23 @@ typedef Join = Future<SyncResult> Function(
 /// Device or of everything, and one imported. What a sync did, or why it
 /// did not, is announced at the top; Conflicts it found are announced
 /// with a way to them.
+///
+/// On the first start, adding a Device of one's own ([firstStart]), it
+/// shows only the ways to pair and pops with true once a sync went
+/// through, either way round, and with false once one failed or the
+/// user turned the Device asking away.
 class SyncScreen extends StatefulWidget {
   final Store store;
   final Join join;
   final StartHosting host;
+  final bool firstStart;
 
   const SyncScreen({
     super.key,
     required this.store,
     this.join = lanSync,
     this.host = startPairingHost,
+    this.firstStart = false,
   });
 
   @override
@@ -159,19 +166,37 @@ class _SyncScreenState extends State<SyncScreen> {
     setState(_countConflicts);
   }
 
-  /// Shows this Device's code until the user comes back.
+  /// Shows this Device's code until the user comes back; on the first
+  /// start, until a sync went through and the user goes on, or the user
+  /// turned the Device asking away.
   Future<void> _showCode() async {
     final store = widget.store;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) => HostScreen(
-          store: store,
-          title: context.t.hostTitle,
-          start: widget.host,
-        ),
+    final navigator = Navigator.of(context);
+    final first = widget.firstStart;
+    var synced = false;
+    var declined = false;
+    late final Route<void> route;
+    route = MaterialPageRoute<void>(
+      builder: (context) => HostScreen(
+        store: store,
+        title: context.t.hostTitle,
+        start: widget.host,
+        onSession: first ? (_) => synced = true : null,
+        onContinue: first ? navigator.pop : null,
+        onDeclined: first
+            ? () {
+                declined = true;
+                if (route.isCurrent) navigator.pop();
+              }
+            : null,
       ),
     );
+    await navigator.push(route);
     if (!mounted) return;
+    if (first && (synced || declined)) {
+      navigator.pop(synced);
+      return;
+    }
     setState(() {
       _paired = store.pairedDevices();
       _countConflicts();
@@ -203,6 +228,7 @@ class _SyncScreenState extends State<SyncScreen> {
     }
     final pairing = PairingScope.of(context);
     setState(() => _busy = true);
+    var synced = false;
     try {
       final name = await pairing.deviceName();
       final result = await widget.join(widget.store, info, name: name);
@@ -240,6 +266,7 @@ class _SyncScreenState extends State<SyncScreen> {
         );
       }
       _code.clear();
+      synced = true;
     } on SyncException catch (e) {
       if (!mounted) return;
       _announce(syncFailureText(t, e.failure));
@@ -261,6 +288,8 @@ class _SyncScreenState extends State<SyncScreen> {
     if (mounted && widget.store.profileQuestion != null) {
       await askWhichProfile(context, widget.store);
     }
+    // The first start goes on, or back to its first screen.
+    if (mounted && widget.firstStart) Navigator.of(context).pop(synced);
   }
 
   void _forget(PairedDevice device) {
@@ -435,7 +464,9 @@ class _SyncScreenState extends State<SyncScreen> {
     final when = DateFormat.yMd(Localizations.localeOf(context).toString())
         .add_Hm();
     return Scaffold(
-      appBar: AppBar(title: Text(t.syncTitle)),
+      appBar: AppBar(
+        title: Text(widget.firstStart ? t.firstStartDevice : t.syncTitle),
+      ),
       body: ListView(
         padding: clearOfSystemBars(
           context,
@@ -498,61 +529,64 @@ class _SyncScreenState extends State<SyncScreen> {
               label: Text(t.syncShowCode),
             ),
           ),
-          const SizedBox(height: 16),
-          ListTile(
-            key: const ValueKey('conflicts'),
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.call_split),
-            title: Text(t.conflictsTitle),
-            subtitle: Text(t.conflictsEntry(_conflicts)),
-            onTap: () => _openConflicts(Navigator.of(context)),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            t.pairedDevicesTitle,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),
-          ),
-          for (final device in _paired) ...[
-            ControlBelow(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              leading: Icon(
-                device.shared ? Icons.people_outline : Icons.devices_outlined,
-              ),
-              title: Text(device.name),
-              subtitle: Text(
-                [
-                  if (device.shared) t.pairedPerson,
-                  t.pairedLastSync(when.format(device.lastSync.toLocal())),
-                ].join('\n'),
-              ),
-              control: TextButton(
-                onPressed: () => _forget(device),
-                child: Text(t.forgetDevice),
-              ),
-            ),
-            // Only a Device that hosts can be found and synced with.
-            if (device.fingerprint.isNotEmpty)
-              SwitchBelow(
-                switchKey: ValueKey('auto-${device.id}'),
-                // In line with the Device's name above.
-                padding: const EdgeInsetsDirectional.fromSTEB(40, 0, 0, 8),
-                title: Text(t.syncAutomatically),
-                value: widget.store.autoSyncOn(device.id),
-                onChanged: (on) => _setAuto(device, on),
-              ),
-          ],
-          if (FolderScope.of(context).available) ..._folder(t, when),
-          if (BundleScope.of(context).available) ..._bundle(t),
-          const SizedBox(height: 16),
-          Text(t.syncSettingsStay),
+          if (!widget.firstStart) ..._rest(t, when),
         ],
       ),
     );
   }
+
+  /// Everything past the ways to pair, which the first start leaves
+  /// out.
+  List<Widget> _rest(AppLocalizations t, DateFormat when) => [
+    const SizedBox(height: 16),
+    ListTile(
+      key: const ValueKey('conflicts'),
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.call_split),
+      title: Text(t.conflictsTitle),
+      subtitle: Text(t.conflictsEntry(_conflicts)),
+      onTap: () => _openConflicts(Navigator.of(context)),
+    ),
+    const SizedBox(height: 8),
+    Text(t.pairedDevicesTitle, style: Theme.of(context).textTheme.titleSmall),
+    Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(_paired.isEmpty ? t.pairedNone : t.syncAutoIntro),
+    ),
+    for (final device in _paired) ...[
+      ControlBelow(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        leading: Icon(
+          device.shared ? Icons.people_outline : Icons.devices_outlined,
+        ),
+        title: Text(device.name),
+        subtitle: Text(
+          [
+            if (device.shared) t.pairedPerson,
+            t.pairedLastSync(when.format(device.lastSync.toLocal())),
+          ].join('\n'),
+        ),
+        control: TextButton(
+          onPressed: () => _forget(device),
+          child: Text(t.forgetDevice),
+        ),
+      ),
+      // Only a Device that hosts can be found and synced with.
+      if (device.fingerprint.isNotEmpty)
+        SwitchBelow(
+          switchKey: ValueKey('auto-${device.id}'),
+          // In line with the Device's name above.
+          padding: const EdgeInsetsDirectional.fromSTEB(40, 0, 0, 8),
+          title: Text(t.syncAutomatically),
+          value: widget.store.autoSyncOn(device.id),
+          onChanged: (on) => _setAuto(device, on),
+        ),
+    ],
+    if (FolderScope.of(context).available) ..._folder(t, when),
+    if (BundleScope.of(context).available) ..._bundle(t),
+    const SizedBox(height: 16),
+    Text(t.syncSettingsStay),
+  ];
 }
 
 /// What a sync that needs an update ([UpdateNotices]) says at the top:

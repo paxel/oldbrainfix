@@ -103,3 +103,7 @@ The settings gear in the Agenda's corner is replaced by the own Profile's pictur
 ## Blocks (ADR 0021)
 
 Amended by ADR 0021 (#90): a blocked person's Profile is kept with its picture taken out of the record (`"stripped":true`), never passed on, and no newer record of theirs is taken while they are blocked; after an unblock any record of theirs at the same version or newer replaces it. People leaves blocked people out. The block itself lies in the log like an Override, `block:<profile id>`, and counts only when one of the user's own Devices wrote it.
+
+## A Device of one's own added at first start (#106)
+
+The first start asks first whether this is a new user, a Device of one's own being added, or a Backup being restored, and the Profile is made with the defaults only after the answer: at once for a new user, after the restore or the first sync otherwise, where it is already there and the defaults change nothing. A Device being added therefore holds no Profile when it pairs, and takes over the one the other Device sends in that first sync as a Device without a Profile does, whichever id is lower, with the backup key after it, as a joiner or as the host. Made at once, its fresh Profile would meet a Profile that is usually still on the defaults as well, and the lower of the two ids would stay, so in about half the cases the Device holding everything would take over the new Device's Profile and its name. A cancelled or failed Pairing leaves the Device without a Profile and back on the first screen.

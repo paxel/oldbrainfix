@@ -1568,6 +1568,53 @@ mod tests {
     }
 
     #[test]
+    fn a_new_device_without_a_profile_takes_profile_places_and_key_joining_or_hosting() -> Result<()>
+    {
+        let dir = tempfile::tempdir()?;
+        let at = held(1);
+        for joins in [true, false] {
+            // Still with the defaults, as most are: the other's id may be
+            // the lower one, and still its Profile stays.
+            let desk = own(dir.path(), &format!("desk{joins}"), &at, 2, None)?;
+            let code = set_up(&desk, PASSPHRASE, CHEAP, &mut system_random)?;
+            let places = Places::new(&desk);
+            let home = places.add_area("Home")?;
+            places.add_topic(&home.id, "Kitchen")?;
+            let held_by = |store: &Store| -> Result<(Option<String>, Option<String>)> {
+                let own = OwnProfile::new(store);
+                Ok((own.get()?.map(|p| p.encode()), own.code()?))
+            };
+            let kept = held_by(&desk)?;
+            let phone = device(dir.path(), &format!("phone{joins}"), &at, 1)?;
+            if joins {
+                exchange(&phone, &desk)?;
+            } else {
+                exchange(&desk, &phone)?;
+            }
+            assert_eq!(held_by(&desk)?, kept);
+            assert_eq!(held_by(&phone)?, kept);
+            assert_eq!(phone.recovery_code()?, Some(code));
+            assert!(phone.backups_set_up()?);
+            let places = Places::new(&phone);
+            let areas: Vec<String> = places.areas()?.into_iter().map(|a| a.name).collect();
+            assert_eq!(areas, ["Home"]);
+            let topics: Vec<String> = places
+                .topics(&home.id)?
+                .into_iter()
+                .map(|t| t.name)
+                .collect();
+            assert_eq!(topics, ["Kitchen"]);
+            // The phone's key is bound to the Profile on the desk at once.
+            let signed = OwnProfile::new(&desk)
+                .signed()?
+                .ok_or(Error::Invalid("no Profile".into()))?;
+            let keys: Vec<String> = signed.keys.into_iter().map(|k| k.key).collect();
+            assert_eq!(keys, [BASE64.encode(phone.signing_key()?.public_key())]);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn a_key_is_taken_only_for_the_own_profile_whole_and_newer() -> Result<()> {
         let dir = tempfile::tempdir()?;
         let at = held(1);

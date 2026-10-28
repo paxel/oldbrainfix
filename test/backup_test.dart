@@ -18,6 +18,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_photos.dart';
+import 'fake_profile.dart';
 
 /// A stand-in for Argon2id, quick in a widget test: the real one is the
 /// core's to test.
@@ -426,10 +427,11 @@ void main() {
           bundles: bundles,
           photos: FakePhotos(nextPhoto: onePixelPng),
           pairing: pairing,
+          profile: FakeProfilePlatform(name: 'Pixel'),
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Pick your Areas'), findsOneWidget);
+      expect(find.text('Welcome to Old Brain Fix'), findsOneWidget);
       Playback? playback() =>
           VoiceScope.playbackOf(tester.element(find.byType(Navigator).first));
       expect(playback()?.speed.value, 1);
@@ -452,10 +454,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(announcements.visible, startsWith('Restored: '));
+      expect(find.text('Welcome to Old Brain Fix'), findsNothing);
       expect(find.text('Pick your Areas'), findsNothing);
       expect(store.starterSetOffered, isTrue);
       expect(Places(store).areas().single.name, 'Doctor');
       expect(store.recoveryCode, code);
+      // The Profile came with it; the phone's name does not replace it.
+      expect(store.ownProfile?.name, 'Ada');
       // The playback speed came with it, for every play button.
       expect(store.playbackSpeed, 1.5);
       expect(playback()?.speed.value, 1.5);
@@ -491,10 +496,10 @@ void main() {
       // The opt-in stays off on the new phone: its agent is told so.
       expect(folders.optedIn, isFalse);
 
-      // Not now: back to the Starter Set, the file kept.
+      // Not now: back to the first screen, the file kept.
       await tester.tap(find.byKey(const ValueKey('restore-skip')));
       await tester.pumpAndSettle();
-      expect(find.text('Pick your Areas'), findsOneWidget);
+      expect(find.text('Welcome to Old Brain Fix'), findsOneWidget);
       expect(File(found).existsSync(), isTrue);
 
       await tester.tap(find.byKey(const ValueKey('restore-offer')));
@@ -530,7 +535,7 @@ void main() {
       Notes(store).capture('Captured before');
       await tester.pumpWidget(OldBrainFixApp(store: store, bundles: bundles));
       await tester.pumpAndSettle();
-      expect(find.text('Pick your Areas'), findsOneWidget);
+      expect(find.text('Welcome to Old Brain Fix'), findsOneWidget);
       expect(find.byKey(const ValueKey('restore-offer')), findsNothing);
     });
   });

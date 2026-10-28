@@ -176,6 +176,7 @@ void main() {
     store.starterSetOffered = false;
     requests.waiting = CaptureMode.text;
     await start(tester);
+    await tap(tester, find.byKey(const ValueKey('first-new')));
 
     expect(find.byType(StarterSetScreen), findsOneWidget);
     expect(find.byType(CaptureScreen), findsNothing);

@@ -118,6 +118,9 @@ pub struct SyncHost {
     joining: Option<Receiver<oldbrainfix_core::Result<JoinResult>>>,
     /// How a typed code is joined; [`lan_sync`] when none.
     pub joiner: Option<Joiner>,
+    /// Whether a session, hosted or joined, went through since hosting
+    /// started.
+    synced: bool,
 }
 
 impl SyncHost {
@@ -126,6 +129,7 @@ impl SyncHost {
         self.halt();
         self.error = None;
         self.last = None;
+        self.synced = false;
         self.refused = 0;
         self.found = 0;
         self.reload_conflicts(store);
@@ -291,6 +295,7 @@ impl SyncHost {
                 .unwrap_or_default();
             self.shared = Some((who, area.clone()));
         }
+        self.synced = true;
         self.refused = session.report.refused_count();
         self.found = session.conflicts.len();
         self.last = Some((session.name, session.applied.len()));
@@ -327,6 +332,17 @@ impl SyncHost {
     /// Whether a typed code is being joined.
     pub fn joining(&self) -> bool {
         self.joining.is_some()
+    }
+
+    /// Whether a session, hosted or joined, went through since hosting
+    /// last started; a sync that brought nothing counts as well.
+    pub fn synced(&self) -> bool {
+        self.synced
+    }
+
+    /// Takes why the typed code joined nothing, out of the field.
+    pub fn take_code_error(&mut self) -> Option<String> {
+        self.code_error.take()
     }
 
     /// Takes in the join's answer once there: `None` while it runs, else
@@ -428,33 +444,8 @@ impl SyncHost {
                             }
                         });
                     });
-                } else if let Some(ask) = self.asking() {
-                    let who = if ask.name.is_empty() {
-                        t.unnamed_device().to_string()
-                    } else {
-                        ask.name.clone()
-                    };
-                    embossed(ui, tones, true, None, |ui| {
-                        ui.label(
-                            RichText::new(t.sync_trust_question(&who))
-                                .strong()
-                                .color(text),
-                        );
-                        ui.horizontal(|ui| {
-                            if ui
-                                .button(RichText::new(t.sync_trust()).color(text))
-                                .clicked()
-                            {
-                                action = Some(SyncAction::Trust(true));
-                            }
-                            if ui
-                                .button(RichText::new(t.sync_refuse()).color(text))
-                                .clicked()
-                            {
-                                action = Some(SyncAction::Trust(false));
-                            }
-                        });
-                    });
+                } else if let Some(asked) = self.trust_card(ui, t, tones) {
+                    action = Some(asked);
                 }
                 if let Some(invite) = &self.inviting {
                     let area = Places::new(store)
@@ -481,41 +472,7 @@ impl SyncHost {
                         }
                     });
                 }
-                if let Some(host) = &self.host {
-                    embossed(ui, tones, false, None, |ui| {
-                        if self.no_network {
-                            ui.label(RichText::new(t.sync_no_network()).color(error));
-                        }
-                        if host.locked_out() {
-                            ui.label(RichText::new(t.sync_locked_out()).color(error));
-                        }
-                        ui.vertical_centered(|ui| {
-                            qr(ui, &host.pair_code(false), 240.0);
-                            let typed = host.pair_code(true);
-                            for line in pair_code_lines(&typed) {
-                                ui.label(
-                                    RichText::new(line)
-                                        .monospace()
-                                        .strong()
-                                        .size(20.0)
-                                        .color(text),
-                                );
-                            }
-                            ui.label(RichText::new(t.sync_pin(host.pin())).strong().color(text));
-                            ui.label(
-                                RichText::new(format!("{}:{}", host.address(), host.port()))
-                                    .small()
-                                    .color(weak),
-                            );
-                            if ui
-                                .button(RichText::new(t.sync_copy_code()).color(text))
-                                .clicked()
-                            {
-                                ui.ctx().copy_text(typed);
-                            }
-                        });
-                    });
-                }
+                self.host_card(ui, t, tones);
                 // Joining another Device by its code; not while inviting,
                 // which hands out this Device's own code.
                 if self.inviting.is_none() && self.join_section(ui, t, tones) {
@@ -652,6 +609,105 @@ impl SyncHost {
 }
 
 impl SyncHost {
+    /// The ways to pair either way round, as the first start's adding of
+    /// a Device of one's own shows them: the question about a Device
+    /// asking, this Device's code, and the field for the other's.
+    pub fn pairing(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<SyncAction> {
+        let error = ui.visuals().error_fg_color;
+        let mut action = None;
+        ui.spacing_mut().item_spacing.y = 12.0;
+        if let Some(message) = &self.error {
+            ui.label(RichText::new(message).color(error));
+        }
+        if let Some(asked) = self.trust_card(ui, t, tones) {
+            action = Some(asked);
+        }
+        self.host_card(ui, t, tones);
+        if self.join_section(ui, t, tones) {
+            action = Some(SyncAction::Join);
+        }
+        action
+    }
+
+    /// The question about a Device not paired yet that asks to sync,
+    /// with Trust and Refuse.
+    fn trust_card(&self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<SyncAction> {
+        let text = ui.visuals().text_color();
+        let ask = self.asking()?;
+        let who = if ask.name.is_empty() {
+            t.unnamed_device().to_string()
+        } else {
+            ask.name.clone()
+        };
+        let mut action = None;
+        embossed(ui, tones, true, None, |ui| {
+            ui.label(
+                RichText::new(t.sync_trust_question(&who))
+                    .strong()
+                    .color(text),
+            );
+            ui.horizontal(|ui| {
+                if ui
+                    .button(RichText::new(t.sync_trust()).color(text))
+                    .clicked()
+                {
+                    action = Some(SyncAction::Trust(true));
+                }
+                if ui
+                    .button(RichText::new(t.sync_refuse()).color(text))
+                    .clicked()
+                {
+                    action = Some(SyncAction::Trust(false));
+                }
+            });
+        });
+        action
+    }
+
+    /// This Device's pair code as a QR and as text, with its PIN and
+    /// address, while it hosts.
+    fn host_card(&self, ui: &mut Ui, t: &L10n, tones: Tones) {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let error = ui.visuals().error_fg_color;
+        let Some(host) = &self.host else {
+            return;
+        };
+        embossed(ui, tones, false, None, |ui| {
+            if self.no_network {
+                ui.label(RichText::new(t.sync_no_network()).color(error));
+            }
+            if host.locked_out() {
+                ui.label(RichText::new(t.sync_locked_out()).color(error));
+            }
+            ui.vertical_centered(|ui| {
+                qr(ui, &host.pair_code(false), 240.0);
+                let typed = host.pair_code(true);
+                for line in pair_code_lines(&typed) {
+                    ui.label(
+                        RichText::new(line)
+                            .monospace()
+                            .strong()
+                            .size(20.0)
+                            .color(text),
+                    );
+                }
+                ui.label(RichText::new(t.sync_pin(host.pin())).strong().color(text));
+                ui.label(
+                    RichText::new(format!("{}:{}", host.address(), host.port()))
+                        .small()
+                        .color(weak),
+                );
+                if ui
+                    .button(RichText::new(t.sync_copy_code()).color(text))
+                    .clicked()
+                {
+                    ui.ctx().copy_text(typed);
+                }
+            });
+        });
+    }
+
     /// The field for another Device's code, its error under it, and the
     /// button, or the waiting while it joins. Returns whether the user
     /// asked to join.

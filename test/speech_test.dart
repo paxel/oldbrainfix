@@ -457,6 +457,7 @@ void main() {
     }) async {
       store.starterSetOffered = false;
       await start(tester, platform: platform);
+      await tap(tester, find.byKey(const ValueKey('first-new')));
       expect(find.byType(StarterSetScreen), findsOneWidget);
       expect(find.byType(SpeechOfferScreen), findsNothing);
       await tap(tester, find.text('Start'));

@@ -3,8 +3,8 @@
 //! up on another of the user's Devices, the backup key belonging to the
 //! Profile; saves the Recovery Sheet, picks the folder, switches the
 //! weekly Backup and writes one now; and the first start's view that
-//! restores one into the empty log with the passphrase or the recovery
-//! key, or starts fresh.
+//! asks whether the user is new, adds a Device of their own or restores
+//! a Backup into the empty log with the passphrase or the recovery key.
 
 use std::path::PathBuf;
 
@@ -227,24 +227,54 @@ pub fn sheet(t: &L10n, store: &Store, wall: &Wall) -> Option<Vec<u8>> {
 /// What the user asked for on the first start's view.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WelcomeAction {
+    /// New to Old Brain Fix: start with an empty log.
+    New,
+    /// Add a Device of one's own: pair with it and sync.
+    AddDevice,
     /// Choose the Backup file with the system's dialog.
     Pick,
     /// Restore the file chosen with what was typed.
     Restore,
-    /// Start with an empty log.
-    Fresh,
+    /// A sync with the other Device went through; go on.
+    Synced,
+    /// Back to the three choices, nothing kept.
+    Back,
 }
 
-/// The first start's view: the Backup file chosen, with its header, and
-/// what was typed to open it.
+/// The first start's view: the three choices, or adding a Device of
+/// one's own, or the Backup file chosen, with its header, and what was
+/// typed to open it.
 #[derive(Debug, Clone, Default)]
 pub struct Welcome {
+    /// Whether a Device of one's own is being added.
+    pub adding: bool,
     pub file: Option<(PathBuf, Header)>,
     pub passphrase: String,
     pub code: String,
 }
 
-/// The first start's view's content.
+impl Welcome {
+    /// Whether the view shows the three choices.
+    pub fn choosing(&self) -> bool {
+        !self.adding && self.file.is_none()
+    }
+}
+
+/// The text, then its button below it (UI laws, "Dialogs and pages").
+fn choice(ui: &mut Ui, detail: &str, label: &str) -> bool {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.add_space(8.0);
+    ui.label(RichText::new(detail).color(weak));
+    ui.add_sized(
+        [ui.available_width(), 32.0],
+        egui::Button::new(RichText::new(label).strong().color(text)),
+    )
+    .clicked()
+}
+
+/// The first start's view's content, but for the adding of a Device of
+/// one's own, which the Sync view's pieces draw.
 pub fn welcome(
     ui: &mut Ui,
     t: &L10n,
@@ -254,31 +284,32 @@ pub fn welcome(
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    ui.heading(RichText::new(t.welcome_title()).color(text));
-    ui.label(RichText::new(t.restore_offer_detail()).color(text));
-    ui.add_space(8.0);
-    ui.label(RichText::new(t.restore_intro()).small().color(weak));
-    ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        if ui
-            .button(RichText::new(t.restore_pick()).color(text))
-            .clicked()
-        {
+    let Some((_, header)) = &state.file else {
+        ui.heading(RichText::new(t.first_start_title()).color(text));
+        ui.label(RichText::new(t.first_start_intro()).color(text));
+        // Actions, each with what it means; not a choice of value.
+        if choice(ui, t.welcome_new_detail(), t.first_start_new()) {
+            actions.push(WelcomeAction::New);
+        }
+        if choice(ui, t.first_start_device_detail(), t.first_start_device()) {
+            actions.push(WelcomeAction::AddDevice);
+        }
+        if choice(ui, t.restore_offer_detail(), t.restore_offer()) {
             actions.push(WelcomeAction::Pick);
         }
-        if ui
-            .button(RichText::new(t.welcome_fresh()).color(text))
-            .clicked()
-        {
-            actions.push(WelcomeAction::Fresh);
-        }
-    });
-    let Some((_, header)) = &state.file else {
         return;
     };
+    ui.heading(RichText::new(t.restore_offer()).color(text));
+    ui.label(RichText::new(t.restore_intro()).small().color(weak));
     ui.add_space(8.0);
     let made = wall(header.created).format("%Y-%m-%d %H:%M").to_string();
     ui.label(RichText::new(t.restore_file(&made)).strong().color(text));
+    if ui
+        .button(RichText::new(t.restore_pick()).color(text))
+        .clicked()
+    {
+        actions.push(WelcomeAction::Pick);
+    }
     secret(
         ui,
         "restore passphrase",
@@ -293,12 +324,17 @@ pub fn welcome(
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
-    if ui
-        .button(RichText::new(t.restore_start()).color(text))
-        .clicked()
-    {
-        actions.push(WelcomeAction::Restore);
-    }
+    ui.horizontal(|ui| {
+        if ui
+            .button(RichText::new(t.restore_start()).color(text))
+            .clicked()
+        {
+            actions.push(WelcomeAction::Restore);
+        }
+        if ui.button(RichText::new(t.cancel()).color(text)).clicked() {
+            actions.push(WelcomeAction::Back);
+        }
+    });
 }
 
 /// Why a restore took nothing in, in words.

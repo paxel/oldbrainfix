@@ -1,7 +1,7 @@
 //! Backups driven headless: set up in the Settings with a passphrase
 //! typed twice, the Recovery Sheet saved, the folder chosen with a first
 //! Backup at once; and the first start's view restoring one into the
-//! empty log with the passphrase or the recovery key, or starting fresh.
+//! empty log with the passphrase or the recovery key, or starting new.
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
@@ -65,6 +65,12 @@ fn type_over(harness: &mut Harness<'_, App>, role: Role, n: usize, text: &str) {
     harness.run();
     harness.get_by(|n| n.is_focused()).type_text(text);
     harness.run();
+}
+
+/// The own Profile's name, none before there is one.
+fn own_name(harness: &Harness<'_, App>) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let own = oldbrainfix_core::profile::OwnProfile::new(harness.state().store()).get()?;
+    Ok(own.map(|p| p.name))
 }
 
 fn click(harness: &mut Harness<'_, App>, label: &str) {
@@ -225,6 +231,9 @@ fn first_start(
             Some(path.clone())
         }),
     );
+    app.set_profile_defaults(Box::new(|store| {
+        oldbrainfix_core::profile::OwnProfile::new(store).apply_defaults("Desk", None)
+    }));
     app.offer_restore();
     assert!(app.welcoming());
     Ok(window(app))
@@ -240,11 +249,10 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
         .state_mut()
         .set_player(Box::new(Speakers(speeds.clone())));
     assert_eq!(*speeds.borrow(), vec![1.0]);
-    // The computer made a Profile of its own at its first start.
-    oldbrainfix_core::profile::OwnProfile::new(harness.state().store())
-        .apply_defaults("Computer", None)?;
+    // No Profile of its own before the first start is answered.
+    assert!(own_name(&harness)?.is_none());
     assert!(shows(&harness, "Welcome to Old Brain Fix"));
-    click(&mut harness, "Choose the Backup file");
+    click(&mut harness, "Restore from a Backup");
     assert!(shows(&harness, "Backup of "));
 
     type_into(&mut harness, "Passphrase", "wrong horse");
@@ -271,7 +279,7 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
     harness.step();
     harness.step();
     assert!(harness.query_all_by_value("Ada").next().is_some());
-    assert!(harness.query_all_by_value("Computer").next().is_none());
+    assert!(harness.query_all_by_value("Desk").next().is_none());
     harness.state_mut().select(Selection::All);
     harness.step();
     let own = oldbrainfix_core::profile::OwnProfile::new(harness.state().store()).get()?;
@@ -283,11 +291,11 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
 }
 
 #[test]
-fn the_first_start_restores_with_the_recovery_key_or_starts_fresh() -> TestResult {
+fn the_first_start_restores_with_the_recovery_key_or_starts_new() -> TestResult {
     let dir = tempfile::tempdir()?;
     let (path, code) = old_backup(dir.path())?;
     let mut harness = first_start(path.clone())?;
-    click(&mut harness, "Choose the Backup file");
+    click(&mut harness, "Restore from a Backup");
     type_into(&mut harness, "Recovery key", "nonsense");
     click(&mut harness, "Restore");
     assert!(shows(&harness, "That is not a recovery key."));
@@ -296,10 +304,19 @@ fn the_first_start_restores_with_the_recovery_key_or_starts_fresh() -> TestResul
     assert!(!harness.state().welcoming());
     assert_eq!(Places::new(harness.state().store()).areas()?.len(), 1);
 
-    // Starting fresh: the view goes and stays gone.
+    // Cancel goes back to the three choices, nothing answered.
     let mut harness = first_start(path)?;
-    click(&mut harness, "Start fresh");
+    click(&mut harness, "Restore from a Backup");
+    assert!(shows(&harness, "Backup of "));
+    click(&mut harness, "Cancel");
+    assert!(shows(&harness, "Add a Device of mine"));
+    assert!(harness.state().welcoming());
+    assert!(own_name(&harness)?.is_none());
+
+    // New: the view goes and stays gone; only now is the Profile made.
+    click(&mut harness, "New to Old Brain Fix");
     assert!(!harness.state().welcoming());
+    assert_eq!(own_name(&harness)?.as_deref(), Some("Desk"));
     harness.state_mut().offer_restore();
     assert!(!harness.state().welcoming());
     assert!(Notes::new(harness.state().store()).all()?.is_empty());

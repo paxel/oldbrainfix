@@ -381,8 +381,9 @@ fn run() -> Result<i32, String> {
     std::thread::spawn(oldbrainfix_gui::launcher::register);
     let store = Arc::new(open_store(&dir)?);
     // The own Profile from the login's full name and account picture,
-    // asking nothing; the window opens without it if that fails.
-    if let Err(e) = login::apply_system_defaults(&store) {
+    // asking nothing; the window opens without it if that fails. On the
+    // first start only once its view is answered (ADR 0017).
+    if let Err(e) = login::apply_at_launch(&store) {
         eprintln!("oldbrainfix: {e}");
     }
 

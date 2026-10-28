@@ -686,6 +686,38 @@ void main() {
       expect(desk.backupKeyVersion, 0);
     });
 
+    test('a new Device added as one\'s own before it made a Profile takes '
+        'the Profile, the places and the key in its first sync, joining or '
+        'hosting', () async {
+      for (final joins in [true, false]) {
+        // Still with the defaults, as most are: the other's id may be the
+        // lower one, and still its Profile stays.
+        final desk = own(null, device: 'Desk');
+        final code = await setUpBackups(desk, passphrase, kdf: cheap);
+        final places = Places(desk);
+        final home = places.addArea('Home');
+        places.addTopic(home.id, 'Kitchen');
+        NamedPlaces(desk).add('Office', Coordinates(52.5, 13.4), radius: 100);
+        final kept = (desk.ownProfile?.encode(), desk.ownProfileCode);
+        final phone = Store.inMemory(clock: ticking());
+        addTearDown(phone.close);
+        addTearDown(desk.close);
+        joins ? exchange(phone, desk) : exchange(desk, phone);
+        expect((desk.ownProfile?.encode(), desk.ownProfileCode), kept);
+        expect((phone.ownProfile?.encode(), phone.ownProfileCode), kept);
+        expect(phone.recoveryCode, code);
+        expect(phone.backupsSetUp, isTrue);
+        expect(Places(phone).areas().map((a) => a.name), ['Home']);
+        expect(Places(phone).topics(home.id).map((t) => t.name), ['Kitchen']);
+        expect(NamedPlaces(phone).all().map((p) => p.name), ['Office']);
+        expect(Places(phone).starterSetDue, isFalse);
+        // The phone's key is bound to the Profile on the desk at once.
+        expect(desk.ownSignedProfile?.keys.map((k) => k.key), [
+          phone.signingKey.publicBase64,
+        ]);
+      }
+    });
+
     test('another person\'s Device neither gets nor gives one', () async {
       final ann = own('Ann')..setLocalSetting('author', 'Ann');
       final ben = own('Ben')..setLocalSetting('author', 'Ben');

@@ -42,6 +42,17 @@ pub fn apply_system_defaults(store: &Store) -> Result<Profile> {
     apply_defaults(store, &login(), &device_name())
 }
 
+/// [`apply_system_defaults`] at launch, but not while the first start's
+/// view is due: a Device being added would hold a fresh Profile of its
+/// own when it pairs, which can take over the one of the user's other
+/// Devices (ADR 0017). The view makes it once answered.
+pub fn apply_at_launch(store: &Store) -> Result<Option<Profile>> {
+    if crate::backup_view::restore_due(store)? {
+        return Ok(None);
+    }
+    apply_system_defaults(store).map(Some)
+}
+
 /// The full name in a passwd GECOS field: the part before the first
 /// comma; an `&` stands for the login name, capitalised.
 pub fn gecos_name(gecos: &str, login: &str) -> String {
@@ -204,6 +215,17 @@ mod tests {
         let store = new_store()?;
         let made = apply_system_defaults(&store)?;
         assert!(!made.name.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn no_profile_is_made_at_launch_before_the_first_start_is_answered() -> TestResult {
+        let store = new_store()?;
+        assert!(apply_at_launch(&store)?.is_none());
+        assert!(OwnProfile::new(&store).get()?.is_none());
+        crate::backup_view::restore_answered(&store)?;
+        assert!(apply_at_launch(&store)?.is_some());
+        assert!(OwnProfile::new(&store).get()?.is_some());
         Ok(())
     }
 }

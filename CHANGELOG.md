@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ## [0.2.0]
 
 ### Added
+- On the phone and the desktop, the first start asks whether the user is new to Old Brain Fix, adds a Device of their own or restores a Backup, and "Add a Device of mine" shows this Device's pair code or takes the other Device's, then syncs before any setup, bringing the Profile, Areas and everything else, so that the phone skips the Starter Set and only offers the speech model and the alarm setup, while a failed or cancelled Pairing returns to the first screen.
 - On the phone, text Capture has a Gallery button next to Photo and Voice that picks one or more pictures from the phone into the Note as its photos, each with its Photo Text.
 - On the phone, an audio file shared in from another app, such as a WhatsApp voice message, becomes a voice Note with its Transcript, several shared at once one Note with a recording each, and a file the phone cannot decode is kept in the Note with an announcement that it could not be transcribed, whose tap shows the reason.
 - On the desktop, "From file…" in the capture field and files dropped onto the window make pictures and sound files, such as a WhatsApp voice message in Ogg Opus, m4a, mp3 or WAV, into one Note with their photos and voice recordings, each with its Photo Text or Transcript, a sound file the desktop cannot decode kept in the Note with an announcement whose click shows the reason; voice Notes in Ogg Opus or MP3 from the phone also play and are transcribed on the desktop.

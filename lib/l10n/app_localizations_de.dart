@@ -145,6 +145,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get fileInto => 'Ablegen in …';
 
   @override
+  String get firstStartTitle => 'Willkommen bei Old Brain Fix';
+
+  @override
+  String get firstStartIntro => 'Wie beginnt Old Brain Fix auf diesem Gerät?';
+
+  @override
+  String get firstStartNew => 'Neu bei Old Brain Fix';
+
+  @override
+  String get firstStartNewDetail => 'Mit einer Auswahl an Bereichen beginnen.';
+
+  @override
+  String get firstStartDevice => 'Ein Gerät von mir hinzufügen';
+
+  @override
+  String get firstStartDeviceDetail =>
+      'Old Brain Fix läuft schon auf einem anderen Gerät von dir. Kopple es, und alles kommt herüber.';
+
+  @override
+  String get hostContinue => 'Weiter';
+
+  @override
   String get starterSetTitle => 'Wähle deine Bereiche';
 
   @override

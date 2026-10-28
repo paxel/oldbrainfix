@@ -83,7 +83,8 @@ class _PairingHosting implements Hosting {
 /// sync brought is announced at the top; the page stays open, so the
 /// other Device can finish fetching photos and recordings. Without a
 /// local network, or once too many wrong PINs locked the host, it says
-/// so and offers a new code.
+/// so and offers a new code. Where [onContinue] is given, a button goes
+/// on once a session completed.
 class HostScreen extends StatefulWidget {
   final Store store;
 
@@ -100,6 +101,13 @@ class HostScreen extends StatefulWidget {
   /// Hears every session that completed.
   final ValueChanged<SyncSession>? onSession;
 
+  /// Goes on once a session completed, as a button under the code; none
+  /// where the page stays until it is left.
+  final VoidCallback? onContinue;
+
+  /// Hears the user turn away a Device asking to join.
+  final VoidCallback? onDeclined;
+
   const HostScreen({
     super.key,
     required this.store,
@@ -108,6 +116,8 @@ class HostScreen extends StatefulWidget {
     this.area = '',
     this.start = startPairingHost,
     this.onSession,
+    this.onContinue,
+    this.onDeclined,
   });
 
   @override
@@ -131,6 +141,9 @@ class _HostScreenState extends State<HostScreen> {
 
   /// The Profile the user confirmed last, for the announcement.
   ProfileChoice? _confirmed;
+
+  /// Whether a session completed while the page shows.
+  var _synced = false;
 
   @override
   void didChangeDependencies() {
@@ -221,6 +234,7 @@ class _HostScreenState extends State<HostScreen> {
       context: context,
       builder: (_) => JoinAskDialog(name: ask.name),
     );
+    if (!(sure ?? false)) widget.onDeclined?.call();
     return sure ?? false;
   }
 
@@ -228,6 +242,7 @@ class _HostScreenState extends State<HostScreen> {
   void _session(SyncSession session) {
     widget.onSession?.call(session);
     if (!mounted) return;
+    setState(() => _synced = true);
     final t = context.t;
     final store = widget.store;
     final announcements = AnnouncementsScope.of(context);
@@ -326,6 +341,7 @@ class _HostScreenState extends State<HostScreen> {
         Text(t.hostStays),
       ];
     }
+    final onContinue = widget.onContinue;
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: ListView(
@@ -333,7 +349,20 @@ class _HostScreenState extends State<HostScreen> {
           context,
           const EdgeInsets.fromLTRB(16, 8, 16, 24),
         ),
-        children: children,
+        children: [
+          ...children,
+          if (_synced && onContinue != null) ...[
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                key: const ValueKey('host-continue'),
+                onPressed: onContinue,
+                child: Text(t.hostContinue),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

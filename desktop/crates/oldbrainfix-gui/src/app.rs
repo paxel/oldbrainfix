@@ -73,6 +73,7 @@ use crate::folder_sync;
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
+use crate::login;
 use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
     photo_from_file,
@@ -670,7 +671,14 @@ pub struct App {
     /// Ask where to save the Recovery Sheet and which Backup to restore.
     sheet_saver: FileSaver,
     backup_opener: FolderPicker,
+    /// Makes the own Profile from this computer's login, or fills in the
+    /// defaults of one there (ADR 0017).
+    profile_defaults: ProfileDefaults,
 }
+
+/// Makes or fills in the own Profile in a store with this computer's
+/// defaults, as [`login::apply_system_defaults`] does.
+pub type ProfileDefaults = Box<dyn Fn(&Store) -> oldbrainfix_core::Result<Profile>>;
 
 /// Asks for a folder, or a file to open, with the dialog's title.
 pub type FolderPicker = Box<dyn Fn(&str) -> Option<std::path::PathBuf>>;
@@ -805,6 +813,7 @@ impl App {
                 sheet_dialog(title).set_file_name(name).save_file()
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
+            profile_defaults: Box::new(login::apply_system_defaults),
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -862,6 +871,12 @@ impl App {
     pub fn set_backup_dialogs(&mut self, saver: FileSaver, opener: FolderPicker) {
         self.sheet_saver = saver;
         self.backup_opener = opener;
+    }
+
+    /// Makes the own Profile with `defaults` instead of this computer's
+    /// login once the first start's view is answered; tests hand one in.
+    pub fn set_profile_defaults(&mut self, defaults: ProfileDefaults) {
+        self.profile_defaults = defaults;
     }
 
     /// Shows the first start's view instead of the panes when it is due:
@@ -934,6 +949,27 @@ impl App {
     fn welcome_action(&mut self, asked: WelcomeAction) -> oldbrainfix_core::Result<()> {
         let t = self.t;
         match asked {
+            WelcomeAction::New => self.welcomed()?,
+            WelcomeAction::AddDevice => {
+                if let Some(welcome) = &mut self.welcome {
+                    welcome.adding = true;
+                }
+                self.notice = None;
+            }
+            WelcomeAction::Synced => self.welcomed()?,
+            WelcomeAction::Back => {
+                // A join under way finishes first: what it brings is kept.
+                if self.sync.joining() {
+                    return Ok(());
+                }
+                // Left after a sync went through: on, as with Continue.
+                if self.welcome.as_ref().is_some_and(|w| w.adding) && self.sync.synced() {
+                    return self.welcomed();
+                }
+                if let Some(welcome) = &mut self.welcome {
+                    *welcome = Welcome::default();
+                }
+            }
             WelcomeAction::Pick => {
                 if let Some(path) = (self.backup_opener)(t.restore_open_title()) {
                     match backup::read_header(&path) {
@@ -946,10 +982,6 @@ impl App {
                         _ => self.notice = Some(t.restore_not_a_backup().to_string()),
                     }
                 }
-            }
-            WelcomeAction::Fresh => {
-                backup_view::restore_answered(&self.store)?;
-                self.welcome = None;
             }
             WelcomeAction::Restore => {
                 let Some(welcome) = &self.welcome else {
@@ -967,8 +999,7 @@ impl App {
                 };
                 match backup::restore(&self.store, path, &key) {
                     Ok(restored) => {
-                        backup_view::restore_answered(&self.store)?;
-                        self.welcome = None;
+                        self.welcomed()?;
                         self.notice = Some(t.restore_done(restored.entries as i64));
                         // The playback speed came with it; one that cannot
                         // be read leaves the speed as it was.
@@ -983,6 +1014,17 @@ impl App {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// The first start's view is answered: new, restored or synced. Only
+    /// now is the own Profile made with this computer's defaults, so a
+    /// Device being added takes the one its other Devices hold (ADR
+    /// 0017); one that came with a restore or a sync stays as it is.
+    fn welcomed(&mut self) -> oldbrainfix_core::Result<()> {
+        backup_view::restore_answered(&self.store)?;
+        self.welcome = None;
+        (self.profile_defaults)(&self.store)?;
         Ok(())
     }
 
@@ -1659,8 +1701,10 @@ impl App {
     /// Does `action`, reads the log again and announces what went wrong.
     fn apply(&mut self, action: Action) {
         let done = self.act(action);
-        // The session runs exactly while the Sync view shows.
-        if (self.selection == Selection::Sync) != self.sync.hosting() {
+        // The session runs exactly while the Sync view shows, or the
+        // first start's adding of a Device of one's own.
+        let adding = self.welcome.as_ref().is_some_and(|w| w.adding);
+        if (self.selection == Selection::Sync || adding) != self.sync.hosting() {
             if self.sync.hosting() {
                 self.sync.stop();
             } else {
@@ -2013,6 +2057,10 @@ impl App {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
                     // A Moment and the new entries: read again below.
                     self.refresh();
+                }
+                // Turned away on the first start: back to its choices.
+                if !trust && self.welcome.as_ref().is_some_and(|w| w.adding) {
+                    self.welcome_action(WelcomeAction::Back)?;
                 }
             }
             Action::Sync(SyncAction::Forget(id)) => self.store.forget_device(&id)?,
@@ -2441,6 +2489,85 @@ impl App {
         })
     }
 
+    /// The first start's view instead of the panes: the three choices, a
+    /// Backup being restored, or a Device of one's own being added with
+    /// the Sync view's ways to pair. Back, as key or mouse button, goes
+    /// to the choices.
+    fn welcome_view(&mut self, ui: &mut Ui, tones: Tones, actions: Vec<Action>) {
+        let (t, wall) = (self.t, self.wall.clone());
+        let mut asked = Vec::new();
+        let mut synced = Vec::new();
+        if actions.contains(&Action::Back) {
+            asked.push(WelcomeAction::Back);
+        }
+        // What the earlier part of the frame decided about a join.
+        let actions = actions
+            .into_iter()
+            .filter(|a| matches!(a, Action::Welcome(_)));
+        let (joining, hosted) = (self.sync.joining(), self.sync.synced());
+        let sync = &mut self.sync;
+        if let Some(welcome) = &mut self.welcome {
+            egui::CentralPanel::default()
+                .frame(Frame::NONE.inner_margin(Margin::same(24)))
+                .show(ui, |ui| {
+                    ui.set_max_width(640.0);
+                    egui::ScrollArea::vertical()
+                        .id_salt("welcome")
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            embossed(ui, tones, false, None, |ui| {
+                                if !welcome.adding {
+                                    backup_view::welcome(ui, &t, &wall, welcome, &mut asked);
+                                    return;
+                                }
+                                let text = ui.visuals().text_color();
+                                let weak = ui.visuals().weak_text_color();
+                                ui.heading(RichText::new(t.first_start_device()).color(text));
+                                ui.label(RichText::new(t.first_start_device_detail()).color(weak));
+                                if let Some(action) = sync.pairing(ui, &t, tones) {
+                                    synced.push(Action::Sync(action));
+                                }
+                                ui.horizontal(|ui| {
+                                    // A session that went through: on, once
+                                    // the other Device fetched what it needs.
+                                    if hosted
+                                        && !joining
+                                        && ui
+                                            .button(
+                                                RichText::new(t.host_continue())
+                                                    .strong()
+                                                    .color(text),
+                                            )
+                                            .clicked()
+                                    {
+                                        asked.push(WelcomeAction::Synced);
+                                    }
+                                    if !hosted
+                                        && ui
+                                            .add_enabled(
+                                                !joining,
+                                                egui::Button::new(
+                                                    RichText::new(t.cancel()).color(text),
+                                                ),
+                                            )
+                                            .clicked()
+                                    {
+                                        asked.push(WelcomeAction::Back);
+                                    }
+                                });
+                            });
+                        });
+                });
+        }
+        let all: Vec<Action> = actions
+            .chain(synced)
+            .chain(asked.into_iter().map(Action::Welcome))
+            .collect();
+        for action in all {
+            self.apply(action);
+        }
+    }
+
     /// Draws one frame into `ui` and does what was asked in it.
     pub fn show(&mut self, ui: &mut Ui) {
         let tones = theme::tones(ui.visuals());
@@ -2478,6 +2605,17 @@ impl App {
         // answer is taken in when it comes.
         if self.sync.joining() {
             match self.sync.joined(&self.store, &self.t) {
+                Some(_) if self.welcome.is_some() => {
+                    // The first start goes on once synced, else back to
+                    // its choices, saying why at the top.
+                    if self.sync.synced() {
+                        actions.push(Action::Welcome(WelcomeAction::Synced));
+                    } else {
+                        self.notice = self.sync.take_code_error();
+                        actions.push(Action::Welcome(WelcomeAction::Back));
+                    }
+                    ui.ctx().request_repaint();
+                }
                 Some(changed) => {
                     // Paired Devices and Conflicts too: read again.
                     self.refresh();
@@ -2629,21 +2767,7 @@ impl App {
         }
         // The first start's view, instead of the panes, until answered.
         if self.welcome.is_some() {
-            let (t, wall) = (self.t, self.wall.clone());
-            let mut asked = Vec::new();
-            if let Some(welcome) = &mut self.welcome {
-                egui::CentralPanel::default()
-                    .frame(Frame::NONE.inner_margin(Margin::same(24)))
-                    .show(ui, |ui| {
-                        ui.set_max_width(640.0);
-                        embossed(ui, tones, false, None, |ui| {
-                            backup_view::welcome(ui, &t, &wall, welcome, &mut asked);
-                        });
-                    });
-            }
-            for asked in asked {
-                self.apply(Action::Welcome(asked));
-            }
+            self.welcome_view(ui, tones, actions);
             return;
         }
         egui::Panel::left("places")

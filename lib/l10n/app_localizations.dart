@@ -332,6 +332,48 @@ abstract class AppLocalizations {
   /// **'File into…'**
   String get fileInto;
 
+  /// No description provided for @firstStartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Old Brain Fix'**
+  String get firstStartTitle;
+
+  /// No description provided for @firstStartIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'How does Old Brain Fix start on this Device?'**
+  String get firstStartIntro;
+
+  /// No description provided for @firstStartNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New to Old Brain Fix'**
+  String get firstStartNew;
+
+  /// No description provided for @firstStartNewDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a set of Areas to pick from.'**
+  String get firstStartNewDetail;
+
+  /// No description provided for @firstStartDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Device of mine'**
+  String get firstStartDevice;
+
+  /// No description provided for @firstStartDeviceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix runs on another Device of yours. Pair with it, and everything comes over.'**
+  String get firstStartDeviceDetail;
+
+  /// No description provided for @hostContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get hostContinue;
+
   /// No description provided for @starterSetTitle.
   ///
   /// In en, this message translates to:

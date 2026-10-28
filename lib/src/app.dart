@@ -21,7 +21,9 @@ import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'first_start_screen.dart';
 import 'folder_platform.dart';
+import 'host_screen.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'lock_platform.dart';
@@ -115,6 +117,11 @@ class OldBrainFixApp extends StatefulWidget {
   /// given, this Device only joins.
   final StartPairedHost? pairedHost;
 
+  /// How the first start joins a Device of one's own and hosts for one;
+  /// tests hand in fakes.
+  final Join join;
+  final StartHosting hosting;
+
   /// The shared folder to sync through; none when not given.
   final FolderPlatform folders;
 
@@ -150,6 +157,8 @@ class OldBrainFixApp extends StatefulWidget {
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
     this.pairedHost,
+    this.join = lanSync,
+    this.hosting = startPairingHost,
     this.folders = const NoFolders(),
     this.bundles = const NoBundles(),
     this.profile = const NoProfilePlatform(),
@@ -221,8 +230,10 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     unawaited(_speechModel.check());
     // Photo Texts come in the background too, never holding Capture up.
     _photoReader = PhotoReader(notes: _notes, platform: widget.ocr);
-    // The own Profile from the phone's name, asking nothing.
-    unawaited(_profile.applyDefaults());
+    // The own Profile from the phone's name, asking nothing; on the first
+    // start only once it is past its first screen (ADR 0017), so a Device
+    // being added takes the Profile of the user's other Devices.
+    if (!_places.starterSetDue) unawaited(_profile.applyDefaults());
   }
 
   @override
@@ -323,6 +334,8 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
       bundles: widget.bundles,
       profile: _profile,
       speech: _speechModel,
+      join: widget.join,
+      hosting: widget.hosting,
       onThemeChanged: _themeChanged,
     ),
   );
@@ -365,9 +378,10 @@ class RouteStack extends NavigatorObserver {
   }
 }
 
-/// The Starter Set on this Device's first start, then the speech model
-/// offer where there is a speech layer, then the alarm setup where there
-/// are alarms, the Agenda after them. Keeps the alarms in
+/// This Device's first start: its first screen, then the Starter Set
+/// for someone new, or a restore, or a Device of one's own added and
+/// synced; then the speech model offer where there is a speech layer,
+/// then the alarm setup where there are alarms, the Agenda after them. Keeps the alarms in
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, and the Unsorted list when the Agenda widget's Unsorted
@@ -391,6 +405,8 @@ class _Home extends StatefulWidget {
   final BundlePlatform bundles;
   final OwnProfileModel profile;
   final SpeechModel speech;
+  final Join join;
+  final StartHosting hosting;
   final VoidCallback onThemeChanged;
 
   const _Home({
@@ -407,6 +423,8 @@ class _Home extends StatefulWidget {
     required this.bundles,
     required this.profile,
     required this.speech,
+    required this.join,
+    required this.hosting,
     required this.onThemeChanged,
   });
 
@@ -419,6 +437,10 @@ class _HomeState extends State<_Home> {
   /// its own (ADR 0008: the flag is this Device's).
   late bool _starterSetOffered = !widget.places.starterSetDue;
 
+  /// Whether "New to Old Brain Fix" was picked on the first screen: the
+  /// Starter Set shows, and Back goes to the first screen again.
+  var _new = false;
+
   /// Whether a Backup may be restored: only into an empty log, and only
   /// where a file can be picked; worked out once.
   late final bool _restorable =
@@ -430,7 +452,7 @@ class _HomeState extends State<_Home> {
   String? _found;
 
   /// Whether the speech model is offered now: right after the Starter
-  /// Set or a restore on the first start, and never again, as Settings
+  /// Set, a restore or a Device added on the first start, and never again, as Settings
   /// offers it as well.
   var _speechOfferDue = false;
   late bool _alarmSetupDone =
@@ -707,6 +729,7 @@ class _HomeState extends State<_Home> {
   void _plant(Set<String> picked) {
     widget.places.plantStarterSet(picked);
     widget.store.starterSetOffered = true;
+    unawaited(widget.profile.applyDefaults());
     setState(() {
       _starterSetOffered = true;
       _speechOfferDue = _speechWanted;
@@ -774,10 +797,37 @@ class _HomeState extends State<_Home> {
     widget.store.starterSetOffered = true;
     // The playback speed came with it.
     VoiceScope.playbackOf(context)?.speed.value = widget.store.playbackSpeed;
+    _setUpAfterwards();
+  }
+
+  /// Adds this Device to the user's others: paired either way round and
+  /// synced, it holds their Profile, Areas and the rest, and goes on with
+  /// this Device's own setup, without the Starter Set. Back, a failure or
+  /// a Device turned away leave the first screen as it was.
+  Future<void> _addDevice() async {
+    final synced = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SyncScreen(
+          store: widget.store,
+          join: widget.join,
+          host: widget.hosting,
+          firstStart: true,
+        ),
+      ),
+    );
+    if (!mounted || synced != true) return;
+    widget.store.starterSetOffered = true;
+    _setUpAfterwards();
+  }
+
+  /// After a restore or a Device added: what came with it is in place;
+  /// the Profile is there already, the defaults only fill a gap.
+  void _setUpAfterwards() {
     setState(() {
       _starterSetOffered = true;
       _speechOfferDue = _speechWanted;
     });
+    unawaited(widget.profile.applyDefaults());
     unawaited(widget.alarms.refresh());
     widget.autoSync.devicesChanged();
   }
@@ -790,9 +840,19 @@ class _HomeState extends State<_Home> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_starterSetOffered && _new) {
+      return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) setState(() => _new = false);
+        },
+        child: StarterSetScreen(onDone: _plant),
+      );
+    }
     if (!_starterSetOffered) {
-      return StarterSetScreen(
-        onDone: _plant,
+      return FirstStartScreen(
+        onNew: () => setState(() => _new = true),
+        onAddDevice: () => unawaited(_addDevice()),
         onRestore: _restorable || _found != null
             ? () => unawaited(_restore())
             : null,

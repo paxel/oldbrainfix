@@ -144,6 +144,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fileInto => 'File into…';
 
   @override
+  String get firstStartTitle => 'Welcome to Old Brain Fix';
+
+  @override
+  String get firstStartIntro => 'How does Old Brain Fix start on this Device?';
+
+  @override
+  String get firstStartNew => 'New to Old Brain Fix';
+
+  @override
+  String get firstStartNewDetail => 'Start with a set of Areas to pick from.';
+
+  @override
+  String get firstStartDevice => 'Add a Device of mine';
+
+  @override
+  String get firstStartDeviceDetail =>
+      'Old Brain Fix runs on another Device of yours. Pair with it, and everything comes over.';
+
+  @override
+  String get hostContinue => 'Continue';
+
+  @override
   String get starterSetTitle => 'Pick your Areas';
 
   @override

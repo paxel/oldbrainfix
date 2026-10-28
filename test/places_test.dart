@@ -68,6 +68,8 @@ void main() {
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('first-new')));
+      await tester.pumpAndSettle();
 
       expect(find.byType(StarterSetScreen), findsOneWidget);
       final boxes = tester.widgetList<CheckboxListTile>(
@@ -85,6 +87,8 @@ void main() {
     ) async {
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('first-new')));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Kitchen'));
@@ -124,6 +128,8 @@ void main() {
       speakGerman(tester);
       final store = openStore(offered: false);
       await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('first-new')));
       await tester.pumpAndSettle();
       expect(find.text('Haushalt'), findsOneWidget);
       expect(find.text('Zu klären'), findsOneWidget);

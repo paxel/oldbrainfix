@@ -117,8 +117,7 @@
   "backupSheetSaved": "Das Wiederherstellungsblatt ist gespeichert. Druck es von dort aus und bewahre es sicher auf.",
   "backupFolderPickTitle": "Ordner für Sicherungen wählen",
   "restoreOpenTitle": "Sicherungsdatei wählen",
-  "welcomeTitle": "Willkommen bei Old Brain Fix",
-  "welcomeFresh": "Neu anfangen",
+  "welcomeNewDetail": "Mit einem leeren Old Brain Fix auf diesem Computer beginnen.",
   "personOpen": "Profil von {name} öffnen",
   "personFilterRemove": "{name} aus dem Filter nehmen"
 }
