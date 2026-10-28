@@ -90,15 +90,18 @@ impl Store {
             .and_then(|json| PairedDevice::from_json(&json)))
     }
 
-    /// Remembers `device`, keeping the fingerprint and address of a
-    /// Device that hosted before when it only joined now; one paired by
-    /// invite stays shared.
+    /// Remembers `device`, as the Dart core's `rememberDevice`: a Device
+    /// that only joined keeps the fingerprint it had when it hosted, and
+    /// a Device whose address is not known now the address it had with
+    /// that fingerprint; one paired by invite stays shared.
     pub fn remember_device(&self, device: &PairedDevice) -> Result<()> {
         let mut kept = device.clone();
         if let Some(held) = self.paired_device(&device.id)? {
             kept.shared |= held.shared;
             if device.fingerprint.is_empty() {
-                kept.fingerprint = held.fingerprint;
+                kept.fingerprint = held.fingerprint.clone();
+            }
+            if kept.fingerprint == held.fingerprint && device.host.is_none() {
                 kept.host = held.host;
                 kept.port = held.port;
             }
@@ -234,6 +237,34 @@ mod tests {
         assert!(s.paired_devices()?.is_empty());
         assert!(s.auto_sync_on("desk")?, "the switch goes with it");
         assert!(s.all_entries()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_joiner_keeps_the_address_it_hosted_at_with_the_same_certificate() -> Result<()> {
+        let s = store();
+        let device = |fingerprint: String, host: Option<&str>| PairedDevice {
+            id: "pad".into(),
+            name: "Pad".into(),
+            fingerprint,
+            host: host.map(str::to_string),
+            port: host.map(|_| 4000),
+            last_sync: s.now(),
+            shared: false,
+        };
+        s.remember_device(&device("ab".repeat(32), Some("192.168.1.7")))?;
+        s.remember_device(&device("ab".repeat(32), None))?;
+        let held = s.paired_device("pad")?;
+        assert_eq!(
+            held.as_ref().and_then(|d| d.host.clone()).as_deref(),
+            Some("192.168.1.7")
+        );
+        assert_eq!(held.and_then(|d| d.port), Some(4000));
+        // Another certificate is another host: its address is not known.
+        s.remember_device(&device("cd".repeat(32), None))?;
+        let held = s.paired_device("pad")?;
+        assert_eq!(held.as_ref().and_then(|d| d.host.clone()), None);
+        assert_eq!(held.map(|d| d.fingerprint), Some("cd".repeat(32)));
         Ok(())
     }
 

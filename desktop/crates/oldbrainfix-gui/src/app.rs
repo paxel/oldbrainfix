@@ -84,7 +84,9 @@ use crate::profile_view::{self, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::speech::SpeechModel;
-use crate::sync_view::{SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text};
+use crate::sync_view::{
+    Joiner, SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text,
+};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -822,6 +824,12 @@ impl App {
     pub fn set_sync_host(&mut self, bind: Option<std::net::IpAddr>, name: &str) {
         self.sync.bind = bind;
         self.sync_name = name.to_string();
+    }
+
+    /// Joins a typed code with `joiner` instead of the LAN; tests hand
+    /// one in.
+    pub fn set_joiner(&mut self, joiner: Joiner) {
+        self.sync.joiner = Some(joiner);
     }
 
     /// Asks `picker` for a Profile picture file instead of the system's
@@ -2155,6 +2163,9 @@ impl App {
                 }
             }
             Action::Sync(SyncAction::StopInviting) => self.sync.stop_inviting(&self.store),
+            Action::Sync(SyncAction::Join) => {
+                self.sync.join(self.store.clone(), &self.sync_name, &self.t)
+            }
             Action::People(area) => self.dialog = Some(Dialog::People { area }),
             Action::SetRole { area, person, role } => self.store.set_role(&area, &person, role)?,
             Action::AskRemovePerson { area, person } => {
@@ -2462,6 +2473,23 @@ impl App {
             }
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
+        }
+        // A typed code being joined, also after leaving the Sync view: its
+        // answer is taken in when it comes.
+        if self.sync.joining() {
+            match self.sync.joined(&self.store, &self.t) {
+                Some(changed) => {
+                    // Paired Devices and Conflicts too: read again.
+                    self.refresh();
+                    if changed && let Some(wake) = &self.wake {
+                        drop(wake.send(Event::Wake));
+                    }
+                    ui.ctx().request_repaint();
+                }
+                None => ui
+                    .ctx()
+                    .request_repaint_after(std::time::Duration::from_millis(100)),
+            }
         }
         // A speech model came: what waited is transcribed now.
         let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());

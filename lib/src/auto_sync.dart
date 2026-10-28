@@ -34,6 +34,52 @@ Future<SyncResult> quickPairedSync(
   timeout: const Duration(seconds: 5),
 );
 
+/// This Device's paired host as automatic sync runs it: where it
+/// answers, and the way to stop it. The app wraps the core's
+/// [PairedHost], tests a fake.
+abstract interface class PairedHosting {
+  int get port;
+  Future<void> stop();
+}
+
+/// How the paired host is started; the app passes [startPairedHosting],
+/// tests a fake.
+typedef StartPairedHost = Future<PairedHosting> Function(
+  Store store, {
+  required String name,
+  required void Function(SyncSession session) onSession,
+});
+
+/// The core's [PairedHost] on every IPv4 address of this Device.
+Future<PairedHosting> startPairedHosting(
+  Store store, {
+  required String name,
+  required void Function(SyncSession session) onSession,
+}) async => _PairedHosting(
+  await PairedHost.start(store, name: name, onSession: onSession),
+);
+
+class _PairedHosting implements PairedHosting {
+  final PairedHost _host;
+
+  _PairedHosting(this._host);
+
+  @override
+  int get port => _host.port;
+
+  @override
+  Future<void> stop() => _host.stop();
+}
+
+/// How long a sync the periodic work started hosts and looks for paired
+/// Devices (ADR 0003): long enough for another phone's run to meet it,
+/// well within the ten minutes Android gives the work.
+const hostWindow = Duration(minutes: 2);
+
+/// How often, within [hostWindow], the paired Devices not synced yet are
+/// tried again.
+const retryEvery = Duration(seconds: 15);
+
 /// Automatic sync while the app is open (ADR 0003): with every paired
 /// Device that syncs on its own and through the shared folder, at once
 /// when the app shows, when the periodic work comes due meanwhile and
@@ -41,7 +87,10 @@ Future<SyncResult> quickPairedSync(
 /// here, and every minute while it stays open ([AutoSyncSchedule]). One
 /// sync at a time; failures stay quiet, the next try comes anyway, except
 /// one that needs an update of the app here or there: that one is
-/// announced once (ADR 0019). Tells its listeners when a sync brought
+/// announced once (ADR 0019). While some paired Device syncs on its own,
+/// this Device hosts for them too ([host]) and says so on the network,
+/// while the app shows and, when the periodic work comes due while the
+/// app is out of sight, for [hostWindow]. Tells its listeners when a sync brought
 /// Conflicts or needs an update, or a background sync did while the app
 /// was closed, for the announcement at the top.
 class AutoSync extends ChangeNotifier {
@@ -65,6 +114,9 @@ class AutoSync extends ChangeNotifier {
   /// one, the weekly Backup waits for the background work.
   final String? workDir;
 
+  /// Starts the paired host; without one, this Device only joins.
+  final StartPairedHost? host;
+
   final _schedule = AutoSyncSchedule();
 
   /// Where discovery last heard each Device.
@@ -74,6 +126,15 @@ class AutoSync extends ChangeNotifier {
   var _running = false;
   var _open = false;
   var _disposed = false;
+
+  /// The paired host while it runs, and the changes to it, one at a time.
+  PairedHosting? _hosting;
+  Future<void> _hostQueue = Future.value();
+
+  /// Whether the periodic work's window runs while the app is out of
+  /// sight, and the Devices synced within it.
+  var _window = false;
+  final _synced = <String>{};
 
   /// This Device's own entries as of the last look: only a change of
   /// its own sends a sync, not the entries a sync brought in.
@@ -93,12 +154,13 @@ class AutoSync extends ChangeNotifier {
     this.folders = const NoFolders(),
     this.clock = DateTime.now,
     this.workDir,
+    this.host,
   }) {
     _own = _ownSeq();
     store.addListener(_changed);
     _subscriptions
       ..add(platform.found.listen(_hostFound))
-      ..add(platform.wanted.listen((_) => _wantAll()));
+      ..add(platform.wanted.listen((_) => _wanted()));
   }
 
   int _ownSeq() => store.versionVector()[store.deviceId] ?? 0;
@@ -184,6 +246,7 @@ class AutoSync extends ChangeNotifier {
     _open = false;
     _timer?.cancel();
     unawaited(platform.stopDiscovery());
+    _host();
     _schedule.flush(clock());
     unawaited(_run());
   }
@@ -200,8 +263,107 @@ class AutoSync extends ChangeNotifier {
         folder: store.syncFolder != null || backups,
       ),
     );
+    _host();
     _arm();
   }
+
+  /// Starts or stops the paired host as wanted now: while the app shows
+  /// or the periodic work's window runs, some paired Device syncs on its
+  /// own, and this Device is on a local network. A host that does not
+  /// start is tried again on the next occasion.
+  void _host() {
+    if (host == null) return;
+    _hostQueue = _hostQueue
+        .then((_) => _applyHost())
+        .then((_) {}, onError: (Object _) {});
+  }
+
+  Future<void> _applyHost() async {
+    final start = host;
+    final want =
+        start != null &&
+        !_disposed &&
+        (_open || _window) &&
+        store.autoSyncWanted &&
+        await platform.onLocalNetwork();
+    final running = _hosting;
+    if (running != null) {
+      if (want) return;
+      _hosting = null;
+      await platform.unadvertise();
+      await running.stop();
+      return;
+    }
+    if (!want) return;
+    final started = await start(
+      store,
+      name: await deviceName(),
+      onSession: _hostSession,
+    );
+    if (_disposed) {
+      await started.stop();
+      return;
+    }
+    _hosting = started;
+    await platform.advertise(device: store.deviceId, port: started.port);
+  }
+
+  /// A paired Device synced with this one's host.
+  void _hostSession(SyncSession session) {
+    if (_disposed) return;
+    _synced.add(session.peer);
+    _schedule.succeeded(session.peer, clock());
+    if (session.conflicts.isNotEmpty) {
+      _conflicts += session.conflicts.length;
+      notifyListeners();
+    }
+  }
+
+  /// The periodic work came due. While the app shows, every Device is
+  /// synced now; out of sight, this Device also hosts and looks for
+  /// [hostWindow], or until every Device that syncs on its own synced,
+  /// the work keeping the app running meanwhile. Then the work hears it
+  /// is over.
+  void _wanted() {
+    if (_disposed) return;
+    if (_open || _window) {
+      _wantAll();
+      unawaited(platform.finished());
+      return;
+    }
+    unawaited(_hostWindow());
+  }
+
+  Future<void> _hostWindow() async {
+    _window = true;
+    _synced.clear();
+    _host();
+    unawaited(platform.startDiscovery());
+    _wantAll();
+    final until = clock().add(hostWindow);
+    var retry = clock().add(retryEvery);
+    while (!_disposed && !_open && clock().isBefore(until) && !_allSynced()) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (_disposed || !clock().isAfter(retry)) continue;
+      retry = clock().add(retryEvery);
+      _schedule.wantAll(
+        _devices.where((d) => d != folderId && !_synced.contains(d)),
+        clock(),
+      );
+      unawaited(_run());
+    }
+    _window = false;
+    if (_disposed) return;
+    if (!_open) unawaited(platform.stopDiscovery());
+    _host();
+    unawaited(platform.finished());
+  }
+
+  /// Whether every paired Device that syncs on its own synced within the
+  /// window, either way round.
+  bool _allSynced() => store.pairedDevices().every(
+    (d) => !store.autoSyncOn(d.id) || _synced.contains(d.id),
+  );
 
   /// How many Conflicts syncs brought since last asked; taking them
   /// clears them.
@@ -296,6 +458,7 @@ class AutoSync extends ChangeNotifier {
               name: name,
             );
             _schedule.succeeded(device.id, clock());
+            _synced.add(device.id);
             if (result.session.conflicts.isNotEmpty && !_disposed) {
               _conflicts += result.session.conflicts.length;
               notifyListeners();
@@ -319,6 +482,11 @@ class AutoSync extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    if (_hosting case final running?) {
+      _hosting = null;
+      unawaited(platform.unadvertise());
+      unawaited(running.stop());
+    }
     store.removeListener(_changed);
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
@@ -329,9 +497,12 @@ class AutoSync extends ChangeNotifier {
 
 /// One background sync, as the platform's periodic work runs it while
 /// the app is closed: what was tapped on notifications meanwhile is
-/// applied first, so a Done here goes out with it; on a local network
-/// every paired Device that syncs on its own is looked for for [look]
-/// and synced where it answers; then the shared folder, wherever the
+/// applied first, so a Done here goes out with it; on a local network,
+/// while some paired Device syncs on its own, this Device hosts for them
+/// ([host]) and says so on the network, and every paired Device it can
+/// join is looked for for [look] and synced where it answers, again
+/// every [retryEvery], for [window] or until every one synced, either
+/// way round; then the shared folder, wherever the
 /// Device is; Conflicts they brought are kept to be announced when the
 /// app opens; and the alarms are armed anew, so a Done on another Device
 /// silences the alarm here. A weekly Backup due is written through
@@ -344,12 +515,23 @@ Future<void> backgroundSync({
   PairedJoin join = quickPairedSync,
   FolderPlatform folders = const NoFolders(),
   Duration look = const Duration(seconds: 8),
+  StartPairedHost? host,
+  Duration window = hostWindow,
+  DateTime Function() clock = DateTime.now,
   String? workDir,
 }) async {
   await alarms.refresh();
-  final devices = store.autoSyncDevices();
-  if (devices.isNotEmpty && await platform.onLocalNetwork()) {
-    await _lanInBackground(store, platform, devices, name, join, look);
+  if (store.autoSyncWanted && await platform.onLocalNetwork()) {
+    await _lanInBackground(
+      store,
+      platform,
+      name,
+      join,
+      look,
+      host,
+      clock().add(window),
+      clock,
+    );
   }
   if (store.syncFolder case final folder?) {
     try {
@@ -379,30 +561,76 @@ Future<void> backgroundSync({
 Future<void> _lanInBackground(
   Store store,
   SyncPlatform platform,
-  List<PairedDevice> devices,
   String name,
   PairedJoin join,
   Duration look,
+  StartPairedHost? host,
+  DateTime until,
+  DateTime Function() clock,
 ) async {
-  final found = {for (final f in await platform.discover(look)) f.device: f};
-  for (final device in devices) {
-    final host = found[device.id]?.host ?? device.host;
-    final port = found[device.id]?.port ?? device.port;
-    if (host == null || port == null) continue;
+  final synced = <String>{};
+  void took(SyncSession session) {
+    if (session.conflicts.isNotEmpty) store.conflictsArrived = true;
+  }
+
+  PairedHosting? hosting;
+  if (host != null) {
     try {
-      final result = await join(
+      hosting = await host(
         store,
-        device,
-        host: host,
-        port: port,
         name: name,
+        onSession: (session) {
+          synced.add(session.peer);
+          took(session);
+        },
       );
-      if (result.session.conflicts.isNotEmpty) store.conflictsArrived = true;
-    } on SyncException catch (e) {
-      // Kept to be announced when the app opens.
-      _noteUpdate(store, device.id, e);
+      await platform.advertise(device: store.deviceId, port: hosting.port);
     } on Object {
-      // Not there now: the next run tries again.
+      // Not hosting this time: joining still works.
+    }
+  }
+  try {
+    while (true) {
+      final devices = [
+        for (final d in store.autoSyncDevices())
+          if (!synced.contains(d.id)) d,
+      ];
+      if (devices.isNotEmpty) {
+        final found = {
+          for (final f in await platform.discover(look)) f.device: f,
+        };
+        for (final device in devices) {
+          final at = found[device.id]?.host ?? device.host;
+          final port = found[device.id]?.port ?? device.port;
+          if (at == null || port == null) continue;
+          try {
+            final result = await join(
+              store,
+              device,
+              host: at,
+              port: port,
+              name: name,
+            );
+            synced.add(device.id);
+            took(result.session);
+          } on SyncException catch (e) {
+            // Kept to be announced when the app opens.
+            _noteUpdate(store, device.id, e);
+          } on Object {
+            // Not there now: tried again within the window, or next run.
+          }
+        }
+      }
+      final all = store.pairedDevices().every(
+        (d) => !store.autoSyncOn(d.id) || synced.contains(d.id),
+      );
+      if (all || !clock().isBefore(until)) break;
+      await Future<void>.delayed(retryEvery);
+    }
+  } finally {
+    if (hosting != null) {
+      await platform.unadvertise();
+      await hosting.stop();
     }
   }
 }

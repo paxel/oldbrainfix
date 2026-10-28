@@ -26,6 +26,9 @@ pub enum Error {
     /// A Backup that could not be restored, and why.
     #[error("backup: {0:?}")]
     Backup(crate::backup::Problem),
+    /// A LAN sync this Device joined that did not happen, and why.
+    #[error("sync: {0:?}")]
+    Sync(crate::join::SyncFailure),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

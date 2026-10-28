@@ -16,23 +16,35 @@ import java.util.concurrent.TimeUnit
  * One background sync while the app is closed: the store and the sync
  * are Dart's, so the worker starts a Flutter engine of its own without
  * any screen and runs `backgroundSyncMain` (lib/main.dart) in it, which
- * applies what was tapped on notifications, finds the paired hosts here
- * ([Discovery]), syncs with them and through the shared folder
- * ([FolderChannel]), writes the weekly Backup when it is due, and arms
- * the alarms anew. The engine is gone when
- * Dart says it finished, or after [LIMIT_MINUTES] at the latest. While
- * the app is open it syncs itself instead.
+ * applies what was tapped on notifications, hosts for paired Devices and
+ * tells the network so ([Advertiser]), finds the paired hosts here
+ * ([Discovery]), syncs with them for a while and through the shared
+ * folder ([FolderChannel]), writes the weekly Backup when it is due, and
+ * arms the alarms anew. The engine is gone when Dart says it finished,
+ * or after [LIMIT_MINUTES] at the latest. While the app runs it syncs
+ * itself instead, and the worker waits for it as long, so the app is
+ * not frozen meanwhile.
  */
 class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     private val main = Handler(Looper.getMainLooper())
     private val over = CountDownLatch(1)
     private var engine: FlutterEngine? = null
     private var discovery: Discovery? = null
+    private var advertiser: Advertiser? = null
+
+    /** The app's own sync this worker waits for, while it runs. */
+    @Volatile
+    private var inApp: CountDownLatch? = null
 
     override fun doWork(): Result {
         val context = applicationContext
         if (!SyncWork.folderOn(context) && !SyncWork.onLocalNetwork(context)) return Result.success()
-        if (MainActivity.syncInApp()) return Result.success()
+        MainActivity.syncInApp()?.let { app ->
+            inApp = app
+            app.await(LIMIT_MINUTES, TimeUnit.MINUTES)
+            inApp = null
+            return Result.success()
+        }
         main.post { start() }
         over.await(LIMIT_MINUTES, TimeUnit.MINUTES)
         main.post { finish() }
@@ -40,6 +52,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
     }
 
     override fun onStopped() {
+        inApp?.countDown()
         main.post { finish() }
     }
 
@@ -61,6 +74,19 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
                     finish()
                 }
                 "localNetwork" -> result.success(SyncWork.onLocalNetwork(context))
+                "advertise" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val device = args?.get("device") as? String
+                    val port = (args?.get("port") as? Number)?.toInt()
+                    if (device != null && port != null) {
+                        (advertiser ?: Advertiser(context).also { advertiser = it }).start(device, port)
+                    }
+                    result.success(null)
+                }
+                "unadvertise" -> {
+                    advertiser?.stop()
+                    result.success(null)
+                }
                 "start", "stop", "background" -> result.success(null)
                 else -> result.notImplemented()
             }
@@ -98,6 +124,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
     private fun finish() {
         discovery?.stop()
         discovery = null
+        advertiser?.stop()
+        advertiser = null
         engine?.destroy()
         engine = null
         over.countDown()

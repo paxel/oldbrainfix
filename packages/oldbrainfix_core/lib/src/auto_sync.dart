@@ -1,3 +1,4 @@
+import 'lan_host.dart' show PairedHost;
 import 'pairing.dart';
 import 'store.dart';
 
@@ -14,6 +15,11 @@ extension AutoSyncDevices on Store {
     for (final device in pairedDevices())
       if (device.fingerprint.length == 64 && autoSyncOn(device.id)) device,
   ];
+
+  /// Whether some paired Device syncs with this one on its own, so the
+  /// paired host ([PairedHost]) is wanted, as the desktop core's
+  /// `auto_sync_wanted`.
+  bool get autoSyncWanted => pairedDevices().any((d) => autoSyncOn(d.id));
 
   /// Whether a sync nobody watched, in the background, brought
   /// Conflicts that were not announced yet.

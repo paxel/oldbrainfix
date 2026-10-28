@@ -37,6 +37,21 @@ class NsdRecordsTest {
     }
 
     @Test
+    fun theOwnRecordCarriesTheDeviceIdOnly() {
+        assertEquals(mapOf("id" to id), NsdRecords.own(id, 45231))
+        val heard = NsdRecords.own(id, 45231)!!.mapValues { it.value.toByteArray(Charsets.US_ASCII) }
+        assertEquals(Found(id, "192.168.1.5", 45231), NsdRecords.found(heard, "192.168.1.5", 45231))
+    }
+
+    @Test
+    fun nothingIsAdvertisedWithoutADeviceIdAndARealPort() {
+        assertNull(NsdRecords.own("Patrick's phone", 45231))
+        assertNull(NsdRecords.own(id.uppercase(), 45231))
+        assertNull(NsdRecords.own(id, 0))
+        assertNull(NsdRecords.own(id, 70000))
+    }
+
+    @Test
     fun theServiceTypeIsReadAsNsdManagerReportsIt() {
         assertTrue(NsdRecords.isOurs("_oldbrainfix._tcp"))
         assertTrue(NsdRecords.isOurs("._oldbrainfix._tcp."))

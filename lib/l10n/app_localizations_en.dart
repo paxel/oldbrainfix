@@ -1539,7 +1539,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncJoinIntro =>
-      'Open Sync on the computer. Scan the code it shows, or type it in.';
+      'Open Sync on the other Device. Scan the code it shows, or type it in.';
 
   @override
   String get syncScan => 'Scan the code';
@@ -1551,11 +1551,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncJoin => 'Sync now';
 
   @override
+  String get syncShowIntro =>
+      'Or show a code here for the other Device to scan.';
+
+  @override
+  String get syncShowCode => 'Show this Device\'s code';
+
+  @override
+  String get shareShowIntro => 'Or show a code here for their Device to scan.';
+
+  @override
+  String get hostTitle => 'This Device\'s code';
+
+  @override
+  String get hostIntro =>
+      'On the other Device, open Sync and scan this code, or type in the code under it.';
+
+  @override
+  String get hostInviteIntro =>
+      'On their Device, open Sync and scan this code, or type in the code under it. Their Profile then shows here to confirm.';
+
+  @override
+  String get hostTypedCode => 'Code to type';
+
+  @override
+  String get hostStays =>
+      'The code holds while this page is open. Go back once the other Device says it synced.';
+
+  @override
+  String get hostNoNetwork =>
+      'This Device is on no Wi-Fi. Connect it to the same Wi-Fi as the other Device, then try again.';
+
+  @override
+  String get hostLocked =>
+      'Too many wrong codes were tried. Make a new code to go on.';
+
+  @override
+  String get hostFailed => 'No code could be made. Try again.';
+
+  @override
+  String get hostTryAgain => 'Try again';
+
+  @override
+  String get hostNewCode => 'New code';
+
+  @override
+  String hostAskTitle(String name) {
+    return 'Let $name join?';
+  }
+
+  @override
+  String get hostAskUnnamed => 'Let the other Device join?';
+
+  @override
+  String get hostAskText =>
+      'It gets everything on this Device and syncs with it from then on. Say yes only to a Device of your own.';
+
+  @override
+  String get hostAllow => 'Let it join';
+
+  @override
   String get syncSyncing => 'Syncing…';
 
   @override
   String get syncInvalidCode =>
-      'That is not a pair code. Check it against the computer\'s screen.';
+      'That is not a pair code. Check it against the other Device\'s screen.';
 
   @override
   String get syncNoCode =>
@@ -1590,21 +1650,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncFailUnreachable =>
-      'The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?';
+      'The other Device did not answer. Does it still show the code, and are both on the same Wi-Fi?';
 
   @override
-  String get syncFailWrongHost =>
-      'This is not the computer the code belongs to.';
+  String get syncFailWrongHost => 'This is not the Device the code belongs to.';
 
   @override
   String get syncFailWrongPin => 'The PIN does not match. Type the code again.';
 
   @override
   String get syncFailLocked =>
-      'Too many wrong tries. Open Sync on the computer again for a new code.';
+      'Too many wrong tries. Show a new code on the other Device.';
 
   @override
-  String get syncFailDeclined => 'The computer said no to this Device.';
+  String get syncFailDeclined => 'The other Device said no to this one.';
 
   @override
   String get syncFailUpdateHere =>
@@ -1654,7 +1713,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get syncAutoIntro =>
-      'Paired computers on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.';
+      'Paired Devices on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.';
 
   @override
   String get conflictsTitle => 'Conflicts';
@@ -1859,7 +1918,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareIntro =>
-      'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.';
+      'Meet the other person. On their Device, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.';
 
   @override
   String get roleHeading => 'They may';

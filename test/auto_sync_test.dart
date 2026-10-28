@@ -66,6 +66,55 @@ class FakeSync implements SyncPlatform {
 
   @override
   Future<bool> onLocalNetwork() async => localNetwork;
+
+  /// The port the paired host is advertised on, while it is.
+  int? advertised;
+
+  /// How often the periodic work heard that its sync is over.
+  var finishes = 0;
+
+  /// The device id it is advertised under.
+  String? advertisedAs;
+
+  @override
+  Future<void> advertise({required String device, required int port}) async {
+    advertisedAs = device;
+    advertised = port;
+  }
+
+  @override
+  Future<void> unadvertise() async => advertised = null;
+
+  @override
+  Future<void> finished() async => finishes++;
+}
+
+/// The paired host as the test says: started on a port, and the session
+/// a paired Device's join would bring, handed in by the test.
+class FakeHosts {
+  var starts = 0;
+  FakeHost? running;
+
+  Future<PairedHosting> start(
+    Store store, {
+    required String name,
+    required void Function(SyncSession session) onSession,
+  }) async {
+    starts++;
+    return running = FakeHost(4700 + starts, onSession);
+  }
+}
+
+class FakeHost implements PairedHosting {
+  @override
+  final int port;
+  final void Function(SyncSession session) onSession;
+  var stopped = false;
+
+  FakeHost(this.port, this.onSession);
+
+  @override
+  Future<void> stop() async => stopped = true;
 }
 
 void main() {
@@ -123,6 +172,26 @@ void main() {
     join: join,
     clock: () => now,
   );
+
+  AutoSync hostingAutoSync(FakeHosts hosts) => AutoSync(
+    store: phone,
+    platform: sync,
+    deviceName: () async => 'Pixel',
+    join: join,
+    clock: () => now,
+    host: hosts.start,
+  );
+
+  AlarmSync alarmSync() {
+    final armed = AlarmSync(
+      store: phone,
+      platform: FakeAlarms(),
+      wallClock: deviceWallClock,
+    );
+    addTearDown(armed.dispose);
+    armed.setTexts(lookupAppLocalizations(const Locale('en')), 'en');
+    return armed;
+  }
 
   /// Lets [by] pass on the clock and the timers alike.
   Future<void> wait(WidgetTester tester, Duration by) async {
@@ -326,6 +395,110 @@ void main() {
     });
   });
 
+  group('hosting while the app is open', () {
+    testWidgets('hosts for paired Devices while it shows, says so on the '
+        'network, and stops on leaving', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      auto.shown();
+      await tester.pump();
+      expect(hosts.starts, 1);
+      expect(sync.advertised, 4701);
+      expect(sync.advertisedAs, phone.deviceId);
+      auto.devicesChanged();
+      await tester.pump();
+      expect(hosts.starts, 1, reason: 'one host at a time');
+
+      auto.hidden();
+      await tester.pump();
+      expect(hosts.running?.stopped, isTrue);
+      expect(sync.advertised, isNull);
+
+      // Nobody syncs on their own any more: nothing to host for.
+      phone.setAutoSync(desk.deviceId, false);
+      auto.shown();
+      await tester.pump();
+      expect(hosts.starts, 1);
+      auto.dispose();
+    });
+
+    testWidgets('away from Wi-Fi, nothing is hosted', (tester) async {
+      pairDesk();
+      sync.localNetwork = false;
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      auto.shown();
+      await tester.pump();
+      expect(hosts.starts, 0);
+      expect(sync.advertised, isNull);
+      auto.dispose();
+    });
+
+    testWidgets('the periodic work out of sight hosts and looks for its '
+        'window, tries again, then says it is over', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      auto.shown();
+      await tester.pump();
+      auto.hidden();
+      await tester.pump();
+      final before = joined.length;
+      failure = SyncFailure.unreachable;
+
+      sync.want();
+      await tester.pump();
+      expect(hosts.starts, 2);
+      expect(sync.advertised, 4702);
+      expect(sync.discovering, isTrue);
+      expect(joined, hasLength(before + 1));
+
+      await wait(tester, retryEvery + const Duration(seconds: 1));
+      expect(joined, hasLength(before + 2), reason: 'tried again');
+      expect(sync.finishes, 0);
+
+      await wait(tester, hostWindow);
+      expect(sync.finishes, 1);
+      expect(hosts.running?.stopped, isTrue);
+      expect(sync.advertised, isNull);
+      expect(sync.discovering, isFalse);
+      auto.dispose();
+    });
+
+    testWidgets('the window ends once every Device synced, also by joining '
+        'this one', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      failure = SyncFailure.unreachable;
+      sync.want();
+      await tester.pump();
+      expect(hosts.starts, 1);
+      hosts.running?.onSession(session());
+      await wait(tester, const Duration(seconds: 1));
+      expect(sync.finishes, 1);
+      expect(hosts.running?.stopped, isTrue);
+      auto.dispose();
+    });
+
+    testWidgets('while it shows, the periodic work is told at once', (
+      tester,
+    ) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      final auto = hostingAutoSync(hosts);
+      auto.shown();
+      await tester.pump();
+      sync.want();
+      await tester.pump();
+      expect(sync.finishes, 1);
+      expect(hosts.starts, 1);
+      expect(hosts.running?.stopped, isFalse);
+      auto.dispose();
+    });
+  });
+
   group('the whole app', () {
     late Announcements announcements;
     setUp(() => announcements = Announcements());
@@ -478,8 +651,97 @@ void main() {
         alarms: armed,
         name: 'Pixel',
         join: join,
+        window: Duration.zero,
       );
       expect(joined, hasLength(2));
+    });
+  });
+
+  group('hosting in the background', () {
+    testWidgets('hosts for its window, tries again, and stops once every '
+        'Device synced', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      failure = SyncFailure.unreachable;
+      final run = backgroundSync(
+        store: phone,
+        platform: sync,
+        alarms: alarmSync(),
+        name: 'Pixel',
+        join: join,
+        host: hosts.start,
+        clock: () => now,
+      );
+      await tester.pump();
+      expect(sync.advertised, 4701);
+      expect(sync.advertisedAs, phone.deviceId);
+      expect(joined, hasLength(1));
+
+      failure = null;
+      await wait(tester, retryEvery);
+      expect(joined, hasLength(2));
+      await run;
+      expect(hosts.running?.stopped, isTrue);
+      expect(sync.advertised, isNull);
+    });
+
+    testWidgets('a Device that only joins this one is waited for until it '
+        'did', (tester) async {
+      phone.rememberDevice(
+        PairedDevice(
+          id: desk.deviceId,
+          name: 'Tablet',
+          fingerprint: '',
+          host: null,
+          port: null,
+          lastSync: DateTime.utc(2026, 10, 24, 6),
+        ),
+      );
+      final hosts = FakeHosts();
+      var over = false;
+      final run = backgroundSync(
+        store: phone,
+        platform: sync,
+        alarms: alarmSync(),
+        name: 'Pixel',
+        join: join,
+        host: hosts.start,
+        clock: () => now,
+      ).then((_) => over = true);
+      await tester.pump();
+      expect(joined, isEmpty, reason: 'nowhere to join it');
+      await wait(tester, retryEvery);
+      expect(over, isFalse);
+
+      hosts.running?.onSession(session());
+      await wait(tester, retryEvery);
+      await run;
+      expect(hosts.running?.stopped, isTrue);
+    });
+
+    testWidgets('gives up when the window is over', (tester) async {
+      pairDesk();
+      final hosts = FakeHosts();
+      failure = SyncFailure.unreachable;
+      var over = false;
+      final run = backgroundSync(
+        store: phone,
+        platform: sync,
+        alarms: alarmSync(),
+        name: 'Pixel',
+        join: join,
+        host: hosts.start,
+        clock: () => now,
+      ).then((_) => over = true);
+      await tester.pump();
+      for (var i = 0; i < 8; i++) {
+        await wait(tester, retryEvery);
+      }
+      await run;
+      expect(over, isTrue);
+      expect(joined, hasLength(9));
+      expect(hosts.running?.stopped, isTrue);
+      expect(sync.advertised, isNull);
     });
   });
 

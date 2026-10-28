@@ -2,7 +2,9 @@
 //! view shows, with the pair code as a QR and as text and its PIN. A
 //! phone that is not paired yet gets the user's question first; a
 //! paired one, proven by its key, syncs straight away. Every session's joiner is remembered
-//! as a paired Device, and the paired Devices can be forgotten here, or
+//! as a paired Device, with the certificate it hosts with. The other way
+//! round, the code a phone or tablet shows is typed here and the desktop
+//! joins it, off the window's thread. The paired Devices can be forgotten here, or
 //! kept from syncing on their own. The Conflicts are listed here too,
 //! each version a button that keeps it, and the shared folder is chosen,
 //! synced and forgotten here, with how its last sync went. A bundle file
@@ -11,12 +13,16 @@
 
 use std::net::IpAddr;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::mpsc::{Receiver, TryRecvError};
 
 use egui::{Color32, Rect, RichText, Ui, Vec2};
 use oldbrainfix_core::bundle::{BundleResult, import_bundle};
 use oldbrainfix_core::conflicts::{RADIUS, SCHEDULE_UNIT};
+use oldbrainfix_core::join::{JoinResult, SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{
-    Host, JoinAsk, Request, Response, lan_address, new_pin, pair_code_lines,
+    Host, JoinAsk, PairInfo, Request, Response, Session, decode_pair_code, lan_address, new_pin,
+    pair_code_lines,
 };
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
@@ -62,7 +68,14 @@ pub enum SyncAction {
     /// End the invite to a Shared Area; hosting goes on with a fresh
     /// code.
     StopInviting,
+    /// Join the Device whose code was typed.
+    Join,
 }
+
+/// Joins the host a pair code names, as [`lan_sync`] does, as this
+/// Device named by the last argument; tests hand in another.
+pub type Joiner =
+    Arc<dyn Fn(&Store, &PairInfo, &str) -> oldbrainfix_core::Result<JoinResult> + Send + Sync>;
 
 /// The desktop's hosting state.
 #[derive(Default)]
@@ -96,6 +109,15 @@ pub struct SyncHost {
     pub inviting: Option<Invite>,
     /// The last session that shared an Area: with whom, and which.
     shared: Option<(String, String)>,
+    /// The code of another Device typed to join it.
+    code: String,
+    /// Why the typed code joined nothing: not a code, or the sync
+    /// failed; red under the field.
+    code_error: Option<String>,
+    /// The join running off the window's thread, until it answers.
+    joining: Option<Receiver<oldbrainfix_core::Result<JoinResult>>>,
+    /// How a typed code is joined; [`lan_sync`] when none.
+    pub joiner: Option<Joiner>,
 }
 
 impl SyncHost {
@@ -239,42 +261,98 @@ impl SyncHost {
                 let Some(session) = session else {
                     return false;
                 };
-                if !session.peer.is_empty() {
-                    let remembered = store.remember_device(&PairedDevice {
-                        id: session.peer.clone(),
-                        name: session.name.clone(),
-                        fingerprint: String::new(),
-                        host: None,
-                        port: None,
-                        last_sync: store.now(),
-                        shared: session.shared_area.is_some(),
-                    });
-                    if let Err(e) = remembered {
-                        self.error = Some(e.to_string());
-                    }
+                // With the certificate it hosts with, so it can be joined
+                // back later.
+                if let Err(e) = store.remember_joiner(&session) {
+                    self.error = Some(e.to_string());
                 }
-                if let Some(area) = &session.shared_area {
-                    // The person's Profile, as the grant names it.
-                    let who = store
-                        .grants_of(area)
-                        .ok()
-                        .flatten()
-                        .and_then(|g| g.person_of(&session.peer).map(str::to_string))
-                        .and_then(|person| store.person_shown(&person).ok())
-                        .map(|p| p.name)
-                        .unwrap_or_default();
-                    self.shared = Some((who, area.clone()));
-                }
-                self.refused = session.report.refused_count();
-                self.found = session.conflicts.len();
-                self.last = Some((session.name, session.applied.len()));
-                self.reload_conflicts(store);
-                !session.applied.is_empty() || session.profile.changed() || session.people_changed
+                self.took_in(store, session)
             }
             Err(e) => {
                 request.reply(Response::status(500));
                 self.error = Some(e.to_string());
                 false
+            }
+        }
+    }
+
+    /// Notes what a session, hosted or joined, brought. Returns whether
+    /// the log changed.
+    fn took_in(&mut self, store: &Store, session: Session) -> bool {
+        if let Some(area) = &session.shared_area {
+            // The person's Profile, as the grant names it.
+            let who = store
+                .grants_of(area)
+                .ok()
+                .flatten()
+                .and_then(|g| g.person_of(&session.peer).map(str::to_string))
+                .and_then(|person| store.person_shown(&person).ok())
+                .map(|p| p.name)
+                .unwrap_or_default();
+            self.shared = Some((who, area.clone()));
+        }
+        self.refused = session.report.refused_count();
+        self.found = session.conflicts.len();
+        self.last = Some((session.name, session.applied.len()));
+        self.reload_conflicts(store);
+        !session.applied.is_empty() || session.profile.changed() || session.people_changed
+    }
+
+    /// Joins the Device whose code was typed, as this Device named
+    /// `name`, on a thread of its own: the other Device may ask its user
+    /// first. A text that is no code says so under the field.
+    pub fn join(&mut self, store: Arc<Store>, name: &str, t: &L10n) {
+        if self.joining.is_some() {
+            return;
+        }
+        let Some(info) = decode_pair_code(&self.code) else {
+            self.code_error = Some(t.sync_invalid_code().to_string());
+            return;
+        };
+        self.code_error = None;
+        let joiner = self.joiner.clone();
+        let name = name.to_string();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let joined = match joiner {
+                Some(joiner) => joiner(&store, &info, &name),
+                None => lan_sync(&store, &info, &name),
+            };
+            // A window gone meanwhile is nobody's problem.
+            drop(tx.send(joined));
+        });
+        self.joining = Some(rx);
+    }
+
+    /// Whether a typed code is being joined.
+    pub fn joining(&self) -> bool {
+        self.joining.is_some()
+    }
+
+    /// Takes in the join's answer once there: `None` while it runs, else
+    /// whether the log changed. A failure says why under the field; the
+    /// code stays there to be fixed.
+    pub fn joined(&mut self, store: &Store, t: &L10n) -> Option<bool> {
+        let answer = match self.joining.as_ref()?.try_recv() {
+            Ok(answer) => answer,
+            Err(TryRecvError::Empty) => return None,
+            // The thread broke off without an answer.
+            Err(TryRecvError::Disconnected) => Err(Error::Sync(SyncFailure::Failed)),
+        };
+        self.joining = None;
+        match answer {
+            Ok(joined) => {
+                self.code.clear();
+                self.code_error = None;
+                if !joined.session.conflicts.is_empty() {
+                    // Announced at the top when this view is not showing.
+                    drop(store.set_conflicts_arrived(true));
+                }
+                Some(self.took_in(store, joined.session))
+            }
+            Err(e) => {
+                self.code_error = Some(join_failure_text(t, &e).to_string());
+                Some(false)
             }
         }
     }
@@ -438,6 +516,11 @@ impl SyncHost {
                         });
                     });
                 }
+                // Joining another Device by its code; not while inviting,
+                // which hands out this Device's own code.
+                if self.inviting.is_none() && self.join_section(ui, t, tones) {
+                    action = Some(SyncAction::Join);
+                }
                 if let Some((name, count)) = &self.last {
                     ui.label(RichText::new(t.sync_came_in(name, *count as i64)).color(text));
                     if let Some((who, area)) = &self.shared
@@ -565,6 +648,72 @@ impl SyncHost {
                 });
             });
         action
+    }
+}
+
+impl SyncHost {
+    /// The field for another Device's code, its error under it, and the
+    /// button, or the waiting while it joins. Returns whether the user
+    /// asked to join.
+    fn join_section(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        let error = ui.visuals().error_fg_color;
+        let joining = self.joining.is_some();
+        let mut asked = false;
+        embossed(ui, tones, false, None, |ui| {
+            ui.label(RichText::new(t.sync_join_title()).strong().color(text));
+            ui.label(RichText::new(t.sync_type_code_intro()).small().color(weak));
+            let label = ui.label(RichText::new(t.sync_code_label()).color(text));
+            let field = ui
+                .add_enabled(
+                    !joining,
+                    egui::TextEdit::singleline(&mut self.code)
+                        .font(egui::TextStyle::Monospace)
+                        .desired_width(f32::INFINITY),
+                )
+                .labelled_by(label.id);
+            if let Some(message) = &self.code_error {
+                ui.label(RichText::new(message).color(error));
+            }
+            if joining {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(RichText::new(t.sync_join_waiting()).color(text));
+                });
+            } else {
+                let entered = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let clicked = ui
+                    .button(RichText::new(t.sync_join_button()).color(text))
+                    .clicked();
+                asked = entered || clicked;
+            }
+        });
+        asked
+    }
+}
+
+/// Why joining a typed code failed, in words: each [`SyncFailure`] as
+/// the phone says it, anything else as broken off.
+pub fn join_failure_text(t: &L10n, error: &Error) -> &'static str {
+    match error {
+        Error::Sync(failure) => sync_failure_text(t, *failure),
+        _ => t.sync_fail_failed(),
+    }
+}
+
+/// A [`SyncFailure`] in words, as the phone's `syncFailureText`.
+pub fn sync_failure_text(t: &L10n, failure: SyncFailure) -> &'static str {
+    match failure {
+        SyncFailure::NotPrivate => t.sync_fail_not_private(),
+        SyncFailure::Unreachable => t.sync_fail_unreachable(),
+        SyncFailure::WrongHost => t.sync_fail_wrong_host(),
+        SyncFailure::WrongPin => t.sync_fail_wrong_pin(),
+        SyncFailure::Locked => t.sync_fail_locked(),
+        SyncFailure::Declined => t.sync_fail_declined(),
+        SyncFailure::UpdateHere => t.sync_fail_update_here(),
+        SyncFailure::UpdateThere => t.sync_fail_update_there(),
+        SyncFailure::Failed => t.sync_fail_failed(),
     }
 }
 

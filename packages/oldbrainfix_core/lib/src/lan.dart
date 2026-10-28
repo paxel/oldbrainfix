@@ -8,6 +8,8 @@ import 'area_keys.dart';
 import 'backup.dart';
 import 'conflicts.dart';
 import 'entry.dart';
+import 'host_identity.dart';
+import 'lan_host.dart' show LanHost, PairedHost, PairingHost;
 import 'pair_code.dart';
 import 'pairing.dart';
 import 'profiles.dart';
@@ -16,22 +18,26 @@ import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
 
-/// LAN sync (ADR 0003), Catlog's in-person sync copied and adapted: the
-/// desktop hosts a small HTTPS server with a self-signed certificate
-/// made once per install, the pair code carries the certificate's
-/// fingerprint and a PIN, and the phone joins: `GET /vector`, then
-/// `POST /sync` with what the host lacks, which answers with what the
-/// phone lacks, then the photos and voice recordings both ways under
-/// `/blob/<kind>/<hash>`. Every request carries the PIN; the host locks
-/// an address out after [pinFailuresPerAddress] wrong ones and stops
-/// answering anyone after [pinFailuresTotal].
+/// LAN sync (ADR 0003), Catlog's in-person sync copied and adapted: a
+/// Device hosts a small HTTPS server with a self-signed certificate made
+/// once per install ([HostIdentity]), the pair code carries the
+/// certificate's fingerprint and a PIN, and the other Device joins:
+/// `GET /vector`, then `POST /sync` with what the host lacks, which
+/// answers with what the joiner lacks, then the photos and voice
+/// recordings both ways under `/blob/<kind>/<hash>`. Every request
+/// carries the PIN; the host locks an address out after
+/// [pinFailuresPerAddress] wrong ones and stops answering anyone after
+/// [pinFailuresTotal]. Any Device hosts, the phone as the desktop does
+/// ([LanHost], [PairingHost], [PairedHost]).
 ///
 /// A Device paired before syncs on its own without the PIN
 /// ([pairedSync]): it checks the host's certificate against the whole
 /// fingerprint it pinned before anything is sent, fetches a fresh nonce
 /// from `GET /challenge`, and signs it with its own key in every request
 /// ([pairedProofBytes]); the host answers only a paired Device whose
-/// verified key made that signature ([trustsPairedJoiner]).
+/// verified key made that signature ([trustsPairedJoiner]). The joiner
+/// names its own certificate's fingerprint in `POST /sync`, so the host
+/// can join it the other way round later.
 ///
 /// The host side here ([answerSync] and the blob answers) is what the
 /// fixtures and the tests serve with; the desktop core answers the
@@ -141,6 +147,11 @@ class SyncSession {
   /// Whether a Profile of another person came in or changed.
   final bool peopleChanged;
 
+  /// The whole fingerprint of the certificate the joiner hosts with, hex,
+  /// as it named it in `POST /sync` and proved with its key; null on the
+  /// joiner's side and when it named none.
+  final String? fingerprint;
+
   const SyncSession({
     required this.peer,
     required this.name,
@@ -151,6 +162,7 @@ class SyncSession {
     this.sharedArea,
     this.profile = ProfileTaken.unchanged,
     this.peopleChanged = false,
+    this.fingerprint,
   });
 }
 
@@ -228,7 +240,9 @@ bool trustsPairedJoiner(
 /// The joiner's `POST /sync` body: what a host holding [hostVector]
 /// lacks, with this Device's vector, id, [name] and keys, and its proof
 /// over [hostDevice] and [pin] that it holds its own key: a host that
-/// paired with it before lets it in without asking only then. The
+/// paired with it before lets it in without asking only then. The whole
+/// fingerprint of the certificate this Device hosts with goes along once
+/// it has one ([HostIdentities]), so the host can join it later. The
 /// Area keys travel along (ADR 0012): only over this session, which the
 /// pair code or the pinned certificate authenticated; to a Device of
 /// this one's own group the own Profile's backup key (ADR 0016) and the
@@ -297,6 +311,8 @@ Map<String, Object?> syncRequest(
     'entries': [for (final e in entries) e.toJson()],
     'keys': [for (final k in store.keyRecords()) k.toJson()],
     'areaKeys': [for (final k in areaKeys) k.toJson()],
+    if (store.heldHostIdentity case final identity?)
+      'fingerprint': hex(identity.fingerprint),
     if (own) 'backupKey': ?store.backupKeyToSend,
     if (own) 'profile': ?store.ownProfileJson,
     if (invited) 'profile': ?store.ownProfileForOthers,
@@ -324,6 +340,35 @@ String? _invitedTo(Object? json) {
   return null;
 }
 
+/// The certificate fingerprint the joiner [peer] named in [body], when
+/// it is a whole one and the joiner proved, with the key pinned for
+/// [peer], that it is that Device: its proof over this host and [pin]
+/// (empty for a paired Device's session). Anyone holding the PIN can
+/// name any device id, and a fingerprint kept for another Device's id
+/// would have this one join them as that Device later.
+String? _provenFingerprint(
+  Store store,
+  Map<String, Object?> body,
+  String peer,
+  String pin,
+) {
+  final fingerprint = body['fingerprint'];
+  if (fingerprint is! String || !_wholeFingerprint.hasMatch(fingerprint)) {
+    return null;
+  }
+  final key = store.pinnedKey(peer);
+  final proof = body['proof'];
+  if (peer.isEmpty || key == null || proof is! String) return null;
+  final proven = verifySignature(
+    key.record.publicKey,
+    pairingProofBytes(store.deviceId, pin),
+    proof,
+  );
+  return proven ? fingerprint : null;
+}
+
+final _wholeFingerprint = RegExp(r'^[0-9a-f]{64}$');
+
 /// The blobs this Device lacks that [peer], another person's Device,
 /// may be asked for: those of the Areas it holds a role in.
 List<String> _missingFor(Store store, String peer) {
@@ -338,7 +383,9 @@ List<String> _missingFor(Store store, String peer) {
 /// a Moment before it when anything was new) and answers with what the
 /// joiner lacks, the blobs this Device wants, its keys, id and [name].
 /// The joiner's own key is pinned as verified: it came over a session
-/// the pair code authenticated. Null when the body is in a format this
+/// the pair code authenticated. The certificate fingerprint it names
+/// comes back in the session only when its proof over this host and
+/// [pin] holds ([_provenFingerprint]). Null when the body is in a format this
 /// build does not speak ([speaksFormat]), the joiner ignores this
 /// host's [inviting], or invites it to an Area it holds as its own. The
 /// answer is in the body's format.
@@ -356,6 +403,7 @@ List<String> _missingFor(Store store, String peer) {
   required String name,
   Invite? inviting,
   bool Function(String peer)? isShared,
+  String pin = '',
 }) {
   final format = formatOf(body);
   if (!speaksFormat(format)) return null;
@@ -468,6 +516,7 @@ List<String> _missingFor(Store store, String peer) {
       sharedArea: sharedArea,
       profile: profile,
       peopleChanged: people,
+      fingerprint: _provenFingerprint(store, body, peer, pin),
     ),
   );
 }
@@ -865,6 +914,8 @@ Future<SyncResult> _sync(
         throw const SyncException(SyncFailure.cancelled);
       }
     }
+    // So the host can join this Device the other way round later.
+    store.hostIdentity();
     final request = syncRequest(
       store,
       hostVector,

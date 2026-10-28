@@ -3,7 +3,10 @@
 //! certificate made once per install, the pair code carrying its
 //! fingerprint and a PIN, and the phone joining as the Dart core's
 //! `lanSync` does: `GET /vector`, `POST /sync`, then the photos and
-//! voice recordings under `/blob/<kind>/<hash>`. Every request carries
+//! voice recordings under `/blob/<kind>/<hash>`. Phones host the same
+//! way (the Dart core's `LanHost`); the joiner names its own
+//! certificate's fingerprint in `POST /sync`, so the host can join it
+//! the other way round later. Every request carries
 //! the PIN; an address is locked out after
 //! [`PIN_FAILURES_PER_ADDRESS`] wrong ones, everyone after
 //! [`PIN_FAILURES_TOTAL`].
@@ -218,6 +221,22 @@ pub fn encode_pair_code(
         .join("_")
 }
 
+/// Whether `host` is an address on a local network, as the Dart core's
+/// `isPrivateHost`: the only place a Device to pair with in person can
+/// be. A code naming a public address would send every entry to a
+/// stranger before any answer came back.
+pub fn is_private_host(host: &str) -> bool {
+    let Ok(ip) = host.parse::<Ipv4Addr>() else {
+        return false;
+    };
+    let [a, b, _, _] = ip.octets();
+    a == 10
+        || (a == 172 && (16..=31).contains(&b))
+        || (a == 192 && b == 168)
+        || (a == 169 && b == 254)
+        || a == 127
+}
+
 /// The code's groups in lines of three.
 pub fn pair_code_lines(code: &str) -> Vec<String> {
     code.split('_')
@@ -342,21 +361,30 @@ impl Store {
     /// This Device's identity, made on first hosting and kept, so a
     /// paired phone knows it again.
     pub fn tls_identity(&self) -> Result<Identity> {
-        if let (Some(cert), Some(key)) = (
-            self.local_setting(TLS_CERT_KEY)?,
-            self.local_setting(TLS_KEY_KEY)?,
-        ) && let (Ok(cert_der), Ok(key_der)) = (BASE64.decode(cert), BASE64.decode(key))
-        {
-            return Ok(Identity {
-                fingerprint: fingerprint_of(&cert_der),
-                cert_der,
-                key_der,
-            });
+        if let Some(held) = self.held_tls_identity()? {
+            return Ok(held);
         }
         let made = generate_identity()?;
         self.set_local_setting(TLS_CERT_KEY, &BASE64.encode(&made.cert_der))?;
         self.set_local_setting(TLS_KEY_KEY, &BASE64.encode(&made.key_der))?;
         Ok(made)
+    }
+
+    /// The identity kept here, as the Dart core's `heldHostIdentity`;
+    /// none before this Device first hosted or joined.
+    pub fn held_tls_identity(&self) -> Result<Option<Identity>> {
+        if let (Some(cert), Some(key)) = (
+            self.local_setting(TLS_CERT_KEY)?,
+            self.local_setting(TLS_KEY_KEY)?,
+        ) && let (Ok(cert_der), Ok(key_der)) = (BASE64.decode(cert), BASE64.decode(key))
+        {
+            return Ok(Some(Identity {
+                fingerprint: fingerprint_of(&cert_der),
+                cert_der,
+                key_der,
+            }));
+        }
+        Ok(None)
     }
 }
 
@@ -964,7 +992,10 @@ fn read_request<R: BufRead>(reader: &mut R, from: IpAddr) -> std::io::Result<Opt
 }
 
 /// A chunked body; `None` past the limit.
-fn read_chunked<R: BufRead>(reader: &mut R, limit: usize) -> std::io::Result<Option<Vec<u8>>> {
+pub(crate) fn read_chunked<R: BufRead>(
+    reader: &mut R,
+    limit: usize,
+) -> std::io::Result<Option<Vec<u8>>> {
     let mut body = Vec::new();
     loop {
         let mut line = String::new();
@@ -1013,6 +1044,10 @@ pub struct Session {
     pub profile: ProfileTaken,
     /// Whether a Profile of another person came in or changed.
     pub people_changed: bool,
+    /// The whole fingerprint of the certificate the joiner hosts with,
+    /// hex, as it named it in `POST /sync` and proved with its key; none
+    /// on the joiner's side and when it named none.
+    pub fingerprint: Option<String>,
 }
 
 fn vector_of(value: Option<&Value>) -> HashMap<String, i64> {
@@ -1112,7 +1147,9 @@ fn invited_person(store: &Store, json: Option<&Value>, device: &str) -> Result<O
 }
 
 /// The joiner's `POST /sync` body, as the Dart core's `syncRequest`,
-/// with its proof over `host_device` and `pin` and the Area keys.
+/// with its proof over `host_device` and `pin` and the Area keys, and
+/// the whole fingerprint of the certificate this Device hosts with once
+/// it has one, so the host can join it later.
 pub fn sync_request(
     store: &Store,
     host_vector: &HashMap<String, i64>,
@@ -1191,6 +1228,12 @@ pub fn sync_request_as(
         if let Some(profiles) = profiles {
             map.insert("profiles".to_string(), Value::Array(profiles));
         }
+        if let Some(identity) = store.held_tls_identity()? {
+            map.insert(
+                "fingerprint".to_string(),
+                Value::String(hex::encode(&identity.fingerprint)),
+            );
+        }
         if own && let Some(key) = store.backup_key_to_send()? {
             map.insert("backupKey".to_string(), key);
         }
@@ -1199,6 +1242,40 @@ pub fn sync_request_as(
         }
     }
     Ok(body)
+}
+
+/// The certificate fingerprint the joiner `peer` named in `body`, as the
+/// Dart core's `_provenFingerprint`: only a whole one, and only when the
+/// joiner proved, with the key pinned for `peer`, that it is that
+/// Device: its proof over this host and `pin` (empty for a paired
+/// Device's session). Anyone holding the PIN can name any device id, and
+/// a fingerprint kept for another Device's id would have this one join
+/// them as that Device later.
+fn proven_fingerprint(
+    store: &Store,
+    body: &Value,
+    peer: &str,
+    pin: &str,
+) -> Result<Option<String>> {
+    let Some(fingerprint) = body.get("fingerprint").and_then(Value::as_str) else {
+        return Ok(None);
+    };
+    let whole = fingerprint.len() == 64
+        && fingerprint
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    if !whole || peer.is_empty() {
+        return Ok(None);
+    }
+    let Some(key) = store.pinned_key(peer)? else {
+        return Ok(None);
+    };
+    let proven = crate::signing::verify_signature(
+        &key.record.public_key,
+        &pairing_proof_bytes(&store.device_id()?, pin),
+        body.get("proof").and_then(Value::as_str),
+    );
+    Ok(proven.then(|| fingerprint.to_string()))
 }
 
 /// The blobs this Device lacks that `peer`, another person's Device, may
@@ -1231,6 +1308,19 @@ pub fn answer_sync_inviting(
     body: &Value,
     name: &str,
     inviting: Option<&Invite>,
+) -> Result<Option<(Value, Session)>> {
+    answer_sync_with(store, body, name, inviting, "")
+}
+
+/// [`answer_sync_inviting`] for a joiner whose proof is over `pin`: the
+/// certificate fingerprint it names comes back in the session only when
+/// that proof holds ([`proven_fingerprint`]).
+pub fn answer_sync_with(
+    store: &Store,
+    body: &Value,
+    name: &str,
+    inviting: Option<&Invite>,
+    pin: &str,
 ) -> Result<Option<(Value, Session)>> {
     let format = format_of(body);
     if !speaks_format(format) {
@@ -1352,6 +1442,7 @@ pub fn answer_sync_inviting(
         map.insert("profile".to_string(), own);
     }
     let conflicts = store.conflicts_among(&applied)?;
+    let fingerprint = proven_fingerprint(store, body, &peer, pin)?;
     Ok(Some((
         answer,
         Session {
@@ -1364,6 +1455,7 @@ pub fn answer_sync_inviting(
             shared_area,
             profile,
             people_changed: people,
+            fingerprint,
         },
     )))
 }
@@ -1447,6 +1539,7 @@ pub fn apply_answer_as(
         shared_area: invited.or_else(|| invited_by.map(str::to_string)),
         profile,
         people_changed: people,
+        fingerprint: None,
     })
 }
 
@@ -1494,7 +1587,15 @@ impl Store {
                 }
             }
             ("GET", "/profile") => (Response::json(200, &profile_answer(self)?), None),
-            ("POST", "/sync") => self.serve_sync_inviting(&request.body, name, inviting)?,
+            ("POST", "/sync") => {
+                // A paired Device's proof is over no PIN.
+                let pin = if request.challenged {
+                    ""
+                } else {
+                    request.header(PIN_HEADER).unwrap_or_default()
+                };
+                self.serve_sync_with(&request.body, name, inviting, pin)?
+            }
             ("GET", p) if p.starts_with("/blob/") => {
                 let reference = &p["/blob/".len()..];
                 let (kind, hash) = split_blob_ref(reference);
@@ -1592,10 +1693,22 @@ impl Store {
         name: &str,
         inviting: Option<&Invite>,
     ) -> Result<(Response, Option<Session>)> {
+        self.serve_sync_with(body, name, inviting, "")
+    }
+
+    /// [`Store::serve_sync_inviting`] for a joiner whose proof is over
+    /// `pin`.
+    fn serve_sync_with(
+        &self,
+        body: &[u8],
+        name: &str,
+        inviting: Option<&Invite>,
+        pin: &str,
+    ) -> Result<(Response, Option<Session>)> {
         let body: Value =
             serde_json::from_slice(body).map_err(|e| Error::Invalid(format!("sync body: {e}")))?;
         let format = format_of(&body);
-        Ok(match answer_sync_inviting(self, &body, name, inviting)? {
+        Ok(match answer_sync_with(self, &body, name, inviting, pin)? {
             Some((answer, session)) => {
                 self.update_no_longer_needed(&session.peer)?;
                 let mut response = Response::json(200, &answer);
@@ -1620,7 +1733,7 @@ impl Store {
     /// Answers one request on the paired host, going by `name`: only a
     /// paired Device that syncs on its own, proven by its key, and its
     /// `/sync` only in its own name. The Device is remembered as synced
-    /// after a completed `/sync`.
+    /// after a completed `/sync` ([`Store::remember_joiner`]).
     pub fn serve_paired(
         &self,
         request: &Request,
@@ -1636,17 +1749,28 @@ impl Store {
         }
         let (response, session) = self.serve_as(request, name, None, Some(&device))?;
         if let Some(session) = &session {
-            self.remember_device(&PairedDevice {
-                id: device,
-                name: session.name.clone(),
-                fingerprint: String::new(),
-                host: None,
-                port: None,
-                last_sync: self.now(),
-                shared: session.shared_area.is_some(),
-            })?;
+            self.remember_joiner(session)?;
         }
         Ok((response, session))
+    }
+
+    /// Remembers the joiner of `session` as a paired Device, as the Dart
+    /// core's `rememberJoiner`: with the certificate it proved it hosts
+    /// with ([`Session::fingerprint`]), by invite when the session invited
+    /// one side.
+    pub fn remember_joiner(&self, session: &Session) -> Result<()> {
+        if session.peer.is_empty() {
+            return Ok(());
+        }
+        self.remember_device(&PairedDevice {
+            id: session.peer.clone(),
+            name: session.name.clone(),
+            fingerprint: session.fingerprint.clone().unwrap_or_default(),
+            host: None,
+            port: None,
+            last_sync: self.now(),
+            shared: session.shared_area.is_some(),
+        })
     }
 
     /// Starts the paired host with this Device's certificate on `bind`,
@@ -2296,6 +2420,8 @@ mod tests {
             Some("403 declined")
         );
 
+        // The phone hosts too, and names its certificate.
+        let phone_print = hex::encode(phone.tls_identity()?.fingerprint);
         let session = join_paired(&phone, &phone_id, port, &desk_id)?;
         assert!(!session.applied.is_empty());
         assert_eq!(session.name, "Desk");
@@ -2309,10 +2435,42 @@ mod tests {
         let sessions = served.join().map_err(|_| "host thread")??;
         assert_eq!(sessions.len(), 2);
         let desk = open(&host_path, 1)?;
-        assert_eq!(
-            desk.paired_device(&phone_id)?.map(|d| d.name),
-            Some("Phone".to_string())
-        );
+        let paired = desk.paired_device(&phone_id)?.ok_or("paired")?;
+        assert_eq!(paired.name, "Phone");
+        assert_eq!(paired.fingerprint, phone_print, "so it can join the phone");
+        Ok(())
+    }
+
+    #[test]
+    fn a_joiners_certificate_is_kept_only_with_its_proof() -> TestResult {
+        let desk = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        let phone = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([2; 32])))?;
+        let pad = Store::in_memory(ticking(), || Ok(SigningKey::from_seed([3; 32])))?;
+        let desk_id = desk.device_id()?;
+        let request = |joiner: &Store, pin: &str| {
+            sync_request(joiner, &desk.version_vector()?, "Phone", &desk_id, pin)
+        };
+        // Without a certificate of its own the joiner names none.
+        assert!(request(&phone, "246810")?.get("fingerprint").is_none());
+        let print = hex::encode(phone.tls_identity()?.fingerprint);
+        assert_eq!(request(&phone, "246810")?["fingerprint"], json!(print));
+        let (_, session) =
+            answer_sync_with(&desk, &request(&phone, "246810")?, "Desk", None, "246810")?
+                .ok_or("an answer")?;
+        assert_eq!(session.fingerprint.as_deref(), Some(print.as_str()));
+        // A proof for another PIN proves nothing here.
+        let (_, session) =
+            answer_sync_with(&desk, &request(&phone, "000000")?, "Desk", None, "246810")?
+                .ok_or("an answer")?;
+        assert_eq!(session.fingerprint, None);
+        // Nor does naming another Device whose key is pinned here.
+        answer_sync_with(&desk, &request(&pad, "246810")?, "Desk", None, "246810")?;
+        let mut posing = request(&phone, "246810")?;
+        posing["deviceId"] = json!(pad.device_id()?);
+        let (_, session) =
+            answer_sync_with(&desk, &posing, "Desk", None, "246810")?.ok_or("an answer")?;
+        assert_eq!(session.peer, pad.device_id()?);
+        assert_eq!(session.fingerprint, None);
         Ok(())
     }
 

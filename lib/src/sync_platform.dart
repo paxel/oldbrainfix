@@ -22,10 +22,11 @@ class FoundHost {
   int get hashCode => Object.hash(device, host, port);
 }
 
-/// The platform seam for automatic sync (android/…/Discovery.kt and
-/// SyncWorker.kt): finding paired hosts on the network (mDNS/DNS-SD,
-/// `_oldbrainfix._tcp`) and the periodic work that syncs while the app
-/// is closed. Widget tests hand in a fake.
+/// The platform seam for automatic sync (android/…/Discovery.kt,
+/// Advertiser.kt and SyncWorker.kt): finding paired hosts on the network
+/// (mDNS/DNS-SD, `_oldbrainfix._tcp`), telling the network about this
+/// Device's own paired host, and the periodic work that syncs while the
+/// app is closed. Widget tests hand in a fake.
 abstract interface class SyncPlatform {
   /// Hosts found while discovery runs.
   Stream<FoundHost> get found;
@@ -48,6 +49,15 @@ abstract interface class SyncPlatform {
   /// Whether the Device is on a local network now (Wi-Fi or Ethernet),
   /// where paired Devices can be.
   Future<bool> onLocalNetwork();
+
+  /// Advertises this Device's paired host on [port] (`_oldbrainfix._tcp`,
+  /// its id [device] as the name and the only TXT entry), until
+  /// [unadvertise].
+  Future<void> advertise({required String device, required int port});
+  Future<void> unadvertise();
+
+  /// Tells the periodic work that the sync it asked for is over.
+  Future<void> finished();
 }
 
 /// No discovery and no background work: the default where none is
@@ -75,6 +85,15 @@ class NoSync implements SyncPlatform {
 
   @override
   Future<bool> onLocalNetwork() async => true;
+
+  @override
+  Future<void> advertise({required String device, required int port}) async {}
+
+  @override
+  Future<void> unadvertise() async {}
+
+  @override
+  Future<void> finished() async {}
 }
 
 /// Android's NsdManager and WorkManager in Kotlin, behind the app's
@@ -144,7 +163,14 @@ class AndroidSync implements SyncPlatform {
     }
   }
 
-  /// Tells the periodic work that this background sync is over.
+  @override
+  Future<void> advertise({required String device, required int port}) =>
+      _call('advertise', {'device': device, 'port': port});
+
+  @override
+  Future<void> unadvertise() => _call('unadvertise');
+
+  @override
   Future<void> finished() => _call('finished');
 
   Future<void> _call(String method, [Object? arguments]) async {

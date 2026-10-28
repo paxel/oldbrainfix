@@ -24,7 +24,6 @@ A Shared Area reuses whatever shared folder both people reach, with no folder of
 - Roles keep honest people from mistakes; they do not stop a modified app. Dates are the writer's word, so a backdated entry counts as the owner's, a Device key made up by someone holding the Area key can be given Member by them, and entries a person's Device writes outside its Areas are not refused by the Devices it reaches.
 - A Device of the other person joins through Pairing with them, or a Device of its own that already has a role; a Device that meets them only through the folder needs one LAN sync first to learn the signing keys.
 - A Note moved out of a Shared Area stays as it was for the others.
-- Phones only join, so two people with only phones cannot share yet.
 
 ## Profiles (ADR 0017)
 
@@ -33,3 +32,7 @@ Amended by ADR 0017 (#50): nobody types a name any more. The grant's `name` and 
 ## Blocks and leaving (ADR 0021)
 
 Amended by ADR 0021 (#90): a blocked person's Devices are those the grants name them for, and what they write is refused at import, but their check-offs, grants and the filing of their Notes. A grant set to null counts also when the Device that signed it holds a grant naming the same person as the grant it ends: a person may end the grants of their own Devices, and so leave an Area, a Member too.
+
+## Phones as hosts (ADR 0003, #105)
+
+Amended for #105: any Device hosts (ADR 0003), so a phone or tablet shows an invite code as the computer does. While it invites, every joiner's `POST /sync` is held, with the Profile its person sent, until the user confirms it, and a Device trusted before is asked as well; anyone else asking meanwhile hears 503 and tries again. Two people with only phones share an Area so; the consequence that phones only join is gone. The invited Device names its certificate like any joiner, so a Device paired by invite is joined the other way round too, and gets only what it shares.

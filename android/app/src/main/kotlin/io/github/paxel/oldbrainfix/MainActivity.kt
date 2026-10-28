@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.TimeZone
+import java.util.concurrent.CountDownLatch
 
 class MainActivity : FlutterActivity() {
     /** The answer to "request", until the permission dialog comes back. */
@@ -71,6 +72,12 @@ class MainActivity : FlutterActivity() {
     private val discovery by lazy {
         Discovery(this) { found -> syncChannel?.invokeMethod("found", found.toMap()) }
     }
+
+    /** This Device's own paired host on the network, while the app hosts. */
+    private val advertiser by lazy { Advertiser(this) }
+
+    /** The periodic sync the app runs for the worker, until the app says it is over. */
+    private var inAppSync: CountDownLatch? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
@@ -272,6 +279,22 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "localNetwork" -> result.success(SyncWork.onLocalNetwork(this@MainActivity))
+                    "advertise" -> {
+                        val args = call.arguments as? Map<*, *>
+                        val device = args?.get("device") as? String
+                        val port = (args?.get("port") as? Number)?.toInt()
+                        if (device != null && port != null) advertiser.start(device, port)
+                        result.success(null)
+                    }
+                    "unadvertise" -> {
+                        advertiser.stop()
+                        result.success(null)
+                    }
+                    "finished" -> {
+                        inAppSync?.countDown()
+                        inAppSync = null
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -424,6 +447,9 @@ class MainActivity : FlutterActivity() {
         speech.release()
         ocr.release()
         discovery.stop()
+        advertiser.stop()
+        inAppSync?.countDown()
+        inAppSync = null
         super.onDestroy()
     }
 
@@ -810,12 +836,25 @@ class MainActivity : FlutterActivity() {
 
         /**
          * The periodic sync came due: a running app syncs itself, with
-         * its own store; true when there was one to tell.
+         * its own store, and out of sight hosts for a while too. The
+         * latch opens when the app says it is over; null when there was
+         * no app to tell.
          */
-        fun syncInApp(): Boolean {
-            val activity = active ?: return false
-            activity.runOnUiThread { activity.syncChannel?.invokeMethod("wanted", null) }
-            return true
+        fun syncInApp(): CountDownLatch? {
+            val activity = active ?: return null
+            val over = CountDownLatch(1)
+            activity.runOnUiThread {
+                // One at a time: an earlier one still waiting is over.
+                activity.inAppSync?.countDown()
+                val channel = activity.syncChannel
+                if (channel == null) {
+                    over.countDown()
+                    return@runOnUiThread
+                }
+                activity.inAppSync = over
+                channel.invokeMethod("wanted", null)
+            }
+            return over
         }
 
         /**

@@ -111,6 +111,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// How an automatic sync is run; tests hand in a fake.
   final PairedJoin autoJoin;
 
+  /// Starts this Device's paired host for automatic sync; while none is
+  /// given, this Device only joins.
+  final StartPairedHost? pairedHost;
+
   /// The shared folder to sync through; none when not given.
   final FolderPlatform folders;
 
@@ -145,6 +149,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.pairing = const NoPairing(),
     this.sync = const NoSync(),
     this.autoJoin = quickPairedSync,
+    this.pairedHost,
     this.folders = const NoFolders(),
     this.bundles = const NoBundles(),
     this.profile = const NoProfilePlatform(),
@@ -187,6 +192,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     join: widget.autoJoin,
     folders: widget.folders,
     workDir: widget.workDir,
+    host: widget.pairedHost,
   );
   late final Transcriber _transcriber;
   late final PhotoReader _photoReader;

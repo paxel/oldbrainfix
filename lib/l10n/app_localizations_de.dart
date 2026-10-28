@@ -1548,7 +1548,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncJoinIntro =>
-      'Öffne am Computer „Synchronisieren“. Scanne den angezeigten Code oder tippe ihn ein.';
+      'Öffne auf dem anderen Gerät „Synchronisieren“. Scanne den angezeigten Code oder tippe ihn ein.';
 
   @override
   String get syncScan => 'Code scannen';
@@ -1560,11 +1560,73 @@ class AppLocalizationsDe extends AppLocalizations {
   String get syncJoin => 'Jetzt synchronisieren';
 
   @override
+  String get syncShowIntro =>
+      'Oder zeig hier einen Code, den das andere Gerät scannt.';
+
+  @override
+  String get syncShowCode => 'Code dieses Geräts zeigen';
+
+  @override
+  String get shareShowIntro =>
+      'Oder zeig hier einen Code, den ihr Gerät scannt.';
+
+  @override
+  String get hostTitle => 'Code dieses Geräts';
+
+  @override
+  String get hostIntro =>
+      'Öffne auf dem anderen Gerät „Synchronisieren“ und scanne diesen Code oder tippe den Code darunter ein.';
+
+  @override
+  String get hostInviteIntro =>
+      'Auf ihrem Gerät „Synchronisieren“ öffnen und diesen Code scannen oder den Code darunter eintippen. Ihr Profil wird dann hier zur Bestätigung gezeigt.';
+
+  @override
+  String get hostTypedCode => 'Code zum Eintippen';
+
+  @override
+  String get hostStays =>
+      'Der Code gilt, solange diese Seite offen ist. Geh zurück, sobald das andere Gerät meldet, dass es synchronisiert hat.';
+
+  @override
+  String get hostNoNetwork =>
+      'Dieses Gerät ist in keinem WLAN. Verbinde es mit demselben WLAN wie das andere Gerät und versuch es dann noch einmal.';
+
+  @override
+  String get hostLocked =>
+      'Zu viele falsche Codes wurden versucht. Erzeuge einen neuen Code, um weiterzumachen.';
+
+  @override
+  String get hostFailed =>
+      'Es konnte kein Code erzeugt werden. Versuch es noch einmal.';
+
+  @override
+  String get hostTryAgain => 'Noch einmal versuchen';
+
+  @override
+  String get hostNewCode => 'Neuer Code';
+
+  @override
+  String hostAskTitle(String name) {
+    return '$name beitreten lassen?';
+  }
+
+  @override
+  String get hostAskUnnamed => 'Das andere Gerät beitreten lassen?';
+
+  @override
+  String get hostAskText =>
+      'Es bekommt alles auf diesem Gerät und synchronisiert sich von da an mit ihm. Sag nur bei einem eigenen Gerät Ja.';
+
+  @override
+  String get hostAllow => 'Beitreten lassen';
+
+  @override
   String get syncSyncing => 'Wird synchronisiert …';
 
   @override
   String get syncInvalidCode =>
-      'Das ist kein Kopplungscode. Vergleiche ihn mit dem Bildschirm des Computers.';
+      'Das ist kein Kopplungscode. Vergleiche ihn mit dem Bildschirm des anderen Geräts.';
 
   @override
   String get syncNoCode =>
@@ -1600,11 +1662,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncFailUnreachable =>
-      'Der Computer hat nicht geantwortet. Ist dort „Synchronisieren“ offen, und sind beide im selben WLAN?';
+      'Das andere Gerät hat nicht geantwortet. Zeigt es den Code noch, und sind beide im selben WLAN?';
 
   @override
   String get syncFailWrongHost =>
-      'Das ist nicht der Computer, zu dem der Code gehört.';
+      'Das ist nicht das Gerät, zu dem der Code gehört.';
 
   @override
   String get syncFailWrongPin =>
@@ -1612,10 +1674,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncFailLocked =>
-      'Zu viele falsche Versuche. Öffne „Synchronisieren“ am Computer neu, um einen neuen Code zu bekommen.';
+      'Zu viele falsche Versuche. Lass auf dem anderen Gerät einen neuen Code zeigen.';
 
   @override
-  String get syncFailDeclined => 'Der Computer hat dieses Gerät abgelehnt.';
+  String get syncFailDeclined => 'Das andere Gerät hat dieses abgelehnt.';
 
   @override
   String get syncFailUpdateHere =>
@@ -1666,7 +1728,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get syncAutoIntro =>
-      'Gekoppelte Computer im selben WLAN synchronisieren sich von selbst: während die App offen ist und im Hintergrund jede Viertelstunde.';
+      'Gekoppelte Geräte im selben WLAN synchronisieren sich von selbst: während die App offen ist und im Hintergrund jede Viertelstunde.';
 
   @override
   String get conflictsTitle => 'Konflikte';
@@ -1871,7 +1933,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shareIntro =>
-      'Triff die andere Person. Auf ihrem Computer Sync öffnen und den Code zeigen lassen; scanne ihn oder tippe ihn hier ein. Ihr Profil wird zur Bestätigung gezeigt; dann bekommt sie diesen Bereich und sonst nichts.';
+      'Triff die andere Person. Auf ihrem Gerät „Synchronisieren“ öffnen und den Code zeigen lassen; scanne ihn oder tippe ihn hier ein. Ihr Profil wird zur Bestätigung gezeigt; dann bekommt sie diesen Bereich und sonst nichts.';
 
   @override
   String get roleHeading => 'Sie darf';

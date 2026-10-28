@@ -21,6 +21,7 @@ pub mod discovery;
 pub mod entry;
 pub mod error;
 pub mod folder;
+pub mod join;
 pub mod keys;
 pub mod lan;
 pub mod notes;

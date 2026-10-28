@@ -142,6 +142,11 @@ void main() {
     expect(announcements.visible, startsWith('Synced with Desk: '));
     expect(find.text(announcements.visible!), findsOneWidget);
     expect([for (final n in Notes(phone).all()) n.text], ['From the desk']);
+    await tester.scrollUntilVisible(
+      find.text('Desk'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Desk'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Forget'));
@@ -250,7 +255,7 @@ void main() {
     expect(joined, isEmpty);
     expect(
       announcements.visible,
-      "That is not a pair code. Check it against the computer's screen.",
+      "That is not a pair code. Check it against the other Device's screen.",
     );
   });
 

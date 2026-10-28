@@ -12,6 +12,7 @@ import 'bundle_platform.dart';
 import 'sent_item_screen.dart';
 import 'conflicts_screen.dart';
 import 'folder_platform.dart';
+import 'host_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'pairing_platform.dart';
@@ -27,8 +28,9 @@ typedef Join = Future<SyncResult> Function(
   required String name,
 });
 
-/// Sync, inside Settings (UI laws): joins the computer the pair code
-/// names, scanned from a photo of its screen or typed in, leads to the
+/// Sync, inside Settings (UI laws): joins the Device the pair code
+/// names, scanned from a photo of its screen or typed in, or shows this
+/// Device's code for the other to join ([HostScreen]), leads to the
 /// Conflicts, and lists the paired Devices with when they last synced,
 /// each of which can be forgotten, and those that host kept from syncing
 /// on their own. The shared folder is picked and forgotten here too,
@@ -39,8 +41,14 @@ typedef Join = Future<SyncResult> Function(
 class SyncScreen extends StatefulWidget {
   final Store store;
   final Join join;
+  final StartHosting host;
 
-  const SyncScreen({super.key, required this.store, this.join = lanSync});
+  const SyncScreen({
+    super.key,
+    required this.store,
+    this.join = lanSync,
+    this.host = startPairingHost,
+  });
 
   @override
   State<SyncScreen> createState() => _SyncScreenState();
@@ -151,7 +159,26 @@ class _SyncScreenState extends State<SyncScreen> {
     setState(_countConflicts);
   }
 
-  /// Takes a photo of the computer's screen and reads the code in it.
+  /// Shows this Device's code until the user comes back.
+  Future<void> _showCode() async {
+    final store = widget.store;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => HostScreen(
+          store: store,
+          title: context.t.hostTitle,
+          start: widget.host,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _paired = store.pairedDevices();
+      _countConflicts();
+    });
+  }
+
+  /// Takes a photo of the other Device's screen and reads the code in it.
   Future<void> _scan() async {
     final photos = PhotoScope.of(context);
     final pairing = PairingScope.of(context);
@@ -460,6 +487,18 @@ class _SyncScreenState extends State<SyncScreen> {
                   ),
           ),
           const SizedBox(height: 16),
+          Text(t.syncShowIntro),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('show-code'),
+              onPressed: _busy ? null : _showCode,
+              icon: const Icon(Icons.qr_code_2),
+              label: Text(t.syncShowCode),
+            ),
+          ),
+          const SizedBox(height: 16),
           ListTile(
             key: const ValueKey('conflicts'),
             contentPadding: EdgeInsets.zero,
@@ -481,7 +520,7 @@ class _SyncScreenState extends State<SyncScreen> {
             ControlBelow(
               padding: const EdgeInsets.symmetric(vertical: 8),
               leading: Icon(
-                device.shared ? Icons.people_outline : Icons.computer_outlined,
+                device.shared ? Icons.people_outline : Icons.devices_outlined,
               ),
               title: Text(device.name),
               subtitle: Text(

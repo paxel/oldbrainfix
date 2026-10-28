@@ -96,6 +96,7 @@ Future<void> _openAndRun(Directory dir) async {
       lock: const AndroidBiometrics(),
       pairing: const AndroidPairing(),
       sync: AndroidSync(),
+      pairedHost: startPairedHosting,
       folders: const AndroidFolders(),
       bundles: AndroidBundles(),
       profile: const AndroidProfile(),
@@ -105,10 +106,10 @@ Future<void> _openAndRun(Directory dir) async {
 }
 
 /// The background sync the periodic work starts in an engine of its own
-/// while the app is closed (android/…/SyncWorker.kt): paired Devices and
-/// the shared folder, the same store, the weekly Backup when it is due,
-/// the alarms armed with the texts in the Device's language, and the
-/// work told when it is over.
+/// while the app is closed (android/…/SyncWorker.kt): paired Devices,
+/// hosted for and joined, and the shared folder, the same store, the
+/// weekly Backup when it is due, the alarms armed with the texts in the
+/// Device's language, and the work told when it is over.
 @pragma('vm:entry-point')
 Future<void> backgroundSyncMain() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -133,6 +134,7 @@ Future<void> backgroundSyncMain() async {
         alarms: alarms,
         name: await const AndroidPairing().deviceName(),
         folders: const AndroidFolders(),
+        host: startPairedHosting,
         workDir: (await getTemporaryDirectory()).path,
       );
     } finally {

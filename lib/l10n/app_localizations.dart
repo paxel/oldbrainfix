@@ -2519,7 +2519,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncJoinIntro.
   ///
   /// In en, this message translates to:
-  /// **'Open Sync on the computer. Scan the code it shows, or type it in.'**
+  /// **'Open Sync on the other Device. Scan the code it shows, or type it in.'**
   String get syncJoinIntro;
 
   /// No description provided for @syncScan.
@@ -2540,6 +2540,108 @@ abstract class AppLocalizations {
   /// **'Sync now'**
   String get syncJoin;
 
+  /// No description provided for @syncShowIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Or show a code here for the other Device to scan.'**
+  String get syncShowIntro;
+
+  /// No description provided for @syncShowCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this Device\'s code'**
+  String get syncShowCode;
+
+  /// No description provided for @shareShowIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Or show a code here for their Device to scan.'**
+  String get shareShowIntro;
+
+  /// No description provided for @hostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device\'s code'**
+  String get hostTitle;
+
+  /// No description provided for @hostIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'On the other Device, open Sync and scan this code, or type in the code under it.'**
+  String get hostIntro;
+
+  /// No description provided for @hostInviteIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'On their Device, open Sync and scan this code, or type in the code under it. Their Profile then shows here to confirm.'**
+  String get hostInviteIntro;
+
+  /// No description provided for @hostTypedCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code to type'**
+  String get hostTypedCode;
+
+  /// No description provided for @hostStays.
+  ///
+  /// In en, this message translates to:
+  /// **'The code holds while this page is open. Go back once the other Device says it synced.'**
+  String get hostStays;
+
+  /// No description provided for @hostNoNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device is on no Wi-Fi. Connect it to the same Wi-Fi as the other Device, then try again.'**
+  String get hostNoNetwork;
+
+  /// No description provided for @hostLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes were tried. Make a new code to go on.'**
+  String get hostLocked;
+
+  /// No description provided for @hostFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'No code could be made. Try again.'**
+  String get hostFailed;
+
+  /// No description provided for @hostTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get hostTryAgain;
+
+  /// No description provided for @hostNewCode.
+  ///
+  /// In en, this message translates to:
+  /// **'New code'**
+  String get hostNewCode;
+
+  /// No description provided for @hostAskTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Let {name} join?'**
+  String hostAskTitle(String name);
+
+  /// No description provided for @hostAskUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the other Device join?'**
+  String get hostAskUnnamed;
+
+  /// No description provided for @hostAskText.
+  ///
+  /// In en, this message translates to:
+  /// **'It gets everything on this Device and syncs with it from then on. Say yes only to a Device of your own.'**
+  String get hostAskText;
+
+  /// No description provided for @hostAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Let it join'**
+  String get hostAllow;
+
   /// No description provided for @syncSyncing.
   ///
   /// In en, this message translates to:
@@ -2549,7 +2651,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncInvalidCode.
   ///
   /// In en, this message translates to:
-  /// **'That is not a pair code. Check it against the computer\'s screen.'**
+  /// **'That is not a pair code. Check it against the other Device\'s screen.'**
   String get syncInvalidCode;
 
   /// No description provided for @syncNoCode.
@@ -2579,13 +2681,13 @@ abstract class AppLocalizations {
   /// No description provided for @syncFailUnreachable.
   ///
   /// In en, this message translates to:
-  /// **'The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?'**
+  /// **'The other Device did not answer. Does it still show the code, and are both on the same Wi-Fi?'**
   String get syncFailUnreachable;
 
   /// No description provided for @syncFailWrongHost.
   ///
   /// In en, this message translates to:
-  /// **'This is not the computer the code belongs to.'**
+  /// **'This is not the Device the code belongs to.'**
   String get syncFailWrongHost;
 
   /// No description provided for @syncFailWrongPin.
@@ -2597,13 +2699,13 @@ abstract class AppLocalizations {
   /// No description provided for @syncFailLocked.
   ///
   /// In en, this message translates to:
-  /// **'Too many wrong tries. Open Sync on the computer again for a new code.'**
+  /// **'Too many wrong tries. Show a new code on the other Device.'**
   String get syncFailLocked;
 
   /// No description provided for @syncFailDeclined.
   ///
   /// In en, this message translates to:
-  /// **'The computer said no to this Device.'**
+  /// **'The other Device said no to this one.'**
   String get syncFailDeclined;
 
   /// No description provided for @syncFailUpdateHere.
@@ -2681,7 +2783,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncAutoIntro.
   ///
   /// In en, this message translates to:
-  /// **'Paired computers on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.'**
+  /// **'Paired Devices on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.'**
   String get syncAutoIntro;
 
   /// No description provided for @conflictsTitle.
@@ -2957,7 +3059,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareIntro.
   ///
   /// In en, this message translates to:
-  /// **'Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.'**
+  /// **'Meet the other person. On their Device, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.'**
   String get shareIntro;
 
   /// No description provided for @roleHeading.

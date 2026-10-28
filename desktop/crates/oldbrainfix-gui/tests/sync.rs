@@ -1,18 +1,24 @@
 //! The Sync view driven headless: it hosts while it shows, asks before a
 //! Device it does not know syncs, remembers the Devices it synced with
 //! and forgets them on request. A phone joins over the loopback as the
-//! Dart core's `lanSync` does.
+//! Dart core's `lanSync` does, and the desktop joins a phone by the code
+//! typed in.
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use oldbrainfix_core::join::{SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{
-    DEVICE_HEADER, FORMAT_HEADER, OWN_FORMATS, PIN_HEADER, apply_answer, sync_request,
+    DEVICE_HEADER, FORMAT_HEADER, Host, OWN_FORMATS, PIN_HEADER, PairInfo, apply_answer,
+    decode_pair_code, encode_pair_code, sync_request,
 };
-use oldbrainfix_core::{Notes, SigningKey, Store};
+use oldbrainfix_core::{Error, Notes, SigningKey, Store};
 use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -726,5 +732,208 @@ fn a_device_that_needs_an_update_is_announced_until_clicked_away() -> TestResult
     harness.step();
     harness.step();
     assert!(!shows(&harness, text));
+    Ok(())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Types `code` into the pair code field and clicks "Sync with this code".
+fn type_code(harness: &mut Harness<'_, App>, code: &str) {
+    harness
+        .get_by_role(egui::accesskit::Role::TextInput)
+        .click();
+    harness.step();
+    harness.get_by(|n| n.is_focused()).type_text(code);
+    harness.step();
+    harness
+        .get_by_label("Sync with this code")
+        .click_accesskit();
+    harness.step();
+}
+
+#[test]
+fn the_desktop_joins_a_phone_by_its_code_and_waits_while_the_phone_asks() -> TestResult {
+    let phone = Arc::new(store(2)?);
+    Notes::new(&phone).capture("From the phone", None, None)?;
+    let identity = phone.tls_identity()?;
+    let host = Host::start(&identity, "246810", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
+    let code = host.pair_code(true);
+    // The phone's host holds `POST /sync` until its user says yes.
+    let (yes, asked) = std::sync::mpsc::channel::<()>();
+    let stop = Arc::new(AtomicBool::new(false));
+    let served = {
+        let (phone, stop) = (phone.clone(), stop.clone());
+        std::thread::spawn(move || -> Result<(), String> {
+            while !stop.load(Ordering::Relaxed) {
+                let Some(request) = host.wait_request(Duration::from_millis(20)) else {
+                    continue;
+                };
+                if request.path == "/sync" {
+                    asked.recv().map_err(|e| e.to_string())?;
+                }
+                let (response, session) =
+                    phone.serve(&request, "Phone").map_err(|e| e.to_string())?;
+                request.reply(response);
+                if let Some(session) = session {
+                    phone.remember_joiner(&session).map_err(|e| e.to_string())?;
+                }
+            }
+            Ok(())
+        })
+    };
+
+    let desk = store(1)?;
+    Notes::new(&desk).capture("From the desk", None, None)?;
+    let mut harness = sync_view(desk, std::path::Path::new("/nonexistent"))?;
+    assert!(shows(&harness, "Sync with a Device that shows its code"));
+    type_code(&mut harness, &code);
+    assert!(harness.state().sync_host().joining());
+    harness.step();
+    assert!(shows(&harness, "Syncing… The other Device may first ask"));
+    assert!(harness.query_by_label("Sync with this code").is_none());
+
+    yes.send(())?;
+    step_until(&mut harness, |app| !app.sync_host().joining())?;
+    harness.step();
+    stop.store(true, Ordering::Relaxed);
+    served.join().map_err(|_| "host thread")??;
+    assert!(shows(&harness, "Synced with Phone: "));
+    assert!(harness.query_by_label("Sync with this code").is_some());
+
+    let desk = harness.state().store();
+    for store in [desk, &*phone] {
+        let mut texts = texts_of(store)?;
+        texts.sort();
+        assert_eq!(texts, ["From the desk", "From the phone"]);
+    }
+    // Each keeps the other's whole certificate, to join it again later.
+    let on_desk = desk.paired_device(&phone.device_id()?)?.ok_or("paired")?;
+    assert_eq!(on_desk.name, "Phone");
+    assert_eq!(on_desk.fingerprint, hex(&identity.fingerprint));
+    let on_phone = phone.paired_device(&desk.device_id()?)?.ok_or("paired")?;
+    assert_eq!(on_phone.name, "Desk");
+    assert_eq!(on_phone.fingerprint, hex(&desk.tls_identity()?.fingerprint));
+    Ok(())
+}
+
+#[test]
+fn a_typed_text_that_is_no_code_says_so_under_the_field() -> TestResult {
+    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    harness
+        .get_by_role(egui::accesskit::Role::TextInput)
+        .click();
+    harness.step();
+    harness.get_by(|n| n.is_focused()).type_text("hello");
+    harness.step();
+    harness.key_press(egui::Key::Enter);
+    harness.step();
+    harness.step();
+    assert!(!harness.state().sync_host().joining());
+    assert!(shows(&harness, "That is not a pair code."));
+    Ok(())
+}
+
+#[test]
+fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
+    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let code = encode_pair_code(
+        Ipv4Addr::new(192, 168, 1, 20),
+        4000,
+        "123456",
+        &[7; 8],
+        true,
+    );
+    let said = [
+        (
+            SyncFailure::NotPrivate,
+            "This code points outside your home network.",
+        ),
+        (SyncFailure::Unreachable, "The other Device did not answer."),
+        (
+            SyncFailure::WrongHost,
+            "This is not the Device the code belongs to.",
+        ),
+        (
+            SyncFailure::WrongPin,
+            "The PIN does not match. Type the code again.",
+        ),
+        (SyncFailure::Locked, "Too many wrong tries. Show a new code"),
+        (
+            SyncFailure::Declined,
+            "The other Device said no to this one.",
+        ),
+        (
+            SyncFailure::UpdateHere,
+            "Old Brain Fix on this Device needs an update",
+        ),
+        (
+            SyncFailure::UpdateThere,
+            "Old Brain Fix on the other Device needs an update",
+        ),
+        (
+            SyncFailure::Failed,
+            "Sync broke off. Nothing was lost; try again.",
+        ),
+    ];
+    // Whatever else broke is said as broken off.
+    harness
+        .state_mut()
+        .set_joiner(Arc::new(|_: &Store, _: &PairInfo, _: &str| {
+            Err(Error::Invalid("tls".into()))
+        }));
+    type_code(&mut harness, &code);
+    step_until(&mut harness, |app| !app.sync_host().joining())?;
+    harness.step();
+    assert!(shows(&harness, "Sync broke off."));
+    for (failure, text) in said {
+        harness
+            .state_mut()
+            .set_joiner(Arc::new(move |_: &Store, _: &PairInfo, _: &str| {
+                Err(Error::Sync(failure))
+            }));
+        // The code stays in the field after a failure, to be fixed.
+        harness
+            .get_by_label("Sync with this code")
+            .click_accesskit();
+        harness.step();
+        step_until(&mut harness, |app| !app.sync_host().joining())?;
+        harness.step();
+        assert!(shows(&harness, text), "{failure:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_phone_that_joined_the_desktop_is_remembered_with_its_certificate() -> TestResult {
+    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let code = harness
+        .state()
+        .sync_host()
+        .host()
+        .ok_or("hosting")?
+        .pair_code(true);
+    // The phone joins as the cores do, naming the certificate it hosts with.
+    let joined = std::thread::spawn(move || -> Result<(String, String), String> {
+        let fail = |e: &dyn std::fmt::Display| e.to_string();
+        let phone = store(2).map_err(|e| fail(&e))?;
+        let print = hex(&phone.tls_identity().map_err(|e| fail(&e))?.fingerprint);
+        let info = decode_pair_code(&code).ok_or("a code")?;
+        lan_sync(&phone, &info, "Pixel").map_err(|e| fail(&e))?;
+        Ok((phone.device_id().map_err(|e| fail(&e))?, print))
+    });
+    step_until(&mut harness, |app| app.sync_host().asking().is_some())?;
+    harness.step();
+    harness.get_by_label("Trust").click_accesskit();
+    harness.step();
+    let (phone_id, print) = joined.join().map_err(|_| "joiner")??;
+    let paired = harness
+        .state()
+        .store()
+        .paired_device(&phone_id)?
+        .ok_or("paired")?;
+    assert_eq!(paired.name, "Pixel");
+    assert_eq!(paired.fingerprint, print);
     Ok(())
 }

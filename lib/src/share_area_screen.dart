@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'auto_sync.dart';
+import 'host_screen.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'person_screen.dart';
@@ -24,16 +25,17 @@ typedef InviteJoin = Future<SyncResult> Function(
 });
 
 /// Shares an Area with another person (ADR 0013): the role they get,
-/// and the pair code their computer shows, scanned or typed. Nobody types
-/// a name: once the phone reached their computer, it shows their Profile
-/// (ADR 0017), and only when the user confirms it does the phone invite
-/// it, so their computer gets this Area and nothing else, and the Area
-/// shows as shared from then on. A Starter Set Area goes on under fresh
-/// ids; [onShared] hears the id it has now.
+/// and the pair code their Device shows, scanned or typed, or the code
+/// this Device shows for theirs ([HostScreen]). Nobody types a name: once
+/// the two Devices met, this one shows their Profile (ADR 0017), and
+/// only when the user confirms it does their Device get this Area and
+/// nothing else, and the Area shows as shared from then on. A Starter
+/// Set Area goes on under fresh ids; [onShared] hears the id it has now.
 class ShareAreaScreen extends StatefulWidget {
   final Store store;
   final String areaId;
   final InviteJoin join;
+  final StartHosting host;
   final ValueChanged<String>? onShared;
 
   const ShareAreaScreen({
@@ -41,6 +43,7 @@ class ShareAreaScreen extends StatefulWidget {
     required this.store,
     required this.areaId,
     this.join = lanSync,
+    this.host = startPairingHost,
     this.onShared,
   });
 
@@ -63,7 +66,33 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
 
   void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
 
-  /// Takes a photo of their computer's screen and reads the code in it.
+  /// Shows a code for their Device to join with, inviting it with the
+  /// role chosen; once one joined, back to where sharing began.
+  Future<void> _showCode() async {
+    final t = context.t;
+    final store = widget.store;
+    final area = _area;
+    _areaId = store.share(_areaId);
+    widget.onShared?.call(_areaId);
+    var joined = false;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HostScreen(
+          store: store,
+          title: t.shareTitle(area == null ? '' : areaName(t, area)),
+          inviting: Invite(_areaId, role: _role),
+          area: area == null ? '' : areaName(t, area),
+          start: widget.host,
+          onSession: (_) => joined = true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    AutoSyncScope.of(context)?.devicesChanged();
+    if (joined) Navigator.of(context).pop(true);
+  }
+
+  /// Takes a photo of their Device's screen and reads the code in it.
   Future<void> _scan() async {
     final photos = PhotoScope.of(context);
     final pairing = PairingScope.of(context);
@@ -223,6 +252,18 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
                     child: Text(t.shareInvite),
                   ),
           ),
+          const SizedBox(height: 16),
+          Text(t.shareShowIntro),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('share-show'),
+              onPressed: _busy ? null : _showCode,
+              icon: const Icon(Icons.qr_code_2),
+              label: Text(t.syncShowCode),
+            ),
+          ),
         ],
       ),
     );
@@ -230,7 +271,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
 }
 
 /// "Share this Area with this person?": the other person's picture, name
-/// and short code, as their computer sent them (ADR 0017), to compare
+/// and short code, as their Device sent them (ADR 0017), to compare
 /// with the code on their Profile page. Pops with true to share.
 class InviteConfirmDialog extends StatelessWidget {
   final String area;

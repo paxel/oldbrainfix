@@ -1498,12 +1498,22 @@ void _sync(Directory root) {
     joiner.applyProfileDefaults(name: 'Pixel 7');
     _plantBackupKey(host, 41);
     _plantBackupKey(joiner, 73);
+    // The joiner hosts too: it names its certificate, which the host
+    // keeps once the joiner's proof holds.
+    joiner.hostIdentity(random: _counted(6000));
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
     _write(
       File('${out.path}/settings.json'),
-      '${_json.convert({'host': _keysWithBackup(host), 'joiner': _keysWithBackup(joiner)})}\n',
+      '${_json.convert({
+        'host': _keysWithBackup(host),
+        'joiner': [
+          ..._keysWithBackup(joiner),
+          for (final key in [HostIdentities.certKey, HostIdentities.keyKey])
+            if (joiner.localSetting(key) case final value?) [key, value],
+        ],
+      })}\n',
     );
     final hostVector = host.versionVector();
     final request = syncRequest(
@@ -1513,7 +1523,10 @@ void _sync(Directory root) {
       hostDevice: host.deviceId,
       pin: '246810',
     );
-    final done = answerSync(host, request, name: 'Desk')!;
+    final done = answerSync(host, request, name: 'Desk', pin: '246810')!;
+    if (done.session.fingerprint != hex(joiner.hostIdentity().fingerprint)) {
+      throw StateError('the host of the sync fixture lost the certificate');
+    }
     _write(File('${out.path}/vector.json'), '${_json.convert(hostVector)}\n');
     _write(File('${out.path}/request.json'), '${_json.convert(request)}\n');
     _write(File('${out.path}/answer.json'), '${_json.convert(done.answer)}\n');
@@ -3933,8 +3946,11 @@ Future<void> main(List<String> args) async {
     'device.\n'
     '- `sync/`: two Devices that met once and wrote more since: their logs '
     '(`host.jsonl`, `joiner.jsonl`) with their blobs and the keys they '
-    'hold (`settings.json`), the host\'s vector, the joiner\'s `POST /sync` '
-    'request (with its proof for the PIN 246810) and the host\'s answer, '
+    'hold (`settings.json`), the joiner\'s host certificate among them '
+    '(`tls:cert`, `tls:key`, random bytes counted from 6001 on), the '
+    'host\'s vector, the joiner\'s `POST /sync` request (with its proof '
+    'for the PIN 246810 and its certificate\'s fingerprint, which the host '
+    'keeps) and the host\'s answer, '
     'both with the Area keys, the own Profile and its backup key, the '
     'backup key each then holds, the host\'s on both '
     '(`backup_keys.json`), the own Profiles both hold after it, the '

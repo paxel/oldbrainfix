@@ -91,17 +91,21 @@ extension Pairing on Store {
   }
 
   /// Remembers [device], or what changed about it. A Device that only
-  /// joined keeps the fingerprint and address it had when it hosted; one
-  /// paired by invite stays [PairedDevice.shared].
+  /// joined keeps the fingerprint it had when it hosted, and a Device
+  /// whose address is not known now the address it had with that
+  /// fingerprint; one paired by invite stays [PairedDevice.shared].
   void rememberDevice(PairedDevice device) {
     final held = pairedDevice(device.id);
-    final hosted = held == null || device.fingerprint.isNotEmpty;
+    final fingerprint = device.fingerprint.isNotEmpty
+        ? device.fingerprint
+        : held?.fingerprint ?? '';
+    final same = held != null && held.fingerprint == fingerprint;
     final kept = PairedDevice(
       id: device.id,
       name: device.name,
-      fingerprint: hosted ? device.fingerprint : held.fingerprint,
-      host: hosted ? device.host : held.host,
-      port: hosted ? device.port : held.port,
+      fingerprint: fingerprint,
+      host: device.host ?? (same ? held.host : null),
+      port: device.port ?? (same ? held.port : null),
       lastSync: device.lastSync,
       shared: device.shared || (held?.shared ?? false),
     );

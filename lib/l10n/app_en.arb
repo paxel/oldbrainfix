@@ -924,12 +924,36 @@
   "syncTitle": "Sync",
   "syncSettingsEntry": "Sync with another Device",
   "syncSettingsDetail": "Pair once by code; both then hold the same Notes, Areas and Routines.",
-  "syncJoinIntro": "Open Sync on the computer. Scan the code it shows, or type it in.",
+  "syncJoinIntro": "Open Sync on the other Device. Scan the code it shows, or type it in.",
   "syncScan": "Scan the code",
   "syncCodeLabel": "Pair code",
   "syncJoin": "Sync now",
+  "syncShowIntro": "Or show a code here for the other Device to scan.",
+  "syncShowCode": "Show this Device's code",
+  "shareShowIntro": "Or show a code here for their Device to scan.",
+  "hostTitle": "This Device's code",
+  "hostIntro": "On the other Device, open Sync and scan this code, or type in the code under it.",
+  "hostInviteIntro": "On their Device, open Sync and scan this code, or type in the code under it. Their Profile then shows here to confirm.",
+  "hostTypedCode": "Code to type",
+  "hostStays": "The code holds while this page is open. Go back once the other Device says it synced.",
+  "hostNoNetwork": "This Device is on no Wi-Fi. Connect it to the same Wi-Fi as the other Device, then try again.",
+  "hostLocked": "Too many wrong codes were tried. Make a new code to go on.",
+  "hostFailed": "No code could be made. Try again.",
+  "hostTryAgain": "Try again",
+  "hostNewCode": "New code",
+  "hostAskTitle": "Let {name} join?",
+  "@hostAskTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hostAskUnnamed": "Let the other Device join?",
+  "hostAskText": "It gets everything on this Device and syncs with it from then on. Say yes only to a Device of your own.",
+  "hostAllow": "Let it join",
   "syncSyncing": "Syncing…",
-  "syncInvalidCode": "That is not a pair code. Check it against the computer's screen.",
+  "syncInvalidCode": "That is not a pair code. Check it against the other Device's screen.",
   "syncNoCode": "No code found in the photo. Try again a little closer, or type the code.",
   "syncCameIn": "Synced with {name}: {count, plural, =0{nothing new came in} =1{1 change came in} other{{count} changes came in}}.",
   "@syncCameIn": {
@@ -951,11 +975,11 @@
     }
   },
   "syncFailNotPrivate": "This code points outside your home network. Only Devices on the same network can sync.",
-  "syncFailUnreachable": "The computer did not answer. Is Sync open on it, and are both on the same Wi-Fi?",
-  "syncFailWrongHost": "This is not the computer the code belongs to.",
+  "syncFailUnreachable": "The other Device did not answer. Does it still show the code, and are both on the same Wi-Fi?",
+  "syncFailWrongHost": "This is not the Device the code belongs to.",
   "syncFailWrongPin": "The PIN does not match. Type the code again.",
-  "syncFailLocked": "Too many wrong tries. Open Sync on the computer again for a new code.",
-  "syncFailDeclined": "The computer said no to this Device.",
+  "syncFailLocked": "Too many wrong tries. Show a new code on the other Device.",
+  "syncFailDeclined": "The other Device said no to this one.",
   "syncFailUpdateHere": "Old Brain Fix on this Device needs an update to sync with the other Device.",
   "syncFailUpdateThere": "Old Brain Fix on the other Device needs an update to sync with this one.",
   "syncUpdateHereWith": "Old Brain Fix on this Device needs an update to sync with {name}.",
@@ -978,7 +1002,7 @@
   "syncSettingsStay": "Settings stay on each Device and are never synced.",
   "syncAutomatically": "Sync automatically",
   "@syncAutomatically": {"description": "The switch per paired Device: it syncs on its own on the same network."},
-  "syncAutoIntro": "Paired computers on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.",
+  "syncAutoIntro": "Paired Devices on the same Wi-Fi sync on their own, while the app is open and every quarter of an hour in the background.",
   "conflictsTitle": "Conflicts",
   "conflictsEntry": "{count, plural, =0{No conflicts} =1{1 conflict to settle} other{{count} conflicts to settle}}",
   "@conflictsEntry": {
@@ -1100,7 +1124,7 @@
       }
     }
   },
-  "shareIntro": "Meet the other person. On their computer, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.",
+  "shareIntro": "Meet the other person. On their Device, open Sync and show the code; scan it or type it here. Their Profile shows to confirm; then they get this Area and nothing else.",
   "roleHeading": "They may",
   "roleManager": "Manager",
   "roleMember": "Member",

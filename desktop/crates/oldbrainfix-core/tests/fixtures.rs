@@ -1304,7 +1304,7 @@ fn fixture_device(
 
 #[test]
 fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
-    use oldbrainfix_core::lan::{answer_sync, apply_answer, sync_request};
+    use oldbrainfix_core::lan::{answer_sync_with, apply_answer, sync_request};
     let dir = fixtures().join("sync");
     let mut expected = read_json(&dir.join("expected.json"))?;
     let now = expected["now"].as_str().ok_or("now")?.to_string();
@@ -1321,10 +1321,19 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
         request
     );
 
-    // The host answers as the Dart core answers.
-    let (answer, session) = answer_sync(&host, &request, "Desk")?.ok_or("an answer")?;
+    // The host answers as the Dart core answers, and keeps the
+    // certificate the joiner proved it hosts with.
+    let (answer, session) =
+        answer_sync_with(&host, &request, "Desk", None, "246810")?.ok_or("an answer")?;
     assert_eq!(answer, read_json(&dir.join("answer.json"))?);
     assert_eq!(session.name, "Phone");
+    let identity = joiner
+        .held_tls_identity()?
+        .ok_or("the joiner's certificate")?;
+    assert_eq!(
+        session.fingerprint,
+        Some(hex::encode(&identity.fingerprint))
+    );
     assert!(session.moment.is_some());
     assert_eq!(session.report.refused_count(), 0);
 
@@ -1352,6 +1361,75 @@ fn a_sync_session_goes_as_the_dart_core_runs_it() -> TestResult {
         }
         assert_eq!(actual, expected, "{side}");
     }
+    Ok(())
+}
+
+/// A client that checks the certificate as browsers do, with `cert` its
+/// only root: what it accepts, webpki parsed and ring verified.
+fn strict_get(port: u16, cert: Vec<u8>, pin: &str) -> Result<String, String> {
+    use std::io::{Read, Write};
+    use std::sync::Arc;
+    let fail = |e: &dyn std::fmt::Display| e.to_string();
+    let mut roots = rustls::RootCertStore::empty();
+    roots
+        .add(rustls::pki_types::CertificateDer::from(cert))
+        .map_err(|e| fail(&e))?;
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| fail(&e))?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    let name = rustls::pki_types::ServerName::try_from("oldbrainfix").map_err(|e| fail(&e))?;
+    let conn = rustls::ClientConnection::new(Arc::new(config), name).map_err(|e| fail(&e))?;
+    let sock = std::net::TcpStream::connect(("127.0.0.1", port)).map_err(|e| fail(&e))?;
+    let mut tls = rustls::StreamOwned::new(conn, sock);
+    use oldbrainfix_core::lan::{FORMAT_HEADER, OWN_FORMATS};
+    write!(
+        tls,
+        "GET /vector HTTP/1.1\r\nHost: oldbrainfix\r\nX-Oldbrainfix-Pin: {pin}\r\n{FORMAT_HEADER}: {}\r\nContent-Length: 0\r\n\r\n",
+        OWN_FORMATS.encode()
+    )
+    .map_err(|e| fail(&e))?;
+    let mut text = String::new();
+    // The host closes the connection after its answer.
+    match tls.read_to_string(&mut text) {
+        Ok(_) => Ok(text),
+        Err(e) if !text.is_empty() => Ok(format!("{text}\n({e})")),
+        Err(e) => Err(fail(&e)),
+    }
+}
+
+#[test]
+fn a_certificate_the_dart_core_made_serves_and_verifies_here() -> TestResult {
+    use oldbrainfix_core::lan::Host;
+    use std::net::{IpAddr, Ipv4Addr};
+    let dir = fixtures().join("sync");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let joiner = sync_device("joiner", joiner_key, expected["now"].as_str().ok_or("now")?)?;
+    let identity = joiner
+        .held_tls_identity()?
+        .ok_or("the Dart core's certificate")?;
+    assert_eq!(joiner.tls_identity()?, identity, "kept, not made anew");
+    let request = read_json(&dir.join("request.json"))?;
+    assert_eq!(
+        request["fingerprint"],
+        json!(hex::encode(&identity.fingerprint))
+    );
+    // Served here with its PKCS#8 key, ring signs the handshake; a client
+    // taking the certificate as its root checks it whole.
+    let host = Host::start(&identity, "246810", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
+    let port = host.port();
+    let cert = identity.cert_der.clone();
+    let client = std::thread::spawn(move || strict_get(port, cert, "246810"));
+    let asked = host
+        .wait_request(std::time::Duration::from_secs(30))
+        .ok_or("no request came")?;
+    let (response, _) = joiner.serve(&asked, "Phone")?;
+    asked.reply(response);
+    let text = client.join().map_err(|_| "the client")??;
+    assert!(text.starts_with("HTTP/1.1 200"), "{text}");
+    assert!(text.contains(&joiner.device_id()?), "{text}");
     Ok(())
 }
 

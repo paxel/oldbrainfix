@@ -13,9 +13,10 @@ data class Found(val device: String, val host: String, val port: Int) {
 }
 
 /**
- * What an mDNS/DNS-SD record of the desktop's paired host says (the
- * desktop core's `discovery`): the service type, and the device id as
- * its only TXT entry. Plain values, so the JVM tests can read records.
+ * What an mDNS/DNS-SD record of a paired host says (the desktop core's
+ * `discovery`, and [Advertiser] here): the service type, and the device
+ * id as the instance name and its only TXT entry. Plain values, so the
+ * JVM tests can read and make records.
  */
 object NsdRecords {
     /** The service type as NsdManager takes it. */
@@ -32,6 +33,14 @@ object NsdRecords {
         val id = String(raw, Charsets.US_ASCII)
         return id.takeIf { ID.matches(it) }
     }
+
+    /**
+     * The TXT entries of this Device's own record: its [device] id only,
+     * no name, since anyone on the network hears it. Null when [device]
+     * is no device id or [port] no real port: then nothing is advertised.
+     */
+    fun own(device: String, port: Int): Map<String, String>? =
+        if (ID.matches(device) && port in 1..65535) mapOf(ID_KEY to device) else null
 
     /** The host the record names, when it gives a device id, an IPv4 [host] and a [port]. */
     fun found(attributes: Map<String, ByteArray?>, host: String?, port: Int): Found? {
