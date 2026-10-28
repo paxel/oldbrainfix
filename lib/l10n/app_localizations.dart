@@ -4795,6 +4795,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'As a file through any messenger.'**
   String get personSendChangesDetail;
+
+  /// The Changes Nudge's notification: people synced by bundles lack changes. names is a list such as 'Bob and Carol'.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes for {names}'**
+  String changesNudgeTitle(String names);
+
+  /// Under the Changes Nudge's title.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to send them.'**
+  String get changesNudgeBody;
+
+  /// The Changes Nudge on the lock screen, without the names.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes are waiting to be sent'**
+  String get changesNudgePublic;
+
+  /// Joins a list of names: first holds all but the last, separated by commas.
+  ///
+  /// In en, this message translates to:
+  /// **'{first} and {last}'**
+  String namesAnd(String first, String last);
 }
 
 class _AppLocalizationsDelegate

@@ -228,3 +228,115 @@ PlannedNudge? nudgePlan({
     at: next,
   );
 }
+
+/// How long after the first change a person lacks the Changes Nudge
+/// waits, so several changes travel in one bundle (#109).
+const changesNudgeDelay = Duration(minutes: 30);
+
+/// The one Changes Nudge (CONTEXT.md, #109) that should exist while
+/// people synced by bundles lack changes: "Changes for Bob and Carol".
+///
+/// It fires first [changesNudgeDelay] after the earliest first unsent
+/// change of the people waiting and covers them all; while they wait it
+/// comes again every [repeat] after it last fired, as the Nudge does. A
+/// person whose first unsent change came after it last fired brings it
+/// forward to their own time when that is sooner. A firing in [quiet]
+/// waits for its end, and the repeats count from there.
+class PlannedChangesNudge {
+  /// The people waiting, by Profile id: by their first unsent change,
+  /// then by id.
+  final List<String> people;
+
+  /// Their own times, in the same order: due [changesNudgeDelay] after
+  /// the first unsent change, captured at it. The platform's alarm layer
+  /// follows them as it follows a Nudge's.
+  final List<NudgeAnchor> anchors;
+  final Duration repeat;
+
+  /// This Device's Quiet Hours; null when they are off.
+  final QuietHours? quiet;
+
+  /// When it last fired up to the plan's now, by this rule; null when it
+  /// has not yet.
+  final DateTime? since;
+
+  /// When it fires next after the plan's now.
+  final DateTime at;
+
+  const PlannedChangesNudge._({
+    required this.people,
+    required this.anchors,
+    required this.repeat,
+    required this.quiet,
+    required this.since,
+    required this.at,
+  });
+
+  /// When it fires first after [after], on [wallClock].
+  DateTime firesAfter(DateTime after, WallClock wallClock) {
+    final from = since;
+    return _firings(
+      anchors,
+      null,
+      repeat,
+      quiet,
+      from != null && !after.isBefore(from) ? from : null,
+      after,
+      wallClock,
+    ).next;
+  }
+
+  @override
+  String toString() =>
+      'changes nudge for $people at ${at.toIso8601String()} every '
+      '${repeat.inMinutes} min since ${since?.toIso8601String()}, '
+      'quiet ${quiet ?? 'off'}, '
+      'own ${[for (final a in anchors) a.due.toIso8601String()]}';
+}
+
+/// The Changes Nudge at [now] for the people [waiting], by Profile id
+/// with the time of the first change each lacks; null when nobody
+/// waits. It repeats every [repeat] while they wait and waits out
+/// [quiet] (null when Quiet Hours are off).
+PlannedChangesNudge? changesNudgePlan({
+  required Map<String, DateTime> waiting,
+  required DateTime now,
+  required WallClock wallClock,
+  required Duration repeat,
+  QuietHours? quiet,
+}) {
+  if (waiting.isEmpty) return null;
+  if (repeat.inMinutes < 1) {
+    throw ArgumentError.value(repeat, 'repeat', 'at least a minute');
+  }
+  final firsts =
+      [
+        for (final MapEntry(:key, :value) in waiting.entries)
+          (key, value.toUtc()),
+      ]..sort((a, b) {
+        final byTime = a.$2.compareTo(b.$2);
+        return byTime != 0 ? byTime : a.$1.compareTo(b.$1);
+      });
+  final people = [for (final (person, _) in firsts) person];
+  final anchors = [
+    for (final (_, first) in firsts)
+      (due: first.add(changesNudgeDelay), captured: first),
+  ];
+  final (:last, :next) = _firings(
+    anchors,
+    null,
+    repeat,
+    quiet,
+    null,
+    now.toUtc(),
+    wallClock,
+  );
+  return PlannedChangesNudge._(
+    people: people,
+    anchors: anchors,
+    repeat: repeat,
+    quiet: quiet,
+    since: last,
+    at: next,
+  );
+}

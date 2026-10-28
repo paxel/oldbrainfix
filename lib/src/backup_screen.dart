@@ -227,7 +227,8 @@ class _BackupScreenState extends State<BackupScreen> {
       );
       final handed = print
           ? await bundles.print(path, recoverySheetName)
-          : await bundles.share(path, type: 'application/pdf');
+          : await bundles.share(path, type: 'application/pdf') !=
+                ShareOutcome.noApp;
       if (!mounted) return;
       if (!handed) _announce(t.backupSheetNoApp);
     } on FileSystemException {

@@ -18,17 +18,20 @@ import 'settings_screen.dart';
 import 'system_bars.dart';
 
 /// What opening another person's Profile needs, wherever their picture
-/// shows (#52): the store, and where an Override's picture comes from.
+/// shows (#52): the store, where an Override's picture comes from, and
+/// whom to tell that changes were sent to them (#109).
 class PersonScope extends InheritedWidget {
   final Store store;
   final ProfilePlatform platform;
   final PictureWork work;
+  final VoidCallback? onChangesSent;
 
   const PersonScope({
     super.key,
     required this.store,
     required this.platform,
     this.work = PictureWork.isolated,
+    this.onChangesSent,
     required super.child,
   });
 
@@ -39,7 +42,8 @@ class PersonScope extends InheritedWidget {
   bool updateShouldNotify(PersonScope oldWidget) =>
       store != oldWidget.store ||
       platform != oldWidget.platform ||
-      work != oldWidget.work;
+      work != oldWidget.work ||
+      onChangesSent != oldWidget.onChangesSent;
 }
 
 /// Whether the person [id]'s Profile can be opened from here: another
@@ -73,6 +77,7 @@ Route<void>? personRoute(
       work: scope.work,
       id: id,
       offerBack: offerBack,
+      onChangesSent: scope.onChangesSent,
     ),
   );
 }
@@ -162,6 +167,10 @@ class PersonScreen extends StatefulWidget {
   /// added from a card that answers none of the user's.
   final bool offerBack;
 
+  /// Told when changes went to them by bundle, so the Changes Nudge is
+  /// planned anew.
+  final VoidCallback? onChangesSent;
+
   const PersonScreen({
     super.key,
     required this.store,
@@ -169,6 +178,7 @@ class PersonScreen extends StatefulWidget {
     this.work = PictureWork.isolated,
     required this.id,
     this.offerBack = false,
+    this.onChangesSent,
   });
 
   @override
@@ -191,7 +201,7 @@ class _PersonScreenState extends State<PersonScreen> {
   var _blocked = false;
 
   /// Whether "Send changes" shows: changes travel with them by bundles
-  /// (#108), and an Area is shared with a Device of theirs.
+  /// (#108), and they are not blocked.
   var _sendsChanges = false;
   var _sending = false;
 
@@ -223,10 +233,7 @@ class _PersonScreenState extends State<PersonScreen> {
     _code = store.personCode(widget.id);
     _verified = store.personVerified(widget.id);
     _blocked = store.isBlocked(widget.id);
-    _sendsChanges =
-        !_blocked &&
-        store.transportWith(widget.id) == Transport.bundle &&
-        store.devicesOf(widget.id).isNotEmpty;
+    _sendsChanges = store.sendsByBundle(widget.id);
   }
 
   @override
@@ -308,29 +315,19 @@ class _PersonScreenState extends State<PersonScreen> {
 
   /// Writes a bundle of what is new in the Areas shared with them, for
   /// all of their Devices at once (#108), and offers it to the app the
-  /// user picks; nothing is written when nothing is new for them.
-  Future<void> _sendChanges(String name) async {
-    final t = context.t;
-    final announcements = AnnouncementsScope.of(context);
-    final bundles = BundleScope.of(context);
-    final store = widget.store;
-    if (store.entriesForPerson(widget.id).isEmpty) {
-      announcements?.announce(t.bundleNothingNew(name));
-      return;
-    }
+  /// user picks; nothing is written when nothing is new for them. Once
+  /// an app took it, the Changes Nudge no longer waits for them (#109).
+  Future<void> _sendChanges() async {
     setState(() => _sending = true);
     try {
-      final path = await bundles.exportPath(
-        bundleFileName(store.clock().toLocal()),
+      await sendChanges(
+        store: widget.store,
+        bundles: BundleScope.of(context),
+        t: context.t,
+        announcements: AnnouncementsScope.of(context),
+        person: widget.id,
+        onSent: widget.onChangesSent,
       );
-      if (path == null) {
-        announcements?.announce(t.bundleFailed);
-        return;
-      }
-      await writeBundle(store, path, forPerson: widget.id);
-      if (!await bundles.share(path)) announcements?.announce(t.bundleNoApp);
-    } on Object {
-      announcements?.announce(t.bundleFailed);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -563,7 +560,7 @@ class _PersonScreenState extends State<PersonScreen> {
                   title: Text(t.personSendChanges(shownName)),
                   subtitle: Text(t.personSendChangesDetail),
                   enabled: !_sending,
-                  onTap: () => _sendChanges(shownName),
+                  onTap: _sendChanges,
                 ),
               SettingsHeading(t.personForMe),
               Padding(

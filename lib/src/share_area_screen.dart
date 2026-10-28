@@ -246,7 +246,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
       await writeAreaOffer(store, path, _areaId, person);
       final shared = await bundles.share(path);
       if (!mounted) return;
-      if (!shared) {
+      if (shared == ShareOutcome.noApp) {
         _announce(t.bundleNoApp);
         return;
       }

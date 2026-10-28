@@ -15,6 +15,16 @@ pub fn wordless(t: &L10n, wordless: Wordless) -> &'static str {
     }
 }
 
+/// `names` as a sentence lists them: "Bob", "Bob and Carol", "Bob, Carol
+/// and Dave", as the phone's `namesText`.
+pub fn names_text(t: &L10n, names: &[String]) -> String {
+    match names {
+        [] => String::new(),
+        [one] => one.clone(),
+        [head @ .., last] => t.names_and(&head.join(", "), last),
+    }
+}
+
 /// The app's locale for a system locale such as `de_DE.UTF-8` or
 /// `en-US`: the language part when the app speaks it, else English.
 pub fn locale_for_system(system: Option<&str>) -> &'static str {
@@ -46,6 +56,19 @@ mod tests {
         assert_eq!(locale_for_system(Some("en-US")), "en");
         assert_eq!(locale_for_system(Some("fr")), "en");
         assert_eq!(locale_for_system(None), "en");
+    }
+
+    #[test]
+    fn names_are_listed_as_a_sentence() {
+        let names = |n: &[&str]| n.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let en = L10n::new("en");
+        assert_eq!(names_text(&en, &[]), "");
+        assert_eq!(names_text(&en, &names(&["Bob"])), "Bob");
+        assert_eq!(names_text(&en, &names(&["Bob", "Carol"])), "Bob and Carol");
+        assert_eq!(
+            names_text(&L10n::new("de"), &names(&["Bob", "Carol", "Dave"])),
+            "Bob, Carol und Dave"
+        );
     }
 
     #[test]

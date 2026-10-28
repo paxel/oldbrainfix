@@ -126,5 +126,7 @@
   "personAddFromLink": "Person über einen Link hinzufügen",
   "personSendBackCopied": "Kopiert. Füge ihn in eine Nachricht an {name} ein.",
   "shareAfarSaveTitle": "Geteilten Bereich zum Senden speichern",
-  "personSendChangesTitle": "Änderungen zum Senden speichern"
+  "personSendChangesTitle": "Änderungen zum Senden speichern",
+  "changesNudgeBody": "Klicke, um sie zu schicken.",
+  "changesSaveTitle": "Änderungen für {name} zum Senden speichern"
 }

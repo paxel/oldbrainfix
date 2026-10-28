@@ -1,11 +1,13 @@
 package io.github.paxel.oldbrainfix
 
 import android.app.Activity
-import android.content.ActivityNotFoundException
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
@@ -64,23 +66,45 @@ object Bundles {
         return file.parentFile?.canonicalPath == dir.canonicalPath && file.name.isNotEmpty()
     }
 
-    /** Opens the share chooser for the bundle at [path] as [type]; false when nothing can take it. */
-    fun share(context: Context, path: String, type: String): Boolean {
-        if (!inside(FileShare.dir(context), path)) return false
+    /**
+     * Whether an app was picked on the share chooser opened last: the
+     * chooser tells [ShareChosenReceiver], and nothing when it is left
+     * without one.
+     */
+    @Volatile
+    var chosen = false
+
+    /**
+     * The share chooser for the bundle at [path] as [type], telling
+     * [ShareChosenReceiver] which app is picked; null when there is no
+     * such file to share.
+     */
+    fun chooser(context: Context, path: String, type: String): Intent? {
+        if (!inside(FileShare.dir(context), path)) return null
         val file = File(path)
-        if (!file.isFile) return false
+        if (!file.isFile) return null
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
         val send = Intent(Intent.ACTION_SEND)
             .setType(type)
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         send.clipData = ClipData.newRawUri("", uri)
-        return try {
-            context.startActivity(Intent.createChooser(send, null))
-            true
-        } catch (_: ActivityNotFoundException) {
-            false
-        }
+        // Mutable, so the chooser can put in the app picked; explicit, so
+        // only this app's receiver hears it.
+        val picked = PendingIntent.getBroadcast(
+            context, 0, Intent(context, ShareChosenReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0),
+        )
+        chosen = false
+        return Intent.createChooser(send, null, picked.intentSender)
+    }
+}
+
+/** Hears from the share chooser that an app was picked ([Intent.EXTRA_CHOSEN_COMPONENT]). */
+class ShareChosenReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        Bundles.chosen = true
     }
 }
 

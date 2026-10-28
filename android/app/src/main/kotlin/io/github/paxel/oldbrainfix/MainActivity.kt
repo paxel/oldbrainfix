@@ -70,6 +70,12 @@ class MainActivity : FlutterActivity() {
     /** The answer to the bundle's "pick", until the file picker comes back. */
     private var bundleAnswer: MethodChannel.Result? = null
 
+    /** The answer to the bundle's "share", until the user is back from the share chooser. */
+    private var shareAnswer: MethodChannel.Result? = null
+
+    /** Whether the app went out of sight since the share chooser was opened. */
+    private var shareLeft = false
+
     /** Paired hosts on the network while the app shows, told to the app as they come. */
     private val discovery by lazy {
         Discovery(this) { found -> syncChannel?.invokeMethod("found", found.toMap()) }
@@ -84,6 +90,7 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         if (intent?.getBooleanExtra(EXTRA_RING, false) == true) showOverLockScreen(true)
         if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_NUDGE, false) == true) nudgeOpened = true
+        if (savedInstanceState == null && intent?.getBooleanExtra(EXTRA_CHANGES, false) == true) changesOpened = true
         if (savedInstanceState == null && opensUnsorted(intent)) unsortedOpened = true
         if (savedInstanceState == null) {
             CaptureModes.of(intent?.action, intent?.flags ?: 0)?.let { captureRequested = it }
@@ -92,14 +99,18 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * The full-screen alarm, the Nudge or the Agenda widget's Unsorted
-     * count opened the running app: the app shows it.
+     * The full-screen alarm, the Nudge, the Changes Nudge or the Agenda
+     * widget's Unsorted count opened the running app: the app shows it.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_NUDGE, false)) {
             nudgeOpened = true
+            actionsArrived()
+        }
+        if (intent.getBooleanExtra(EXTRA_CHANGES, false)) {
+            changesOpened = true
             actionsArrived()
         }
         if (opensUnsorted(intent)) {
@@ -322,12 +333,10 @@ class MainActivity : FlutterActivity() {
                     "exportPath" -> result.success(
                         Bundles.exportPath(this@MainActivity, args["name"] as? String ?: ""),
                     )
-                    "share" -> result.success(
-                        Bundles.share(
-                            this@MainActivity,
-                            args["path"] as? String ?: "",
-                            args["type"] as? String ?: "application/octet-stream",
-                        ),
+                    "share" -> shareBundle(
+                        result,
+                        args["path"] as? String ?: "",
+                        args["type"] as? String ?: "application/octet-stream",
                     )
                     "pick" -> pickBundle(result)
                     "take" -> result.success(Bundles.take())
@@ -436,6 +445,10 @@ class MainActivity : FlutterActivity() {
                         result.success(nudgeOpened)
                         nudgeOpened = false
                     }
+                    "changesOpened" -> {
+                        result.success(changesOpened)
+                        changesOpened = false
+                    }
                     "unsortedOpened" -> {
                         result.success(unsortedOpened)
                         unsortedOpened = false
@@ -450,7 +463,45 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Opens the share chooser for the file at [path]; the answer comes
+     * once the user is back: "taken" when an app was picked, "dismissed"
+     * when the chooser was left, "none" when nothing can take it.
+     */
+    private fun shareBundle(result: MethodChannel.Result, path: String, type: String) {
+        val chooser = Bundles.chooser(this, path, type) ?: return result.success("none")
+        try {
+            startActivity(chooser)
+        } catch (_: ActivityNotFoundException) {
+            return result.success("none")
+        }
+        shareAnswer?.success("dismissed")
+        shareAnswer = result
+        shareLeft = false
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (shareAnswer != null) shareLeft = true
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!shareLeft) return
+        val answer = shareAnswer ?: return
+        shareAnswer = null
+        shareLeft = false
+        // The chooser tells of the app picked by a broadcast, which may
+        // come just after the app is back.
+        window.decorView.postDelayed(
+            { answer.success(if (Bundles.chosen) "taken" else "dismissed") },
+            SHARE_SETTLE_MS,
+        )
+    }
+
     override fun onDestroy() {
+        shareAnswer?.success(if (Bundles.chosen) "taken" else "dismissed")
+        shareAnswer = null
         if (active === this) active = null
         voice.release()
         speech.release()
@@ -815,6 +866,12 @@ class MainActivity : FlutterActivity() {
         /** Marks the launch from the Nudge's notification. */
         const val EXTRA_NUDGE = "oldbrainfix.nudge"
 
+        /** Marks the launch from the Changes Nudge's notification. */
+        const val EXTRA_CHANGES = "oldbrainfix.changes"
+
+        /** How long the app waits, back from the share chooser, for it to tell of the app picked. */
+        private const val SHARE_SETTLE_MS = 500L
+
         /** Marks the launch from the Agenda widget's Unsorted count. */
         const val EXTRA_UNSORTED = "oldbrainfix.unsorted"
 
@@ -829,6 +886,9 @@ class MainActivity : FlutterActivity() {
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false
+
+        /** The Changes Nudge was tapped and the app has not sent the changes yet. */
+        private var changesOpened = false
 
         /** The Agenda widget's Unsorted count was tapped and the app has not shown the list yet. */
         private var unsortedOpened = false

@@ -9,6 +9,10 @@
       "{\"key\":\"UVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3A=\",\"scope\":\"personal\"}"
     ],
     [
+      "changesSent:00000000000000000000000000000002",
+      "{\"area:00000000000000000000000000000003\":18}"
+    ],
+    [
       "key:c945cbf2a5602002141e2fb9d17054d6",
       "{\"box\":\"NpiOI37NKcQmhuv9Zt92gze8GE9ERdBaZWk8gmVJvjc=\",\"boxSig\":\"CR+HkKAeMw4FvMzO+UZTDRPI/4qFAzqiJLCQxk5OXcOsuKJM+lwr++fmMLvm8ixSoYdd10bAj/tiG0iqe6+VDw==\",\"device\":\"c945cbf2a5602002141e2fb9d17054d6\",\"key\":\"5/FioQvsVZr+oZXk3OhLaVaNXSywlj60RsBoXisX8vA=\",\"sig\":\"2wrHKmEPiJjrYMpUfKDzqc1mX6uRKn6HvOCTOQjkcysfPp+CdZ9etvG6PJtR+WqivowcC4jr45zxBYfezJAKCA==\",\"trust\":\"tofu\"}"
     ],

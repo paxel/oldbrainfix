@@ -11,6 +11,7 @@ export 'src/blobs.dart';
 export 'src/box_keys.dart';
 export 'src/bundle.dart';
 export 'src/calendar_mirror.dart';
+export 'src/changes_nudges.dart';
 export 'src/conflicts.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';

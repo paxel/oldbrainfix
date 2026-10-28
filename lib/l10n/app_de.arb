@@ -791,5 +791,9 @@
   "areaOffersWaitingTitle": "Wartende geteilte Bereiche",
   "areaOffersNoneWaiting": "Keine geteilten Bereiche warten.",
   "personSendChanges": "Änderungen an {name} schicken",
-  "personSendChangesDetail": "Als Datei über einen beliebigen Messenger."
+  "personSendChangesDetail": "Als Datei über einen beliebigen Messenger.",
+  "changesNudgeTitle": "Änderungen für {names}",
+  "changesNudgeBody": "Tippe, um sie zu schicken.",
+  "changesNudgePublic": "Änderungen warten darauf, geschickt zu werden",
+  "namesAnd": "{first} und {last}"
 }

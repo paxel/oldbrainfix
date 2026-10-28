@@ -5,11 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_offer_screen.dart';
 import 'conflicts_screen.dart';
 import 'l10n.dart';
+import 'profile.dart';
+
+/// What became of a file offered to the app the user picks.
+enum ShareOutcome {
+  /// The user picked an app on the share sheet, which took the file.
+  taken,
+
+  /// The share sheet was left without picking an app.
+  dismissed,
+
+  /// No app here can take the file.
+  noApp,
+}
 
 /// The platform seam for bundle files (android/…/Bundles.kt): where a
 /// bundle is written before it is shared, handing it to the app the user
@@ -26,8 +40,9 @@ abstract interface class BundlePlatform {
   Future<String?> exportPath(String name);
 
   /// Offers the file at [path], a bundle unless [type] says otherwise,
-  /// to the app the user picks; false when no app can take it.
-  Future<bool> share(String path, {String type = bundleMimeType});
+  /// to the app the user picks; answers once the user is back, with
+  /// whether an app was picked.
+  Future<ShareOutcome> share(String path, {String type = bundleMimeType});
 
   /// Opens the system's file picker; the copy of the file picked, or
   /// null when the user backed out.
@@ -56,8 +71,10 @@ class NoBundles implements BundlePlatform {
   Future<String?> exportPath(String name) async => null;
 
   @override
-  Future<bool> share(String path, {String type = bundleMimeType}) async =>
-      false;
+  Future<ShareOutcome> share(
+    String path, {
+    String type = bundleMimeType,
+  }) async => ShareOutcome.noApp;
 
   @override
   Future<String?> pick() async => null;
@@ -93,8 +110,15 @@ class AndroidBundles implements BundlePlatform {
       _ask<String>('exportPath', {'name': name});
 
   @override
-  Future<bool> share(String path, {String type = bundleMimeType}) async =>
-      await _ask<bool>('share', {'path': path, 'type': type}) ?? false;
+  Future<ShareOutcome> share(
+    String path, {
+    String type = bundleMimeType,
+  }) async =>
+      switch (await _ask<String>('share', {'path': path, 'type': type})) {
+        'taken' => ShareOutcome.taken,
+        'dismissed' => ShareOutcome.dismissed,
+        _ => ShareOutcome.noApp,
+      };
 
   @override
   Future<String?> pick() => _ask<String>('pick', null);
@@ -202,4 +226,70 @@ Future<int> importBundleFile(
   final refused = result.report.refusedCount;
   if (refused > 0) announcements?.announce(t.syncRefused(refused));
   return visibleConflicts(store, lock, result.conflicts).length;
+}
+
+/// The name a bundle for [person], whose own Profile name is [name],
+/// goes out as on [day]: the day's bundle name with theirs in it, so the
+/// bundles for several people, sent one after another, never overwrite
+/// one an app may still be reading.
+String changesFileName(DateTime day, String person, String name) {
+  String part(String text) => text
+      .replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  final who = part(name).isNotEmpty ? part(name) : part(person);
+  final base = bundleFileName(day);
+  final dot = base.lastIndexOf('.');
+  final short = who.length > 32 ? who.substring(0, 32) : who;
+  return '${base.substring(0, dot)}-$short${base.substring(dot)}';
+}
+
+/// Sends [person] a bundle of what is new for them in the Areas shared
+/// with them (#108), offered to the app the user picks. Only once an app
+/// was picked do the changes up to the log's mark, read before the
+/// bundle was written, count as sent (#109), and [onSent] is told: a
+/// share sheet left without an app keeps the Changes Nudge and says
+/// nothing. Nothing new, no app and a failure are announced at the top.
+Future<ShareOutcome?> sendChanges({
+  required Store store,
+  required BundlePlatform bundles,
+  required AppLocalizations t,
+  required Announcements? announcements,
+  required String person,
+  VoidCallback? onSent,
+}) async {
+  if (store.entriesForPerson(person).isEmpty) {
+    announcements?.announce(
+      t.bundleNothingNew(profileDisplayName(t, store.personShown(person).name)),
+    );
+    return null;
+  }
+  try {
+    final path = await bundles.exportPath(
+      changesFileName(
+        store.clock().toLocal(),
+        person,
+        store.personTheirs(person).name,
+      ),
+    );
+    if (path == null) {
+      announcements?.announce(t.bundleFailed);
+      return null;
+    }
+    final seq = store.currentSeq();
+    await writeBundle(store, path, forPerson: person);
+    final shared = await bundles.share(path);
+    switch (shared) {
+      case ShareOutcome.taken:
+        store.noteChangesSent(person, seq);
+        onSent?.call();
+      case ShareOutcome.noApp:
+        announcements?.announce(t.bundleNoApp);
+      case ShareOutcome.dismissed:
+        break;
+    }
+    return shared;
+  } on Object {
+    announcements?.announce(t.bundleFailed);
+    return null;
+  }
 }

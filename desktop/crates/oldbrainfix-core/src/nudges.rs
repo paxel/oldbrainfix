@@ -3,6 +3,7 @@
 //! Unsorted Notes, now, the wall clock and this Device's snooze, Quiet
 //! Hours and repeat interval.
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use chrono::{DateTime, Duration, Timelike, Utc};
@@ -105,9 +106,29 @@ impl PlannedNudge {
     /// When it fires first after `after`, on `wall`.
     pub fn fires_after(&self, after: DateTime<Utc>, wall: &WallClock) -> DateTime<Utc> {
         let from = self.since.filter(|from| after >= *from);
-        self.firings(from, after, wall).1
+        self.rule().firings(from, after, wall).1
     }
 
+    fn rule(&self) -> Rule<'_> {
+        Rule {
+            anchors: &self.anchors,
+            snooze: self.snooze,
+            repeat: self.repeat,
+            quiet: self.quiet,
+        }
+    }
+}
+
+/// How a Nudge fires over its anchors, as the Dart core's `_firings`:
+/// shared by the Nudge and the Changes Nudge.
+struct Rule<'a> {
+    anchors: &'a [NudgeAnchor],
+    snooze: Option<NudgeSnooze>,
+    repeat: Duration,
+    quiet: Option<QuietHours>,
+}
+
+impl Rule<'_> {
     /// Follows the Nudge from `from`, when it fired (`None`: from the
     /// start), to its last firing up to `after` and the next one after.
     fn firings(
@@ -118,8 +139,8 @@ impl PlannedNudge {
     ) -> (Option<DateTime<Utc>>, DateTime<Utc>) {
         let mut last = from;
         loop {
-            // Never `None`: there is a Note, and each firing is followed by
-            // a repeat.
+            // Never `None`: there is an anchor, and each firing is followed
+            // by a repeat.
             let next = self.next_firing(last, wall).unwrap_or(after + self.repeat);
             if next > after {
                 return (last, next);
@@ -204,7 +225,92 @@ pub fn nudge_plan(
         since: None,
         at: now,
     };
-    let (since, at) = plan.firings(None, now, wall);
+    let (since, at) = plan.rule().firings(None, now, wall);
+    plan.since = since;
+    plan.at = at;
+    Ok(Some(plan))
+}
+
+/// How long after the first change a person lacks the Changes Nudge
+/// waits, so several changes travel in one bundle (#109).
+pub const CHANGES_NUDGE_DELAY_MINUTES: i64 = 30;
+
+/// The one Changes Nudge (CONTEXT.md, #109) that should exist while
+/// people synced by bundles lack changes, as the Dart core's
+/// `PlannedChangesNudge`: it fires first 30 minutes after the earliest
+/// first unsent change of the people waiting and covers them all; while
+/// they wait it comes again every `repeat` after it last fired, as the
+/// Nudge does, and a firing in Quiet Hours waits for their end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedChangesNudge {
+    /// The people waiting, by Profile id: by their first unsent change,
+    /// then by id.
+    pub people: Vec<String>,
+    /// Their own times, in the same order: due 30 minutes after the first
+    /// unsent change, captured at it.
+    pub anchors: Vec<NudgeAnchor>,
+    pub repeat: Duration,
+    /// This Device's Quiet Hours; `None` when they are off.
+    pub quiet: Option<QuietHours>,
+    /// When it last fired up to the plan's now; `None` when it has not.
+    pub since: Option<DateTime<Utc>>,
+    /// When it fires next after the plan's now.
+    pub at: DateTime<Utc>,
+}
+
+impl PlannedChangesNudge {
+    /// When it fires first after `after`, on `wall`.
+    pub fn fires_after(&self, after: DateTime<Utc>, wall: &WallClock) -> DateTime<Utc> {
+        let from = self.since.filter(|from| after >= *from);
+        self.rule().firings(from, after, wall).1
+    }
+
+    fn rule(&self) -> Rule<'_> {
+        Rule {
+            anchors: &self.anchors,
+            snooze: None,
+            repeat: self.repeat,
+            quiet: self.quiet,
+        }
+    }
+}
+
+/// The Changes Nudge at `now` for the people `waiting`, by Profile id
+/// with the time of the first change each lacks, as the Dart core's
+/// `changesNudgePlan`; `None` when nobody waits.
+pub fn changes_nudge_plan(
+    waiting: &BTreeMap<String, DateTime<Utc>>,
+    now: DateTime<Utc>,
+    wall: &WallClock,
+    repeat: Duration,
+    quiet: Option<QuietHours>,
+) -> Result<Option<PlannedChangesNudge>> {
+    if waiting.is_empty() {
+        return Ok(None);
+    }
+    if repeat.num_minutes() < 1 {
+        return Err(Error::Invalid(
+            "a Nudge repeats after a minute at least".into(),
+        ));
+    }
+    let mut firsts: Vec<(&String, DateTime<Utc>)> = waiting.iter().map(|(p, t)| (p, *t)).collect();
+    firsts.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(b.0)));
+    let delay = Duration::minutes(CHANGES_NUDGE_DELAY_MINUTES);
+    let mut plan = PlannedChangesNudge {
+        people: firsts.iter().map(|(p, _)| (*p).clone()).collect(),
+        anchors: firsts
+            .iter()
+            .map(|(_, first)| NudgeAnchor {
+                due: *first + delay,
+                captured: *first,
+            })
+            .collect(),
+        repeat,
+        quiet,
+        since: None,
+        at: now,
+    };
+    let (since, at) = plan.rule().firings(None, now, wall);
     plan.since = since;
     plan.at = at;
     Ok(Some(plan))

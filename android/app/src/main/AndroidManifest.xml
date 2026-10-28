@@ -307,6 +307,11 @@
         <receiver
             android:name=".AlarmReceiver"
             android:exported="false" />
+        <!-- Told by the share chooser which app the user picked for a
+             bundle, so a chooser left without one sends nothing. -->
+        <receiver
+            android:name=".ShareChosenReceiver"
+            android:exported="false" />
         <receiver
             android:name=".RearmReceiver"
             android:exported="true">

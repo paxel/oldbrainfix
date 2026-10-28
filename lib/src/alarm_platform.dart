@@ -43,6 +43,23 @@ class ArmedNudge {
   });
 }
 
+/// The planned Changes Nudge (#109) with the texts its notification
+/// shows: [title] names the people, [public] does not, for the lock
+/// screen.
+class ArmedChangesNudge {
+  final PlannedChangesNudge nudge;
+  final String title;
+  final String body;
+  final String public;
+
+  const ArmedChangesNudge({
+    required this.nudge,
+    required this.title,
+    required this.body,
+    required this.public,
+  });
+}
+
 /// The texts of the alarm notifications, in the reader's language. The
 /// platform keeps them, so it can show alarms while the app is closed.
 class AlarmLabels {
@@ -178,20 +195,26 @@ abstract interface class AlarmPlatform {
   /// only show where it has.
   bool get available;
 
-  /// Arms exactly [alarms] and the [nudge], replacing everything armed
-  /// before, and takes away the notifications of the Occurrences in
-  /// [done], given as Routine id and Occurrence, and the Nudge's when
-  /// there is none.
+  /// Arms exactly [alarms], the [nudge] and the Changes Nudge
+  /// [changes], replacing everything armed before, and takes away the
+  /// notifications of the Occurrences in [done], given as Routine id and
+  /// Occurrence, and the Nudge's or the Changes Nudge's when there is
+  /// none.
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
+    ArmedChangesNudge? changes,
   });
 
   /// Whether the Nudge's notification was tapped since this was last
   /// asked; asking clears it.
   Future<bool> nudgeOpened();
+
+  /// Whether the Changes Nudge's notification was tapped since this was
+  /// last asked; asking clears it.
+  Future<bool> changesOpened();
 
   /// Hands the home-screen Agenda widget what it shows from now on.
   Future<void> showAgenda(AgendaSnapshot snapshot);
@@ -237,10 +260,14 @@ class NoAlarms implements AlarmPlatform {
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
+    ArmedChangesNudge? changes,
   }) async {}
 
   @override
   Future<bool> nudgeOpened() async => false;
+
+  @override
+  Future<bool> changesOpened() async => false;
 
   @override
   Future<void> showAgenda(AgendaSnapshot snapshot) async {}
@@ -290,6 +317,7 @@ class AndroidAlarms implements AlarmPlatform {
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
+    ArmedChangesNudge? changes,
   }) => _channel.invokeMethod('arm', {
     'alarms': [
       for (final ArmedAlarm(:alarm, :title, :body) in alarms)
@@ -351,11 +379,40 @@ class AndroidAlarms implements AlarmPlatform {
         'title': title,
         'body': body,
       },
+    if (changes case ArmedChangesNudge(
+      nudge: final changes,
+      :final title,
+      :final body,
+      :final public,
+    ))
+      // Followed like the Nudge, without a snooze.
+      'changes': {
+        'anchors': [
+          for (final (:due, :captured) in changes.anchors)
+            [due.millisecondsSinceEpoch, captured.millisecondsSinceEpoch],
+        ],
+        'repeat': changes.repeat.inMinutes,
+        if (changes.quiet case final quiet?)
+          'quiet': [
+            quiet.start.hour,
+            quiet.start.minute,
+            quiet.end.hour,
+            quiet.end.minute,
+          ],
+        'since': ?changes.since?.millisecondsSinceEpoch,
+        'title': title,
+        'body': body,
+        'public': public,
+      },
   });
 
   @override
   Future<bool> nudgeOpened() async =>
       await _channel.invokeMethod<bool>('nudgeOpened') ?? false;
+
+  @override
+  Future<bool> changesOpened() async =>
+      await _channel.invokeMethod<bool>('changesOpened') ?? false;
 
   @override
   Future<void> showAgenda(AgendaSnapshot snapshot) =>

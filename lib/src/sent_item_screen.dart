@@ -42,7 +42,7 @@ Future<void> sendNoteFile(
   File(path).writeAsBytesSync(
     sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
   );
-  if (!await files.share(path, type: sentItemMimeType)) {
+  if (await files.share(path, type: sentItemMimeType) == ShareOutcome.noApp) {
     announcements?.announce(t.sendNoApp);
   }
 }

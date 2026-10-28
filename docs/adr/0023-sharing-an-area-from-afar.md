@@ -53,3 +53,7 @@ Through the shared folder and in bundles, the Profiles file of a Shared Area, `k
 - ADR 0013: an Area is shared from afar by an offer file as well as by Pairing by invite; a bundle for another person's Device is cut to what it shares also when that Device was never paired.
 - ADR 0017: a Profiles file has `keys` beside `profiles`.
 - ADR 0022: an offered Area is a set of kind `area-offer`, never shown, whose photos and recordings are kept in the blob store until it is decided.
+
+## The Changes Nudge (ADR 0024)
+
+Amended by ADR 0024 (#109): "Share with…" sets the sent mark of the Area for the person to the log at the share, and accepting an offer sets the sharer's mark of the Area to the log after the history was taken in, so neither leaves the history waiting for a bundle. The marks are local settings `changesSent:<profile id>`; the Changes Nudge reminds of what lies past them for people synced by bundles.

@@ -5,10 +5,10 @@
 //! their own Devices; last, Block, or Unblock for a blocked person (#90).
 //! Just added from their Profile card, it offers "Send yours back" (#107).
 //! When changes of the Areas shared with them travel as files, "Send
-//! changes to Ann" saves a bundle for all of their Devices (#108).
+//! changes to Ann" saves a bundle for all of their Devices (#108); once
+//! saved, the Changes Nudge no longer waits for them (#109).
 
 use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
-use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{Profile, Store};
 
 use crate::l10n::L10n;
@@ -73,8 +73,9 @@ pub struct PersonView {
     pub own_picture: bool,
     /// Whether the user blocked them (ADR 0021).
     pub blocked: bool,
-    /// Whether "Send changes" shows: changes travel with them as files
-    /// and an Area is shared with a Device of theirs (#108).
+    /// Whether "Send changes" shows: changes travel with them as files,
+    /// they are not blocked and an Area is shared with a Device of
+    /// theirs (#108).
     pub sends_changes: bool,
 }
 
@@ -91,9 +92,7 @@ impl PersonView {
                 .person_override(id)?
                 .is_some_and(|o| o.picture.is_some()),
             blocked,
-            sends_changes: !blocked
-                && store.transport_with(id)? == Some(Transport::Bundle)
-                && !store.devices_of(id)?.is_empty(),
+            sends_changes: store.sends_by_bundle(id)?,
         })
     }
 }

@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ## [0.2.0]
 
 ### Added
+- On the phone and the desktop, 30 minutes after the first change that people synced by files have not been sent yet, a notification "Changes for Bob and Carol" comes, repeats like the Nudge and waits out the Quiet Hours until each of them was sent their file, and tapping or clicking it offers each person their file in turn, while a file counts as sent, there and with "Send changes to …", only once an app was picked on the phone's share sheet or the file was saved on the desktop.
 - On the phone and the desktop, the first start asks whether the user is new to Old Brain Fix, adds a Device of their own or restores a Backup, and "Add a Device of mine" shows this Device's pair code or takes the other Device's, then syncs before any setup, bringing the Profile, Areas and everything else, so that the phone skips the Starter Set and only offers the speech model and the alarm setup, while a failed or cancelled Pairing returns to the first screen.
 - On the phone, text Capture has a Gallery button next to Photo and Voice that picks one or more pictures from the phone into the Note as its photos, each with its Photo Text.
 - On the phone, an audio file shared in from another app, such as a WhatsApp voice message, becomes a voice Note with its Transcript, several shared at once one Note with a recording each, and a file the phone cannot decode is kept in the Note with an announcement that it could not be transcribed, whose tap shows the reason.

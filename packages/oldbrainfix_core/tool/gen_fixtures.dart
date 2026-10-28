@@ -2894,7 +2894,14 @@ void _pendingFixture(Directory root) {
 /// holds, its own Profile, the people it keeps and how changes travel
 /// with them.
 List<List<String>> _offerSettings(Store store) => [
-  for (final prefix in ['areakey:', 'key:', 'person:', 'profile', 'transport:'])
+  for (final prefix in [
+    'areakey:',
+    'changesSent:',
+    'key:',
+    'person:',
+    'profile',
+    'transport:',
+  ])
     for (final (key, value) in store.localSettingsWithPrefix(prefix))
       [key, value],
 ];

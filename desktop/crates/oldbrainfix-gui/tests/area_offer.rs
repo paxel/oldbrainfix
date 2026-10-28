@@ -7,10 +7,13 @@
 //! Accept, Decline and "Decline and block"; one left undecided waits
 //! behind the Agenda's "x shared Areas waiting". Each refusal says its
 //! own cause. A person's Profile offers "Send changes to Ann" when
-//! changes travel with them as files.
+//! changes travel with them as files. A click on the Changes Nudge (#109)
+//! asks where to save each waiting person's bundle, one after another;
+//! only a bundle saved ends their wait.
 
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
@@ -19,7 +22,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::bundle::{import_bundle, write_area_offer_now, write_person_bundle_now};
 use oldbrainfix_core::offers::{OfferError, Transport};
-use oldbrainfix_core::{AreaRole, Notes, OwnProfile, Places, SigningKey, Store};
+use oldbrainfix_core::{Alarms, AreaRole, Notes, OwnProfile, Places, SigningKey, Store};
 use oldbrainfix_gui::app::FileSaver;
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::sync_view::offer_refusal;
@@ -504,5 +507,139 @@ fn blocking_the_sharer_on_their_profile_drops_the_offer() -> TestResult {
         Some("Refused: this shared Area comes from a person you blocked.")
     );
     assert!(harness.state().store().pending_sets()?.is_empty());
+    Ok(())
+}
+
+/// A save dialog answering each call with the next of `answers`, `None`
+/// being cancelled, and noting the titles and names it was asked with.
+fn answering(answers: Vec<Option<PathBuf>>, asked: Arc<Mutex<Vec<(String, String)>>>) -> FileSaver {
+    let answers = Mutex::new(VecDeque::from(answers));
+    Box::new(move |title, name| {
+        if let Ok(mut asked) = asked.lock() {
+            asked.push((title.to_string(), name.to_string()));
+        }
+        answers.lock().ok()?.pop_front().flatten()
+    })
+}
+
+/// Ann of [`met`], who also shares a Garden with Cat by bundles, and then
+/// adds a Note for Ben and one for Cat: both wait, Ben first. The store
+/// with Ben's and Cat's Profile ids.
+fn two_waiting() -> Result<(Store, String, String), Box<dyn std::error::Error>> {
+    let (ann, _ben, area, ben_id) = met()?;
+    let cat = device(3, "Cat")?;
+    ann.open_profile_card(&cat.profile_card(false)?.ok_or("her card")?, false)?;
+    let cat_id = id_of(&cat)?;
+    let house = ann.share_area_with(&area, &ben_id, AreaRole::Member, Transport::Bundle)?;
+    let garden = Places::new(&ann).add_area("Garden")?;
+    let garden = ann.share_area_with(&garden.id, &cat_id, AreaRole::Member, Transport::Bundle)?;
+    assert!(ann.waiting_for_changes()?.is_empty());
+    Notes::new(&ann).capture("Buy bread", Some(&house), None)?;
+    Notes::new(&ann).capture("Water the roses", Some(&garden), None)?;
+    let people = Alarms::new(&ann)
+        .changes_nudge(&|utc| utc.naive_utc())?
+        .ok_or("the Changes Nudge")?
+        .people;
+    assert_eq!(people, [ben_id.clone(), cat_id.clone()]);
+    Ok((ann, ben_id, cat_id))
+}
+
+#[test]
+fn a_click_on_the_changes_nudge_saves_each_bundle_and_a_cancel_keeps_the_wait() -> TestResult {
+    let (ann, ben, cat) = two_waiting()?;
+    let dir = tempfile::tempdir()?;
+    let for_ben = dir.path().join("for-ben.obfsync");
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let wanted = Arc::new(AtomicBool::new(true));
+    let mut desk = app(ann, Selection::Agenda, "en");
+    desk.set_bundle_dialogs(
+        answering(vec![Some(for_ben.clone()), None], asked.clone()),
+        Box::new(|_| None),
+    );
+    desk.set_changes_wanted(wanted.clone());
+    let harness = window(desk);
+    assert!(!wanted.load(Ordering::SeqCst));
+    let asked = asked.lock().map_err(|e| e.to_string())?.clone();
+    let titles: Vec<&str> = asked.iter().map(|(t, _)| t.as_str()).collect();
+    assert_eq!(
+        titles,
+        [
+            "Save the changes for Ben to send",
+            "Save the changes for Cat to send"
+        ]
+    );
+    assert!(asked[0].1.ends_with("-Ben.obfsync"), "{}", asked[0].1);
+    assert!(asked[1].1.ends_with("-Cat.obfsync"), "{}", asked[1].1);
+    assert!(for_ben.exists());
+    assert_eq!(
+        harness.state().notice(),
+        Some("Saved. Send the file to them through any messenger or mail.")
+    );
+    // Ben's bundle was saved: he no longer waits. Cat's dialog was
+    // cancelled: she keeps the Changes Nudge.
+    let waiting = harness.state().store().waiting_for_changes()?;
+    assert!(!waiting.contains_key(&ben));
+    assert!(waiting.contains_key(&cat));
+    Ok(())
+}
+
+#[test]
+fn a_bundle_that_could_not_be_saved_counts_as_not_sent() -> TestResult {
+    let (ann, ben, _cat) = two_waiting()?;
+    let dir = tempfile::tempdir()?;
+    let nowhere = dir.path().join("gone").join("for-ben.obfsync");
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let wanted = Arc::new(AtomicBool::new(true));
+    let mut desk = app(ann, Selection::Agenda, "de");
+    desk.set_bundle_dialogs(
+        answering(vec![Some(nowhere.clone()), None], asked.clone()),
+        Box::new(|_| None),
+    );
+    desk.set_changes_wanted(wanted);
+    let harness = window(desk);
+    assert_eq!(
+        asked.lock().map_err(|e| e.to_string())?[0].0,
+        "Änderungen für Ben zum Senden speichern"
+    );
+    assert!(!nowhere.exists());
+    assert!(harness.state().notice().is_some_and(|n| !n.is_empty()));
+    let waiting = harness.state().store().waiting_for_changes()?;
+    assert!(waiting.contains_key(&ben));
+    Ok(())
+}
+
+#[test]
+fn send_changes_on_the_profile_ends_the_wait_only_once_saved() -> TestResult {
+    let (ann, ben, cat) = two_waiting()?;
+    let dir = tempfile::tempdir()?;
+    let for_ben = dir.path().join("for-ben.obfsync");
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let mut desk = app(ann, Selection::Profile, "en");
+    desk.set_bundle_dialogs(
+        answering(vec![None, Some(for_ben.clone())], asked.clone()),
+        Box::new(|_| None),
+    );
+    let mut harness = window(desk);
+    click(&mut harness, "Open the Profile of Ben");
+    // Cancelled: nothing saved, he still waits.
+    click(&mut harness, "Send changes to Ben");
+    assert!(!for_ben.exists());
+    assert!(
+        harness
+            .state()
+            .store()
+            .waiting_for_changes()?
+            .contains_key(&ben)
+    );
+    // Saved: he no longer waits; Cat still does.
+    click(&mut harness, "Send changes to Ben");
+    assert!(for_ben.exists());
+    let waiting = harness.state().store().waiting_for_changes()?;
+    assert!(!waiting.contains_key(&ben));
+    assert!(waiting.contains_key(&cat));
+    assert_eq!(
+        asked.lock().map_err(|e| e.to_string())?[0].0,
+        "Save the changes to send"
+    );
     Ok(())
 }

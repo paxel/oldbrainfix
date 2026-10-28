@@ -9,6 +9,7 @@ import 'agenda_widget.dart';
 import 'alarm_platform.dart';
 import 'app_lock.dart';
 import 'l10n.dart';
+import 'profile.dart';
 import 'schedule_text.dart';
 
 /// Keeps the platform's alarms in step with the core's alarm plan: on
@@ -18,8 +19,10 @@ import 'schedule_text.dart';
 /// meanwhile, so a Done reaches the log even when it was tapped while
 /// the app was not running. Tells its listeners when taps were applied,
 /// the granted permissions changed, Escalation was turned on or off
-/// anywhere, a full-screen alarm started or stopped, or the Nudge's
-/// notification or the Agenda widget's Unsorted count was tapped.
+/// anywhere, a full-screen alarm started or stopped, or the Nudge's or
+/// the Changes Nudge's notification or the Agenda widget's Unsorted
+/// count was tapped. The Changes Nudge (#109) is armed anew when a
+/// Profile changes, and when [replan] says changes were sent.
 class AlarmSync extends ChangeNotifier {
   /// The permissions whose absence the red banner always shows; the
   /// full-screen one counts as well while any Routine escalates.
@@ -50,6 +53,7 @@ class AlarmSync extends ChangeNotifier {
   var _escalating = false;
   Ringing? _ringing;
   var _nudgeOpened = false;
+  var _changesOpened = false;
   var _unsortedOpened = false;
 
   AlarmSync({
@@ -58,6 +62,7 @@ class AlarmSync extends ChangeNotifier {
     required this.wallClock,
   }) {
     store.addListener(_changed);
+    store.addProfileListener(_changed);
     _arrivals = platform.actionsArrived.listen((_) => refresh());
   }
 
@@ -99,6 +104,23 @@ class AlarmSync extends ChangeNotifier {
     return opened;
   }
 
+  /// Whether the Changes Nudge's notification was tapped and its
+  /// bundles are still to send; taking it clears it.
+  bool takeChangesOpened() {
+    final opened = _changesOpened;
+    _changesOpened = false;
+    return opened;
+  }
+
+  /// The people the Changes Nudge covers now, in its order; empty when
+  /// nobody waits.
+  List<String> get changesWaiting =>
+      Alarms(store).changesNudge(wallClock)?.people ?? const [];
+
+  /// Arms the plan anew after something the log does not show changed,
+  /// such as changes sent to a person by bundle.
+  void replan() => _changed();
+
   /// Whether the Agenda widget's Unsorted count was tapped and the
   /// Unsorted list is still to show; taking it clears it.
   bool takeUnsortedOpened() {
@@ -133,9 +155,11 @@ class AlarmSync extends ChangeNotifier {
     final granted = await platform.permissions();
     final ringing = await platform.ringing();
     final nudgeOpened = await platform.nudgeOpened();
+    final changesOpened = await platform.changesOpened();
     final unsortedOpened = await platform.unsortedOpened();
     if (_disposed) return;
     if (nudgeOpened) _nudgeOpened = true;
+    if (changesOpened) _changesOpened = true;
     if (unsortedOpened) _unsortedOpened = true;
     final permissionsChanged = !mapEquals(granted, _granted);
     final ringingChanged = ringing != _ringing;
@@ -154,6 +178,7 @@ class AlarmSync extends ChangeNotifier {
             permissionsChanged ||
             ringingChanged ||
             nudgeOpened ||
+            changesOpened ||
             unsortedOpened)) {
       notifyListeners();
     }
@@ -215,10 +240,26 @@ class AlarmSync extends ChangeNotifier {
             title: t.nudgeTitle(planned.count),
             body: t.nudgeBody,
           );
+    final plannedChanges = Alarms(store).changesNudge(wallClock);
+    final changes = plannedChanges == null
+        ? null
+        : ArmedChangesNudge(
+            nudge: plannedChanges,
+            title: t.changesNudgeTitle(
+              namesText(t, [
+                for (final person in plannedChanges.people)
+                  profileDisplayName(t, store.personShown(person).name),
+              ]),
+            ),
+            body: t.changesNudgeBody,
+            public: t.changesNudgePublic,
+          );
     final signature = [
       for (final a in armed) '${a.alarm}|${a.title}|${a.body}',
       for (final (routine, occurrence) in done) 'done $routine@$occurrence',
       if (nudge != null) '${nudge.nudge}|${nudge.title}|${nudge.body}',
+      if (changes != null)
+        '${changes.nudge}|${changes.title}|${changes.body}|${changes.public}',
     ].join('\n');
     await _show(t, force: force);
     if (!force && signature == _lastArmed) return;
@@ -243,6 +284,7 @@ class AlarmSync extends ChangeNotifier {
       ),
       done: done,
       nudge: nudge,
+      changes: changes,
     );
   }
 
@@ -274,6 +316,7 @@ class AlarmSync extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     store.removeListener(_changed);
+    store.removeProfileListener(_changed);
     unawaited(_arrivals?.cancel());
     super.dispose();
   }

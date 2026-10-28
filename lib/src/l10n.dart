@@ -19,3 +19,11 @@ String wordlessTitle(AppLocalizations t, Wordless wordless) =>
       Wordless.photo => t.photo,
       Wordless.voiceRecording => t.voiceRecording,
     };
+
+/// [names] as a sentence lists them: "Bob", "Bob and Carol", "Bob, Carol
+/// and Dave".
+String namesText(AppLocalizations t, List<String> names) => switch (names) {
+  [] => '',
+  [final one] => one,
+  [...final head, final last] => t.namesAnd(head.join(', '), last),
+};

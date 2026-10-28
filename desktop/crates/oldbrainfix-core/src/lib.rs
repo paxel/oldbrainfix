@@ -17,6 +17,7 @@ pub mod blocks;
 pub mod box_keys;
 pub mod bundle;
 pub mod cards;
+pub mod changes_nudges;
 pub mod conflicts;
 pub mod discovery;
 pub mod entry;
@@ -55,7 +56,7 @@ pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
 pub use notes::{Blob, Importance, Note, Notes, Section, Wordless};
-pub use nudges::{PlannedNudge, QuietHours};
+pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};
 pub use overrides::PersonOverride;
 pub use pairing::PairedDevice;
 pub use pending::{

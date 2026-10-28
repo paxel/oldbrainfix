@@ -186,6 +186,9 @@ struct Shell {
     reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
+    /// Raised by a click on the Changes Nudge, for the window to save the
+    /// bundles.
+    changes_wanted: Arc<AtomicBool>,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
 }
@@ -225,6 +228,7 @@ impl Shell {
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
+        app.set_changes_wanted(self.changes_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
@@ -408,10 +412,12 @@ fn run() -> Result<i32, String> {
     // The alarm layer, on its own thread for as long as the app runs.
     let (events_tx, events_rx) = std::sync::mpsc::channel::<Event>();
     let changes = Arc::new(AtomicU64::new(0));
+    let changes_wanted = Arc::new(AtomicBool::new(false));
     {
         let store = store.clone();
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
+        alerts.set_changes_wanted(changes_wanted.clone());
         let open = command_tx.clone();
         let wake_window = waker(&window);
         std::thread::spawn(move || {
@@ -604,6 +610,7 @@ fn run() -> Result<i32, String> {
         reader,
         speech,
         folder_wanted,
+        changes_wanted,
         handed,
     };
     // A login start stays in the tray; without one it shows the window.

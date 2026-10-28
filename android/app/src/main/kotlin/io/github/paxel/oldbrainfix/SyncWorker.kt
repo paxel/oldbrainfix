@@ -94,7 +94,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
         MethodChannel(messenger, ALARM_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 // Nothing was tapped to open: there is no screen.
-                "nudgeOpened", "unsortedOpened" -> result.success(false)
+                "nudgeOpened", "changesOpened", "unsortedOpened" -> result.success(false)
                 else -> if (!AlarmChannel.handle(context, call, result)) result.notImplemented()
             }
         }

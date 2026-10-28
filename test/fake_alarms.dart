@@ -48,15 +48,20 @@ class FakeAlarms implements AlarmPlatform {
   /// The Nudge armed last; null when none was.
   ArmedNudge? nudge;
 
+  /// The Changes Nudge armed last; null when none was.
+  ArmedChangesNudge? changes;
+
   @override
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
+    ArmedChangesNudge? changes,
   }) async {
     armed = alarms;
     this.nudge = nudge;
+    this.changes = changes;
     this.labels = labels;
     this.done = [for (final (r, o) in done) '$r@${o.key}'];
     arms++;
@@ -122,6 +127,21 @@ class FakeAlarms implements AlarmPlatform {
   Future<bool> nudgeOpened() async {
     final tapped = _nudgeTapped;
     _nudgeTapped = false;
+    return tapped;
+  }
+
+  var _changesTapped = false;
+
+  /// The Changes Nudge's notification is tapped while the app runs.
+  void tapChanges() {
+    _changesTapped = true;
+    _actions.add(null);
+  }
+
+  @override
+  Future<bool> changesOpened() async {
+    final tapped = _changesTapped;
+    _changesTapped = false;
     return tapped;
   }
 

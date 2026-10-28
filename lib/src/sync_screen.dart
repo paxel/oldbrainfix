@@ -371,7 +371,7 @@ class _SyncScreenState extends State<SyncScreen> {
       await writeBundle(store, path, forDevice: device);
       final shared = await bundles.share(path);
       if (!mounted) return;
-      if (!shared) _announce(t.bundleNoApp);
+      if (shared == ShareOutcome.noApp) _announce(t.bundleNoApp);
     } on Object {
       if (!mounted) return;
       _announce(t.bundleFailed);

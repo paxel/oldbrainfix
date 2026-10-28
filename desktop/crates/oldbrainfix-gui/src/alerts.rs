@@ -2,25 +2,30 @@
 //! with the core's alarm plan, done while the app runs, also with the
 //! window closed into the tray. Every tick shows what came due since the
 //! last one as a notification (an Occurrence, its Re-nags, a snooze, the
-//! Nudge), escalated ones urgent and with sound, and closes the
-//! notifications of Occurrences Done meanwhile. What became Missed while
-//! the app was not running is told in one Catch-up Notification, never
-//! rung late. Done and the snoozes tapped on a notification come back as
-//! [`Tap`]s and are applied to the log. Quiet Hours only hold back the
-//! Nudge; with alerts off on this Device nothing shows (ADR 0008).
+//! Nudge, the Changes Nudge), escalated ones urgent and with sound, and
+//! closes the notifications of Occurrences Done meanwhile, and the
+//! Changes Nudge's once nobody waits. What became Missed while the app
+//! was not running is told in one Catch-up Notification, never rung
+//! late. Done and the snoozes tapped on a notification come back as
+//! [`Tap`]s and are applied to the log; a click on the Changes Nudge asks
+//! the window to send each person waiting their bundle (#109). Quiet
+//! Hours only hold back the Nudge and the Changes Nudge; with alerts off
+//! on this Device nothing shows (ADR 0008).
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 
 use chrono::{DateTime, Duration, Utc};
 use oldbrainfix_core::alarms::{PlannedAlarm, alarm_plan};
 use oldbrainfix_core::{
-    Alarms, DeviceSettings, Occurrence, PlannedNudge, Routines, Store, WallClock,
+    Alarms, DeviceSettings, Occurrence, PlannedChangesNudge, PlannedNudge, Routines, Store,
+    WallClock,
 };
 
-use crate::l10n::{L10n, wordless};
+use crate::l10n::{L10n, names_text, wordless};
+use crate::profile_view::display_name;
 use crate::schedule_text::occurrence_time;
 
 /// An alarm that came due this long before a tick still shows; older
@@ -38,7 +43,8 @@ pub fn longest_wait() -> Duration {
 /// the same key.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
-    /// `routine:…@2026-10-25T08:00`, [`NUDGE_KEY`] or [`CATCH_UP_KEY`].
+    /// `routine:…@2026-10-25T08:00`, [`NUDGE_KEY`], [`CHANGES_KEY`] or
+    /// [`CATCH_UP_KEY`].
     pub key: String,
     pub title: String,
     pub body: String,
@@ -50,6 +56,8 @@ pub struct Notice {
 }
 
 pub const NUDGE_KEY: &str = "nudge";
+/// The Changes Nudge's (#109).
+pub const CHANGES_KEY: &str = "changes";
 pub const CATCH_UP_KEY: &str = "catch-up";
 
 /// The ids of a notification's buttons; [`OPEN`] is a click on the
@@ -163,6 +171,9 @@ pub struct Alerts {
     changed: Arc<AtomicU64>,
     /// Asked for by a click on a notification: the window is to open.
     pub open_requested: bool,
+    /// Raised by a click on the Changes Nudge: the window is to send each
+    /// person waiting their bundle.
+    changes_wanted: Arc<AtomicBool>,
 }
 
 impl Alerts {
@@ -174,12 +185,24 @@ impl Alerts {
             shown: BTreeSet::new(),
             changed,
             open_requested: false,
+            changes_wanted: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Raises `wanted` when the Changes Nudge is clicked, for the window
+    /// to send the bundles ([`crate::App::set_changes_wanted`]).
+    pub fn set_changes_wanted(&mut self, wanted: Arc<AtomicBool>) {
+        self.changes_wanted = wanted;
     }
 
     /// Applies one tap to the log and this Device's snoozes.
     pub fn apply(&mut self, store: &Store, tap: &Tap) -> oldbrainfix_core::Result<()> {
         if tap.action == OPEN {
+            // The Changes Nudge stays until the bundles went: a save
+            // dialog cancelled keeps it for that person.
+            if tap.key == CHANGES_KEY {
+                self.changes_wanted.store(true, Ordering::SeqCst);
+            }
             self.open_requested = true;
             return Ok(());
         }
@@ -230,6 +253,7 @@ impl Alerts {
         let alarms = Alarms::new(store);
         let plan = alarms.plan(wall)?;
         let nudge = alarms.nudge(wall)?;
+        let changes = alarms.changes_nudge(wall)?;
         let fired = settings.last_fired()?;
         // After a start, or a sleep of the computer while running.
         let slept = last.filter(|l| now - *l > longest_wait() * 4);
@@ -253,13 +277,22 @@ impl Alerts {
             self.show_nudge(nudge);
             showed = true;
         }
-        self.close_settled(store, wall, nudge.is_none())?;
+        if let Some(changes) = &changes
+            && changes.fires_after(after, wall) <= now
+        {
+            self.show_changes(store, changes)?;
+            showed = true;
+        }
+        self.close_settled(store, wall, nudge.is_none(), changes.is_none())?;
         if showed || first || fired.is_none_or(|f| now - f >= Duration::minutes(5)) {
             settings.set_last_fired(now)?;
         }
         let mut next = next(&plan, now).unwrap_or(now + longest_wait());
         if let Some(nudge) = &nudge {
             next = next.min(nudge.fires_after(now, wall));
+        }
+        if let Some(changes) = &changes {
+            next = next.min(changes.fires_after(now, wall));
         }
         Ok(next.min(now + longest_wait()))
     }
@@ -349,13 +382,39 @@ impl Alerts {
         self.shown.insert(NUDGE_KEY.into());
     }
 
-    /// Closes the notifications of Occurrences Done meanwhile, and the
-    /// Nudge's once nothing is Unsorted.
+    /// The Changes Nudge, naming the people waiting: "Changes for Bob and
+    /// Carol".
+    fn show_changes(
+        &mut self,
+        store: &Store,
+        changes: &PlannedChangesNudge,
+    ) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let mut names = Vec::new();
+        for person in &changes.people {
+            let shown = store.person_shown(person)?;
+            names.push(display_name(&t, &shown.name).to_string());
+        }
+        self.notifier.show(&Notice {
+            key: CHANGES_KEY.into(),
+            title: t.changes_nudge_title(&names_text(&t, &names)),
+            body: t.changes_nudge_body().into(),
+            urgent: false,
+            actions: vec![(OPEN.into(), t.send_action().into())],
+        });
+        self.shown.insert(CHANGES_KEY.into());
+        Ok(())
+    }
+
+    /// Closes the notifications of Occurrences Done meanwhile, the
+    /// Nudge's once nothing is Unsorted and the Changes Nudge's once
+    /// nobody waits.
     fn close_settled(
         &mut self,
         store: &Store,
         wall: &WallClock,
         sorted: bool,
+        sent: bool,
     ) -> oldbrainfix_core::Result<()> {
         let done: BTreeSet<String> = Alarms::new(store)
             .recently_done(wall)?
@@ -365,7 +424,9 @@ impl Alerts {
         let settled: Vec<String> = self
             .shown
             .iter()
-            .filter(|k| done.contains(*k) || (sorted && *k == NUDGE_KEY))
+            .filter(|k| {
+                done.contains(*k) || (sorted && *k == NUDGE_KEY) || (sent && *k == CHANGES_KEY)
+            })
             .cloned()
             .collect();
         for key in settled {

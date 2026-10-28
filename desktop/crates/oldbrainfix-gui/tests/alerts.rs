@@ -1,19 +1,23 @@
 //! The desktop's alarm layer over the Dart core's `routines` fixture
 //! log, on a European wall clock and a clock the test moves: what shows
 //! when, Re-nag, Escalation, the Nudge in and out of Quiet Hours, Done and
-//! Snooze from a notification, alerts off, and the one Catch-up
-//! Notification after the app was not running.
+//! Snooze from a notification, alerts off, the one Catch-up
+//! Notification after the app was not running, and the Changes Nudge for
+//! a person synced by bundles (#109).
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Occurrence, Routines, SigningKey, Store, WireEntry,
+    AreaRole, ClockTime, Day, DeviceSettings, Notes, Occurrence, OwnProfile, Places, Routines,
+    SigningKey, Store, WireEntry,
 };
 use oldbrainfix_gui::alerts::{
-    Alerts, CATCH_UP_KEY, DONE, NUDGE_KEY, Notice, SNOOZE_10, Tap, occurrence_key,
+    Alerts, CATCH_UP_KEY, CHANGES_KEY, DONE, NUDGE_KEY, Notice, OPEN, SNOOZE_10, Tap,
+    occurrence_key,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::notify::{Recorded, RecordingNotifier};
@@ -249,6 +253,138 @@ fn what_was_missed_while_not_running_is_told_once() -> TestResult {
         self::shown(&record.take())
             .iter()
             .all(|n| n.key != CATCH_UP_KEY)
+    );
+    Ok(())
+}
+
+/// Ann on the clock the test sets, who shared her Household with Ben by
+/// bundles: her store, the clock, Ben's Profile id and the Area's id.
+fn shared_by_bundles() -> Result<(Store, Clock, String, String), Box<dyn std::error::Error>> {
+    let clock = Clock(Arc::new(AtomicI64::new(0)));
+    clock.set("2026-10-26T09:00:00.000Z")?;
+    let read = clock.0.clone();
+    let ann = Store::in_memory(
+        Box::new(move || {
+            Utc.timestamp_millis_opt(read.load(Ordering::SeqCst))
+                .single()
+                .unwrap_or_default()
+        }),
+        || Ok(SigningKey::from_seed([1; 32])),
+    )?;
+    OwnProfile::new(&ann).apply_defaults("Device", None)?;
+    OwnProfile::new(&ann).rename("Ann")?;
+    let then = oldbrainfix_core::parse_time("2026-10-26T08:00:00.000Z")?;
+    let ben = Store::in_memory(Box::new(move || then), || {
+        Ok(SigningKey::from_seed([2; 32]))
+    })?;
+    OwnProfile::new(&ben).apply_defaults("Device", None)?;
+    OwnProfile::new(&ben).rename("Ben")?;
+    ann.open_profile_card(&ben.profile_card(false)?.ok_or("his card")?, false)?;
+    let ben_id = OwnProfile::new(&ben).get()?.ok_or("his Profile")?.id;
+    let house = Places::new(&ann).add_area("Household")?;
+    let shared = ann.share_area_with(&house.id, &ben_id, AreaRole::Member, Transport::Bundle)?;
+    Ok((ann, clock, ben_id, shared))
+}
+
+#[test]
+fn the_changes_nudge_names_who_waits_and_closes_once_sent() -> TestResult {
+    let (ann, clock, ben, house) = shared_by_bundles()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let wanted = Arc::new(AtomicBool::new(false));
+    alerts.set_changes_wanted(wanted.clone());
+    // The offer carried the history: nobody waits yet.
+    clock.set("2026-10-26T10:00:00.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != CHANGES_KEY));
+    // A Note in the shared Area at 11:00 in Europe: due 30 minutes on.
+    Notes::new(&ann).capture("Buy milk", Some(&house), None)?;
+    clock.set("2026-10-26T10:10:00.000Z")?;
+    let next = alerts.tick(&ann, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != CHANGES_KEY));
+    assert!(next <= oldbrainfix_core::parse_time("2026-10-26T10:30:00.000Z")?);
+    clock.set("2026-10-26T10:30:05.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    let record_now = record.take();
+    let notice = shown(&record_now)
+        .into_iter()
+        .find(|n| n.key == CHANGES_KEY)
+        .cloned()
+        .ok_or("the Changes Nudge")?;
+    assert_eq!(notice.title, "Changes for Ben");
+    assert_eq!(notice.body, "Click to send them.");
+    assert_eq!(notice.actions, [(OPEN.to_string(), "Send".to_string())]);
+    assert!(!notice.urgent);
+
+    // A click asks the window to send the bundles and keeps it.
+    let at = clock.set("2026-10-26T10:31:00.000Z")?;
+    alerts.apply(
+        &ann,
+        &Tap {
+            key: CHANGES_KEY.into(),
+            action: OPEN.into(),
+            at,
+        },
+    )?;
+    assert!(wanted.load(Ordering::SeqCst));
+    assert!(alerts.open_requested);
+    alerts.tick(&ann, &berlin)?;
+    assert!(
+        !record
+            .take()
+            .iter()
+            .any(|r| matches!(r, Recorded::Closed(k) if k == CHANGES_KEY))
+    );
+
+    // Sent: nobody waits, the notification closes.
+    ann.note_changes_sent(&ben, ann.current_seq()?)?;
+    clock.set("2026-10-26T10:31:30.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    let closed = record.take();
+    assert!(
+        closed
+            .iter()
+            .any(|r| matches!(r, Recorded::Closed(k) if k == CHANGES_KEY))
+    );
+    assert!(shown(&closed).iter().all(|n| n.key != CHANGES_KEY));
+    Ok(())
+}
+
+#[test]
+fn the_changes_nudge_waits_out_quiet_hours_and_speaks_german() -> TestResult {
+    let (ann, clock, _ben, house) = shared_by_bundles()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = Alerts::new(
+        Box::new(record.clone()),
+        L10n::new("de"),
+        Arc::new(AtomicU64::new(0)),
+    );
+    // A Note at 23:00 in Europe, within the Quiet Hours.
+    clock.set("2026-10-26T22:00:00.000Z")?;
+    Notes::new(&ann).capture("Buy milk", Some(&house), None)?;
+    clock.set("2026-10-26T22:40:00.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    assert!(shown(&record.take()).iter().all(|n| n.key != CHANGES_KEY));
+    // They end at 08:00: it comes then.
+    clock.set("2026-10-27T07:00:10.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    let record_now = record.take();
+    let notice = shown(&record_now)
+        .into_iter()
+        .find(|n| n.key == CHANGES_KEY)
+        .cloned()
+        .ok_or("the Changes Nudge")?;
+    assert_eq!(notice.title, "Änderungen für Ben");
+    assert_eq!(notice.body, "Klicke, um sie zu schicken.");
+    // With alerts off it closes and shows nothing.
+    DeviceSettings::new(&ann).set_alerts_on(false)?;
+    clock.set("2026-10-27T09:00:10.000Z")?;
+    alerts.tick(&ann, &berlin)?;
+    let off = record.take();
+    assert!(shown(&off).is_empty());
+    assert!(
+        off.iter()
+            .any(|r| matches!(r, Recorded::Closed(k) if k == CHANGES_KEY))
     );
     Ok(())
 }

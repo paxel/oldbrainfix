@@ -208,5 +208,9 @@
   "shareAfarSaveTitle": "Save the shared Area to send",
   "@shareAfarSaveTitle": {"description": "Title of the desktop's save dialog for the file that shares an Area with a person not nearby."},
   "personSendChangesTitle": "Save the changes to send",
-  "@personSendChangesTitle": {"description": "Title of the desktop's save dialog after 'Send changes to …' on a person's Profile."}
+  "@personSendChangesTitle": {"description": "Title of the desktop's save dialog after 'Send changes to …' on a person's Profile."},
+  "changesNudgeBody": "Click to send them.",
+  "@changesNudgeBody": {"description": "Desktop wording of the phone's text."},
+  "changesSaveTitle": "Save the changes for {name} to send",
+  "@changesSaveTitle": {"description": "Title of the desktop's save dialog for each person after a click on the Changes Nudge.", "placeholders": {"name": {"type": "String"}}}
 }

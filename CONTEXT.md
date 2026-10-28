@@ -64,7 +64,7 @@ The reminder that Unsorted Notes are waiting. Its time is chosen at Capture (10 
 _Avoid_: reminder (that is a different thing), nag (that is Re-nag)
 
 **Quiet Hours**:
-A daily window in which Nudges wait. Routines and Reminders are not affected.
+A daily window in which Nudges and the Changes Nudge wait. Routines and Reminders are not affected.
 
 **Starter Set**:
 The Areas and Topics offered on first start; the user picks which ones to keep.
@@ -124,6 +124,10 @@ Introducing two Devices, or a person, to each other in person or by code, which 
 
 **Shared Area**:
 An Area that other people sync with. Everything outside it stays private. It is shared in person by Pairing, or from afar with a person in People through an offer file the person accepts or declines; changes then travel by a shared folder or by bundles.
+
+**Changes Nudge**:
+The notice that people synced by bundles lack changes, such as "Changes for Bob and Carol". It comes 30 minutes after the first change no bundle for them carried yet, one for everyone waiting, and repeats as the Nudge does until a bundle went to each of them. Opening it sends each person their bundle.
+_Avoid_: reminder (that is a different thing), sync reminder
 
 **Manager**:
 A person who may do everything in a Shared Area.

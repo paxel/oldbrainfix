@@ -6,6 +6,7 @@ library;
 
 import 'dart:convert';
 
+import 'changes_nudges.dart';
 import 'device_settings.dart';
 import 'notes.dart';
 import 'nudges.dart';
@@ -419,6 +420,18 @@ class Alarms {
   PlannedNudge? nudge(WallClock wallClock) => nudgePlan(
     unsorted: Notes(store).unsorted(),
     snooze: nudgeSnooze,
+    now: store.clock(),
+    wallClock: wallClock,
+    repeat: store.nudgeRepeat,
+    quiet: store.quietHoursOn ? store.quietHours : null,
+  );
+
+  /// The Changes Nudge at the store's now (#109): the people changes
+  /// travel with by bundles who lack some ([ChangesNudges.waitingForChanges]),
+  /// with the Nudge's repeat interval and Quiet Hours; null when nobody
+  /// waits.
+  PlannedChangesNudge? changesNudge(WallClock wallClock) => changesNudgePlan(
+    waiting: store.waitingForChanges(),
     now: store.clock(),
     wallClock: wallClock,
     repeat: store.nudgeRepeat,

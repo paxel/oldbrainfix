@@ -27,22 +27,33 @@ object Scheduler {
     private const val KEY_LAST_FIRED = "lastFired"
     private const val KEY_LAST_ARMED = "lastArmed"
     private const val KEY_NUDGE = "nudge"
+    private const val KEY_CHANGES = "changes"
 
     const val EXTRA_ARMED = "oldbrainfix.armed"
 
     /**
-     * Keeps [plan], the [nudge] and the notification [labels], and arms
-     * them. The notifications of what is [done] go away, and so does a
-     * full-screen alarm the plan no longer escalates, and the Nudge's
-     * once nothing is Unsorted.
+     * Keeps [plan], the [nudge], the Changes Nudge [changes] and the
+     * notification [labels], and arms them. The notifications of what is
+     * [done] go away, and so does a full-screen alarm the plan no longer
+     * escalates, the Nudge's once nothing is Unsorted, and the Changes
+     * Nudge's once nobody waits for changes.
      */
-    fun replace(context: Context, plan: JSONArray, labels: JSONObject, done: JSONArray, nudge: JSONObject?) {
+    fun replace(
+        context: Context,
+        plan: JSONArray,
+        labels: JSONObject,
+        done: JSONArray,
+        nudge: JSONObject?,
+        changes: JSONObject? = null,
+    ) {
         val edit = prefs(context).edit()
             .putString(KEY_PLAN, plan.toString())
             .putString(KEY_LABELS, labels.toString())
         if (nudge == null) edit.remove(KEY_NUDGE) else edit.putString(KEY_NUDGE, nudge.toString())
+        if (changes == null) edit.remove(KEY_CHANGES) else edit.putString(KEY_CHANGES, changes.toString())
         edit.commit()
         if (nudge == null) Notifications.cancelNudge(context)
+        if (changes == null) Notifications.cancelChangesNudge(context)
         arm(context)
         RingService.ringing?.let { ringing ->
             if (!AlarmPlan.keepsRinging(alarms(context), ringing.routine, ringing.occurrence)) {
@@ -76,6 +87,16 @@ object Scheduler {
     }
 
     /**
+     * The Changes Nudge (#109) and its text for the lock screen; null
+     * while nobody waits for changes. It has no snooze, so the Nudge's
+     * snoozes queued meanwhile do not touch it.
+     */
+    private fun changes(context: Context): Pair<Nudge, String>? {
+        val json = JSONObject(prefs(context).getString(KEY_CHANGES, null) ?: return null)
+        return nudge(json) to json.optString("public")
+    }
+
+    /**
      * After the phone was off (or its clock jumped ahead): what became
      * Missed meanwhile is told in one Catch-up Notification, not rung
      * late, and the next alarm is armed.
@@ -103,6 +124,7 @@ object Scheduler {
         val next = listOfNotNull(
             AlarmPlan.next(alarms(context), zone, lastFired, now),
             nudge(context)?.let { NudgePlan.next(it, zone, lastFired, now) },
+            changes(context)?.let { (changes, _) -> NudgePlan.next(changes, zone, lastFired, now) },
         ).minOrNull()
         if (next == null) {
             manager.cancel(fire(context, null))
@@ -134,6 +156,9 @@ object Scheduler {
             Notifications.show(context, alarm, urgent = AlarmPlan.escalates(alarm, zone, now))
         }
         nudge(context)?.let { if (NudgePlan.due(it, zone, armed, lastFired, now)) Notifications.showNudge(context, it) }
+        changes(context)?.let { (changes, public) ->
+            if (NudgePlan.due(changes, zone, armed, lastFired, now)) Notifications.showChangesNudge(context, changes, public)
+        }
         prefs(context).edit().putLong(KEY_LAST_FIRED, now).commit()
         arm(context)
     }

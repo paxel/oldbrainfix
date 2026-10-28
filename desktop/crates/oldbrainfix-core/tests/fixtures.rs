@@ -3136,7 +3136,14 @@ fn offer_device(
 /// `_offerSettings`.
 fn offer_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
     let mut out = Vec::new();
-    for prefix in ["areakey:", "key:", "person:", "profile", "transport:"] {
+    for prefix in [
+        "areakey:",
+        "changesSent:",
+        "key:",
+        "person:",
+        "profile",
+        "transport:",
+    ] {
         for (key, value) in store.local_settings_with_prefix(prefix)? {
             out.push(json!([key, value]));
         }

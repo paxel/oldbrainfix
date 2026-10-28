@@ -2988,4 +2988,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personSendChangesDetail => 'As a file through any messenger.';
+
+  @override
+  String changesNudgeTitle(String names) {
+    return 'Changes for $names';
+  }
+
+  @override
+  String get changesNudgeBody => 'Tap to send them.';
+
+  @override
+  String get changesNudgePublic => 'Changes are waiting to be sent';
+
+  @override
+  String namesAnd(String first, String last) {
+    return '$first and $last';
+  }
 }

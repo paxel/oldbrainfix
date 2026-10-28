@@ -11,7 +11,9 @@ use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, TimeZone, Utc};
 
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Note, Notes, Wordless};
-use crate::nudges::{NudgeSnooze, PlannedNudge, nudge_plan};
+use crate::nudges::{
+    NudgeSnooze, PlannedChangesNudge, PlannedNudge, changes_nudge_plan, nudge_plan,
+};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Occurrence, WallClock};
 use crate::settings::DeviceSettings;
@@ -460,6 +462,26 @@ impl<'a> Alarms<'a> {
         nudge_plan(
             &Notes::new(self.store).unsorted()?,
             self.nudge_snooze()?,
+            self.store.now(),
+            wall,
+            settings.nudge_repeat()?,
+            quiet,
+        )
+    }
+
+    /// The Changes Nudge at the store's now (#109): the people changes
+    /// travel with by bundles who lack some
+    /// ([`Store::waiting_for_changes`]), with the Nudge's repeat interval
+    /// and Quiet Hours; `None` when nobody waits.
+    pub fn changes_nudge(&self, wall: &WallClock) -> Result<Option<PlannedChangesNudge>> {
+        let settings = DeviceSettings::new(self.store);
+        let quiet = if settings.quiet_hours_on()? {
+            Some(settings.quiet_hours()?)
+        } else {
+            None
+        };
+        changes_nudge_plan(
+            &self.store.waiting_for_changes()?,
             self.store.now(),
             wall,
             settings.nudge_repeat()?,

@@ -302,6 +302,7 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                       child: PersonScope(
                                         store: widget.store,
                                         platform: widget.profile,
+                                        onChangesSent: _alarms.replan,
                                         child: child ?? const SizedBox.shrink(),
                                       ),
                                     ),
@@ -471,7 +472,11 @@ class _HomeState extends State<_Home> {
   /// The Nudge screen and the Unsorted list, asked for while locked, and
   /// Conflicts a sync brought meanwhile.
   var _nudgeWaiting = false;
+  var _changesWaiting = false;
   var _unsortedWaiting = false;
+
+  /// Whether the bundles of the Changes Nudge are going out now.
+  var _sendingChanges = false;
   var _conflictsWaiting = false;
 
   late final StreamSubscription<void> _bundlesOpened;
@@ -497,6 +502,7 @@ class _HomeState extends State<_Home> {
     widget.profile.addListener(_profileMade);
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
+    widget.alarms.addListener(_changesOpened);
     widget.alarms.addListener(_unsortedOpened);
     widget.lock.addListener(_lockChanged);
     widget.speech.addListener(_speechChanged);
@@ -601,6 +607,7 @@ class _HomeState extends State<_Home> {
   void dispose() {
     widget.alarms.removeListener(_ringChanged);
     widget.alarms.removeListener(_nudgeOpened);
+    widget.alarms.removeListener(_changesOpened);
     widget.alarms.removeListener(_unsortedOpened);
     widget.lock.removeListener(_lockChanged);
     widget.speech.removeListener(_speechChanged);
@@ -697,6 +704,7 @@ class _HomeState extends State<_Home> {
       return;
     }
     if (_nudgeWaiting) _openNudge();
+    if (_changesWaiting) unawaited(_sendWaitingChanges());
     if (_conflictsWaiting) _announceConflicts();
     if (_openedWaiting.isNotEmpty) unawaited(_importOpened());
     if (_cardsWaiting.isNotEmpty) unawaited(_openCards());
@@ -753,6 +761,41 @@ class _HomeState extends State<_Home> {
         ),
       ),
     );
+  }
+
+  /// Sends the waiting changes when the Changes Nudge's notification was
+  /// tapped (#109); behind the App Lock they wait for the unlock.
+  void _changesOpened() {
+    if (!mounted || !widget.alarms.takeChangesOpened()) return;
+    if (widget.lock.locked) {
+      _changesWaiting = true;
+      return;
+    }
+    unawaited(_sendWaitingChanges());
+  }
+
+  /// Offers each person the Changes Nudge covers their bundle, one share
+  /// sheet after another; a sheet left without an app passes to the next
+  /// person and keeps the Changes Nudge for that one.
+  Future<void> _sendWaitingChanges() async {
+    _changesWaiting = false;
+    if (_sendingChanges) return;
+    _sendingChanges = true;
+    try {
+      for (final person in widget.alarms.changesWaiting) {
+        if (!mounted) return;
+        await sendChanges(
+          store: widget.store,
+          bundles: widget.bundles,
+          t: context.t,
+          announcements: AnnouncementsScope.of(context),
+          person: person,
+          onSent: widget.alarms.replan,
+        );
+      }
+    } finally {
+      _sendingChanges = false;
+    }
   }
 
   /// Opens the Unsorted list when the Agenda widget's Unsorted count

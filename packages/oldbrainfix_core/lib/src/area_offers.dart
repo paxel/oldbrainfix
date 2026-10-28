@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'area_keys.dart';
 import 'box_keys.dart';
+import 'changes_nudges.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
 import 'notes.dart';
@@ -259,10 +260,11 @@ List<String> offerDevices(Store store, String person) => [
 /// "Share with…" (#108): shares the Area [areaId] as [SharedAreas.share]
 /// does, grants [person] [role] on every Device of theirs an offer can be
 /// sealed for ([offerDevices]), and keeps [transport] as how changes
-/// travel with them. Returns the id the Area goes on under; the offer
-/// itself is written by `writeAreaOffer`. Throws a [StateError], changing
-/// nothing, for the own Profile, a blocked person, or one none of whose
-/// Devices' keys is known here.
+/// travel with them; the history counts as sent to them (ADR 0024).
+/// Returns the id the Area goes on under; the offer itself is written by
+/// `writeAreaOffer`. Throws a [StateError], changing nothing, for the own
+/// Profile, a blocked person, or one none of whose Devices' keys is known
+/// here.
 String shareAreaWith(
   Store store,
   String areaId,
@@ -283,6 +285,8 @@ String shareAreaWith(
     }
   });
   store.setTransportWith(id, transport);
+  // The offer carries the Area's history: none of it waits for a bundle.
+  store.noteAreaSent(id, area, store.currentSeq());
   return area;
 }
 
@@ -304,15 +308,16 @@ List<Uint8List> offerKeys(Store store, String areaId, String person) {
 /// Changes travel with each person as the user chose when sharing with
 /// them (#108): a local setting of this Device by Profile id (ADR 0008).
 extension Transports on Store {
-  static const _prefix = 'transport:';
+  /// The local setting's key before the Profile id.
+  static const prefix = 'transport:';
 
   /// How changes travel with [person], or null when the user was never
   /// asked.
   Transport? transportWith(String person) => Transport.values
-      .asNameMap()[localSetting('$_prefix${resolvePerson(person)}')];
+      .asNameMap()[localSetting('$prefix${resolvePerson(person)}')];
 
   void setTransportWith(String person, Transport transport) =>
-      setLocalSetting('$_prefix${resolvePerson(person)}', transport.name);
+      setLocalSetting('$prefix${resolvePerson(person)}', transport.name);
 }
 
 // ------------------------------------------------------------ receiving
@@ -469,7 +474,8 @@ HeldAreaOffer? heldAreaOffer(Store store, String id) {
 /// Accepts the offered Area held as [id]: the Area's key is kept, then
 /// its history taken in as any import is ([PendingChanges.acceptPending]),
 /// its keys pinned, with a Moment before it; then the Profiles its
-/// grants name and how changes travel with the sharer are kept. With [verified] the
+/// grants name and how changes travel with the sharer are kept, and the
+/// history counts as sent to the sharer (ADR 0024). With [verified] the
 /// sharer's Profile is marked verified, as for a Sent Item (#51). Returns
 /// the Area's id. Throws a [StateError] when the set is gone,
 /// [AreaOfferFromBlocked] for one from a person blocked since, which is
@@ -506,6 +512,8 @@ String acceptAreaOffer(Store store, String id, {bool verified = false}) {
   ], allowed: store.peopleOf(offer.area));
   if (verified) store.verifyPerson(sender.profile.id, sender.code);
   store.setTransportWith(sender.profile.id, offer.transport);
+  // The sharer holds the history taken in: none of it waits for a bundle.
+  store.noteAreaSent(sender.profile.id, offer.area, store.currentSeq());
   store.momentFor(
     before: before,
     changed: accepted.taken.isNotEmpty,

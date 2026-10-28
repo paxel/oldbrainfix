@@ -29,6 +29,9 @@ object Notifications {
     /** The one notification of the Nudge, and the request code opening the Nudge screen. */
     private val NUDGE_ID = "nudge".hashCode()
 
+    /** The one notification of the Changes Nudge, and the request code sending the changes. */
+    private val CHANGES_ID = "changes".hashCode()
+
     /** The notification of the full-screen alarm ringing. */
     val RING_ID = "ringing".hashCode()
 
@@ -178,6 +181,54 @@ object Notifications {
 
     fun cancelNudge(context: Context) =
         context.getSystemService(NotificationManager::class.java).cancel(NUDGE_ID)
+
+    /**
+     * The Changes Nudge (#109): "Changes for Bob and Carol", on the
+     * Nudge's channel. Tapping it opens the app, which offers each of them
+     * their bundle; it has no snooze. The lock screen shows [public],
+     * without the names. A later one replaces it.
+     */
+    fun showChangesNudge(context: Context, nudge: Nudge, public: String) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        fun builder(): Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(NUDGE_CHANNEL, Scheduler.label(context, "nudgeChannel"), NotificationManager.IMPORTANCE_DEFAULT),
+            )
+            Notification.Builder(context, NUDGE_CHANNEL)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(context).setDefaults(Notification.DEFAULT_ALL)
+        }
+        val send = PendingIntent.getActivity(
+            context, CHANGES_ID,
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_CHANGES, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        manager.notify(
+            CHANGES_ID,
+            builder()
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(nudge.title)
+                .setContentText(nudge.body)
+                .setCategory(Notification.CATEGORY_REMINDER)
+                // The names stay off the lock screen.
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+                .setPublicVersion(
+                    builder()
+                        .setSmallIcon(R.drawable.ic_notification)
+                        .setContentTitle(public)
+                        .build(),
+                )
+                .setAutoCancel(true)
+                .setContentIntent(send)
+                .build(),
+        )
+    }
+
+    fun cancelChangesNudge(context: Context) =
+        context.getSystemService(NotificationManager::class.java).cancel(CHANGES_ID)
 
     fun cancel(context: Context, alarm: Alarm) =
         context.getSystemService(NotificationManager::class.java)

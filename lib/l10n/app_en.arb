@@ -1644,5 +1644,13 @@
   "personSendChanges": "Send changes to {name}",
   "@personSendChanges": {"description": "On a person's Profile page when changes travel with them by files: shares a bundle of the Shared Areas.", "placeholders": {"name": {"type": "String"}}},
   "personSendChangesDetail": "As a file through any messenger.",
-  "@personSendChangesDetail": {"description": "Under 'Send changes to …'."}
+  "@personSendChangesDetail": {"description": "Under 'Send changes to …'."},
+  "changesNudgeTitle": "Changes for {names}",
+  "@changesNudgeTitle": {"description": "The Changes Nudge's notification: people synced by bundles lack changes. names is a list such as 'Bob and Carol'.", "placeholders": {"names": {"type": "String"}}},
+  "changesNudgeBody": "Tap to send them.",
+  "@changesNudgeBody": {"description": "Under the Changes Nudge's title."},
+  "changesNudgePublic": "Changes are waiting to be sent",
+  "@changesNudgePublic": {"description": "The Changes Nudge on the lock screen, without the names."},
+  "namesAnd": "{first} and {last}",
+  "@namesAnd": {"description": "Joins a list of names: first holds all but the last, separated by commas.", "placeholders": {"first": {"type": "String"}, "last": {"type": "String"}}}
 }

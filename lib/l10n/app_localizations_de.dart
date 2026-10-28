@@ -3018,4 +3018,21 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get personSendChangesDetail =>
       'Als Datei über einen beliebigen Messenger.';
+
+  @override
+  String changesNudgeTitle(String names) {
+    return 'Änderungen für $names';
+  }
+
+  @override
+  String get changesNudgeBody => 'Tippe, um sie zu schicken.';
+
+  @override
+  String get changesNudgePublic =>
+      'Änderungen warten darauf, geschickt zu werden';
+
+  @override
+  String namesAnd(String first, String last) {
+    return '$first und $last';
+  }
 }

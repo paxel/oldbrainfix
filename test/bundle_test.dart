@@ -22,6 +22,9 @@ class FakeBundles implements BundlePlatform {
   final types = <String>[];
   var shares = true;
 
+  /// Whether the share sheet is left without picking an app.
+  var dismisses = false;
+
   /// What the picker answers; null backs out.
   String? picks;
   final waiting = <String>[];
@@ -36,10 +39,14 @@ class FakeBundles implements BundlePlatform {
   Future<String?> exportPath(String name) async => '${dir.path}/$name';
 
   @override
-  Future<bool> share(String path, {String type = bundleMimeType}) async {
+  Future<ShareOutcome> share(
+    String path, {
+    String type = bundleMimeType,
+  }) async {
     shared.add(path);
     types.add(type);
-    return shares;
+    if (!shares) return ShareOutcome.noApp;
+    return dismisses ? ShareOutcome.dismissed : ShareOutcome.taken;
   }
 
   @override

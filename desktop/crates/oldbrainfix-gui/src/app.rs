@@ -524,6 +524,9 @@ enum Action {
     /// Imports the bundle file dropped onto the window or handed over,
     /// or shows the preview of the Sent Item.
     OpenFile(std::path::PathBuf),
+    /// Saves a bundle for each person the Changes Nudge covers, one
+    /// after another, as its click asked (#109).
+    SendWaitingChanges,
     /// Asks whom the selected Note is sent to.
     StartSend,
     /// Saves the Note of the send dialog as a Sent Item.
@@ -704,6 +707,9 @@ pub struct App {
     /// Tells the folder thread to sync now; without one, the window
     /// syncs itself.
     folder_wanted: Option<Arc<AtomicBool>>,
+    /// Raised by a click on the Changes Nudge: the bundles of the people
+    /// waiting are to be saved (#109).
+    changes_wanted: Option<Arc<AtomicBool>>,
     /// Ask the system's dialogs where to save a bundle and which one to
     /// import.
     bundle_saver: FileSaver,
@@ -766,6 +772,28 @@ pub type FilesPicker = Box<dyn Fn(&str) -> Vec<std::path::PathBuf>>;
 /// Asks where to save a file, with the dialog's title and the name it
 /// proposes.
 pub type FileSaver = Box<dyn Fn(&str, &str) -> Option<std::path::PathBuf>>;
+
+/// The name a bundle for the person `person`, whose own Profile name is
+/// `name`, is proposed under on `day`: the day's bundle name with theirs
+/// in it, so the bundles for several people, saved one after another,
+/// never overwrite each other (the phone's `changesFileName`).
+fn changes_file_name(day: chrono::NaiveDate, person: &str, name: &str) -> String {
+    let part = |text: &str| {
+        text.split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .collect::<Vec<_>>()
+            .join("-")
+    };
+    let who = Some(part(name))
+        .filter(|w| !w.is_empty())
+        .unwrap_or_else(|| part(person));
+    let short: String = who.chars().take(32).collect();
+    let base = bundle::file_name(day);
+    match base.rsplit_once('.') {
+        Some((stem, ext)) => format!("{stem}-{short}.{ext}"),
+        None => base,
+    }
+}
 
 /// The dialogs' filter for bundle files, and Sent Items to open.
 fn bundle_dialog(title: &str) -> rfd::FileDialog {
@@ -868,6 +896,7 @@ impl App {
             arrived: 0,
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
+            changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
             }),
@@ -1452,30 +1481,72 @@ impl App {
             return Ok(());
         };
         let id = id.clone();
-        let t = self.t;
-        let shown = self.store.person_shown(&id)?;
-        let name = profile_view::display_name(&t, &shown.name).to_string();
-        if self.store.entries_for_person(&id)?.is_empty() {
-            self.notice = Some(t.bundle_nothing_new(&name));
+        let title = self.t.person_send_changes_title().to_string();
+        if let Some(said) = self.send_changes_to(&id, &title)? {
+            self.notice = Some(said);
+        }
+        Ok(())
+    }
+
+    /// After a click on the Changes Nudge (#109): a save dialog for each
+    /// person waiting, one after another, in the order the Changes Nudge
+    /// names them. A dialog cancelled skips that person, who keeps the
+    /// Changes Nudge.
+    fn send_waiting_changes(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(planned) = Alarms::new(&self.store).changes_nudge(&*self.wall)? else {
             return Ok(());
+        };
+        let mut said: Vec<String> = Vec::new();
+        for id in &planned.people {
+            let shown = self.store.person_shown(id)?;
+            let name = profile_view::display_name(&self.t, &shown.name).to_string();
+            let title = self.t.changes_save_title(&name);
+            if let Some(text) = self.send_changes_to(id, &title)?
+                && !said.contains(&text)
+            {
+                said.push(text);
+            }
+        }
+        if !said.is_empty() {
+            self.notice = Some(said.join("\n"));
+        }
+        Ok(())
+    }
+
+    /// Saves a bundle of what is new for the person `id` where the save
+    /// dialog titled `title` says, and only once it is saved counts the
+    /// changes up to the log's mark, read before writing, as sent to them
+    /// (#109). What to announce; `None` when the dialog was cancelled.
+    fn send_changes_to(
+        &mut self,
+        id: &str,
+        title: &str,
+    ) -> oldbrainfix_core::Result<Option<String>> {
+        let t = self.t;
+        let name = profile_view::display_name(&t, &self.store.person_shown(id)?.name).to_string();
+        if self.store.entries_for_person(id)?.is_empty() {
+            return Ok(Some(t.bundle_nothing_new(&name)));
         }
         let day = (self.wall)(self.store.now()).date();
-        let Some(mut path) =
-            (self.bundle_saver)(t.person_send_changes_title(), &bundle::file_name(day))
+        let theirs = self.store.person_theirs(id)?.name;
+        let Some(mut path) = (self.bundle_saver)(title, &changes_file_name(day, id, &theirs))
         else {
-            return Ok(());
+            return Ok(None);
         };
         if path.extension().is_none_or(|e| e != bundle::EXTENSION) {
             path.set_extension(bundle::EXTENSION);
         }
-        self.notice = Some(
-            match bundle::write_person_bundle_now(&self.store, &path, &id) {
-                Ok(Some(_)) => t.sent_saved().to_string(),
+        let seq = self.store.current_seq()?;
+        Ok(Some(
+            match bundle::write_person_bundle_now(&self.store, &path, id) {
+                Ok(Some(_)) => {
+                    self.store.note_changes_sent(id, seq)?;
+                    t.sent_saved().to_string()
+                }
                 Ok(None) => t.bundle_nothing_new(&name),
                 Err(e) => format!("{} ({e})", t.bundle_failed()),
             },
-        );
-        Ok(())
+        ))
     }
 
     /// Imports the bundle at `path` and announces what came in; one
@@ -1504,6 +1575,12 @@ impl App {
     /// Leaves folder syncs to the thread that `wanted` wakes.
     pub fn set_folder_wanted(&mut self, wanted: Arc<AtomicBool>) {
         self.folder_wanted = Some(wanted);
+    }
+
+    /// Saves the bundles of the people the Changes Nudge covers whenever
+    /// a click on it raised `wanted` (#109).
+    pub fn set_changes_wanted(&mut self, wanted: Arc<AtomicBool>) {
+        self.changes_wanted = Some(wanted);
     }
 
     /// Syncs through the shared folder now: on the folder thread, or here
@@ -2347,6 +2424,7 @@ impl App {
                 }
             }
             Action::OpenFile(path) => self.open_file(&path),
+            Action::SendWaitingChanges => self.send_waiting_changes()?,
             Action::Backup(asked) => self.backup(asked)?,
             Action::Profile(asked) => self.profile_action(asked)?,
             Action::OpenPerson(id) => self.open_person(id, SendBack::No)?,
@@ -2989,6 +3067,14 @@ impl App {
         {
             actions.extend(handed.drain(..).map(Action::OpenFile));
             // Nothing else stirs the window: what it opened shows at once.
+            ui.ctx().request_repaint();
+        }
+        if self
+            .changes_wanted
+            .as_ref()
+            .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
+        {
+            actions.push(Action::SendWaitingChanges);
             ui.ctx().request_repaint();
         }
         let files: Vec<(String, Vec<u8>)> = dropped
@@ -6787,6 +6873,21 @@ mod tests {
         );
         assert_eq!(area_colour(Some("nope")), None);
         assert_eq!(area_colour(None), None);
+    }
+
+    #[test]
+    fn a_bundle_for_a_person_is_named_after_them() {
+        let Some(day) = chrono::NaiveDate::from_ymd_opt(2026, 3, 4) else {
+            panic!("a valid date")
+        };
+        assert_eq!(
+            changes_file_name(day, "profile:1", "Ann-Marie Öz!"),
+            "oldbrainfix-2026-03-04-Ann-Marie-Öz.obfsync"
+        );
+        assert_eq!(
+            changes_file_name(day, "profile:1", " "),
+            "oldbrainfix-2026-03-04-profile-1.obfsync"
+        );
     }
 
     #[test]

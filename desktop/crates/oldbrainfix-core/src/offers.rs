@@ -48,7 +48,7 @@ const SEALED_AAD: &str = "oldbrainfix:area-offer";
 const KEY_AAD: &str = "oldbrainfix:area-offer-key";
 
 /// The local setting of how changes travel with a person.
-const TRANSPORT_PREFIX: &str = "transport:";
+pub const TRANSPORT_PREFIX: &str = "transport:";
 
 /// How the changes of a Shared Area travel with a person met from afar,
 /// asked once when sharing with them.
@@ -391,9 +391,10 @@ impl Store {
     /// "Share with…" (#108), as the Dart core's `shareAreaWith`: shares
     /// the Area `area`, grants `person` `role` on every Device of theirs
     /// an offer can be sealed for, and keeps `transport` as how changes
-    /// travel with them. Returns the id the Area goes on under. An error,
-    /// changing nothing, for the own Profile, a blocked person, or one
-    /// none of whose Devices' keys is known here.
+    /// travel with them; the history counts as sent to them (ADR 0024).
+    /// Returns the id the Area goes on under. An error, changing nothing,
+    /// for the own Profile, a blocked person, or one none of whose
+    /// Devices' keys is known here.
     pub fn share_area_with(
         &self,
         area: &str,
@@ -417,6 +418,9 @@ impl Store {
             Ok(())
         })?;
         self.set_transport_with(&id, transport)?;
+        // The offer carries the Area's history: none of it waits for a
+        // bundle.
+        self.note_area_sent(&id, &shared, self.current_seq()?)?;
         Ok(shared)
     }
 
@@ -541,7 +545,8 @@ impl Store {
     /// Accepts the offered Area held as `id`, as the Dart core's
     /// `acceptAreaOffer`: the Area's key is kept, then its history taken
     /// in as any import is, with a Moment before it; then the Profiles its
-    /// grants name and how changes travel with the sharer are kept; with
+    /// grants name and how changes travel with the sharer are kept, and
+    /// the history counts as sent to the sharer (ADR 0024); with
     /// `verified` the sharer's Profile is marked verified. Returns the
     /// Area's id. [`OfferError::FromBlocked`] for one from a person
     /// blocked since and [`OfferError::Refused`] for an Area this Device
@@ -580,6 +585,9 @@ impl Store {
             self.verify_person(&sender.profile.id, &sender.code)?;
         }
         self.set_transport_with(&sender.profile.id, offer.transport)?;
+        // The sharer holds the history taken in: none of it waits for a
+        // bundle.
+        self.note_area_sent(&sender.profile.id, &offer.area, self.current_seq()?)?;
         let label = (!sender.profile.name.is_empty()).then_some(sender.profile.name.as_str());
         self.moment_for(before, !accepted.taken.is_empty(), cause::BUNDLE, label)?;
         Ok(offer.area)
