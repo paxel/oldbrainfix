@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'area_keys.dart';
 import 'entry.dart';
+import 'frogs.dart';
 import 'notes.dart';
 import 'pairing.dart';
 import 'places.dart';
@@ -168,7 +169,8 @@ class JudgedLog {
 /// Which of [entries], the whole raw log, no role allows. Layered, so
 /// nothing depends on what is still to be judged: the grants of every
 /// Area by latest wins; the Topics by their Area; the Notes by their
-/// Area or Topic; the Sections and Routines by their Note. Each entry is
+/// Area or Topic; the Sections, Routines and Frogs by their Note. Each
+/// entry is
 /// judged in the Area its entity was in at that point, by the filings
 /// that count: the last one before it, or the first one for what came
 /// before any.
@@ -312,7 +314,8 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
 
   for (final id in ids) {
     final section = id.startsWith('section:');
-    if (!section && !id.startsWith('routine:')) continue;
+    final frog = id.startsWith(FrogKeys.prefix);
+    if (!section && !frog && !id.startsWith('routine:')) continue;
     final list = byEntity[id] ?? const <Entry>[];
     String? note;
     for (final e in list) {
@@ -332,6 +335,9 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
           section
               ? ownerIn(area, list) == areas[area]?.personOf(e.device) &&
                     ownerIn(area, list) != null
+              // A Member checks off; the Frog is the Manager's.
+              : frog
+              ? e.field == FrogKeys.done
               : e.field.startsWith(RoutineKeys.donePrefix),
       };
       if (!ok) ignored.add(e.id);
@@ -413,7 +419,7 @@ extension SharedAreas on Store {
   /// [type] (`$type`): the pick is an edit like any other.
   bool mayResolve(String entity, String type) => switch (type) {
     NoteKeys.typeNote || SectionKeys.typeSection => mayChange(entity),
-    RoutineKeys.typeRoutine => mayChangeRoutine(entity),
+    RoutineKeys.typeRoutine || FrogKeys.typeFrog => mayChangeRoutine(entity),
     PlaceKeys.typeArea => mayManage(entity),
     PlaceKeys.typeTopic => mayManage(areaOf(entity)),
     _ => true,
@@ -655,7 +661,8 @@ extension SharedAreas on Store {
   }
 
   /// [delta] with the whole history of every Note a filing in it put
-  /// into an Area [wanted] says yes to, with its Sections and Routines:
+  /// into an Area [wanted] says yes to, with its Sections, Routines and
+  /// Frogs:
   /// a Note captured Unsorted and filed later began below the vector. In
   /// (device, dseq) order, each entry once.
   List<Entry> withFiled(List<Entry> delta, bool Function(String area) wanted) {
@@ -666,7 +673,11 @@ extension SharedAreas on Store {
     };
     if (notes.isEmpty) return delta;
     final entities = {...notes};
-    for (final type in [SectionKeys.typeSection, RoutineKeys.typeRoutine]) {
+    for (final type in [
+      SectionKeys.typeSection,
+      RoutineKeys.typeRoutine,
+      FrogKeys.typeFrog,
+    ]) {
       for (final id in entitiesOfType(type)) {
         if (notes.contains(current(id, SectionKeys.note))) entities.add(id);
       }

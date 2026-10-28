@@ -7,6 +7,7 @@ import 'package:cryptography/cryptography.dart'
     show Mac, SecretBox, SecretBoxAuthenticationError, SecretKeyData;
 import 'package:cryptography/dart.dart' show DartXchacha20;
 
+import 'frogs.dart';
 import 'notes.dart';
 import 'places.dart';
 import 'routines.dart';
@@ -214,8 +215,8 @@ extension AreaKeys on Store {
   }
 
   /// The scope [entity] is sealed under, from where it is now: an Area
-  /// itself; a Topic by its Area; a Note by its Area or Topic; a Section
-  /// or a Routine by its Note; everything else, and whatever is in no
+  /// itself; a Topic by its Area; a Note by its Area or Topic; a Section,
+  /// a Routine or a Frog by its Note; everything else, and whatever is in no
   /// Area, [personalScope]. Read from the log alone: a pending change
   /// (ADR 0022) moves nothing into an Area before it is accepted.
   String scopeOf(String entity) {
@@ -229,6 +230,8 @@ extension AreaKeys on Store {
       next = logged(entity, SectionKeys.note);
     } else if (entity.startsWith('routine:')) {
       next = logged(entity, RoutineKeys.note);
+    } else if (entity.startsWith(FrogKeys.prefix)) {
+      next = logged(entity, FrogKeys.note);
     }
     // Each step goes to a kind further up, so the walk ends.
     if (next == null || !_above(entity, next)) return personalScope;
@@ -245,7 +248,7 @@ extension AreaKeys on Store {
       'area' => 0,
       'topic' => 1,
       'note' => 2,
-      'section' || 'routine' => 3,
+      'section' || 'routine' || 'frog' => 3,
       _ => 9,
     };
     return rank(next) < rank(entity);

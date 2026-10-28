@@ -11,6 +11,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::entry::{Entry, WireEntry};
+use crate::frogs::keys as frog_keys;
 use crate::keys::PERSONAL_SCOPE;
 use crate::notes::keys as note_keys;
 use crate::profile::{Profile, sanitize_name};
@@ -73,9 +74,10 @@ fn is_instant(text: &str) -> bool {
 /// Whether `e`, written by a blocked person's Device, is kept (ADR 0021),
 /// as the Dart core's `keptFromBlocked`: only what carries no text,
 /// picture or sound and keeps the Shared Areas whole. That is a
-/// check-off or its undoing (`done@…` on a Routine), a grant (`role:…`
-/// on an Area), and a Note's `$type` and filing, which say where the
-/// Routines and Sections others hung on it lie; the Note itself shows
+/// check-off or its undoing (`done@…` on a Routine, `done` on a Frog), a
+/// grant (`role:…` on an Area), and a Note's `$type` and filing, which
+/// say where the Routines, Frogs and Sections others hung on it lie; the
+/// Note itself shows
 /// nowhere without its capture. Each in its exact shape, so nothing else
 /// can hide in it.
 pub fn kept_from_blocked(e: &Entry) -> bool {
@@ -117,6 +119,9 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
     {
         return Occurrence::parse(key).is_some_and(|o| o.key() == key)
             && value.is_none_or(is_instant);
+    }
+    if kind == frog_keys::TYPE_FROG && field == frog_keys::DONE {
+        return value.is_none_or(is_instant);
     }
     if kind == "area"
         && let Some(device) = field.strip_prefix(ROLE_PREFIX)
@@ -1146,6 +1151,8 @@ mod tests {
                 Some("2026-03-01T08:00:00.000Z"),
             ),
             entry("routine:ab12", "done@2026-03-01", None),
+            entry("frog:ab12", "done", Some("2026-03-01T08:00:00.000Z")),
+            entry("frog:ab12", "done", None),
             entry("area:starter-household", "role:ab12", None),
             entry("area:ab12", "role:ab12", Some(&member)),
             entry("note:ab12", "$type", Some("note")),
@@ -1178,6 +1185,10 @@ mod tests {
             entry("routine:ab12", "done@2026-3-1", None),
             entry("routine:Rude words", "done@2026-03-01", None),
             entry(&big, "done@2026-03-01", None),
+            entry("frog:ab12", "done", Some("Rude words")),
+            entry("frog:ab12", "trashed", Some("2026-03-01T08:00:00.000Z")),
+            entry("frog:ab12", "$type", Some("frog")),
+            entry("frog:Rude words", "done", None),
             entry(
                 "area:ab12",
                 "role:ab12",

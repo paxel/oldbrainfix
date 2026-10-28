@@ -4,17 +4,19 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
 import 'browser.dart';
+import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
 
-/// The deleted Notes, and the Routines and Reminders deleted on their
-/// own, most recently deleted first, each with how long it stays and a
-/// button to restore it. A Note comes back to where it was filed, with
-/// the Routines and Reminders deleted along with it. Those of closed
-/// locked Areas stay out.
+/// The deleted Notes, and the Routines, Reminders and Frogs deleted on
+/// their own, most recently deleted first, each with how long it stays
+/// and a button to restore it; a Frog stays until restored (ADR 0027).
+/// A Note comes back to where it was filed, with the Routines and
+/// Reminders deleted along with it. Those of closed locked Areas stay
+/// out.
 class TrashScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -25,11 +27,18 @@ class TrashScreen extends StatefulWidget {
   State<TrashScreen> createState() => _TrashScreenState();
 }
 
-/// One thing in the trash: a Note or a Routine, with when it was deleted.
-typedef _Trashed = ({DateTime at, PlacedNote? note, Routine? routine});
+/// One thing in the trash: a Note, a Routine or a Frog, with when it was
+/// deleted.
+typedef _Trashed = ({
+  DateTime at,
+  PlacedNote? note,
+  Routine? routine,
+  Frog? frog,
+});
 
 class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
   late final _routines = Routines(widget.notes.store);
+  late final _frogs = Frogs(widget.notes.store);
   late List<_Trashed> _trashed = _load();
 
   @override
@@ -47,13 +56,39 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
             at: note.trashed ?? note.captured,
             note: placeNote(widget.places, note),
             routine: null,
+            frog: null,
           ),
       for (final routine in _routines.trashed())
         if (!(lock?.hidesRoutine(routine) ?? false))
-          (at: routine.trashed ?? DateTime(0), note: null, routine: routine),
+          (
+            at: routine.trashed ?? DateTime(0),
+            note: null,
+            routine: routine,
+            frog: null,
+          ),
+      for (final id in widget.notes.store.entitiesOfType(FrogKeys.typeFrog))
+        if (_frogs.byId(id) case final frog? when frog.isTrashed)
+          if (!_hidesFrog(lock, frog))
+            (
+              at: frog.trashed ?? DateTime(0),
+              note: null,
+              routine: null,
+              frog: frog,
+            ),
     ];
     trashed.sort((a, b) => b.at.compareTo(a.at));
     return trashed;
+  }
+
+  /// Whether [frog] stays out, as its Note does.
+  bool _hidesFrog(AppLock? lock, Frog frog) {
+    final note = _frogs.note(frog);
+    return note != null && (lock?.hides(note) ?? false);
+  }
+
+  void _restoreFrog(Frog frog) {
+    _frogs.restore(frog.id);
+    setState(() => _trashed = _load());
   }
 
   void _restoreNote(Note note) {
@@ -126,6 +161,49 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
     );
   }
 
+  /// A Frog: what its Note says, and Restore; it is never purged.
+  Widget _frogCard(Frog frog) {
+    final t = context.t;
+    final note = _frogs.note(frog);
+    final store = widget.notes.store;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Embossed(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 4, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const FrogIcon(),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      note == null ? t.noteDeleted : noteText(t, note),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(t.frog),
+              // Only a Manager restores it in a Shared Area (ADR 0013).
+              if (store.mayManage(store.areaOf(frog.id)))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => _restoreFrog(frog),
+                    child: Text(t.restore),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
@@ -167,7 +245,9 @@ class _TrashScreenState extends State<TrashScreen> with ReloadsOnLogChange {
                           : null,
                     )
                   else if (trashed.routine case final routine?)
-                    _routineCard(routine),
+                    _routineCard(routine)
+                  else if (trashed.frog case final frog?)
+                    _frogCard(frog),
               ],
       ),
     );

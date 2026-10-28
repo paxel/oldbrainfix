@@ -515,7 +515,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: reminder ? Spawn.reminder : Spawn.routine,
     );
     if (!mounted) return;
     _reload();

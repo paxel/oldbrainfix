@@ -403,7 +403,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newRoutineTooltip => 'New Routine or Reminder';
 
   @override
-  String get routineOrReminder => 'Routine or Reminder';
+  String get routineOrReminder => 'Routine, Reminder or Frog';
 
   @override
   String get routine => 'Routine';
@@ -3053,4 +3053,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String namesAnd(String first, String last) {
     return '$first and $last';
   }
+
+  @override
+  String get frog => 'Frog';
+
+  @override
+  String get eatAFrog => 'Eat a frog';
+
+  @override
+  String get anotherFrog => 'Another one';
+
+  @override
+  String get frogsTitle => 'Frogs';
+
+  @override
+  String get frogsDone => 'Done';
+
+  @override
+  String frogDoneOn(String date) {
+    return 'Done on $date';
+  }
+
+  @override
+  String get frogsEmpty =>
+      'No open Frogs. \"Routine, Reminder or Frog\" on a Note\'s card makes one.';
+
+  @override
+  String get maskedFrog => 'Private Frog';
+
+  @override
+  String get deleteFrogQuestion =>
+      'Delete this Frog? It stays in the trash. Its Note stays.';
 }

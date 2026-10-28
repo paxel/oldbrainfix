@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
@@ -14,23 +15,29 @@ import 'system_bars.dart';
 /// The Device's wall clock: what its own clock shows for an instant.
 DateTime deviceWallClock(DateTime utc) => utc.toLocal();
 
-/// Opens the editor for a new Routine, or a Reminder when [reminder],
-/// spawned from [note]; true when one was made.
+/// Spawns [spawn] from [note]: a Routine or Reminder through its editor,
+/// a Frog at once, which needs nothing more; true when one was made.
 Future<bool> spawnFromNote(
   BuildContext context,
   Notes notes,
   Places places,
   Note note, {
-  required bool reminder,
-}) => _push(
-  context,
-  RoutineEditorScreen(
-    notes: notes,
-    places: places,
-    noteId: note.id,
-    reminder: reminder,
-  ),
-);
+  required Spawn spawn,
+}) async {
+  if (spawn == Spawn.frog) {
+    Frogs(notes.store).spawn(note.id);
+    return true;
+  }
+  return _push(
+    context,
+    RoutineEditorScreen(
+      notes: notes,
+      places: places,
+      noteId: note.id,
+      reminder: spawn == Spawn.reminder,
+    ),
+  );
+}
 
 /// Opens the editor for a new Routine whose Note is made behind the
 /// scenes; true when one was made.

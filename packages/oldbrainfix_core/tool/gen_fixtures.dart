@@ -8,12 +8,13 @@
 /// (`expected.json`). The desktop core loads each log into its own store
 /// and must read the same. The Routine scenario adds what the alarm plan,
 /// the Missed Summary, the Nudge and the Agenda come to at a few held
-/// moments (`alarms.json`), on a European wall clock. A scenario with
-/// photos and voice recordings writes their bytes as the store keeps
-/// them, under `photos/<hash>` and `audio/<hash>`. Next to them: the
-/// store's schema, a signed entry with awkward text, the question-mark
-/// scatter, and RRULEs with their Occurrences and the instants of
-/// daylight-saving days (`schedules.json`).
+/// moments (`alarms.json`), on a European wall clock; the Frog scenario
+/// what its lists and the Agenda's "Eat a frog" come to (`frogs.json`).
+/// A scenario with photos and voice recordings writes their bytes as the
+/// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
+/// them: the store's schema, a signed entry with awkward text, the
+/// question-mark scatter, and RRULEs with their Occurrences and the
+/// instants of daylight-saving days (`schedules.json`).
 library;
 
 import 'dart:convert';
@@ -501,7 +502,86 @@ final _scenarios = <Scenario>[
       notes.capture('Another thought');
     },
   ),
+  (
+    name: 'frogs',
+    about:
+        'Frogs spawned from Notes, one Note asked twice; today\'s pick, '
+        'asked for again, "Another one", a Frog eaten and uneaten and '
+        'eaten at a given time; the next days\' picks, a Frog trashed from '
+        'one and replaced in its place, restored, and one whose Note went '
+        'to the trash; an Unsorted Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final frogs = Frogs(store);
+      final cupboard = frogs.spawn(notes.capture('Clean out the cupboard').id);
+      final windows = frogs.spawn(notes.capture('Wash the windows').id);
+      frogs.spawn(notes.capture('Sort out the old DVDs').id);
+      final gate = notes.capture('Fix the gate');
+      frogs.spawn(gate.id);
+      frogs.spawn(gate.id);
+      final shed = frogs.spawn(notes.capture('Paint the shed').id);
+      frogs.pickToday(_frogDay(0));
+      frogs.pickToday(_frogDay(0));
+      frogs.another(_frogDay(0), cupboard.id);
+      frogs.markDone(windows.id);
+      frogs.pickToday(_frogDay(0));
+      frogs.unmarkDone(windows.id);
+      frogs.markDone(windows.id, at: DateTime.utc(2026, 1, 1, 18));
+      frogs.pickToday(_frogDay(1));
+      frogs.trash(shed.id);
+      frogs.pickToday(_frogDay(1));
+      frogs.restore(shed.id);
+      notes.trash(gate.id);
+      frogs.pickToday(_frogDay(2));
+      notes.capture('Unsorted thought');
+    },
+  ),
 ];
+
+/// The European wall clock [days] days on: the scenario's clock moves by
+/// seconds, the Agenda by days.
+WallClock _frogDay(int days) =>
+    (utc) => _europe(utc).add(Duration(days: days));
+
+Map<String, Object?> _frog(Frog frog) => {
+  'id': frog.id,
+  'noteId': frog.noteId,
+  'spawned': frog.spawned.toUtc().toIso8601String(),
+  'done': frog.done?.toUtc().toIso8601String(),
+  'trashed': frog.trashed?.toUtc().toIso8601String(),
+};
+
+/// What the Frogs of [store] come to: each Frog, the lists, and the
+/// "Eat a frog" section today and on the days after, written nowhere.
+Map<String, Object?> _frogs(Store store) {
+  final frogs = Frogs(store);
+  final ids = store.entitiesOfType(FrogKeys.typeFrog)..sort();
+  List<String> listed(List<Frog> list) => [for (final f in list) f.id];
+  Map<String, Object?> section(FrogsToday today) => {
+    'today': '${today.today}',
+    'shown': listed(today.shown),
+    'eaten': today.eaten,
+    'canSwap': today.canSwap,
+    'visible': today.visible,
+  };
+  return {
+    'frogs': [
+      for (final id in ids)
+        if (frogs.byId(id) case final frog?) _frog(frog),
+    ],
+    'open': listed(frogs.open()),
+    'done': listed(frogs.done()),
+    'rotation': listed(frogs.rotation()),
+    'ofNote': {
+      for (final note in Notes(store).all())
+        note.id: listed(frogs.ofNote(note.id)),
+    },
+    'today': [
+      for (var days = -1; days <= 2; days++)
+        section(frogs.today(_frogDay(days))),
+    ],
+  };
+}
 
 /// A small JPEG, different for every [n], with an APP0, an Exif APP1,
 /// an ICC APP2 and a comment before its tables and scan: stripping keeps
@@ -4241,6 +4321,10 @@ Future<void> main(List<String> args) async {
     '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
     'Nudge of the `routines` log at held moments with this Device\'s '
     'settings, on the same clock.\n'
+    '- `frogs/frogs.json`: each Frog of the `frogs` log, the open ones, '
+    'those Done, the rotation, the Frogs of each Note, and the "Eat a '
+    'frog" section the day before, on and after the clock held, on the '
+    'same clock.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, and what is no code.\n'
     '- `keys.json`: the writer\'s key record, and another key claiming its '
@@ -4472,6 +4556,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/alarms.json'),
           '${_json.convert(_alarms(store))}\n',
+        );
+      }
+      if (store.entitiesOfType(FrogKeys.typeFrog).isNotEmpty) {
+        _write(
+          File('${out.path}/frogs.json'),
+          '${_json.convert(_frogs(store))}\n',
         );
       }
       index.writeln('- `${scenario.name}`: ${scenario.about}');

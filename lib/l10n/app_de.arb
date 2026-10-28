@@ -125,7 +125,7 @@
   "justCaptured": "Gerade erfasst",
   "allNotesTitle": "Alle Notizen",
   "newRoutineTooltip": "Neue Routine oder Erinnerung",
-  "routineOrReminder": "Routine oder Erinnerung",
+  "routineOrReminder": "Routine, Erinnerung oder Frosch",
   "routine": "Routine",
   "reminder": "Erinnerung",
   "newRoutine": "Neue Routine",
@@ -810,5 +810,14 @@
   "changesNudgeTitle": "Änderungen für {names}",
   "changesNudgeBody": "Tippe, um sie zu schicken.",
   "changesNudgePublic": "Änderungen warten darauf, geschickt zu werden",
-  "namesAnd": "{first} und {last}"
+  "namesAnd": "{first} und {last}",
+  "frog": "Frosch",
+  "eatAFrog": "Iss einen Frosch",
+  "anotherFrog": "Einen anderen",
+  "frogsTitle": "Frösche",
+  "frogsDone": "Erledigt",
+  "frogDoneOn": "Erledigt am {date}",
+  "frogsEmpty": "Keine offenen Frösche. „Routine, Erinnerung oder Frosch“ auf der Karte einer Notiz macht einen.",
+  "maskedFrog": "Privater Frosch",
+  "deleteFrogQuestion": "Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt."
 }

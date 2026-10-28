@@ -7,6 +7,7 @@ import 'box_keys.dart';
 import 'changes_nudges.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
+import 'frogs.dart';
 import 'notes.dart';
 import 'pending.dart';
 import 'places.dart';
@@ -655,7 +656,9 @@ List<Entry> _inArea(Store store, String area, List<Entry> entries) {
     ...notes,
     for (final e in entries)
       if ((e.entity.startsWith('section:') && e.field == SectionKeys.note ||
-              e.entity.startsWith('routine:') && e.field == RoutineKeys.note) &&
+              e.entity.startsWith('routine:') && e.field == RoutineKeys.note ||
+              e.entity.startsWith(FrogKeys.prefix) &&
+                  e.field == FrogKeys.note) &&
           notes.contains(e.value))
         e.entity,
   };

@@ -315,7 +315,7 @@ void main() {
 
       expect(find.text('Just captured'), findsOneWidget);
       expect(find.byType(NoteCard), findsOneWidget);
-      await tap(tester, find.byTooltip('Routine or Reminder'));
+      await tap(tester, find.byTooltip('Routine, Reminder or Frog'));
       expect(find.byType(BottomSheet), findsNothing);
       await tap(tester, find.text('Reminder'));
 
@@ -405,7 +405,7 @@ void main() {
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
-      await tap(tester, find.byTooltip('Routine or Reminder'));
+      await tap(tester, find.byTooltip('Routine, Reminder or Frog'));
       expect(find.byType(BottomSheet), findsNothing);
       await tap(tester, find.text('Routine').last);
       await tap(tester, find.text('Save'));

@@ -82,13 +82,13 @@ class _AllNotesScreenState extends State<AllNotesScreen>
     _reload();
   }
 
-  Future<void> _schedule(Note note, bool reminder) async {
+  Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();

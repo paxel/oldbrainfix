@@ -503,7 +503,7 @@ class BrowserSearchField extends StatelessWidget {
 }
 
 /// Notes as a diary of cards, each with "file into…", "merge into…",
-/// with [onSchedule] Routine or Reminder, and ⋮ for the rest the Note
+/// with [onSchedule] Routine, Reminder or Frog, and ⋮ for the rest the Note
 /// editor offers, as far as this Device may; tapping a card opens it.
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
 /// [showPlace] says which cards name where they are filed: those the
@@ -517,7 +517,7 @@ List<Widget> diaryCards(
   required Notes notes,
   required VoidCallback onChanged,
   required bool Function(PlacedNote placed) showPlace,
-  void Function(Note note, bool reminder)? onSchedule,
+  void Function(Note note, Spawn spawn)? onSchedule,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
@@ -544,7 +544,7 @@ List<Widget> diaryCards(
           onMerge: changes ? () => onMerge(note) : null,
           onSchedule: onSchedule == null || !schedules
               ? null
-              : (reminder) => onSchedule(note, reminder),
+              : (spawn) => onSchedule(note, spawn),
           actions: noteActions(context, notes, placed, onChanged),
           onTap: () => onOpen(note),
         ),

@@ -44,3 +44,7 @@ Amended by ADR 0023 (#108): an Area is also shared with a person who is not on t
 ## Removing generated texts (ADR 0025)
 
 Amended by ADR 0025 (#110): a Member adds Transcripts and Photo Texts to any Note only as texts; a null under `transcript:` or `ocr:`, which removes one, is judged like any other edit of the Note, so only the Note's owner or a Manager removes it.
+
+## Frogs (ADR 0027)
+
+Amended by ADR 0027 (#101): a Frog is judged by its Note like a Routine. A Manager spawns, trashes and restores it; a Member writes only its `done`, so every Member can check it off and uncheck it.

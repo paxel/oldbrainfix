@@ -11,6 +11,7 @@ import 'area_offers.dart';
 import 'backup.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
+import 'frogs.dart';
 import 'notes.dart';
 import 'pending.dart';
 import 'photos.dart';

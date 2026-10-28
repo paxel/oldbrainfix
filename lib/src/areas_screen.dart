@@ -203,13 +203,13 @@ class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
     _reload();
   }
 
-  Future<void> _schedule(Note note, bool reminder) async {
+  Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();
@@ -580,13 +580,13 @@ class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
     _reload();
   }
 
-  Future<void> _schedule(Note note, bool reminder) async {
+  Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();
@@ -839,13 +839,13 @@ class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
     _reload();
   }
 
-  Future<void> _schedule(Note note, bool reminder) async {
+  Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();
@@ -978,7 +978,7 @@ List<Widget> _hitCards(
   void Function(Note note) onFile,
   void Function(Note note) onMerge,
   void Function(Note note) onOpen,
-  void Function(Note note, bool reminder) onSchedule,
+  void Function(Note note, Spawn spawn) onSchedule,
   Notes notes,
   VoidCallback onChanged,
   bool Function(PlacedNote placed) showPlace,

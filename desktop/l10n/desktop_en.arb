@@ -302,5 +302,7 @@
   "aiNotInTrash": "Not in the trash",
   "@aiNotInTrash": {"description": "On the review page: a value meaning the Note or Routine is not in the trash."},
   "syncPausedError": "Sync is paused while an AI Task is open or waits for review. Finish it with 'Done, review' in the Settings and accept or reject its changes, then try again.",
-  "@syncPausedError": {"description": "Where a sync, a bundle, a shared Area or a sent Note was refused because an AI Task is open or waits for its review."}
+  "@syncPausedError": {"description": "Where a sync, a bundle, a shared Area or a sent Note was refused because an AI Task is open or waits for its review."},
+  "frogsEmptyDesk": "No open Frogs. \"Frog\" under \"Routines and Reminders\" in a Note's editor makes one.",
+  "@frogsEmptyDesk": {"description": "The desktop's Frog view without open Frogs; a Frog is made in the Note editor there, not on the card."}
 }

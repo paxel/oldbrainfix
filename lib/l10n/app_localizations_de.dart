@@ -406,7 +406,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get newRoutineTooltip => 'Neue Routine oder Erinnerung';
 
   @override
-  String get routineOrReminder => 'Routine oder Erinnerung';
+  String get routineOrReminder => 'Routine, Erinnerung oder Frosch';
 
   @override
   String get routine => 'Routine';
@@ -3086,4 +3086,35 @@ class AppLocalizationsDe extends AppLocalizations {
   String namesAnd(String first, String last) {
     return '$first und $last';
   }
+
+  @override
+  String get frog => 'Frosch';
+
+  @override
+  String get eatAFrog => 'Iss einen Frosch';
+
+  @override
+  String get anotherFrog => 'Einen anderen';
+
+  @override
+  String get frogsTitle => 'Frösche';
+
+  @override
+  String get frogsDone => 'Erledigt';
+
+  @override
+  String frogDoneOn(String date) {
+    return 'Erledigt am $date';
+  }
+
+  @override
+  String get frogsEmpty =>
+      'Keine offenen Frösche. „Routine, Erinnerung oder Frosch“ auf der Karte einer Notiz macht einen.';
+
+  @override
+  String get maskedFrog => 'Privater Frosch';
+
+  @override
+  String get deleteFrogQuestion =>
+      'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
 }

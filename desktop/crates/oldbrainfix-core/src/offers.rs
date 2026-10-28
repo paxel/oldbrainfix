@@ -20,6 +20,7 @@ use serde_json::{Map, Value, json};
 use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of, hkdf_sha256, x25519};
 use crate::entry::{ENTRY_VERSION, Entry, WireEntry};
 use crate::folder::{SyncFolder, entries_sealed_with};
+use crate::frogs::keys as frog_keys;
 use crate::keys::{
     AREA_KEY_BYTES, AreaKey, SEAL_NONCE_BYTES, area_keys_of, blob_name, seal, sealed_as, unseal,
 };
@@ -788,7 +789,8 @@ impl Store {
         inside.extend(&notes);
         for e in entries {
             let child = (e.entity.starts_with("section:") && is(e, note_keys::NOTE))
-                || (e.entity.starts_with("routine:") && is(e, routine_keys::NOTE));
+                || (e.entity.starts_with("routine:") && is(e, routine_keys::NOTE))
+                || (e.entity.starts_with(frog_keys::PREFIX) && is(e, frog_keys::NOTE));
             if child && e.value.as_deref().is_some_and(|v| notes.contains(v)) {
                 inside.insert(e.entity.as_str());
             }

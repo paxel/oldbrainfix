@@ -30,9 +30,10 @@ final _blockedInstant = RegExp(
 
 /// Whether [e], written by a blocked person's Device, is kept (ADR 0021):
 /// only what carries no text, picture or sound and keeps the Shared Areas
-/// whole. That is a check-off or its undoing (`done@…` on a Routine), a
-/// grant (`role:…` on an Area), and a Note's `$type` and filing, which
-/// say where the Routines and Sections others hung on it lie; the Note
+/// whole. That is a check-off or its undoing (`done@…` on a Routine,
+/// `done` on a Frog), a grant (`role:…` on an Area), and a Note's `$type`
+/// and filing, which say where the Routines, Frogs and Sections others
+/// hung on it lie; the Note
 /// itself shows nowhere without its capture. Each in its exact shape, so
 /// nothing else can hide in it: version 1 with no causal context, ids
 /// of letters, digits and dashes, values as the apps write them, and an
@@ -50,6 +51,9 @@ bool keptFromBlocked(Entry e) {
     final key = e.field.substring(RoutineKeys.donePrefix.length);
     return Occurrence.tryParse(key)?.key == key &&
         (value == null || _blockedInstant.hasMatch(value));
+  }
+  if (kind == FrogKeys.typeFrog && e.field == FrogKeys.done) {
+    return value == null || _blockedInstant.hasMatch(value);
   }
   if (kind == 'area' && e.field.startsWith(ShareKeys.rolePrefix)) {
     final device = e.field.substring(ShareKeys.rolePrefix.length);

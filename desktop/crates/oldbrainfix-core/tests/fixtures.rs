@@ -2,8 +2,8 @@
 //! (`packages/oldbrainfix_core/tool/gen_fixtures.dart`); this core must
 //! read every log the same, sign every entry the same, and write every
 //! scenario again to the same log, byte for byte. Schedules, the alarm
-//! plan, the Missed Summary and the Nudge must come to the same on the
-//! same European wall clock, Europe/Berlin here.
+//! plan, the Missed Summary, the Nudge and the Frogs offered must come to
+//! the same on the same European wall clock, Europe/Berlin here.
 
 use std::path::{Path, PathBuf};
 
@@ -18,16 +18,17 @@ use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Importance, Note, Notes, NotesGo,
-    Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines, STARTER_SET,
-    Schedule, Search, Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Frog, Frogs, Importance, Note, Notes,
+    NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines,
+    STARTER_SET, Schedule, Search, Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso,
+    parse_time,
 };
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 8] = [
-    "edits", "formats", "media", "notes", "places", "routines", "sections", "trash",
+const SCENARIOS: [&str; 9] = [
+    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "trash",
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
@@ -832,9 +833,10 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 8] = [
+    let writers: [(&str, Writer); 9] = [
         ("edits", write_edits),
         ("formats", write_formats),
+        ("frogs", write_frogs),
         ("media", write_media),
         ("notes", write_notes),
         ("places", write_places),
@@ -1125,6 +1127,98 @@ fn routines_and_their_alarms_come_to_what_the_dart_core_says() -> TestResult {
             assert_eq!(ours[key], check[key], "{} {key}", check["now"]);
         }
     }
+    Ok(())
+}
+
+// ---------------------------------------------------------------- Frogs
+
+/// The European wall clock `days` days on, as the generator's `_frogDay`.
+fn frog_day(days: i64) -> impl Fn(DateTime<Utc>) -> NaiveDateTime {
+    move |utc| berlin(utc) + Duration::days(days)
+}
+
+/// The generator's `frogs` scenario.
+fn write_frogs(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let frogs = Frogs::new(store);
+    let spawn = |text: &str| -> Result<Frog, Box<dyn std::error::Error>> {
+        Ok(frogs.spawn(&notes.capture(text, None, None)?.id)?)
+    };
+    let cupboard = spawn("Clean out the cupboard")?;
+    let windows = spawn("Wash the windows")?;
+    spawn("Sort out the old DVDs")?;
+    let gate = notes.capture("Fix the gate", None, None)?;
+    frogs.spawn(&gate.id)?;
+    frogs.spawn(&gate.id)?;
+    let shed = spawn("Paint the shed")?;
+    frogs.pick_today(&frog_day(0))?;
+    frogs.pick_today(&frog_day(0))?;
+    frogs.another(&frog_day(0), &cupboard.id)?;
+    frogs.mark_done(&windows.id, None)?;
+    frogs.pick_today(&frog_day(0))?;
+    frogs.unmark_done(&windows.id)?;
+    frogs.mark_done(&windows.id, Some(utc(2026, 1, 1, 18)?))?;
+    frogs.pick_today(&frog_day(1))?;
+    frogs.trash(&shed.id)?;
+    frogs.pick_today(&frog_day(1))?;
+    frogs.restore(&shed.id)?;
+    notes.trash(&gate.id)?;
+    frogs.pick_today(&frog_day(2))?;
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
+fn frog_json(frog: &Frog) -> Value {
+    json!({
+        "id": frog.id,
+        "noteId": frog.note_id,
+        "spawned": dart_iso(frog.spawned),
+        "done": iso(frog.done),
+        "trashed": iso(frog.trashed),
+    })
+}
+
+fn frog_ids(frogs: &[Frog]) -> Value {
+    json!(frogs.iter().map(|f| f.id.clone()).collect::<Vec<_>>())
+}
+
+#[test]
+fn frogs_and_todays_pick_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("frogs").join("frogs.json"))?;
+    let read_at = read_json(&fixtures().join("frogs").join("expected.json"))?;
+    let store = load("frogs", read_at["now"].as_str().ok_or("now")?)?;
+    let frogs = Frogs::new(&store);
+    let mut ids = store.entities_of_type("frog")?;
+    ids.sort();
+    let mut every = Vec::new();
+    for id in &ids {
+        if let Some(frog) = frogs.by_id(id)? {
+            every.push(frog_json(&frog));
+        }
+    }
+    assert_eq!(json!(every), expected["frogs"]);
+    assert_eq!(frog_ids(&frogs.open()?), expected["open"]);
+    assert_eq!(frog_ids(&frogs.done()?), expected["done"]);
+    assert_eq!(frog_ids(&frogs.rotation()?), expected["rotation"]);
+    let mut of_note = serde_json::Map::new();
+    for note in Notes::new(&store).all()? {
+        of_note.insert(note.id.clone(), frog_ids(&frogs.of_note(&note.id)?));
+    }
+    assert_eq!(Value::Object(of_note), expected["ofNote"]);
+    let before = store.all_entries()?.len();
+    let mut sections = Vec::new();
+    for days in -1..=2 {
+        let today = frogs.today(&frog_day(days))?;
+        sections.push(json!({
+            "today": today.today.to_string(),
+            "shown": frog_ids(&today.shown),
+            "eaten": today.eaten,
+            "canSwap": today.can_swap,
+            "visible": today.visible,
+        }));
+    }
+    assert_eq!(json!(sections), expected["today"]);
+    assert_eq!(store.all_entries()?.len(), before, "today writes nothing");
     Ok(())
 }
 

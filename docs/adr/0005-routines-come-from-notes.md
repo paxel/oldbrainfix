@@ -5,3 +5,7 @@ Routines and Reminders are never standalone: each one is spawned from a Note and
 ## Consequences
 
 Deleting a Note that spawned Routines asks whether to trash them too; if not, they stay and their back-link shows the Note as trashed or deleted.
+
+## Frogs (ADR 0027)
+
+Amended by ADR 0027 (#101): a Note also spawns Frogs, jobs with no time done once, and spawning one takes it out of Unsorted as a Routine does. A Note has one open Frog at a time.

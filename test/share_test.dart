@@ -174,6 +174,30 @@ void main() {
     expect(find.text('Add to Note'), findsOneWidget);
   });
 
+  testWidgets('a Member checks off a Frog of the Area on the Agenda but '
+      'neither makes nor deletes one', (tester) async {
+    final frog = Frogs(ann).spawn(milk);
+    invite(AreaRole.member);
+    await tester.pumpWidget(OldBrainFixApp(store: ben));
+    await tester.pumpAndSettle();
+    final row = find.byKey(ValueKey('frog-${frog.id}'));
+    expect(row, findsOneWidget);
+
+    await tester.longPress(row);
+    await tester.pumpAndSettle();
+    expect(find.text('Delete'), findsNothing);
+
+    await tester.tap(find.descendant(of: row, matching: find.byType(Checkbox)));
+    await tester.pumpAndSettle();
+    expect(Frogs(ben).byId(frog.id)?.isDone, isTrue);
+
+    await tester.tap(find.byIcon(Icons.search));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Household'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Routine, Reminder or Frog'), findsNothing);
+  });
+
   testWidgets('a Member may not remove the recording of someone else\'s '
       'Note, nor touch its Transcript', (tester) async {
     final owner = Notes(ann);

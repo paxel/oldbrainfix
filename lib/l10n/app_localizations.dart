@@ -797,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @routineOrReminder.
   ///
   /// In en, this message translates to:
-  /// **'Routine or Reminder'**
+  /// **'Routine, Reminder or Frog'**
   String get routineOrReminder;
 
   /// No description provided for @routine.
@@ -4909,6 +4909,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{first} and {last}'**
   String namesAnd(String first, String last);
+
+  /// A Note's job with no time, done once (CONTEXT.md: Frog).
+  ///
+  /// In en, this message translates to:
+  /// **'Frog'**
+  String get frog;
+
+  /// Heading of the Agenda section that offers two Frogs a day; tapping it opens the Frog view.
+  ///
+  /// In en, this message translates to:
+  /// **'Eat a frog'**
+  String get eatAFrog;
+
+  /// Swaps a Frog offered on the Agenda for the next one.
+  ///
+  /// In en, this message translates to:
+  /// **'Another one'**
+  String get anotherFrog;
+
+  /// No description provided for @frogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Frogs'**
+  String get frogsTitle;
+
+  /// The folded section of the Frog view with the Frogs checked off.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get frogsDone;
+
+  /// No description provided for @frogDoneOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Done on {date}'**
+  String frogDoneOn(String date);
+
+  /// No description provided for @frogsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No open Frogs. \"Routine, Reminder or Frog\" on a Note\'s card makes one.'**
+  String get frogsEmpty;
+
+  /// A Frog from a locked Area set to Masked, on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Frog'**
+  String get maskedFrog;
+
+  /// No description provided for @deleteFrogQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
+  String get deleteFrogQuestion;
 }
 
 class _AppLocalizationsDelegate

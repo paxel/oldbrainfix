@@ -329,6 +329,8 @@ void main() {
           '2026-03-01T08:00:00.000Z',
         ),
         entry('routine:ab12', 'done@2026-03-01', null),
+        entry('frog:ab12', 'done', '2026-03-01T08:00:00.000Z'),
+        entry('frog:ab12', 'done', null),
         entry('area:starter-household', 'role:ab12', null),
         entry(
           'area:ab12',
@@ -356,6 +358,10 @@ void main() {
         entry('routine:ab12', 'done@2026-3-1', null),
         entry('routine:Rude words', 'done@2026-03-01', null),
         entry('routine:$big', 'done@2026-03-01', null),
+        entry('frog:ab12', 'done', 'Rude words'),
+        entry('frog:ab12', 'trashed', '2026-03-01T08:00:00.000Z'),
+        entry('frog:ab12', r'$type', 'frog'),
+        entry('frog:Rude words', 'done', null),
         entry(
           'area:ab12',
           'role:ab12',

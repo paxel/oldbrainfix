@@ -23,6 +23,7 @@ pub mod backups;
 pub mod cli;
 pub mod enrich;
 pub mod folder_sync;
+pub mod frogs_view;
 pub mod hotkey;
 pub mod icons;
 pub mod instance;

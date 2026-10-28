@@ -56,7 +56,7 @@ The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. 
 _Avoid_: category, subcategory, tag
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine or Reminder, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:
@@ -79,12 +79,16 @@ _Avoid_: chore, task, habit, to-do
 A Routine that happens only once. German: Erinnerung.
 _Avoid_: alarm, appointment, event
 
+**Frog**:
+A Note's job with no time, done once, offered on the Agenda to eat one a day. German: Frosch.
+_Avoid_: chore, task, to-do
+
 **Occurrence**:
 One due moment of a Routine, e.g. Tuesday 08:00. Each Occurrence is checked off on its own.
 _Avoid_: instance, slot
 
 **Done**:
-An Occurrence the user checked off. Checking off early or late never moves the schedule.
+An Occurrence or Frog the user checked off. Checking off early or late never moves the schedule.
 _Avoid_: completed, ticked (in the UI)
 
 **Re-nag**:
@@ -111,7 +115,7 @@ The run of consecutive Occurrences of a Routine that were Done.
 The share of a Routine's Occurrences that were Done over a period, e.g. "92 % this month".
 
 **Agenda**:
-The home screen: today's Occurrences, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
+The home screen: today's Occurrences, then two Frogs to eat one of, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
 _Avoid_: dashboard, today view, home
 
 ### People and devices
@@ -133,7 +137,7 @@ _Avoid_: reminder (that is a different thing), sync reminder
 A person who may do everything in a Shared Area.
 
 **Member**:
-A person in a Shared Area who may add and amend Notes and check off Occurrences, but not change Routines, Reminders or other people's Notes.
+A person in a Shared Area who may add and amend Notes and check off Occurrences and Frogs, but not change Routines, Reminders, Frogs or other people's Notes.
 _Avoid_: guest, viewer
 
 **Sent Item**:

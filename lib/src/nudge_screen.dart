@@ -204,7 +204,7 @@ List<Widget> _sortingCards(
     onChanged: changed,
     // The screen is Unsorted.
     showPlace: (_) => false,
-    onSchedule: (note, reminder) =>
-        then(spawnFromNote(context, notes, places, note, reminder: reminder)),
+    onSchedule: (note, spawn) =>
+        then(spawnFromNote(context, notes, places, note, spawn: spawn)),
   );
 }

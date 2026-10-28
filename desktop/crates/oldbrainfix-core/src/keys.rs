@@ -15,6 +15,7 @@ use hmac::{Hmac, Mac};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::frogs::keys as frog_keys;
 use crate::notes::keys as note_keys;
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
@@ -163,7 +164,7 @@ fn rank(id: &str) -> u8 {
         Some("area") => 0,
         Some("topic") => 1,
         Some("note") => 2,
-        Some("section") | Some("routine") => 3,
+        Some("section") | Some("routine") | Some("frog") => 3,
         _ => 9,
     }
 }
@@ -242,6 +243,7 @@ impl Store {
             Some("note") => note_keys::PLACE,
             Some("section") => note_keys::NOTE,
             Some("routine") => routine_keys::NOTE,
+            Some("frog") => frog_keys::NOTE,
             _ => return Ok(PERSONAL_SCOPE.to_string()),
         };
         match self.logged(entity, field)? {

@@ -15,6 +15,7 @@ import 'calendar_platform.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
+import 'frogs_screen.dart';
 import 'held_sent_items_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -36,6 +37,10 @@ import 'system_bars.dart';
 /// An Agenda row with where its Note is filed and whether it shows
 /// Masked, read once per change.
 typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
+
+/// A Frog of the "Eat a frog" section with its Note and Area, and
+/// whether it shows Masked.
+typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 
 /// The home screen (CONTEXT.md): today's Occurrences, all-day first and
 /// then by time, a visible gap, and tomorrow's in dimmer colours, then
@@ -61,6 +66,13 @@ typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
 /// locked Area set to Masked shows its masked text and can still be
 /// checked off; opening it, or its history, asks to open its Area first.
 /// Back on the Agenda, every Area opened meanwhile is closed again.
+///
+/// Under today's timed Occurrences the "Eat a frog" section offers
+/// today's pick of two Frogs (ADR 0027), written for the user's own
+/// Devices as it loads; each has "Another one" to swap it. Once one is
+/// checked off, only that one shows, struck through, for the day. Its
+/// heading opens the Frog view; it shows while a Frog is open or one was
+/// eaten today. A Frog of a Masked Area shows masked, as an Occurrence.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -105,6 +117,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _routines = Routines(widget.notes.store);
   late final _alarms = Alarms(widget.notes.store);
   late final _locks = AreaLocks(widget.notes.store);
+  late final _frogs = Frogs(widget.notes.store);
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
@@ -114,6 +127,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// The days after tomorrow, each with its rows.
   List<({Day day, List<_PlacedRow> rows})> _later = const [];
   var _unsorted = 0;
+
+  /// Today's "Eat a frog" section, and its Frogs as they show.
+  FrogsToday? _frogsToday;
+  List<_ShownFrog> _frogRows = const [];
 
   /// How many strangers' Sent Items wait (#91).
   var _waiting = 0;
@@ -202,6 +219,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
       for (final (i, rows) in agenda.laterRows.indexed)
         (day: agenda.later(i), rows: [for (final row in rows) _place(row)]),
     ];
+    // Writes today's pick when it is new; the reload that follows
+    // writes nothing.
+    final frogs = _frogsToday = _frogs.pickToday(deviceWallClock);
+    _frogRows = [
+      for (final frog in frogs.shown)
+        if (placeFrog(_frogs, widget.places, frog) case final placed?)
+          (placed: placed, masked: _masksNote(placed.note)),
+    ];
     _missed = _alarms.missed(deviceWallClock);
     _unsorted = widget.notes.unsorted().length;
     // Counted from the pending sets, without reading each held file.
@@ -233,13 +258,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
     masked: _locks.masks(row.routine),
   );
 
+  /// Whether [note] shows Masked here: it is filed in a locked Area set
+  /// to Masked, as [AreaLocks.masks] says of a Routine.
+  bool _masksNote(Note note) {
+    final area = _locks.lockedAreaOf(note);
+    return area != null && widget.notes.store.isAreaMasked(area);
+  }
+
   /// Back on the Agenda: the Areas opened meanwhile close again.
   void _closeAreas() => LockScope.of(context)?.closeAreas();
 
   /// Opens the locked Area [row] comes from first, when it is closed;
   /// whether the way is open.
-  Future<bool> _openAreaOf(AgendaRow row) async {
-    final note = row.note;
+  Future<bool> _openAreaOf(AgendaRow row) => _openAreaOfNote(row.note);
+
+  /// Opens the locked Area [note] is filed in first, when it is closed;
+  /// whether the way is open.
+  Future<bool> _openAreaOfNote(Note? note) async {
     final areaId = note == null ? null : _locks.lockedAreaOf(note);
     if (areaId == null) return true;
     final area = widget.places.areaById(areaId);
@@ -467,6 +502,35 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  void _toggleFrog(Frog frog) {
+    if (frog.isDone) {
+      _frogs.unmarkDone(frog.id);
+    } else {
+      _frogs.markDone(frog.id);
+    }
+    _reload();
+  }
+
+  void _anotherFrog(Frog frog) {
+    _frogs.another(deviceWallClock, frog.id);
+    _reload();
+  }
+
+  Future<void> _openFrogNote(Note note) async {
+    if (!await _openAreaOfNote(note) || !mounted) return;
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _closeAreas();
+    _reload();
+  }
+
+  Future<void> _openFrogs() async {
+    await openFrogs(context, widget.notes, widget.places);
+    if (!mounted) return;
+    _closeAreas();
+    _reload();
+  }
+
   Future<void> _file(Note note) async {
     await fileNote(context, widget.notes, widget.places, note);
     if (!mounted) return;
@@ -485,13 +549,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
-  Future<void> _schedule(Note note, bool reminder) async {
+  Future<void> _schedule(Note note, Spawn spawn) async {
     await spawnFromNote(
       context,
       widget.notes,
       widget.places,
       note,
-      reminder: reminder,
+      spawn: spawn,
     );
     if (!mounted) return;
     _reload();
@@ -608,7 +672,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 showPlace: true,
                 onFile: () => _file(captured.note),
                 onMerge: () => _merge(captured.note),
-                onSchedule: (reminder) => _schedule(captured.note, reminder),
+                // Only a Manager spawns in a Shared Area (ADR 0013).
+                onSchedule: captured.schedules
+                    ? (spawn) => _schedule(captured.note, spawn)
+                    : null,
                 actions: noteActions(context, widget.notes, captured, _reload),
                 onTap: () => _open(captured.note),
               ),
@@ -618,6 +685,26 @@ class _AgendaScreenState extends State<AgendaScreen> {
               BrowserEmpty(text: t.nothingToday)
             else
               ...rows(_today),
+            // Under what is due, never above it (#101).
+            if (_frogsToday case final frogs? when frogs.visible) ...[
+              _FrogsHeading(onTap: _openFrogs),
+              for (final (:placed, :masked) in _frogRows)
+                FrogRow(
+                  key: ValueKey('frog-${placed.frog.id}'),
+                  frog: placed.frog,
+                  // A Masked row tells nothing of its Area either.
+                  area: masked ? null : placed.area,
+                  title: masked ? t.maskedFrog : noteText(t, placed.note),
+                  onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
+                      ? () => _toggleFrog(placed.frog)
+                      : null,
+                  onTap: () => _openFrogNote(placed.note),
+                  onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
+                  onAnother: frogs.canSwap && !frogs.eaten
+                      ? () => _anotherFrog(placed.frog)
+                      : null,
+                ),
+            ],
             // The visible gap between today and tomorrow.
             const SizedBox(height: 32),
             Opacity(
@@ -776,6 +863,40 @@ class _Heading extends StatelessWidget {
     child: Align(
       alignment: Alignment.centerLeft,
       child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    ),
+  );
+}
+
+/// The heading of the "Eat a frog" section, with the frog; tapping it
+/// opens the Frog view.
+class _FrogsHeading extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _FrogsHeading({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+    child: InkWell(
+      key: const ValueKey('frogsHeading'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+        child: Row(
+          children: [
+            const FrogIcon(),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                context.t.eatAFrog,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+      ),
     ),
   );
 }

@@ -66,9 +66,9 @@ use oldbrainfix_core::sent::{
 };
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CardTaken, ClockTime, Day,
-    DeviceSettings, Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence,
-    OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search,
-    Section, Store, Topic, bundle,
+    DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, MissedSummary, Note, Notes,
+    NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
+    Routines, Search, Section, Store, Topic, bundle,
 };
 
 use crate::about_view;
@@ -80,6 +80,7 @@ use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction}
 use crate::backups;
 use crate::enrich::Enricher;
 use crate::folder_sync;
+use crate::frogs_view::{self, FrogAction, FrogShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
@@ -130,6 +131,9 @@ pub enum Selection {
     /// and Reject all; reached by "Done, review" in the Settings, and on
     /// start while one waits.
     AiReview,
+    /// The Frog view (#101): the open Frogs, oldest first, and the
+    /// folded "Done" section; reached from the Agenda's "Eat a frog".
+    Frogs,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -174,6 +178,10 @@ struct AgendaView {
     waiting: usize,
     /// How many Areas shared from afar wait (#108), counted alike.
     offers: usize,
+    /// Today's "Eat a frog" section (ADR 0027), and its Frogs as they
+    /// show.
+    frogs: Option<FrogsToday>,
+    frog_rows: Vec<FrogShown>,
 }
 
 /// What this Device may do to the selected Note in a Shared Area
@@ -238,6 +246,14 @@ struct View {
     detail: Option<(Placed, Vec<Section>)>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
+    /// The Frogs the selected Note spawned, oldest first, each with
+    /// whether this Device may check it off.
+    note_frogs: Vec<(Frog, bool)>,
+    /// The Frog view's open and Done Frogs, while it shows, and whether
+    /// its "Done" section is open.
+    frogs_open: Vec<FrogShown>,
+    frogs_done: Vec<FrogShown>,
+    frogs_done_open: bool,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
@@ -247,6 +263,9 @@ struct View {
     /// The Routines and Reminders in the trash on their own, with their
     /// Notes, while the trash shows.
     trashed_routines: Vec<(Routine, Option<Note>)>,
+    /// The Frogs in the trash, with their Notes and whether this Device
+    /// may restore them, while the trash shows.
+    trashed_frogs: Vec<(Frog, Option<Note>, bool)>,
     /// The user's own Profile and its short code.
     profile: Option<Profile>,
     profile_code: Option<String>,
@@ -313,6 +332,10 @@ enum Dialog {
     /// Whether the edited Routine or Reminder goes to the trash.
     DeleteRoutine {
         question: String,
+    },
+    /// Whether the Frog `id` goes to the trash; its Note stays.
+    DeleteFrog {
+        id: String,
     },
     /// Sharing the Area `area`: the role the other person gets, and the
     /// People it can go to from afar (#108).
@@ -549,6 +572,13 @@ enum Action {
     /// Deletes the selected Note, with or without its Routines, asked.
     TrashNote(bool),
     RestoreRoutine(String),
+    /// Something asked of a Frog or the Frog view (#101).
+    Frog(FrogAction),
+    /// Spawns a Frog from the Note with this id.
+    SpawnFrog(String),
+    /// Moves the Frog the dialog asks about to the trash.
+    DeleteFrog,
+    RestoreFrog(String),
     Setting(Setting),
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window or handed over,
@@ -2053,7 +2083,8 @@ impl App {
             | Selection::Licences
             | Selection::SentItemsWaiting
             | Selection::AreaOffersWaiting
-            | Selection::AiReview => Vec::new(),
+            | Selection::AiReview
+            | Selection::Frogs => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -2095,6 +2126,29 @@ impl App {
                 author,
             })
         };
+        let frogs = Frogs::new(store);
+        let show_frog = |frog: Frog| -> oldbrainfix_core::Result<Option<FrogShown>> {
+            // A Frog whose Note is gone for good shows nowhere.
+            let Some(note) = frogs.note(&frog)? else {
+                return Ok(None);
+            };
+            let area = place(note.clone())?.area;
+            Ok(Some(FrogShown {
+                may_check: store.may_check_off(&frog.id)?,
+                manages: store.may_manage(store.area_of(&frog.id)?.as_deref())?,
+                done_on: frog.done.map(|at| Day::of((self.wall)(at))),
+                frog,
+                note,
+                area,
+            }))
+        };
+        let shown_frogs = |list: Vec<Frog>| -> oldbrainfix_core::Result<Vec<FrogShown>> {
+            let mut out = Vec::new();
+            for frog in list {
+                out.extend(show_frog(frog)?);
+            }
+            Ok(out)
+        };
         let detail = match &self.selected_note {
             Some(id) => match notes.by_id(id)? {
                 Some(note) if !note.is_merged() => Some((place(note)?, notes.sections(id)?)),
@@ -2110,6 +2164,15 @@ impl App {
             Some((p, _)) if !p.note.is_trashed() => routines.of_note(&p.note.id)?,
             _ => Vec::new(),
         };
+        let mut note_frogs = Vec::new();
+        if let Some((p, _)) = &detail
+            && !p.note.is_trashed()
+        {
+            for frog in frogs.of_note(&p.note.id)? {
+                let may_check = store.may_check_off(&frog.id)?;
+                note_frogs.push((frog, may_check));
+            }
+        }
         let may = match &detail {
             Some((p, _)) => NoteMay {
                 changes: self.store.may_change(&p.note.id)?,
@@ -2185,6 +2248,11 @@ impl App {
                         .collect::<oldbrainfix_core::Result<_>>()?;
                     later.push((agenda.later(i), rows));
                 }
+                // Read as the Agenda shows, never while it is drawn:
+                // today's pick is written for the user's own Devices when
+                // it is new, and reading again writes nothing.
+                let today = frogs.pick_today(wall)?;
+                let frog_rows = shown_frogs(today.shown.clone())?;
                 Some(AgendaView {
                     later,
                     today: agenda
@@ -2213,6 +2281,8 @@ impl App {
                         .iter()
                         .filter(|s| s.kind == offers::PENDING_KIND)
                         .count(),
+                    frogs: Some(today),
+                    frog_rows,
                 })
             }
             _ => None,
@@ -2225,6 +2295,24 @@ impl App {
                 trashed_routines.push((routine, note));
             }
         }
+        let mut trashed_frogs = Vec::new();
+        if self.selection == Selection::Trash {
+            for id in store.entities_of_type(oldbrainfix_core::frogs::keys::TYPE_FROG)? {
+                if let Some(frog) = frogs.by_id(&id)?
+                    && frog.is_trashed()
+                {
+                    let note = frogs.note(&frog)?;
+                    let manages = store.may_manage(store.area_of(&frog.id)?.as_deref())?;
+                    trashed_frogs.push((frog, note, manages));
+                }
+            }
+            trashed_frogs.sort_by_key(|(frog, ..)| std::cmp::Reverse(frog.trashed));
+        }
+        let (frogs_open, frogs_done) = if self.selection == Selection::Frogs {
+            (shown_frogs(frogs.open()?)?, shown_frogs(frogs.done()?)?)
+        } else {
+            (Vec::new(), Vec::new())
+        };
         Ok(View {
             areas,
             access,
@@ -2247,6 +2335,10 @@ impl App {
             notes: placed,
             detail,
             routines: note_routines,
+            note_frogs,
+            frogs_open,
+            frogs_done,
+            frogs_done_open: self.store.local_setting(FROGS_DONE_OPEN)?.as_deref() == Some("true"),
             agenda,
             // Each read checks every held file again: only while listed.
             held: if self.selection == Selection::SentItemsWaiting {
@@ -2260,6 +2352,7 @@ impl App {
                 Vec::new()
             },
             trashed_routines,
+            trashed_frogs,
             profile: OwnProfile::new(&self.store).get()?,
             profile_code: OwnProfile::new(&self.store).code()?,
             profile_question: OwnProfile::new(&self.store).question()?,
@@ -2628,6 +2721,17 @@ impl App {
                 }
             }
             Action::RestoreRoutine(id) => Routines::new(&self.store).restore(&id)?,
+            Action::Frog(asked) => self.frog_action(asked)?,
+            Action::SpawnFrog(note) => {
+                self.save_text()?;
+                Frogs::new(&self.store).spawn(&note)?;
+            }
+            Action::DeleteFrog => {
+                if let Some(Dialog::DeleteFrog { id }) = self.dialog.take() {
+                    Frogs::new(&self.store).trash(&id)?;
+                }
+            }
+            Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
             Action::Setting(setting) => self.set(setting)?,
             Action::Sync(SyncAction::Trust(trust)) => {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
@@ -2999,6 +3103,29 @@ impl App {
     /// Captures the capture field's text with `photos` and `recordings`
     /// as a new Note nudged `nudge_in` from now, and shows it; nothing
     /// when all of them are empty.
+    /// Does what was asked of a Frog or the Frog view (#101).
+    fn frog_action(&mut self, asked: FrogAction) -> oldbrainfix_core::Result<()> {
+        let frogs = Frogs::new(&self.store);
+        match asked {
+            FrogAction::Toggle(id) => {
+                if frogs.by_id(&id)?.is_some_and(|f| f.is_done()) {
+                    frogs.unmark_done(&id)?;
+                } else {
+                    frogs.mark_done(&id, None)?;
+                }
+            }
+            FrogAction::Another(id) => frogs.another(&*self.wall, &id)?,
+            FrogAction::OpenNote(id) => return self.act(Action::SelectNote(id)),
+            FrogAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteFrog { id }),
+            FrogAction::OpenView => return self.act(Action::Select(Selection::Frogs)),
+            FrogAction::DoneOpen(open) => {
+                let value = if open { "true" } else { "false" };
+                self.store.set_local_setting(FROGS_DONE_OPEN, value)?;
+            }
+        }
+        Ok(())
+    }
+
     fn capture_note(
         &mut self,
         nudge_in: Duration,
@@ -3137,6 +3264,7 @@ impl App {
             }
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
             Selection::AiReview => Some(Selection::Settings),
+            Selection::Frogs => Some(Selection::Agenda),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
@@ -3700,6 +3828,7 @@ impl App {
             Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
             Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
             Selection::AiReview => self.t.ai_review_title().to_string(),
+            Selection::Frogs => self.t.frogs_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -3821,6 +3950,18 @@ impl App {
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
             Selection::AiReview => return self.ai_review_pane(ui, tones, actions),
+            Selection::Frogs => {
+                let mut asked = Vec::new();
+                let view = &self.view;
+                let lists = (
+                    view.frogs_open.as_slice(),
+                    view.frogs_done.as_slice(),
+                    view.frogs_done_open,
+                );
+                frogs_view::frogs_page(ui, &self.t, tones, lists, &mut asked);
+                actions.extend(asked.into_iter().map(Action::Frog));
+                return;
+            }
             Selection::Sync => {
                 let wall = self.wall.clone();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
@@ -3888,13 +4029,18 @@ impl App {
         if trash && !self.view.trashed_routines.is_empty() {
             self.trashed_routines(ui, tones, actions);
         }
+        if trash && !self.view.trashed_frogs.is_empty() {
+            self.trashed_frogs(ui, tones, actions);
+        }
         if self.view.notes.is_empty() {
             let empty = if trash {
                 self.t.trash_empty()
             } else {
                 self.t.no_notes_yet()
             };
-            if !(trash && !self.view.trashed_routines.is_empty()) {
+            let others =
+                !self.view.trashed_routines.is_empty() || !self.view.trashed_frogs.is_empty();
+            if !(trash && others) {
                 ui.label(RichText::new(empty).color(ui.visuals().weak_text_color()));
             }
             return;
@@ -4040,6 +4186,7 @@ impl App {
             return;
         };
         let linked = &self.view.routines;
+        let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
         let t = self.t;
         let note = &placed.note;
@@ -4262,10 +4409,38 @@ impl App {
                             actions.push(Action::OpenRoutine(routine.id.clone()));
                         }
                     }
+                    // Its Frogs, checked off here too; the words open the
+                    // Frog view.
+                    for (frog, may_check) in note_frogs {
+                        ui.horizontal(|ui| {
+                            let done = frog.is_done();
+                            let label = format!("{}: {}", t.mark_done(), t.frog());
+                            let toggled = ui
+                                .add_enabled_ui(*may_check, |ui| check(ui, tones, done, &label))
+                                .inner;
+                            if toggled.clicked() {
+                                actions.push(Action::Frog(FrogAction::Toggle(frog.id.clone())));
+                            }
+                            frogs_view::frog_mark(ui, 16.0, text);
+                            let mut words = RichText::new(t.frog()).color(text);
+                            if done {
+                                words = words.strikethrough();
+                            }
+                            let open = ui
+                                .add(egui::Label::new(words).sense(Sense::click()))
+                                .on_hover_cursor(egui::CursorIcon::PointingHand);
+                            if open.clicked() {
+                                actions.push(Action::Frog(FrogAction::OpenView));
+                            }
+                        });
+                    }
                     if !may.schedules {
                         ui.label(RichText::new(t.only_managers()).small().color(weak));
                         return;
                     }
+                    // "Routine, Reminder or Frog"; a Note has one open
+                    // Frog at a time.
+                    let frog_open = note_frogs.iter().any(|(f, _)| !f.is_done());
                     ui.horizontal(|ui| {
                         for (reminder, label) in [(false, t.routine()), (true, t.reminder())] {
                             if ui.button(RichText::new(label).color(text)).clicked() {
@@ -4274,6 +4449,9 @@ impl App {
                                     reminder,
                                 });
                             }
+                        }
+                        if !frog_open && ui.button(RichText::new(t.frog()).color(text)).clicked() {
+                            actions.push(Action::SpawnFrog(note.id.clone()));
                         }
                     });
                 });
@@ -4397,6 +4575,15 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.delete()) {
                                 actions.push(Action::DeleteRoutine);
+                            }
+                        });
+                    }
+                    Dialog::DeleteFrog { .. } => {
+                        title(ui, t.delete_frog_question());
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::DeleteFrog);
                             }
                         });
                     }
@@ -4738,6 +4925,17 @@ impl App {
                 }
                 for row in &agenda.today {
                     agenda_row(ui, &t, tones, row, actions);
+                }
+                // Under what is due, never above it (#101).
+                if let Some(frogs) = agenda.frogs.as_ref().filter(|f| f.visible) {
+                    let mut asked = Vec::new();
+                    ui.add_space(4.0);
+                    frogs_view::heading(ui, &t, &mut asked);
+                    let another = frogs.can_swap && !frogs.eaten;
+                    for shown in &agenda.frog_rows {
+                        frogs_view::frog_row(ui, &t, tones, shown, (another, None), &mut asked);
+                    }
+                    actions.extend(asked.into_iter().map(Action::Frog));
                 }
                 // The visible gap between today and tomorrow.
                 ui.add_space(24.0);
@@ -5524,6 +5722,31 @@ impl App {
         });
     }
 
+    /// The Frogs in the trash, most recently deleted first, each with its
+    /// Restore for who may manage it (ADR 0013); a Frog in the trash is
+    /// never purged (ADR 0027).
+    fn trashed_frogs(&self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        embossed(ui, tones, false, None, |ui| {
+            ui.horizontal(|ui| {
+                frogs_view::frog_mark(ui, 16.0, text);
+                ui.label(RichText::new(t.frogs_title()).strong().color(text));
+            });
+            for (frog, note, manages) in &self.view.trashed_frogs {
+                ui.horizontal_wrapped(|ui| {
+                    let what = row_title(&t, note.as_ref());
+                    ui.label(RichText::new(what).color(text));
+                    ui.label(RichText::new(t.frog()).small().color(weak));
+                    if *manages && ui.button(RichText::new(t.restore()).color(text)).clicked() {
+                        actions.push(Action::RestoreFrog(frog.id.clone()));
+                    }
+                });
+            }
+        });
+    }
+
     /// The card's text next to the pointer while a card is dragged.
     fn dragged(&self, ctx: &egui::Context, tones: Tones) {
         let Some(dragged) = egui::DragAndDrop::payload::<DraggedNote>(ctx) else {
@@ -5709,6 +5932,10 @@ fn cancel(ui: &mut Ui, t: &L10n, actions: &mut Vec<Action>) {
 /// The setting of this Device that keeps the "Blocked" section of People
 /// open (#90), the phone's.
 const BLOCKED_OPEN: &str = "peopleBlockedOpen";
+
+/// The local setting that keeps the Frog view's "Done" section open, as
+/// the phone names it.
+const FROGS_DONE_OPEN: &str = "frogsDoneOpen";
 
 /// A person in People: their picture and name, either opening their
 /// Profile.
@@ -6816,7 +7043,7 @@ pub(crate) fn pill(ui: &mut Ui, tones: Tones, on: bool, label: &str) -> egui::Re
 }
 
 /// The box that checks an Occurrence off, called `label`.
-fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
+pub(crate) fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::click());
     resp.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, true, done, label));
     if resp.hovered() {

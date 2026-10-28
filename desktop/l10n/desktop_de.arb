@@ -173,5 +173,6 @@
   "aiFieldArea": "Bereich",
   "aiInTrash": "Im Papierkorb",
   "aiNotInTrash": "Nicht im Papierkorb",
-  "syncPausedError": "Die Synchronisierung ist pausiert, solange eine KI-Aufgabe offen ist oder auf Prüfung wartet. Beende sie mit „Fertig, prüfen“ in den Einstellungen, nimm ihre Änderungen an oder lehne sie ab und versuche es dann noch einmal."
+  "syncPausedError": "Die Synchronisierung ist pausiert, solange eine KI-Aufgabe offen ist oder auf Prüfung wartet. Beende sie mit „Fertig, prüfen“ in den Einstellungen, nimm ihre Änderungen an oder lehne sie ab und versuche es dann noch einmal.",
+  "frogsEmptyDesk": "Keine offenen Frösche. „Frosch“ unter „Routinen und Erinnerungen“ im Editor einer Notiz macht einen."
 }
