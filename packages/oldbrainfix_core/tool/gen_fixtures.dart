@@ -304,7 +304,9 @@ final _scenarios = <Scenario>[
         'its bytes kept for the other Note showing it; a merged Note\'s '
         'photo and a recording removed, their bytes gone, their texts '
         'kept; Notes without words titled as a photo or as a voice '
-        'recording, one with an empty Transcript.',
+        'recording, one with an empty Transcript; a Note merged into that '
+        'one whose Photo Text was removed and whose Transcript was removed '
+        'and transcribed again.',
     build: (store) {
       final notes = Notes(store);
       final receipt = notes.capture('', photos: [_photo(1)]);
@@ -357,6 +359,19 @@ final _scenarios = <Scenario>[
       notes.capture('', photos: [_photo(7)]);
       final hum = notes.capture('', recordings: [_recording(6)]);
       notes.setTranscript(hum.id, hum.recordings.single, '');
+      final bike = notes.capture(
+        'Bike',
+        photos: [_photo(8)],
+        recordings: [_recording(7)],
+      );
+      final frame = bike.photos.single;
+      final lock = bike.recordings.single;
+      notes.setPhotoText(bike.id, frame, 'Frame no. 4711');
+      notes.setTranscript(bike.id, lock, 'Lock code is one two');
+      notes.merge(bike.id, hum.id);
+      notes.removePhotoText(bike.id, frame);
+      notes.removeTranscript(bike.id, lock);
+      notes.setTranscript(bike.id, lock, 'Lock code 1234');
     },
   ),
   (
@@ -531,6 +546,8 @@ const _queries = [
   ' e ',
   'heading',
   'format',
+  // A removed Photo Text, found nowhere.
+  '4711',
 ];
 
 /// A text in a format this version does not know, as a later version
@@ -573,6 +590,8 @@ Map<String, Object?> _note(Note note) => {
   'photoTexts': note.photoTexts,
   'removedPhotos': note.removedPhotos,
   'removedRecordings': note.removedRecordings,
+  'removedTranscripts': note.removedTranscripts,
+  'removedPhotoTexts': note.removedPhotoTexts,
   'wordless': note.wordless.name,
 };
 
@@ -590,15 +609,23 @@ Map<String, Object?> _section(Section section) => {
   'photoTexts': section.photoTexts,
   'removedPhotos': section.removedPhotos,
   'removedRecordings': section.removedRecordings,
+  'removedTranscripts': section.removedTranscripts,
+  'removedPhotoTexts': section.removedPhotoTexts,
 };
 
 /// The photos and recordings of [note] this Device may remove and keep
-/// the text of, as `photo/<hash>` and `audio/<hash>`.
+/// the text of, as `photo/<hash>` and `audio/<hash>`, and the texts it
+/// may remove and keep the file of, as `ocr/<hash>` and
+/// `transcript/<hash>`.
 List<String> _removable(Notes notes, Note note) => [
   for (final hash in note.photos)
     if (notes.mayRemovePhoto(note.id, hash)) 'photo/$hash',
   for (final hash in note.recordings)
     if (notes.mayRemoveRecording(note.id, hash)) 'audio/$hash',
+  for (final hash in note.photos)
+    if (notes.mayRemovePhotoText(note.id, hash)) 'ocr/$hash',
+  for (final hash in note.recordings)
+    if (notes.mayRemoveTranscript(note.id, hash)) 'transcript/$hash',
 ];
 
 List<Map<String, String>> _blobs(List<({String noteId, String hash})> list) => [
@@ -2367,9 +2394,10 @@ Future<void> _sharedFixture(Directory root) async {
       'joinerPeople': _people(ben),
     };
 
-    // Ben, a Member: his own Note, an Amend and a Done count; editing
-    // and trashing Ann's Note, renaming the Area, rescheduling and a
-    // Topic and a Routine of his own are ignored everywhere.
+    // Ben, a Member: his own Note, an Amend, a Done and a text his
+    // machine read count; editing and trashing Ann's Note, removing that
+    // text, renaming the Area, rescheduling and a Topic and a Routine of
+    // his own are ignored everywhere.
     _held = DateTime.utc(2026, 2, 1, 11);
     mark = ben.currentSeq();
     final topic = Places(ben).topics(area).single.id;
@@ -2377,6 +2405,10 @@ Future<void> _sharedFixture(Directory root) async {
     Notes(ben).edit(own.id, 'Ben buys rye bread');
     Notes(ben).amend(milk.id, 'Oat milk please');
     Routines(ben).markDone(bins.id, Occurrence(Day(2026, 2, 1), _at(8)));
+    // As a modified app would write them: a Photo Text on Ann's Note,
+    // which a Member's machine may add, and its removal, which it may not.
+    ben.append(milk.id, NoteKeys.ocr('cd' * 32), 'Oat milk 1,29');
+    ben.append(milk.id, NoteKeys.ocr('cd' * 32), null);
     Notes(ben).edit(milk.id, 'Buy beer');
     Notes(ben).trash(milk.id);
     Places(ben).rename(area, "Ben's");

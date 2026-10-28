@@ -923,3 +923,200 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     assert!(shows(&harness, "×0,75"));
     Ok(())
 }
+
+#[test]
+fn replace_and_append_take_a_photo_text_over_into_the_notes_text() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    // Only the Photo Text that says something; one button per line, in
+    // the phone's order, above the file's own.
+    assert_eq!(harness.query_all_by_label("Replace Note text").count(), 1);
+    assert_eq!(harness.query_all_by_label("Append to Note text").count(), 1);
+    let order = [
+        "Spare key under the pot",
+        "Replace Note text",
+        "Append to Note text",
+        "Remove generated text",
+        "Remove photo, keep text",
+    ];
+    for pair in order.windows(2) {
+        let above = harness.get_by_label(pair[0]).rect();
+        let below = harness.get_by_label(pair[1]).rect();
+        assert!(above.bottom() <= below.top(), "{pair:?}");
+    }
+    let text = |store: &Store| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(Notes::new(store).by_id(SHED)?.ok_or("Shed")?.text)
+    };
+    harness.get_by_label("Append to Note text").click();
+    harness.run();
+    assert_eq!(text(&store)?, "Shed\nSpare key under the pot");
+    // The editor's field took the new text: a second Append builds on it.
+    harness.get_by_label("Append to Note text").click();
+    harness.run();
+    assert_eq!(
+        text(&store)?,
+        "Shed\nSpare key under the pot\nSpare key under the pot"
+    );
+    harness.get_by_label("Replace Note text").click();
+    harness.run();
+    assert_eq!(text(&store)?, "Spare key under the pot");
+    assert_eq!(harness.state().error(), None);
+    // The Photo Text itself stays as it was.
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
+    assert_eq!(
+        shed.photo_texts.get(photo).map(String::as_str),
+        Some("Spare key under the pot")
+    );
+    Ok(())
+}
+
+#[test]
+fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
+    let store = media_store()?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(SHED);
+    harness.run();
+    let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
+    harness.get_by_label("Remove generated text").click();
+    harness.run();
+    assert!(shows(&harness, "Remove this Photo Text?"));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    assert!(!shows(&harness, "Remove this Photo Text?"));
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert!(shed.removed_photo_texts.is_empty());
+    harness.get_by_label("Remove generated text").click();
+    harness.run();
+    harness.get_by_label("Remove").click();
+    harness.run();
+    assert_eq!(harness.state().error(), None);
+    let shed = Notes::new(&store).by_id(SHED)?.ok_or("Shed")?;
+    assert_eq!(shed.removed_photo_texts, vec![photo.to_string()]);
+    assert_eq!(shed.photos.len(), 3);
+    assert!(store.photo(photo).is_some(), "the photo stays");
+    // No text, nothing to take over, remove or remove the photo for.
+    for gone in [
+        "Spare key under the pot",
+        "Replace Note text",
+        "Remove generated text",
+        "Remove photo, keep text",
+    ] {
+        assert!(!shows(&harness, gone), "{gone}");
+    }
+    type_into(&mut harness, "Search all Notes", "spare key");
+    assert!(harness.state().shown_notes().is_empty());
+    Ok(())
+}
+
+#[test]
+fn a_removed_text_shows_only_again_and_comes_back_from_its_file() -> TestResult {
+    let store = media_store()?;
+    let bike = "note:0000000000000000000000000000000a";
+    let photo = "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872";
+    let reader = Enricher::spawn(
+        store.clone(),
+        Kind::PhotoTexts,
+        Box::new(FakeEngine {
+            fail_over: usize::MAX,
+        }),
+        Box::new(|| {}),
+    );
+    let mut app = App::new(store.clone(), "en");
+    app.set_enrichers(None, Some(reader), None);
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    // The voice Note with Bike merged into it: Bike's photo lost its
+    // Photo Text and shows only the button that reads it again; without
+    // a transcriber nothing offers transcribing.
+    harness
+        .state_mut()
+        .select_note("note:00000000000000000000000000000009");
+    harness.run();
+    assert_eq!(harness.query_all_by_label("Read the text again").count(), 1);
+    assert!(!shows(&harness, "Transcribe again"));
+    harness
+        .get_by_label("Read the text again")
+        .click_accesskit();
+    harness.run();
+    let notes = Notes::new(&store);
+    let read = || {
+        notes
+            .by_id(bike)
+            .ok()
+            .flatten()
+            .is_some_and(|n| n.photo_texts.contains_key(photo))
+    };
+    assert!(eventually(read));
+    let section = notes.by_id(bike)?.ok_or("Bike")?;
+    assert!(section.removed_photo_texts.is_empty());
+    assert!(section.photo_texts[photo].starts_with("heard "));
+    Ok(())
+}
+
+#[test]
+fn transcribing_again_without_a_text_is_announced_at_the_top() -> TestResult {
+    let store = media_store()?;
+    let transcriber = Enricher::spawn(
+        store.clone(),
+        Kind::Transcripts,
+        Box::new(FakeEngine { fail_over: 0 }),
+        Box::new(|| {}),
+    );
+    let mut app = App::new(store.clone(), "en");
+    app.set_enrichers(Some(transcriber), None, None);
+    app.select(Selection::All);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 900.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    // Its own recording heard no words; Bike's has a Transcript.
+    harness
+        .state_mut()
+        .select_note("note:00000000000000000000000000000009");
+    harness.run();
+    assert_eq!(harness.query_all_by_label("Transcribe again").count(), 2);
+    assert!(shows(&harness, "Lock code 1234"));
+    harness
+        .query_all_by_label("Transcribe again")
+        .next()
+        .ok_or("again")?
+        .click_accesskit();
+    let announced = "A recording could not be transcribed.";
+    let until = Instant::now() + StdDuration::from_secs(10);
+    while !shows(&harness, announced) && Instant::now() < until {
+        std::thread::sleep(StdDuration::from_millis(5));
+        harness.run();
+    }
+    assert!(shows(&harness, announced));
+    harness.get_by_label(announced).click();
+    harness.run();
+    assert!(shows(&harness, "Recording not transcribed"));
+    assert!(shows(&harness, "Whisper made no text from this recording."));
+    // What was there before stays.
+    let section = Notes::new(&store)
+        .by_id("note:0000000000000000000000000000000a")?
+        .ok_or("Bike")?;
+    assert_eq!(
+        section.transcripts.values().next().map(String::as_str),
+        Some("Lock code 1234")
+    );
+    Ok(())
+}

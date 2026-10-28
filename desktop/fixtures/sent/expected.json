@@ -64,6 +64,8 @@
     "photoTexts": {},
     "removedPhotos": [],
     "removedRecordings": [],
+    "removedTranscripts": [],
+    "removedPhotoTexts": [],
     "wordless": "photo"
   },
   "routines": [
@@ -162,6 +164,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     "sections": [
@@ -178,7 +182,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000501",
@@ -193,7 +199,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000701",
@@ -208,7 +216,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ],
     "routines": [
@@ -312,6 +322,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     "sections": [
@@ -328,7 +340,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000501",
@@ -343,7 +357,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000701",
@@ -358,7 +374,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ],
     "routines": [

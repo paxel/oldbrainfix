@@ -406,6 +406,8 @@ class SpeechModel extends ChangeNotifier {
 /// only repeats of that lead-in is taken out of the Transcript. A
 /// recording that cannot be transcribed is left alone until the next
 /// start; it is never lost, as the recording itself is always kept.
+/// Asked to, it transcribes one recording again, ahead of the others
+/// and whether or not it has a Transcript ([transcribeAgain]).
 class Transcriber extends ChangeNotifier {
   final Notes notes;
   final SpeechModel model;
@@ -413,6 +415,9 @@ class Transcriber extends ChangeNotifier {
 
   /// Recordings that could not be transcribed since the start.
   final _skipped = <String>{};
+
+  /// Recordings the user asked to transcribe again, oldest ask first.
+  final _asked = <({String noteId, String hash, Completer<bool> done})>[];
   String? _current;
   var _running = false;
   var _queued = false;
@@ -458,6 +463,18 @@ class Transcriber extends ChangeNotifier {
   String? transcriptOf(String noteId, String hash) =>
       notes.byId(noteId)?.transcripts[hash];
 
+  /// Transcribes the recording [hash] of the Note [noteId] again, after
+  /// the one running if any, and keeps the result as its Transcript in
+  /// place of the one before or of a removed one; whether it did. A
+  /// recording that could not be transcribed before is tried again.
+  Future<bool> transcribeAgain(String noteId, String hash) {
+    if (_disposed || model.current == null) return Future.value(false);
+    final done = Completer<bool>();
+    _asked.add((noteId: noteId, hash: hash, done: done));
+    _kick();
+    return done.future;
+  }
+
   /// Starts transcribing once whatever changed the log is done, unless
   /// it runs already.
   void _kick() {
@@ -474,12 +491,17 @@ class Transcriber extends ChangeNotifier {
     if (_running) return;
     _running = true;
     _again = false;
+    Completer<bool>? waiting;
     try {
       while (!_disposed && model.current != null) {
-        final next = notes
-            .untranscribed()
-            .where((r) => !_skipped.contains(r.hash))
-            .firstOrNull;
+        final asked = _asked.isEmpty ? null : _asked.removeAt(0);
+        waiting = asked?.done;
+        final next = asked == null
+            ? notes
+                  .untranscribed()
+                  .where((r) => !_skipped.contains(r.hash))
+                  .firstOrNull
+            : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final bytes = notes.recordingBytes(next.hash);
         String? text;
@@ -494,23 +516,41 @@ class Transcriber extends ChangeNotifier {
         }
         // Still there: the Note may have been trashed meanwhile.
         final note = notes.byId(next.noteId);
+        final kept =
+            text != null && note != null && note.recordings.contains(next.hash);
         if (text == null) {
           _skipped.add(next.hash);
-        } else if (note != null && note.recordings.contains(next.hash)) {
+        } else if (kept) {
+          _skipped.remove(next.hash);
           notes.setTranscript(next.noteId, next.hash, text);
         }
+        waiting?.complete(kept);
+        waiting = null;
         notifyListeners();
       }
       await platform.idle();
     } finally {
       _running = false;
+      waiting?.complete(false);
+      // Without a model, or gone: nothing asked for is transcribed.
+      if (_disposed || model.current == null) _dropAsked();
     }
     if (_again) _kick();
+  }
+
+  /// Tells everyone still waiting that their recording was not
+  /// transcribed.
+  void _dropAsked() {
+    for (final asked in _asked) {
+      asked.done.complete(false);
+    }
+    _asked.clear();
   }
 
   @override
   void dispose() {
     _disposed = true;
+    _dropAsked();
     notes.store.removeListener(_kick);
     model.removeListener(_kick);
     super.dispose();
@@ -616,7 +656,9 @@ class _TranscriptTextState extends State<TranscriptText> {
     return Padding(
       // Apart from the play button; nothing at all while there is no text.
       padding: EdgeInsets.only(top: widget.compact ? 4 : 8),
+      // Transcribed again, the Transcript before gives way meanwhile.
       child: switch (text) {
+        _ when _transcribing => Text(t.transcribing, style: quiet),
         null => Text(t.transcribing, style: quiet),
         '' => Text(t.noWordsHeard, style: quiet),
         _ => Text(

@@ -21,6 +21,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -41,6 +43,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -61,6 +65,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -81,6 +87,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -101,6 +109,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -121,6 +131,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     }
   ],
@@ -152,7 +164,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ],
     "note:00000000000000000000000000000005": [
@@ -169,7 +183,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000002",
@@ -184,7 +200,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "note:00000000000000000000000000000003",
@@ -199,7 +217,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000004",
@@ -214,7 +234,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000006",
@@ -229,7 +251,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ]
   },
@@ -264,7 +288,8 @@
       "note:00000000000000000000000000000005"
     ],
     "heading": [],
-    "format": []
+    "format": [],
+    "4711": []
   },
   "searchWithin": {},
   "conflicts": []

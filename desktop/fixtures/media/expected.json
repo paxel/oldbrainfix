@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:01:06.000Z",
+  "now": "2026-01-02T10:01:18.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -25,6 +25,8 @@
         "49ef0140b3d9715c2016cef8da04fbfb1cb913d6ec53c7e9bb29f414f2efbbbb"
       ],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -51,6 +53,8 @@
       "removedRecordings": [
         "bd1898f18f38946acbf9a54575f929632db9b4e01e79fbb635fe382437a5e5d0"
       ],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -83,6 +87,8 @@
       },
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -105,6 +111,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -129,6 +137,8 @@
         "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
       ],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -151,6 +161,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "voiceRecording"
     },
     {
@@ -175,6 +187,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -197,6 +211,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -221,7 +237,39 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "voiceRecording"
+    },
+    {
+      "id": "note:0000000000000000000000000000000a",
+      "text": "Bike",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:01:07.000Z",
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": "note:00000000000000000000000000000009",
+      "spawned": false,
+      "photos": [
+        "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
+      ],
+      "recordings": [
+        "d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58"
+      ],
+      "transcripts": {
+        "d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58": "Lock code 1234"
+      },
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [
+        "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
+      ],
+      "wordless": "photo"
     }
   ],
   "all": [
@@ -245,7 +293,33 @@
   ],
   "inside": {},
   "sections": {
-    "note:00000000000000000000000000000009": [],
+    "note:00000000000000000000000000000009": [
+      {
+        "id": "note:0000000000000000000000000000000a",
+        "noteId": "note:00000000000000000000000000000009",
+        "text": "Bike",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:01:07.000Z",
+        "photos": [
+          "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
+        ],
+        "recordings": [
+          "d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58"
+        ],
+        "transcripts": {
+          "d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58": "Lock code 1234"
+        },
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [
+          "557383277bf8ba9fdbe899439670c7a47a5e0abfb679f48025ce9d6cf1fd4872"
+        ]
+      }
+    ],
     "note:00000000000000000000000000000008": [],
     "note:00000000000000000000000000000004": [
       {
@@ -265,7 +339,9 @@
         "removedPhotos": [
           "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
         ],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "note:00000000000000000000000000000006",
@@ -282,7 +358,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ],
     "note:00000000000000000000000000000003": [],
@@ -320,7 +398,12 @@
   ],
   "removable": {
     "note:00000000000000000000000000000003": [
-      "photo/0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
+      "photo/0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90",
+      "ocr/0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90"
+    ],
+    "note:0000000000000000000000000000000a": [
+      "audio/d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58",
+      "transcript/d759190e4e60e44f152b196c4e9bc710e6e5aabe0ceb0c486a12aa8d17222d58"
     ]
   },
   "search": {
@@ -349,13 +432,15 @@
     "called": [],
     "loop": [],
     " e ": [
+      "note:00000000000000000000000000000009",
       "note:00000000000000000000000000000004",
       "note:00000000000000000000000000000003",
       "note:00000000000000000000000000000002",
       "note:00000000000000000000000000000001"
     ],
     "heading": [],
-    "format": []
+    "format": [],
+    "4711": []
   },
   "searchWithin": {},
   "conflicts": []

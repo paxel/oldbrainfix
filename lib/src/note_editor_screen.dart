@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'calendar_platform.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
@@ -143,7 +145,12 @@ Future<bool> removeMedia(
 }) async {
   final confirmed = await showDialog<bool>(
     context: context,
-    builder: (_) => _RemoveMediaDialog(photo: photo),
+    builder: (context) => _RemoveDialog(
+      title: photo
+          ? context.t.removePhotoQuestion
+          : context.t.removeRecordingQuestion,
+      detail: context.t.removeMediaDetail,
+    ),
   );
   // A sync while the dialog was open may have taken it already.
   final allowed = photo
@@ -154,6 +161,39 @@ Future<bool> removeMedia(
     notes.removePhoto(noteId, hash);
   } else {
     notes.removeRecording(noteId, hash);
+  }
+  return true;
+}
+
+/// Asks once whether the Photo Text ([photo]) or Transcript of the photo
+/// or voice recording [hash] of the Note or Section [noteId] goes while
+/// the file stays, with the verb on the button in the error colour, and
+/// removes it; whether it did (ADR 0025).
+Future<bool> removeGeneratedText(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  String hash, {
+  required bool photo,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => _RemoveDialog(
+      title: photo
+          ? context.t.removePhotoTextQuestion
+          : context.t.removeTranscriptQuestion,
+      detail: context.t.removeGeneratedTextDetail,
+    ),
+  );
+  // A sync while the dialog was open may have taken it already.
+  final allowed = photo
+      ? notes.mayRemovePhotoText(noteId, hash)
+      : notes.mayRemoveTranscript(noteId, hash);
+  if (confirmed != true || !allowed) return false;
+  if (photo) {
+    notes.removePhotoText(noteId, hash);
+  } else {
+    notes.removeTranscript(noteId, hash);
   }
   return true;
 }
@@ -244,6 +284,12 @@ NoteActions noteActions(
 /// it. A photo or recording with a text, of the Note or a Section, has a
 /// button under it that removes it and keeps the text (ADR 0020).
 ///
+/// Under each Transcript and Photo Text, "Replace Note text" and "Append
+/// to Note text" take it over into the text of its Note or Section, and
+/// "Remove generated text" removes it while the file stays; "Transcribe
+/// again" and "Read the text again" make it anew while the file is on
+/// this Device, a removed one included (ADR 0025).
+///
 /// Typed text survives the app being killed: it goes to the log when the
 /// app goes to the background, and a [Draft] of it is kept after every
 /// [draftPause] of typing until it does. A draft newer than the Note's
@@ -284,6 +330,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// The photos and recordings, by the Note or Section they belong to,
   /// that this Device may remove while their texts stay.
   Set<(String, String)> _removable = const {};
+
+  /// The photos and recordings, as for [_removable], whose texts this
+  /// Device may remove while they stay.
+  Set<(String, String)> _textRemovable = const {};
+
+  /// The photos and recordings, as for [_removable], whose texts this
+  /// Device may make again: their files are here.
+  Set<(String, String)> _remakeable = const {};
+
+  /// Those being made again now.
+  final _remaking = <(String, String)>{};
+
+  /// The Note and Sections whose text this Device may change, by id.
+  Set<String> _textChangeable = const {};
   late final _routineBook = Routines(widget.notes.store);
 
   /// Whether this Device may Amend the Note: anywhere it holds a role.
@@ -360,17 +420,42 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
     final notes = widget.notes;
+    final store = notes.store;
+    final files = [
+      if (note != null) (note.id, note.photos, note.recordings),
+      for (final section in _sections)
+        (section.id, section.photos, section.recordings),
+    ];
     _removable = {
-      for (final (id, photos, recordings) in [
-        if (note != null) (note.id, note.photos, note.recordings),
-        for (final section in _sections)
-          (section.id, section.photos, section.recordings),
-      ]) ...[
+      for (final (id, photos, recordings) in files) ...[
         for (final hash in photos)
           if (notes.mayRemovePhoto(id, hash)) (id, hash),
         for (final hash in recordings)
           if (notes.mayRemoveRecording(id, hash)) (id, hash),
       ],
+    };
+    _textRemovable = {
+      for (final (id, photos, recordings) in files) ...[
+        for (final hash in photos)
+          if (notes.mayRemovePhotoText(id, hash)) (id, hash),
+        for (final hash in recordings)
+          if (notes.mayRemoveTranscript(id, hash)) (id, hash),
+      ],
+    };
+    _remakeable = {
+      for (final (id, photos, recordings) in files)
+        if (store.mayChange(id)) ...[
+          for (final hash in photos)
+            if (notes.photoBytes(hash) != null) (id, hash),
+          for (final hash in recordings)
+            if (notes.recordingBytes(hash) != null) (id, hash),
+        ],
+    };
+    _textChangeable = {
+      if (_placed case final placed? when placed.changes)
+        if (placed.note.textEditable) placed.note.id,
+      for (final section in _sections)
+        if (section.textEditable && store.mayChange(section.id)) section.id,
     };
   }
 
@@ -496,6 +581,154 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     ];
   }
 
+  /// Makes the Transcript or Photo Text [generated] the text of the Note
+  /// or Section [id], or adds it on a line of its own after the text
+  /// there ([append]); the Note's field then shows the result.
+  void _takeOver(String id, String generated, {required bool append}) {
+    _saveText();
+    final target = widget.notes.byId(id);
+    if (target == null || !target.textEditable) return;
+    final text = target.text;
+    widget.notes.edit(
+      id,
+      !append
+          ? generated
+          : text.trim().isEmpty
+          ? generated
+          : '${text.trimRight()}\n$generated',
+    );
+    setState(_load);
+    if (id == widget.noteId) _text.text = _placed?.note.text ?? '';
+  }
+
+  /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
+  /// or Section [id] after asking once; the file stays.
+  Future<void> _removeGenerated(String id, String hash, bool photo) async {
+    _saveText();
+    final removed = await removeGeneratedText(
+      context,
+      widget.notes,
+      id,
+      hash,
+      photo: photo,
+    );
+    if (!mounted || !removed) return;
+    _reload();
+  }
+
+  /// Reads the photo ([photo]) or transcribes the recording [hash] of the
+  /// Note or Section [id] again; a failure is announced at the top, also
+  /// when the editor was left meanwhile.
+  Future<void> _makeAgain(String id, String hash, bool photo) async {
+    _saveText();
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context);
+    final reader = PhotoReaderScope.of(context);
+    final transcriber = SpeechScope.of(context)?.transcriber;
+    setState(() => _remaking.add((id, hash)));
+    final made = photo
+        ? await reader?.readAgain(id, hash) ?? false
+        : await transcriber?.transcribeAgain(id, hash) ?? false;
+    if (mounted) {
+      setState(() {
+        _remaking.remove((id, hash));
+        _load();
+      });
+    }
+    if (made || announcements == null) return;
+    announcements.announce(
+      photo ? t.readTextAgainFailed : t.transcribeAgainFailed,
+      onTap: () => unawaited(
+        showFailure(
+          navigator.context,
+          title: photo
+              ? t.readTextAgainFailedTitle
+              : t.transcribeAgainFailedTitle,
+          cause: photo
+              ? t.readTextAgainFailedCause
+              : t.transcribeAgainFailedCause,
+          fix: t.generatedTextAgainFix,
+          details: photo
+              ? 'read again: no Photo Text'
+              : 'transcribe again: no Transcript',
+        ),
+      ),
+    );
+  }
+
+  /// The buttons under the Photo Text ([photo]) or Transcript [text] of
+  /// [hash] of the Note or Section [id], one per line: Replace and Append
+  /// for a text that says something, Remove for one this Device may
+  /// remove, and again while the file is here and an engine runs. Only
+  /// "again" shows for a removed text.
+  List<Widget> _generatedButtons(
+    String id,
+    String hash,
+    String? text, {
+    required bool photo,
+  }) {
+    final t = context.t;
+    // ocrs is tried until it is known not to run; Whisper needs a model.
+    final engine = photo
+        ? switch (PhotoReaderScope.of(context)) {
+            final reader? => reader.supported != false,
+            null => false,
+          }
+        : SpeechScope.of(context)?.model.current != null;
+    final remaking = _remaking.contains((id, hash));
+    Widget button(String key, IconData icon, String label, VoidCallback? run) =>
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('$key:$hash'),
+            onPressed: run,
+            icon: Icon(icon),
+            label: Text(label),
+          ),
+        );
+    return [
+      if (text != null &&
+          text.trim().isNotEmpty &&
+          _textChangeable.contains(id)) ...[
+        button(
+          'replace-text',
+          Icons.swap_horiz,
+          t.replaceNoteText,
+          () => _takeOver(id, text, append: false),
+        ),
+        button(
+          'append-text',
+          Icons.playlist_add,
+          t.appendToNoteText,
+          () => _takeOver(id, text, append: true),
+        ),
+      ],
+      if (_textRemovable.contains((id, hash)))
+        button(
+          'remove-text',
+          Icons.backspace_outlined,
+          t.removeGeneratedText,
+          () => _removeGenerated(id, hash, photo),
+        ),
+      if (engine && _remakeable.contains((id, hash)))
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('again:$hash'),
+            onPressed: remaking ? null : () => _makeAgain(id, hash, photo),
+            icon: remaking
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(photo ? t.readTextAgain : t.transcribeAgain),
+          ),
+        ),
+    ];
+  }
+
   /// Merges the Note, with its text as typed, into the one picked; it
   /// then is a Section there and the editor closes.
   Future<void> _merge() async {
@@ -606,16 +839,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 hash: hash,
                 photoText: note.photoTexts[hash],
               ),
+              ..._generatedButtons(
+                note.id,
+                hash,
+                note.photoTexts[hash],
+                photo: true,
+              ),
               ..._removeButton(note.id, hash, photo: true),
             ],
             // Removed, the file shows no more; its text stays.
-            for (final hash in note.removedPhotos)
+            for (final hash in note.removedPhotos) ...[
               PhotoText(
                 key: ValueKey('ocr:$hash'),
                 noteId: note.id,
                 hash: hash,
                 photoText: note.photoTexts[hash],
               ),
+              ..._generatedButtons(
+                note.id,
+                hash,
+                note.photoTexts[hash],
+                photo: true,
+              ),
+            ],
             for (final hash in note.recordings) ...[
               const SizedBox(height: 16),
               Align(
@@ -633,9 +879,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 transcript: note.transcripts[hash],
                 compact: false,
               ),
+              ..._generatedButtons(
+                note.id,
+                hash,
+                note.transcripts[hash],
+                photo: false,
+              ),
               ..._removeButton(note.id, hash, photo: false),
             ],
-            for (final hash in note.removedRecordings)
+            for (final hash in note.removedRecordings) ...[
               TranscriptText(
                 key: ValueKey('transcript:$hash'),
                 noteId: note.id,
@@ -643,6 +895,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 transcript: note.transcripts[hash],
                 compact: false,
               ),
+              ..._generatedButtons(
+                note.id,
+                hash,
+                note.transcripts[hash],
+                photo: false,
+              ),
+            ],
             const SizedBox(height: 16),
             EditorPanel(
               heading: t.importance,
@@ -767,15 +1026,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         hash: hash,
                         photoText: section.photoTexts[hash],
                       ),
+                      ..._generatedButtons(
+                        section.id,
+                        hash,
+                        section.photoTexts[hash],
+                        photo: true,
+                      ),
                       ..._removeButton(section.id, hash, photo: true),
                     ],
-                    for (final hash in section.removedPhotos)
+                    for (final hash in section.removedPhotos) ...[
                       PhotoText(
                         key: ValueKey('ocr:$hash'),
                         noteId: section.id,
                         hash: hash,
                         photoText: section.photoTexts[hash],
                       ),
+                      ..._generatedButtons(
+                        section.id,
+                        hash,
+                        section.photoTexts[hash],
+                        photo: true,
+                      ),
+                    ],
                     for (final hash in section.recordings) ...[
                       const SizedBox(height: 8),
                       RecordingButton(
@@ -790,9 +1062,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         transcript: section.transcripts[hash],
                         compact: false,
                       ),
+                      ..._generatedButtons(
+                        section.id,
+                        hash,
+                        section.transcripts[hash],
+                        photo: false,
+                      ),
                       ..._removeButton(section.id, hash, photo: false),
                     ],
-                    for (final hash in section.removedRecordings)
+                    for (final hash in section.removedRecordings) ...[
                       TranscriptText(
                         key: ValueKey('transcript:$hash'),
                         noteId: section.id,
@@ -800,6 +1078,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                         transcript: section.transcripts[hash],
                         compact: false,
                       ),
+                      ..._generatedButtons(
+                        section.id,
+                        hash,
+                        section.transcripts[hash],
+                        photo: false,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     CaptureContextLines(capture: section.context, when: when),
                   ],
@@ -974,19 +1259,21 @@ class _DeleteNoteDialog extends StatelessWidget {
   }
 }
 
-/// Asks once whether a photo ([photo]) or voice recording goes while its
-/// text stays: true to remove it, null to cancel.
-class _RemoveMediaDialog extends StatelessWidget {
-  final bool photo;
+/// Asks once whether a photo or voice recording goes while its text
+/// stays, or a text while its file stays: true to remove it, null to
+/// cancel.
+class _RemoveDialog extends StatelessWidget {
+  final String title;
+  final String detail;
 
-  const _RemoveMediaDialog({required this.photo});
+  const _RemoveDialog({required this.title, required this.detail});
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     return AlertDialog(
-      title: Text(photo ? t.removePhotoQuestion : t.removeRecordingQuestion),
-      content: Text(t.removeMediaDetail),
+      title: Text(title),
+      content: Text(detail),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

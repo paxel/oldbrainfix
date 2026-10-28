@@ -62,13 +62,18 @@ class AndroidOcr implements OcrPlatform {
 /// Reads the text in photos in the background, one at a time: each new
 /// one after its Note is saved, and those from before. Capture never
 /// waits for it. A photo that cannot be read is left alone until the
-/// next start; the photo itself is always kept.
+/// next start; the photo itself is always kept. Asked to, it reads one
+/// photo again, ahead of the others and whether or not it has a Photo
+/// Text ([readAgain]).
 class PhotoReader extends ChangeNotifier {
   final Notes notes;
   final OcrPlatform platform;
 
   /// Photos that could not be read since the start.
   final _skipped = <String>{};
+
+  /// Photos the user asked to read again, oldest ask first.
+  final _asked = <({String noteId, String hash, Completer<bool> done})>[];
   bool? _supported;
   String? _current;
   var _running = false;
@@ -91,6 +96,21 @@ class PhotoReader extends ChangeNotifier {
   String? photoTextOf(String noteId, String hash) =>
       notes.byId(noteId)?.photoTexts[hash];
 
+  /// Whether ocrs runs here: null until known.
+  bool? get supported => _supported;
+
+  /// Reads the text in the photo [hash] of the Note [noteId] again, after
+  /// the one running if any, and keeps it as its Photo Text in place of
+  /// the one before or of a removed one; whether it did. A photo that
+  /// could not be read before is tried again.
+  Future<bool> readAgain(String noteId, String hash) {
+    if (_disposed || _supported == false) return Future.value(false);
+    final done = Completer<bool>();
+    _asked.add((noteId: noteId, hash: hash, done: done));
+    _kick();
+    return done.future;
+  }
+
   /// Starts reading once whatever changed the log is done, unless it
   /// runs already or ocrs does not run here.
   void _kick() {
@@ -107,15 +127,20 @@ class PhotoReader extends ChangeNotifier {
     if (_running) return;
     _running = true;
     _again = false;
+    Completer<bool>? waiting;
     try {
       final supported = _supported ??= await platform.supported();
       if (!supported || _disposed) return;
       var read = false;
       while (!_disposed) {
-        final next = notes
-            .unreadPhotos()
-            .where((p) => !_skipped.contains(p.hash))
-            .firstOrNull;
+        final asked = _asked.isEmpty ? null : _asked.removeAt(0);
+        waiting = asked?.done;
+        final next = asked == null
+            ? notes
+                  .unreadPhotos()
+                  .where((p) => !_skipped.contains(p.hash))
+                  .firstOrNull
+            : (noteId: asked.noteId, hash: asked.hash);
         if (next == null) break;
         final bytes = notes.photoBytes(next.hash);
         String? text;
@@ -129,23 +154,40 @@ class PhotoReader extends ChangeNotifier {
         }
         // Still there: the Note may have been trashed meanwhile.
         final note = notes.byId(next.noteId);
+        final kept =
+            text != null && note != null && note.photos.contains(next.hash);
         if (text == null) {
           _skipped.add(next.hash);
-        } else if (note != null && note.photos.contains(next.hash)) {
+        } else if (kept) {
+          _skipped.remove(next.hash);
           notes.setPhotoText(next.noteId, next.hash, text);
         }
+        waiting?.complete(kept);
+        waiting = null;
         notifyListeners();
       }
       if (read) await platform.idle();
     } finally {
       _running = false;
+      waiting?.complete(false);
+      // Where ocrs does not run, or gone: nothing asked for is read.
+      if (_disposed || _supported == false) _dropAsked();
     }
     if (_again) _kick();
+  }
+
+  /// Tells everyone still waiting that their photo was not read.
+  void _dropAsked() {
+    for (final asked in _asked) {
+      asked.done.complete(false);
+    }
+    _asked.clear();
   }
 
   @override
   void dispose() {
     _disposed = true;
+    _dropAsked();
     notes.store.removeListener(_kick);
     super.dispose();
   }

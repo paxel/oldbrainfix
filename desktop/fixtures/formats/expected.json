@@ -21,6 +21,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -41,6 +43,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -61,6 +65,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -81,6 +87,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -101,6 +109,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -121,6 +131,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -141,6 +153,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -161,6 +175,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -181,6 +197,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -201,6 +219,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     }
   ],
@@ -249,7 +269,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       },
       {
         "id": "section:00000000000000000000000000000004",
@@ -264,7 +286,9 @@
         "transcripts": {},
         "photoTexts": {},
         "removedPhotos": [],
-        "removedRecordings": []
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
       }
     ],
     "note:00000000000000000000000000000002": [],
@@ -310,7 +334,8 @@
     "format": [
       "note:0000000000000000000000000000000b",
       "note:00000000000000000000000000000002"
-    ]
+    ],
+    "4711": []
   },
   "searchWithin": {},
   "conflicts": []

@@ -2646,6 +2646,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get remove => 'Remove';
 
   @override
+  String get replaceNoteText => 'Replace Note text';
+
+  @override
+  String get appendToNoteText => 'Append to Note text';
+
+  @override
+  String get removeGeneratedText => 'Remove generated text';
+
+  @override
+  String get transcribeAgain => 'Transcribe again';
+
+  @override
+  String get readTextAgain => 'Read the text again';
+
+  @override
+  String get removeTranscriptQuestion => 'Remove this Transcript?';
+
+  @override
+  String get removePhotoTextQuestion => 'Remove this Photo Text?';
+
+  @override
+  String get removeGeneratedTextDetail =>
+      'Search no longer finds the text, on all your Devices. The file stays, and the text can be made from it again.';
+
+  @override
+  String get transcribeAgainFailed => 'A recording could not be transcribed.';
+
+  @override
+  String get transcribeAgainFailedTitle => 'Recording not transcribed';
+
+  @override
+  String get transcribeAgainFailedCause =>
+      'Whisper made no text from this recording.';
+
+  @override
+  String get readTextAgainFailed => 'The text in a photo could not be read.';
+
+  @override
+  String get readTextAgainFailedTitle => 'Photo not read';
+
+  @override
+  String get readTextAgainFailedCause =>
+      'The text recognition could not read this photo.';
+
+  @override
+  String get generatedTextAgainFix =>
+      'The file stays on the Note; try again later.';
+
+  @override
   String get playbackSpeed => 'Playback speed';
 
   @override

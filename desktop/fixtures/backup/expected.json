@@ -125,6 +125,8 @@
         "photoTexts": {},
         "removedPhotos": [],
         "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
         "wordless": "photo"
       },
       {
@@ -145,6 +147,8 @@
         "photoTexts": {},
         "removedPhotos": [],
         "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
         "wordless": "photo"
       }
     ],
@@ -176,7 +180,9 @@
           "transcripts": {},
           "photoTexts": {},
           "removedPhotos": [],
-          "removedRecordings": []
+          "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": []
         }
       ]
     },
@@ -212,7 +218,8 @@
         "note:00000000000000000000000000000002"
       ],
       "heading": [],
-      "format": []
+      "format": [],
+      "4711": []
     },
     "searchWithin": {
       "area:00000000000000000000000000000006": [],

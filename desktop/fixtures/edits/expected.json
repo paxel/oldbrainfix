@@ -30,6 +30,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -50,6 +52,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -70,6 +74,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -90,6 +96,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -110,6 +118,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -130,6 +140,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -150,6 +162,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -170,6 +184,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     },
     {
@@ -190,6 +206,8 @@
       "photoTexts": {},
       "removedPhotos": [],
       "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
       "wordless": "photo"
     }
   ],
@@ -258,7 +276,8 @@
       "note:0000000000000000000000000000000a"
     ],
     "heading": [],
-    "format": []
+    "format": [],
+    "4711": []
   },
   "searchWithin": {
     "area:00000000000000000000000000000001": [

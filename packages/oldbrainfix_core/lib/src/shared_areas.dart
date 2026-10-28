@@ -297,8 +297,11 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
       may: (a, e, area) {
         if (full(a)) return true;
         if (a != AreaAccess.member) return false;
-        if (e.field.startsWith(NoteKeys.transcriptPrefix) ||
-            e.field.startsWith(NoteKeys.ocrPrefix)) {
+        // Any Note gets its texts from a Member's machine; removing one
+        // is the owner's (ADR 0025).
+        if (e.value != null &&
+            (e.field.startsWith(NoteKeys.transcriptPrefix) ||
+                e.field.startsWith(NoteKeys.ocrPrefix))) {
           return true;
         }
         final owner = ownerIn(area, list);

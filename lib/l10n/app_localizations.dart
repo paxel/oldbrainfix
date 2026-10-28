@@ -4268,6 +4268,96 @@ abstract class AppLocalizations {
   /// **'Remove'**
   String get remove;
 
+  /// Button under a Transcript or Photo Text that makes it the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace Note text'**
+  String get replaceNoteText;
+
+  /// Button under a Transcript or Photo Text that adds it to the end of the Note's text.
+  ///
+  /// In en, this message translates to:
+  /// **'Append to Note text'**
+  String get appendToNoteText;
+
+  /// Button under a Transcript or Photo Text that removes the text and keeps the recording or photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove generated text'**
+  String get removeGeneratedText;
+
+  /// Button under a voice recording that makes its Transcript anew.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribe again'**
+  String get transcribeAgain;
+
+  /// Button under a photo that makes its Photo Text anew.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the text again'**
+  String get readTextAgain;
+
+  /// No description provided for @removeTranscriptQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this Transcript?'**
+  String get removeTranscriptQuestion;
+
+  /// No description provided for @removePhotoTextQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this Photo Text?'**
+  String get removePhotoTextQuestion;
+
+  /// No description provided for @removeGeneratedTextDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Search no longer finds the text, on all your Devices. The file stays, and the text can be made from it again.'**
+  String get removeGeneratedTextDetail;
+
+  /// Announcement when Transcribe again brought no Transcript.
+  ///
+  /// In en, this message translates to:
+  /// **'A recording could not be transcribed.'**
+  String get transcribeAgainFailed;
+
+  /// No description provided for @transcribeAgainFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording not transcribed'**
+  String get transcribeAgainFailedTitle;
+
+  /// No description provided for @transcribeAgainFailedCause.
+  ///
+  /// In en, this message translates to:
+  /// **'Whisper made no text from this recording.'**
+  String get transcribeAgainFailedCause;
+
+  /// Announcement when Read the text again brought no Photo Text.
+  ///
+  /// In en, this message translates to:
+  /// **'The text in a photo could not be read.'**
+  String get readTextAgainFailed;
+
+  /// No description provided for @readTextAgainFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo not read'**
+  String get readTextAgainFailedTitle;
+
+  /// No description provided for @readTextAgainFailedCause.
+  ///
+  /// In en, this message translates to:
+  /// **'The text recognition could not read this photo.'**
+  String get readTextAgainFailedCause;
+
+  /// No description provided for @generatedTextAgainFix.
+  ///
+  /// In en, this message translates to:
+  /// **'The file stays on the Note; try again later.'**
+  String get generatedTextAgainFix;
+
   /// Heading of the menu that chooses how fast recordings play.
   ///
   /// In en, this message translates to:

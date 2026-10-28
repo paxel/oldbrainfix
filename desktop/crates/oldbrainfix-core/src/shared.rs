@@ -429,8 +429,11 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                 if a != AreaAccess::Member {
                     return false;
                 }
-                if e.field.starts_with(note_keys::TRANSCRIPT_PREFIX)
-                    || e.field.starts_with(note_keys::OCR_PREFIX)
+                // Any Note gets its texts from a Member's machine;
+                // removing one is the owner's (ADR 0025).
+                if e.value.is_some()
+                    && (e.field.starts_with(note_keys::TRANSCRIPT_PREFIX)
+                        || e.field.starts_with(note_keys::OCR_PREFIX))
                 {
                     return true;
                 }

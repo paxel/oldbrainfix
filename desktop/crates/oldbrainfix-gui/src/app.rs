@@ -64,7 +64,7 @@ use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, CardTaken, ClockTime, Day,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CardTaken, ClockTime, Day,
     DeviceSettings, Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence,
     OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search,
     Section, Store, Topic, bundle,
@@ -86,7 +86,7 @@ use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
     photo_from_file,
 };
-use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
+use crate::media_view::{self, Generated, Offers, Photo, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
@@ -218,6 +218,15 @@ struct View {
     /// Sections this Device may remove while their texts stay
     /// (ADR 0020), by Note id and hash.
     removable: HashSet<(String, String)>,
+    /// Those, as for `removable`, whose Transcripts and Photo Texts this
+    /// Device may remove while they stay (ADR 0025).
+    text_removable: HashSet<(String, String)>,
+    /// Those, as for `removable`, whose texts this Device may make
+    /// again: their files are here and the Note is its to change.
+    remakeable: HashSet<(String, String)>,
+    /// The selected Note and its Sections whose text this Device may
+    /// change, by id.
+    text_changeable: HashSet<String>,
     notes: Vec<Placed>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
@@ -367,6 +376,13 @@ enum Dialog {
     /// Whether the photo (`photo`) or voice recording `hash` of the Note
     /// `note` goes while its text stays (ADR 0020).
     RemoveMedia {
+        note: String,
+        hash: String,
+        photo: bool,
+    },
+    /// Whether the Photo Text (`photo`) or Transcript of `hash` of the
+    /// Note `note` goes while its file stays (ADR 0025).
+    RemoveText {
         note: String,
         hash: String,
         photo: bool,
@@ -595,6 +611,34 @@ enum Action {
     },
     /// Removes the photo or recording asked about and keeps its text.
     RemoveMedia,
+    /// Makes the Photo Text (`photo`) or Transcript of `hash` the text of
+    /// the Note `note`, the selected one or one merged into it, or adds
+    /// it on a line of its own after that text (`append`) (ADR 0025).
+    TakeOver {
+        note: String,
+        hash: String,
+        photo: bool,
+        append: bool,
+    },
+    /// Asks whether the Photo Text (`photo`) or Transcript of `hash` of
+    /// the Note `note` goes while its file stays.
+    AskRemoveText {
+        note: String,
+        hash: String,
+        photo: bool,
+    },
+    /// Removes the Photo Text or Transcript asked about.
+    RemoveText,
+    /// Reads the photo (`photo`) or transcribes the recording `hash` of
+    /// the Note `note` again.
+    Again {
+        note: String,
+        hash: String,
+        photo: bool,
+    },
+    /// Shows why reading a photo (`true`) or transcribing a recording
+    /// again brought no text.
+    ShowAgainFailed(bool),
     /// Something asked of the Backups card on the Profile page.
     Backup(BackupAction),
     /// Something asked of the own Profile on the Profile page.
@@ -741,6 +785,9 @@ pub struct App {
     /// Why the recordings from files last made into a Note cannot be
     /// transcribed, one line each, announced at the top until clicked.
     untranscribable: Vec<(oldbrainfix_whisper::Problem, String)>,
+    /// Whether reading a photo (`true`) or transcribing a recording again
+    /// last brought no text, announced at the top until clicked.
+    again_failed: Option<bool>,
     /// The dialog a person's Profile opened over, shown again after it.
     dialog_behind: Option<Dialog>,
     /// "Which one is you?" was put off until the Profile page asks again.
@@ -912,6 +959,7 @@ impl App {
             person_square: None,
             files_picker: Box::new(|title| files_dialog(title).pick_files().unwrap_or_default()),
             untranscribable: Vec::new(),
+            again_failed: None,
             dialog_behind: None,
             question_later: false,
             picture_picker: Box::new(|title| picture_dialog(title).pick_file()),
@@ -1928,20 +1976,46 @@ impl App {
             None => NoteMay::default(),
         };
         let mut removable = HashSet::new();
+        let mut text_removable = HashSet::new();
+        let mut remakeable = HashSet::new();
+        let mut text_changeable = HashSet::new();
         if let Some((p, sections)) = &detail
             && !p.note.is_trashed()
         {
+            if may.changes && p.note.text_editable {
+                text_changeable.insert(p.note.id.clone());
+            }
+            for section in sections {
+                if section.text_editable && self.store.may_change(&section.id)? {
+                    text_changeable.insert(section.id.clone());
+                }
+            }
             let note = (&p.note.id, &p.note.photos, &p.note.recordings);
             let merged = sections.iter().map(|s| (&s.id, &s.photos, &s.recordings));
             for (id, photos, recordings) in std::iter::once(note).chain(merged) {
+                let changes = self.store.may_change(id)?;
                 for hash in photos {
+                    let key = (id.clone(), hash.clone());
                     if notes.may_remove_photo(id, hash)? {
-                        removable.insert((id.clone(), hash.clone()));
+                        removable.insert(key.clone());
+                    }
+                    if notes.may_remove_photo_text(id, hash)? {
+                        text_removable.insert(key.clone());
+                    }
+                    if changes && notes.photo_bytes(hash).is_some() {
+                        remakeable.insert(key);
                     }
                 }
                 for hash in recordings {
+                    let key = (id.clone(), hash.clone());
                     if notes.may_remove_recording(id, hash)? {
-                        removable.insert((id.clone(), hash.clone()));
+                        removable.insert(key.clone());
+                    }
+                    if notes.may_remove_transcript(id, hash)? {
+                        text_removable.insert(key.clone());
+                    }
+                    if changes && notes.recording_bytes(hash).is_some() {
+                        remakeable.insert(key);
                     }
                 }
             }
@@ -2021,6 +2095,9 @@ impl App {
             mine,
             may,
             removable,
+            text_removable,
+            remakeable,
+            text_changeable,
             notes: placed,
             detail,
             routines: note_routines,
@@ -2662,6 +2739,90 @@ impl App {
                     }
                 }
             }
+            Action::TakeOver {
+                note,
+                hash,
+                photo,
+                append,
+            } => {
+                self.save_text()?;
+                let notes = Notes::new(&self.store);
+                let Some(target) = notes.by_id(&note)? else {
+                    return Ok(());
+                };
+                let texts = if photo {
+                    &target.photo_texts
+                } else {
+                    &target.transcripts
+                };
+                let Some(generated) = texts.get(&hash).filter(|g| !g.trim().is_empty()) else {
+                    return Ok(());
+                };
+                if !target.text_editable || !self.store.may_change(&note)? {
+                    return Ok(());
+                }
+                // As the phone joins them.
+                let text = &target.text;
+                let joined = if !append || text.trim().is_empty() {
+                    generated.clone()
+                } else {
+                    format!("{}\n{}", text.trim_end(), generated)
+                };
+                notes.edit(&note, &joined)?;
+                if self.text_of.as_deref() == Some(note.as_str()) {
+                    self.text = joined.trim().to_string();
+                }
+            }
+            Action::AskRemoveText { note, hash, photo } => {
+                self.save_text()?;
+                self.dialog = Some(Dialog::RemoveText { note, hash, photo });
+            }
+            Action::RemoveText => {
+                if let Some(Dialog::RemoveText { note, hash, photo }) = self.dialog.take() {
+                    // A sync while the dialog was open may have taken it
+                    // already.
+                    if photo {
+                        if notes.may_remove_photo_text(&note, &hash)? {
+                            notes.remove_photo_text(&note, &hash)?;
+                        }
+                    } else if notes.may_remove_transcript(&note, &hash)? {
+                        notes.remove_transcript(&note, &hash)?;
+                    }
+                }
+            }
+            Action::Again { note, hash, photo } => {
+                self.save_text()?;
+                let enricher = if photo {
+                    &self.reader
+                } else {
+                    &self.transcriber
+                };
+                if let Some(enricher) = enricher {
+                    enricher.again(Blob {
+                        note_id: note,
+                        hash,
+                    });
+                }
+            }
+            Action::ShowAgainFailed(photo) => {
+                self.again_failed = None;
+                let t = self.t;
+                self.dialog = Some(if photo {
+                    Dialog::Failure {
+                        title: t.read_text_again_failed_title().into(),
+                        cause: t.read_text_again_failed_cause().into(),
+                        fix: t.generated_text_again_fix().into(),
+                        details: "read again: no Photo Text".into(),
+                    }
+                } else {
+                    Dialog::Failure {
+                        title: t.transcribe_again_failed_title().into(),
+                        cause: t.transcribe_again_failed_cause().into(),
+                        fix: t.generated_text_again_fix().into(),
+                        details: "transcribe again: no Transcript".into(),
+                    }
+                });
+            }
             Action::Sync(SyncAction::AutoSync(id, on)) => self.store.set_auto_sync(&id, on)?,
             Action::Sync(SyncAction::Keep {
                 entity,
@@ -2990,6 +3151,15 @@ impl App {
         }
         ui.ctx()
             .request_repaint_after(std::time::Duration::from_secs(30));
+        // What was asked to be read again and brought no text.
+        for (enricher, photo) in [(&self.transcriber, false), (&self.reader, true)] {
+            if enricher
+                .as_ref()
+                .is_some_and(|e| !e.take_failed().is_empty())
+            {
+                self.again_failed = Some(photo);
+            }
+        }
         // A phone's requests are answered while the Sync view shows.
         if self.sync.hosting() {
             let asked = self.sync.asking().is_some();
@@ -3136,6 +3306,24 @@ impl App {
                         .sense(egui::Sense::click());
                     if ui.add(label).clicked() {
                         actions.push(Action::ShowUntranscribable);
+                    }
+                });
+        } else if let Some(photo) = self.again_failed {
+            // Reading or transcribing again brought no text; the click
+            // shows why.
+            let text = if photo {
+                self.t.read_text_again_failed()
+            } else {
+                self.t.transcribe_again_failed()
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowAgainFailed(photo));
                     }
                 });
         } else if let Some(notice) = self.notice.clone() {
@@ -3679,7 +3867,14 @@ impl App {
         let speed = self.speed;
         let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
         let transcribing = transcribing.as_deref();
-        let removable = &self.view.removable;
+        // Whisper needs its model; ocrs is built in.
+        let heard = self.speech.as_ref().is_none_or(|s| s.current().is_some());
+        let offering = Offering {
+            view: &self.view,
+            transcriber: self.transcriber.as_ref().filter(|_| heard),
+            reader: self.reader.as_ref(),
+        };
+        let offering = &offering;
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -3740,7 +3935,7 @@ impl App {
                                 &note.transcripts,
                             ),
                         };
-                        let shown = (&mut *cache, &**store, removable);
+                        let shown = (&mut *cache, &**store, offering);
                         editor_media(
                             ui,
                             &t,
@@ -3843,7 +4038,7 @@ impl App {
                                 &section.transcripts,
                             ),
                         };
-                        let shown = (&mut *cache, &**store, removable);
+                        let shown = (&mut *cache, &**store, offering);
                         editor_media(
                             ui,
                             &t,
@@ -4150,6 +4345,24 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.remove()) {
                                 actions.push(Action::RemoveMedia);
+                            }
+                        });
+                    }
+                    Dialog::RemoveText { photo, .. } => {
+                        title(
+                            ui,
+                            if *photo {
+                                t.remove_photo_text_question()
+                            } else {
+                                t.remove_transcript_question()
+                            },
+                        );
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.remove_generated_text_detail()).color(text));
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.remove()) {
+                                actions.push(Action::RemoveText);
                             }
                         });
                     }
@@ -6671,30 +6884,71 @@ struct Media<'a> {
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
 }
 
+/// What the editor may offer under the photos and recordings it shows
+/// and their texts: the Transcripts are made again by `transcriber`,
+/// the Photo Texts by `reader`, each one given only while it can.
+struct Offering<'a> {
+    view: &'a View,
+    transcriber: Option<&'a Enricher>,
+    reader: Option<&'a Enricher>,
+}
+
+impl Offering<'_> {
+    /// What shows under the photo (`photo`) or recording `hash` of the
+    /// Note or Section `id` (ADR 0020, ADR 0025).
+    fn offers(&self, id: &str, hash: &str, photo: bool) -> Offers {
+        let key = (id.to_string(), hash.to_string());
+        let engine = if photo { self.reader } else { self.transcriber };
+        Offers {
+            take_over: self.view.text_changeable.contains(id),
+            remove_text: self.view.text_removable.contains(&key),
+            again: engine
+                .filter(|_| self.view.remakeable.contains(&key))
+                .map(|e| e.busy_with(hash)),
+            remove_file: self.view.removable.contains(&key),
+        }
+    }
+}
+
 /// What the editor shows of `media`: the photos with their Photo Texts,
 /// the recordings with their play buttons and playback `speed` while
-/// `can_play`, the button under each one the Device may remove while its
-/// text stays, and the texts of those removed where the files were
-/// (ADR 0020).
+/// `can_play`, the texts of those removed where the files were
+/// (ADR 0020), and under each text and file the buttons `offering`
+/// gives (ADR 0025).
 fn editor_media(
     ui: &mut Ui,
     t: &L10n,
     media: Media,
-    (cache, store, removable): (&mut PhotoCache, &Store, &HashSet<(String, String)>),
+    (cache, store, offering): (&mut PhotoCache, &Store, &Offering),
     (playing, transcribing, can_play, speed): (Option<&str>, Option<&str>, bool, f64),
     actions: &mut Vec<Action>,
 ) {
     let id = media.id;
     let (photos, removed_photos, photo_texts) = media.photos;
     let (recordings, removed_recordings, transcripts) = media.recordings;
-    let may = |hash: &str| removable.contains(&(id.to_string(), hash.to_string()));
     let ask = |hash: String, photo: bool| Action::AskRemoveMedia {
         note: id.to_string(),
         hash,
         photo,
     };
-    if let Some(hash) = media_view::photos(ui, t, (cache, store), photos, photo_texts, &may) {
-        actions.push(ask(hash, true));
+    let text = |asked: Generated, photo: bool| {
+        let note = id.to_string();
+        match asked {
+            Generated::TakeOver { hash, append } => Action::TakeOver {
+                note,
+                hash,
+                photo,
+                append,
+            },
+            Generated::Remove(hash) => Action::AskRemoveText { note, hash, photo },
+            Generated::Again(hash) => Action::Again { note, hash, photo },
+        }
+    };
+    let photo_offers = |hash: &str| offering.offers(id, hash, true);
+    match media_view::photos(ui, t, (cache, store), photos, photo_texts, &photo_offers) {
+        Some(Photo::Remove(hash)) => actions.push(ask(hash, true)),
+        Some(Photo::Text(asked)) => actions.push(text(asked, true)),
+        None => {}
     }
     let asked = media_view::recordings(
         ui,
@@ -6703,19 +6957,24 @@ fn editor_media(
         transcripts,
         (playing, transcribing, speed),
         can_play,
-        &may,
+        &|hash| offering.offers(id, hash, false),
     );
     match asked {
         Some(Recording::Play(hash)) => actions.push(Action::Play(hash)),
         Some(Recording::Remove(hash)) => actions.push(ask(hash, false)),
+        Some(Recording::Text(asked)) => actions.push(text(asked, false)),
         Some(Recording::Speed(speed)) => actions.push(Action::Speed(speed)),
         None => {}
     }
-    media_view::removed_texts(
+    if let Some((photo, asked)) = media_view::removed_texts(
         ui,
+        t,
         (removed_photos, photo_texts),
         (removed_recordings, transcripts),
-    );
+        &|hash, photo| offering.offers(id, hash, photo),
+    ) {
+        actions.push(text(asked, photo));
+    }
 }
 
 /// A Note as a card (UI laws, "Cards"): its text, when it was captured
@@ -6773,12 +7032,14 @@ fn note_card(
                 &note.transcripts,
                 (None, media.transcribing, 1.0),
                 false,
-                &|_| false,
+                &|_| Offers::default(),
             );
             media_view::removed_texts(
                 ui,
+                t,
                 (&note.removed_photos, &note.photo_texts),
                 (&note.removed_recordings, &note.transcripts),
+                &|_, _| Offers::default(),
             );
             // Another person's Note shows their picture (ADR 0017); the
             // user's own none.

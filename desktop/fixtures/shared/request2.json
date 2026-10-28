@@ -5,7 +5,7 @@
   "proof": "h2abveNbJ58jdblj9aIX7Jy9G9gvc7pEVFOWWYW1tJD8Vlv5JJEUo+U1hYUYCe4dcGe0odqeM9UKvmPdHCfmCQ==",
   "vector": {
     "65b60673d6ed884bf01c2c222d82ada0": 44,
-    "c945cbf2a5602002141e2fb9d17054d6": 25
+    "c945cbf2a5602002141e2fb9d17054d6": 27
   },
   "entries": [
     {
@@ -123,28 +123,50 @@
       "device": "c945cbf2a5602002141e2fb9d17054d6",
       "dseq": 14,
       "entity": "note:00000000000000000000000000000001",
+      "field": "ocr:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "value": "Oat milk 1,29",
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "QVK7tgR7NODvfnRo9uT+6c17OW8cKk6MI/K1wC/dCfVOJyvFW46xYK11T0Kg36PR2TpNELRwJT4UTrLpSgynBw=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 15,
+      "entity": "note:00000000000000000000000000000001",
+      "field": "ocr:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "value": null,
+      "date": "2026-02-01T11:00:00.000Z",
+      "author": "Ada",
+      "recorded": "2026-02-01T11:00:00.000Z",
+      "sig": "5Rvyjxxg8f2iV1DEumsHHuoN6j7He61VYAkjW9U73gam7texbryJksyDGXb3VV1YQlp5K6X48BqbYLQXs4GLCg=="
+    },
+    {
+      "device": "c945cbf2a5602002141e2fb9d17054d6",
+      "dseq": 16,
+      "entity": "note:00000000000000000000000000000001",
       "field": "text",
       "value": "{\"format\":\"plain\",\"text\":\"Buy beer\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
-      "sig": "BePm2aCgwHVBr3vvofVkemnbj27yS2EKpehFFIxeyMo4AZSC9qju8YdYkdMDOPQoXpJ0cscY0eMZRZwNIgrWBQ=="
+      "sig": "IQ+LvgPucnPkWwlLyOAysYn+MVfCgIE+ARKE2K853S09XYEhbL6P+4AiBouJDNsMpyR2pr/yZi+G400489h+AA=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 15,
+      "dseq": 17,
       "entity": "note:00000000000000000000000000000001",
       "field": "trashed",
       "value": "2026-02-01T11:00:00.000Z",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "w0UATX5RTP4SKvPjvD99P3fZyfLooelZU5OLrZXBB5kApL0nH9x1UHD/0WUVofRV/pCBE6o/I+JxBAZvgaTnAw=="
+      "sig": "2FxxWOz0e0E5CdXrqOSKWfD0Cf/9AQCi+2rvvMQptnIFBS6eeGFgztofOuuHKwGhVdwHw/m4oGmUm54+HYLeDg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 16,
+      "dseq": 18,
       "entity": "area:00000000000000000000000000000101",
       "field": "name",
       "value": "Ben's",
@@ -152,11 +174,11 @@
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
-      "sig": "IcKt7KSKC0ijSG5entCWndRqyrFAvRKc3ObrFR3PNYORV7vFEvw3/HZSi21FNd+n7kaWcsNT/ySk4uB+46O7Bg=="
+      "sig": "WHkwcjayrbBUBBW1Z45gJnyPaZtfGAk8H8rZrxbOnAXdxTYl2nHe5dQ063Htgk4eVfIUmX5h6fmuvcVIX01+Bg=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 17,
+      "dseq": 19,
       "entity": "routine:00000000000000000000000000000002",
       "field": "times",
       "value": "06:00",
@@ -164,11 +186,11 @@
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
-      "sig": "HZ6XTlBkLd6Zni5xf+0NQlWlajV/I+WRA7TMIyXboXpm6GQJmSeboBgTwyxkhYRDzDC8ubrSetLrB5HaNJSACg=="
+      "sig": "DJleRDwoN5nGxYQBLzA0AQAaZ03ZyeIhhCO2DLmX9N2iXC5hreBBd1Hmuk10C1Hj/jzeeE9cvkCz8cPHuPbaDw=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 18,
+      "dseq": 20,
       "entity": "routine:00000000000000000000000000000002",
       "field": "rule",
       "value": null,
@@ -176,18 +198,18 @@
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
       "ctx": "65b60673d6ed884bf01c2c222d82ada0:44",
-      "sig": "8dt6ykeNPyK40+wez2qM7TQGNVCVT0XJ9gLIHwaqc39woSiFYphwpY2b4H+nrlzRljlrZzXZPLY/Ts2sGx5qAg=="
+      "sig": "dKoUPYigfDXf4woeVY46bJ89TtLfmWLMGaerY9TI3RGhXBMahoxgZA0gTOvEHQRzjKogErF30gW94HSBRTbnDQ=="
     },
     {
       "device": "c945cbf2a5602002141e2fb9d17054d6",
-      "dseq": 25,
+      "dseq": 27,
       "entity": "area:00000000000000000000000000000101",
       "field": "role:c945cbf2a5602002141e2fb9d17054d6",
       "value": "{\"profile\":\"nobody\",\"role\":\"manager\"}",
       "date": "2026-02-01T11:00:00.000Z",
       "author": "Ada",
       "recorded": "2026-02-01T11:00:00.000Z",
-      "sig": "jY0WUIV99+wevLA/spdIGQ5jcl/HNNAmTM6fdeXwVB/q1XfoMTg/4E34aJztGX6iAwg+/2tzrrDXh7vGHtJzBA=="
+      "sig": "lh91IC77AVbr3qTqt5i/0C/G4Z5XeBSRtHXWfKDQ5avK9NtpkOVJlsCobcdjuRrGho3/EAjDBLhDdPt5SvbBBA=="
     }
   ],
   "keys": [

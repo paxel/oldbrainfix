@@ -2,7 +2,9 @@
 //! show in the window and the capture popup: photos as pictures, in the
 //! editor with their Photo Texts under them, a play button per recording
 //! with its Transcript under it, the texts of those removed while their
-//! texts stay (ADR 0020), the microphone's
+//! texts stay (ADR 0020), the buttons under each Transcript and Photo
+//! Text that take it over, remove it or make it again (ADR 0025), the
+//! microphone's
 //! button and the one big stop button (UI laws, "Capture"), and the
 //! speech model's card in the Settings.
 
@@ -89,23 +91,110 @@ pub fn thumbnails(
     });
 }
 
+/// What the editor offers under a photo or voice recording and its
+/// text, by its hash; nothing on a card.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Offers {
+    /// "Replace Note text" and "Append to Note text": the text of its
+    /// Note or Section may change (ADR 0025).
+    pub take_over: bool,
+    /// "Remove generated text" (ADR 0025).
+    pub remove_text: bool,
+    /// "Transcribe again" or "Read the text again" while the file is
+    /// here, an engine runs and the Note may change: `Some(true)` while
+    /// it is being made, when the button rests.
+    pub again: Option<bool>,
+    /// The button that removes the file and keeps its text (ADR 0020).
+    pub remove_file: bool,
+}
+
+/// What was asked of a Transcript or Photo Text, by its file's hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Generated {
+    /// Make it the Note's text (`append` false) or add it on a line of
+    /// its own after the Note's text.
+    TakeOver { hash: String, append: bool },
+    /// Remove it; the file stays.
+    Remove(String),
+    /// Make it again from the file.
+    Again(String),
+}
+
+/// The buttons under the Photo Text (`photo`) or Transcript `said` of
+/// `hash`, one per line, in the phone's order: Replace and Append for a
+/// text that says something, Remove, and "again". Only "again" shows for
+/// a removed text, which has none.
+fn generated_buttons(
+    ui: &mut Ui,
+    t: &L10n,
+    hash: &str,
+    said: Option<&String>,
+    offers: Offers,
+    photo: bool,
+) -> Option<Generated> {
+    let text = ui.visuals().text_color();
+    let mut asked = None;
+    if offers.take_over && said.is_some_and(|s| !s.trim().is_empty()) {
+        for (append, label) in [
+            (false, t.replace_note_text()),
+            (true, t.append_to_note_text()),
+        ] {
+            if ui.button(RichText::new(label).color(text)).clicked() {
+                asked = Some(Generated::TakeOver {
+                    hash: hash.to_string(),
+                    append,
+                });
+            }
+        }
+    }
+    if offers.remove_text
+        && ui
+            .button(RichText::new(t.remove_generated_text()).color(text))
+            .clicked()
+    {
+        asked = Some(Generated::Remove(hash.to_string()));
+    }
+    if let Some(busy) = offers.again {
+        let label = if photo {
+            t.read_text_again()
+        } else {
+            t.transcribe_again()
+        };
+        let again = egui::Button::new(RichText::new(label).color(text));
+        if ui.add_enabled(!busy, again).clicked() {
+            asked = Some(Generated::Again(hash.to_string()));
+        }
+    }
+    asked
+}
+
+/// What was asked of a photo.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Photo {
+    /// Removing it and keeping its Photo Text (ADR 0020).
+    Remove(String),
+    /// Something of its Photo Text.
+    Text(Generated),
+}
+
 /// The photos `hashes` one under the other, as wide as there is room,
 /// each with its Photo Text from `photo_texts` under it, as the phone's
-/// editor shows it, and each one `removable` with the button that
-/// removes it and keeps its Photo Text (ADR 0020). The hash whose button
-/// was clicked comes back.
+/// editor shows it, the buttons it `offers` for that text, and the
+/// button that removes the photo and keeps its Photo Text (ADR 0020).
+/// What was clicked comes back.
 pub fn photos(
     ui: &mut Ui,
     t: &L10n,
     (cache, store): (&mut PhotoCache, &Store),
     hashes: &[String],
     photo_texts: &BTreeMap<String, String>,
-    removable: &dyn Fn(&str) -> bool,
-) -> Option<String> {
+    offers: &dyn Fn(&str) -> Offers,
+) -> Option<Photo> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
-    let mut remove = None;
+    let mut clicked = None;
     for hash in hashes {
+        let offered = offers(hash);
         match cache.get(ui, store, hash) {
             Some(texture) => {
                 let size = texture.size_vec2();
@@ -125,36 +214,53 @@ pub fn photos(
             }
         }
         // A photo without text, or not read yet, shows none.
-        if let Some(said) = photo_texts.get(hash).filter(|s| !s.trim().is_empty()) {
+        let said = photo_texts.get(hash);
+        if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
             ui.label(RichText::new(said).color(weak));
         }
-        if removable(hash)
+        if let Some(asked) = generated_buttons(ui, t, hash, said, offered, true) {
+            clicked = Some(Photo::Text(asked));
+        }
+        if offered.remove_file
             && ui
                 .button(RichText::new(t.remove_photo_keep_text()).color(text))
                 .clicked()
         {
-            remove = Some(hash.clone());
+            clicked = Some(Photo::Remove(hash.clone()));
         }
     }
-    remove
+    clicked
 }
 
 /// The texts of the photos and voice recordings removed while their
 /// texts stay (ADR 0020), where the files were: each Photo Text of
-/// `photos` and Transcript of `recordings` that is not empty.
+/// `photos` and Transcript of `recordings` that is not empty, with the
+/// buttons it `offers` by hash and whether it is a photo's. What was
+/// asked of a Photo Text (`true`) or Transcript comes back.
 pub fn removed_texts(
     ui: &mut Ui,
+    t: &L10n,
     (photos, photo_texts): (&[String], &BTreeMap<String, String>),
     (recordings, transcripts): (&[String], &BTreeMap<String, String>),
-) {
+    offers: &dyn Fn(&str, bool) -> Offers,
+) -> Option<(bool, Generated)> {
     let weak = ui.visuals().weak_text_color();
     let texts = photos
         .iter()
-        .filter_map(|h| photo_texts.get(h))
-        .chain(recordings.iter().filter_map(|h| transcripts.get(h)));
-    for said in texts.filter(|s| !s.trim().is_empty()) {
+        .map(|h| (h, photo_texts.get(h), true))
+        .chain(recordings.iter().map(|h| (h, transcripts.get(h), false)));
+    let mut clicked = None;
+    for (hash, said, photo) in texts {
+        let Some(said) = said.filter(|s| !s.trim().is_empty()) else {
+            continue;
+        };
         ui.label(RichText::new(said).color(weak));
+        if let Some(asked) = generated_buttons(ui, t, hash, Some(said), offers(hash, photo), photo)
+        {
+            clicked = Some((photo, asked));
+        }
     }
+    clicked
 }
 
 /// What was asked of a voice recording.
@@ -164,6 +270,8 @@ pub enum Recording {
     Play(String),
     /// Removing it and keeping its Transcript (ADR 0020).
     Remove(String),
+    /// Something of its Transcript.
+    Text(Generated),
     /// Playing every recording at this speed from now on, 1 being normal
     /// speed.
     Speed(f64),
@@ -172,9 +280,10 @@ pub enum Recording {
 /// What shows of the voice recordings `hashes`: a play or stop button
 /// each with the playback `speed` beside it, which opens the speeds to
 /// choose from, and its Transcript, "Transcribing…" while it is being
-/// made, or "No words heard." for an empty one; each one `removable`
-/// with the button that removes it and keeps its Transcript. What was
-/// clicked comes back, `None` without buttons.
+/// made, or "No words heard." for an empty one, none for a removed one;
+/// under it the buttons it `offers` for its Transcript and the one that
+/// removes it and keeps its Transcript. What was clicked comes back,
+/// `None` without buttons.
 pub fn recordings(
     ui: &mut Ui,
     t: &L10n,
@@ -182,7 +291,7 @@ pub fn recordings(
     transcripts: &BTreeMap<String, String>,
     (playing, transcribing, speed): (Option<&str>, Option<&str>, f64),
     buttons: bool,
-    removable: &dyn Fn(&str) -> bool,
+    offers: &dyn Fn(&str) -> Offers,
 ) -> Option<Recording> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -218,7 +327,12 @@ pub fn recordings(
         if let Some(line) = line {
             ui.label(line.color(weak));
         }
-        if removable(hash)
+        let offered = offers(hash);
+        let said = transcripts.get(hash);
+        if let Some(asked) = generated_buttons(ui, t, hash, said, offered, false) {
+            clicked = Some(Recording::Text(asked));
+        }
+        if offered.remove_file
             && ui
                 .button(RichText::new(t.remove_recording_keep_text()).color(text))
                 .clicked()

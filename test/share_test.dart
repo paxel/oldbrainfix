@@ -175,7 +175,7 @@ void main() {
   });
 
   testWidgets('a Member may not remove the recording of someone else\'s '
-      'Note', (tester) async {
+      'Note, nor touch its Transcript', (tester) async {
     final owner = Notes(ann);
     final plumber = owner.capture(
       'Call the plumber',
@@ -212,10 +212,18 @@ void main() {
     await tester.tap(find.text('Call the plumber'));
     await tester.pumpAndSettle();
     await reveal(tester, find.text('Tuesday after five'));
-    expect(
-      find.byKey(ValueKey('remove:$hash'), skipOffstage: false),
-      findsNothing,
-    );
+    // Nor take its Transcript over into the text, or remove it.
+    for (final key in [
+      'remove',
+      'replace-text',
+      'append-text',
+      'remove-text',
+    ]) {
+      expect(
+        find.byKey(ValueKey('$key:$hash'), skipOffstage: false),
+        findsNothing,
+      );
+    }
   });
 
   testWidgets('a Manager sees everything as an owner does', (tester) async {

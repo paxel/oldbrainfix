@@ -97,6 +97,8 @@
           "photoTexts": {},
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         }
       ],
@@ -132,7 +134,8 @@
         "loop": [],
         " e ": [],
         "heading": [],
-        "format": []
+        "format": [],
+        "4711": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000003": []
@@ -229,6 +232,8 @@
           "photoTexts": {},
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         }
       ],
@@ -264,7 +269,8 @@
         "loop": [],
         " e ": [],
         "heading": [],
-        "format": []
+        "format": [],
+        "4711": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000003": []
@@ -358,6 +364,8 @@
           "photoTexts": {},
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         }
       ],
@@ -393,7 +401,8 @@
         "loop": [],
         " e ": [],
         "heading": [],
-        "format": []
+        "format": [],
+        "4711": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000003": []
@@ -492,6 +501,8 @@
           "photoTexts": {},
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         },
         {
@@ -516,6 +527,8 @@
           },
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         },
         {
@@ -536,6 +549,8 @@
           "photoTexts": {},
           "removedPhotos": [],
           "removedRecordings": [],
+          "removedTranscripts": [],
+          "removedPhotoTexts": [],
           "wordless": "photo"
         }
       ],
@@ -570,7 +585,9 @@
             "transcripts": {},
             "photoTexts": {},
             "removedPhotos": [],
-            "removedRecordings": []
+            "removedRecordings": [],
+            "removedTranscripts": [],
+            "removedPhotoTexts": []
           }
         ]
       },
@@ -578,7 +595,8 @@
       "unreadPhotos": [],
       "removable": {
         "note:00000000000000000000000000000007": [
-          "photo/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
+          "photo/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d",
+          "ocr/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
         ]
       },
       "search": {
@@ -603,7 +621,8 @@
           "note:00000000000000000000000000000005"
         ],
         "heading": [],
-        "format": []
+        "format": [],
+        "4711": []
       },
       "searchWithin": {
         "area:00000000000000000000000000000003": [

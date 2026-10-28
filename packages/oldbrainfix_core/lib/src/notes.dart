@@ -64,7 +64,8 @@ abstract final class NoteKeys {
   /// The Transcript of a voice recording, `transcript:<hash>` = its text,
   /// on the Note holding `audio:<hash>`, next to the recording and never
   /// in its place (CONTEXT.md). An empty text means Whisper heard no
-  /// words; absent means not transcribed (yet).
+  /// words; absent means not transcribed (yet); null means removed while
+  /// the recording stays (ADR 0025).
   static const transcriptPrefix = 'transcript:';
 
   static String transcript(String hash) => '$transcriptPrefix$hash';
@@ -72,7 +73,8 @@ abstract final class NoteKeys {
   /// The Photo Text of a photo, `ocr:<hash>` = the text ocrs recognised
   /// in it, on the Note holding `photo:<hash>`, next to the photo and
   /// never in its place (CONTEXT.md). An empty text means no text was
-  /// found; absent means not read (yet).
+  /// found; absent means not read (yet); null means removed while the
+  /// photo stays (ADR 0025).
   static const ocrPrefix = 'ocr:';
 
   static String ocr(String hash) => '$ocrPrefix$hash';
@@ -264,6 +266,15 @@ class Note {
   /// [transcripts].
   final List<String> removedRecordings;
 
+  /// The hashes of its voice recordings whose Transcript was removed
+  /// while the recording stays, in the order they were added; they are
+  /// not transcribed again unless asked to (ADR 0025).
+  final List<String> removedTranscripts;
+
+  /// The hashes of its photos whose Photo Text was removed while the
+  /// photo stays, as for [removedTranscripts].
+  final List<String> removedPhotoTexts;
+
   const Note({
     required this.id,
     required this.text,
@@ -283,6 +294,8 @@ class Note {
     this.photoTexts = const {},
     this.removedPhotos = const [],
     this.removedRecordings = const [],
+    this.removedTranscripts = const [],
+    this.removedPhotoTexts = const [],
   });
 
   /// When the Note was captured.
@@ -349,6 +362,11 @@ class Section {
   final List<String> removedPhotos;
   final List<String> removedRecordings;
 
+  /// The recordings and photos whose texts were removed while they stay,
+  /// as for [Note.removedTranscripts] and [Note.removedPhotoTexts].
+  final List<String> removedTranscripts;
+  final List<String> removedPhotoTexts;
+
   const Section({
     required this.id,
     required this.noteId,
@@ -363,6 +381,8 @@ class Section {
     this.photoTexts = const {},
     this.removedPhotos = const [],
     this.removedRecordings = const [],
+    this.removedTranscripts = const [],
+    this.removedPhotoTexts = const [],
   });
 }
 
@@ -494,7 +514,9 @@ class Notes {
   /// Keeps [text] as the Transcript of the voice recording [hash] of the
   /// Note [noteId], a merged one included, next to the recording; the
   /// recording stays as it is. An empty [text] records that no words
-  /// were heard, so the recording is not transcribed again.
+  /// were heard, so the recording is not transcribed again. Given again,
+  /// as when transcribing again, it replaces the Transcript, a removed
+  /// one included.
   void setTranscript(String noteId, String hash, String text) {
     if (byId(noteId)?.recordings.contains(hash) != true) {
       throw ArgumentError.value(hash, 'hash', 'not a recording of $noteId');
@@ -503,27 +525,27 @@ class Notes {
   }
 
   /// The voice recordings without a Transcript, newest capture first:
-  /// those of every Note not in the trash, merged ones included.
+  /// those of every Note not in the trash, merged ones included. One
+  /// whose Transcript was removed is not among them.
   List<({String noteId, String hash})> untranscribed() {
     final notes = [
       for (final id in store.entitiesOfType(NoteKeys.typeNote))
         if (byId(id) case final note? when !note.isTrashed)
-          if (note.recordings.any((h) => !note.transcripts.containsKey(h)))
-            note,
+          if (note.recordings.any((h) => _untranscribed(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
         for (final hash in note.recordings)
-          if (!note.transcripts.containsKey(hash))
-            (noteId: note.id, hash: hash),
+          if (_untranscribed(note, hash)) (noteId: note.id, hash: hash),
     ];
   }
 
   /// Keeps [text] as the Photo Text of the photo [hash] of the Note
   /// [noteId], a merged one included, next to the photo; the photo stays
   /// as it is. An empty [text] records that no text was found, so the
-  /// photo is not read again.
+  /// photo is not read again. Given again, as when reading the text
+  /// again, it replaces the Photo Text, a removed one included.
   void setPhotoText(String noteId, String hash, String text) {
     if (byId(noteId)?.photos.contains(hash) != true) {
       throw ArgumentError.value(hash, 'hash', 'not a photo of $noteId');
@@ -532,20 +554,29 @@ class Notes {
   }
 
   /// The photos without a Photo Text, newest capture first: those of
-  /// every Note not in the trash, merged ones included.
+  /// every Note not in the trash, merged ones included. One whose Photo
+  /// Text was removed is not among them.
   List<({String noteId, String hash})> unreadPhotos() {
     final notes = [
       for (final id in store.entitiesOfType(NoteKeys.typeNote))
         if (byId(id) case final note? when !note.isTrashed)
-          if (note.photos.any((h) => !note.photoTexts.containsKey(h))) note,
+          if (note.photos.any((h) => _unread(note, h))) note,
     ];
     notes.sort((a, b) => b.captured.compareTo(a.captured));
     return [
       for (final note in notes)
         for (final hash in note.photos)
-          if (!note.photoTexts.containsKey(hash)) (noteId: note.id, hash: hash),
+          if (_unread(note, hash)) (noteId: note.id, hash: hash),
     ];
   }
+
+  static bool _untranscribed(Note note, String hash) =>
+      !note.transcripts.containsKey(hash) &&
+      !note.removedTranscripts.contains(hash);
+
+  static bool _unread(Note note, String hash) =>
+      !note.photoTexts.containsKey(hash) &&
+      !note.removedPhotoTexts.contains(hash);
 
   /// Whether this Device may remove the photo [hash] of the Note
   /// [noteId], a merged one included, and keep its Photo Text: the photo
@@ -599,6 +630,56 @@ class Notes {
     }
     store.append(noteId, NoteKeys.audio(hash), null);
     store.dropRemovedBlobs();
+  }
+
+  /// Whether this Device may remove the Photo Text of the photo [hash]
+  /// of the Note [noteId], a merged one included, and keep the photo:
+  /// the photo is there with a text that is not empty, and the Note is
+  /// this Device's to change ([SharedAreas.mayChange]).
+  bool mayRemovePhotoText(String noteId, String hash) {
+    final note = byId(noteId);
+    return note != null &&
+        note.photos.contains(hash) &&
+        _hasText(note.photoTexts[hash]) &&
+        store.mayChange(noteId);
+  }
+
+  /// Whether this Device may remove the Transcript of the voice
+  /// recording [hash] of the Note [noteId] and keep the recording, as
+  /// for [mayRemovePhotoText].
+  bool mayRemoveTranscript(String noteId, String hash) {
+    final note = byId(noteId);
+    return note != null &&
+        note.recordings.contains(hash) &&
+        _hasText(note.transcripts[hash]) &&
+        store.mayChange(noteId);
+  }
+
+  /// Removes the Photo Text of the photo [hash] from the Note [noteId];
+  /// the photo stays (ADR 0025). Search no longer finds the text, and the
+  /// photo is not read again until [setPhotoText] is given a new one.
+  /// Refused unless [mayRemovePhotoText].
+  void removePhotoText(String noteId, String hash) {
+    if (byId(noteId)?.photos.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a photo of $noteId');
+    }
+    if (!mayRemovePhotoText(noteId, hash)) {
+      throw StateError('the Photo Text of $hash may not be removed here');
+    }
+    store.append(noteId, NoteKeys.ocr(hash), null);
+  }
+
+  /// Removes the Transcript of the voice recording [hash] from the Note
+  /// [noteId] and keeps the recording, as [removePhotoText] does.
+  /// Refused unless [mayRemoveTranscript].
+  void removeTranscript(String noteId, String hash) {
+    if (byId(noteId)?.recordings.contains(hash) != true) {
+      throw ArgumentError.value(hash, 'hash', 'not a recording of $noteId');
+    }
+    if (!mayRemoveTranscript(noteId, hash)) {
+      throw StateError('the Transcript of $hash may not be removed here');
+    }
+    store.append(noteId, NoteKeys.transcript(hash), null);
   }
 
   /// Whether a Transcript or Photo Text says anything: an empty one
@@ -718,6 +799,8 @@ class Notes {
             photoTexts: note.photoTexts,
             removedPhotos: note.removedPhotos,
             removedRecordings: note.removedRecordings,
+            removedTranscripts: note.removedTranscripts,
+            removedPhotoTexts: note.removedPhotoTexts,
           ),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
@@ -841,6 +924,12 @@ class Notes {
     final text = StoredText.read(fields[NoteKeys.text]);
     final transcripts = _texts(fields, NoteKeys.transcriptPrefix);
     final photoTexts = _texts(fields, NoteKeys.ocrPrefix);
+    final photos = _blobs(fields, NoteKeys.photoPrefix, NoteKeys.photoAdded);
+    final recordings = _blobs(
+      fields,
+      NoteKeys.audioPrefix,
+      NoteKeys.audioAdded,
+    );
     return Note(
       id: id,
       text: text.text,
@@ -857,8 +946,8 @@ class Notes {
       spawned: fields[NoteKeys.spawned] != null,
       nudge: DateTime.tryParse(fields[NoteKeys.nudge] ?? '')?.toUtc(),
       // The fields come in the order they were first written.
-      photos: _blobs(fields, NoteKeys.photoPrefix, NoteKeys.photoAdded),
-      recordings: _blobs(fields, NoteKeys.audioPrefix, NoteKeys.audioAdded),
+      photos: photos,
+      recordings: recordings,
       transcripts: transcripts,
       photoTexts: photoTexts,
       removedPhotos: [
@@ -868,6 +957,16 @@ class Notes {
       removedRecordings: [
         for (final hash in _blobs(fields, NoteKeys.audioPrefix, null))
           if (_hasText(transcripts[hash])) hash,
+      ],
+      // Only while the file stays: a text is removed from it, never
+      // from a file that is gone.
+      removedTranscripts: [
+        for (final hash in recordings)
+          if (_removedText(fields, NoteKeys.transcript(hash))) hash,
+      ],
+      removedPhotoTexts: [
+        for (final hash in photos)
+          if (_removedText(fields, NoteKeys.ocr(hash))) hash,
       ],
     );
   }
@@ -882,6 +981,11 @@ class Notes {
     for (final MapEntry(:key, value: held) in fields.entries)
       if (key.startsWith(prefix) && held == value) key.substring(prefix.length),
   ];
+
+  /// Whether the text [field] was written and then removed: it holds
+  /// null.
+  static bool _removedText(Map<String, String?> fields, String field) =>
+      fields.containsKey(field) && fields[field] == null;
 
   /// The texts under [prefix], by the hash they belong to.
   static Map<String, String> _texts(

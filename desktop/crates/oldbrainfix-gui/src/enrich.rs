@@ -4,7 +4,10 @@
 //! that came from the phone before they were read there. A recording or
 //! photo that cannot be read, or whose bytes are not on this computer
 //! yet, is left alone until the next start; it is never lost, as the
-//! recording or photo itself is always kept.
+//! recording or photo itself is always kept. Asked to, one reads a
+//! recording or photo again, ahead of the others and whether or not it
+//! has a text, as "Transcribe again" and "Read the text again" do
+//! (ADR 0025).
 //!
 //! The engines sit behind a trait: Whisper and ocrs in the app, fakes in
 //! the tests. Whisper is led in with the Area and Topic names as the user
@@ -12,7 +15,7 @@
 //! full of (`TranscriptPrompts`); what it only repeats of that lead-in
 //! is taken out of the Transcript.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -59,20 +62,22 @@ impl Kind {
         }
     }
 
-    /// Keeps `text` for `blob`, unless its Note let go of it meanwhile.
-    fn keep(self, notes: &Notes, blob: &Blob, text: &str) -> oldbrainfix_core::Result<()> {
+    /// Keeps `text` for `blob`, unless its Note let go of it meanwhile;
+    /// whether it did.
+    fn keep(self, notes: &Notes, blob: &Blob, text: &str) -> oldbrainfix_core::Result<bool> {
         let Some(note) = notes.by_id(&blob.note_id)? else {
-            return Ok(());
+            return Ok(false);
         };
         match self {
             Kind::Transcripts if note.recordings.contains(&blob.hash) => {
-                notes.set_transcript(&blob.note_id, &blob.hash, text)
+                notes.set_transcript(&blob.note_id, &blob.hash, text)?;
             }
             Kind::PhotoTexts if note.photos.contains(&blob.hash) => {
-                notes.set_photo_text(&blob.note_id, &blob.hash, text)
+                notes.set_photo_text(&blob.note_id, &blob.hash, text)?;
             }
-            _ => Ok(()),
+            _ => return Ok(false),
         }
+        Ok(true)
     }
 }
 
@@ -82,6 +87,15 @@ impl Kind {
 pub struct Enricher {
     kick: Sender<()>,
     current: Arc<Mutex<Option<String>>>,
+    asked: Arc<Asked>,
+}
+
+/// The recordings or photos asked to be read again, oldest ask first,
+/// and those of them that brought no text.
+#[derive(Default)]
+struct Asked {
+    waiting: Mutex<VecDeque<Blob>>,
+    failed: Mutex<Vec<Blob>>,
 }
 
 impl Enricher {
@@ -96,9 +110,37 @@ impl Enricher {
     ) -> Enricher {
         let (kick, kicked) = std::sync::mpsc::channel();
         let current = Arc::new(Mutex::new(None));
-        let shared = current.clone();
-        std::thread::spawn(move || run(&store, kind, engine, &kicked, &shared, &*changed));
-        Enricher { kick, current }
+        let asked = Arc::new(Asked::default());
+        let (shared, asks) = (current.clone(), asked.clone());
+        std::thread::spawn(move || run(&store, kind, engine, (&kicked, &asks), &shared, &*changed));
+        Enricher {
+            kick,
+            current,
+            asked,
+        }
+    }
+
+    /// Reads the recording or photo `blob` again, after the one being
+    /// read if any, and keeps the result as its text in place of the one
+    /// before or of a removed one (ADR 0025). One that could not be read
+    /// before is tried again; one that brings no text now is among
+    /// [`Enricher::take_failed`].
+    pub fn again(&self, blob: Blob) {
+        self.asked.waiting.lock().push_back(blob);
+        self.kick();
+    }
+
+    /// Whether the recording or photo `hash` is being read, or waits to
+    /// be read again.
+    pub fn busy_with(&self, hash: &str) -> bool {
+        self.current.lock().as_deref() == Some(hash)
+            || self.asked.waiting.lock().iter().any(|b| b.hash == hash)
+    }
+
+    /// Those asked to be read again that brought no text since the last
+    /// call.
+    pub fn take_failed(&self) -> Vec<Blob> {
+        std::mem::take(&mut *self.asked.failed.lock())
     }
 
     /// Looks for something to read, unless it reads already; it looks
@@ -117,7 +159,7 @@ fn run(
     store: &Store,
     kind: Kind,
     mut engine: Box<dyn Engine>,
-    kicked: &Receiver<()>,
+    (kicked, asked): (&Receiver<()>, &Asked),
     current: &Mutex<Option<String>>,
     changed: &dyn Fn(),
 ) {
@@ -127,24 +169,37 @@ fn run(
     while kicked.recv().is_ok() {
         while kicked.try_recv().is_ok() {}
         loop {
-            let next = kind
-                .waiting(&notes)
-                .ok()
-                .and_then(|w| w.into_iter().find(|b| !skipped.contains(&b.hash)));
+            // What was asked for comes first, skipped before or not.
+            let again = asked.waiting.lock().pop_front();
+            let is_again = again.is_some();
+            let next = again.or_else(|| {
+                kind.waiting(&notes)
+                    .ok()
+                    .and_then(|w| w.into_iter().find(|b| !skipped.contains(&b.hash)))
+            });
             let Some(blob) = next else {
                 break;
             };
             let Some(bytes) = kind.bytes(&notes, &blob.hash) else {
-                skipped.insert(blob.hash);
+                skipped.insert(blob.hash.clone());
+                if is_again {
+                    asked.failed.lock().push(blob);
+                    changed();
+                }
                 continue;
             };
             *current.lock() = Some(blob.hash.clone());
             changed();
             let text = engine.read(bytes);
             *current.lock() = None;
-            let kept = text.is_some_and(|text| kind.keep(&notes, &blob, &text).is_ok());
-            if !kept {
-                skipped.insert(blob.hash);
+            let kept = text.is_some_and(|text| kind.keep(&notes, &blob, &text).unwrap_or(false));
+            if kept {
+                skipped.remove(&blob.hash);
+            } else {
+                skipped.insert(blob.hash.clone());
+                if is_again {
+                    asked.failed.lock().push(blob);
+                }
             }
             changed();
         }

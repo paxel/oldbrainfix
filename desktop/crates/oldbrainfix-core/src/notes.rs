@@ -47,11 +47,13 @@ pub mod keys {
     pub const ADDED: &str = "added";
     /// The Transcript of a voice recording, `transcript:<hash>` = its
     /// text, on the Note holding `audio:<hash>`. An empty text means
-    /// Whisper heard no words; absent means not transcribed (yet).
+    /// Whisper heard no words; absent means not transcribed (yet); null
+    /// means removed while the recording stays (ADR 0025).
     pub const TRANSCRIPT_PREFIX: &str = "transcript:";
     /// The Photo Text of a photo, `ocr:<hash>` = the text ocrs recognised
     /// in it, on the Note holding `photo:<hash>`. An empty text means no
-    /// text was found; absent means not read (yet).
+    /// text was found; absent means not read (yet); null means removed
+    /// while the photo stays (ADR 0025).
     pub const OCR_PREFIX: &str = "ocr:";
 
     pub fn photo(hash: &str) -> String {
@@ -170,6 +172,13 @@ pub struct Note {
     /// Transcript stays, in the order they were added; the text is in
     /// `transcripts`.
     pub removed_recordings: Vec<String>,
+    /// The hashes of its voice recordings whose Transcript was removed
+    /// while the recording stays, in the order they were added; they are
+    /// not transcribed again unless asked to (ADR 0025).
+    pub removed_transcripts: Vec<String>,
+    /// The hashes of its photos whose Photo Text was removed while the
+    /// photo stays, as for `removed_transcripts`.
+    pub removed_photo_texts: Vec<String>,
 }
 
 impl Note {
@@ -234,7 +243,19 @@ pub struct Section {
     /// as for [`Note::removed_photos`] and [`Note::removed_recordings`].
     pub removed_photos: Vec<String>,
     pub removed_recordings: Vec<String>,
+    /// The recordings and photos whose texts were removed while they
+    /// stay, as for [`Note::removed_transcripts`] and
+    /// [`Note::removed_photo_texts`].
+    pub removed_transcripts: Vec<String>,
+    pub removed_photo_texts: Vec<String>,
 }
+
+/// A Note's photos or recordings, their texts and those removed.
+type Waiting<'n> = (
+    &'n Vec<String>,
+    &'n BTreeMap<String, String>,
+    &'n Vec<String>,
+);
 
 /// A photo or a voice recording of a Note, by its hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,7 +391,9 @@ impl<'a> Notes<'a> {
     /// Keeps `text`, trimmed, as the Transcript of the voice recording
     /// `hash` of the Note `note_id`, a merged one included, next to the
     /// recording. An empty text records that no words were heard, so the
-    /// recording is not transcribed again.
+    /// recording is not transcribed again. Given again, as when
+    /// transcribing again, it replaces the Transcript, a removed one
+    /// included.
     pub fn set_transcript(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
         let held = self
             .by_id(note_id)?
@@ -388,7 +411,8 @@ impl<'a> Notes<'a> {
     /// Keeps `text`, trimmed, as the Photo Text of the photo `hash` of
     /// the Note `note_id`, a merged one included, next to the photo. An
     /// empty text records that no text was found, so the photo is not
-    /// read again.
+    /// read again. Given again, as when reading the text again, it
+    /// replaces the Photo Text, a removed one included.
     pub fn set_photo_text(&self, note_id: &str, hash: &str, text: &str) -> Result<()> {
         let held = self
             .by_id(note_id)?
@@ -402,15 +426,17 @@ impl<'a> Notes<'a> {
     }
 
     /// The voice recordings without a Transcript, newest capture first:
-    /// those of every Note not in the trash, merged ones included.
+    /// those of every Note not in the trash, merged ones included. One
+    /// whose Transcript was removed is not among them.
     pub fn untranscribed(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.recordings, &n.transcripts))
+        self.waiting(|n| (&n.recordings, &n.transcripts, &n.removed_transcripts))
     }
 
     /// The photos without a Photo Text, newest capture first: those of
-    /// every Note not in the trash, merged ones included.
+    /// every Note not in the trash, merged ones included. One whose Photo
+    /// Text was removed is not among them.
     pub fn unread_photos(&self) -> Result<Vec<Blob>> {
-        self.waiting(|n| (&n.photos, &n.photo_texts))
+        self.waiting(|n| (&n.photos, &n.photo_texts, &n.removed_photo_texts))
     }
 
     /// Whether this Device may remove the photo `hash` of the Note
@@ -485,18 +511,80 @@ impl<'a> Notes<'a> {
         self.store.drop_removed_blobs().map(drop)
     }
 
-    /// The blobs `of` every Note not in the trash that have no text yet.
-    fn waiting(
-        &self,
-        of: impl Fn(&Note) -> (&Vec<String>, &BTreeMap<String, String>),
-    ) -> Result<Vec<Blob>> {
+    /// Whether this Device may remove the Photo Text of the photo `hash`
+    /// of the Note `note_id`, a merged one included, and keep the photo:
+    /// the photo is there with a text that is not empty, and the Note is
+    /// this Device's to change ([`Store::may_change`]).
+    pub fn may_remove_photo_text(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove(note_id, hash, |n| (&n.photos, &n.photo_texts))
+    }
+
+    /// Whether this Device may remove the Transcript of the voice
+    /// recording `hash` of the Note `note_id` and keep the recording, as
+    /// for [`Notes::may_remove_photo_text`].
+    pub fn may_remove_transcript(&self, note_id: &str, hash: &str) -> Result<bool> {
+        self.may_remove(note_id, hash, |n| (&n.recordings, &n.transcripts))
+    }
+
+    /// Removes the Photo Text of the photo `hash` from the Note
+    /// `note_id`; the photo stays (ADR 0025). Search no longer finds the
+    /// text, and the photo is not read again until
+    /// [`Notes::set_photo_text`] is given a new one. Refused unless
+    /// [`Notes::may_remove_photo_text`].
+    pub fn remove_photo_text(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.photos.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!("not a photo of {note_id}: {hash}")));
+        }
+        if !self.may_remove_photo_text(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the Photo Text of {hash} may not be removed here"
+            )));
+        }
+        self.store
+            .append(note_id, &keys::ocr(hash), None, None)
+            .map(drop)
+    }
+
+    /// Removes the Transcript of the voice recording `hash` from the
+    /// Note `note_id` and keeps the recording, as
+    /// [`Notes::remove_photo_text`] does. Refused unless
+    /// [`Notes::may_remove_transcript`].
+    pub fn remove_transcript(&self, note_id: &str, hash: &str) -> Result<()> {
+        let held = self
+            .by_id(note_id)?
+            .is_some_and(|n| n.recordings.iter().any(|h| h == hash));
+        if !held {
+            return Err(Error::Invalid(format!(
+                "not a recording of {note_id}: {hash}"
+            )));
+        }
+        if !self.may_remove_transcript(note_id, hash)? {
+            return Err(Error::Invalid(format!(
+                "the Transcript of {hash} may not be removed here"
+            )));
+        }
+        self.store
+            .append(note_id, &keys::transcript(hash), None, None)
+            .map(drop)
+    }
+
+    /// The blobs `of` every Note not in the trash that have no text yet,
+    /// nor one that was removed.
+    fn waiting(&self, of: impl Fn(&Note) -> Waiting<'_>) -> Result<Vec<Blob>> {
+        let waits = |note: &Note, hash: &String| {
+            let (_, texts, removed) = of(note);
+            !texts.contains_key(hash) && !removed.contains(hash)
+        };
         let mut notes = Vec::new();
         for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
             if let Some(note) = self.by_id(&id)?
                 && !note.is_trashed()
             {
-                let (blobs, texts) = of(&note);
-                if blobs.iter().any(|h| !texts.contains_key(h)) {
+                let (blobs, _, _) = of(&note);
+                if blobs.iter().any(|h| waits(&note, h)) {
                     notes.push(note);
                 }
             }
@@ -504,9 +592,9 @@ impl<'a> Notes<'a> {
         notes.sort_by_key(|n| std::cmp::Reverse(n.captured));
         let mut out = Vec::new();
         for note in &notes {
-            let (blobs, texts) = of(note);
+            let (blobs, _, _) = of(note);
             for hash in blobs {
-                if !texts.contains_key(hash) {
+                if waits(note, hash) {
                     out.push(Blob {
                         note_id: note.id.clone(),
                         hash: hash.clone(),
@@ -662,6 +750,19 @@ impl<'a> Notes<'a> {
                 .filter(|hash| has_text(texts.get(hash)))
                 .collect()
         };
+        let photos = added(&fields, keys::PHOTO_PREFIX);
+        let recordings = added(&fields, keys::AUDIO_PREFIX);
+        // Only while the file stays: a text is removed from it, never
+        // from a file that is gone.
+        let removed_texts = |blobs: &[String], field: fn(&str) -> String| -> Vec<String> {
+            blobs
+                .iter()
+                .filter(|hash| removed_text(&fields, &field(hash)))
+                .cloned()
+                .collect()
+        };
+        let removed_transcripts = removed_texts(&recordings, keys::transcript);
+        let removed_photo_texts = removed_texts(&photos, keys::ocr);
         Ok(Some(Note {
             id: id.to_string(),
             text: text.text,
@@ -676,12 +777,14 @@ impl<'a> Notes<'a> {
             spawned: fields.get(keys::SPAWNED).is_some(),
             nudge: fields.get(keys::NUDGE).and_then(|n| parse_time(n).ok()),
             // The fields come in the order they were first written.
-            photos: added(&fields, keys::PHOTO_PREFIX),
-            recordings: added(&fields, keys::AUDIO_PREFIX),
+            photos,
+            recordings,
             removed_photos: removed(keys::PHOTO_PREFIX, &photo_texts),
             removed_recordings: removed(keys::AUDIO_PREFIX, &transcripts),
             transcripts,
             photo_texts,
+            removed_transcripts,
+            removed_photo_texts,
         }))
     }
 
@@ -775,6 +878,8 @@ impl<'a> Notes<'a> {
                     photo_texts: note.photo_texts,
                     removed_photos: note.removed_photos,
                     removed_recordings: note.removed_recordings,
+                    removed_transcripts: note.removed_transcripts,
+                    removed_photo_texts: note.removed_photo_texts,
                 });
             }
         }
@@ -815,6 +920,8 @@ impl<'a> Notes<'a> {
             photo_texts: BTreeMap::new(),
             removed_photos: Vec::new(),
             removed_recordings: Vec::new(),
+            removed_transcripts: Vec::new(),
+            removed_photo_texts: Vec::new(),
         }))
     }
 
@@ -865,6 +972,13 @@ fn removed(fields: &Fields, prefix: &str) -> Vec<String> {
         .filter(|(_, value)| value.is_none())
         .filter_map(|(key, _)| key.strip_prefix(prefix).map(str::to_string))
         .collect()
+}
+
+/// Whether the text `field` was written and then removed: it holds null.
+fn removed_text(fields: &Fields, field: &str) -> bool {
+    fields
+        .iter()
+        .any(|(key, value)| key == field && value.is_none())
 }
 
 /// Whether a Transcript or Photo Text says anything: an empty one means
@@ -1305,6 +1419,153 @@ mod tests {
         assert_eq!(ann.current(&id, &keys::photo(&p))?, None);
         assert!(ann.removed_blobs()?.is_empty());
         assert_eq!(ann.photo(&p), Some(photo(1)));
+        Ok(())
+    }
+
+    #[test]
+    fn a_removed_text_goes_its_file_stays_and_it_is_not_read_again() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let (id, p, r) = with_texts(&ann, None, 1)?;
+        assert!(notes.may_remove_photo_text(&id, &p)?);
+        assert!(notes.may_remove_transcript(&id, &r)?);
+        notes.remove_photo_text(&id, &p)?;
+        notes.remove_transcript(&id, &r)?;
+        let read = note(&ann, &id)?;
+        assert_eq!(read.photos, vec![p.clone()]);
+        assert_eq!(read.recordings, vec![r.clone()]);
+        assert!(read.photo_texts.is_empty() && read.transcripts.is_empty());
+        assert_eq!(read.removed_photo_texts, vec![p.clone()]);
+        assert_eq!(read.removed_transcripts, vec![r.clone()]);
+        assert!(read.removed_photos.is_empty() && read.removed_recordings.is_empty());
+        assert!(ann.photo(&p).is_some() && ann.audio(&r).is_some());
+        assert!(found(&ann, "weber")?.is_empty());
+        assert!(found(&ann, "x-ray")?.is_empty());
+        assert!(notes.unread_photos()?.is_empty());
+        assert!(notes.untranscribed()?.is_empty());
+        // Without a text the file may not go either.
+        assert!(!notes.may_remove_photo(&id, &p)?);
+        assert!(!notes.may_remove_photo_text(&id, &p)?);
+        assert_eq!(ann.current(&id, &keys::transcript(&r))?, None);
+        // Transcribing or reading again brings a text back.
+        notes.set_photo_text(&id, &p, "Dr. Weber, Tue 9-12")?;
+        notes.set_transcript(&id, &r, "Bring the new X-ray")?;
+        let read = note(&ann, &id)?;
+        assert!(read.removed_photo_texts.is_empty() && read.removed_transcripts.is_empty());
+        assert_eq!(found(&ann, "tue")?, vec![id.clone()]);
+        assert_eq!(found(&ann, "new x-ray")?, vec![id.clone()]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_missing_or_empty_text_or_one_without_its_file_is_not_removed() -> TestResult {
+        let ann = Devices::new().device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let n = notes.capture_with("", None, None, &[photo(1), photo(2)], &[voice(1)])?;
+        let (p1, p2, r) = (&n.photos[0], &n.photos[1], &n.recordings[0]);
+        notes.set_photo_text(&n.id, p2, "")?;
+        for hash in [p1, p2] {
+            assert!(!notes.may_remove_photo_text(&n.id, hash)?);
+            assert!(notes.remove_photo_text(&n.id, hash).is_err());
+        }
+        assert!(!notes.may_remove_transcript(&n.id, r)?);
+        assert!(notes.remove_transcript(&n.id, r).is_err());
+        assert!(
+            notes.remove_photo_text(&n.id, r).is_err(),
+            "a recording is no photo"
+        );
+        assert!(!notes.may_remove_transcript("note:none", r)?);
+        let (id, p, _) = with_texts(&ann, None, 3)?;
+        notes.remove_photo(&id, &p)?;
+        assert!(!notes.may_remove_photo_text(&id, &p)?);
+        assert!(notes.remove_photo_text(&id, &p).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_removed_text_shows_in_the_section_and_reaches_another_own_device() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let desk = devices.device(3, "Ann")?;
+        let notes = Notes::new(&ann);
+        let (id, p, r) = with_texts(&ann, None, 1)?;
+        let target = notes.capture("Health", None, None)?;
+        notes.merge(&id, &target.id)?;
+        exchange(&desk, &ann, None)?;
+        notes.remove_transcript(&id, &r)?;
+        Notes::new(&desk).remove_photo_text(&id, &p)?;
+        exchange(&desk, &ann, None)?;
+        for store in [&ann, &desk] {
+            let section = Notes::new(store).sections(&target.id)?;
+            assert_eq!(section[0].removed_transcripts, vec![r.clone()]);
+            assert_eq!(section[0].removed_photo_texts, vec![p.clone()]);
+            assert!(store.photo(&p).is_some() && store.audio(&r).is_some());
+            assert!(Notes::new(store).untranscribed()?.is_empty());
+            assert!(Notes::new(store).unread_photos()?.is_empty());
+            assert!(found(store, "weber")?.is_empty());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_text_removal_on_anothers_note_is_refused_and_ignored() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let (id, p, r) = with_texts(&ann, Some(&area), 1)?;
+        let (own, own_p, own_r) = with_texts(&ben, Some(&area), 2)?;
+        exchange(&ben, &ann, None)?;
+        assert!(!Notes::new(&ben).may_remove_transcript(&id, &r)?);
+        assert!(Notes::new(&ben).remove_transcript(&id, &r).is_err());
+        // As a modified app would write them.
+        ben.append(&id, &keys::transcript(&r), None, None)?;
+        ben.append(&id, &keys::ocr(&p), None, None)?;
+        // A Member removes from their own Note, a Manager from anyone's.
+        Notes::new(&ben).remove_photo_text(&own, &own_p)?;
+        Notes::new(&ann).remove_transcript(&own, &own_r)?;
+        exchange(&ben, &ann, None)?;
+        for store in [&ann, &ben] {
+            let read = note(store, &id)?;
+            assert_eq!(
+                read.transcripts.get(&r).map(String::as_str),
+                Some("Bring the old X-ray")
+            );
+            assert_eq!(
+                read.photo_texts.get(&p).map(String::as_str),
+                Some("Dr. Weber, Mon 9-12")
+            );
+            assert!(read.removed_transcripts.is_empty());
+            let own = note(store, &own)?;
+            assert_eq!(own.removed_photo_texts, vec![own_p.clone()]);
+            assert_eq!(own.removed_transcripts, vec![own_r.clone()]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_members_machine_still_gives_anothers_note_its_texts() -> TestResult {
+        let devices = Devices::new();
+        let ann = devices.device(1, "Ann")?;
+        let ben = devices.device(2, "Ben")?;
+        let (area, _) = household(&ann, &ben)?;
+        let shed =
+            Notes::new(&ann).capture_with("Shed", Some(&area), None, &[photo(4)], &[voice(4)])?;
+        exchange(&ben, &ann, None)?;
+        Notes::new(&ben).set_photo_text(&shed.id, &shed.photos[0], "Spare key")?;
+        Notes::new(&ben).set_transcript(&shed.id, &shed.recordings[0], "Oil the door")?;
+        exchange(&ben, &ann, None)?;
+        let read = note(&ann, &shed.id)?;
+        assert_eq!(
+            read.photo_texts.get(&shed.photos[0]).map(String::as_str),
+            Some("Spare key")
+        );
+        assert_eq!(
+            read.transcripts
+                .get(&shed.recordings[0])
+                .map(String::as_str),
+            Some("Oil the door")
+        );
         Ok(())
     }
 

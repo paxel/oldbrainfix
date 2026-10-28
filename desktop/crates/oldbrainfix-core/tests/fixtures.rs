@@ -31,9 +31,9 @@ const SCENARIOS: [&str; 8] = [
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
-const QUERIES: [&str; 12] = [
+const QUERIES: [&str; 13] = [
     "", "sauce", "MILK", "receipt", "dentist", "x-ray", "müller", "called", "loop", " e ",
-    "heading", "format",
+    "heading", "format", "4711",
 ];
 
 /// A text in a format this version does not know, as the generator's
@@ -143,6 +143,8 @@ fn note_json(note: &Note) -> Value {
         "photoTexts": note.photo_texts,
         "removedPhotos": note.removed_photos,
         "removedRecordings": note.removed_recordings,
+        "removedTranscripts": note.removed_transcripts,
+        "removedPhotoTexts": note.removed_photo_texts,
         "wordless": note.wordless().name(),
     })
 }
@@ -162,6 +164,8 @@ fn section_json(section: &Section) -> Value {
         "photoTexts": section.photo_texts,
         "removedPhotos": section.removed_photos,
         "removedRecordings": section.removed_recordings,
+        "removedTranscripts": section.removed_transcripts,
+        "removedPhotoTexts": section.removed_photo_texts,
     })
 }
 
@@ -238,6 +242,16 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
             for hash in &note.recordings {
                 if notes.may_remove_recording(id, hash)? {
                     refs.push(format!("audio/{hash}"));
+                }
+            }
+            for hash in &note.photos {
+                if notes.may_remove_photo_text(id, hash)? {
+                    refs.push(format!("ocr/{hash}"));
+                }
+            }
+            for hash in &note.recordings {
+                if notes.may_remove_transcript(id, hash)? {
+                    refs.push(format!("transcript/{hash}"));
                 }
             }
             if !refs.is_empty() {
@@ -770,6 +784,14 @@ fn write_media(store: &Store) -> Built {
     notes.capture_with("", None, None, &[photo(7)], &[])?;
     let hum = notes.capture_with("", None, None, &[], &[recording(6)])?;
     notes.set_transcript(&hum.id, &hum.recordings[0], "")?;
+    let bike = notes.capture_with("Bike", None, None, &[photo(8)], &[recording(7)])?;
+    let (frame, lock) = (&bike.photos[0], &bike.recordings[0]);
+    notes.set_photo_text(&bike.id, frame, "Frame no. 4711")?;
+    notes.set_transcript(&bike.id, lock, "Lock code is one two")?;
+    notes.merge(&bike.id, &hum.id)?;
+    notes.remove_photo_text(&bike.id, frame)?;
+    notes.remove_transcript(&bike.id, lock)?;
+    notes.set_transcript(&bike.id, lock, "Lock code 1234")?;
     Ok(())
 }
 

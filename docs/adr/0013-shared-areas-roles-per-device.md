@@ -40,3 +40,7 @@ Amended for #105: any Device hosts (ADR 0003), so a phone or tablet shows an inv
 ## From afar (ADR 0023)
 
 Amended by ADR 0023 (#108): an Area is also shared with a person who is not on the same network, one added from a Profile card among them: the grants are written to the Devices of theirs whose keys are known here, and an offer file, a bundle of the Area's whole history with the Area's key sealed to those Devices' X25519 keys, goes through any messenger; later changes travel by the shared folder or by bundles. The receiver holds the offer as Pending Changes until the user accepts it. A bundle for another person's Device, one paired by invite, one a grant names for another person or one bound to another person's Profile kept here, holds only what that Device shares, also when it was never paired.
+
+## Removing generated texts (ADR 0025)
+
+Amended by ADR 0025 (#110): a Member adds Transcripts and Photo Texts to any Note only as texts; a null under `transcript:` or `ocr:`, which removes one, is judged like any other edit of the Note, so only the Note's owner or a Manager removes it.

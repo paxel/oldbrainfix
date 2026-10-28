@@ -206,6 +206,9 @@ void main() {
         find.byKey(ValueKey('remove:$spoken'), skipOffstage: false),
         findsNothing,
       );
+      // The page grew shorter: from the top again.
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 5000));
+      await tester.pumpAndSettle();
       await reveal(tester, inEditor(find.text('Bring the insurance card')));
       expect(inEditor(find.text('Bring the insurance card')), findsOneWidget);
 
