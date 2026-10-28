@@ -31,3 +31,7 @@ Amended by ADR 0020 (#77): a blob the log lets go of, a recording or photo remov
 ## Blocks (ADR 0021)
 
 Amended by ADR 0021 (#90): the segments a blocked person's Devices write are never opened, and the folder is not touched for a block. An unblock forgets how far every segment was read, so the next folder sync reads them whole and takes in again what was refused.
+
+## Signing keys under an Area's key (ADR 0023)
+
+Amended by ADR 0023 (#108): the Profiles file of a Shared Area, `keys/<device>.<key id>.profiles`, carries `keys` beside `profiles`, the key records of the writer and of every Device the Area's grants ever named that it holds. A reader takes them in before the segments, from every Profiles file sealed with a key of an Area it holds, so a person met only through the folder or a bundle checks what the other person's Devices write there. The consequence that such a Device needs one LAN sync first to learn the signing keys is gone for the Devices a grant names.

@@ -2886,4 +2886,136 @@ class AppLocalizationsDe extends AppLocalizations {
   String personSendBackDetail(String name) {
     return 'Damit $name dich auch hinzufügen kann.';
   }
+
+  @override
+  String get shareAfarHeading => 'Jemand, der nicht in der Nähe ist';
+
+  @override
+  String get shareAfarIntro =>
+      'Teile ihn mit einer Person unter „Personen“. Sie bekommt eine Datei über einen beliebigen Messenger und nimmt sie an oder lehnt sie ab.';
+
+  @override
+  String get shareAfarPick => 'Teilen mit…';
+
+  @override
+  String get shareAfarNobody =>
+      'Noch kann niemand unter „Personen“ ihn bekommen. Füge die Person zuerst über ihre Profilkarte hinzu.';
+
+  @override
+  String shareWithTitle(String area) {
+    return '$area teilen mit…';
+  }
+
+  @override
+  String get shareNotVerified => 'Nicht bestätigt';
+
+  @override
+  String transportTitle(String name) {
+    return 'Wie kommen Änderungen zu $name?';
+  }
+
+  @override
+  String get transportFolder =>
+      'Ein gemeinsamer Ordner, den ihr beide erreicht';
+
+  @override
+  String get transportFolderDetail =>
+      'Nextcloud, Syncthing oder ein USB-Ordner; Änderungen kommen von selbst an.';
+
+  @override
+  String get transportBundle => 'Dateien über einen Messenger';
+
+  @override
+  String get transportBundleDetail =>
+      'Du schickst Änderungen als Datei von ihrer Profilseite aus.';
+
+  @override
+  String get shareAfarFailed =>
+      'Der Bereich konnte nicht geteilt werden. Nichts ging verloren; versuche es noch einmal.';
+
+  @override
+  String get areaOfferNotForUs =>
+      'Dieser geteilte Bereich ist für eine andere Person oder ein anderes deiner Geräte. Bitte die Person, ihn noch einmal mit dir zu teilen.';
+
+  @override
+  String get areaOfferFromBlocked =>
+      'Abgewiesen: Dieser geteilte Bereich kommt von einer Person, die du blockiert hast.';
+
+  @override
+  String get areaOfferRefused =>
+      'Abgewiesen: Dieser Bereich gehört auf diesem Gerät schon dir.';
+
+  @override
+  String get notAnAreaOffer =>
+      'Diese Datei enthält keinen geteilten Bereich, den diese App lesen kann. Bitte die Person, ihn noch einmal zu teilen.';
+
+  @override
+  String get areaOfferWaits => 'Ein geteilter Bereich wartet in der Agenda.';
+
+  @override
+  String get areaOfferTitle => 'Geteilter Bereich';
+
+  @override
+  String areaOfferText(String name, String area, String role) {
+    return '$name teilt $area mit dir als $role';
+  }
+
+  @override
+  String get areaOfferNoName => 'einen Bereich';
+
+  @override
+  String get areaOfferByFolder =>
+      'Änderungen kommen über einen gemeinsamen Ordner, den ihr beide erreicht.';
+
+  @override
+  String get areaOfferByBundle =>
+      'Änderungen kommen als Dateien über einen Messenger.';
+
+  @override
+  String get areaOfferKeepsNothing =>
+      'Vom Bereich wird nichts behalten, bevor du annimmst.';
+
+  @override
+  String get areaOfferAccepted => 'Geteilten Bereich angenommen.';
+
+  @override
+  String get areaOfferGone =>
+      'Dieser geteilte Bereich wartet nicht mehr: Er wurde angenommen oder abgelehnt.';
+
+  @override
+  String get areaOfferFolderQuestion => 'Den gemeinsamen Ordner wählen?';
+
+  @override
+  String areaOfferFolderDetail(String area) {
+    return 'Änderungen an $area kommen über einen Ordner, den ihr beide erreicht. Wähle ihn jetzt oder später unter „Synchronisieren“.';
+  }
+
+  @override
+  String get areaOfferFolderLater => 'Später';
+
+  @override
+  String areaOffersWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count geteilte Bereiche warten',
+      one: '1 geteilter Bereich wartet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaOffersWaitingTitle => 'Wartende geteilte Bereiche';
+
+  @override
+  String get areaOffersNoneWaiting => 'Keine geteilten Bereiche warten.';
+
+  @override
+  String personSendChanges(String name) {
+    return 'Änderungen an $name schicken';
+  }
+
+  @override
+  String get personSendChangesDetail =>
+      'Als Datei über einen beliebigen Messenger.';
 }

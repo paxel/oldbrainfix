@@ -2858,4 +2858,134 @@ class AppLocalizationsEn extends AppLocalizations {
   String personSendBackDetail(String name) {
     return 'So $name can add you too.';
   }
+
+  @override
+  String get shareAfarHeading => 'Someone not nearby';
+
+  @override
+  String get shareAfarIntro =>
+      'Share it with a person in People. They get a file through any messenger and accept or decline it.';
+
+  @override
+  String get shareAfarPick => 'Share with…';
+
+  @override
+  String get shareAfarNobody =>
+      'Nobody in People can get it yet. Add the person from their Profile card first.';
+
+  @override
+  String shareWithTitle(String area) {
+    return 'Share $area with…';
+  }
+
+  @override
+  String get shareNotVerified => 'Not verified';
+
+  @override
+  String transportTitle(String name) {
+    return 'How do changes travel with $name?';
+  }
+
+  @override
+  String get transportFolder => 'A shared folder you both reach';
+
+  @override
+  String get transportFolderDetail =>
+      'Nextcloud, Syncthing or a USB folder; changes travel on their own.';
+
+  @override
+  String get transportBundle => 'Files through a messenger';
+
+  @override
+  String get transportBundleDetail =>
+      'You send changes as a file from their Profile page.';
+
+  @override
+  String get shareAfarFailed =>
+      'The Area could not be shared. Nothing was lost; try again.';
+
+  @override
+  String get areaOfferNotForUs =>
+      'This shared Area is meant for another person or another of your Devices. Ask the sender to share it again with you.';
+
+  @override
+  String get areaOfferFromBlocked =>
+      'Refused: this shared Area comes from a person you blocked.';
+
+  @override
+  String get areaOfferRefused =>
+      'Refused: this Area is your own on this Device already.';
+
+  @override
+  String get notAnAreaOffer =>
+      'This file holds no shared Area this app can read. Ask the sender to share it again.';
+
+  @override
+  String get areaOfferWaits => 'A shared Area is waiting on the Agenda.';
+
+  @override
+  String get areaOfferTitle => 'Shared Area';
+
+  @override
+  String areaOfferText(String name, String area, String role) {
+    return '$name shares $area with you as $role';
+  }
+
+  @override
+  String get areaOfferNoName => 'an Area';
+
+  @override
+  String get areaOfferByFolder =>
+      'Changes travel through a shared folder you both reach.';
+
+  @override
+  String get areaOfferByBundle =>
+      'Changes travel as files through a messenger.';
+
+  @override
+  String get areaOfferKeepsNothing =>
+      'Nothing of the Area is kept until you accept.';
+
+  @override
+  String get areaOfferAccepted => 'Shared Area accepted.';
+
+  @override
+  String get areaOfferGone =>
+      'This shared Area is no longer waiting: it was accepted or declined.';
+
+  @override
+  String get areaOfferFolderQuestion => 'Choose the shared folder?';
+
+  @override
+  String areaOfferFolderDetail(String area) {
+    return 'Changes of $area travel through a folder you both reach. Choose it now, or later under Sync.';
+  }
+
+  @override
+  String get areaOfferFolderLater => 'Later';
+
+  @override
+  String areaOffersWaiting(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count shared Areas waiting',
+      one: '1 shared Area waiting',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaOffersWaitingTitle => 'Shared Areas waiting';
+
+  @override
+  String get areaOffersNoneWaiting => 'No shared Areas are waiting.';
+
+  @override
+  String personSendChanges(String name) {
+    return 'Send changes to $name';
+  }
+
+  @override
+  String get personSendChangesDetail => 'As a file through any messenger.';
 }

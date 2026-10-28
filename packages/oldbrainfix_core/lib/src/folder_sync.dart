@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
+
 import 'area_keys.dart';
 import 'backup.dart';
 import 'conflicts.dart';
@@ -301,6 +303,7 @@ Future<FolderSyncResult> folderSync(
   }
   final report = ImportReport();
   final profileChanged = await _learnKeys(store, folder, report);
+  await _learnAreaSigningKeys(store, folder, report);
   final before = store.currentSeq();
   final (applied, unreadable, newer) = await _readForeign(
     store,
@@ -348,6 +351,7 @@ Future<FolderSyncResult> readSealed(
 }) async {
   final report = ImportReport();
   final profileChanged = await _learnKeys(store, folder, report);
+  await _learnAreaSigningKeys(store, folder, report);
   final before = store.currentSeq();
   final (applied, unreadable, newer) = await _readForeign(
     store,
@@ -483,6 +487,49 @@ Future<bool> _learnKeys(
     }
   }
   return profileChanged;
+}
+
+/// Opens every other Device's Profiles file sealed with the key of an
+/// Area held here and takes in the signing keys it carries (#108): the
+/// keys of the Devices the Area's grants name, so a person met only
+/// through the folder or a bundle checks what the others' Devices write.
+/// Before the entries, which are checked against them. A key record
+/// names the Device its key belongs to, so a record from anyone holding
+/// the Area key pins nothing that is not that Device's.
+Future<void> _learnAreaSigningKeys(
+  Store store,
+  SyncFolder folder,
+  ImportReport report,
+) async {
+  final self = store.deviceId;
+  for (final name in await folder.list('keys')) {
+    if (!name.endsWith('.profiles')) continue;
+    final (device, id) = _deviceAndKey(name) ?? ('', '');
+    if (device.isEmpty || device == self) continue;
+    final key = store.areaKey(id);
+    if (key == null || key.scope == personalScope) continue;
+    final Uint8List? plain;
+    try {
+      final bytes = await folder.read('keys', name);
+      plain = bytes == null
+          ? null
+          : unseal(key.key, bytes, aad: SealedAs.profiles(device));
+    } on FileSystemException {
+      continue;
+    }
+    if (plain == null) continue;
+    final Object? json;
+    try {
+      json = jsonDecode(utf8.decode(plain));
+    } on FormatException {
+      continue;
+    }
+    if (json is! Map) continue;
+    store.learnKeys([
+      for (final k in json['keys'] is List ? json['keys'] : const [])
+        ?KeyRecord.fromJson(k),
+    ], report: report);
+  }
 }
 
 /// Opens every other Device's Profiles file sealed with the key of a
@@ -636,6 +683,37 @@ Future<(List<Entry>, int, int)> _readForeign(
   return (applied, unreadable, newer);
 }
 
+/// Every entry the other Devices' segments in [folder] hold sealed with
+/// one of [keys], each segment read whole, in the order the manifests
+/// name them; null when one is cut short or does not open. For an Area
+/// offered from afar (#108): read with the offered key before anything
+/// is kept.
+@internal
+Future<List<Entry>?> entriesSealedWith(
+  Store store,
+  SyncFolder folder,
+  List<AreaKey> keys,
+) async {
+  final self = store.deviceId;
+  final byId = {for (final k in keys) k.id: k};
+  final out = <Entry>[];
+  for (final name in await folder.list('')) {
+    if (!name.endsWith('.manifest')) continue;
+    final device = name.substring(0, name.length - '.manifest'.length);
+    if (device == self || device.isEmpty) continue;
+    final manifest = FolderManifest.parse(await folder.read('', name));
+    if (manifest == null) continue;
+    for (final segment in manifest.segments) {
+      final key = byId[segment.key];
+      if (key == null) continue;
+      final got = await _segmentEntries(folder, segment, 0, key.key);
+      if (got == null) return null;
+      out.addAll(got);
+    }
+  }
+  return out;
+}
+
 /// The entries of [segment] from line [have] on, or null when it is not
 /// all there yet or does not open.
 Future<List<Entry>?> _segmentEntries(
@@ -706,10 +784,10 @@ Future<void> _publishKeys(
 }
 
 /// Publishes, for every Shared Area whose key this Device holds, the
-/// Profiles of the people its grants name, the own one among them,
-/// sealed with that Area's key, so only the people of the Area read them
-/// (ADR 0017). By key id; a file that already says the same stays
-/// untouched.
+/// Profiles of the people its grants name, the own one among them, and
+/// the signing keys of the Devices they name (#108), sealed with that
+/// Area's key, so only the people of the Area read them (ADR 0017). By
+/// key id; a file that already says the same stays untouched.
 Future<void> _publishProfiles(
   Store store,
   SyncFolder folder,
@@ -720,8 +798,13 @@ Future<void> _publishProfiles(
   for (final key in keys) {
     if (key.scope == personalScope || !store.isShared(key.scope)) continue;
     final profiles = store.profilesToSend(areas: {key.scope});
-    if (profiles.isEmpty) continue;
-    final plain = utf8.encode(jsonEncode({'profiles': profiles}));
+    final signing = store.signingKeysOf(key.scope);
+    final plain = utf8.encode(
+      jsonEncode({
+        'keys': [for (final k in signing) k.toJson()],
+        'profiles': profiles,
+      }),
+    );
     final name = profilesFileName(self, key.id);
     final held = await folder.read('keys', name);
     final said = held == null

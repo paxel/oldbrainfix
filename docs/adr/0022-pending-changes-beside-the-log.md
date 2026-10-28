@@ -61,3 +61,7 @@ The phone's background sync opens a second store on the same files. So every cal
 - ADR 0002: entries this Device writes are numbered and signed when they reach the log, so changes the user has not accepted yet wait beside it.
 - ADR 0011: an edit's causal context counts the entries of the shown pending sets as seen.
 - ADR 0021: a blocked person's entries never enter a pending set, and a block removes them from the sets already held.
+
+## An Area offered from afar (ADR 0023)
+
+Amended by ADR 0023 (#108): an offered Area is a set of kind `area-offer`, never shown, so the sync does not pause for it. Its received entries are the Area's history, its `keys` the key records the offer carries, and its `payload` `{"blobs":[…],"offer":…,"profiles":[…]}`: the offer with the Area's key, the Profiles of the Area's people, and the photos and recordings put into the blob store when it came, which Decline deletes again unless the log refers to them.

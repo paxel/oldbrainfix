@@ -333,7 +333,8 @@ impl Store {
     /// asked for again, the shared folder read whole again too. The
     /// shared folder itself is not touched, and nothing of theirs waits
     /// in a pending set (ADR 0022), a Sent Item held until "Show" (#91)
-    /// neither. Returns whether anything was deleted or let go.
+    /// or an Area they offer (#108) neither. Returns whether anything was
+    /// deleted or let go.
     pub fn enforce_blocks(&self) -> Result<bool> {
         let blocked = self.blocked_ids()?;
         let marks = self.refusal_marks()?;
@@ -395,9 +396,10 @@ impl Store {
                 changed |= self.strip_person_picture(id)?;
             }
             // Nor does anything of theirs wait in a pending set, a Sent
-            // Item held until "Show" neither.
+            // Item held until "Show" or an Area they offer neither.
             changed |= self.drop_blocked_from_pending()?;
             changed |= self.drop_held_from_blocked()?;
+            changed |= self.drop_offers_from_blocked()?;
             Ok(changed)
         })?;
         let mut dropped = false;

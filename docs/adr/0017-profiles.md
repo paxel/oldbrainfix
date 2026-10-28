@@ -137,3 +137,7 @@ At the same version, a record with a picture now replaces one without, before th
 - A Device whose key is not bound to its Profile yet, one that took a Profile over before the binding reached it, makes no card; the next sync with another of the user's Devices binds it.
 - The key a card pins goes out with every other pinned key in LAN sessions, as keys always have (ADR 0002): a person of a Shared Area who knows that Device's key can tell the user added its owner.
 - Each further Device in the binding adds about 270 characters to the link.
+
+## Areas shared from afar (#108)
+
+Amended by ADR 0023: a Profiles file in the shared folder or a bundle is `{"keys":[…],"profiles":[…]}`, the key records of the Devices the Area's grants name beside the Profiles, read before the entries. An offered Area keeps the Profiles it carries only at Accept, through the same path as a Shared Area's; Decline keeps none.

@@ -223,8 +223,8 @@ extension Blocks on Store {
   /// refusals released, so what was refused is asked for again, the
   /// shared folder read whole again too. The shared folder itself is not
   /// touched, and nothing of theirs waits in a pending set (ADR 0022),
-  /// a Sent Item held until "Show" (#91) neither. Returns whether
-  /// anything was deleted or let go.
+  /// a Sent Item held until "Show" (#91) or an Area they offer (#108)
+  /// neither. Returns whether anything was deleted or let go.
   bool enforceBlocks() {
     final blocked = blockedIds;
     final marks = refusalMarks();
@@ -268,9 +268,10 @@ extension Blocks on Store {
         if (_stripPicture(id)) changed = true;
       }
       // Nor does anything of theirs wait in a pending set, a Sent Item
-      // held until "Show" neither.
+      // held until "Show" or an Area they offer neither.
       if (dropBlockedFromPending()) changed = true;
       if (dropHeldFromBlocked(this)) changed = true;
+      if (dropOffersFromBlocked(this)) changed = true;
     });
     for (final ref in refs.toList()..sort()) {
       if (knowsBlob(ref)) continue;

@@ -7,7 +7,9 @@ import 'pairing.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'routines.dart';
+import 'signing.dart';
 import 'store.dart';
+import 'sync.dart';
 
 /// Shared Areas (CONTEXT.md, ADR 0013): an Area other people sync with.
 /// Who may do what in it is signed into the Area itself, one grant per
@@ -677,6 +679,64 @@ extension SharedAreas on Store {
     });
   }
 
+  /// Every entry that lies in the Area [areaId] now, by (device, dseq):
+  /// its whole history, as an offer from afar carries it (#108).
+  List<Entry> areaHistory(String areaId) {
+    final scopes = <String, String>{};
+    return [
+      for (final e in entriesSince(const {}))
+        if (scopes.putIfAbsent(e.entity, () => scopeOf(e.entity)) == areaId) e,
+    ];
+  }
+
+  /// The Devices the grants of the Shared Areas give [person] a role on
+  /// now, never one of the user's own; sorted.
+  List<String> devicesOf(String person) {
+    final target = resolvePerson(person);
+    final out = <String>{};
+    for (final grants in judged.areas.values) {
+      for (final device in grants.devices) {
+        if (grants.grantOf(device) case final grant?
+            when resolvePerson(grant.profile) == target &&
+                !writtenByOwn(device)) {
+          out.add(device);
+        }
+      }
+    }
+    return out.toList()..sort();
+  }
+
+  /// What a bundle for the person [person] carries (#108): what lies in
+  /// the Areas shared with any Device of theirs ([devicesOf]), beyond
+  /// what any of those Devices said it holds, with the whole history of
+  /// Notes filed into them meanwhile. Their Devices sync with each other,
+  /// so the one that reads it passes it on.
+  List<Entry> entriesForPerson(String person) {
+    final devices = devicesOf(person);
+    if (devices.isEmpty) return const [];
+    final vector = <String, int>{};
+    final areas = <String>{};
+    for (final device in devices) {
+      for (final MapEntry(:key, :value) in heldBy(device).entries) {
+        if (value > (vector[key] ?? 0)) vector[key] = value;
+      }
+      areas.addAll(areasSharedWith(device));
+    }
+    return entriesFor(devices.first, vector, also: areas);
+  }
+
+  /// The signing keys the people of the Shared Area [areaId] check its
+  /// entries with (#108): this Device's own and those held here of every
+  /// Device its grants ever named, by device.
+  List<KeyRecord> signingKeysOf(String areaId) {
+    final self = deviceId;
+    return [
+      ownKeyRecord,
+      for (final device in grantsOf(areaId)?.devices ?? const <String>[])
+        if (device != self) ?pinnedKey(device)?.record,
+    ]..sort((a, b) => a.device.compareTo(b.device));
+  }
+
   /// The Area keys [peer], paired by invite, gets: those of the Areas it
   /// holds a role in, and of [also].
   List<AreaKey> areaKeysFor(String peer, {Set<String> also = const {}}) {
@@ -716,4 +776,19 @@ extension SharedPeers on Store {
   /// Whether the Device [id] is one of this Device's own group: paired
   /// without an invite.
   bool isOwnDevice(String id) => pairedDevice(id)?.shared == false;
+
+  /// Whether the Device [id] is another person's as far as this Device
+  /// knows (#108): paired by invite, given a role in a Shared Area for
+  /// another person, or bound to the Profile of another person kept
+  /// here, as one added from a Profile card; never one of the user's
+  /// own.
+  bool isOthersDevice(String id) {
+    if (isSharedPeer(id)) return true;
+    if (writtenByOwn(id)) return false;
+    for (final grants in judged.areas.values) {
+      final person = grants.personOf(id);
+      if (person != null && !isOwnPerson(person)) return true;
+    }
+    return keptPeople.any((p) => pinnedDevicesOf(p.id).contains(id));
+  }
 }

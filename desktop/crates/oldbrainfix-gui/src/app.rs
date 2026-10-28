@@ -5,7 +5,9 @@
 //!
 //! The window opens on the Agenda (UI laws, "Agenda"): the Missed
 //! Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
-//! waiting" line while a stranger's Sent Item waits for "Show", today's
+//! waiting" line while a stranger's Sent Item waits for "Show", the "x
+//! shared Areas waiting" line while an Area shared from afar waits for
+//! Accept or Decline, today's
 //! all-day and then timed Occurrences, a gap, and tomorrow's dimmed,
 //! then the five days after it under their weekdays and dates, all of them checkable. Its gear leads to this Device's Settings, its alarm button
 //! to a new Routine. A Note spawns Routines and Reminders from its
@@ -32,7 +34,12 @@
 //! Sent Item dropped there, opened or handed over by `oldbrainfix open`
 //! shows its preview to accept or decline, a stranger's hidden until
 //! "Show" and waiting behind the Agenda's "x Sent Items waiting" until
-//! decided. A Note is sent from its editor, saved where the user says.
+//! decided. A bundle offering an Area shared from afar (#108) shows who
+//! shares which Area as what, to accept or decline; an Area is shared so
+//! from its Share dialog with a person in People, the offer saved where
+//! the user says, and later changes go from that person's Profile as a
+//! bundle when they travel as files.
+//! A Note is sent from its editor, saved where the user says.
 //! The editor shows a Note's photos and plays its recordings, with their
 //! Transcripts. Transcripts and Photo Texts are made in the background
 //! and found by the search over All Notes, an Area or a Topic.
@@ -51,6 +58,7 @@ use egui::{
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
 use oldbrainfix_core::backup;
+use oldbrainfix_core::offers::{self, HeldAreaOffer, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
@@ -79,14 +87,15 @@ use crate::media::{
     photo_from_file,
 };
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
-use crate::names::{area_name, topic_name};
+use crate::names::{area_name, offered_area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
-    Joiner, SyncAction, SyncHost, device_name, import_bundle_text, update_notice_text,
+    Joiner, SyncAction, SyncHost, bundle_result_text, device_name, import_bundle_result,
+    offer_refusal, update_notice_text,
 };
 use crate::theme::{self, AREA_PALETTE, Tones};
 
@@ -112,6 +121,9 @@ pub enum Selection {
     /// The strangers' Sent Items waiting for "Show", Accept or Decline
     /// (#91), reached from the Agenda's "x Sent Items waiting" line.
     SentItemsWaiting,
+    /// The Areas shared from afar waiting for Accept or Decline (#108),
+    /// reached from the Agenda's "x shared Areas waiting" line.
+    AreaOffersWaiting,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -154,6 +166,8 @@ struct AgendaView {
     /// How many strangers' Sent Items wait (#91), counted from the
     /// pending sets without reading their files.
     waiting: usize,
+    /// How many Areas shared from afar wait (#108), counted alike.
+    offers: usize,
 }
 
 /// What this Device may do to the selected Note in a Shared Area
@@ -213,6 +227,8 @@ struct View {
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
     held: Vec<HeldSentItem>,
+    /// The Areas shared from afar waiting, while their list shows.
+    offers: Vec<HeldAreaOffer>,
     /// The Routines and Reminders in the trash on their own, with their
     /// Notes, while the trash shows.
     trashed_routines: Vec<(Routine, Option<Note>)>,
@@ -277,10 +293,36 @@ enum Dialog {
     DeleteRoutine {
         question: String,
     },
-    /// Sharing the Area `area`: the role the other person gets.
+    /// Sharing the Area `area`: the role the other person gets, and the
+    /// People it can go to from afar (#108).
     Share {
         area: String,
         role: AreaRole,
+        afar: Vec<AfarPerson>,
+    },
+    /// Sharing the Area `area` from afar as `role` (#108): whom, picked
+    /// from `people`, then, for a person never asked about, how changes
+    /// travel with them.
+    ShareAfar {
+        area: String,
+        role: AreaRole,
+        people: Vec<AfarPerson>,
+        person: Option<String>,
+        transport: Transport,
+    },
+    /// An Area shared with the user from afar (#108, ADR 0023), held
+    /// until Accept or Decline, with what comparing its sharer's short
+    /// code came to and, while "Decline and block" asks, the Shared Areas
+    /// blocking them leaves (#90).
+    AreaOffer {
+        held: HeldAreaOffer,
+        compared: Compared,
+        blocking: Option<Vec<String>>,
+    },
+    /// "Choose the shared folder?" after the Area `area` was accepted
+    /// with its changes travelling by a folder, while none is chosen.
+    OfferFolder {
+        area: String,
     },
     /// Sending the Note `note`: to one of `recipients`, encrypted, or to
     /// anyone (`None`), signed only. One sent before (`update`) goes as
@@ -356,6 +398,16 @@ enum Dialog {
     ProfileQr {
         link: String,
     },
+}
+
+/// A person in People an Area can go to from afar (#108): with a Device
+/// whose key is known here, not blocked; as the user sees them, and
+/// whether their code was compared in person.
+#[derive(Debug, Clone, PartialEq)]
+struct AfarPerson {
+    id: String,
+    shown: Profile,
+    verified: bool,
 }
 
 /// What a person's Profile asks before it blocks them or ends their
@@ -500,6 +552,20 @@ enum Action {
     CodesCompared(bool),
     /// Asks how the Area is to be shared.
     Share(String),
+    /// Asks whom the Area of the Share dialog goes to from afar (#108).
+    ShareAfar,
+    /// The person the Area goes to from afar was picked.
+    ShareTo(String),
+    /// Shares the Area from afar as the dialog says and saves the offer.
+    ShareAfarNow,
+    /// Opens the Area shared from afar held as this pending set.
+    OpenOffer(String),
+    /// Accepts the Area shared from afar the dialog shows, or declines
+    /// it.
+    AcceptOffer,
+    DeclineOffer,
+    /// Asks for the shared folder after an Area was accepted.
+    OfferFolder,
     /// Shares the Area of the Share dialog and hosts its invite.
     StartInvite,
     /// Shows who shares the Area.
@@ -1058,11 +1124,12 @@ impl App {
         self.handed = Some(handed);
     }
 
-    /// Whether a Sent Item's preview shows, a stranger's hidden one too.
+    /// Whether a Sent Item's preview shows, a stranger's hidden one too,
+    /// or that of an Area shared from afar.
     pub fn previewing(&self) -> bool {
         matches!(
             self.dialog,
-            Some(Dialog::SentItem { .. } | Dialog::HeldSentItem { .. })
+            Some(Dialog::SentItem { .. } | Dialog::HeldSentItem { .. } | Dialog::AreaOffer { .. })
         )
     }
 
@@ -1247,10 +1314,186 @@ impl App {
         Ok(())
     }
 
-    /// Imports the bundle at `path` and announces what came in.
+    /// The People an Area can go to from afar (#108): not blocked, with a
+    /// Device whose key is known here; by the name the user sees.
+    fn afar_people(&self) -> oldbrainfix_core::Result<Vec<AfarPerson>> {
+        let mut out = Vec::new();
+        for person in self.store.kept_people()? {
+            if self.store.is_blocked(&person.id)?
+                || self.store.offer_devices(&person.id)?.is_empty()
+            {
+                continue;
+            }
+            out.push(AfarPerson {
+                shown: self.store.person_shown(&person.id)?,
+                verified: self.store.person_verified(&person.id)?,
+                id: person.id,
+            });
+        }
+        let t = self.t;
+        out.sort_by_cached_key(|p| profile_view::display_name(&t, &p.shown.name).to_lowercase());
+        Ok(out)
+    }
+
+    /// Shares the Area of the dialog with the person picked from afar
+    /// (#108): the shared folder first when changes travel by one and
+    /// none is chosen, then where the offer is saved. Only then is
+    /// anything written, so backing out of a dialog changes nothing. A
+    /// Starter Set Area goes on under fresh ids, which the selection
+    /// follows.
+    fn share_afar(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::ShareAfar {
+            area,
+            role,
+            person: Some(person),
+            transport,
+            ..
+        }) = self.dialog.take()
+        else {
+            return Ok(());
+        };
+        let t = self.t;
+        let transport = self.store.transport_with(&person)?.unwrap_or(transport);
+        let mut folder = None;
+        if transport == Transport::Folder && self.store.sync_folder()?.is_none() {
+            let Some(path) = (self.folder_picker)(t.folder_pick_title()) else {
+                return Ok(());
+            };
+            folder = Some(path);
+        }
+        let day = (self.wall)(self.store.now()).date();
+        let Some(mut path) =
+            (self.bundle_saver)(t.share_afar_save_title(), &bundle::file_name(day))
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != bundle::EXTENSION) {
+            path.set_extension(bundle::EXTENSION);
+        }
+        if let Some(folder) = &folder {
+            self.store.choose_sync_folder(&folder.to_string_lossy())?;
+        }
+        let shared = match self.store.share_area_with(&area, &person, role, transport) {
+            Ok(shared) => shared,
+            Err(e) => {
+                self.notice = Some(format!("{} ({e})", t.share_afar_failed()));
+                return Ok(());
+            }
+        };
+        if self.selection == Selection::Place(area.clone()) {
+            self.selection = Selection::Place(shared.clone());
+        }
+        if self.trail.area.as_deref() == Some(area.as_str()) {
+            self.trail.area = Some(shared.clone());
+        }
+        self.notice = Some(
+            match bundle::write_area_offer_now(&self.store, &path, &shared, &person) {
+                Ok(_) => t.sent_saved().to_string(),
+                Err(e) => format!("{} ({e})", t.share_afar_failed()),
+            },
+        );
+        // The Area goes into the folder as well.
+        if transport == Transport::Folder {
+            self.folder_now()?;
+        }
+        Ok(())
+    }
+
+    /// Accepts the Area shared from afar the dialog shows (#108), the
+    /// sharer verified when the codes matched; asks for the shared folder
+    /// when its changes travel by one and none is chosen here. One
+    /// decided meanwhile, or refused now, is announced, not failed.
+    fn accept_offer(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::AreaOffer { held, compared, .. }) = self.dialog.take() else {
+            return Ok(());
+        };
+        let t = self.t;
+        match self
+            .store
+            .accept_area_offer(&held.id, compared == Compared::Match)
+        {
+            Ok(_) => {}
+            Err(oldbrainfix_core::Error::Offer(e)) => {
+                self.notice = Some(offer_refusal(&t, e).to_string());
+                return Ok(());
+            }
+            // Decided meanwhile; a block drops it too.
+            Err(oldbrainfix_core::Error::Invalid(_)) => {
+                self.notice = Some(if self.store.is_blocked(&held.sender.id)? {
+                    t.area_offer_from_blocked().to_string()
+                } else {
+                    t.area_offer_gone().to_string()
+                });
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        }
+        self.notice = Some(t.area_offer_accepted().to_string());
+        // The alerts plan the Area's Routines.
+        if let Some(wake) = &self.wake {
+            drop(wake.send(Event::Wake));
+        }
+        if held.transport == Transport::Folder && self.store.sync_folder()?.is_none() {
+            self.dialog = Some(Dialog::OfferFolder {
+                area: offer_area(&t, &held),
+            });
+        } else if held.transport == Transport::Folder {
+            self.folder_now()?;
+        }
+        Ok(())
+    }
+
+    /// "Send changes to Ann" on the person's Profile the dialog shows
+    /// (#108): saves a bundle of what is new in the Areas shared with
+    /// them, for all of their Devices at once, where the user says;
+    /// nothing asked when nothing is new for them.
+    fn send_changes(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(Dialog::Person { id, .. }) = &self.dialog else {
+            return Ok(());
+        };
+        let id = id.clone();
+        let t = self.t;
+        let shown = self.store.person_shown(&id)?;
+        let name = profile_view::display_name(&t, &shown.name).to_string();
+        if self.store.entries_for_person(&id)?.is_empty() {
+            self.notice = Some(t.bundle_nothing_new(&name));
+            return Ok(());
+        }
+        let day = (self.wall)(self.store.now()).date();
+        let Some(mut path) =
+            (self.bundle_saver)(t.person_send_changes_title(), &bundle::file_name(day))
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != bundle::EXTENSION) {
+            path.set_extension(bundle::EXTENSION);
+        }
+        self.notice = Some(
+            match bundle::write_person_bundle_now(&self.store, &path, &id) {
+                Ok(Some(_)) => t.sent_saved().to_string(),
+                Ok(None) => t.bundle_nothing_new(&name),
+                Err(e) => format!("{} ({e})", t.bundle_failed()),
+            },
+        );
+        Ok(())
+    }
+
+    /// Imports the bundle at `path` and announces what came in; one
+    /// offering an Area shared from afar (#108) shows its preview instead.
     fn import_bundle(&mut self, path: &std::path::Path) {
-        let said = import_bundle_text(&self.t, &self.store, path);
-        self.notice = Some(said.unwrap_or_else(|e| e));
+        match import_bundle_result(&self.t, &self.store, path) {
+            Ok(result) => match result.offer {
+                Some(held) => {
+                    self.dialog = Some(Dialog::AreaOffer {
+                        held,
+                        compared: Compared::Not,
+                        blocking: None,
+                    });
+                }
+                None => self.notice = Some(bundle_result_text(&self.t, &result)),
+            },
+            Err(said) => self.notice = Some(said),
+        }
         self.refresh();
         // The alerts plan again: a Done in the bundle closes its alarm.
         if let Some(wake) = &self.wake {
@@ -1539,7 +1782,8 @@ impl App {
             | Selection::Sync
             | Selection::About
             | Selection::Licences
-            | Selection::SentItemsWaiting => Vec::new(),
+            | Selection::SentItemsWaiting
+            | Selection::AreaOffersWaiting => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -1667,6 +1911,12 @@ impl App {
                         .iter()
                         .filter(|s| s.kind == sent::PENDING_KIND)
                         .count(),
+                    offers: self
+                        .store
+                        .pending_sets()?
+                        .iter()
+                        .filter(|s| s.kind == offers::PENDING_KIND)
+                        .count(),
                 })
             }
             _ => None,
@@ -1701,6 +1951,11 @@ impl App {
             // Each read checks every held file again: only while listed.
             held: if self.selection == Selection::SentItemsWaiting {
                 self.store.held_sent_items()?
+            } else {
+                Vec::new()
+            },
+            offers: if self.selection == Selection::AreaOffersWaiting {
+                self.store.held_area_offers()?
             } else {
                 Vec::new()
             },
@@ -2173,6 +2428,9 @@ impl App {
                 Some(Dialog::HeldSentItem { held, blocking }) => {
                     *blocking = Some(self.store.areas_to_leave_for_blocking(&held.sender.id)?);
                 }
+                Some(Dialog::AreaOffer { held, blocking, .. }) => {
+                    *blocking = Some(self.store.areas_to_leave_for_blocking(&held.sender.id)?);
+                }
                 _ => {}
             },
             Action::Block => self.block()?,
@@ -2183,9 +2441,11 @@ impl App {
                 }
             }
             Action::CancelBlock => match &mut self.dialog {
-                Some(Dialog::SentItem { blocking, .. } | Dialog::HeldSentItem { blocking, .. }) => {
-                    *blocking = None
-                }
+                Some(
+                    Dialog::SentItem { blocking, .. }
+                    | Dialog::HeldSentItem { blocking, .. }
+                    | Dialog::AreaOffer { blocking, .. },
+                ) => *blocking = None,
                 Some(Dialog::Person { asking, .. }) => *asking = None,
                 _ => {}
             },
@@ -2194,12 +2454,18 @@ impl App {
                     .set_local_setting(BLOCKED_OPEN, if open { "true" } else { "false" })?;
             }
             Action::CompareCodes => {
-                if let Some(Dialog::SentItem { compared, .. }) = &mut self.dialog {
+                if let Some(
+                    Dialog::SentItem { compared, .. } | Dialog::AreaOffer { compared, .. },
+                ) = &mut self.dialog
+                {
                     *compared = Compared::Asking;
                 }
             }
             Action::CodesCompared(matched) => {
-                if let Some(Dialog::SentItem { compared, .. }) = &mut self.dialog {
+                if let Some(
+                    Dialog::SentItem { compared, .. } | Dialog::AreaOffer { compared, .. },
+                ) = &mut self.dialog
+                {
                     *compared = if matched {
                         Compared::Match
                     } else {
@@ -2208,13 +2474,58 @@ impl App {
                 }
             }
             Action::Share(area) => {
+                let afar = self.afar_people()?;
                 self.dialog = Some(Dialog::Share {
                     area,
                     role: AreaRole::Member,
+                    afar,
                 });
             }
+            Action::ShareAfar => {
+                if let Some(Dialog::Share { area, role, afar }) = self.dialog.take() {
+                    self.dialog = Some(Dialog::ShareAfar {
+                        area,
+                        role,
+                        people: afar,
+                        person: None,
+                        transport: Transport::Bundle,
+                    });
+                }
+            }
+            Action::ShareTo(id) => {
+                let known = self.store.transport_with(&id)?;
+                if let Some(Dialog::ShareAfar { person, .. }) = &mut self.dialog {
+                    *person = Some(id);
+                }
+                // Asked once per person: a second Area goes the same way.
+                if known.is_some() {
+                    self.share_afar()?;
+                }
+            }
+            Action::ShareAfarNow => self.share_afar()?,
+            Action::OpenOffer(id) => match self.store.held_area_offer(&id)? {
+                Some(held) => {
+                    self.dialog = Some(Dialog::AreaOffer {
+                        held,
+                        compared: Compared::Not,
+                        blocking: None,
+                    });
+                }
+                None => self.notice = Some(self.t.area_offer_gone().to_string()),
+            },
+            Action::AcceptOffer => self.accept_offer()?,
+            Action::DeclineOffer => {
+                if let Some(Dialog::AreaOffer { held, .. }) = self.dialog.take() {
+                    self.store.decline_area_offer(&held.id)?;
+                    self.notice = Some(self.t.sent_item_declined().to_string());
+                }
+            }
+            Action::OfferFolder => {
+                self.dialog = None;
+                self.act(Action::Sync(SyncAction::PickFolder))?;
+            }
             Action::StartInvite => {
-                if let Some(Dialog::Share { area, role }) = self.dialog.clone() {
+                if let Some(Dialog::Share { area, role, .. }) = self.dialog.clone() {
                     let area = self.store.share(&area)?;
                     self.dialog = None;
                     self.save_text()?;
@@ -2427,7 +2738,9 @@ impl App {
     fn back(&self) -> Option<Selection> {
         match &self.selection {
             Selection::All | Selection::Agenda => None,
-            Selection::Profile | Selection::SentItemsWaiting => Some(Selection::Agenda),
+            Selection::Profile | Selection::SentItemsWaiting | Selection::AreaOffersWaiting => {
+                Some(Selection::Agenda)
+            }
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
@@ -2924,6 +3237,7 @@ impl App {
             Selection::About => self.t.about_title().to_string(),
             Selection::Licences => self.t.open_source_licenses().to_string(),
             Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
+            Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -3043,6 +3357,7 @@ impl App {
             }
             Selection::Licences => return about_view::licences_page(ui, &self.t),
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
+            Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
             Selection::Sync => {
                 let wall = self.wall.clone();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
@@ -3615,12 +3930,69 @@ impl App {
                             }
                         });
                     }
-                    Dialog::Share { area, role } => {
+                    Dialog::Share { area, role, afar } => {
                         let shown = view
                             .area(area)
                             .map(|a| area_name(&t, a))
                             .unwrap_or_default();
-                        share_form(ui, &t, &shown, role, actions);
+                        share_form(ui, &t, &shown, (role, !afar.is_empty()), actions);
+                    }
+                    Dialog::ShareAfar {
+                        area,
+                        people,
+                        person: None,
+                        ..
+                    } => {
+                        let shown = view
+                            .area(area)
+                            .map(|a| area_name(&t, a))
+                            .unwrap_or_default();
+                        share_person_form(ui, &t, tones, (&shown, people), pictures, actions);
+                    }
+                    Dialog::ShareAfar {
+                        people,
+                        person: Some(person),
+                        transport,
+                        ..
+                    } => {
+                        let name = people
+                            .iter()
+                            .find(|p| p.id == *person)
+                            .map(|p| profile_view::display_name(&t, &p.shown.name))
+                            .unwrap_or_default();
+                        transport_form(ui, &t, name, transport, actions);
+                    }
+                    Dialog::AreaOffer {
+                        held,
+                        blocking: Some(areas),
+                        ..
+                    } => {
+                        let name = profile_view::display_name(&t, &held.sender.name);
+                        block_form(ui, &t, name, &area_names(&t, view, areas), actions);
+                    }
+                    Dialog::AreaOffer {
+                        held,
+                        compared,
+                        blocking: None,
+                    } => area_offer_form(ui, &t, tones, (held, *compared), pictures, actions),
+                    Dialog::OfferFolder { area } => {
+                        title(ui, t.area_offer_folder_question());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.area_offer_folder_detail(area)).color(text));
+                        ui.horizontal(|ui| {
+                            if ui
+                                .button(RichText::new(t.area_offer_folder_later()).color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::CloseDialog);
+                            }
+                            if ui
+                                .button(RichText::new(t.folder_pick()).strong().color(text))
+                                .clicked()
+                            {
+                                actions.push(Action::OfferFolder);
+                            }
+                        });
                     }
                     Dialog::Send {
                         recipients,
@@ -3781,6 +4153,9 @@ impl App {
                 | Dialog::HeldSentItem {
                     blocking: Some(_), ..
                 }
+                | Dialog::AreaOffer {
+                    blocking: Some(_), ..
+                }
                 | Dialog::Person {
                     asking: Some(_), ..
                 } => Action::CancelBlock,
@@ -3791,7 +4166,8 @@ impl App {
 
     /// The Agenda (UI laws, "Agenda"): the capture field, the Missed
     /// Summary until "Seen", the "x Unsorted" banner, the "x Sent Items
-    /// waiting" line opening their list, today's Occurrences, a gap, and tomorrow's dimmed, then the five days after
+    /// waiting" line opening their list, the "x shared Areas waiting" line
+    /// opening theirs, today's Occurrences, a gap, and tomorrow's dimmed, then the five days after
     /// the same way, each under its weekday and date; each checkable on
     /// its own, a click on one opens its Routine. The Profile picture in the
     /// corner, where the settings gear was, leads to the Profile page.
@@ -3841,6 +4217,13 @@ impl App {
                     let id = Id::new("sent items waiting");
                     if count_banner(ui, tones, (id, icons::MAIL_UNREAD), &said) {
                         actions.push(Action::Select(Selection::SentItemsWaiting));
+                    }
+                }
+                if agenda.offers > 0 {
+                    let said = t.area_offers_waiting(agenda.offers as i64);
+                    let id = Id::new("shared areas waiting");
+                    if count_banner(ui, tones, (id, icons::GROUP_ADD), &said) {
+                        actions.push(Action::Select(Selection::AreaOffersWaiting));
                     }
                 }
                 ui.label(
@@ -4061,9 +4444,10 @@ impl App {
     }
 
     /// Closes the dialog. A person's Profile keeps the name typed last
-    /// and shows the dialog it opened over again, a Sent Item's sender as
-    /// the user sees them now; a Sent Item whose sender the user blocked
-    /// there shows nothing more and closes too (#90).
+    /// and shows the dialog it opened over again, a Sent Item's or an Area
+    /// offer's sender as the user sees them now; a Sent Item or an offer
+    /// whose sender the user blocked there shows nothing more and closes
+    /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
         let behind = self.dialog_behind.take();
         if let Some(Dialog::Person { id, name, .. }) = self.dialog.take() {
@@ -4078,6 +4462,15 @@ impl App {
                     opened.sender = self.store.person_shown(&opened.sender.id)?;
                 }
             }
+            // A block drops the offer with it (ADR 0021).
+            if let Some(Dialog::AreaOffer { held, .. }) = &mut self.dialog {
+                if self.store.is_blocked(&held.sender.id)? {
+                    self.dialog = None;
+                    self.notice = Some(self.t.area_offer_from_blocked().to_string());
+                } else if held.trust != SenderTrust::Unknown {
+                    held.sender = self.store.person_shown(&held.sender.id)?;
+                }
+            }
         }
         Ok(())
     }
@@ -4085,7 +4478,8 @@ impl App {
     /// Blocks the person the dialog asks about (#90), leaving the Shared
     /// Areas it named; asks again, naming them, should one have come in
     /// by sync since. From a Sent Item's preview, a stranger's hidden one
-    /// too, the item is declined and the preview closes; a person's
+    /// too, or an Area offer's (#108), the item is declined and the
+    /// preview closes; a person's
     /// Profile stays and shows the block.
     fn block(&mut self) -> oldbrainfix_core::Result<()> {
         let done = match &mut self.dialog {
@@ -4135,6 +4529,21 @@ impl App {
                 }
                 Err(e) => return Err(e),
             },
+            Some(Dialog::AreaOffer {
+                held,
+                blocking: Some(areas),
+                ..
+            }) => match self
+                .store
+                .block_area_offer_sender(&held.id, !areas.is_empty())
+            {
+                Ok(blocked) => Some(blocked),
+                Err(oldbrainfix_core::Error::MustLeaveAreas(more)) => {
+                    *areas = more;
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            },
             _ => return Ok(()),
         };
         match done {
@@ -4162,6 +4571,7 @@ impl App {
             PersonAction::UseSquare => return self.person_square_done(true),
             PersonAction::CancelSquare => return self.person_square_done(false),
             PersonAction::TheirNotes => return self.their_notes(),
+            PersonAction::SendChanges => return self.send_changes(),
             _ => {}
         }
         let Some(Dialog::Person {
@@ -4197,7 +4607,10 @@ impl App {
                     None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
                 }
             }
-            PersonAction::UseSquare | PersonAction::CancelSquare | PersonAction::TheirNotes => {}
+            PersonAction::UseSquare
+            | PersonAction::CancelSquare
+            | PersonAction::TheirNotes
+            | PersonAction::SendChanges => {}
             PersonAction::Block => {
                 *asking = Some(Asking::Block(self.store.areas_to_leave_for_blocking(id)?));
             }
@@ -4376,6 +4789,45 @@ impl App {
                     });
                     if clicked {
                         actions.push(Action::OpenHeld(held.id.clone()));
+                    }
+                }
+            });
+    }
+
+    /// The Areas shared from afar waiting (#108), the oldest first: who
+    /// shares which Area as what, and when it came. A click opens its
+    /// preview; those left undecided, or by a restart, wait here until
+    /// Accept or Decline.
+    fn offers_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        ui.heading(RichText::new(t.area_offers_waiting_title()).color(text));
+        ui.add_space(8.0);
+        if self.view.offers.is_empty() {
+            ui.label(RichText::new(t.area_offers_none_waiting()).color(weak));
+            return;
+        }
+        egui::ScrollArea::vertical()
+            .id_salt("shared areas waiting")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 12.0;
+                ui.add_space(4.0);
+                for held in &self.view.offers {
+                    let line = offer_line(&t, held);
+                    let id = Id::new(("offer", &held.id));
+                    let clicked = clickable_card(ui, tones, (id, &line), |ui| {
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::GROUP_ADD, 20.0, tones.accent);
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&line).color(text));
+                                ui.label(RichText::new(when(&t, held.held)).small().color(weak));
+                            });
+                        });
+                    });
+                    if clicked {
+                        actions.push(Action::OpenOffer(held.id.clone()));
                     }
                 }
             });
@@ -4857,8 +5309,16 @@ fn name_form(
 
 /// How an Area is shared: the role, and the button that shows the
 /// invite's code. Nobody types a name: the other person's Profile shows
-/// when their phone joins, to confirm (ADR 0017).
-fn share_form(ui: &mut Ui, t: &L10n, area: &str, role: &mut AreaRole, actions: &mut Vec<Action>) {
+/// when their phone joins, to confirm (ADR 0017). Below, "Share with…"
+/// gives it with the same role to a person in People who is not nearby
+/// (#108), when there is anybody it can go to.
+fn share_form(
+    ui: &mut Ui,
+    t: &L10n,
+    area: &str,
+    (role, afar): (&mut AreaRole, bool),
+    actions: &mut Vec<Action>,
+) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     title(ui, &t.share_title(area));
@@ -4880,6 +5340,244 @@ fn share_form(ui: &mut Ui, t: &L10n, area: &str, role: &mut AreaRole, actions: &
             actions.push(Action::StartInvite);
         }
     });
+    ui.separator();
+    ui.label(RichText::new(t.share_afar_heading()).strong().color(text));
+    let intro = if afar {
+        t.share_afar_intro()
+    } else {
+        t.share_afar_nobody()
+    };
+    ui.label(RichText::new(intro).color(weak));
+    if afar
+        && ui
+            .button(RichText::new(t.share_afar_pick()).color(text))
+            .clicked()
+    {
+        actions.push(Action::ShareAfar);
+    }
+}
+
+/// "Share Household with…" (#108): the People the Area can go to from
+/// afar, each with their picture and name as the user sees them and "Not
+/// verified" under those whose code was never compared in person; a
+/// click picks them.
+fn share_person_form(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (area, people): (&str, &[AfarPerson]),
+    pictures: &mut profile_view::Pictures,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, &t.share_with_title(area));
+    egui::ScrollArea::vertical()
+        .id_salt("share with")
+        .max_height(420.0)
+        .show(ui, |ui| {
+            for person in people {
+                let name = profile_view::display_name(t, &person.shown.name);
+                let id = Id::new(("share to", &person.id));
+                let clicked = clickable_card(ui, tones, (id, name), |ui| {
+                    ui.horizontal(|ui| {
+                        profile_view::person_picture(ui, pictures, &person.shown, 40.0, name);
+                        ui.add_space(8.0);
+                        ui.vertical(|ui| {
+                            ui.label(RichText::new(name).color(text));
+                            if !person.verified {
+                                ui.label(RichText::new(t.share_not_verified()).small().color(weak));
+                            }
+                        });
+                    });
+                });
+                if clicked {
+                    actions.push(Action::ShareTo(person.id.clone()));
+                }
+            }
+        });
+    cancel(ui, t, actions);
+}
+
+/// "How do changes travel with Ann?" (#108), asked once per person: a
+/// shared folder both reach, or files through a messenger.
+fn transport_form(
+    ui: &mut Ui,
+    t: &L10n,
+    name: &str,
+    transport: &mut Transport,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    title(ui, &t.transport_title(name));
+    for (choice, label, detail) in [
+        (
+            Transport::Folder,
+            t.transport_folder(),
+            t.transport_folder_detail(),
+        ),
+        (
+            Transport::Bundle,
+            t.transport_bundle(),
+            t.transport_bundle_detail(),
+        ),
+    ] {
+        ui.radio_value(transport, choice, RichText::new(label).color(text));
+        ui.label(RichText::new(detail).small().color(weak));
+    }
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        if ui
+            .button(RichText::new(t.invite_confirm_share()).strong().color(text))
+            .clicked()
+        {
+            actions.push(Action::ShareAfarNow);
+        }
+    });
+}
+
+/// The name of the Area `held` offers as the user reads it, or "an
+/// Area" when the roles left the name out.
+fn offer_area(t: &L10n, held: &HeldAreaOffer) -> String {
+    let area = offered_area_name(t, held.area_starter.as_deref(), &held.area_name);
+    if area.is_empty() {
+        t.area_offer_no_name().to_string()
+    } else {
+        area
+    }
+}
+
+/// "Ann shares Household with you as Member" for the offer `held`.
+fn offer_line(t: &L10n, held: &HeldAreaOffer) -> String {
+    let role = match held.role {
+        AreaRole::Manager => t.role_manager(),
+        AreaRole::Member => t.role_member(),
+    };
+    t.area_offer_text(
+        profile_view::display_name(t, &held.sender.name),
+        &offer_area(t, held),
+        role,
+    )
+}
+
+/// The preview of an Area shared with the user from afar (#108, ADR
+/// 0023): who shares it, with their picture, verified or not with its
+/// short code, the Area and the role it comes with, and how changes
+/// travel; nothing of it is kept before Accept. "Compare codes" marks the
+/// sharer verified on Accept, as for a Sent Item (#51). Leaving decides
+/// nothing: the offer waits behind the Agenda's "x shared Areas waiting".
+fn area_offer_form(
+    ui: &mut Ui,
+    t: &L10n,
+    tones: Tones,
+    (held, compared): (&HeldAreaOffer, Compared),
+    pictures: &mut profile_view::Pictures,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let name = profile_view::display_name(t, &held.sender.name).to_string();
+    let line = offer_line(t, held);
+    ui.horizontal(|ui| {
+        // A sharer kept here opens their Profile (#52); one not kept yet
+        // has nothing to open until accepted.
+        if held.trust == SenderTrust::Unknown {
+            profile_view::person_picture(ui, pictures, &held.sender, 40.0, &name);
+        } else if profile_view::person_button(
+            ui,
+            pictures,
+            &held.sender,
+            40.0,
+            &t.person_open(&name),
+        )
+        .clicked()
+        {
+            actions.push(Action::OpenPerson(held.sender.id.clone()));
+        }
+        ui.add_space(8.0);
+        ui.add(egui::Label::new(RichText::new(&line).strong().size(18.0).color(text)).wrap());
+    });
+    let code = &held.code;
+    let trust = if compared == Compared::Match {
+        SenderTrust::Verified
+    } else {
+        held.trust
+    };
+    let said = match trust {
+        SenderTrust::Verified => t.sent_item_verified(code),
+        SenderTrust::Known => t.sent_item_known(code),
+        SenderTrust::Unknown => t.sent_item_unknown(code),
+    };
+    ui.label(RichText::new(said).color(text));
+    match compared {
+        Compared::Match if held.trust != SenderTrust::Verified => {
+            ui.label(
+                RichText::new(t.sent_item_verified_on_accept())
+                    .small()
+                    .color(weak),
+            );
+        }
+        Compared::Differ => {
+            ui.label(RichText::new(t.sent_item_codes_differed()).color(tones.accent));
+        }
+        Compared::Asking => {
+            ui.label(RichText::new(t.sent_item_compare_hint(&name, code)).color(text));
+            ui.horizontal(|ui| {
+                if ui
+                    .button(RichText::new(t.sent_item_codes_match()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::CodesCompared(true));
+                }
+                if ui
+                    .button(RichText::new(t.sent_item_codes_differ()).color(text))
+                    .clicked()
+                {
+                    actions.push(Action::CodesCompared(false));
+                }
+            });
+        }
+        _ => {}
+    }
+    if trust != SenderTrust::Verified
+        && compared != Compared::Asking
+        && ui
+            .button(RichText::new(t.sent_item_compare()).color(text))
+            .clicked()
+    {
+        actions.push(Action::CompareCodes);
+    }
+    let travel = match held.transport {
+        Transport::Folder => t.area_offer_by_folder(),
+        Transport::Bundle => t.area_offer_by_bundle(),
+    };
+    ui.label(RichText::new(travel).color(text));
+    ui.label(
+        RichText::new(t.area_offer_keeps_nothing())
+            .small()
+            .color(weak),
+    );
+    ui.horizontal(|ui| {
+        if ui
+            .button(RichText::new(t.sent_item_accept()).strong().color(text))
+            .clicked()
+        {
+            actions.push(Action::AcceptOffer);
+        }
+        if ui
+            .button(RichText::new(t.sent_item_decline()).color(text))
+            .clicked()
+        {
+            actions.push(Action::DeclineOffer);
+        }
+    });
+    if ui
+        .button(RichText::new(t.sent_item_block()).color(text))
+        .clicked()
+    {
+        actions.push(Action::AskBlockSender);
+    }
 }
 
 /// Asks whom a Note is sent to: one of the people whose keys are known

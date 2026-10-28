@@ -25,6 +25,7 @@ use oldbrainfix_core::lan::{
     pair_code_lines,
 };
 use oldbrainfix_core::notes::keys as note_keys;
+use oldbrainfix_core::offers::OfferError;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::sync::{FOLDER_SOURCE, UpdateNeeded};
 use oldbrainfix_core::{
@@ -910,18 +911,37 @@ fn bundle_section(
 
 /// Imports the bundle at `path` into `store` and says what came in, or
 /// what went wrong; Conflicts it brought are announced as an automatic
-/// sync's are.
+/// sync's are. A bundle offering an Area (#108) is held as the offer and
+/// said to wait on the Agenda.
 pub fn import_bundle_text(t: &L10n, store: &Store, path: &Path) -> Result<String, String> {
+    import_bundle_result(t, store, path).map(|result| bundle_result_text(t, &result))
+}
+
+/// Imports the bundle at `path` into `store`, Conflicts it brought
+/// announced as an automatic sync's are; what went wrong in words.
+pub fn import_bundle_result(t: &L10n, store: &Store, path: &Path) -> Result<BundleResult, String> {
     match import_bundle(store, path) {
         Ok(result) => {
             if !result.conflicts.is_empty() {
                 drop(store.set_conflicts_arrived(true));
             }
-            Ok(bundle_result_text(t, &result))
+            Ok(result)
         }
         Err(Error::NotABundle) => Err(t.bundle_not_a_bundle().to_string()),
         Err(Error::BundleNeedsUpdate) => Err(t.bundle_needs_update().to_string()),
+        Err(Error::Offer(e)) => Err(offer_refusal(t, e).to_string()),
         Err(e) => Err(format!("{} ({e})", t.bundle_failed())),
+    }
+}
+
+/// What an Area offer refused as `error` is announced as (#108), each
+/// with its own cause and fix.
+pub fn offer_refusal(t: &L10n, error: OfferError) -> &'static str {
+    match error {
+        OfferError::NotAnOffer => t.not_an_area_offer(),
+        OfferError::NotForUs => t.area_offer_not_for_us(),
+        OfferError::FromBlocked => t.area_offer_from_blocked(),
+        OfferError::Refused => t.area_offer_refused(),
     }
 }
 
@@ -948,6 +968,9 @@ pub fn update_notice_text(t: &L10n, store: &Store, source: &str, update: UpdateN
 
 /// What a bundle import did, in words.
 pub fn bundle_result_text(t: &L10n, result: &BundleResult) -> String {
+    if result.offer.is_some() {
+        return t.area_offer_waits().to_string();
+    }
     if result.needs_pairing() {
         return t.bundle_pair_first().to_string();
     }

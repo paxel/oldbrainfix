@@ -123,7 +123,7 @@ One installation of the app, on a phone or a desktop. Settings belong to a Devic
 Introducing two Devices, or a person, to each other in person or by code, which hands over the keys they need.
 
 **Shared Area**:
-An Area that other people sync with. Everything outside it stays private.
+An Area that other people sync with. Everything outside it stays private. It is shared in person by Pairing, or from afar with a person in People through an offer file the person accepts or declines; changes then travel by a shared folder or by bundles.
 
 **Manager**:
 A person who may do everything in a Shared Area.

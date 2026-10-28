@@ -27,6 +27,7 @@ pub mod keys;
 pub mod lan;
 pub mod notes;
 pub mod nudges;
+pub mod offers;
 pub mod overrides;
 pub mod pairing;
 pub mod pending;

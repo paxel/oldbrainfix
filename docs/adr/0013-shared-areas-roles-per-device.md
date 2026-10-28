@@ -36,3 +36,7 @@ Amended by ADR 0021 (#90): a blocked person's Devices are those the grants name 
 ## Phones as hosts (ADR 0003, #105)
 
 Amended for #105: any Device hosts (ADR 0003), so a phone or tablet shows an invite code as the computer does. While it invites, every joiner's `POST /sync` is held, with the Profile its person sent, until the user confirms it, and a Device trusted before is asked as well; anyone else asking meanwhile hears 503 and tries again. Two people with only phones share an Area so; the consequence that phones only join is gone. The invited Device names its certificate like any joiner, so a Device paired by invite is joined the other way round too, and gets only what it shares.
+
+## From afar (ADR 0023)
+
+Amended by ADR 0023 (#108): an Area is also shared with a person who is not on the same network, one added from a Profile card among them: the grants are written to the Devices of theirs whose keys are known here, and an offer file, a bundle of the Area's whole history with the Area's key sealed to those Devices' X25519 keys, goes through any messenger; later changes travel by the shared folder or by bundles. The receiver holds the offer as Pending Changes until the user accepts it. A bundle for another person's Device, one paired by invite, one a grant names for another person or one bound to another person's Profile kept here, holds only what that Device shares, also when it was never paired.

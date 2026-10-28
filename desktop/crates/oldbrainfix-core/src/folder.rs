@@ -334,6 +334,7 @@ pub fn folder_sync(
     }
     let mut report = ImportReport::default();
     let profile_changed = learn_keys(store, folder, &mut report)?;
+    learn_area_signing_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
     let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
@@ -375,6 +376,7 @@ pub fn read_sealed(
 ) -> Result<FolderSyncResult> {
     let mut report = ImportReport::default();
     let profile_changed = learn_keys(store, folder, &mut report)?;
+    learn_area_signing_keys(store, folder, &mut report)?;
     let before = store.current_seq()?;
     let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, false)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
@@ -485,6 +487,51 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
     Ok(profile_changed)
 }
 
+/// Opens every other Device's Profiles file sealed with the key of an
+/// Area held here and takes in the signing keys it carries (#108), as
+/// the Dart core's `_learnAreaSigningKeys`: the keys of the Devices the
+/// Area's grants name, so a person met only through the folder or a
+/// bundle checks what the others' Devices write. Before the entries. A
+/// key record names the Device its key belongs to, so a record from
+/// anyone holding the Area key pins nothing that is not that Device's.
+fn learn_area_signing_keys(
+    store: &Store,
+    folder: &dyn SyncFolder,
+    report: &mut ImportReport,
+) -> Result<()> {
+    let own = store.device_id()?;
+    for name in folder.list("keys")? {
+        if !name.ends_with(".profiles") {
+            continue;
+        }
+        let Some((device, id)) = device_and_key(&name) else {
+            continue;
+        };
+        if device == own {
+            continue;
+        }
+        let Some(key) = store.area_key(id)?.filter(|k| k.scope != PERSONAL_SCOPE) else {
+            continue;
+        };
+        let Ok(Some(bytes)) = folder.read("keys", &name) else {
+            continue;
+        };
+        let Some(plain) = unseal(&key.key, &bytes, &sealed_as::profiles(device)) else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_slice::<Value>(&plain) else {
+            continue;
+        };
+        let signing: Vec<KeyRecord> = json
+            .get("keys")
+            .and_then(Value::as_array)
+            .map(|list| list.iter().filter_map(KeyRecord::from_json).collect())
+            .unwrap_or_default();
+        store.learn_keys(&signing, None, report)?;
+    }
+    Ok(())
+}
+
 /// Opens every other Device's Profiles file sealed with the key of a
 /// Shared Area held here and takes in the Profiles of the people that
 /// Area's grants name (ADR 0017), as the Dart core's `_learnProfiles`.
@@ -550,6 +597,42 @@ fn read_state(store: &Store, device: &str) -> Result<(i64, BTreeMap<String, usiz
 fn split_lines(bytes: &[u8]) -> Option<Vec<String>> {
     let text = std::str::from_utf8(bytes).ok()?;
     Some(text.lines().map(str::to_string).collect())
+}
+
+/// Every entry the other Devices' segments in `folder` hold sealed with
+/// one of `keys`, each segment read whole, in the order the manifests
+/// name them, as the Dart core's `entriesSealedWith`; none when one is
+/// cut short or does not open. For an Area offered from afar (#108):
+/// read with the offered key before anything is kept.
+pub(crate) fn entries_sealed_with(
+    store: &Store,
+    folder: &dyn SyncFolder,
+    keys: &[AreaKey],
+) -> Result<Option<Vec<WireEntry>>> {
+    let own = store.device_id()?;
+    let by_id: HashMap<String, &AreaKey> = keys.iter().map(|k| (k.id(), k)).collect();
+    let mut out = Vec::new();
+    for name in folder.list("")? {
+        let Some(device) = name.strip_suffix(".manifest") else {
+            continue;
+        };
+        if device == own || device.is_empty() {
+            continue;
+        }
+        let Some(manifest) = Manifest::parse(folder.read("", &name)?.as_deref()) else {
+            continue;
+        };
+        for segment in &manifest.segments {
+            let Some(key) = by_id.get(&segment.key) else {
+                continue;
+            };
+            match segment_entries(folder, segment, 0, key) {
+                Some(got) => out.extend(got),
+                None => return Ok(None),
+            }
+        }
+    }
+    Ok(Some(out))
 }
 
 /// The entries of `segment` from line `have` on, or none when it is not
@@ -701,9 +784,10 @@ fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -
 }
 
 /// Publishes, for every Shared Area whose key this Device holds, the
-/// Profiles of the people its grants name, the own one among them,
-/// sealed with that Area's key, as the Dart core's `_publishProfiles`:
-/// by key id; a file that already says the same stays untouched.
+/// Profiles of the people its grants name, the own one among them, and
+/// the signing keys of the Devices they name (#108), sealed with that
+/// Area's key, as the Dart core's `_publishProfiles`: by key id; a file
+/// that already says the same stays untouched.
 fn publish_profiles(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<()> {
     let own = store.device_id()?;
     let mut keys = store.area_keys()?;
@@ -715,10 +799,17 @@ fn publish_profiles(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_
         }
         let areas = std::collections::HashSet::from([key.scope.clone()]);
         let profiles = store.profiles_to_send(Some(&areas))?;
-        if profiles.is_empty() {
-            continue;
-        }
-        let plain = json!({"profiles": profiles}).to_string().into_bytes();
+        let signing: Vec<Value> = store
+            .signing_keys_of(&key.scope)?
+            .iter()
+            .map(KeyRecord::to_json)
+            .collect();
+        // Keys in sorted order, whether or not serde_json keeps the
+        // order they went in.
+        let mut map = serde_json::Map::new();
+        map.insert("keys".into(), Value::Array(signing));
+        map.insert("profiles".into(), Value::Array(profiles));
+        let plain = Value::Object(map).to_string().into_bytes();
         let name = profiles_file_name(&own, &key.id());
         let said = folder
             .read("keys", &name)?

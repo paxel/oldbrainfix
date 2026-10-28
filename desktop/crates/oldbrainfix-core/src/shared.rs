@@ -17,6 +17,7 @@ use crate::notes::keys as note_keys;
 use crate::places::keys as place_keys;
 use crate::places::{Places, starter_id};
 use crate::routines::keys as routine_keys;
+use crate::signing::KeyRecord;
 use crate::store::Store;
 
 /// The field prefix of the grants on an Area.
@@ -950,6 +951,94 @@ impl Store {
         Ok(out)
     }
 
+    /// Every entry that lies in the Area `area` now, by (device, dseq):
+    /// its whole history, as an offer from afar carries it (#108), as the
+    /// Dart core's `areaHistory`.
+    pub fn area_history(&self, area: &str) -> Result<Vec<Entry>> {
+        let mut scopes: HashMap<String, String> = HashMap::new();
+        let mut out = Vec::new();
+        for e in self.entries_since(&HashMap::new())? {
+            let scope = match scopes.get(&e.entity) {
+                Some(s) => s.clone(),
+                None => {
+                    let s = self.scope_of(&e.entity)?;
+                    scopes.insert(e.entity.clone(), s.clone());
+                    s
+                }
+            };
+            if scope == area {
+                out.push(e);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The Devices the grants of the Shared Areas give `person` a role on
+    /// now, never one of the user's own; sorted.
+    pub fn devices_of(&self, person: &str) -> Result<Vec<String>> {
+        let target = self.resolve_person(person)?;
+        let judged = self.judged()?;
+        let mut out = std::collections::BTreeSet::new();
+        for grants in judged.areas.values() {
+            for device in grants.devices() {
+                let Some(grant) = grants.grant_of(&device) else {
+                    continue;
+                };
+                if self.resolve_person(&grant.profile)? == target
+                    && !self.written_by_own(&device)?
+                {
+                    out.insert(device);
+                }
+            }
+        }
+        Ok(out.into_iter().collect())
+    }
+
+    /// What a bundle for the person `person` carries (#108), as the Dart
+    /// core's `entriesForPerson`: what lies in the Areas shared with any
+    /// Device of theirs ([`Store::devices_of`]), beyond what any of those
+    /// Devices said it holds, with the whole history of Notes filed into
+    /// them meanwhile.
+    pub fn entries_for_person(&self, person: &str) -> Result<Vec<Entry>> {
+        let devices = self.devices_of(person)?;
+        let Some(first) = devices.first() else {
+            return Ok(Vec::new());
+        };
+        let mut vector: HashMap<String, i64> = HashMap::new();
+        let mut areas: HashSet<String> = HashSet::new();
+        for device in &devices {
+            for (key, value) in self.held_by(device)? {
+                let held = vector.entry(key).or_insert(0);
+                if value > *held {
+                    *held = value;
+                }
+            }
+            areas.extend(self.areas_shared_with(device)?);
+        }
+        let also: Vec<String> = areas.into_iter().collect();
+        self.entries_for(first, &vector, false, &also)
+    }
+
+    /// The signing keys the people of the Shared Area `area` check its
+    /// entries with (#108): this Device's own and those held here of
+    /// every Device its grants ever named, by device.
+    pub fn signing_keys_of(&self, area: &str) -> Result<Vec<KeyRecord>> {
+        let own = self.device_id()?;
+        let mut out = vec![self.own_key_record()?];
+        if let Some(grants) = self.grants_of(area)? {
+            for device in grants.devices() {
+                if device == own {
+                    continue;
+                }
+                if let Some(pinned) = self.pinned_key(&device)? {
+                    out.push(pinned.record);
+                }
+            }
+        }
+        out.sort_by(|a, b| a.device.cmp(&b.device));
+        Ok(out)
+    }
+
     /// The Area keys `peer`, paired by invite, gets: those of the Areas
     /// it holds a role in, and of `also`.
     pub fn area_keys_for(&self, peer: &str, also: &[String]) -> Result<Vec<AreaKey>> {
@@ -994,6 +1083,34 @@ impl Store {
     /// without an invite.
     pub fn is_own_device(&self, id: &str) -> Result<bool> {
         Ok(self.paired_device(id)?.is_some_and(|d| !d.shared))
+    }
+
+    /// Whether the Device `id` is another person's as far as this Device
+    /// knows (#108), as the Dart core's `isOthersDevice`: paired by
+    /// invite, given a role in a Shared Area for another person, or bound
+    /// to the Profile of another person kept here, as one added from a
+    /// Profile card; never one of the user's own.
+    pub fn is_others_device(&self, id: &str) -> Result<bool> {
+        if self.is_shared_peer(id)? {
+            return Ok(true);
+        }
+        if self.written_by_own(id)? {
+            return Ok(false);
+        }
+        let judged = self.judged()?;
+        for grants in judged.areas.values() {
+            if let Some(person) = grants.person_of(id)
+                && !self.is_own_person(person)?
+            {
+                return Ok(true);
+            }
+        }
+        for person in self.kept_people()? {
+            if self.pinned_devices_of(&person.id)?.iter().any(|d| d == id) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 

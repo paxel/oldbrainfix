@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
+import 'bundle_platform.dart';
 import 'l10n.dart';
 import 'notes_screen.dart';
 import 'photo_platform.dart';
@@ -189,6 +190,11 @@ class _PersonScreenState extends State<PersonScreen> {
   var _verified = false;
   var _blocked = false;
 
+  /// Whether "Send changes" shows: changes travel with them by bundles
+  /// (#108), and an Area is shared with a Device of theirs.
+  var _sendsChanges = false;
+  var _sending = false;
+
   /// Whether "Send yours back" shows: until the card went out once.
   late var _offerBack = widget.offerBack;
 
@@ -217,6 +223,10 @@ class _PersonScreenState extends State<PersonScreen> {
     _code = store.personCode(widget.id);
     _verified = store.personVerified(widget.id);
     _blocked = store.isBlocked(widget.id);
+    _sendsChanges =
+        !_blocked &&
+        store.transportWith(widget.id) == Transport.bundle &&
+        store.devicesOf(widget.id).isNotEmpty;
   }
 
   @override
@@ -294,6 +304,36 @@ class _PersonScreenState extends State<PersonScreen> {
     );
     if (!mounted || !sent) return;
     setState(() => _offerBack = false);
+  }
+
+  /// Writes a bundle of what is new in the Areas shared with them, for
+  /// all of their Devices at once (#108), and offers it to the app the
+  /// user picks; nothing is written when nothing is new for them.
+  Future<void> _sendChanges(String name) async {
+    final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final bundles = BundleScope.of(context);
+    final store = widget.store;
+    if (store.entriesForPerson(widget.id).isEmpty) {
+      announcements?.announce(t.bundleNothingNew(name));
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      final path = await bundles.exportPath(
+        bundleFileName(store.clock().toLocal()),
+      );
+      if (path == null) {
+        announcements?.announce(t.bundleFailed);
+        return;
+      }
+      await writeBundle(store, path, forPerson: widget.id);
+      if (!await bundles.share(path)) announcements?.announce(t.bundleNoApp);
+    } on Object {
+      announcements?.announce(t.bundleFailed);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   /// Opens All Notes with only this person's Notes (#53).
@@ -515,6 +555,16 @@ class _PersonScreenState extends State<PersonScreen> {
                 title: Text(t.personTheirNotes),
                 onTap: _theirNotes,
               ),
+              if (_sendsChanges)
+                ListTile(
+                  key: const ValueKey('sendChanges'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                  leading: const Icon(Icons.send_outlined),
+                  title: Text(t.personSendChanges(shownName)),
+                  subtitle: Text(t.personSendChangesDetail),
+                  enabled: !_sending,
+                  onTap: () => _sendChanges(shownName),
+                ),
               SettingsHeading(t.personForMe),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),

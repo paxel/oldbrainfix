@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
 import 'app_lock.dart';
+import 'area_offer_screen.dart';
 import 'conflicts_screen.dart';
 import 'l10n.dart';
 
@@ -142,7 +143,9 @@ class BundleScope extends InheritedWidget {
 /// Imports the bundle copy at [path] into [store], removes the copy and
 /// announces at the top what came in, or why nothing did. Returns how
 /// many of the Conflicts it brought may be shown, for the caller to
-/// announce: behind the App Lock they wait for the unlock.
+/// announce: behind the App Lock they wait for the unlock. A bundle that
+/// offers an Area from afar (#108) opens its preview instead; behind the
+/// App Lock it is only said to wait, and waits on the Agenda.
 Future<int> importBundleFile(
   BuildContext context,
   Store store,
@@ -151,6 +154,7 @@ Future<int> importBundleFile(
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
   final lock = LockScope.of(context);
+  final navigator = Navigator.of(context);
   BundleResult? result;
   String? failure;
   try {
@@ -159,6 +163,10 @@ Future<int> importBundleFile(
     failure = t.bundleNotABundle;
   } on BundleNeedsUpdate {
     failure = t.bundleNeedsUpdate;
+  } on Exception catch (e) {
+    // An Area offer refused says why; whatever else broke on the way
+    // leaves nothing half-taken.
+    failure = areaOfferRefusal(t, e) ?? t.bundleFailed;
   } on Object {
     // Whatever else broke on the way: nothing half-taken stays.
     failure = t.bundleFailed;
@@ -171,6 +179,18 @@ Future<int> importBundleFile(
   }
   if (failure != null || result == null) {
     announcements?.announce(failure ?? t.bundleFailed);
+    return 0;
+  }
+  if (result.offer case final offer?) {
+    if (lock?.locked ?? false) {
+      announcements?.announce(t.areaOfferWaits);
+    } else {
+      await navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => AreaOfferScreen(store: store, offer: offer),
+        ),
+      );
+    }
     return 0;
   }
   if (result.needsPairing) {

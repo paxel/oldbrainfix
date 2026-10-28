@@ -38,6 +38,8 @@ pub const PHOTO: char = '\u{e4b4}';
 pub const FOLDER_OPEN: char = '\u{e2a4}';
 pub const PERSON: char = '\u{e491}';
 pub const MAIL_UNREAD: char = '\u{f1b6}';
+/// `group_add_outlined`, as the phone marks Areas shared from afar.
+pub const GROUP_ADD: char = '\u{f0d8}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

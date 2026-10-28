@@ -4,8 +4,11 @@
 //! then "Name and picture for me", the Override only the user sees, on
 //! their own Devices; last, Block, or Unblock for a blocked person (#90).
 //! Just added from their Profile card, it offers "Send yours back" (#107).
+//! When changes of the Areas shared with them travel as files, "Send
+//! changes to Ann" saves a bundle for all of their Devices (#108).
 
 use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
+use oldbrainfix_core::offers::Transport;
 use oldbrainfix_core::{Profile, Store};
 
 use crate::l10n::L10n;
@@ -34,6 +37,9 @@ pub enum PersonAction {
     /// Put the own Profile card, as the answer to theirs, on the clipboard
     /// (#107).
     SendBack,
+    /// Save a bundle of what is new for them in the Areas shared with
+    /// them, to send (#108).
+    SendChanges,
 }
 
 /// Where "Send yours back" stands on a person's Profile (#107).
@@ -67,11 +73,15 @@ pub struct PersonView {
     pub own_picture: bool,
     /// Whether the user blocked them (ADR 0021).
     pub blocked: bool,
+    /// Whether "Send changes" shows: changes travel with them as files
+    /// and an Area is shared with a Device of theirs (#108).
+    pub sends_changes: bool,
 }
 
 impl PersonView {
     /// The person `id` as `store` keeps them.
     pub fn read(store: &Store, id: &str) -> oldbrainfix_core::Result<PersonView> {
+        let blocked = store.is_blocked(id)?;
         Ok(PersonView {
             theirs: store.person_theirs(id)?,
             shown: store.person_shown(id)?,
@@ -80,13 +90,17 @@ impl PersonView {
             own_picture: store
                 .person_override(id)?
                 .is_some_and(|o| o.picture.is_some()),
-            blocked: store.is_blocked(id)?,
+            blocked,
+            sends_changes: !blocked
+                && store.transport_with(id)? == Some(Transport::Bundle)
+                && !store.devices_of(id)?.is_empty(),
         })
     }
 }
 
 /// The person's Profile: their picture, name and code, verified or not,
-/// "Compare codes", "Send yours back" while `back` offers it, and the
+/// "Compare codes", "Send yours back" while `back` offers it, "Send
+/// changes" when changes travel with them as files, and the
 /// name and picture for the user, with the field `name` for the name;
 /// then Block, or Unblock.
 pub fn form(
@@ -170,6 +184,16 @@ pub fn form(
             SendBack::Copied => {
                 ui.label(RichText::new(t.person_send_back_copied(shown)).color(text));
             }
+        }
+    }
+    if person.sends_changes {
+        let shown = display_name(t, &person.shown.name);
+        ui.label(RichText::new(t.person_send_changes_detail()).color(weak));
+        if ui
+            .button(RichText::new(t.person_send_changes(shown)).color(text))
+            .clicked()
+        {
+            actions.push(PersonAction::SendChanges);
         }
     }
     if ui

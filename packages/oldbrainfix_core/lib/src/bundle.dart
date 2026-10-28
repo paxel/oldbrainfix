@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 
 import 'area_keys.dart';
+import 'area_offers.dart';
 import 'conflicts.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
@@ -78,6 +79,10 @@ class BundleResult {
   /// (ADR 0017).
   final bool profileChanged;
 
+  /// The Area the bundle offers, held until the user accepts or declines
+  /// it (#108); nothing else of the bundle was taken in then.
+  final HeldAreaOffer? offer;
+
   const BundleResult({
     required this.applied,
     required this.blobsIn,
@@ -88,6 +93,7 @@ class BundleResult {
     required this.from,
     required this.fromName,
     this.profileChanged = false,
+    this.offer,
   });
 
   /// Nothing could be read for want of keys: the Devices have to be
@@ -107,10 +113,12 @@ const maxBundleBlobBytes = 256 << 20;
 /// the paired Device [forDevice] it holds what lies beyond what that
 /// Device last said it holds ([Pairing.heldBy]), else everything; the
 /// blobs only of the entries in it. For another person's Device, paired
-/// by invite, only what lies in the Areas it shares, with the whole
-/// history of Notes filed into them meanwhile (ADR 0013). A bundle that
-/// never arrived loses nothing: the next one for the same Device carries
-/// it again.
+/// by invite or met from afar ([SharedPeers.isOthersDevice]), only what
+/// lies in the Areas it shares, with the whole history of Notes filed
+/// into them meanwhile (ADR 0013). For the person [forPerson] the same for all of
+/// their Devices at once ([SharedAreas.entriesForPerson], #108). A
+/// bundle that never arrived loses nothing: the next one for the same
+/// Device carries it again.
 ///
 /// The nonces come from [nonce] in the folder's order; the fixture
 /// generator hands in a counter.
@@ -118,14 +126,66 @@ Future<({int entries, int blobs})?> writeBundle(
   Store store,
   String path, {
   String? forDevice,
+  String? forPerson,
   Uint8List Function()? nonce,
 }) async {
-  final entries = forDevice != null && store.isSharedPeer(forDevice)
+  final entries = forPerson != null
+      ? store.entriesForPerson(forPerson)
+      : forDevice != null && store.isOthersDevice(forDevice)
       ? store.entriesFor(forDevice, store.heldBy(forDevice))
       : store.entriesSince(
           forDevice == null ? const {} : store.heldBy(forDevice),
         );
   if (entries.isEmpty) return null;
+  return _writeZip(store, path, entries, nonce: nonce);
+}
+
+/// Writes the offer of the Shared Area [areaId] to the person [person]
+/// (#108, ADR 0023) to [path]: a bundle of the Area's whole history with
+/// its photos, recordings and Profiles, sealed with the Area's key as
+/// any bundle is, and beside it the offer ([areaOfferFor]), signed by
+/// this Device and sealed to the X25519 keys of the Devices of [person]
+/// the Area's grants name ([offerKeys]). Returns how many entries and
+/// blobs it carries. Throws a [StateError], writing nothing, when the
+/// grants name no Device of theirs whose key is known here.
+///
+/// The nonces of the bundle come from [nonce], the content key, nonces
+/// and ephemeral keys of the offer from [random]; the fixture generator
+/// hands in counters.
+Future<({int entries, int blobs})> writeAreaOffer(
+  Store store,
+  String path,
+  String areaId,
+  String person, {
+  Uint8List Function()? nonce,
+  Uint8List Function(int length)? random,
+}) async {
+  final to = offerKeys(store, areaId, person);
+  if (to.isEmpty) throw StateError('no Device of $person to offer to');
+  final offer = encodeAreaOffer(
+    areaOfferFor(store, areaId, person),
+    store.signingKey,
+    to: to,
+    random: random,
+  );
+  return _writeZip(
+    store,
+    path,
+    store.areaHistory(areaId),
+    nonce: nonce,
+    offer: offer,
+  );
+}
+
+/// Writes [entries] as a bundle to [path], with their blobs and, given
+/// one, the [offer] after them.
+Future<({int entries, int blobs})> _writeZip(
+  Store store,
+  String path,
+  List<Entry> entries, {
+  Uint8List Function()? nonce,
+  Uint8List? offer,
+}) async {
   final blobs = <String>{
     for (final e in entries)
       for (final (kind, prefix) in Sync.blobKinds)
@@ -136,13 +196,16 @@ Future<({int entries, int blobs})?> writeBundle(
   // every photo is never in memory as a whole.
   final encoder = ZipFileEncoder()..create(path, modified: DateTime.utc(1980));
   try {
-    return await writeSealed(
+    final folder = _ZipWriteFolder(encoder);
+    final wrote = await writeSealed(
       store,
-      _ZipWriteFolder(encoder),
+      folder,
       entries,
       blobs: blobs,
       nonce: nonce ?? () => secretBytes(sealNonceBytes),
     );
+    if (offer != null) await folder.write('', areaOfferFile, offer);
+    return wrote;
   } finally {
     encoder.closeSync();
   }
@@ -152,6 +215,12 @@ Future<({int entries, int blobs})?> writeBundle(
 /// blobs the log lacks, as a folder sync does, and keeps what the
 /// writer said it holds. Throws [NotABundle] for a file that is none,
 /// and [BundleNeedsUpdate] for one holding only newer formats.
+///
+/// A bundle that offers an Area (#108) is held as the offer instead
+/// ([receiveAreaOffer]) and returned in [BundleResult.offer], nothing of
+/// it taken in, unless this Device holds a role in the Area already; it
+/// throws as [receiveAreaOffer] does, [AreaOfferNotForUs] only when
+/// nothing of the bundle could be read either.
 Future<BundleResult> importBundle(Store store, String path) async {
   final InputFileStream input;
   try {
@@ -186,6 +255,28 @@ Future<BundleResult> importBundle(Store store, String path) async {
       (d) => d != store.deviceId,
       orElse: () => writers.keys.first,
     );
+    var notForUs = false;
+    if (await folder.read('', areaOfferFile) case final offer?) {
+      try {
+        if (await receiveAreaOffer(store, folder, offer) case final held?) {
+          return BundleResult(
+            applied: const [],
+            blobsIn: 0,
+            unreadable: 0,
+            moment: null,
+            report: ImportReport(),
+            conflicts: const [],
+            from: from,
+            fromName: '',
+            offer: held,
+          );
+        }
+      } on AreaOfferNotForUs {
+        // Another Device of the user's may have taken the Area in and
+        // passed its key on: then the bundle reads as any other.
+        notForUs = true;
+      }
+    }
     final name = store.pairedDevice(from)?.name ?? '';
     final FolderSyncResult read;
     try {
@@ -197,6 +288,9 @@ Future<BundleResult> importBundle(Store store, String path) async {
       );
     } on FileSystemException {
       throw const NotABundle();
+    }
+    if (notForUs && read.applied.isEmpty && read.unreadable > 0) {
+      throw const AreaOfferNotForUs();
     }
     for (final MapEntry(:key, :value) in writers.entries) {
       store.noteHeldBy(key, value.vector);

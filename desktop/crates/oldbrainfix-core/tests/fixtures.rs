@@ -3104,3 +3104,147 @@ fn pending_changes_go_as_the_dart_core_takes_them() -> TestResult {
     assert!(ann.pending_sets()?.is_empty());
     Ok(())
 }
+
+// ------------------------------------------------- an Area from afar
+
+/// One Device of the `offer` fixture: its log with its blobs and the
+/// settings an offer reads, on the held `clock`.
+fn offer_device(
+    name: &str,
+    key: fn() -> SigningKey,
+    clock: &std::sync::Arc<parking_lot::Mutex<DateTime<Utc>>>,
+) -> Result<Store, Box<dyn std::error::Error>> {
+    let dir = fixtures().join("offer");
+    let held = clock.clone();
+    let store = Store::in_memory(Box::new(move || *held.lock()), move || Ok(key()))?;
+    store.set_local_setting("author", "Ada")?;
+    insert_lines(&store, &dir.join(format!("{name}.jsonl")))?;
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings[name].as_array().ok_or("settings")? {
+        store.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    for (hash, bytes) in files(&dir.join(name).join("photos"))? {
+        assert!(store.put_blob("photo", &hash, &bytes)?, "{name} {hash}");
+    }
+    Ok(store)
+}
+
+/// The settings an offer reads and writes, as the generator's
+/// `_offerSettings`.
+fn offer_settings(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let mut out = Vec::new();
+    for prefix in ["areakey:", "key:", "person:", "profile", "transport:"] {
+        for (key, value) in store.local_settings_with_prefix(prefix)? {
+            out.push(json!([key, value]));
+        }
+    }
+    Ok(Value::Array(out))
+}
+
+fn same_zip(mine: &Path, theirs: &Path) -> TestResult {
+    let mine = zip_files(mine)?;
+    let theirs = zip_files(theirs)?;
+    assert_eq!(
+        mine.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>(),
+        theirs.iter().map(|(n, _)| n.clone()).collect::<Vec<_>>()
+    );
+    for ((name, a), (_, b)) in mine.iter().zip(&theirs) {
+        assert!(a == b, "{name} differs");
+    }
+    Ok(())
+}
+
+#[test]
+fn an_area_offered_from_afar_goes_as_the_dart_core_offers_and_takes_it() -> TestResult {
+    use oldbrainfix_core::OwnProfile;
+    use oldbrainfix_core::bundle::{import_bundle, write_area_offer, write_person_bundle};
+    let dir = fixtures().join("offer");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let clock = held_clock("2026-02-01T09:00:00.000Z")?;
+    let ann = offer_device("ann", writer_key, &clock)?;
+    let mut ben = offer_device("ben", joiner_key, &clock)?;
+    let area = expected["offer"]["area"].as_str().ok_or("the Area")?;
+    let ann_id = OwnProfile::new(&ann).get()?.ok_or("her Profile")?.id;
+    let ben_id = OwnProfile::new(&ben).get()?.ok_or("his Profile")?.id;
+
+    // Ann writes the very same offer, nonce for nonce.
+    let ours = tempfile::tempdir()?;
+    let path = ours.path().join("offer.obfsync");
+    let (entries, blobs) = write_area_offer(
+        &ann,
+        &path,
+        area,
+        &ben_id,
+        &mut counted_nonces_after(3000),
+        &mut counted_after(4000),
+    )?;
+    assert_eq!(json!(entries), expected["offer"]["entries"]);
+    assert_eq!(json!(blobs), expected["offer"]["blobs"]);
+    same_zip(&path, &dir.join("offer.obfsync"))?;
+
+    // Ben holds the Dart core's offer as it holds it.
+    counted_ids(&mut ben, 0x900);
+    let offer = dir.join("offer.obfsync");
+    let held = import_bundle(&ben, &offer)?.offer.ok_or("an offer")?;
+    assert_eq!(
+        json!({
+            "id": held.id,
+            "area": held.area,
+            "areaName": held.area_name,
+            "areaStarter": held.area_starter,
+            "role": held.role.name(),
+            "sender": held.sender.id,
+            "senderName": held.sender.name,
+            "code": held.code,
+            "trust": held.trust.name(),
+            "transport": held.transport.name(),
+            "held": dart_iso(held.held),
+        }),
+        expected["held"]
+    );
+    let set = ben.pending_set(&held.id)?.ok_or("the set")?;
+    assert_eq!(json!(set.encode()?), expected["set"]);
+
+    // Accepting takes in what the Dart core took in.
+    let mark = ben.current_seq()?;
+    ben.accept_area_offer(&held.id, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("accepted.jsonl"))?
+    );
+    assert_eq!(offer_settings(&ben)?, expected["settings"]);
+    let mut actual = read(&ben)?;
+    if let Some(map) = actual.as_object_mut() {
+        map.remove("device");
+    }
+    assert_eq!(actual, expected["read"]);
+
+    // The bundle Ben sends back, byte for byte, and Ann taking his in.
+    insert_lines(&ben, &dir.join("written.jsonl"))?;
+    let back = ours.path().join("back.obfsync");
+    let (entries, blobs) =
+        write_person_bundle(&ben, &back, &ann_id, &mut counted_nonces_after(5000))?
+            .ok_or("a bundle")?;
+    assert_eq!(json!(entries), expected["back"]["entries"]);
+    assert_eq!(json!(blobs), expected["back"]["blobs"]);
+    same_zip(&back, &dir.join("back.obfsync"))?;
+    let took = import_bundle(&ann, &dir.join("back.obfsync"))?;
+    assert_eq!(json!(took.applied.len()), expected["back"]["applied"]);
+    assert_eq!(took.unreadable, 0);
+
+    // Declined on a Device that never accepted it, nothing stays.
+    let other = offer_device("ben", joiner_key, &clock)?;
+    let settings = other.local_settings_with_prefix("")?;
+    let count = other.all_entries()?.len();
+    let held = import_bundle(&other, &offer)?.offer.ok_or("an offer")?;
+    assert!(other.decline_area_offer(&held.id)?);
+    assert_eq!(other.local_settings_with_prefix("")?, settings);
+    assert_eq!(other.all_entries()?.len(), count);
+    for (hash, _) in files(&dir.join("ann").join("photos"))? {
+        assert!(other.photo(&hash).is_none());
+    }
+    Ok(())
+}

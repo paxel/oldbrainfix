@@ -17,6 +17,12 @@ pub fn topic_name(t: &L10n, topic: &Topic) -> String {
     shown(t, topic.starter.as_deref(), &topic.name)
 }
 
+/// [`area_name`] for an Area known only by its Starter Set `slug` and
+/// its stored `name`, as an Area offered from afar (#108).
+pub fn offered_area_name(t: &L10n, slug: Option<&str>, name: &str) -> String {
+    shown(t, slug, name)
+}
+
 fn shown(t: &L10n, slug: Option<&str>, name: &str) -> String {
     let Some(slug) = slug else {
         return name.to_string();

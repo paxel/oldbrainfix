@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
+import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
 import 'calendar_export_screen.dart';
@@ -116,6 +117,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   /// How many strangers' Sent Items wait (#91).
   var _waiting = 0;
+  var _offers = 0;
 
   /// The Note captured last from here, shown on top until it is let go.
   String? _capturedId;
@@ -205,6 +207,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
     // Counted from the pending sets, without reading each held file.
     _waiting = widget.notes.store.pendingSets
         .where((s) => s.kind == sentItemPendingKind)
+        .length;
+    _offers = widget.notes.store.pendingSets
+        .where((s) => s.kind == areaOfferPendingKind)
         .length;
     _armTimer();
     final captured = _capturedId == null
@@ -358,6 +363,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => HeldSentItemsScreen(store: widget.notes.store),
+      ),
+    );
+    if (!mounted) return;
+    _reload();
+  }
+
+  Future<void> _openOffers() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => HeldAreaOffersScreen(store: widget.notes.store),
       ),
     );
     if (!mounted) return;
@@ -575,6 +590,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 icon: Icons.mark_email_unread_outlined,
                 text: t.sentItemsWaiting(_waiting),
                 onTap: _openHeld,
+              ),
+            if (_offers > 0)
+              _CountBanner(
+                bannerKey: const ValueKey('areaOffersWaiting'),
+                icon: Icons.group_add_outlined,
+                text: t.areaOffersWaiting(_offers),
+                onTap: _openOffers,
               ),
             if (captured != null) ...[
               _Heading(t.justCaptured),

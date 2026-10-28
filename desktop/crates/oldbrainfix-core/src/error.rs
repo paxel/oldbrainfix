@@ -23,6 +23,9 @@ pub enum Error {
     /// A Sent Item from a person the user blocked (ADR 0021).
     #[error("a Sent Item from a blocked person")]
     FromBlocked,
+    /// An Area offered from afar that was not taken (#108), and why.
+    #[error("area offer: {0:?}")]
+    Offer(crate::offers::OfferError),
     /// A Backup that could not be restored, and why.
     #[error("backup: {0:?}")]
     Backup(crate::backup::Problem),

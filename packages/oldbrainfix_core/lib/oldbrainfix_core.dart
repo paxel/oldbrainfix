@@ -4,6 +4,7 @@ library;
 
 export 'src/alarms.dart';
 export 'src/area_keys.dart';
+export 'src/area_offers.dart';
 export 'src/auto_sync.dart';
 export 'src/backup.dart';
 export 'src/blobs.dart';
@@ -13,7 +14,7 @@ export 'src/calendar_mirror.dart';
 export 'src/conflicts.dart';
 export 'src/device_settings.dart';
 export 'src/entry.dart';
-export 'src/folder_sync.dart';
+export 'src/folder_sync.dart' hide entriesSealedWith;
 export 'src/history.dart';
 export 'src/host_identity.dart';
 export 'src/ics.dart';

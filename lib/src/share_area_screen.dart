@@ -4,6 +4,8 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'auto_sync.dart';
+import 'bundle_platform.dart';
+import 'folder_platform.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
@@ -31,6 +33,11 @@ typedef InviteJoin = Future<SyncResult> Function(
 /// only when the user confirms it does their Device get this Area and
 /// nothing else, and the Area shows as shared from then on. A Starter
 /// Set Area goes on under fresh ids; [onShared] hears the id it has now.
+///
+/// A person in People who is not nearby gets the Area from afar (#108,
+/// ADR 0023): picked from those whose Devices' keys are known here, with
+/// the role chosen above, and asked once how changes travel with them;
+/// the offer goes out as a file through the app the user picks.
 class ShareAreaScreen extends StatefulWidget {
   final Store store;
   final String areaId;
@@ -57,6 +64,19 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
   var _busy = false;
   late String _areaId = widget.areaId;
   late final Area? _area = Places(widget.store).areaById(widget.areaId);
+
+  /// The People an offer can go to: not blocked, with a Device whose
+  /// key is known here.
+  late final List<AfarPerson> _afar = [
+    for (final p in widget.store.keptPeople)
+      if (!widget.store.isBlocked(p.id) &&
+          offerDevices(widget.store, p.id).isNotEmpty)
+        (
+          id: p.id,
+          shown: widget.store.personShown(p.id),
+          verified: widget.store.personVerified(p.id),
+        ),
+  ];
 
   @override
   void dispose() {
@@ -167,11 +187,87 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     }
   }
 
+  /// Shares the Area with a person in People from afar: who, then how
+  /// changes travel with them unless they were asked before, then the
+  /// folder when it goes by one and none is chosen yet. Only then is
+  /// anything written, so backing out of any step changes nothing; the
+  /// offer goes to the app the user picks, and once handed over, back to
+  /// where sharing began.
+  Future<void> _shareAfar() async {
+    final t = context.t;
+    final store = widget.store;
+    final folders = FolderScope.of(context);
+    final bundles = BundleScope.of(context);
+    final area = _area;
+    final person = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => SharePersonScreen(
+          people: _afar,
+          title: t.shareWithTitle(area == null ? '' : areaName(t, area)),
+        ),
+      ),
+    );
+    if (!mounted || person == null) return;
+    final name = profileDisplayName(t, store.personShown(person).name);
+    final canFolder = folders.available || store.syncFolder != null;
+    var transport = store.transportWith(person);
+    if (transport == null) {
+      transport = canFolder
+          ? await showDialog<Transport>(
+              context: context,
+              builder: (_) => TransportDialog(name: name),
+            )
+          : Transport.bundle;
+      if (!mounted || transport == null) return;
+    }
+    if (transport == Transport.folder && store.syncFolder == null) {
+      final picked = await folders.pick();
+      if (!mounted || picked == null) return;
+      store.chooseSyncFolder(picked);
+    }
+    setState(() => _busy = true);
+    try {
+      _areaId = shareAreaWith(
+        store,
+        _areaId,
+        person,
+        role: _role,
+        transport: transport,
+      );
+      widget.onShared?.call(_areaId);
+      final path = await bundles.exportPath(
+        bundleFileName(store.clock().toLocal()),
+      );
+      if (!mounted) return;
+      if (path == null) {
+        _announce(t.shareAfarFailed);
+        return;
+      }
+      await writeAreaOffer(store, path, _areaId, person);
+      final shared = await bundles.share(path);
+      if (!mounted) return;
+      if (!shared) {
+        _announce(t.bundleNoApp);
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } on Object {
+      if (!mounted) return;
+      _announce(t.shareAfarFailed);
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+        AutoSyncScope.of(context)?.devicesChanged();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final area = _area;
     final canScan = PhotoScope.of(context).available;
+    final canSend = BundleScope.of(context).available;
     return Scaffold(
       appBar: AppBar(
         title: Text(t.shareTitle(area == null ? '' : areaName(t, area))),
@@ -264,8 +360,167 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
               label: Text(t.syncShowCode),
             ),
           ),
+          if (canSend) ...[
+            const SizedBox(height: 24),
+            Text(
+              t.shareAfarHeading,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(_afar.isEmpty ? t.shareAfarNobody : t.shareAfarIntro),
+            if (_afar.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  key: const ValueKey('share-afar'),
+                  onPressed: _busy ? null : _shareAfar,
+                  icon: const Icon(Icons.person_search_outlined),
+                  label: Text(t.shareAfarPick),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// A person an Area can go to from afar, as the user sees them.
+typedef AfarPerson = ({String id, Profile shown, bool verified});
+
+/// "Share Household with…": the People an Area can go to from afar
+/// ([offerDevices]), each with their picture and name as the user sees
+/// them, and "Not verified" under those whose code was never compared in
+/// person. A tap pops with the person's id.
+class SharePersonScreen extends StatelessWidget {
+  final List<AfarPerson> people;
+  final String title;
+
+  const SharePersonScreen({
+    super.key,
+    required this.people,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: ListView(
+        padding: clearOfSystemBars(context, EdgeInsets.zero),
+        children: [
+          for (final person in people)
+            _PersonRow(
+              key: ValueKey('share-to-${person.id}'),
+              id: person.id,
+              profile: person.shown,
+              verified: person.verified,
+              onTap: () => Navigator.of(context).pop(person.id),
+              notVerified: t.shareNotVerified,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonRow extends StatelessWidget {
+  final String id;
+  final Profile profile;
+  final bool verified;
+  final String notVerified;
+  final VoidCallback onTap;
+
+  const _PersonRow({
+    super.key,
+    required this.id,
+    required this.profile,
+    required this.verified,
+    required this.notVerified,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    // The picture opens their Profile; the row picks them.
+    leading: GestureDetector(
+      onTap: canOpenPerson(context, id) ? () => openPerson(context, id) : null,
+      child: ProfileAvatar(profile: profile, size: 40),
+    ),
+    title: Text(profileDisplayName(context.t, profile.name)),
+    subtitle: verified
+        ? null
+        : Row(
+            children: [
+              const Icon(Icons.gpp_maybe_outlined, size: 16),
+              const SizedBox(width: 4),
+              Text(notVerified),
+            ],
+          ),
+    onTap: onTap,
+  );
+}
+
+/// "How do changes travel with Ann?", asked once per person when sharing
+/// an Area with them from afar: a shared folder both reach, or files
+/// through a messenger. Pops with the choice.
+class TransportDialog extends StatefulWidget {
+  final String name;
+
+  const TransportDialog({super.key, required this.name});
+
+  @override
+  State<TransportDialog> createState() => _TransportDialogState();
+}
+
+class _TransportDialogState extends State<TransportDialog> {
+  var _transport = Transport.bundle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return AlertDialog(
+      title: Text(t.transportTitle(widget.name)),
+      scrollable: true,
+      content: RadioGroup<Transport>(
+        groupValue: _transport,
+        onChanged: (how) {
+          if (how != null) setState(() => _transport = how);
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<Transport>(
+              key: const ValueKey('transport-folder'),
+              contentPadding: EdgeInsets.zero,
+              value: Transport.folder,
+              title: Text(t.transportFolder),
+              subtitle: Text(t.transportFolderDetail),
+            ),
+            RadioListTile<Transport>(
+              key: const ValueKey('transport-bundle'),
+              contentPadding: EdgeInsets.zero,
+              value: Transport.bundle,
+              title: Text(t.transportBundle),
+              subtitle: Text(t.transportBundleDetail),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('transport-share'),
+          onPressed: () => Navigator.of(context).pop(_transport),
+          child: Text(t.inviteConfirmShare),
+        ),
+      ],
     );
   }
 }

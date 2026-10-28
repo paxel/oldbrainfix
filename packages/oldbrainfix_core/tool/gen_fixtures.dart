@@ -2890,6 +2890,118 @@ void _pendingFixture(Directory root) {
   }
 }
 
+/// The settings an offer reads and writes on [store]: the keys it
+/// holds, its own Profile, the people it keeps and how changes travel
+/// with them.
+List<List<String>> _offerSettings(Store store) => [
+  for (final prefix in ['areakey:', 'key:', 'person:', 'profile', 'transport:'])
+    for (final (key, value) in store.localSettingsWithPrefix(prefix))
+      [key, value],
+];
+
+/// Ann shares her Household with Ben, whom she knows from his Profile
+/// card only (#108): the offer as a bundle, Ben holding it, accepting it
+/// and sending a bundle back.
+Future<void> _offerFixture(Directory root) async {
+  final out = Directory('${root.path}/offer')..createSync(recursive: true);
+  final keep = secretBytes;
+  secretBytes = _counted(700);
+  final ann = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ada');
+  try {
+    ann.applyProfileDefaults(name: 'Ann');
+    ben.applyProfileDefaults(name: 'Ben');
+    ben.openProfileCard(ann.profileCard()!);
+    ann.openProfileCard(ben.profileCard(back: true)!);
+    final benId = ben.ownProfile!.id;
+    final annId = ann.ownProfile!.id;
+    final house = Places(ann).addArea('Household');
+    final milk = Notes(ann)
+        .capture('Buy milk', place: house.id, photos: [_photo(13)]);
+    Routines(ann).spawn(
+      milk.id,
+      Schedule(start: Day(2026, 1, 5), times: [ClockTime(8, 0)]),
+    );
+    Notes(ann).capture('Private');
+    Notes(ben).capture('Ben private');
+    final area = shareAreaWith(
+      ann,
+      house.id,
+      benId,
+      role: AreaRole.member,
+      transport: Transport.folder,
+    );
+    ann.ensureAreaKeys();
+    ben.ensureAreaKeys();
+    _writeDevice(ann, out, 'ann');
+    _writeDevice(ben, out, 'ben');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert({'ann': _offerSettings(ann), 'ben': _offerSettings(ben)})}\n',
+    );
+
+    // From here on at a held clock, so the desktop core writes the same.
+    _held = DateTime.utc(2026, 2, 1, 9);
+    final nonces = _counted(3000);
+    final file = '${out.path}/offer.$bundleExtension';
+    final wrote = await writeAreaOffer(
+      ann,
+      file,
+      area,
+      benId,
+      nonce: () => nonces(sealNonceBytes),
+      random: _counted(4000),
+    );
+    var ids = 0x900;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    final held = (await importBundle(ben, file)).offer!;
+    final set = ben.pendingSet(held.id)!.encode();
+    final mark = ben.currentSeq();
+    acceptAreaOffer(ben, held.id);
+    _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
+    final after = _offerSettings(ben);
+    final read = _expected(ben)..remove('device');
+
+    // Ben writes into the Area and sends a bundle back.
+    final mark2 = ben.currentSeq();
+    Notes(ben).capture('From Ben', place: area);
+    _writeAfter(ben, mark2, File('${out.path}/written.jsonl'));
+    final backNonces = _counted(5000);
+    final back = '${out.path}/back.$bundleExtension';
+    final sent = await writeBundle(
+      ben,
+      back,
+      forPerson: annId,
+      nonce: () => backNonces(sealNonceBytes),
+    );
+    final took = await importBundle(ann, back);
+    if (sent == null ||
+        took.unreadable != 0 ||
+        !Notes(ann).all().any((n) => n.text == 'From Ben')) {
+      throw StateError('Ann did not read the bundle Ben sent back');
+    }
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'offer': {'area': area, 'entries': wrote.entries, 'blobs': wrote.blobs},
+        'held': {'id': held.id, 'area': held.area, 'areaName': held.areaName, 'areaStarter': held.areaStarter, 'role': held.role.name, 'sender': held.sender.id, 'senderName': held.sender.name, 'code': held.code, 'trust': held.trust.name, 'transport': held.transport.name, 'held': held.held.toIso8601String()},
+        'set': set,
+        'settings': after,
+        'read': read,
+        'back': {'entries': sent.entries, 'blobs': sent.blobs, 'applied': took.applied.length},
+      })}\n',
+    );
+  } finally {
+    secretBytes = keep;
+    _held = null;
+    ann.close();
+    ben.close();
+  }
+}
+
 /// The Profiles of other people [store] keeps, as both cores keep them:
 /// signed as received, by id.
 Map<String, Object?> _people(Store store) => {
@@ -4250,7 +4362,18 @@ Future<void> main(List<String> args) async {
     'the log as it was, '
     'Accept of each (`accept-ai.jsonl`, `accept-bundle.jsonl`) with the '
     'fields her own edits kept, and what she reads after '
-    '(`expected.json`).\n',
+    '(`expected.json`).\n'
+    '- `offer/`: Ann shares her Household with Ben, whom she knows from his '
+    'Profile card only (#108), as a Member, changes to travel by a shared '
+    'folder: both logs with their blobs and the settings an offer reads '
+    '(`settings.json`); at a held clock the offer bundle '
+    '(`offer.$bundleExtension`, nonces counted from 3001 on, the offer\'s '
+    'random bytes from 4001 on), Ben holding it as a pending set (its id '
+    'counted from 0x901), what accepting it took in (`accepted.jsonl`), '
+    'Ben writing into the Area (`written.jsonl`) and the bundle he sends '
+    'Ann back (`back.$bundleExtension`, nonces from 5001 on); the offer '
+    'as held, the set\'s file, Ben\'s settings and what he reads after '
+    'accepting, and what Ann took from his bundle (`expected.json`).\n',
   );
   final work = Directory.systemTemp.createTempSync('oldbrainfix_fixture_');
   try {
@@ -4289,6 +4412,7 @@ Future<void> main(List<String> args) async {
   _versionsFixture(root);
   _blockFixture(root);
   _pendingFixture(root);
+  await _offerFixture(root);
   for (final scenario in _scenarios) {
     final store = _store();
     try {

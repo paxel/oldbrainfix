@@ -7,6 +7,7 @@ import 'package:image/image.dart' as img;
 import 'package:meta/meta.dart';
 
 import 'area_keys.dart';
+import 'area_offers.dart';
 import 'backup.dart';
 import 'entry.dart';
 import 'folder_sync.dart';

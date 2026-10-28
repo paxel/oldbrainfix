@@ -17,6 +17,11 @@ String topicName(AppLocalizations t, Topic topic) =>
 String starterName(AppLocalizations t, StarterPlace place) =>
     _shown(t, place.slug, place.name);
 
+/// [areaName] for an Area known only by its Starter Set [slug] and its
+/// stored [name], as an Area offered from afar (#108).
+String offeredAreaName(AppLocalizations t, String? slug, String name) =>
+    _shown(t, slug, name);
+
 String _shown(AppLocalizations t, String? slug, String name) {
   if (slug == null || name != _canonical[slug]) return name;
   return _translated(t, slug) ?? name;

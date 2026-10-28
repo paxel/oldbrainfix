@@ -26,6 +26,7 @@ use crate::entry::WireEntry;
 use crate::folder::{
     FolderSyncResult, Manifest, Nonces, SyncFolder, random_nonce, read_sealed, write_sealed,
 };
+use crate::offers::{AREA_OFFER_FILE, HeldAreaOffer, OfferError, encode_area_offer, random_vec};
 use crate::signing::ImportReport;
 use crate::store::Store;
 use crate::sync::{BLOB_KINDS, Moment, cause};
@@ -61,6 +62,9 @@ pub struct BundleResult {
     /// Whether the own Profile changed, or "Which one is you?" came up
     /// (ADR 0017).
     pub profile_changed: bool,
+    /// The Area the bundle offers, held until the user accepts or
+    /// declines it (#108); nothing else of the bundle was taken in then.
+    pub offer: Option<HeldAreaOffer>,
 }
 
 impl BundleResult {
@@ -91,8 +95,9 @@ fn path_of(dir: &str, name: &str) -> String {
 /// when there is nothing to send. For the paired Device `for_device` it
 /// holds what lies beyond what that Device last said it holds, else
 /// everything; the blobs only of the entries in it. For another person's
-/// Device, paired by invite, only what lies in the Areas it shares, with
-/// the whole history of Notes filed into them meanwhile (ADR 0013).
+/// Device, paired by invite or met from afar
+/// ([`Store::is_others_device`]), only what lies in the Areas it shares,
+/// with the whole history of Notes filed into them meanwhile (ADR 0013).
 pub fn write_bundle(
     store: &Store,
     path: &Path,
@@ -104,7 +109,7 @@ pub fn write_bundle(
         None => HashMap::new(),
     };
     let entries = match for_device {
-        Some(device) if store.is_shared_peer(device)? => {
+        Some(device) if store.is_others_device(device)? => {
             store.entries_for(device, &since, false, &[])?
         }
         _ => store.entries_since(&since)?,
@@ -112,8 +117,93 @@ pub fn write_bundle(
     if entries.is_empty() {
         return Ok(None);
     }
+    write_zip(store, path, &entries, nonce, None).map(Some)
+}
+
+/// Writes a bundle for the person `person` to `path` (#108), as the Dart
+/// core's `writeBundle` with `forPerson`: for all of their Devices at
+/// once ([`Store::entries_for_person`]). None, writing nothing, when
+/// there is nothing to send.
+pub fn write_person_bundle(
+    store: &Store,
+    path: &Path,
+    person: &str,
+    nonce: Nonces<'_>,
+) -> Result<Option<(usize, usize)>> {
+    let entries = store.entries_for_person(person)?;
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    write_zip(store, path, &entries, nonce, None).map(Some)
+}
+
+/// [`write_person_bundle`] with fresh random nonces.
+pub fn write_person_bundle_now(
+    store: &Store,
+    path: &Path,
+    person: &str,
+) -> Result<Option<(usize, usize)>> {
+    write_person_bundle(store, path, person, &mut random_nonce)
+}
+
+/// Writes the offer of the Shared Area `area` to the person `person`
+/// (#108, ADR 0023) to `path`, as the Dart core's `writeAreaOffer`: a
+/// bundle of the Area's whole history with its photos, recordings and
+/// Profiles, and beside it the offer, signed by this Device and sealed
+/// to the X25519 keys of the Devices of `person` the Area's grants name.
+/// Returns how many entries and blobs it carries. An error, writing
+/// nothing, when the grants name no Device of theirs whose key is known
+/// here. The bundle's nonces come from `nonce`, the offer's bytes from
+/// `random`.
+pub fn write_area_offer(
+    store: &Store,
+    path: &Path,
+    area: &str,
+    person: &str,
+    nonce: Nonces<'_>,
+    random: &mut dyn FnMut(usize) -> Result<Vec<u8>>,
+) -> Result<(usize, usize)> {
+    let to = store.offer_keys(area, person)?;
+    if to.is_empty() {
+        return Err(Error::Invalid(format!("no Device of {person} to offer to")));
+    }
+    let offer = encode_area_offer(
+        &store.area_offer_for(area, person)?,
+        &store.signing_key()?,
+        &to,
+        random,
+    )?;
+    write_zip(store, path, &store.area_history(area)?, nonce, Some(&offer))
+}
+
+/// [`write_area_offer`] with fresh random bytes.
+pub fn write_area_offer_now(
+    store: &Store,
+    path: &Path,
+    area: &str,
+    person: &str,
+) -> Result<(usize, usize)> {
+    write_area_offer(
+        store,
+        path,
+        area,
+        person,
+        &mut random_nonce,
+        &mut random_vec,
+    )
+}
+
+/// Writes `entries` as a bundle to `path`, with their blobs and, given
+/// one, the `offer` after them.
+fn write_zip(
+    store: &Store,
+    path: &Path,
+    entries: &[crate::entry::Entry],
+    nonce: Nonces<'_>,
+    offer: Option<&[u8]>,
+) -> Result<(usize, usize)> {
     let mut blobs = BTreeSet::new();
-    for e in &entries {
+    for e in entries {
         for (kind, prefix) in BLOB_KINDS {
             if let Some(hash) = e.field.strip_prefix(prefix) {
                 blobs.insert(format!("{kind}/{hash}"));
@@ -124,14 +214,19 @@ pub fn write_bundle(
         writer: Some(ZipWriter::new(File::create(path)?)),
         written: BTreeMap::new(),
     };
-    let wrote = write_sealed(store, &mut folder, &entries, &blobs, nonce);
+    let wrote = write_sealed(store, &mut folder, entries, &blobs, nonce).and_then(|counts| {
+        if let Some(offer) = offer {
+            folder.write("", AREA_OFFER_FILE, offer)?;
+        }
+        Ok(counts)
+    });
     let finished = folder
         .writer
         .take()
         .map(|w| w.finish().map_err(zip_error))
         .transpose();
     match (wrote, finished) {
-        (Ok(counts), Ok(_)) => Ok(Some(counts)),
+        (Ok(counts), Ok(_)) => Ok(counts),
         (Err(e), _) | (_, Err(e)) => {
             // Half a bundle is none: nobody should send it.
             let _ = std::fs::remove_file(path);
@@ -153,6 +248,13 @@ pub fn write_bundle_now(
 /// takes in what is new and the blobs the log lacks, and keeps what the
 /// writer said it holds. [`Error::NotABundle`] for a file that is none,
 /// [`Error::BundleNeedsUpdate`] for one holding only newer formats.
+///
+/// A bundle that offers an Area (#108) is held as the offer instead
+/// ([`Store::receive_area_offer`]) and returned in
+/// [`BundleResult::offer`], nothing of it taken in, unless this Device
+/// holds a role in the Area already; [`Error::Offer`] as that says,
+/// [`OfferError::NotForUs`] only when nothing of the bundle could be
+/// read either.
 pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
     let file = File::open(path).map_err(|_| Error::NotABundle)?;
     let archive = ZipArchive::new(file).map_err(|_| Error::NotABundle)?;
@@ -182,12 +284,39 @@ pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
         .or_else(|| writers.keys().next())
         .cloned()
         .ok_or(Error::NotABundle)?;
+    let mut not_for_us = false;
+    if let Some(offer) = folder.read("", AREA_OFFER_FILE)? {
+        match store.receive_area_offer(&folder, &offer)? {
+            Ok(Some(held)) => {
+                return Ok(BundleResult {
+                    applied: Vec::new(),
+                    blobs_in: 0,
+                    unreadable: 0,
+                    moment: None,
+                    report: ImportReport::default(),
+                    conflicts: Vec::new(),
+                    from,
+                    from_name: String::new(),
+                    profile_changed: false,
+                    offer: Some(held),
+                });
+            }
+            Ok(None) => {}
+            // Another Device of the user's may have taken the Area in and
+            // passed its key on: then the bundle reads as any other.
+            Err(OfferError::NotForUs) => not_for_us = true,
+            Err(e) => return Err(Error::Offer(e)),
+        }
+    }
     let from_name = store
         .paired_device(&from)?
         .map(|d| d.name)
         .unwrap_or_default();
     let label = (!from_name.is_empty()).then_some(from_name.as_str());
     let read: FolderSyncResult = read_sealed(store, &folder, cause::BUNDLE, label)?;
+    if not_for_us && read.applied.is_empty() && read.unreadable > 0 {
+        return Err(Error::Offer(OfferError::NotForUs));
+    }
     for (device, manifest) in &writers {
         let vector: HashMap<String, i64> = manifest.vector.clone().into_iter().collect();
         store.note_held_by(device, &vector)?;
@@ -202,6 +331,7 @@ pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
         from,
         from_name,
         profile_changed: read.profile_changed,
+        offer: None,
     })
 }
 

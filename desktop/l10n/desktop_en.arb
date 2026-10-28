@@ -204,5 +204,9 @@
   "personAddFromLink": "Add a person from a link",
   "@personAddFromLink": {"description": "In People on the desktop's Profile page: opens the Profile card link pasted into the field above. The site's Profile card page names this button."},
   "personSendBackCopied": "Copied. Paste it into a message to {name}.",
-  "@personSendBackCopied": {"description": "On a person's Profile on the desktop, after 'Send yours back' put the own Profile card link on the clipboard.", "placeholders": {"name": {"type": "String"}}}
+  "@personSendBackCopied": {"description": "On a person's Profile on the desktop, after 'Send yours back' put the own Profile card link on the clipboard.", "placeholders": {"name": {"type": "String"}}},
+  "shareAfarSaveTitle": "Save the shared Area to send",
+  "@shareAfarSaveTitle": {"description": "Title of the desktop's save dialog for the file that shares an Area with a person not nearby."},
+  "personSendChangesTitle": "Save the changes to send",
+  "@personSendChangesTitle": {"description": "Title of the desktop's save dialog after 'Send changes to …' on a person's Profile."}
 }

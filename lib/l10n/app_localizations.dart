@@ -4597,6 +4597,204 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'So {name} can add you too.'**
   String personSendBackDetail(String name);
+
+  /// On the Share page: heading of sharing with a person in People through a file.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone not nearby'**
+  String get shareAfarHeading;
+
+  /// Under 'Someone not nearby' on the Share page.
+  ///
+  /// In en, this message translates to:
+  /// **'Share it with a person in People. They get a file through any messenger and accept or decline it.'**
+  String get shareAfarIntro;
+
+  /// Button on the Share page: opens the list of People to share the Area with.
+  ///
+  /// In en, this message translates to:
+  /// **'Share with…'**
+  String get shareAfarPick;
+
+  /// On the Share page when no person in People can be sent an Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody in People can get it yet. Add the person from their Profile card first.'**
+  String get shareAfarNobody;
+
+  /// Title of the page that lists the People an Area can be shared with.
+  ///
+  /// In en, this message translates to:
+  /// **'Share {area} with…'**
+  String shareWithTitle(String area);
+
+  /// Under a person's name in 'Share with…' when their code was never compared in person.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified'**
+  String get shareNotVerified;
+
+  /// Dialog title, asked once per person when sharing an Area with them from afar.
+  ///
+  /// In en, this message translates to:
+  /// **'How do changes travel with {name}?'**
+  String transportTitle(String name);
+
+  /// Choice in 'How do changes travel'.
+  ///
+  /// In en, this message translates to:
+  /// **'A shared folder you both reach'**
+  String get transportFolder;
+
+  /// Under 'A shared folder you both reach'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nextcloud, Syncthing or a USB folder; changes travel on their own.'**
+  String get transportFolderDetail;
+
+  /// Choice in 'How do changes travel'.
+  ///
+  /// In en, this message translates to:
+  /// **'Files through a messenger'**
+  String get transportBundle;
+
+  /// Under 'Files through a messenger'.
+  ///
+  /// In en, this message translates to:
+  /// **'You send changes as a file from their Profile page.'**
+  String get transportBundleDetail;
+
+  /// Announcement when writing the file of a Shared Area failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The Area could not be shared. Nothing was lost; try again.'**
+  String get shareAfarFailed;
+
+  /// Announcement when a received Area file was sealed for other Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'This shared Area is meant for another person or another of your Devices. Ask the sender to share it again with you.'**
+  String get areaOfferNotForUs;
+
+  /// Announcement when a received Area file comes from a blocked person.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: this shared Area comes from a person you blocked.'**
+  String get areaOfferFromBlocked;
+
+  /// Announcement when a received Area file offers an Area this Device holds as its own.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused: this Area is your own on this Device already.'**
+  String get areaOfferRefused;
+
+  /// Announcement when a received Area file is damaged or not signed by its sender.
+  ///
+  /// In en, this message translates to:
+  /// **'This file holds no shared Area this app can read. Ask the sender to share it again.'**
+  String get notAnAreaOffer;
+
+  /// Announcement when an Area file came in while the app was locked.
+  ///
+  /// In en, this message translates to:
+  /// **'A shared Area is waiting on the Agenda.'**
+  String get areaOfferWaits;
+
+  /// Title of the preview of an Area shared with the user from afar.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Area'**
+  String get areaOfferTitle;
+
+  /// Preview of an Area shared from afar, e.g. 'Ann shares Household with you as Member'.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} shares {area} with you as {role}'**
+  String areaOfferText(String name, String area, String role);
+
+  /// Stands for the Area's name in 'shares … with you' when the Area has none.
+  ///
+  /// In en, this message translates to:
+  /// **'an Area'**
+  String get areaOfferNoName;
+
+  /// In the preview of a shared Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes travel through a shared folder you both reach.'**
+  String get areaOfferByFolder;
+
+  /// In the preview of a shared Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes travel as files through a messenger.'**
+  String get areaOfferByBundle;
+
+  /// In the preview of a shared Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing of the Area is kept until you accept.'**
+  String get areaOfferKeepsNothing;
+
+  /// Announcement after accepting a shared Area.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Area accepted.'**
+  String get areaOfferAccepted;
+
+  /// Announcement when a waiting shared Area was decided meanwhile.
+  ///
+  /// In en, this message translates to:
+  /// **'This shared Area is no longer waiting: it was accepted or declined.'**
+  String get areaOfferGone;
+
+  /// Dialog after accepting a shared Area whose changes travel by a folder, when none is chosen here.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the shared folder?'**
+  String get areaOfferFolderQuestion;
+
+  /// Body of 'Choose the shared folder?'.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes of {area} travel through a folder you both reach. Choose it now, or later under Sync.'**
+  String areaOfferFolderDetail(String area);
+
+  /// Button in 'Choose the shared folder?'.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get areaOfferFolderLater;
+
+  /// Agenda line while Areas shared from afar wait to be accepted or declined.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 shared Area waiting} other{{count} shared Areas waiting}}'**
+  String areaOffersWaiting(int count);
+
+  /// Title of the list of Areas shared from afar that wait.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Areas waiting'**
+  String get areaOffersWaitingTitle;
+
+  /// Empty list of waiting shared Areas.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared Areas are waiting.'**
+  String get areaOffersNoneWaiting;
+
+  /// On a person's Profile page when changes travel with them by files: shares a bundle of the Shared Areas.
+  ///
+  /// In en, this message translates to:
+  /// **'Send changes to {name}'**
+  String personSendChanges(String name);
+
+  /// Under 'Send changes to …'.
+  ///
+  /// In en, this message translates to:
+  /// **'As a file through any messenger.'**
+  String get personSendChangesDetail;
 }
 
 class _AppLocalizationsDelegate

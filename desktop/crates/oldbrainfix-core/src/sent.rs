@@ -518,7 +518,7 @@ impl Store {
 
     /// Blocks the sender `id` of a Sent Item carrying `profile`, whose
     /// short code is `code`, as [`Store::block_sent_item_sender`] says.
-    fn block_sender(
+    pub(crate) fn block_sender(
         &self,
         id: &str,
         code: &str,
