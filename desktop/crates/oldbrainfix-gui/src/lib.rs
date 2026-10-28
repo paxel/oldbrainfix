@@ -12,6 +12,7 @@
 //! licence.
 
 pub mod about_view;
+pub mod ai_view;
 pub mod alerts;
 pub mod app;
 pub mod auto_sync;

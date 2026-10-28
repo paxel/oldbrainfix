@@ -57,6 +57,7 @@ use egui::{
     Color32, FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, PopupCloseBehavior,
     RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType,
 };
+use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::offers::{self, HeldAreaOffer, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
@@ -71,6 +72,7 @@ use oldbrainfix_core::{
 };
 
 use crate::about_view;
+use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
 use crate::autostart::Autostart;
 use crate::background;
@@ -124,6 +126,10 @@ pub enum Selection {
     /// The Areas shared from afar waiting for Accept or Decline (#108),
     /// reached from the Agenda's "x shared Areas waiting" line.
     AreaOffersWaiting,
+    /// The review of the AI Task (#112): its changes by kind, Accept all
+    /// and Reject all; reached by "Done, review" in the Settings, and on
+    /// start while one waits.
+    AiReview,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -246,6 +252,12 @@ struct View {
     profile_code: Option<String>,
     /// The other Profile "Which one is you?" asks about, if it does.
     profile_question: Option<ProfileChoice>,
+    /// Whether sync waits for an AI Task (ADR 0026), and the AI Task
+    /// open or waiting for its review, by id.
+    sync_paused: bool,
+    ai_task: Option<String>,
+    /// The AI Task's review, while it shows.
+    ai_review: Option<ReviewShown>,
 }
 
 impl View {
@@ -414,6 +426,8 @@ enum Dialog {
     ProfileQr {
         link: String,
     },
+    /// Whether every change of the AI Task is rejected (#112).
+    RejectAi,
 }
 
 /// A person in People an Area can go to from afar (#108): with a Device
@@ -649,6 +663,8 @@ enum Action {
     Person(PersonAction),
     /// Something asked of the first start's view.
     Welcome(WelcomeAction),
+    /// Something asked of the AI port's card or the AI Task's review.
+    Ai(AiAction),
 }
 
 /// A change in the Settings.
@@ -804,6 +820,11 @@ pub struct App {
     /// Makes the own Profile from this computer's login, or fills in the
     /// defaults of one there (ADR 0017).
     profile_defaults: ProfileDefaults,
+    /// The AI port while it is open (#112, ADR 0026): closed by "Done,
+    /// review" or when the window goes.
+    ai_port: Option<AiPort>,
+    /// The client whose config was copied last while the port is open.
+    ai_copied: Option<Client>,
 }
 
 /// Makes or fills in the own Profile in a store with this computer's
@@ -970,11 +991,18 @@ impl App {
             }),
             backup_opener: Box::new(|title| backup_dialog(title).pick_file()),
             profile_defaults: Box::new(login::apply_system_defaults),
+            ai_port: None,
+            ai_copied: None,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         app.refresh();
+        // An AI Task left when the window went waits for its review.
+        match app.review_ai() {
+            Ok(()) => app.refresh(),
+            Err(e) => app.error = Some(e.to_string()),
+        }
         app
     }
 
@@ -1218,6 +1246,11 @@ impl App {
     /// Saves a bundle for the paired Device `device`, or of everything,
     /// where the user says; nothing asked when there is nothing new.
     fn save_bundle(&mut self, device: Option<String>) -> oldbrainfix_core::Result<()> {
+        // Not even asked where to while sync waits for an AI Task.
+        if self.store.sync_paused()? {
+            self.notice = Some(self.t.sync_paused_error().to_string());
+            return Ok(());
+        }
         let since = match &device {
             Some(id) => self.store.held_by(id)?,
             None => Default::default(),
@@ -1245,7 +1278,7 @@ impl App {
             match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
                 Ok(Some((entries, _))) => self.t.bundle_saved(entries as i64),
                 Ok(None) => self.t.bundle_nothing_new(&name),
-                Err(e) => format!("{} ({e})", self.t.bundle_failed()),
+                Err(e) => ai_view::failed_text(&self.t, self.t.bundle_failed(), &e),
             },
         );
         Ok(())
@@ -1373,6 +1406,10 @@ impl App {
         else {
             return Ok(());
         };
+        if self.store.sync_paused()? {
+            self.notice = Some(self.t.sync_paused_error().to_string());
+            return Ok(());
+        }
         let day = (self.wall)(self.store.now()).date().format("%Y-%m-%d");
         let Some(mut path) =
             (self.item_saver)(self.t.send_save_title(), &sent::file_name(&day.to_string()))
@@ -1430,6 +1467,10 @@ impl App {
             return Ok(());
         };
         let t = self.t;
+        if self.store.sync_paused()? {
+            self.notice = Some(t.sync_paused_error().to_string());
+            return Ok(());
+        }
         let transport = self.store.transport_with(&person)?.unwrap_or(transport);
         let mut folder = None;
         if transport == Transport::Folder && self.store.sync_folder()?.is_none() {
@@ -1453,7 +1494,7 @@ impl App {
         let shared = match self.store.share_area_with(&area, &person, role, transport) {
             Ok(shared) => shared,
             Err(e) => {
-                self.notice = Some(format!("{} ({e})", t.share_afar_failed()));
+                self.notice = Some(ai_view::failed_text(&t, t.share_afar_failed(), &e));
                 return Ok(());
             }
         };
@@ -1466,7 +1507,7 @@ impl App {
         self.notice = Some(
             match bundle::write_area_offer_now(&self.store, &path, &shared, &person) {
                 Ok(_) => t.sent_saved().to_string(),
-                Err(e) => format!("{} ({e})", t.share_afar_failed()),
+                Err(e) => ai_view::failed_text(&t, t.share_afar_failed(), &e),
             },
         );
         // The Area goes into the folder as well.
@@ -1571,6 +1612,9 @@ impl App {
         title: &str,
     ) -> oldbrainfix_core::Result<Option<String>> {
         let t = self.t;
+        if self.store.sync_paused()? {
+            return Ok(Some(t.sync_paused_error().to_string()));
+        }
         let name = profile_view::display_name(&t, &self.store.person_shown(id)?.name).to_string();
         if self.store.entries_for_person(id)?.is_empty() {
             return Ok(Some(t.bundle_nothing_new(&name)));
@@ -1592,7 +1636,7 @@ impl App {
                     t.sent_saved().to_string()
                 }
                 Ok(None) => t.bundle_nothing_new(&name),
-                Err(e) => format!("{} ({e})", t.bundle_failed()),
+                Err(e) => ai_view::failed_text(&t, t.bundle_failed(), &e),
             },
         ))
     }
@@ -1641,6 +1685,106 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// The AI port while it is open (#112).
+    pub fn ai_port(&self) -> Option<&AiPort> {
+        self.ai_port.as_ref()
+    }
+
+    /// Shows the review of the AI Task that waits, if one does; one that
+    /// changed nothing is declined without asking.
+    fn review_ai(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some(task) = self.store.ai_task()? else {
+            return Ok(());
+        };
+        if self.store.ai_review(&task)?.is_empty() {
+            self.store.decline_pending(&task)?;
+            if self.selection == Selection::AiReview {
+                self.selection = Selection::Settings;
+            }
+        } else {
+            self.selection = Selection::AiReview;
+        }
+        Ok(())
+    }
+
+    /// What was asked of the AI port's card or of the review (#112).
+    fn ai_action(&mut self, asked: AiAction) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        match asked {
+            AiAction::Open => {
+                if self.ai_port.is_none() {
+                    self.ai_port = Some(AiPort::open(&self.store)?);
+                    self.ai_copied = None;
+                }
+                if self.selection == Selection::AiReview {
+                    self.selection = Selection::Settings;
+                }
+            }
+            AiAction::Copy(client) => {
+                if let Some(port) = &self.ai_port {
+                    self.copy = Some(ai_view::client_text(client, &port.url(), port.token()));
+                    self.ai_copied = Some(client);
+                }
+            }
+            AiAction::Done => {
+                if let Some(mut port) = self.ai_port.take() {
+                    // What the client asked before "Done" still counts.
+                    port.answer_waiting(&self.store);
+                    port.close();
+                }
+                self.ai_copied = None;
+                self.review_ai()?;
+            }
+            AiAction::Review => {
+                if self.ai_port.is_none() {
+                    self.review_ai()?;
+                }
+            }
+            AiAction::Accept => {
+                if self.ai_port.is_some() {
+                    return Ok(());
+                }
+                if let Some(task) = self.store.ai_task()? {
+                    self.store.accept_pending(&task)?;
+                    self.notice = Some(t.ai_accepted().to_string());
+                }
+                self.selection = Selection::Agenda;
+            }
+            AiAction::AskReject => self.dialog = Some(Dialog::RejectAi),
+            AiAction::Reject => {
+                self.dialog = None;
+                if self.ai_port.is_some() {
+                    return Ok(());
+                }
+                if let Some(task) = self.store.ai_task()? {
+                    self.store.decline_pending(&task)?;
+                    self.notice = Some(t.ai_rejected().to_string());
+                }
+                self.selection = Selection::Agenda;
+            }
+        }
+        Ok(())
+    }
+
+    /// The AI Task's review (#112), or that none waits.
+    fn ai_review_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
+        let t = self.t;
+        let Some(shown) = &self.view.ai_review else {
+            let text = ui.visuals().text_color();
+            ui.heading(RichText::new(t.ai_review_title()).color(text));
+            let weak = ui.visuals().weak_text_color();
+            ui.label(RichText::new(t.ai_review_none()).color(weak));
+            return;
+        };
+        let mut asked = None;
+        if let Some(note) = ai_view::review_page(ui, &t, tones, shown, &mut asked) {
+            actions.push(Action::SelectNote(note));
+        }
+        if let Some(asked) = asked {
+            actions.push(Action::Ai(asked));
+        }
     }
 
     /// The LAN session the Sync view hosts.
@@ -1908,7 +2052,8 @@ impl App {
             | Selection::About
             | Selection::Licences
             | Selection::SentItemsWaiting
-            | Selection::AreaOffersWaiting => Vec::new(),
+            | Selection::AreaOffersWaiting
+            | Selection::AiReview => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -2072,6 +2217,7 @@ impl App {
             }
             _ => None,
         };
+        let ai_task = self.store.ai_task()?;
         let mut trashed_routines = Vec::new();
         if self.selection == Selection::Trash {
             for routine in routines.trashed()? {
@@ -2117,6 +2263,14 @@ impl App {
             profile: OwnProfile::new(&self.store).get()?,
             profile_code: OwnProfile::new(&self.store).code()?,
             profile_question: OwnProfile::new(&self.store).question()?,
+            sync_paused: self.store.sync_paused()?,
+            ai_review: match &ai_task {
+                Some(task) if self.selection == Selection::AiReview && self.ai_port.is_none() => {
+                    Some(ai_view::read_review(&self.store, &self.t, task)?)
+                }
+                _ => None,
+            },
+            ai_task,
         })
     }
 
@@ -2136,7 +2290,7 @@ impl App {
 
         self.refresh();
         if let Err(e) = done {
-            self.error = Some(e.to_string());
+            self.error = Some(ai_view::error_text(&self.t, &e));
         }
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
@@ -2507,6 +2661,7 @@ impl App {
             Action::OpenPerson(id) => self.open_person(id, SendBack::No)?,
             Action::Person(asked) => self.person_action(asked)?,
             Action::Welcome(asked) => self.welcome_action(asked)?,
+            Action::Ai(asked) => self.ai_action(asked)?,
             Action::StartSend => {
                 self.save_text()?;
                 let recipients = self.store.sent_item_recipients()?;
@@ -2981,6 +3136,7 @@ impl App {
                 Some(Selection::Agenda)
             }
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
+            Selection::AiReview => Some(Selection::Settings),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
@@ -3175,6 +3331,15 @@ impl App {
             ui.ctx()
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
+        // The AI port's tool calls are answered on this thread, while the
+        // window idles too; what they drafted shows at once.
+        if let Some(port) = &self.ai_port {
+            if port.answer_waiting(&self.store) > 0 {
+                self.refresh();
+            }
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(100));
+        }
         // A typed code being joined, also after leaving the Sync view: its
         // answer is taken in when it comes.
         if self.sync.joining() {
@@ -3364,6 +3529,28 @@ impl App {
                         actions.push(Action::Select(Selection::Sync));
                     }
                 });
+        } else if self.view.sync_paused {
+            // Sync waits for the AI Task, open or waiting for its review,
+            // for as long as it does, below every announcement that goes
+            // by a click; the click leads to where the wait ends.
+            let (text, asked) = if self.ai_port.is_some() {
+                (
+                    self.t.ai_port_open_banner(),
+                    Action::Select(Selection::Settings),
+                )
+            } else {
+                (self.t.ai_review_banner(), Action::Ai(AiAction::Review))
+            };
+            egui::Panel::top("announcement")
+                .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
+                .show(ui, |ui| {
+                    let colour = ui.visuals().text_color();
+                    let label = egui::Label::new(RichText::new(text).strong().color(colour))
+                        .sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(asked);
+                    }
+                });
         }
         // The first start's view, instead of the panes, until answered.
         if self.welcome.is_some() {
@@ -3512,6 +3699,7 @@ impl App {
             Selection::Licences => self.t.open_source_licenses().to_string(),
             Selection::SentItemsWaiting => self.t.sent_items_waiting_title().to_string(),
             Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
+            Selection::AiReview => self.t.ai_review_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -3632,6 +3820,7 @@ impl App {
             Selection::Licences => return about_view::licences_page(ui, &self.t),
             Selection::SentItemsWaiting => return self.held_pane(ui, tones, actions),
             Selection::AreaOffersWaiting => return self.offers_pane(ui, tones, actions),
+            Selection::AiReview => return self.ai_review_pane(ui, tones, actions),
             Selection::Sync => {
                 let wall = self.wall.clone();
                 if let Some(asked) = self.sync.show(ui, &self.t, tones, &self.store, &wall) {
@@ -4425,6 +4614,17 @@ impl App {
                             actions.push(Action::CloseDialog);
                         }
                     }
+                    Dialog::RejectAi => {
+                        title(ui, t.ai_reject_question());
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(t.ai_reject_detail()).color(text));
+                        ui.horizontal_wrapped(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.ai_reject_all()) {
+                                actions.push(Action::Ai(AiAction::Reject));
+                            }
+                        });
+                    }
                     Dialog::WhichProfile => {
                         if let Some(other) = &view.profile_question {
                             let mut asked = Vec::new();
@@ -5164,6 +5364,9 @@ impl App {
             .unwrap_or_else(|_| oldbrainfix_core::settings::DEFAULT_CAPTURE_HOTKEY.into());
         let hotkey_status = self.hotkey.as_ref().map(|h| h.borrow().status());
         let speech = self.speech.as_ref();
+        let ai_url = self.ai_port.as_ref().map(AiPort::url);
+        let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
+        let ai_copied = self.ai_copied;
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -5189,6 +5392,11 @@ impl App {
                     }
                     ui.label(RichText::new(t.autostart_detail()).small().color(weak));
                 });
+                if let Some(asked) =
+                    ai_view::port_card(ui, &t, tones, ai_url.as_deref(), ai_waiting, ai_copied)
+                {
+                    actions.push(Action::Ai(asked));
+                }
                 embossed(ui, tones, false, None, |ui| {
                     if ui
                         .button(RichText::new(t.about_title()).color(text))
@@ -6167,7 +6375,7 @@ fn count_banner(ui: &mut Ui, tones: Tones, (id, icon): (Id, char), said: &str) -
 
 /// An embossed card holding `content` that is clicked as a whole, a
 /// button with `id` labelled `label`; whether it was clicked.
-fn clickable_card(
+pub(crate) fn clickable_card(
     ui: &mut Ui,
     tones: Tones,
     (id, label): (Id, &str),
@@ -6626,7 +6834,7 @@ fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui::Response {
 
 /// What an Occurrence of a Routine shows as: its Note's text, what the
 /// Note holds when it has no words, or that the Note is gone.
-fn row_title(t: &L10n, note: Option<&Note>) -> String {
+pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if !note.text.trim().is_empty() => note.text.trim().to_string(),
         Some(note) => l10n::wordless(t, note.wordless()).to_string(),

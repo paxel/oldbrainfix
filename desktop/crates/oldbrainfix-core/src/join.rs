@@ -88,9 +88,11 @@ pub fn fingerprint_matches(actual: &[u8], expected: &[u8]) -> bool {
 /// `name`. After a session the host is remembered as a paired Device,
 /// with the whole fingerprint of its certificate. Fails with
 /// [`Error::Sync`]; an address outside the local network is refused
-/// before anything is sent. The host may hold `POST /sync` while its user
+/// before anything is sent, and [`Error::SyncPaused`] while an AI Task
+/// waits (ADR 0026). The host may hold `POST /sync` while its user
 /// is asked; this blocks meanwhile, so it runs off the window's thread.
 pub fn lan_sync(store: &Store, info: &PairInfo, name: &str) -> Result<JoinResult> {
+    store.refuse_while_paused()?;
     if !is_private_host(&info.host) {
         return Err(failed(SyncFailure::NotPrivate));
     }

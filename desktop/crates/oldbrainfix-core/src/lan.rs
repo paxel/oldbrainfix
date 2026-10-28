@@ -582,8 +582,12 @@ impl Response {
     fn reason(&self) -> &'static str {
         match self.status {
             200 => "OK",
+            202 => "Accepted",
+            400 => "Bad Request",
+            401 => "Unauthorized",
             403 => "Forbidden",
             404 => "Not Found",
+            405 => "Method Not Allowed",
             413 => "Payload Too Large",
             500 => "Internal Server Error",
             503 => "Service Unavailable",
@@ -591,7 +595,7 @@ impl Response {
         }
     }
 
-    fn write(&self, out: &mut impl Write) -> std::io::Result<()> {
+    pub(crate) fn write(&self, out: &mut impl Write) -> std::io::Result<()> {
         let mut head = format!("HTTP/1.1 {} {}\r\n", self.status, self.reason());
         if let Some(ct) = &self.content_type {
             head.push_str(&format!("Content-Type: {ct}\r\n"));
@@ -925,7 +929,10 @@ fn serve_connection(
 
 /// Reads one request; `None` once its body exceeds the limit for its
 /// path (the rest is not read).
-fn read_request<R: BufRead>(reader: &mut R, from: IpAddr) -> std::io::Result<Option<Request>> {
+pub(crate) fn read_request<R: BufRead>(
+    reader: &mut R,
+    from: IpAddr,
+) -> std::io::Result<Option<Request>> {
     let mut line = String::new();
     reader.read_line(&mut line)?;
     let mut parts = line.split_whitespace();
@@ -1570,6 +1577,11 @@ impl Store {
         inviting: Option<&Invite>,
         joiner: Option<&str>,
     ) -> Result<(Response, Option<Session>)> {
+        // Sync waits while an AI Task does (ADR 0026); the joiner tries
+        // again later, as when the host is busy.
+        if self.sync_paused()? {
+            return Ok((Response::text(503, "paused"), None));
+        }
         let path = request.path.as_str();
         Ok(match (request.method.as_str(), path) {
             ("GET", "/vector") => {

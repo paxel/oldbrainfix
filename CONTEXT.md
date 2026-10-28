@@ -168,6 +168,10 @@ _Avoid_: clash, merge conflict
 Changes the user sees as if they were kept, which are kept only once the user accepts them; declining leaves nothing behind. What the user edits in the meantime wins on Accept. Used for an AI Task, an Area offered from afar, a stranger's Sent Item until "Show", and a bundle with a lot in it.
 _Avoid_: draft, staging, preview (a preview shows without keeping anything)
 
+**AI Task**:
+One job the user hands to an AI model of their choice through the desktop's AI port, such as fixing typos or removing everything about a topic. Everything it changes is a Pending Change, reviewed together when the user says it is done and accepted or rejected as a whole. One at a time; sync waits meanwhile.
+_Avoid_: agent, assistant, chat, AI mode
+
 ### Privacy
 
 **App Lock**:

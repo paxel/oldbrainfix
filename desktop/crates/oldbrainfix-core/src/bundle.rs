@@ -104,6 +104,7 @@ pub fn write_bundle(
     for_device: Option<&str>,
     nonce: Nonces<'_>,
 ) -> Result<Option<(usize, usize)>> {
+    store.refuse_while_paused()?;
     let since = match for_device {
         Some(device) => store.held_by(device)?,
         None => HashMap::new(),
@@ -130,6 +131,7 @@ pub fn write_person_bundle(
     person: &str,
     nonce: Nonces<'_>,
 ) -> Result<Option<(usize, usize)>> {
+    store.refuse_while_paused()?;
     let entries = store.entries_for_person(person)?;
     if entries.is_empty() {
         return Ok(None);
@@ -163,6 +165,7 @@ pub fn write_area_offer(
     nonce: Nonces<'_>,
     random: &mut dyn FnMut(usize) -> Result<Vec<u8>>,
 ) -> Result<(usize, usize)> {
+    store.refuse_while_paused()?;
     let to = store.offer_keys(area, person)?;
     if to.is_empty() {
         return Err(Error::Invalid(format!("no Device of {person} to offer to")));
@@ -254,8 +257,10 @@ pub fn write_bundle_now(
 /// [`BundleResult::offer`], nothing of it taken in, unless this Device
 /// holds a role in the Area already; [`Error::Offer`] as that says,
 /// [`OfferError::NotForUs`] only when nothing of the bundle could be
-/// read either.
+/// read either. [`Error::SyncPaused`] while an AI Task waits (ADR 0026),
+/// as for every bundle written.
 pub fn import_bundle(store: &Store, path: &Path) -> Result<BundleResult> {
+    store.refuse_while_paused()?;
     let file = File::open(path).map_err(|_| Error::NotABundle)?;
     let archive = ZipArchive::new(file).map_err(|_| Error::NotABundle)?;
     let folder = ZipReadFolder::new(archive);

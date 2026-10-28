@@ -320,11 +320,14 @@ pub fn random_nonce() -> Result<[u8; SEAL_NONCE_BYTES]> {
 /// segments, then publishes this Device's keys, entries and blobs and
 /// fetches the blobs the log lacks. The nonces come from `nonce` in the
 /// Dart core's order: keys files, Profiles files, entry lines, blobs.
+/// [`Error::SyncPaused`], touching nothing, while an AI Task waits (ADR
+/// 0026).
 pub fn folder_sync(
     store: &Store,
     folder: &mut dyn SyncFolder,
     nonce: Nonces<'_>,
 ) -> Result<FolderSyncResult> {
+    store.refuse_while_paused()?;
     folder.ensure("")?;
     folder.ensure("keys")?;
     folder.ensure("blobs")?;

@@ -285,7 +285,7 @@ pub fn short_code(id: &str, first_key: &[u8]) -> String {
 /// `bytes` decoded and turned upright; none when they are no JPEG, PNG
 /// or WebP, are broken, or declare a canvas wider or higher than
 /// `max_edge`.
-fn decode(bytes: &[u8], max_edge: u32) -> Option<DynamicImage> {
+pub(crate) fn decode(bytes: &[u8], max_edge: u32) -> Option<DynamicImage> {
     let mut reader = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .ok()?;

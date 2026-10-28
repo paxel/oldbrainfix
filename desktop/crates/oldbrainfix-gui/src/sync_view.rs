@@ -755,6 +755,7 @@ impl SyncHost {
 pub fn join_failure_text(t: &L10n, error: &Error) -> &'static str {
     match error {
         Error::Sync(failure) => sync_failure_text(t, *failure),
+        Error::SyncPaused => t.sync_paused_error(),
         _ => t.sync_fail_failed(),
     }
 }
@@ -930,6 +931,7 @@ pub fn import_bundle_result(t: &L10n, store: &Store, path: &Path) -> Result<Bund
         Err(Error::NotABundle) => Err(t.bundle_not_a_bundle().to_string()),
         Err(Error::BundleNeedsUpdate) => Err(t.bundle_needs_update().to_string()),
         Err(Error::Offer(e)) => Err(offer_refusal(t, e).to_string()),
+        Err(Error::SyncPaused) => Err(t.sync_paused_error().to_string()),
         Err(e) => Err(format!("{} ({e})", t.bundle_failed())),
     }
 }

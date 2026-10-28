@@ -17,6 +17,10 @@
 //! [`Store::current_fields`] and the lists of entities and fields) sees
 //! the shown sets on top of it; what is held, passed on, numbered or
 //! trusted reads the log alone.
+//!
+//! What an AI Task does (ADR 0026) goes through the same writes as the
+//! user's: on the thread that answers it, inside [`Store::drafting`],
+//! every write becomes a draft of its pending set instead of an entry.
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -240,6 +244,9 @@ pub struct Store {
     /// The pending sets held, and what is worked out from the shown ones
     /// after every change. Never held while the connection is taken.
     pending: Mutex<PendingState>,
+    /// The pending set each thread drafts into ([`Store::drafting`]) and
+    /// the threads that read the log alone ([`Store::log_only`]).
+    pub(crate) scopes: Mutex<crate::ai_task::Scopes>,
 }
 
 impl Store {
@@ -330,6 +337,7 @@ impl Store {
             own_keys: Mutex::new(None),
             pending_files,
             pending: Mutex::new(PendingState::default()),
+            scopes: Mutex::new(crate::ai_task::Scopes::default()),
         };
         if store.local_setting("device")?.is_none() {
             let key = new_key()?;
@@ -451,6 +459,7 @@ impl Store {
     }
 
     pub fn set_local_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.refuse_while_drafting()?;
         self.db.lock().execute(
             "INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)",
             [key, value],
@@ -459,6 +468,7 @@ impl Store {
     }
 
     pub fn remove_local_setting(&self, key: &str) -> Result<()> {
+        self.refuse_while_drafting()?;
         self.db
             .lock()
             .execute("DELETE FROM local_settings WHERE key = ?", [key])?;
@@ -484,6 +494,7 @@ impl Store {
     /// ([`strip_jpeg_metadata`]) and returns the hash it is kept under.
     /// The same photo twice is kept once.
     pub fn put_photo(&self, bytes: &[u8]) -> Result<String> {
+        self.refuse_while_drafting()?;
         let clean = strip_jpeg_metadata(bytes);
         let hash = hex::encode(Sha256::digest(&clean));
         self.photos.put(&hash, &clean)?;
@@ -500,6 +511,7 @@ impl Store {
     /// Keeps the voice recording `bytes` as they are and returns the hash
     /// it is kept under. The same recording twice is kept once.
     pub fn put_audio(&self, bytes: &[u8]) -> Result<String> {
+        self.refuse_while_drafting()?;
         let hash = hex::encode(Sha256::digest(bytes));
         self.audio.put(&hash, bytes)?;
         Ok(hash)
@@ -523,6 +535,7 @@ impl Store {
     /// Lets go of the bytes of the `kind` blob `hash`; returns whether
     /// they were here. Only the log says when that is right (ADR 0020).
     pub fn drop_blob(&self, kind: &str, hash: &str) -> Result<bool> {
+        self.refuse_while_drafting()?;
         match kind {
             "photo" => self.photos.remove(hash),
             "audio" => self.audio.remove(hash),
@@ -534,6 +547,7 @@ impl Store {
     /// Bytes whose SHA-256 is not `hash`, or of an unknown `kind`, are
     /// not kept; returns whether they were.
     pub fn put_blob(&self, kind: &str, hash: &str, bytes: &[u8]) -> Result<bool> {
+        self.refuse_while_drafting()?;
         if hex::encode(Sha256::digest(bytes)) != hash {
             return Ok(false);
         }
@@ -549,7 +563,9 @@ impl Store {
 
     /// Appends one fact under this Device, signed as the Dart core signs.
     /// `date` defaults to now. An edit to a field concurrent edits are a
-    /// Conflict on carries its causal context ([`Entry::ctx`]).
+    /// Conflict on carries its causal context ([`Entry::ctx`]). Inside
+    /// [`Store::drafting`] it is drafted into the AI Task instead, as the
+    /// draft shows ([`Store::draft_entry`]).
     pub fn append(
         &self,
         entity: &str,
@@ -557,6 +573,9 @@ impl Store {
         value: Option<&str>,
         date: Option<DateTime<Utc>>,
     ) -> Result<Entry> {
+        if let Some(set) = self.drafting_into() {
+            return self.draft_entry(&set, entity, field, value, date);
+        }
         let db = self.db.lock();
         let now = self.now();
         let device = self.device_id()?;
@@ -694,6 +713,7 @@ impl Store {
     /// when this version would write it otherwise, and its version when
     /// it is not 1.
     pub fn insert(&self, entry: &WireEntry) -> Result<bool> {
+        self.refuse_while_drafting()?;
         let v = entry.v();
         // Keys of a later version live only in what the entry came as.
         let raw = match &entry.raw {
@@ -1062,6 +1082,7 @@ impl Store {
     /// does (ADR 0021), for what a blocked person wrote. Nothing else ever
     /// leaves the log.
     pub fn delete_entries(&self, device: &str, dseqs: &[i64]) -> Result<()> {
+        self.refuse_while_drafting()?;
         let mut deleted = 0;
         {
             let db = self.db.lock();
@@ -1369,7 +1390,11 @@ impl Store {
     /// holds it by now. Only what this version applies, and nothing an
     /// edit of the user's own made since gives way to at Accept
     /// ([`Store::gives_way`]): the reads show what Accept will keep.
+    /// None inside [`Store::log_only`].
     pub(crate) fn shown(&self) -> Result<Arc<Vec<Entry>>> {
+        if self.reads_log_only() {
+            return Ok(Arc::new(Vec::new()));
+        }
         let generation = self.generation.load(std::sync::atomic::Ordering::SeqCst);
         {
             let held = self.pending.lock();
@@ -1401,24 +1426,7 @@ impl Store {
                             continue;
                         }
                         drafted += 1;
-                        let date = d.date.unwrap_or(d.made);
-                        out.push(Entry {
-                            seq: 0,
-                            device: device.clone(),
-                            dseq: -drafted,
-                            entity: d.entity,
-                            field: d.field,
-                            value: d.value,
-                            date: dart_iso(date),
-                            author: author.clone(),
-                            recorded: dart_iso(d.made),
-                            sig: None,
-                            ctx: None,
-                            extra: serde_json::Map::new(),
-                            raw: None,
-                            date_at: date,
-                            recorded_at: d.made,
-                        });
+                        out.push(d.as_entry(&device, &author, -drafted));
                     }
                     PendingChange::Entry(r) => {
                         if r.entry.applies()

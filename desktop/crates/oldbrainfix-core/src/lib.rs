@@ -10,6 +10,9 @@
 //! writes the fixtures under `desktop/fixtures`; this crate must read them
 //! the same and write the same entries.
 
+pub mod ai_port;
+pub mod ai_task;
+pub mod ai_tools;
 pub mod alarms;
 pub mod backup;
 pub mod blobs;

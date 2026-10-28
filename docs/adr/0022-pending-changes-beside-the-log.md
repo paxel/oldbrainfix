@@ -65,3 +65,7 @@ The phone's background sync opens a second store on the same files. So every cal
 ## An Area offered from afar (ADR 0023)
 
 Amended by ADR 0023 (#108): an offered Area is a set of kind `area-offer`, never shown, so the sync does not pause for it. Its received entries are the Area's history, its `keys` the key records the offer carries, and its `payload` `{"blobs":[…],"offer":…,"profiles":[…]}`: the offer with the Area's key, the Profiles of the Area's people, and the photos and recordings put into the blob store when it came, which Decline deletes again unless the log refers to them.
+
+## The AI Task (ADR 0026)
+
+Amended by ADR 0026 (#112): an AI Task is a set of kind `ai-task`, shown, with no payload, holding drafts only, written through `Store::drafting`. While a shown set waits, the Rust core itself refuses to sync, send or take in a bundle, and the alarm plan reads the log alone.

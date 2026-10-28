@@ -48,6 +48,31 @@ pub struct PendingDraft {
     pub mark: i64,
 }
 
+impl PendingDraft {
+    /// The draft as the reads show it: this Device's entry `dseq`, below
+    /// zero, so it is numbered nowhere, by `author`.
+    pub(crate) fn as_entry(&self, device: &str, author: &str, dseq: i64) -> Entry {
+        let date = self.date.unwrap_or(self.made);
+        Entry {
+            seq: 0,
+            device: device.to_string(),
+            dseq,
+            entity: self.entity.clone(),
+            field: self.field.clone(),
+            value: self.value.clone(),
+            date: dart_iso(date),
+            author: author.to_string(),
+            recorded: dart_iso(self.made),
+            sig: None,
+            ctx: None,
+            extra: Map::new(),
+            raw: None,
+            date_at: date,
+            recorded_at: self.made,
+        }
+    }
+}
+
 /// An entry another Device wrote and signed, kept as it came.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingEntry {

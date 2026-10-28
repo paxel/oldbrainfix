@@ -436,9 +436,13 @@ impl<'a> Alarms<'a> {
             .collect())
     }
 
-    /// The alarm plan at the store's now, on `wall`.
+    /// The alarm plan at the store's now, on `wall`, from the log alone:
+    /// a Routine an AI Task changes fires as it is kept until the change
+    /// is accepted (ADR 0026).
     pub fn plan(&self, wall: &WallClock) -> Result<Vec<PlannedAlarm>> {
-        let routines = Routines::new(self.store).all_with_notes()?;
+        let routines = self
+            .store
+            .log_only(|| Routines::new(self.store).all_with_notes())?;
         let renag = DeviceSettings::new(self.store).renag_interval()?;
         Ok(alarm_plan(
             &routines,
@@ -472,8 +476,12 @@ impl<'a> Alarms<'a> {
     /// The Changes Nudge at the store's now (#109): the people changes
     /// travel with by bundles who lack some
     /// ([`Store::waiting_for_changes`]), with the Nudge's repeat interval
-    /// and Quiet Hours; `None` when nobody waits.
+    /// and Quiet Hours; `None` when nobody waits, or while sync is paused
+    /// ([`Store::sync_paused`]).
     pub fn changes_nudge(&self, wall: &WallClock) -> Result<Option<PlannedChangesNudge>> {
+        if self.store.sync_paused()? {
+            return Ok(None);
+        }
         let settings = DeviceSettings::new(self.store);
         let quiet = if settings.quiet_hours_on()? {
             Some(settings.quiet_hours()?)

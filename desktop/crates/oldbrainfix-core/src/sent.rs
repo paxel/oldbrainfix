@@ -479,6 +479,8 @@ impl Store {
         to: Option<&Recipient>,
         cancel: bool,
     ) -> Result<Vec<u8>> {
+        // What the AI Task changed must not leave (ADR 0026).
+        self.refuse_while_paused()?;
         let item = self.sent_item_of(note_id, cancel)?;
         let keys = to.map(|r| r.keys.clone()).unwrap_or_default();
         encode(&item, &self.signing_key()?, &keys, &mut |n| {

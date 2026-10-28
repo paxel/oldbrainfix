@@ -32,6 +32,10 @@ pub enum Error {
     /// A LAN sync this Device joined that did not happen, and why.
     #[error("sync: {0:?}")]
     Sync(crate::join::SyncFailure),
+    /// Sync waits while a shown pending set does, such as an AI Task
+    /// (ADR 0022, 0026): nothing goes out or comes in until it is decided.
+    #[error("sync is paused until the pending changes are decided")]
+    SyncPaused,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
