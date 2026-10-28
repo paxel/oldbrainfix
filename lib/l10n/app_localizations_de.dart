@@ -2588,7 +2588,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profilePeopleEmpty =>
-      'Noch niemand. Hier erscheinen die Personen, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
+      'Noch niemand. Hier erscheinen die Personen, die du über ihre Profilkarte hinzufügst, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
 
   @override
   String get personFilter => 'Notizen zeigen von…';
@@ -2801,4 +2801,89 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemsNoneWaiting => 'Keine gesendeten Notizen warten.';
+
+  @override
+  String get profileCardSend => 'Mein Profil senden';
+
+  @override
+  String get profileCardSendDetail =>
+      'Als Link, über einen beliebigen Messenger.';
+
+  @override
+  String get profileCardShowQr => 'Meinen QR-Code zeigen';
+
+  @override
+  String get profileCardShowQrDetail => 'Zum Scannen für jemanden neben dir.';
+
+  @override
+  String profileCardText(String link) {
+    return 'Mein Profil für Old Brain Fix:\n$link';
+  }
+
+  @override
+  String get profileCardNotYet =>
+      'Synchronisiere zuerst mit deinem anderen Gerät.';
+
+  @override
+  String get profileCardNoApp => 'Keine App hier kann den Link annehmen.';
+
+  @override
+  String get profileQrTitle => 'Mein Profil als QR-Code';
+
+  @override
+  String get profileQrHint =>
+      'Die andere Person scannt ihn in Old Brain Fix unter Profil, Person hinzufügen. Vor Ort gescannt, bist du für sie sofort bestätigt.';
+
+  @override
+  String get profileQrTooLong =>
+      'Dein Profil hat zu viele Geräte für einen QR-Code. Schick es stattdessen als Link.';
+
+  @override
+  String get personAdd => 'Person hinzufügen';
+
+  @override
+  String get personAddDetail => 'Über ihren Profil-Link oder QR-Code.';
+
+  @override
+  String get personAddIntro =>
+      'Bitte die Person um ihr Profil: als Link über einen Messenger oder als QR-Code auf ihrem Handy neben dir. Ein vor Ort gescannter QR-Code bestätigt sie sofort.';
+
+  @override
+  String get personAddScan => 'QR-Code der Person scannen';
+
+  @override
+  String get personAddPicture => 'QR-Code aus einem Bild';
+
+  @override
+  String get personAddLink => 'Profil-Link der Person';
+
+  @override
+  String get personAddOpen => 'Hinzufügen';
+
+  @override
+  String get cardNoQr =>
+      'Im Bild ist kein QR-Code zu finden. Versuch es etwas näher oder lass dir den Link schicken.';
+
+  @override
+  String get cardUnreadable =>
+      'Das ist keine Profilkarte, oder sie wurde unterwegs verändert. Lass dir den Link noch einmal schicken.';
+
+  @override
+  String get cardOwn => 'Das ist deine eigene Profilkarte.';
+
+  @override
+  String get cardBlocked =>
+      'Diese Karte ist von einer Person, die du blockiert hast. Es wurde nichts hinzugefügt.';
+
+  @override
+  String get cardRefused =>
+      'Diese Karte nennt eine Person unter Personen, stammt aber nicht von ihr. Es wurde nichts hinzugefügt.';
+
+  @override
+  String get personSendBack => 'Deins zurückschicken';
+
+  @override
+  String personSendBackDetail(String name) {
+    return 'Damit $name dich auch hinzufügen kann.';
+  }
 }

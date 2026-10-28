@@ -56,10 +56,10 @@ use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, ClockTime, Day, DeviceSettings,
-    Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
-    PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search, Section, Store, Topic,
-    bundle,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, CardTaken, ClockTime, Day,
+    DeviceSettings, Importance, Invite, MissedSummary, Note, Notes, NotesGo, Occurrence,
+    OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search,
+    Section, Store, Topic, bundle,
 };
 
 use crate::about_view;
@@ -80,8 +80,8 @@ use crate::media::{
 };
 use crate::media_view::{self, PhotoCache, Recording, Speech, Voice};
 use crate::names::{area_name, topic_name};
-use crate::person_view::{self, Comparing, PersonAction, PersonView};
-use crate::profile_view::{self, ProfileAction, ProfileView, Square};
+use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
+use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::speech::SpeechModel;
@@ -342,13 +342,19 @@ enum Dialog {
     /// Devices, both changed by the user, met.
     WhichProfile,
     /// Another person's Profile (#52), with where comparing their code
-    /// stands, the name for the user being typed, and whether blocking
-    /// them or ending their block is being asked (#90).
+    /// stands, the name for the user being typed, whether blocking
+    /// them or ending their block is being asked (#90), and where "Send
+    /// yours back" stands (#107).
     Person {
         id: String,
         comparing: Comparing,
         name: String,
         asking: Option<Asking>,
+        back: SendBack,
+    },
+    /// The own Profile card as a QR (#107).
+    ProfileQr {
+        link: String,
     },
 }
 
@@ -648,6 +654,11 @@ pub struct App {
     updates: std::collections::VecDeque<String>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
+    /// The own Profile card copied, and another person's being pasted
+    /// (#107).
+    card_form: CardForm,
+    /// Text to put on the clipboard at the end of this frame.
+    copy: Option<String>,
     /// The picture of the other Profile "Which one is you?" shows.
     question_view: ProfileView,
     /// The square of a new picture for the person the dialog shows.
@@ -800,6 +811,8 @@ impl App {
             notice: None,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
+            card_form: CardForm::default(),
+            copy: None,
             question_view: ProfileView::default(),
             person_square: None,
             files_picker: Box::new(|title| files_dialog(title).pick_files().unwrap_or_default()),
@@ -2081,7 +2094,7 @@ impl App {
             Action::OpenFile(path) => self.open_file(&path),
             Action::Backup(asked) => self.backup(asked)?,
             Action::Profile(asked) => self.profile_action(asked)?,
-            Action::OpenPerson(id) => self.open_person(id)?,
+            Action::OpenPerson(id) => self.open_person(id, SendBack::No)?,
             Action::Person(asked) => self.person_action(asked)?,
             Action::Welcome(asked) => self.welcome_action(asked)?,
             Action::StartSend => {
@@ -2789,6 +2802,9 @@ impl App {
         self.dragged(ui.ctx(), tones);
         for action in actions {
             self.apply(action);
+        }
+        if let Some(text) = self.copy.take() {
+            ui.ctx().copy_text(text);
         }
     }
 
@@ -3683,6 +3699,7 @@ impl App {
                         comparing,
                         name,
                         asking,
+                        back,
                         ..
                     } => {
                         let mut asked = Vec::new();
@@ -3709,7 +3726,7 @@ impl App {
                                 &t,
                                 pictures,
                                 person,
-                                (*comparing, name),
+                                (*comparing, name, *back),
                                 &mut asked,
                             );
                             if ui
@@ -3727,6 +3744,16 @@ impl App {
                         fix,
                         details,
                     } => failure_form(ui, &t, heading, (cause, fix), details, actions),
+                    Dialog::ProfileQr { link } => {
+                        ui.set_width(500.0);
+                        profile_view::qr_page(ui, &t, link);
+                        if ui
+                            .button(RichText::new(t.close()).color(ui.visuals().text_color()))
+                            .clicked()
+                        {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
                     Dialog::WhichProfile => {
                         if let Some(other) = &view.profile_question {
                             let mut asked = Vec::new();
@@ -3882,9 +3909,10 @@ impl App {
     }
 
     /// The Profile page (ADR 0017): the own Profile's picture, name and
-    /// short code; Backups and recovery; the user's Devices; and the way
-    /// to this Device's settings. While a new picture's square is picked,
-    /// that alone.
+    /// short code; the own Profile card as a link or a QR (#107); Backups
+    /// and recovery; the user's Devices; People, with "Add a person from
+    /// a link"; and the way to this Device's settings. While a new
+    /// picture's square is picked, that alone.
     fn profile_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -3897,11 +3925,12 @@ impl App {
             actions.extend(asked.into_iter().map(Action::Profile));
             return;
         }
-        let (store, wall, backup_form, view) = (
+        let (store, wall, backup_form, view, card_form) = (
             &self.store,
             &self.wall,
             &mut self.backup_form,
             &mut self.profile_view,
+            &mut self.card_form,
         );
         let (people, pictures) = (&self.view.people_shown, &mut self.pictures);
         let (blocked, blocked_open) = (&self.view.blocked_people, self.view.blocked_open);
@@ -3920,6 +3949,11 @@ impl App {
                 embossed(ui, tones, false, None, |ui| {
                     profile_view::header(ui, &t, view, profile, code, &mut asked);
                 });
+                if profile.is_some() {
+                    embossed(ui, tones, false, None, |ui| {
+                        profile_view::card_section(ui, &t, card_form.copied, &mut asked);
+                    });
+                }
                 if question {
                     embossed(ui, tones, false, None, |ui| {
                         ui.label(RichText::new(t.profile_which_waiting()).color(text));
@@ -3973,6 +4007,8 @@ impl App {
                             actions.push(Action::BlockedOpen(!blocked_open));
                         }
                     }
+                    ui.separator();
+                    profile_view::add_person(ui, &t, card_form, &mut asked);
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(
@@ -4000,7 +4036,7 @@ impl App {
     /// Opens the Profile of the person `id` (#52) over the window; over
     /// a dialog, that one shows again once it closes. Nothing for the
     /// user's own.
-    fn open_person(&mut self, id: String) -> oldbrainfix_core::Result<()> {
+    fn open_person(&mut self, id: String, back: SendBack) -> oldbrainfix_core::Result<()> {
         if self.store.is_own_person(&id)? {
             return Ok(());
         }
@@ -4019,6 +4055,7 @@ impl App {
             comparing: Comparing::Not,
             name,
             asking: None,
+            back,
         });
         Ok(())
     }
@@ -4132,6 +4169,7 @@ impl App {
             comparing,
             name,
             asking,
+            back,
         }) = &mut self.dialog
         else {
             return Ok(());
@@ -4166,6 +4204,13 @@ impl App {
             PersonAction::Unblock => *asking = Some(Asking::Unblock),
             PersonAction::CompareCodes => *comparing = Comparing::Asking,
             PersonAction::CodesCompared(false) => *comparing = Comparing::Differ,
+            PersonAction::SendBack => match self.store.profile_card(true)? {
+                Some(link) => {
+                    self.copy = Some(self.t.profile_card_text(&link));
+                    *back = SendBack::Copied;
+                }
+                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+            },
             PersonAction::CodesCompared(true) => {
                 *comparing = Comparing::Not;
                 if let Some(code) = self.store.person_code(id)? {
@@ -4264,6 +4309,34 @@ impl App {
             ProfileAction::Later => {
                 self.dialog = None;
                 self.question_later = true;
+            }
+            ProfileAction::CopyCard => match self.store.profile_card(false)? {
+                Some(link) => {
+                    self.copy = Some(self.t.profile_card_text(&link));
+                    self.card_form.copied = true;
+                }
+                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+            },
+            ProfileAction::ShowQr => match self.store.profile_card(false)? {
+                Some(link) => self.dialog = Some(Dialog::ProfileQr { link }),
+                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+            },
+            ProfileAction::OpenCard => {
+                // Never in person here: the desktop scans nothing.
+                let opened = self.store.open_profile_card(&self.card_form.link, false)?;
+                match (opened.taken, opened.id) {
+                    (CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged, Some(id)) => {
+                        self.card_form.link.clear();
+                        self.card_form.answer = None;
+                        let back = if opened.offer_back {
+                            SendBack::Offered
+                        } else {
+                            SendBack::No
+                        };
+                        self.open_person(id, back)?;
+                    }
+                    (taken, _) => self.card_form.answer = Some(taken),
+                }
             }
         }
         Ok(())

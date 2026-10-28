@@ -217,6 +217,24 @@
     });
   }
 
+  // ---------- Profile card (#107) ----------
+  // The Profile card page shows the card that follows the # for pasting
+  // into the desktop app. The browser never sends what follows the #; it is
+  // read here only, written as plain text, and sent nowhere.
+
+  const cardBox = document.getElementById("profile-card");
+  const cardText = document.getElementById("profile-card-text");
+  if (cardBox && cardText) {
+    const card = window.location.hash.slice(1);
+    if (card.length <= 16384 && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(card)) {
+      cardText.value = "https://paxel.github.io/oldbrainfix/p#" + card;
+      cardBox.hidden = false;
+      cardText.addEventListener("focus", function () {
+        cardText.select();
+      });
+    }
+  }
+
   // ---------- search ----------
 
   const input = document.getElementById("search");

@@ -4133,7 +4133,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilePeopleEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Nobody yet. The people you share an Area with or accept Sent Items from show here.'**
+  /// **'Nobody yet. The people you add from their Profile card, share an Area with or accept Sent Items from show here.'**
   String get profilePeopleEmpty;
 
   /// The browser's button for the person filter: a menu of "Me" and every person, each one put in or out.
@@ -4453,6 +4453,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No Sent Items are waiting.'**
   String get sentItemsNoneWaiting;
+
+  /// On the Profile page: shares the own Profile card as a link through the app the user picks.
+  ///
+  /// In en, this message translates to:
+  /// **'Send my Profile'**
+  String get profileCardSend;
+
+  /// Under 'Send my Profile'.
+  ///
+  /// In en, this message translates to:
+  /// **'As a link, through any messenger.'**
+  String get profileCardSendDetail;
+
+  /// On the Profile page: shows the own Profile card as a QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my QR'**
+  String get profileCardShowQr;
+
+  /// Under 'Show my QR'.
+  ///
+  /// In en, this message translates to:
+  /// **'For someone next to you to scan.'**
+  String get profileCardShowQrDetail;
+
+  /// The text shared with the Profile card. The link must stay last, with nothing after it.
+  ///
+  /// In en, this message translates to:
+  /// **'My Profile for Old Brain Fix:\n{link}'**
+  String profileCardText(String link);
+
+  /// Announced when no Profile card can be made yet: this Device's key is not bound to the Profile until it synced with another of the user's Devices.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with your other Device first.'**
+  String get profileCardNotYet;
+
+  /// Announced when no app takes the shared Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the link.'**
+  String get profileCardNoApp;
+
+  /// Title of the page showing the own Profile card as a QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'My Profile QR'**
+  String get profileQrTitle;
+
+  /// Under the Profile card's QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'The other person scans this in Old Brain Fix, under Profile, Add a person. Scanned in person, you are verified for them at once.'**
+  String get profileQrHint;
+
+  /// On the QR page when the card does not fit a QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Profile has too many Devices for one QR. Send it as a link instead.'**
+  String get profileQrTooLong;
+
+  /// In People on the Profile page: opens the page to add a person from their Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a person'**
+  String get personAdd;
+
+  /// Under 'Add a person'.
+  ///
+  /// In en, this message translates to:
+  /// **'From their Profile link or QR.'**
+  String get personAddDetail;
+
+  /// At the top of the 'Add a person' page.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the person for their Profile: as a link through a messenger, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.'**
+  String get personAddIntro;
+
+  /// Takes a photo of the other person's Profile QR with the camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan their QR'**
+  String get personAddScan;
+
+  /// Reads a Profile QR from a picture the user picks, such as a screenshot.
+  ///
+  /// In en, this message translates to:
+  /// **'QR from a picture'**
+  String get personAddPicture;
+
+  /// Label of the field the user pastes a Profile card link into.
+  ///
+  /// In en, this message translates to:
+  /// **'Their Profile link'**
+  String get personAddLink;
+
+  /// Opens the pasted Profile card link.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get personAddOpen;
+
+  /// Announced when a photo or picture shows no QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'No QR code found in the picture. Try a little closer, or ask for the link.'**
+  String get cardNoQr;
+
+  /// When a Profile card cannot be read or its signature does not hold.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a Profile card, or it was changed on the way. Ask for the link again.'**
+  String get cardUnreadable;
+
+  /// When the user opens their own Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your own Profile card.'**
+  String get cardOwn;
+
+  /// When the Profile card is a blocked person's.
+  ///
+  /// In en, this message translates to:
+  /// **'This card is from a person you blocked. Nothing was added.'**
+  String get cardBlocked;
+
+  /// When the Profile card names a person kept here under other keys.
+  ///
+  /// In en, this message translates to:
+  /// **'This card names a person in People but was not made by them. Nothing was added.'**
+  String get cardRefused;
+
+  /// On a person's Profile just added from their card: shares the own Profile card back.
+  ///
+  /// In en, this message translates to:
+  /// **'Send yours back'**
+  String get personSendBack;
+
+  /// Above 'Send yours back'.
+  ///
+  /// In en, this message translates to:
+  /// **'So {name} can add you too.'**
+  String personSendBackDetail(String name);
 }
 
 class _AppLocalizationsDelegate

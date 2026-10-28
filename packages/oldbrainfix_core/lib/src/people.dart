@@ -256,6 +256,20 @@ extension People on Store {
         : profileShortCode(held.id, base64.decode(held.sent.first));
   }
 
+  /// The Devices pinned here whose keys the Profile of the person [id]
+  /// kept here binds, sorted: those a Sent Item to them is sealed for
+  /// when no Shared Area names their Devices, as for a person added from
+  /// a Profile card (#107).
+  List<String> pinnedDevicesOf(String id) {
+    final held = _people.byId[resolvePerson(id)];
+    if (held == null) return const [];
+    return [
+      for (final k in pinnedKeys())
+        if (held.bound.contains(base64.encode(k.record.publicKey)))
+          k.record.device,
+    ]..sort();
+  }
+
   /// Every Profile of another person kept here, by id.
   List<Profile> get keptPeople {
     final ids = _people.byId.keys.toList()..sort();

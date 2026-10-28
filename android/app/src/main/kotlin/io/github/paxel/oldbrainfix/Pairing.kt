@@ -39,14 +39,28 @@ object Pairing {
         return null
     }
 
+    /**
+     * The long edge read again when [READ_EDGE] found nothing: a Profile
+     * card's QR (#107) has many small modules, too small for zxing once
+     * the photo is brought down to [READ_EDGE].
+     */
+    const val LARGE_EDGE = 4096
+
     /** The QR code's text in the JPEG [photo], or null when it shows none. */
     fun readQr(photo: ByteArray): String? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(photo, 0, photo.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = Photos.sampleSize(bounds.outWidth, bounds.outHeight, READ_EDGE)
-        }
+        val small = readQr(photo, Photos.sampleSize(bounds.outWidth, bounds.outHeight, READ_EDGE))
+        if (small != null) return small
+        val large = Photos.sampleSize(bounds.outWidth, bounds.outHeight, LARGE_EDGE)
+        if (large == Photos.sampleSize(bounds.outWidth, bounds.outHeight, READ_EDGE)) return null
+        return readQr(photo, large)
+    }
+
+    /** The QR code's text in the JPEG [photo] decoded at [sample], or null. */
+    private fun readQr(photo: ByteArray, sample: Int): String? {
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val bitmap = BitmapFactory.decodeByteArray(photo, 0, photo.size, options) ?: return null
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)

@@ -2564,7 +2564,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profilePeopleEmpty =>
-      'Nobody yet. The people you share an Area with or accept Sent Items from show here.';
+      'Nobody yet. The people you add from their Profile card, share an Area with or accept Sent Items from show here.';
 
   @override
   String get personFilter => 'Show Notes by…';
@@ -2775,4 +2775,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sentItemsNoneWaiting => 'No Sent Items are waiting.';
+
+  @override
+  String get profileCardSend => 'Send my Profile';
+
+  @override
+  String get profileCardSendDetail => 'As a link, through any messenger.';
+
+  @override
+  String get profileCardShowQr => 'Show my QR';
+
+  @override
+  String get profileCardShowQrDetail => 'For someone next to you to scan.';
+
+  @override
+  String profileCardText(String link) {
+    return 'My Profile for Old Brain Fix:\n$link';
+  }
+
+  @override
+  String get profileCardNotYet => 'Sync with your other Device first.';
+
+  @override
+  String get profileCardNoApp => 'No app here can take the link.';
+
+  @override
+  String get profileQrTitle => 'My Profile QR';
+
+  @override
+  String get profileQrHint =>
+      'The other person scans this in Old Brain Fix, under Profile, Add a person. Scanned in person, you are verified for them at once.';
+
+  @override
+  String get profileQrTooLong =>
+      'Your Profile has too many Devices for one QR. Send it as a link instead.';
+
+  @override
+  String get personAdd => 'Add a person';
+
+  @override
+  String get personAddDetail => 'From their Profile link or QR.';
+
+  @override
+  String get personAddIntro =>
+      'Ask the person for their Profile: as a link through a messenger, or as a QR on their phone next to you. A QR scanned in person marks them verified at once.';
+
+  @override
+  String get personAddScan => 'Scan their QR';
+
+  @override
+  String get personAddPicture => 'QR from a picture';
+
+  @override
+  String get personAddLink => 'Their Profile link';
+
+  @override
+  String get personAddOpen => 'Add';
+
+  @override
+  String get cardNoQr =>
+      'No QR code found in the picture. Try a little closer, or ask for the link.';
+
+  @override
+  String get cardUnreadable =>
+      'This is not a Profile card, or it was changed on the way. Ask for the link again.';
+
+  @override
+  String get cardOwn => 'This is your own Profile card.';
+
+  @override
+  String get cardBlocked =>
+      'This card is from a person you blocked. Nothing was added.';
+
+  @override
+  String get cardRefused =>
+      'This card names a person in People but was not made by them. Nothing was added.';
+
+  @override
+  String get personSendBack => 'Send yours back';
+
+  @override
+  String personSendBackDetail(String name) {
+    return 'So $name can add you too.';
+  }
 }

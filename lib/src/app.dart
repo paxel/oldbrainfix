@@ -35,6 +35,7 @@ import 'pairing_platform.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
+import 'profile_card.dart';
 import 'profile_platform.dart';
 import 'question_mark_background.dart';
 import 'restore_screen.dart';
@@ -385,7 +386,8 @@ class RouteStack extends NavigatorObserver {
 /// step while the app runs, shows the full-screen alarm on top while
 /// one rings, the Nudge screen when the Nudge's notification was
 /// tapped, and the Unsorted list when the Agenda widget's Unsorted
-/// count was, and imports the bundles other apps opened with this one.
+/// count was, and imports the bundles other apps opened with this one
+/// and opens the Profile card links tapped in them.
 /// While the App Lock is locked, the lock screen stands in
 /// front of the Agenda, which still opens Capture for shares and quick
 /// entry points; what was open of the browser goes when the app locks
@@ -477,12 +479,22 @@ class _HomeState extends State<_Home> {
   /// Sent Items other apps opened with this one while it was locked.
   final _openedWaiting = <String>[];
 
+  late final StreamSubscription<void> _cardsOpened;
+
+  /// Profile card links tapped in other apps while the app was locked,
+  /// or before the first start made the own Profile.
+  final _cardsWaiting = <String>[];
+
   @override
   void initState() {
     super.initState();
     _bundlesOpened = widget.bundles.opened.listen(
       (_) => unawaited(_importOpened()),
     );
+    _cardsOpened = widget.profile.platform.cardOpened.listen(
+      (_) => unawaited(_openCards()),
+    );
+    widget.profile.addListener(_profileMade);
     widget.alarms.addListener(_ringChanged);
     widget.alarms.addListener(_nudgeOpened);
     widget.alarms.addListener(_unsortedOpened);
@@ -497,6 +509,8 @@ class _HomeState extends State<_Home> {
       widget.autoSync.shown();
       // A bundle that opened the app.
       unawaited(_importOpened());
+      // A Profile card link that opened the app.
+      unawaited(_openCards());
       unawaited(_autoBackupStart());
     });
     // Back from the background, or from a settings page: apply what was
@@ -593,6 +607,8 @@ class _HomeState extends State<_Home> {
     widget.autoSync.removeListener(_conflictsSynced);
     widget.autoSync.removeListener(_updatesNeeded);
     unawaited(_bundlesOpened.cancel());
+    unawaited(_cardsOpened.cancel());
+    widget.profile.removeListener(_profileMade);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -621,6 +637,31 @@ class _HomeState extends State<_Home> {
       return;
     }
     _announceConflicts();
+  }
+
+  /// Opens the Profile card links tapped in other apps (#107), each
+  /// showing the person's Profile or why nothing was added; a person's
+  /// Profile is browsing, so not past the App Lock: they wait for the
+  /// unlock. Nor before the first start made the own Profile, so nothing
+  /// is kept before the user chose to restore or add a Device of theirs.
+  Future<void> _openCards() async {
+    _cardsWaiting.addAll(await widget.profile.platform.takeCards());
+    if (!mounted || widget.lock.locked || widget.profile.profile == null) {
+      return;
+    }
+    final links = [..._cardsWaiting];
+    _cardsWaiting.clear();
+    for (final link in links) {
+      if (!mounted) return;
+      await openCardText(context, widget.store, link, inPerson: false);
+    }
+  }
+
+  /// The first start made the own Profile: the card links that waited
+  /// for it open.
+  void _profileMade() {
+    if (_cardsWaiting.isEmpty || widget.profile.profile == null) return;
+    unawaited(_openCards());
   }
 
   /// Opens the full-screen alarm when one starts ringing, and closes it
@@ -658,6 +699,7 @@ class _HomeState extends State<_Home> {
     if (_nudgeWaiting) _openNudge();
     if (_conflictsWaiting) _announceConflicts();
     if (_openedWaiting.isNotEmpty) unawaited(_importOpened());
+    if (_cardsWaiting.isNotEmpty) unawaited(_openCards());
     if (_unsortedWaiting) {
       _unsortedWaiting = false;
       unawaited(openUnsorted(context, widget.notes, widget.places));

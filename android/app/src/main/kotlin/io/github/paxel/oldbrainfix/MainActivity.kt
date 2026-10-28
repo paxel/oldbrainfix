@@ -60,6 +60,8 @@ class MainActivity : FlutterActivity() {
 
     private var syncChannel: MethodChannel? = null
 
+    private var profileChannel: MethodChannel? = null
+
     /** The answer to the shared folder's "pickTree", until the picker comes back. */
     private var folderAnswer: MethodChannel.Result? = null
 
@@ -111,6 +113,10 @@ class MainActivity : FlutterActivity() {
         // A bundle was opened with the running app: it imports it now.
         if (intent.getBooleanExtra(EXTRA_BUNDLE, false)) {
             bundleChannel?.invokeMethod("opened", null)
+        }
+        // A Profile card link was tapped while the app runs: it opens it now.
+        if (intent.getBooleanExtra(EXTRA_CARD, false)) {
+            profileChannel?.invokeMethod("cardOpened", null)
         }
         // A shortcut, tile or widget asked for Capture while the app runs.
         CaptureModes.of(intent.action, intent.flags)?.let {
@@ -242,14 +248,17 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PROFILE_CHANNEL)
-            .setMethodCallHandler { call, result ->
+        profileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PROFILE_CHANNEL).apply {
+            setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "deviceName" -> result.success(Profiles.defaultName(this))
+                    "deviceName" -> result.success(Profiles.defaultName(this@MainActivity))
                     "pick" -> pickPicture(result)
+                    "share" -> result.success(Cards.share(this@MainActivity, call.arguments as? String ?: ""))
+                    "takeCards" -> result.success(Cards.take())
                     else -> result.notImplemented()
                 }
             }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PAIRING_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -814,6 +823,9 @@ class MainActivity : FlutterActivity() {
 
         /** Marks the launch by a bundle another app opened with this one ([BundleActivity]). */
         const val EXTRA_BUNDLE = "oldbrainfix.bundle"
+
+        /** Marks the launch by a Profile card link tapped in another app ([CardActivity]). */
+        const val EXTRA_CARD = "oldbrainfix.card"
 
         /** The Nudge was tapped and the app has not shown the Nudge screen yet. */
         private var nudgeOpened = false

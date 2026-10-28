@@ -194,5 +194,15 @@
   "personOpen": "Open the Profile of {name}",
   "@personOpen": {"description": "Another person's picture on a card, read out and on hover: it opens their Profile.", "placeholders": {"name": {"type": "String"}}},
   "personFilterRemove": "Take {name} out of the filter",
-  "@personFilterRemove": {"description": "On hover over a person kept by the browser's person filter: clicking takes them out.", "placeholders": {"name": {"type": "String"}}}
+  "@personFilterRemove": {"description": "On hover over a person kept by the browser's person filter: clicking takes them out.", "placeholders": {"name": {"type": "String"}}},
+  "profileCardTitle": "My Profile card",
+  "@profileCardTitle": {"description": "On the desktop's Profile page: heading over copying the own Profile card as a link and showing it as a QR."},
+  "profileCardCopy": "Copy my Profile link",
+  "@profileCardCopy": {"description": "On the desktop's Profile page: copies the own Profile card link to the clipboard, for sending through any messenger."},
+  "profileCardCopied": "Copied. Paste it into a message in any messenger.",
+  "@profileCardCopied": {"description": "Under 'Copy my Profile link' once the link is on the clipboard."},
+  "personAddFromLink": "Add a person from a link",
+  "@personAddFromLink": {"description": "In People on the desktop's Profile page: opens the Profile card link pasted into the field above. The site's Profile card page names this button."},
+  "personSendBackCopied": "Copied. Paste it into a message to {name}.",
+  "@personSendBackCopied": {"description": "On a person's Profile on the desktop, after 'Send yours back' put the own Profile card link on the clipboard.", "placeholders": {"name": {"type": "String"}}}
 }

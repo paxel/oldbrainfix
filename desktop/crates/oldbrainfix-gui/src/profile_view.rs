@@ -2,12 +2,14 @@
 //! picture, or the initials on a circle coloured by its id, where the
 //! settings gear was; and the top of the Profile page with the picture,
 //! the name and the short code, and the square the user picks of a new
-//! picture.
+//! picture; the own Profile card as a link or a QR, and a person added
+//! from theirs (#107).
 
 use egui::{
     Color32, ColorImage, FontId, Id, Rect, RichText, Sense, Stroke, StrokeKind, TextEdit,
     TextureHandle, TextureOptions, Ui, WidgetInfo, WidgetType,
 };
+use oldbrainfix_core::CardTaken;
 use oldbrainfix_core::profile::{self, Profile, ProfileChoice};
 
 use crate::icons;
@@ -33,6 +35,22 @@ pub enum ProfileAction {
     Answer(bool),
     /// "Which one is you?" waits on the Profile page.
     Later,
+    /// Put the own Profile card's link on the clipboard (#107).
+    CopyCard,
+    /// Show the own Profile card as a QR.
+    ShowQr,
+    /// Open the Profile card link pasted into the field.
+    OpenCard,
+}
+
+/// The Profile cards on the Profile page (#107): whether the own card's
+/// link was copied, the link of another person's being pasted, and what
+/// opening the last one came to when it added nobody.
+#[derive(Debug, Default)]
+pub struct CardForm {
+    pub copied: bool,
+    pub link: String,
+    pub answer: Option<CardTaken>,
 }
 
 /// A new picture while the user picks its square, in pixels of the
@@ -324,6 +342,106 @@ pub fn header(
             ui.label(RichText::new(code).monospace().size(16.0).color(text));
         });
     }
+}
+
+/// The own Profile card (#107): "Copy my Profile link", with what to do
+/// with it once copied, and "Show my QR".
+pub fn card_section(ui: &mut Ui, t: &L10n, copied: bool, actions: &mut Vec<ProfileAction>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.profile_card_title()).strong().color(text));
+    ui.label(
+        RichText::new(t.profile_card_send_detail())
+            .small()
+            .color(weak),
+    );
+    if ui
+        .button(RichText::new(t.profile_card_copy()).color(text))
+        .clicked()
+    {
+        actions.push(ProfileAction::CopyCard);
+    }
+    if copied {
+        ui.label(RichText::new(t.profile_card_copied()).small().color(weak));
+    }
+    ui.label(
+        RichText::new(t.profile_card_show_qr_detail())
+            .small()
+            .color(weak),
+    );
+    if ui
+        .button(RichText::new(t.profile_card_show_qr()).color(text))
+        .clicked()
+    {
+        actions.push(ProfileAction::ShowQr);
+    }
+}
+
+/// "Add a person from a link" (#107): the field the link is pasted into,
+/// what opening it came to under it when it added nobody, red for a link
+/// that holds no card, and the button. Enter in the field opens it too.
+pub fn add_person(ui: &mut Ui, t: &L10n, form: &mut CardForm, actions: &mut Vec<ProfileAction>) {
+    let text = ui.visuals().text_color();
+    ui.label(RichText::new(t.person_add_link()).color(text));
+    let field = ui.add(
+        TextEdit::singleline(&mut form.link)
+            .id(Id::new("profile card link"))
+            .desired_width(320.0),
+    );
+    field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_add_link()));
+    let typed = !form.link.trim().is_empty();
+    if typed && field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+        actions.push(ProfileAction::OpenCard);
+    }
+    if let Some(answer) = form.answer.and_then(|taken| card_answer(t, taken)) {
+        let colour = if form.answer == Some(CardTaken::Unreadable) {
+            ui.visuals().error_fg_color
+        } else {
+            text
+        };
+        ui.label(RichText::new(answer).color(colour));
+    }
+    let open = egui::Button::new(RichText::new(t.person_add_from_link()).color(text));
+    if ui.add_enabled(typed, open).clicked() {
+        actions.push(ProfileAction::OpenCard);
+    }
+}
+
+/// What a card that added nobody says under the field; none for one that
+/// added, updated or found the person, whose Profile opens instead.
+pub fn card_answer(t: &L10n, taken: CardTaken) -> Option<&str> {
+    match taken {
+        CardTaken::Added | CardTaken::Updated | CardTaken::Unchanged => None,
+        CardTaken::Own => Some(t.card_own()),
+        CardTaken::Blocked => Some(t.card_blocked()),
+        CardTaken::Refused => Some(t.card_refused()),
+        CardTaken::Unreadable => Some(t.card_unreadable()),
+    }
+}
+
+/// The own Profile card `link` as a large QR (#107), at error correction
+/// L as the phone shows it, with what the other person does with it; a
+/// card too long for a QR says to send the link instead.
+pub fn qr_page(ui: &mut Ui, t: &L10n, link: &str) {
+    let text = ui.visuals().text_color();
+    ui.heading(RichText::new(t.profile_qr_title()).color(text));
+    let drawn = ui
+        .vertical_centered(|ui| {
+            crate::sync_view::qr(
+                ui,
+                link,
+                qrcode::EcLevel::L,
+                460.0,
+                Some(t.profile_qr_title()),
+            )
+        })
+        .inner;
+    let hint = if drawn {
+        t.profile_qr_hint()
+    } else {
+        t.profile_qr_too_long()
+    };
+    ui.label(RichText::new(hint).color(text));
 }
 
 /// "Which one is you?" (ADR 0017): this Device's Profile and the other

@@ -16,6 +16,7 @@ pub mod blobs;
 pub mod blocks;
 pub mod box_keys;
 pub mod bundle;
+pub mod cards;
 pub mod conflicts;
 pub mod discovery;
 pub mod entry;
@@ -48,6 +49,7 @@ pub mod text_format;
 pub mod transcript_prompts;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
+pub use cards::{CardOpened, CardTaken};
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};

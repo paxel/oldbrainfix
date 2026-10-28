@@ -99,7 +99,7 @@ Future<void> _openAndRun(Directory dir) async {
       pairedHost: startPairedHosting,
       folders: const AndroidFolders(),
       bundles: AndroidBundles(),
-      profile: const AndroidProfile(),
+      profile: AndroidProfile(),
       workDir: work.path,
     ),
   );

@@ -20,6 +20,9 @@ dependencies:
   path_provider: ^2.1.6
   package_info_plus: ^10.2.1
   url_launcher: ^6.3.2
+  # The Profile card's QR (#107) at error correction L, which the core's
+  # Recovery Sheet QR does not use; already the core's. BSD-3-Clause.
+  qr: ^4.0.0
 
 dev_dependencies:
   flutter_test:

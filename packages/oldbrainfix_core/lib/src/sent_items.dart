@@ -317,8 +317,8 @@ class SentItem {
 }
 
 /// Someone a Sent Item can be encrypted to: another person met through
-/// a Shared Area or Pairing by invite, with the X25519 keys of every
-/// Device of theirs known here.
+/// a Shared Area, Pairing by invite or a Profile card, with the X25519
+/// keys of every Device of theirs known here.
 class Recipient {
   /// The person's id, or the Device's when no Shared Area names one.
   final String id;
@@ -328,9 +328,11 @@ class Recipient {
   const Recipient({required this.id, required this.name, required this.keys});
 }
 
-/// Who a Sent Item can be encrypted to: the people of the Shared Areas
-/// and the Devices paired by invite, never this Device's own group, each
-/// with the keys of their Devices known here; by name. A person none of
+/// Who a Sent Item can be encrypted to: the people of the Shared Areas,
+/// the Devices paired by invite and every other person kept here whose
+/// Profile binds a key pinned here, never this Device's own group nor a
+/// blocked person added that way, each with the keys of their Devices
+/// known here; by name. A person none of
 /// whose keys is known is not listed: a file to them is signed only.
 List<Recipient> sentItemRecipients(Store store) {
   final self = store.deviceId;
@@ -349,6 +351,22 @@ List<Recipient> sentItemRecipients(Store store) {
     if (!paired.shared || grouped.contains(paired.id)) continue;
     devices.putIfAbsent(paired.id, () => {}).add(paired.id);
     names.putIfAbsent(paired.id, () => paired.name);
+  }
+  // Everybody else kept here, a person added from a Profile card among
+  // them (#107): the Devices pinned here that their Profile binds.
+  final listed = {for (final ds in devices.values) ...ds};
+  final people = {for (final id in devices.keys) store.resolvePerson(id)};
+  final blocked = store.blockedIds;
+  for (final person in store.keptPeople) {
+    final id = store.resolvePerson(person.id);
+    if (people.contains(id) || blocked.contains(id)) continue;
+    final ds = [
+      for (final d in store.pinnedDevicesOf(id))
+        if (!own(d) && !listed.contains(d)) d,
+    ];
+    if (ds.isEmpty) continue;
+    devices.putIfAbsent(id, () => {}).addAll(ds);
+    names.putIfAbsent(id, () => store.personShown(id).name);
   }
   final recipients = <Recipient>[];
   for (final MapEntry(key: id, value: ds) in devices.entries) {

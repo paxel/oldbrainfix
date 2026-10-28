@@ -1,0 +1,36 @@
+<!-- page: title="Profile card" track="reference" order=4 summary="What a Profile card link holds, and how it adds a person to People in Old Brain Fix." -->
+<p class="lede">A Profile card is a person's own Profile sent as a link through any messenger, or shown as a QR code. Opened in Old Brain Fix, it adds that person to People. The card is the part of the link after the <code>#</code>.</p>
+
+<div id="profile-card" hidden>
+<p><strong>The card in this link</strong></p>
+<p>On a computer, copy this text and paste it into the desktop app with "Add a person from a link".</p>
+<textarea id="profile-card-text" class="card-text" rows="6" readonly spellcheck="false" aria-label="Profile card"></textarea>
+</div>
+
+<h2>Opening a card</h2>
+<ul>
+  <li><strong>On an Android phone</strong> with Old Brain Fix, tapping the link opens it in the app. If the browser shows this page instead, copy the link, open the app, and paste it under Profile, People, "Add a person".</li>
+  <li><strong>On a computer</strong>, paste the link into the desktop app with "Add a person from a link".</li>
+  <li><strong>In person</strong>, the other person shows "Show my QR" on their Profile page, and you scan it under "Add a person" with "Scan their QR".</li>
+</ul>
+<p>Whoever opens a card that is new to them is offered "Send yours back", which sends their own card in one tap.</p>
+
+<h2>What a card holds</h2>
+<ul>
+  <li>The person's name and the id of their Profile, without the picture.</li>
+  <li>The public keys of the Device that made the card, and of the person's other Devices.</li>
+  <li>A signature of that Device over all of it; a card changed on the way is not accepted.</li>
+</ul>
+<p>A card adds a person and does nothing else: it shares no Area, no Notes and no private key. The picture arrives with the person's first Sent Item or Shared Area. The card of a person you blocked adds nothing.</p>
+
+<h2>Verified or not</h2>
+<p>A person added from a link shows "Not verified" on their Profile until you both compare the short code, for example on a call, and confirm it with "Compare codes". A QR scanned in person marks the person verified at once.</p>
+
+<h2>What this page does with the card</h2>
+<p>Browsers do not send the part of a link after the <code>#</code> to the server. This page reads it in the browser only, to show it above, and sends it nowhere.</p>
+
+<h2>Getting the app</h2>
+<ul>
+  <li><a href="https://play.google.com/store/apps/details?id=io.github.paxel.oldbrainfix">Old Brain Fix on Google Play</a></li>
+  <li><a href="https://paxel.github.io/fdroid/">The F-Droid repository</a> that carries Old Brain Fix</li>
+</ul>

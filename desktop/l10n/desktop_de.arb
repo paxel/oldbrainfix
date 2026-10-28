@@ -119,5 +119,10 @@
   "restoreOpenTitle": "Sicherungsdatei wählen",
   "welcomeNewDetail": "Mit einem leeren Old Brain Fix auf diesem Computer beginnen.",
   "personOpen": "Profil von {name} öffnen",
-  "personFilterRemove": "{name} aus dem Filter nehmen"
+  "personFilterRemove": "{name} aus dem Filter nehmen",
+  "profileCardTitle": "Meine Profilkarte",
+  "profileCardCopy": "Meinen Profil-Link kopieren",
+  "profileCardCopied": "Kopiert. Füge ihn in eine Nachricht in einem beliebigen Messenger ein.",
+  "personAddFromLink": "Person über einen Link hinzufügen",
+  "personSendBackCopied": "Kopiert. Füge ihn in eine Nachricht an {name} ein."
 }

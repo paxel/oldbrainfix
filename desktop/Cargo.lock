@@ -3140,6 +3140,7 @@ dependencies = [
  "arboard",
  "ashpd",
  "async-io",
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "directories",

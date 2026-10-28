@@ -3,6 +3,7 @@
 //! compared it in person, with "Compare codes"; "Their Notes" (#53);
 //! then "Name and picture for me", the Override only the user sees, on
 //! their own Devices; last, Block, or Unblock for a blocked person (#90).
+//! Just added from their Profile card, it offers "Send yours back" (#107).
 
 use egui::{Id, RichText, TextEdit, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::{Profile, Store};
@@ -30,6 +31,19 @@ pub enum PersonAction {
     /// Ask whether to block them, or to end their block (#90).
     Block,
     Unblock,
+    /// Put the own Profile card, as the answer to theirs, on the clipboard
+    /// (#107).
+    SendBack,
+}
+
+/// Where "Send yours back" stands on a person's Profile (#107).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SendBack {
+    /// Not offered: they were not just added from a card asking for it.
+    No,
+    Offered,
+    /// The card went to the clipboard; what to do with it shows instead.
+    Copied,
 }
 
 /// Where comparing a person's short code stands.
@@ -72,14 +86,15 @@ impl PersonView {
 }
 
 /// The person's Profile: their picture, name and code, verified or not,
-/// "Compare codes", and the name and picture for the user, with the
-/// field `name` for the name; then Block, or Unblock.
+/// "Compare codes", "Send yours back" while `back` offers it, and the
+/// name and picture for the user, with the field `name` for the name;
+/// then Block, or Unblock.
 pub fn form(
     ui: &mut Ui,
     t: &L10n,
     pictures: &mut Pictures,
     person: &PersonView,
-    (comparing, name): (Comparing, &mut String),
+    (comparing, name, back): (Comparing, &mut String, SendBack),
     actions: &mut Vec<PersonAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -136,6 +151,24 @@ pub fn form(
                 {
                     actions.push(PersonAction::CompareCodes);
                 }
+            }
+        }
+    }
+    if !person.blocked {
+        let shown = display_name(t, &person.shown.name);
+        match back {
+            SendBack::No => {}
+            SendBack::Offered => {
+                ui.label(RichText::new(t.person_send_back_detail(shown)).color(text));
+                if ui
+                    .button(RichText::new(t.person_send_back()).color(text))
+                    .clicked()
+                {
+                    actions.push(PersonAction::SendBack);
+                }
+            }
+            SendBack::Copied => {
+                ui.label(RichText::new(t.person_send_back_copied(shown)).color(text));
             }
         }
     }

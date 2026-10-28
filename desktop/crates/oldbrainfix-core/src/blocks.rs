@@ -994,6 +994,49 @@ mod tests {
     }
 
     #[test]
+    fn a_card_a_blocked_persons_device_made_under_a_new_id_is_refused() -> TestResult {
+        use crate::cards::{CardTaken, LINK, card_bytes};
+        use base64::Engine;
+        use base64::engine::general_purpose::{STANDARD as BASE64, URL_SAFE_NO_PAD};
+        let h = household()?;
+        exchange(&h.carol, &h.ann, true)?;
+        h.carol.block_person(&own_id(&h.ben)?, false)?;
+        let key = SigningKey::from_seed([2; 32]);
+        let record = r#"{"id":"0123456789abcdef0123456789abcdef","name":"Not Ben","version":1}"#;
+        let me = BASE64.encode(key.public_key());
+        let payload = serde_json::json!({
+            "format": 1,
+            "key": crate::KeyRecord::make(&key).to_json(),
+            "profile": crate::profile::SignedProfile {
+                record: record.into(),
+                signer: me.clone(),
+                sig: key.sign(&crate::profile::record_bytes(record)),
+                first: me,
+                keys: Vec::new(),
+                aliases: Vec::new(),
+                fresh: false,
+            }
+            .to_json(),
+        })
+        .to_string();
+        let sig = BASE64.decode(key.sign(&card_bytes(&payload)))?;
+        let card = format!(
+            "{LINK}{}.{}",
+            URL_SAFE_NO_PAD.encode(payload.as_bytes()),
+            URL_SAFE_NO_PAD.encode(sig)
+        );
+        assert_eq!(
+            h.carol.open_profile_card(&card, false)?.taken,
+            CardTaken::Blocked
+        );
+        assert_eq!(
+            h.carol.person_code("0123456789abcdef0123456789abcdef")?,
+            None
+        );
+        Ok(())
+    }
+
+    #[test]
     fn decline_and_block_keeps_nothing_of_it_and_blocks_its_sender() -> TestResult {
         let ann = device(1, "Ann")?;
         let carol = device(4, "Carol")?;

@@ -146,9 +146,21 @@ _Avoid_: Spitzname, Kontaktname
 Alle Profile, die deine Geräte kennen, aufgelistet auf der Profilseite.
 _Avoid_: Kontakte, Freunde
 
+**Profilkarte** [Profile card]:
+Das eigene Profil eines Menschen, ohne Bild, als Link über einen beliebigen Messenger geschickt oder als QR-Code gezeigt. Wer sie öffnet, hat den Menschen unter Menschen, nicht bestätigt, außer der QR-Code wurde vor Ort gescannt; sie teilt nie einen Bereich.
+_Avoid_: Visitenkarte, Kontaktkarte, Einladung
+
+**Blockieren** [Block]:
+Was du mit einer Person tust, deren Geschriebenes du nie wieder sehen willst: Auf allen deinen eigenen Geräten wird alles gelöscht, was sie geschrieben hat, und nichts Neues davon wird behalten, gezeigt oder weitergegeben, in keinem geteilten Bereich und von keinem Gerät, das es weiterreicht, und keine gesendete Notiz von ihr wird gezeigt; nur ihre Erledigt-Haken bleiben, ohne ihren Namen und ihr Bild. Die Person erfährt es nicht. Einen Verwalter eines geteilten Bereichs zu blockieren heißt, diesen Bereich zu verlassen. Hebst du die Blockierung auf, kommt ihr Geschriebenes wieder.
+_Avoid_: Sperren, Stummschalten, Ignorieren
+
 **Konflikt** [Conflict]:
 Zwei Fassungen desselben von Hand bearbeiteten Feldes, auf verschiedenen Geräten geschrieben, ohne dass eines das andere gesehen hatte. Bis dahin zeigt sich die neueste; du wählst, welche bleibt.
 _Avoid_: Zusammenstoß, Merge-Konflikt
+
+**Ausstehende Änderungen** [Pending Changes]:
+Änderungen, die du siehst, als wären sie behalten, die aber erst behalten werden, wenn du sie annimmst; lehnst du ab, bleibt nichts zurück. Was du in der Zwischenzeit bearbeitest, gewinnt beim Annehmen. Gilt für eine KI-Aufgabe, einen aus der Ferne angebotenen Bereich, die gesendete Notiz einer fremden Person bis „Zeigen“ und ein Bündel mit viel darin.
+_Avoid_: Entwurf, Zwischenstand, Vorschau (eine Vorschau zeigt, ohne etwas zu behalten)
 
 ## Privatsphäre
 

@@ -681,7 +681,7 @@ impl SyncHost {
                 ui.label(RichText::new(t.sync_locked_out()).color(error));
             }
             ui.vertical_centered(|ui| {
-                qr(ui, &host.pair_code(false), 240.0);
+                qr(ui, &host.pair_code(false), qrcode::EcLevel::M, 240.0, None);
                 let typed = host.pair_code(true);
                 for line in pair_code_lines(&typed) {
                     ui.label(
@@ -1057,16 +1057,27 @@ pub fn conflict_origin(t: &L10n, store: &Store, entry: &Entry, when: &str) -> St
     t.conflict_on_unnamed(when)
 }
 
-/// `value` as a QR code, `size` points wide, black on white.
-fn qr(ui: &mut Ui, value: &str, size: f32) {
-    let Ok(code) = qrcode::QrCode::new(value.as_bytes()) else {
-        return;
+/// `value` as a QR code with error correction `level`, `size` points
+/// wide, black on white, read out as `label` when there is one; false,
+/// and nothing drawn, when `value` does not fit a QR code.
+pub(crate) fn qr(
+    ui: &mut Ui,
+    value: &str,
+    level: qrcode::EcLevel,
+    size: f32,
+    label: Option<&str>,
+) -> bool {
+    let Ok(code) = qrcode::QrCode::with_error_correction_level(value.as_bytes(), level) else {
+        return false;
     };
     let width = code.width();
     let colors = code.to_colors();
-    let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), egui::Sense::hover());
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), egui::Sense::hover());
+    if let Some(label) = label {
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Image, true, label));
+    }
     if !ui.is_rect_visible(rect) {
-        return;
+        return true;
     }
     let painter = ui.painter();
     painter.rect_filled(rect, 0.0, Color32::WHITE);
@@ -1085,6 +1096,7 @@ fn qr(ui: &mut Ui, value: &str, size: f32) {
             }
         }
     }
+    true
 }
 
 /// The name this computer goes by in a session: its host name.

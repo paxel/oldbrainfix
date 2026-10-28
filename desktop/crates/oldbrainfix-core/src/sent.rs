@@ -290,8 +290,9 @@ fn times(schedule: &Schedule) -> String {
         .join(",")
 }
 
-/// Someone a Sent Item can be encrypted to, with the X25519 keys of
-/// every Device of theirs known here.
+/// Someone a Sent Item can be encrypted to: another person met through
+/// a Shared Area, Pairing by invite or a Profile card, with the X25519
+/// keys of every Device of theirs known here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Recipient {
     /// The person's id, or the Device's when no Shared Area names one.
@@ -301,10 +302,12 @@ pub struct Recipient {
 }
 
 impl Store {
-    /// Who a Sent Item can be encrypted to: the people of the Shared Areas
-    /// and the Devices paired by invite, never this Device's own group,
-    /// each with the keys of their Devices known here; by name. A person
-    /// none of whose keys is known is not listed.
+    /// Who a Sent Item can be encrypted to: the people of the Shared
+    /// Areas, the Devices paired by invite and every other person kept
+    /// here whose Profile binds a key pinned here, never this Device's own
+    /// group nor a blocked person added that way, each with the keys of
+    /// their Devices known here; by name. A person none of whose keys is
+    /// known is not listed.
     pub fn sent_item_recipients(&self) -> Result<Vec<Recipient>> {
         let me = self.device_id()?;
         let mut devices: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
@@ -338,6 +341,35 @@ impl Store {
                 .or_default()
                 .insert(paired.id.clone());
             names.entry(paired.id.clone()).or_insert(paired.name);
+        }
+        // Everybody else kept here, a person added from a Profile card
+        // among them (#107): the Devices pinned here that their Profile
+        // binds.
+        let listed: std::collections::HashSet<String> =
+            devices.values().flatten().cloned().collect();
+        let mut people = std::collections::HashSet::new();
+        for id in devices.keys() {
+            people.insert(self.resolve_person(id)?);
+        }
+        let blocked = self.blocked_ids()?;
+        for person in self.kept_people()? {
+            let id = self.resolve_person(&person.id)?;
+            if people.contains(&id) || blocked.contains(&id) {
+                continue;
+            }
+            let mut ds = Vec::new();
+            for d in self.pinned_devices_of(&id)? {
+                if d != me && !self.is_own_device(&d)? && !listed.contains(&d) {
+                    ds.push(d);
+                }
+            }
+            if ds.is_empty() {
+                continue;
+            }
+            devices.entry(id.clone()).or_default().extend(ds);
+            if !names.contains_key(&id) {
+                names.insert(id.clone(), self.person_shown(&id)?.name);
+            }
         }
         let mut out = Vec::new();
         for (id, ds) in devices {

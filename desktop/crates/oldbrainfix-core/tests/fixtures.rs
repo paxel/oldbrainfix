@@ -2738,6 +2738,68 @@ fn profiles_come_out_as_the_dart_core_has_them() -> TestResult {
     Ok(())
 }
 
+/// The `person:` settings of `store` as the cards fixture lists them: a
+/// picture made again only noted, since the cores' JPEG encoders differ.
+fn card_people(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
+    let mut out = serde_json::Map::new();
+    for (key, value) in store.local_settings_with_prefix("person:")? {
+        let mut held: Value = serde_json::from_str(&value)?;
+        if let Some(shown) = held.get_mut("shown") {
+            *shown = Value::Bool(true);
+        }
+        out.insert(key, held);
+    }
+    Ok(Value::Object(out))
+}
+
+#[test]
+fn profile_cards_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
+    let fixture = read_json(&fixtures().join("cards").join("cards.json"))?;
+    let at = Utc
+        .with_ymd_and_hms(2026, 3, 1, 9, 0, 0)
+        .single()
+        .ok_or("a time")?;
+    let ada = Store::in_memory(Box::new(move || at), || Ok(writer_key()))?;
+    let ben = Store::in_memory(Box::new(move || at), || Ok(joiner_key()))?;
+    for (store, which) in [(&ada, "maker"), (&ben, "receiver")] {
+        for (key, value) in fixture[which].as_object().ok_or(which)? {
+            store.set_local_setting(key, value.as_str().ok_or("a value")?)?;
+        }
+    }
+    // The same Profile signs to the same cards, byte for byte.
+    assert_eq!(json!(ada.profile_card(false)?), fixture["card"]);
+    assert_eq!(json!(ada.profile_card(true)?), fixture["back"]);
+    assert_eq!(json!(ben.profile_card(true)?), fixture["answer"]);
+    let steps = fixture["steps"].as_array().ok_or("steps")?;
+    for step in steps {
+        let case = step["case"].as_str().ok_or("a case")?;
+        let store = if step["store"] == "maker" { &ada } else { &ben };
+        let out = if let Some(text) = step["open"].as_str() {
+            let opened = store.open_profile_card(text, step["inPerson"] == true)?;
+            json!({
+                "taken": opened.taken.name(),
+                "id": opened.id,
+                "offerBack": opened.offer_back,
+            })
+        } else if let Some(id) = step["block"].as_str() {
+            store.block_person(id, false)?;
+            Value::Null
+        } else {
+            json!(store.take_person(&step["take"], None)?.name())
+        };
+        assert_eq!(out, step["out"], "{case}");
+        assert_eq!(card_people(store)?, step["people"], "{case}");
+        let keys: serde_json::Map<String, Value> = store
+            .local_settings_with_prefix("key:")?
+            .into_iter()
+            .map(|(k, v)| (k, json!(v)))
+            .collect();
+        assert_eq!(Value::Object(keys), step["keys"], "{case}");
+    }
+    assert_eq!(steps.len(), 12);
+    Ok(())
+}
+
 #[test]
 fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
     use oldbrainfix_core::signing::{ImportReport, KeyRecord};

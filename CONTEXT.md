@@ -8,7 +8,7 @@ A local-first, privacy-first memory aid for anyone who forgets things. Capturing
 
 **Note**:
 Anything the user captured: text, a voice recording, a photo, or something shared in from another app, together with its Capture Context. The diary entry everything else hangs off.
-_Avoid_: entry, memo, item, card (a card is only how a Note is drawn)
+_Avoid_: entry, memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
 
 **Capture**:
 The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut, a hardware button, the desktop hotkey). Capturing never asks for sorting or unlocking.
@@ -147,6 +147,10 @@ _Avoid_: nickname, contact name
 **People**:
 Every Profile the user's Devices know, listed on the Profile page.
 _Avoid_: contacts, friends
+
+**Profile card**:
+A person's own Profile, without the picture, sent as a link through any messenger or shown as a QR. Opening it adds the person to People, not verified unless the QR was scanned in person; it never shares an Area. German: Profilkarte.
+_Avoid_: business card, contact card, invite
 
 **Block**:
 What the user does to a person whose writing they never want to see again: on all of the user's own Devices, everything that person wrote is deleted and nothing more of it is stored, shown or passed on, in any Shared Area and from any Device that relays it, and no Sent Item of theirs is shown; only their check-offs stay, without their name or picture. The person is not told. Blocking a Manager of a Shared Area means leaving that Area. Unblocking fetches their writing again.

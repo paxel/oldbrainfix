@@ -2983,6 +2983,156 @@ Map<String, Object?> _keys() {
 /// Profiles (ADR 0017): names as typed and as kept, initials, colours,
 /// short codes, records and their bytes, the own Profile as this Device
 /// keeps it, and a picture made here for the desktop to take in.
+/// The `person:` settings of [store], the picture made again only noted,
+/// since the two cores' JPEG encoders write other bytes.
+Map<String, Object?> _cardPeople(Store store) => {
+  for (final (key, value) in store.localSettingsWithPrefix('person:'))
+    key: {
+      for (final MapEntry(:key, :value)
+          in (jsonDecode(value) as Map<String, Object?>).entries)
+        key: key == 'shown' ? true : value,
+    },
+};
+
+/// Profile cards (#107): Ada (the writer's key) with a picture makes her
+/// card and the one answering another; Ben (the joiner's key) opens
+/// cards in turn, each changed, signed by a key not bound, wrapped in
+/// text, scanned in person, copied under another first key, his own, and
+/// hers after he blocked her; between them he takes her Profile with
+/// its picture at the same version, which replaces the card's record.
+void _cardsFixture(Directory root) {
+  final dir = Directory('${root.path}/cards');
+  DateTime clock() => DateTime.utc(2026, 3, 1, 9);
+  var ids = 0;
+  Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+  final ada = Store.inMemory(
+    clock: clock,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  final ben = Store.inMemory(
+    clock: clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  );
+  final eve = SigningKey.fromSeed(
+    Uint8List.fromList(List<int>.generate(32, (i) => 97 + i)),
+  );
+  try {
+    ada
+      ..applyProfileDefaults(name: 'Ada')
+      ..setOwnProfilePicture(
+        makeProfilePicture(_gradient(320, 240), left: 40, top: 0, size: 240),
+      );
+    ben.applyProfileDefaults(name: 'Ben');
+    Map<String, String> settings(Store store) => {
+      for (final (key, value) in store.localSettingsWithPrefix('profile'))
+        key: value,
+    };
+    final makerSettings = settings(ada);
+    final receiverSettings = settings(ben);
+    final card = ada.profileCard()!;
+    final back = ada.profileCard(back: true)!;
+    final answer = ben.profileCard(back: true)!;
+    final adaId = ada.ownProfile!.id;
+
+    String b64(List<int> bytes) => base64Url.encode(bytes).replaceAll('=', '');
+    String signed(SigningKey key, String payload) =>
+        '$profileCardLink${b64(utf8.encode(payload))}.'
+        '${b64(base64.decode(key.sign(profileCardBytes(payload))))}';
+    final hash = card.indexOf('#');
+    final parts = card.substring(hash + 1).split('.');
+    final payload = utf8.decode(
+      base64Url.decode(base64Url.normalize(parts[0])),
+    );
+    final json = jsonDecode(payload) as Map<String, Object?>;
+    final flagged = jsonEncode({'back': true, ...json});
+    final eveRecord = KeyRecord.make(eve).toJson();
+    final unbound = signed(eve, jsonEncode({...json, 'key': eveRecord}));
+    final copiedRecord = jsonEncode({'id': adaId, 'name': 'Ada', 'version': 9});
+    final copied = signed(
+      eve,
+      jsonEncode({
+        'format': 1,
+        'key': eveRecord,
+        'profile': SignedProfile(
+          record: copiedRecord,
+          signer: eve.publicBase64,
+          sig: eve.sign(profileRecordBytes(copiedRecord)),
+          first: eve.publicBase64,
+        ).toJson(),
+      }),
+    );
+    final wrapped = StringBuffer('Here is my card:\n');
+    for (var i = 0; i < card.length; i += 64) {
+      wrapped.writeln(card.substring(i, (i + 64).clamp(0, card.length)));
+    }
+
+    final steps = <Map<String, Object?>>[];
+    void step(String what, Map<String, Object?> op, Store store, Object? out) =>
+        steps.add({
+          'case': what,
+          ...op,
+          'out': out,
+          'people': _cardPeople(store),
+          'keys': {
+            for (final (key, value) in store.localSettingsWithPrefix('key:'))
+              key: value,
+          },
+        });
+    Map<String, Object?> opened(CardOpened o) => {
+      'taken': o.taken.name,
+      'id': o.id,
+      'offerBack': o.offerBack,
+    };
+    void open(String what, Store store, String text, {bool inPerson = false}) =>
+        step(
+          what,
+          {
+            'store': store == ada ? 'maker' : 'receiver',
+            'open': text,
+            'inPerson': inPerson,
+          },
+          store,
+          opened(store.openProfileCard(text, inPerson: inPerson)),
+        );
+    open(
+      'changed after it was signed',
+      ben,
+      '$profileCardLink${b64(utf8.encode(flagged))}.${parts[1]}',
+    );
+    open('signed by a key not bound', ben, unbound);
+    open('through a messenger', ben, card);
+    open('wrapped in text', ben, '$wrapped\u200B(see you).');
+    open(
+      'the card alone, scanned in person',
+      ben,
+      ' ${parts.join('.')} ',
+      inPerson: true,
+    );
+    open('a copied id', ben, copied, inPerson: true);
+    final full = ada.ownProfileForOthers;
+    step(
+      'her Profile with the picture',
+      {'store': 'receiver', 'take': full},
+      ben,
+      ben.takePerson(full).name,
+    );
+    open('the card after it', ben, back);
+    open('his own', ben, answer);
+    open('his answer', ada, answer);
+    ben.blockPerson(adaId);
+    step('blocked', {'store': 'receiver', 'block': adaId}, ben, null);
+    open('a blocked person\'s', ben, card);
+
+    _write(
+      File('${dir.path}/cards.json'),
+      '${_json.convert({'maker': makerSettings, 'receiver': receiverSettings, 'card': card, 'back': back, 'answer': answer, 'steps': steps})}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+  }
+}
+
 void _profilesFixture(Directory root) {
   final dir = Directory('${root.path}/profiles');
   final writer = SigningKey.fromSeed(_seed).publicKey;
@@ -4061,6 +4211,17 @@ Future<void> main(List<String> args) async {
     'taken by a Device that keeps one with what became of each and what '
     'it keeps after (`people`), and a Profile picture made here '
     '(`picture.jpg`).\n'
+    '- `cards/`: Profile cards (#107): Ada\'s Profile settings, with a '
+    'picture, and Ben\'s (`maker`, `receiver`, ids counted from 1); her card, '
+    'her card answering another and his answering hers, each as a link; '
+    'then, at a held clock, each step in turn: a card opened by Ben, or by '
+    'Ada for his answer (changed after it was signed, signed by a key its '
+    'Profile does not bind, wrapped in text, the card alone scanned in '
+    'person, a copied id under another first key, his own, hers after he '
+    'blocked her), Ben taking her Profile with its picture at the same '
+    'version, and his block, each with what came of it, the `person:` '
+    'settings after (a picture made again only noted) and the keys pinned '
+    '(`cards.json`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
     'joins the School Carol manages; Carol writes a Note with a photo and '
     'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '
@@ -4124,6 +4285,7 @@ Future<void> main(List<String> args) async {
   _sentFixture(root);
   await _backupFixture(root);
   _profilesFixture(root);
+  _cardsFixture(root);
   _versionsFixture(root);
   _blockFixture(root);
   _pendingFixture(root);

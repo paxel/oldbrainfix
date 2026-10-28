@@ -592,12 +592,16 @@ pub(crate) fn check(sent: &SignedProfile) -> Option<Checked> {
     })
 }
 
-/// Whether the record `a` replaces `b`: a higher version, or at the same
-/// version the larger bytes, so two Devices that changed it apart end up
-/// with the same one.
+/// Whether the record `a` replaces `b`: a higher version; at the same
+/// version one with a picture, so a card's record, which leaves the
+/// picture out (#107), gives way to the one it was made of; else the
+/// larger bytes, so two Devices that changed it apart end up with the
+/// same one.
 pub(crate) fn replaces(a: &str, pa: &Profile, b: &str, pb: &Profile) -> bool {
     if pa.version != pb.version {
         pa.version > pb.version
+    } else if pa.picture.is_some() != pb.picture.is_some() {
+        pa.picture.is_some()
     } else {
         a > b
     }
@@ -1660,6 +1664,24 @@ mod tests {
             OwnProfile::new(&phone).get()?.ok_or("a Profile")?.name,
             "Ada"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn changed_apart_at_the_same_version_the_one_with_a_picture_stays() -> TestResult {
+        let phone = device(1, "Pixel 7")?;
+        let desk = device(2, "Desk")?;
+        OwnProfile::new(&desk).rename("Ada")?;
+        exchange(&phone, &desk)?;
+        // "Bea" sorts after "Ada": the larger bytes alone would keep the
+        // phone's.
+        OwnProfile::new(&phone).rename("Bea")?;
+        OwnProfile::new(&desk).set_picture(square_picture(&halves(64, 64, ImageFormat::Png)))?;
+        exchange(&phone, &desk)?;
+        let kept = OwnProfile::new(&phone).get()?.ok_or("a Profile")?;
+        assert_eq!(kept.name, "Ada");
+        assert!(kept.picture.is_some());
+        assert_eq!(held(&phone)?, held(&desk)?);
         Ok(())
     }
 

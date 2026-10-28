@@ -26,7 +26,7 @@ It goes only where the backup key goes (ADR 0016): in the `POST /sync` body and 
 
 In every such session, and for every keys file it opens, a Device whose key is bound to its own Profile first binds the other Device's key to it, signed with its own: the session or the personal key shows that Device is one of the user's own. Then it takes the Profile sent:
 
-- The same id: the first key must be the same (a copied id with another key is refused); keys joined and aliases signed by a bound key are added; the record counts only when its signer is bound, and replaces the stored one when its version is higher, or at the same version when its bytes are larger, so two Devices that changed it apart end with the same one. A name or picture changed elsewhere counts as chosen here.
+- The same id: the first key must be the same (a copied id with another key is refused); keys joined and aliases signed by a bound key are added; the record counts only when its signer is bound, and replaces the stored one when its version is higher, or at the same version when it has a picture and the stored one none (#107), else when its bytes are larger, so two Devices that changed it apart end with the same one. A name or picture changed elsewhere counts as chosen here.
 - Another id that names this Device's id as its alias, signed by a key bound here: this Device takes it over.
 - Another id that this Device gave up: nothing changes, unless both gave each other up, answered apart; then the lower id stays on both.
 - Another id otherwise: a Device whose Profile still has the defaults takes over one that has none, without a question; when both have them, the lower id stays. When the user changed both, "Which one is you?" waits on both Devices, showing the two Profiles with picture, name and short code; on the phone it opens right after Pairing and stays on the Profile page, on the computer it opens over the window and stays on the Profile page when put off. The first answer settles it: keeping this Device's Profile makes the other id its alias, taking the other one over makes this one's id the other's alias; the next sync carries it, and the other Device then takes the kept Profile over or finds its own question answered.
@@ -107,3 +107,33 @@ Amended by ADR 0021 (#90): a blocked person's Profile is kept with its picture t
 ## A Device of one's own added at first start (#106)
 
 The first start asks first whether this is a new user, a Device of one's own being added, or a Backup being restored, and the Profile is made with the defaults only after the answer: at once for a new user, after the restore or the first sync otherwise, where it is already there and the defaults change nothing. A Device being added therefore holds no Profile when it pairs, and takes over the one the other Device sends in that first sync as a Device without a Profile does, whichever id is lower, with the backup key after it, as a joiner or as the host. Made at once, its fresh Profile would meet a Profile that is usually still on the defaults as well, and the lower of the two ids would stay, so in about half the cases the Device holding everything would take over the new Device's Profile and its name. A cancelled or failed Pairing leaves the Device without a Profile and back on the first screen.
+
+## Profile cards (#107)
+
+A person can add another without meeting them or a computer: each sends their own Profile card through any messenger, or shows it as a QR. Both cores make and open cards the same way (`profile_cards.dart`, `cards.rs`).
+
+A card is the link `https://paxel.github.io/oldbrainfix/p#<payload>.<signature>`, both parts base64url without padding; what follows the `#` never reaches a server. The payload is one JSON object, keys sorted and no spaces, the same bytes from both cores: `{"back":true,"format":1,"key":<key record>,"profile":<signed Profile>}`. `key` is the key record of the Device that made the card, with its X25519 key (ADR 0015); `profile` is the own Profile as it goes to other people, its record without the picture and signed again by that Device, with the binding and no aliases; `back` is there only on a card made to answer one the user opened. The signature is that Device's, over `oldbrainfix:profile-card:` followed by the payload as sent, so a card changed anywhere, its flag included, reads as no card. The picture stays out because a 256 × 256 JPEG does not fit a QR; a one-Device Profile with a 40-code-point name makes a link of under 1,300 characters.
+
+Opening a card (an App Link tapped, a QR scanned, a link pasted on the computer) reads only the printable ASCII of the text, takes what follows the last `#` up to the first character no card has, without a full stop after it, and reads at most 16 KiB of that. It then checks, before anything is kept: the key record is valid, its key made the card's signature, the Profile's own signatures hold, and its binding holds the card's key. The person is then taken in as another person's Profile is (#50), not verified, and the card's key is pinned on trust as any key a payload carries, so Sent Items to them are sealed for that Device (ADR 0015). Nothing is kept from a card of the user's own Profile, of a blocked person, or made by a Device a grant names for a blocked person (ADR 0021); a card naming an id kept here under another first key is refused, as a copied id is everywhere else. A card scanned in person marks the person verified at once, through the short code the card's first key gives, so a copied id verifies nobody; one opened from a link stays not verified until the user compares codes on their Profile. "Send yours back" is offered when the person was new here and the card is not itself an answer; the card sent back carries `back`, so the two do not ask each other again.
+
+A card adds a person and nothing else: no Area, no grant, no Pairing, no key but the public ones; neither `fresh` nor anything else only one's own Devices are told goes into it.
+
+At the same version, a record with a picture now replaces one without, before the larger bytes decide, for the own Profile and for other people alike. A card's record keeps the version of the record it was made of, and `"version"` sorts after `"picture"`, so by bytes alone the card's record would win over the full one wherever both arrive, and the picture would show nowhere until the next change.
+
+### Considered options
+
+- The picture in the card, or a hash of it (rejected: the picture does not fit a QR, and with no server a hash points nowhere; the full record arrives with the person's first Sent Item or Shared Area).
+- The card as JSON with its signature inside, `{"card":…,"sig":…}` like a Sent Item (rejected: the payload escaped inside a string, itself holding the record as an escaped string, makes the link longer; base64url of the bytes signed keeps them exact).
+- Compressing the payload (rejected: the two cores' deflate write other bytes, and the keys and signatures, most of the card, do not compress).
+- A short code in the card (rejected: it would be a claim nobody checks; it is computed from the id and the first key).
+- A local mark on a person taken from a card, as `stripped` marks a blocked one (rejected: it would not travel when the Profile goes on to one's own Devices; the rule on pictures does).
+
+### Consequences
+
+- A person added from a card shows the placeholder until their full Profile arrives with a Sent Item or a Shared Area.
+- Two of one's own Devices that changed the Profile apart at the same version, one the picture and one the name, now both keep the one with the picture.
+- Whoever holds a card can pass it on; it says only who the person is, and the receiver sees them as not verified.
+- Text after a link that starts with a letter or a digit, on the same line or the next, joins the card and makes it unreadable: blanks are left out because a mail program may break a long link, so they cannot mark where the card ends. The apps put the link last in what they share.
+- A Device whose key is not bound to its Profile yet, one that took a Profile over before the binding reached it, makes no card; the next sync with another of the user's Devices binds it.
+- The key a card pins goes out with every other pinned key in LAN sessions, as keys always have (ADR 0002): a person of a Shared Area who knows that Device's key can tell the user added its owner.
+- Each further Device in the binding adds about 270 characters to the link.

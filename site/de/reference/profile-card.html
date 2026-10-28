@@ -1,0 +1,36 @@
+<!-- page: title="Profilkarte" track="reference" order=4 summary="Was ein Profilkarten-Link enthält und wie er in Old Brain Fix eine Person unter Personen hinzufügt." -->
+<p class="lede">Eine Profilkarte ist das eigene Profil einer Person, als Link über einen beliebigen Messenger geschickt oder als QR-Code gezeigt. In Old Brain Fix geöffnet, fügt sie diese Person unter Personen hinzu. Die Karte ist der Teil des Links nach dem <code>#</code>.</p>
+
+<div id="profile-card" hidden>
+<p><strong>Die Karte in diesem Link</strong></p>
+<p>Am Computer kopierst du diesen Text und fügst ihn in der Desktop-App mit „Person über einen Link hinzufügen“ ein.</p>
+<textarea id="profile-card-text" class="card-text" rows="6" readonly spellcheck="false" aria-label="Profilkarte"></textarea>
+</div>
+
+<h2>Eine Karte öffnen</h2>
+<ul>
+  <li><strong>Auf einem Android-Handy</strong> mit Old Brain Fix öffnet ein Tippen auf den Link ihn in der App. Zeigt stattdessen der Browser diese Seite, kopierst du den Link, öffnest die App und fügst ihn unter Profil, Personen, „Person hinzufügen“ ein.</li>
+  <li><strong>Am Computer</strong> fügst du den Link in der Desktop-App mit „Person über einen Link hinzufügen“ ein.</li>
+  <li><strong>Vor Ort</strong> zeigt die andere Person auf ihrer Profilseite „Meinen QR-Code zeigen“, und du scannst ihn unter „Person hinzufügen“ mit „QR-Code der Person scannen“.</li>
+</ul>
+<p>Wer eine Karte öffnet, die neu für ihn ist, bekommt „Deins zurückschicken“ angeboten, das die eigene Karte mit einem Tippen schickt.</p>
+
+<h2>Was eine Karte enthält</h2>
+<ul>
+  <li>Den Namen der Person und die Kennung ihres Profils, ohne das Bild.</li>
+  <li>Die öffentlichen Schlüssel des Geräts, das die Karte gemacht hat, und der anderen Geräte der Person.</li>
+  <li>Eine Signatur dieses Geräts über alles davon; eine unterwegs veränderte Karte wird nicht angenommen.</li>
+</ul>
+<p>Eine Karte fügt eine Person hinzu und tut sonst nichts: Sie teilt keinen Bereich, keine Notizen und keinen privaten Schlüssel. Das Bild kommt mit der ersten gesendeten Notiz oder dem ersten geteilten Bereich der Person. Die Karte einer Person, die du blockiert hast, fügt nichts hinzu.</p>
+
+<h2>Bestätigt oder nicht</h2>
+<p>Eine über einen Link hinzugefügte Person zeigt auf ihrem Profil „Nicht bestätigt“, bis ihr beide den Code verglichen habt, etwa bei einem Anruf, und du ihn mit „Codes vergleichen“ bestätigst. Ein vor Ort gescannter QR-Code bestätigt die Person sofort.</p>
+
+<h2>Was diese Seite mit der Karte macht</h2>
+<p>Browser schicken den Teil eines Links nach dem <code>#</code> nicht an den Server. Diese Seite liest ihn nur im Browser, um ihn oben zu zeigen, und schickt ihn nirgendwohin.</p>
+
+<h2>Die App bekommen</h2>
+<ul>
+  <li><a href="https://play.google.com/store/apps/details?id=io.github.paxel.oldbrainfix">Old Brain Fix bei Google Play</a></li>
+  <li><a href="https://paxel.github.io/fdroid/">Das F-Droid-Repository</a>, das Old Brain Fix enthält</li>
+</ul>

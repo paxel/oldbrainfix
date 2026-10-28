@@ -10,6 +10,7 @@ import 'notes_screen.dart';
 import 'photo_platform.dart';
 import 'place_names.dart';
 import 'profile.dart';
+import 'profile_card.dart';
 import 'profile_platform.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
@@ -50,16 +51,27 @@ bool canOpenPerson(BuildContext context, String id) {
 /// Opens the Profile of the person [id]; nothing for the user's own, or
 /// outside the app.
 Future<void> openPerson(BuildContext context, String id) async {
+  final route = personRoute(context, id);
+  if (route == null) return;
+  await Navigator.of(context).push(route);
+}
+
+/// The route of the person [id]'s Profile, offering "Send yours back"
+/// with [offerBack]; null for the user's own, or outside the app.
+Route<void>? personRoute(
+  BuildContext context,
+  String id, {
+  bool offerBack = false,
+}) {
   final scope = PersonScope.of(context);
-  if (scope == null || scope.store.isOwnPerson(id)) return;
-  await Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => PersonScreen(
-        store: scope.store,
-        platform: scope.platform,
-        work: scope.work,
-        id: id,
-      ),
+  if (scope == null || scope.store.isOwnPerson(id)) return null;
+  return MaterialPageRoute<void>(
+    builder: (_) => PersonScreen(
+      store: scope.store,
+      platform: scope.platform,
+      work: scope.work,
+      id: id,
+      offerBack: offerBack,
     ),
   );
 }
@@ -135,7 +147,8 @@ Future<bool> _askBlock(
 /// their short code and whether the user compared it in person, with
 /// "Compare codes"; "Their Notes" (#53); then "Name and picture for
 /// me", the Override only the user sees, on their own Devices. The bar
-/// blocks them, or unblocks a blocked person (#90).
+/// blocks them, or unblocks a blocked person (#90). Just added from their
+/// Profile card, it offers "Send yours back" (#107).
 class PersonScreen extends StatefulWidget {
   final Store store;
   final ProfilePlatform platform;
@@ -144,12 +157,17 @@ class PersonScreen extends StatefulWidget {
   /// The person's Profile id.
   final String id;
 
+  /// Whether to offer sending the own Profile card back: they were just
+  /// added from a card that answers none of the user's.
+  final bool offerBack;
+
   const PersonScreen({
     super.key,
     required this.store,
     required this.platform,
     this.work = PictureWork.isolated,
     required this.id,
+    this.offerBack = false,
   });
 
   @override
@@ -170,6 +188,9 @@ class _PersonScreenState extends State<PersonScreen> {
   String? _code;
   var _verified = false;
   var _blocked = false;
+
+  /// Whether "Send yours back" shows: until the card went out once.
+  late var _offerBack = widget.offerBack;
 
   @override
   void initState() {
@@ -260,6 +281,19 @@ class _PersonScreenState extends State<PersonScreen> {
     }
     widget.store.verifyPerson(widget.id, code);
     setState(_read);
+  }
+
+  /// Shares the own Profile card back, marked as the answer, so the two
+  /// do not ask each other again; once handed over, the offer goes.
+  Future<void> _sendBack() async {
+    final sent = await sendProfileCard(
+      context,
+      widget.store,
+      widget.platform,
+      back: true,
+    );
+    if (!mounted || !sent) return;
+    setState(() => _offerBack = false);
   }
 
   /// Opens All Notes with only this person's Notes (#53).
@@ -418,6 +452,21 @@ class _PersonScreenState extends State<PersonScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
+              if (_offerBack && !blocked) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                  child: Text(t.personSendBackDetail(theirName)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: FilledButton.icon(
+                    key: const ValueKey('send-back'),
+                    onPressed: _sendBack,
+                    icon: const Icon(Icons.reply),
+                    label: Text(t.personSendBack),
+                  ),
+                ),
+              ],
               if (code != null)
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -505,8 +554,9 @@ class _PersonScreenState extends State<PersonScreen> {
   }
 }
 
-/// The People of the Profile page (#52): every Profile kept here, as
-/// the user sees them, each opening its Profile. The blocked people
+/// The People of the Profile page (#52): "Add a person" from their
+/// Profile card (#107), then every Profile kept here, as the user sees
+/// them, each opening its Profile. The blocked people
 /// (#90) are left out and listed in a folded "Blocked" section below,
 /// closed until opened; whether it is open is a setting of this Device.
 class PeopleSection extends StatefulWidget {
@@ -575,6 +625,17 @@ class _PeopleSectionState extends State<PeopleSection> {
     final blocked = _blocked;
     return SettingsSection(
       children: [
+        ListTile(
+          key: const ValueKey('addPerson'),
+          leading: const Icon(Icons.person_add_alt_1_outlined),
+          title: Text(t.personAdd),
+          subtitle: Text(t.personAddDetail),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => AddPersonScreen(store: widget.store),
+            ),
+          ),
+        ),
         if (people.isEmpty && blocked.isEmpty)
           ListTile(
             key: const ValueKey('peopleEmpty'),

@@ -81,7 +81,10 @@ fn the_profile_picture_sits_where_the_gear_was_and_opens_the_profile_page() -> T
     let top = |label: &str| harness.get_by_label_contains(label).rect().top();
     let order = [
         top("Change the picture"),
-        harness.get_by_role(Role::TextInput).rect().top(),
+        harness
+            .get_by_role_and_label(Role::TextInput, "Name")
+            .rect()
+            .top(),
         top(&code),
         top("Backups and recovery"),
         top("Your Devices"),
@@ -126,7 +129,9 @@ fn a_typed_name_is_kept_sanitised() -> TestResult {
     let mut app = App::new(store()?, "en");
     app.select(Selection::Profile);
     let mut harness = window(app);
-    harness.get_by_role(Role::TextInput).click();
+    harness
+        .get_by_role_and_label(Role::TextInput, "Name")
+        .click();
     harness.run();
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
     harness.run();
@@ -143,7 +148,9 @@ fn a_typed_name_is_kept_sanitised() -> TestResult {
     assert!(harness.query_all_by_value("Grace Hopper").next().is_some());
 
     // An empty name shows as "No name".
-    harness.get_by_role(Role::TextInput).click();
+    harness
+        .get_by_role_and_label(Role::TextInput, "Name")
+        .click();
     harness.run();
     harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
     harness.run();

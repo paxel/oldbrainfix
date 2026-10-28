@@ -207,6 +207,23 @@ pre code {
   overflow-wrap: normal;
 }
 
+/* The Profile card page: the card, for pasting into the desktop app. */
+.card-text {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 1.25rem;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--ink);
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
 blockquote {
   border-left: 3px solid var(--rule);
   padding-left: 1rem;

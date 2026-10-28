@@ -277,6 +277,23 @@ void main() {
       expect(held(phone), held(desk));
     });
 
+    test('changed apart at the same version, the one with a picture stays, '
+        'as other people keep it (#107)', () {
+      final clock = ticking();
+      final phone = device(clock, 'Pixel 7');
+      final desk = device(clock, 'Desk')..renameOwnProfile('Ada');
+      exchange(phone, desk);
+      // "Bea" sorts after "Ada": the larger bytes alone would keep the
+      // phone's.
+      phone.renameOwnProfile('Bea');
+      desk.setOwnProfilePicture(squareProfilePicture(halves(64, 64)));
+      expect(phone.ownProfile!.version, desk.ownProfile!.version);
+      exchange(phone, desk);
+      expect(phone.ownProfile!.name, 'Ada');
+      expect(phone.ownProfile!.picture, isNotNull);
+      expect(held(phone), held(desk));
+    });
+
     test('an update signed by a key not bound to the Profile is refused', () {
       final clock = ticking();
       final phone = device(clock, 'Pixel 7');

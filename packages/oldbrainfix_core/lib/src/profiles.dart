@@ -24,6 +24,7 @@ import 'sync.dart';
 part 'blocks.dart';
 part 'overrides.dart';
 part 'people.dart';
+part 'profile_cards.dart';
 
 /// Profiles (ADR 0017): every person has one, with an id, a name and a
 /// picture. This Device keeps the user's own as local settings, signed
@@ -639,11 +640,16 @@ int _compareAliases(ProfileAlias a, ProfileAlias b) {
   return byAlias != 0 ? byAlias : _compareUtf8(a.by, b.by);
 }
 
-/// Whether the record [a] replaces [b]: a higher version, or at the same
-/// version the larger bytes, so two Devices that changed it apart end up
-/// with the same one.
-bool _replaces(String a, Profile pa, String b, Profile pb) =>
-    pa.version != pb.version ? pa.version > pb.version : _compareUtf8(a, b) > 0;
+/// Whether the record [a] replaces [b]: a higher version; at the same
+/// version one with a picture, so a card's record, which leaves the
+/// picture out (#107), gives way to the one it was made of; else the
+/// larger bytes, so two Devices that changed it apart end up with the
+/// same one.
+bool _replaces(String a, Profile pa, String b, Profile pb) {
+  if (pa.version != pb.version) return pa.version > pb.version;
+  if ((pa.picture == null) != (pb.picture == null)) return pa.picture != null;
+  return _compareUtf8(a, b) > 0;
+}
 
 /// What became of a Profile another of the user's Devices sent.
 enum ProfileTaken {

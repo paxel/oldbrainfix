@@ -13,6 +13,7 @@ import 'l10n.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
 import 'profile.dart';
+import 'profile_card.dart';
 import 'settings_screen.dart';
 import 'sync_screen.dart';
 import 'system_bars.dart';
@@ -69,7 +70,8 @@ class PictureWork {
 }
 
 /// The Profile page (ADR 0017): the own Profile's picture, name and
-/// short code, then Backups and recovery, the user's Devices, People
+/// short code, "Send my Profile" and "Show my QR" (#107), then Backups
+/// and recovery, the user's Devices, People
 /// (#52), and the settings of this Device. Reached through the Profile picture in the
 /// Agenda's top corner, where the settings gear was.
 class ProfileScreen extends StatefulWidget {
@@ -256,6 +258,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
+                SettingsSection(
+                  children: [
+                    ListTile(
+                      key: const ValueKey('sendProfile'),
+                      leading: const Icon(Icons.share_outlined),
+                      title: Text(t.profileCardSend),
+                      subtitle: Text(t.profileCardSendDetail),
+                      onTap: () => unawaited(
+                        sendProfileCard(context, widget.store, model.platform),
+                      ),
+                    ),
+                    ListTile(
+                      key: const ValueKey('showProfileQr'),
+                      leading: const Icon(Icons.qr_code_2),
+                      title: Text(t.profileCardShowQr),
+                      subtitle: Text(t.profileCardShowQrDetail),
+                      onTap: () =>
+                          unawaited(showProfileQr(context, widget.store)),
+                    ),
+                  ],
+                ),
                 SettingsHeading(t.profileBackups),
                 SettingsSection(
                   children: [

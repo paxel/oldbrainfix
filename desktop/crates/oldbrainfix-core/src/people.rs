@@ -298,6 +298,26 @@ impl Store {
         }))
     }
 
+    /// The Devices pinned here whose keys the Profile of the person `id`
+    /// kept here binds, sorted: those a Sent Item to them is sealed for
+    /// when no Shared Area names their Devices, as for a person added
+    /// from a Profile card (#107).
+    pub fn pinned_devices_of(&self, id: &str) -> Result<Vec<String>> {
+        let resolved = self.resolve_person(id)?;
+        let index = self.people_index()?;
+        let Some(held) = index.by_id.get(&resolved) else {
+            return Ok(Vec::new());
+        };
+        let mut out: Vec<String> = self
+            .pinned_keys()?
+            .into_iter()
+            .filter(|k| held.bound.contains(&BASE64.encode(&k.record.public_key)))
+            .map(|k| k.record.device)
+            .collect();
+        out.sort();
+        Ok(out)
+    }
+
     /// Every Profile of another person kept here, by id.
     pub fn kept_people(&self) -> Result<Vec<Profile>> {
         Ok(self
