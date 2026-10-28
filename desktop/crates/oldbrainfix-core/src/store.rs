@@ -172,10 +172,13 @@ impl RefusalMark {
             .iter()
             .map(|r| serde_json::json!({"from": r.from, "scope": r.scope, "to": r.to}))
             .collect();
-        let mut json = serde_json::json!({ "runs": runs });
-        if self.released {
-            json["released"] = serde_json::json!(true);
-        }
+        // Built in key order: a workspace build turns on serde_json's
+        // preserve_order, which keeps keys as inserted.
+        let json = if self.released {
+            serde_json::json!({ "released": true, "runs": runs })
+        } else {
+            serde_json::json!({ "runs": runs })
+        };
         json.to_string()
     }
 
