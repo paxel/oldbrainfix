@@ -20,6 +20,7 @@ const AUTOSTART_OFF: &str = "autostartOff";
 const LAST_FIRED: &str = "lastFired";
 const CAPTURE_HOTKEY: &str = "captureHotkey";
 const PLAYBACK_SPEED: &str = "playbackSpeed";
+const ALARM_SOUND: &str = "alarmSound";
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
@@ -194,6 +195,24 @@ impl<'a> DeviceSettings<'a> {
         self.store.set_local_setting(CAPTURE_HOTKEY, chord)
     }
 
+    /// The sound file this Device rings every Occurrence with, as chosen;
+    /// `None` for the app's own sound. Escalation keeps the system alarm
+    /// sound either way.
+    pub fn alarm_sound(&self) -> Result<Option<String>> {
+        Ok(self
+            .store
+            .local_setting(ALARM_SOUND)?
+            .filter(|sound| !sound.trim().is_empty()))
+    }
+
+    /// `None` or blank goes back to the app's own sound.
+    pub fn set_alarm_sound(&self, sound: Option<&str>) -> Result<()> {
+        match sound.filter(|sound| !sound.trim().is_empty()) {
+            Some(sound) => self.store.set_local_setting(ALARM_SOUND, sound),
+            None => self.store.remove_local_setting(ALARM_SOUND),
+        }
+    }
+
     /// How fast this Device plays voice recordings: one of
     /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. The one
     /// Device setting a Backup carries (ADR 0016).
@@ -278,6 +297,26 @@ mod tests {
         assert_eq!(settings.missed_seen()?, Some(now));
         settings.set_missed_seen(None)?;
         assert_eq!(settings.missed_seen()?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn occurrences_ring_with_the_own_sound_until_one_is_chosen() -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        assert_eq!(settings.alarm_sound()?, None);
+        let chosen = "/home/someone/Music/bell.ogg";
+        settings.set_alarm_sound(Some(chosen))?;
+        assert_eq!(settings.alarm_sound()?.as_deref(), Some(chosen));
+        assert_eq!(store.local_setting(ALARM_SOUND)?.as_deref(), Some(chosen));
+        settings.set_alarm_sound(Some("  "))?;
+        assert_eq!(settings.alarm_sound()?, None);
+        assert_eq!(store.local_setting(ALARM_SOUND)?, None);
+        settings.set_alarm_sound(Some(chosen))?;
+        settings.set_alarm_sound(None)?;
+        assert_eq!(settings.alarm_sound()?, None);
+        store.set_local_setting(ALARM_SOUND, "")?;
+        assert_eq!(settings.alarm_sound()?, None);
         Ok(())
     }
 

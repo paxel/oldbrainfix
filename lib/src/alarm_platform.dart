@@ -188,6 +188,10 @@ class Ringing {
   int get hashCode => Object.hash(routineId, occurrenceKey, title, body);
 }
 
+/// The sound picked for Occurrences to ring with: its URI, null for
+/// the app's own sound (#102).
+typedef PickedSound = ({String? sound});
+
 /// The seam to the platform's alarm layer (android/…/Scheduler.kt).
 /// Widget tests hand in a fake.
 abstract interface class AlarmPlatform {
@@ -199,13 +203,14 @@ abstract interface class AlarmPlatform {
   /// [changes], replacing everything armed before, and takes away the
   /// notifications of the Occurrences in [done], given as Routine id and
   /// Occurrence, and the Nudge's or the Changes Nudge's when there is
-  /// none.
+  /// none. Occurrences ring with [sound], null for the app's own.
   Future<void> arm(
     List<ArmedAlarm> alarms,
     AlarmLabels labels, {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
+    String? sound,
   });
 
   /// Whether the Nudge's notification was tapped since this was last
@@ -245,6 +250,11 @@ abstract interface class AlarmPlatform {
   /// Asks for [permission] or opens its system settings page; the answer
   /// shows in [permissions] once the user is back.
   Future<void> request(AlarmPermission permission);
+
+  /// Opens the system's sound picker under [title], [current] marked
+  /// (null for the app's own sound); null when it was left without a
+  /// choice.
+  Future<PickedSound?> pickSound(String? current, String title);
 }
 
 /// No alarm layer: the default where none is handed in.
@@ -261,6 +271,7 @@ class NoAlarms implements AlarmPlatform {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
+    String? sound,
   }) async {}
 
   @override
@@ -295,6 +306,9 @@ class NoAlarms implements AlarmPlatform {
 
   @override
   Future<void> request(AlarmPermission permission) async {}
+
+  @override
+  Future<PickedSound?> pickSound(String? current, String title) async => null;
 }
 
 /// Chaos Alert's Kotlin alarm layer behind the app's method channel.
@@ -318,6 +332,7 @@ class AndroidAlarms implements AlarmPlatform {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
+    String? sound,
   }) => _channel.invokeMethod('arm', {
     'alarms': [
       for (final ArmedAlarm(:alarm, :title, :body) in alarms)
@@ -352,6 +367,7 @@ class AndroidAlarms implements AlarmPlatform {
         },
     ],
     'labels': labels.toMap(),
+    'sound': sound,
     'done': [
       for (final (routine, occurrence) in done)
         {'routine': routine, 'occurrence': occurrence.key},
@@ -473,6 +489,17 @@ class AndroidAlarms implements AlarmPlatform {
   @override
   Future<void> request(AlarmPermission permission) =>
       _channel.invokeMethod('request', permission.name);
+
+  @override
+  Future<PickedSound?> pickSound(String? current, String title) async {
+    final raw = await _channel.invokeMapMethod<String, Object?>('pickSound', {
+      'current': current,
+      'title': title,
+    });
+    if (raw == null) return null;
+    final sound = raw['sound'];
+    return (sound: sound is String ? sound : null);
+  }
 
   static AlarmAction? _action(Map<Object?, Object?> m) {
     final seq = m['seq'];

@@ -1372,6 +1372,17 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wie oft ein unbeachteter Alarm erneut klingelt, wenn seine Routine keinen eigenen Abstand hat.';
 
   @override
+  String get alarmSound => 'Alarmton';
+
+  @override
+  String get alarmSoundOwn =>
+      'Der eigene Klang von Old Brain Fix. Tippen, um einen anderen Ton des Telefons zu wählen.';
+
+  @override
+  String get alarmSoundChosen =>
+      'Ein Ton des Telefons. Tippen, um einen anderen oder den eigenen Klang von Old Brain Fix zu wählen.';
+
+  @override
   String get settingsNudges => 'Stupser';
 
   @override

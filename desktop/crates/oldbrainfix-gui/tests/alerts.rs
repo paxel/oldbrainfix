@@ -1,9 +1,10 @@
 //! The desktop's alarm layer over the Dart core's `routines` fixture
 //! log, on a European wall clock and a clock the test moves: what shows
-//! when, Re-nag, Escalation, the Nudge in and out of Quiet Hours, Done and
-//! Snooze from a notification, alerts off, the one Catch-up
-//! Notification after the app was not running, and the Changes Nudge for
-//! a person synced by bundles (#109).
+//! when, the alarm sound the app rings itself (#102), Re-nag, Escalation,
+//! the Nudge in and out of Quiet Hours, Done and Snooze from a
+//! notification, alerts off, the one Catch-up Notification after the app
+//! was not running, and the Changes Nudge for a person synced by bundles
+//! (#109).
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -21,6 +22,7 @@ use oldbrainfix_gui::alerts::{
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::notify::{Recorded, RecordingNotifier};
+use oldbrainfix_gui::ring::{OWN_SOUND, RecordingRinger};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -148,6 +150,95 @@ fn an_occurrence_rings_renags_escalates_and_stops_when_done() -> TestResult {
     clock.set("2026-10-26T07:25:01.000Z")?;
     alerts.tick(&store, &berlin)?;
     assert!(shown(&record.take()).iter().all(|n| n.key != key));
+    Ok(())
+}
+
+/// A mono 16-bit WAV of a tenth of a second of 440 Hz.
+fn tone_wav() -> Vec<u8> {
+    let samples: Vec<i16> = (0..800)
+        .map(|i| ((i as f32 * 440.0 * std::f32::consts::TAU / 8000.0).sin() * 8000.0) as i16)
+        .collect();
+    let data = (samples.len() * 2) as u32;
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&8000u32.to_le_bytes());
+    out.extend_from_slice(&16000u32.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data.to_le_bytes());
+    for sample in samples {
+        out.extend_from_slice(&sample.to_le_bytes());
+    }
+    out
+}
+
+#[test]
+fn an_occurrence_rings_the_alarm_sound_itself_with_a_silent_notification() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let ringer = RecordingRinger::default();
+    let mut alerts = alerts(&record);
+    alerts.set_ringer(Box::new(ringer.clone()));
+    let pills = pills(&store)?;
+    let eight = Occurrence::new(Day::new(2026, 10, 26), ClockTime::new(8, 0));
+    let key = occurrence_key(&pills, &eight);
+    // 08:00 on a fresh install: a silent notification, and the app rings
+    // its own chime once for the tick.
+    clock.set("2026-10-26T07:00:05.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let rang = record.take();
+    let notice = shown(&rang)
+        .into_iter()
+        .find(|n| n.key == key)
+        .ok_or("the pills rang")?;
+    assert!(notice.silent && !notice.urgent);
+    // The Nudge and the other notifications keep their own sound.
+    assert!(
+        shown(&rang)
+            .iter()
+            .filter(|n| !n.key.contains('@'))
+            .all(|n| !n.silent)
+    );
+    assert_eq!(ringer.take(), [OWN_SOUND.to_vec()]);
+    // A sound file chosen rings at the Re-nag.
+    let dir = tempfile::tempdir()?;
+    let bell = dir.path().join("bell.wav");
+    std::fs::write(&bell, tone_wav())?;
+    DeviceSettings::new(&store).set_alarm_sound(bell.to_str())?;
+    clock.set("2026-10-26T07:05:01.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    assert!(
+        shown(&record.take())
+            .iter()
+            .any(|n| n.key == key && n.silent)
+    );
+    assert_eq!(ringer.take(), [tone_wav()]);
+    // The file gone: the own chime rings in its place.
+    std::fs::remove_file(&bell)?;
+    clock.set("2026-10-26T07:10:01.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    assert!(shown(&record.take()).iter().any(|n| n.key == key));
+    assert_eq!(ringer.take(), [OWN_SOUND.to_vec()]);
+    // Escalated at 08:20: urgent with the system's alarm sound; the app
+    // rings only for another Occurrence still ringing silently.
+    clock.set("2026-10-26T07:20:01.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let escalated = record.take();
+    let notice = shown(&escalated)
+        .into_iter()
+        .find(|n| n.key == key)
+        .ok_or("the pills escalated")?;
+    assert!(notice.urgent && !notice.silent);
+    assert_eq!(
+        !ringer.take().is_empty(),
+        shown(&escalated).iter().any(|n| n.silent)
+    );
     Ok(())
 }
 

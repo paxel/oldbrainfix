@@ -51,6 +51,9 @@ class FakeAlarms implements AlarmPlatform {
   /// The Changes Nudge armed last; null when none was.
   ArmedChangesNudge? changes;
 
+  /// The sound armed last; null for the app's own.
+  String? sound;
+
   @override
   Future<void> arm(
     List<ArmedAlarm> alarms,
@@ -58,8 +61,10 @@ class FakeAlarms implements AlarmPlatform {
     List<(String, Occurrence)> done = const [],
     ArmedNudge? nudge,
     ArmedChangesNudge? changes,
+    String? sound,
   }) async {
     armed = alarms;
+    this.sound = sound;
     this.nudge = nudge;
     this.changes = changes;
     this.labels = labels;
@@ -174,5 +179,17 @@ class FakeAlarms implements AlarmPlatform {
   Future<void> request(AlarmPermission permission) async {
     requested.add(permission);
     if (grantOnRequest) granted[permission] = true;
+  }
+
+  /// What the sound picker answers; null leaves it without a choice.
+  PickedSound? soundPicked;
+
+  /// The sounds the picker was opened on, null for the app's own.
+  final pickedFrom = <String?>[];
+
+  @override
+  Future<PickedSound?> pickSound(String? current, String title) async {
+    pickedFrom.add(current);
+    return soundPicked;
   }
 }

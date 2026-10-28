@@ -46,6 +46,7 @@ use oldbrainfix_gui::login;
 use oldbrainfix_gui::media::{MicRecorder, SpeakerPlayer, SystemClipboard};
 use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
+use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::tray::{self, Command};
@@ -418,6 +419,7 @@ fn run() -> Result<i32, String> {
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
+        alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
         let wake_window = waker(&window);
         std::thread::spawn(move || {

@@ -22,7 +22,8 @@ import 'speech_platform.dart';
 import 'system_bars.dart';
 
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme; the alarm setup and the default Re-nag interval; the
+/// page: the theme; the alarm setup, the default Re-nag interval and the
+/// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; the calendar mirror; the App Lock and
 /// the Area Locks; whether Streaks show; and About. Each is a local
@@ -50,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late ThemeChoice _theme = widget.store.themeChoice;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
+  late String? _sound = widget.store.alarmSound;
 
   void _setTheme(ThemeChoice choice) {
     widget.store.themeChoice = choice;
@@ -60,6 +62,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setRenag(Duration interval) {
     widget.store.renagInterval = interval;
     setState(() => _renag = interval);
+    unawaited(widget.alarms.refresh());
+  }
+
+  /// Opens the system's sound picker; leaving it changes nothing.
+  Future<void> _pickSound() async {
+    final picked = await widget.alarms.platform.pickSound(
+      _sound,
+      context.t.alarmSound,
+    );
+    if (picked == null || !mounted) return;
+    widget.store.alarmSound = picked.sound;
+    setState(() => _sound = widget.store.alarmSound);
     unawaited(widget.alarms.refresh());
   }
 
@@ -152,6 +166,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
+                if (widget.alarms.platform.available)
+                  ListTile(
+                    key: const ValueKey('alarmSound'),
+                    leading: const Icon(Icons.music_note_outlined),
+                    title: Text(t.alarmSound),
+                    subtitle: Text(
+                      _sound == null ? t.alarmSoundOwn : t.alarmSoundChosen,
+                    ),
+                    onTap: _pickSound,
+                  ),
               ],
             ),
             SettingsHeading(t.settingsNudges),

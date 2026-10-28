@@ -273,7 +273,7 @@ impl Player for SpeakerPlayer {
 /// The recording `bytes` as the speakers play it: through rodio's own
 /// decoders, or, for what they cannot decode, such as Ogg Opus, decoded
 /// whole by oldbrainfix-whisper; `None` when neither can.
-fn playable(bytes: Vec<u8>) -> Option<Box<dyn rodio::Source + Send>> {
+pub(crate) fn playable(bytes: Vec<u8>) -> Option<Box<dyn rodio::Source + Send>> {
     match rodio::Decoder::new(Cursor::new(bytes.clone())) {
         Ok(decoder) => Some(Box::new(decoder)),
         Err(_) => {

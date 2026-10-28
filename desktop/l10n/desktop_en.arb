@@ -304,5 +304,17 @@
   "syncPausedError": "Sync is paused while an AI Task is open or waits for review. Finish it with 'Done, review' in the Settings and accept or reject its changes, then try again.",
   "@syncPausedError": {"description": "Where a sync, a bundle, a shared Area or a sent Note was refused because an AI Task is open or waits for its review."},
   "frogsEmptyDesk": "No open Frogs. \"Frog\" under \"Routines and Reminders\" in a Note's editor makes one.",
-  "@frogsEmptyDesk": {"description": "The desktop's Frog view without open Frogs; a Frog is made in the Note editor there, not on the card."}
+  "@frogsEmptyDesk": {"description": "The desktop's Frog view without open Frogs; a Frog is made in the Note editor there, not on the card."},
+  "alarmSoundOwn": "Old Brain Fix's own chime.",
+  "@alarmSoundOwn": {"description": "Desktop wording of the phone's text: the alarm sound in use when no file is chosen."},
+  "alarmSoundFile": "The sound file {file}.",
+  "@alarmSoundFile": {"description": "In the desktop's Settings: the alarm sound file in use, by its name.", "placeholders": {"file": {"type": "String"}}},
+  "alarmSoundUnplayable": "This file cannot be read or played right now, so Old Brain Fix's own chime rings instead.",
+  "@alarmSoundUnplayable": {"description": "In the desktop's Settings, under a chosen alarm sound file that is gone or no sound the desktop can play."},
+  "alarmSoundPick": "Choose a sound file…",
+  "@alarmSoundPick": {"description": "In the desktop's Settings: opens the system's dialog to choose the alarm sound file; also the dialog's title."},
+  "alarmSoundUseOwn": "Use the own chime",
+  "@alarmSoundUseOwn": {"description": "In the desktop's Settings: goes back from a chosen sound file to Old Brain Fix's own chime."},
+  "alarmSoundDetail": "Every Routine and Reminder rings with it on this computer; Old Brain Fix plays it itself and their notifications stay silent. An escalated alarm rings with the system's alarm sound.",
+  "@alarmSoundDetail": {"description": "In the desktop's Settings, under the alarm sound choice."}
 }

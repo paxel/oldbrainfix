@@ -86,9 +86,9 @@ jobs:
         run: |
           desktop/packaging/flatpak/cargo-sources.sh
           git diff --exit-code -- desktop/packaging/flatpak/cargo-sources.json
-      - name: Metainfo and What's-new tools — unit tests
+      - name: Metainfo, What's-new and alarm sound tools — unit tests
         working-directory: tool
-        run: python3 -m unittest test_whats_new test_metainfo
+        run: python3 -m unittest test_whats_new test_metainfo test_alarm_sound
       - name: Render the files as Flathub gets them
         run: |
           ver=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *//; s/\+.*//')

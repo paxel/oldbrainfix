@@ -1364,6 +1364,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'How often an ignored alarm rings again, unless its Routine has its own interval.';
 
   @override
+  String get alarmSound => 'Alarm sound';
+
+  @override
+  String get alarmSoundOwn =>
+      'Old Brain Fix\'s own chime. Tap to choose another sound of the phone.';
+
+  @override
+  String get alarmSoundChosen =>
+      'A sound of the phone. Tap to choose another, or Old Brain Fix\'s own chime.';
+
+  @override
   String get settingsNudges => 'Nudges';
 
   @override

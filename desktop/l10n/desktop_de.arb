@@ -174,5 +174,11 @@
   "aiInTrash": "Im Papierkorb",
   "aiNotInTrash": "Nicht im Papierkorb",
   "syncPausedError": "Die Synchronisierung ist pausiert, solange eine KI-Aufgabe offen ist oder auf Prüfung wartet. Beende sie mit „Fertig, prüfen“ in den Einstellungen, nimm ihre Änderungen an oder lehne sie ab und versuche es dann noch einmal.",
-  "frogsEmptyDesk": "Keine offenen Frösche. „Frosch“ unter „Routinen und Erinnerungen“ im Editor einer Notiz macht einen."
+  "frogsEmptyDesk": "Keine offenen Frösche. „Frosch“ unter „Routinen und Erinnerungen“ im Editor einer Notiz macht einen.",
+  "alarmSoundOwn": "Der eigene Klang von Old Brain Fix.",
+  "alarmSoundFile": "Die Tondatei {file}.",
+  "alarmSoundUnplayable": "Diese Datei lässt sich gerade nicht lesen oder abspielen, deshalb klingelt der eigene Klang von Old Brain Fix.",
+  "alarmSoundPick": "Tondatei wählen…",
+  "alarmSoundUseOwn": "Eigenen Klang verwenden",
+  "alarmSoundDetail": "Damit klingeln alle Routinen und Erinnerungen auf diesem Computer; Old Brain Fix spielt ihn selbst ab, und ihre Benachrichtigungen bleiben stumm. Ein eskalierter Alarm klingelt mit dem Alarmton des Systems."
 }

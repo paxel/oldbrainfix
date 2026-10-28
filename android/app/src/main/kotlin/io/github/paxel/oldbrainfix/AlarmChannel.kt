@@ -25,6 +25,7 @@ object AlarmChannel {
                     channelJson(args["done"]) as JSONArray,
                     channelJson(args["nudge"]) as JSONObject?,
                     channelJson(args["changes"]) as JSONObject?,
+                    args["sound"] as String?,
                 )
                 result.success(null)
             }

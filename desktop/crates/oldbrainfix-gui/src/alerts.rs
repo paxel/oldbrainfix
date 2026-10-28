@@ -2,8 +2,9 @@
 //! with the core's alarm plan, done while the app runs, also with the
 //! window closed into the tray. Every tick shows what came due since the
 //! last one as a notification (an Occurrence, its Re-nags, a snooze, the
-//! Nudge, the Changes Nudge), escalated ones urgent and with sound, and
-//! closes the notifications of Occurrences Done meanwhile, and the
+//! Nudge, the Changes Nudge), escalated ones urgent and with the
+//! system's alarm sound, the others of an Occurrence silent while the app
+//! rings its alarm sound itself (#102), and closes the notifications of Occurrences Done meanwhile, and the
 //! Changes Nudge's once nobody waits. What became Missed while the app
 //! was not running is told in one Catch-up Notification, never rung
 //! late. Done and the snoozes tapped on a notification come back as
@@ -26,6 +27,7 @@ use oldbrainfix_core::{
 
 use crate::l10n::{L10n, names_text, wordless};
 use crate::profile_view::display_name;
+use crate::ring::{Ringer, alarm_sound};
 use crate::schedule_text::occurrence_time;
 
 /// An alarm that came due this long before a tick still shows; older
@@ -48,8 +50,11 @@ pub struct Notice {
     pub key: String,
     pub title: String,
     pub body: String,
-    /// Escalated: urgent and with sound.
+    /// Escalated: urgent and with the system's alarm sound.
     pub urgent: bool,
+    /// Without the notification's own sound: the app rings an
+    /// Occurrence's alarm sound itself (#102).
+    pub silent: bool,
     /// The buttons it offers, by id ([`DONE`], [`SNOOZE_10`], ...) and
     /// label.
     pub actions: Vec<(String, String)>,
@@ -174,6 +179,9 @@ pub struct Alerts {
     /// Raised by a click on the Changes Nudge: the window is to send each
     /// person waiting their bundle.
     changes_wanted: Arc<AtomicBool>,
+    /// Plays the alarm sound of an Occurrence that rings; without one
+    /// nothing plays.
+    ringer: Option<Box<dyn Ringer>>,
 }
 
 impl Alerts {
@@ -186,7 +194,14 @@ impl Alerts {
             changed,
             open_requested: false,
             changes_wanted: Arc::new(AtomicBool::new(false)),
+            ringer: None,
         }
+    }
+
+    /// Plays the alarm sound of each Occurrence that rings through
+    /// `ringer`.
+    pub fn set_ringer(&mut self, ringer: Box<dyn Ringer>) {
+        self.ringer = Some(ringer);
     }
 
     /// Raises `wanted` when the Changes Nudge is clicked, for the window
@@ -267,9 +282,16 @@ impl Alerts {
         };
         let after = fired.filter(|f| *f <= now).map_or(after, |f| after.max(f));
         let mut showed = false;
+        let mut ring = false;
         for alarm in due(&plan, after, now) {
-            self.show_alarm(alarm, now);
+            ring |= self.show_alarm(alarm, now);
             showed = true;
+        }
+        if ring && let Some(ringer) = &mut self.ringer {
+            // Unreadable, it rings the own sound: an alarm never stays
+            // silent over a setting.
+            let chosen = settings.alarm_sound().ok().flatten();
+            ringer.ring(alarm_sound(chosen.as_deref()).0);
         }
         if let Some(nudge) = &nudge
             && nudge.fires_after(after, wall) <= now
@@ -325,13 +347,17 @@ impl Alerts {
             title: t.catch_up_title().into(),
             body,
             urgent: false,
+            silent: false,
             actions: vec![(OPEN.into(), t.tray_open().into())],
         });
         self.shown.insert(CATCH_UP_KEY.into());
         Ok(())
     }
 
-    fn show_alarm(&mut self, alarm: &PlannedAlarm, now: DateTime<Utc>) {
+    /// Shows `alarm`'s notification; true when the app is to ring its
+    /// alarm sound for it, false when it escalated and the system's
+    /// alarm sound rings.
+    fn show_alarm(&mut self, alarm: &PlannedAlarm, now: DateTime<Utc>) -> bool {
         let t = self.t;
         let title = first_line(alarm.text.as_deref()).unwrap_or_else(|| {
             if alarm.text.is_none() {
@@ -348,17 +374,20 @@ impl Alerts {
             (SNOOZE_60, t.snooze60()),
             (OPEN, t.tray_open()),
         ];
+        let urgent = escalates(alarm, now);
         self.notifier.show(&Notice {
             key: key.clone(),
             title,
             body: occurrence_time(&t, &alarm.occurrence),
-            urgent: escalates(alarm, now),
+            urgent,
+            silent: !urgent,
             actions: actions
                 .iter()
                 .map(|(id, label)| (id.to_string(), label.to_string()))
                 .collect(),
         });
         self.shown.insert(key);
+        !urgent
     }
 
     fn show_nudge(&mut self, nudge: &PlannedNudge) {
@@ -374,6 +403,7 @@ impl Alerts {
             title: t.nudge_title(nudge.count() as i64),
             body: t.nudge_body().into(),
             urgent: false,
+            silent: false,
             actions: actions
                 .iter()
                 .map(|(id, label)| (id.to_string(), label.to_string()))
@@ -400,6 +430,7 @@ impl Alerts {
             title: t.changes_nudge_title(&names_text(&t, &names)),
             body: t.changes_nudge_body().into(),
             urgent: false,
+            silent: false,
             actions: vec![(OPEN.into(), t.send_action().into())],
         });
         self.shown.insert(CHANGES_KEY.into());
@@ -581,8 +612,8 @@ mod tests {
             wordless: Wordless::Photo,
             ..voice.clone()
         };
-        alerts.show_alarm(&voice, now);
-        alerts.show_alarm(&photo, now);
+        assert!(alerts.show_alarm(&voice, now));
+        assert!(alerts.show_alarm(&photo, now));
         let titles: Vec<String> = notifier
             .take()
             .into_iter()
@@ -592,6 +623,31 @@ mod tests {
             })
             .collect();
         assert_eq!(titles, ["Sprachaufnahme", "Foto"]);
+        Ok(())
+    }
+
+    #[test]
+    fn an_escalated_alarm_leaves_its_sound_to_the_system() -> oldbrainfix_core::Result<()> {
+        let notifier = crate::notify::RecordingNotifier::default();
+        let changed = Arc::new(AtomicU64::new(0));
+        let mut alerts = Alerts::new(Box::new(notifier.clone()), L10n::new("en"), changed);
+        let a = alarm(
+            "2026-01-01T09:00:00.000Z",
+            "2026-01-01T12:00:00.000Z",
+            Some(2),
+        )?;
+        assert!(alerts.show_alarm(&a, parse_time("2026-01-01T09:00:00.000Z")?));
+        assert!(!alerts.show_alarm(&a, parse_time("2026-01-01T09:30:00.000Z")?));
+        let sounds: Vec<(bool, bool)> = notifier
+            .take()
+            .into_iter()
+            .filter_map(|r| match r {
+                crate::notify::Recorded::Shown(notice) => Some((notice.urgent, notice.silent)),
+                crate::notify::Recorded::Closed(_) => None,
+            })
+            .collect();
+        // Silent while the app rings; urgent with the system's sound.
+        assert_eq!(sounds, [(false, true), (true, false)]);
         Ok(())
     }
 

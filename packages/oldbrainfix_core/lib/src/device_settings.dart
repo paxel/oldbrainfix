@@ -24,6 +24,7 @@ extension DeviceSettings on Store {
   static const _bluetoothContext = 'bluetoothContext';
   static const _streaksOff = 'streaksOff';
   static const _playbackSpeed = 'playbackSpeed';
+  static const _alarmSound = 'alarmSound';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -64,6 +65,19 @@ extension DeviceSettings on Store {
   bool get alarmSetupDone => localSetting(_alarmSetupDone) == 'true';
 
   set alarmSetupDone(bool done) => setLocalSetting(_alarmSetupDone, '$done');
+
+  /// The sound this Device rings every Occurrence with, as the system's
+  /// sound picker named it; null for the app's own sound. Escalation
+  /// keeps the system alarm sound either way.
+  String? get alarmSound {
+    final sound = localSetting(_alarmSound);
+    return sound == null || sound.trim().isEmpty ? null : sound;
+  }
+
+  /// Null or blank goes back to the app's own sound.
+  set alarmSound(String? sound) => sound == null || sound.trim().isEmpty
+      ? removeLocalSetting(_alarmSound)
+      : setLocalSetting(_alarmSound, sound);
 
   /// How often an ignored Occurrence fires again, unless its Routine has
   /// its own interval.

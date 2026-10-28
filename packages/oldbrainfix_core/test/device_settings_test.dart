@@ -68,6 +68,25 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test("Occurrences ring with the app's own sound until one is chosen", () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.alarmSound, isNull);
+    const chosen = 'content://media/internal/audio/media/42';
+    store.alarmSound = chosen;
+    expect(store.alarmSound, chosen);
+    expect(store.localSetting('alarmSound'), chosen);
+    store.alarmSound = '  ';
+    expect(store.alarmSound, isNull);
+    expect(store.localSetting('alarmSound'), isNull);
+    store.alarmSound = chosen;
+    store.alarmSound = null;
+    expect(store.alarmSound, isNull);
+    store.setLocalSetting('alarmSound', '');
+    expect(store.alarmSound, isNull);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('Re-nag every 10 min until this Device sets its own interval', () {
     final store = Store.inMemory();
     addTearDown(store.close);

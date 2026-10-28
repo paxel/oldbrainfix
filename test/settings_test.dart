@@ -207,7 +207,70 @@ void main() {
       await tester.pumpAndSettle();
       await openDeviceSettings(tester);
       expect(find.text('Set up alarms'), findsNothing);
+      expect(find.byKey(const ValueKey('alarmSound')), findsNothing);
       expect(find.byKey(const ValueKey('renagDevice')), findsOneWidget);
+    });
+
+    group('the alarm sound', () {
+      const bell = 'content://media/internal/audio/media/42';
+      final tile = find.byKey(const ValueKey('alarmSound'));
+
+      testWidgets('is the app\'s own until another is picked, which is kept '
+          'on this Device and armed', (tester) async {
+        await start(tester);
+        expect(alarms.sound, isNull, reason: 'the own sound');
+        await openDeviceSettings(tester);
+        expect(
+          find.descendant(
+            of: tile,
+            matching: find.textContaining('own chime. Tap'),
+          ),
+          findsOneWidget,
+        );
+
+        alarms.soundPicked = (sound: bell);
+        await tap(tester, tile);
+        expect(alarms.pickedFrom, [null]);
+        expect(store.alarmSound, bell);
+        expect(alarms.sound, bell);
+        expect(
+          find.descendant(
+            of: tile,
+            matching: find.textContaining('A sound of the phone'),
+          ),
+          findsOneWidget,
+        );
+        expect(store.allEntries(), isEmpty, reason: 'never synced');
+      });
+
+      testWidgets('goes back to the app\'s own with the picker\'s default', (
+        tester,
+      ) async {
+        store.alarmSound = bell;
+        await start(tester);
+        expect(alarms.sound, bell);
+        await openDeviceSettings(tester);
+
+        alarms.soundPicked = (sound: null);
+        await tap(tester, tile);
+        expect(alarms.pickedFrom, [bell]);
+        expect(store.alarmSound, isNull);
+        expect(alarms.sound, isNull);
+      });
+
+      testWidgets('stays as it was when the picker is left', (tester) async {
+        store.alarmSound = bell;
+        await start(tester);
+        await openDeviceSettings(tester);
+        final arms = alarms.arms;
+
+        alarms.soundPicked = null;
+        await tap(tester, tile);
+        expect(alarms.pickedFrom, [bell]);
+        expect(store.alarmSound, bell);
+        expect(alarms.sound, bell);
+        expect(alarms.arms, arms, reason: 'nothing to arm anew');
+      });
     });
 
     testWidgets('and About fit a phone in German', (tester) async {

@@ -20,7 +20,6 @@ import android.os.Build
  * broadcast, so it works from the lock screen without opening the app.
  */
 object Notifications {
-    private const val CHANNEL = "occurrences"
     private const val ESCALATED_CHANNEL = "escalated"
     private const val RING_CHANNEL = "ringing"
     private const val NUDGE_CHANNEL = "nudges"
@@ -258,17 +257,18 @@ object Notifications {
         manager.notify(AlarmPlan.notificationId(alarm.routine, alarm.occurrence), notification)
     }
 
+    /** An Occurrence's notification, ringing with the chosen sound (#102). */
     private fun builder(context: Context): Notification.Builder =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL, Scheduler.label(context, "channel"), NotificationManager.IMPORTANCE_HIGH),
-            )
-            Notification.Builder(context, CHANNEL)
+            Notification.Builder(context, SoundChannel.id(context))
         } else {
+            val sound = SoundChannel.sound(context)
+            SoundChannel.grant(context, sound)
             @Suppress("DEPRECATION")
             Notification.Builder(context)
                 .setPriority(Notification.PRIORITY_HIGH)
-                .setDefaults(Notification.DEFAULT_ALL)
+                .setSound(Uri.parse(sound), SoundChannel.attributes)
+                .setDefaults(Notification.DEFAULT_VIBRATE or Notification.DEFAULT_LIGHTS)
         }
 
     /** The high-priority channel an escalated alarm falls back to, with the alarm sound. */

@@ -50,6 +50,9 @@ impl Notifier for DesktopNotifier {
         if notice.urgent {
             n.urgency(Urgency::Critical).sound_name(ALARM_SOUND);
         }
+        if notice.silent {
+            n.hint(Hint::SuppressSound(true));
+        }
         let held = self.ids.get(&notice.key).cloned();
         if let Some((id, _)) = &held {
             n.id(*id);
@@ -113,6 +116,8 @@ impl Notifier for DesktopNotifier {
         n.summary(&notice.title)
             .body(&notice.body)
             .appname(oldbrainfix_core::APP_NAME);
+        // Without a sound name a toast and a macOS notification stay
+        // silent, as a `silent` notice is to.
         if notice.urgent {
             n.sound_name("Default");
         }

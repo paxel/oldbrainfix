@@ -93,6 +93,7 @@ use crate::media_view::{self, Generated, Offers, Photo, PhotoCache, Recording, S
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
+use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::speech::SpeechModel;
@@ -580,6 +581,8 @@ enum Action {
     DeleteFrog,
     RestoreFrog(String),
     Setting(Setting),
+    /// Asks the system's dialog for the sound file Occurrences ring with.
+    PickAlarmSound,
     Sync(SyncAction),
     /// Imports the bundle file dropped onto the window or handed over,
     /// or shows the preview of the Sent Item.
@@ -708,6 +711,9 @@ enum Setting {
     Quiet(QuietHours),
     /// The capture popup's key chord, as the settings show it.
     Hotkey(String),
+    /// The sound file Occurrences ring with; `None` for the app's own
+    /// (#102).
+    AlarmSound(Option<String>),
 }
 
 /// The wall clock the window shows days on.
@@ -855,6 +861,11 @@ pub struct App {
     ai_port: Option<AiPort>,
     /// The client whose config was copied last while the port is open.
     ai_copied: Option<Client>,
+    /// Asks the system's dialog for an alarm sound file, titled as given.
+    sound_picker: FolderPicker,
+    /// The alarm sound file last looked at and whether it rings or the
+    /// own chime rings in its place, decoded once per file chosen.
+    sound_rung: Option<(String, Rung)>,
 }
 
 /// Makes or fills in the own Profile in a store with this computer's
@@ -918,6 +929,13 @@ fn files_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
         .set_title(title)
         .add_filter(title, &both)
+}
+
+/// The open dialog's filter for an alarm sound.
+fn sound_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(title, &SOUND_EXTENSIONS)
 }
 
 /// The save dialog's filter for the Recovery Sheet.
@@ -1023,6 +1041,8 @@ impl App {
             profile_defaults: Box::new(login::apply_system_defaults),
             ai_port: None,
             ai_copied: None,
+            sound_picker: Box::new(|title| sound_dialog(title).pick_file()),
+            sound_rung: None,
         };
         app.hotkey_text = DeviceSettings::new(&app.store)
             .capture_hotkey()
@@ -1071,6 +1091,12 @@ impl App {
     /// dialog; tests hand in a path.
     pub fn set_model_picker(&mut self, picker: FolderPicker) {
         self.model_picker = picker;
+    }
+
+    /// Asks `picker` for the alarm sound file instead of the system's
+    /// dialog; tests hand in a path.
+    pub fn set_sound_picker(&mut self, picker: FolderPicker) {
+        self.sound_picker = picker;
     }
 
     /// Hands in the dialogs asking where to save a bundle and which one
@@ -2733,6 +2759,12 @@ impl App {
             }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
             Action::Setting(setting) => self.set(setting)?,
+            Action::PickAlarmSound => {
+                if let Some(path) = (self.sound_picker)(self.t.alarm_sound_pick()) {
+                    let path = path.to_string_lossy().into_owned();
+                    self.set(Setting::AlarmSound(Some(path)))?;
+                }
+            }
             Action::Sync(SyncAction::Trust(trust)) => {
                 if self.sync.answer(&self.store, trust, &self.sync_name) {
                     // A Moment and the new entries: read again below.
@@ -3226,6 +3258,7 @@ impl App {
                     hotkey.borrow_mut().rebind(&chord);
                 }
             }
+            Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
         }
         Ok(())
     }
@@ -5531,8 +5564,8 @@ impl App {
     }
 
     /// This Device's settings (ADR 0008): its notifications and login
-    /// start, its Re-nag interval, and the Nudges' repeat and Quiet
-    /// Hours.
+    /// start, its Re-nag interval and alarm sound, and the Nudges' repeat
+    /// and Quiet Hours.
     fn settings_pane(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let text = ui.visuals().text_color();
@@ -5552,6 +5585,20 @@ impl App {
         let quiet = settings
             .quiet_hours()
             .unwrap_or(oldbrainfix_core::settings::DEFAULT_QUIET_HOURS);
+        // Unreadable, the own chime rings (alerts.rs).
+        let sound = settings.alarm_sound().ok().flatten();
+        let sound_rung = match &sound {
+            None => None,
+            // Looked for every frame: a file deleted or a drive taken
+            // out shows at once.
+            Some(path) if !std::path::Path::new(path).exists() => Some(Rung::Own),
+            Some(path) => {
+                if self.sound_rung.as_ref().is_none_or(|(of, _)| of != path) {
+                    self.sound_rung = Some((path.clone(), ring::alarm_sound(Some(path)).1));
+                }
+                self.sound_rung.as_ref().map(|(_, rung)| *rung)
+            }
+        };
         ui.heading(RichText::new(t.settings_title()).color(text));
         ui.label(RichText::new(t.settings_intro()).color(weak));
         ui.add_space(8.0);
@@ -5625,6 +5672,7 @@ impl App {
                         actions.push(Action::Setting(Setting::Renag(m)));
                     });
                     ui.label(RichText::new(t.settings_renag_detail()).small().color(weak));
+                    alarm_sound_choice(ui, &t, sound.as_deref(), sound_rung, actions);
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.settings_nudges()).strong().color(text));
@@ -6963,6 +7011,54 @@ fn quick_capture_card(
         ui.label(RichText::new(line).small().color(weak));
     }
     ui.label(RichText::new(t.capture_command()).small().color(weak));
+}
+
+/// The Settings' alarm sound (#102): the own chime or the file chosen,
+/// by its name, and whether that file plays (`rung`), with the choice of
+/// another file and the way back to the own chime.
+fn alarm_sound_choice(
+    ui: &mut Ui,
+    t: &L10n,
+    sound: Option<&str>,
+    rung: Option<Rung>,
+    actions: &mut Vec<Action>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.alarm_sound()).color(text));
+    match sound {
+        None => {
+            ui.label(RichText::new(t.alarm_sound_own()).color(text));
+        }
+        Some(path) => {
+            let name = std::path::Path::new(path)
+                .file_name()
+                .map_or_else(|| path.into(), |n| n.to_string_lossy());
+            ui.label(RichText::new(t.alarm_sound_file(&name)).color(text))
+                .on_hover_text(path);
+            if rung == Some(Rung::Own) {
+                ui.label(
+                    RichText::new(t.alarm_sound_unplayable()).color(ui.visuals().error_fg_color),
+                );
+            }
+        }
+    }
+    ui.horizontal_wrapped(|ui| {
+        if ui
+            .button(RichText::new(t.alarm_sound_pick()).color(text))
+            .clicked()
+        {
+            actions.push(Action::PickAlarmSound);
+        }
+        if sound.is_some()
+            && ui
+                .button(RichText::new(t.alarm_sound_use_own()).color(text))
+                .clicked()
+        {
+            actions.push(Action::Setting(Setting::AlarmSound(None)));
+        }
+    });
+    ui.label(RichText::new(t.alarm_sound_detail()).small().color(weak));
 }
 
 /// The Nudge repeats offered, in minutes (the phone's choices).

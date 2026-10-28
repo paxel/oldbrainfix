@@ -2210,6 +2210,24 @@ abstract class AppLocalizations {
   /// **'How often an ignored alarm rings again, unless its Routine has its own interval.'**
   String get settingsRenagDetail;
 
+  /// No description provided for @alarmSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarm sound'**
+  String get alarmSound;
+
+  /// No description provided for @alarmSoundOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix\'s own chime. Tap to choose another sound of the phone.'**
+  String get alarmSoundOwn;
+
+  /// No description provided for @alarmSoundChosen.
+  ///
+  /// In en, this message translates to:
+  /// **'A sound of the phone. Tap to choose another, or Old Brain Fix\'s own chime.'**
+  String get alarmSoundChosen;
+
   /// No description provided for @settingsNudges.
   ///
   /// In en, this message translates to:

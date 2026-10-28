@@ -32,8 +32,9 @@ object Scheduler {
     const val EXTRA_ARMED = "oldbrainfix.armed"
 
     /**
-     * Keeps [plan], the [nudge], the Changes Nudge [changes] and the
-     * notification [labels], and arms them. The notifications of what is
+     * Keeps [plan], the [nudge], the Changes Nudge [changes], the
+     * notification [labels] and the [sound] Occurrences ring with (null
+     * for the app's own), and arms them. The notifications of what is
      * [done] go away, and so does a full-screen alarm the plan no longer
      * escalates, the Nudge's once nothing is Unsorted, and the Changes
      * Nudge's once nobody waits for changes.
@@ -44,7 +45,8 @@ object Scheduler {
         labels: JSONObject,
         done: JSONArray,
         nudge: JSONObject?,
-        changes: JSONObject? = null,
+        changes: JSONObject?,
+        sound: String?,
     ) {
         val edit = prefs(context).edit()
             .putString(KEY_PLAN, plan.toString())
@@ -54,6 +56,7 @@ object Scheduler {
         edit.commit()
         if (nudge == null) Notifications.cancelNudge(context)
         if (changes == null) Notifications.cancelChangesNudge(context)
+        SoundChannel.choose(context, sound)
         arm(context)
         RingService.ringing?.let { ringing ->
             if (!AlarmPlan.keepsRinging(alarms(context), ringing.routine, ringing.occurrence)) {

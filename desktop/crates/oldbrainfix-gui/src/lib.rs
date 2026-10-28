@@ -38,6 +38,7 @@ pub mod notify;
 pub mod person_view;
 pub mod popup;
 pub mod profile_view;
+pub mod ring;
 pub mod routine_editor;
 pub mod schedule_text;
 pub mod speech;

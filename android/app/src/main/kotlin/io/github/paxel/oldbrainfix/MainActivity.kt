@@ -6,6 +6,8 @@ import android.app.ApplicationExitInfo
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
@@ -69,6 +71,9 @@ class MainActivity : FlutterActivity() {
 
     /** The answer to the bundle's "pick", until the file picker comes back. */
     private var bundleAnswer: MethodChannel.Result? = null
+
+    /** The answer to the alarm sound's "pickSound", until the sound picker comes back. */
+    private var soundAnswer: MethodChannel.Result? = null
 
     /** The answer to the bundle's "share", until the user is back from the share chooser. */
     private var shareAnswer: MethodChannel.Result? = null
@@ -457,6 +462,10 @@ class MainActivity : FlutterActivity() {
                         Permissions.request(this@MainActivity, call.arguments as String)
                         result.success(null)
                     }
+                    "pickSound" -> {
+                        val args = call.arguments as Map<*, *>
+                        pickSound(result, args["current"] as String?, args["title"] as String)
+                    }
                     else -> if (!AlarmChannel.handle(this@MainActivity, call, result)) result.notImplemented()
                 }
             }
@@ -591,6 +600,30 @@ class MainActivity : FlutterActivity() {
         pictureAnswer = result
     }
 
+    /**
+     * Opens the system's sound picker for the alarm sound (#102), with
+     * ringtones, alarm and notification sounds, the app's own as its
+     * default, and no silence; the answer comes in [onActivityResult].
+     */
+    private fun pickSound(result: MethodChannel.Result, current: String?, title: String) {
+        val own = Uri.parse(SoundChannel.ownSound(this))
+        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALL)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI, own)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, current?.let(Uri::parse) ?: own)
+            .putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, title)
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQUEST_SOUND)
+        } catch (_: ActivityNotFoundException) {
+            return result.success(null)
+        }
+        soundAnswer?.success(null)
+        soundAnswer = result
+    }
+
     /** Opens the system's file picker for a bundle to import; the answer comes in [onActivityResult]. */
     private fun pickBundle(result: MethodChannel.Result) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
@@ -651,6 +684,17 @@ class MainActivity : FlutterActivity() {
             val uri = data?.data
             if (resultCode != Activity.RESULT_OK || uri == null) return answer.success(null)
             return inBackground(answer) { Bundles.copy(this, uri) }
+        }
+        if (requestCode == REQUEST_SOUND) {
+            val answer = soundAnswer ?: return
+            soundAnswer = null
+            val picked = if (resultCode == Activity.RESULT_OK && data != null) {
+                @Suppress("DEPRECATION")
+                data.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)?.toString()
+            } else {
+                null
+            }
+            return answer.success(SoundChannel.picked(picked, SoundChannel.ownSound(this)))
         }
         if (requestCode == REQUEST_PICTURE) {
             val answer = pictureAnswer ?: return
@@ -858,6 +902,7 @@ class MainActivity : FlutterActivity() {
         private const val REQUEST_BLUETOOTH = 11
         private const val REQUEST_MICROPHONE = 12
         private const val REQUEST_CALENDAR_MIRROR = 13
+        private const val REQUEST_SOUND = 14
         private var active: MainActivity? = null
 
         /** Marks the launch from the full-screen alarm's notification. */

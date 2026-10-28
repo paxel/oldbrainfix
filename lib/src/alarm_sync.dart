@@ -254,7 +254,9 @@ class AlarmSync extends ChangeNotifier {
             body: t.changesNudgeBody,
             public: t.changesNudgePublic,
           );
+    final sound = store.alarmSound;
     final signature = [
+      'sound $sound',
       for (final a in armed) '${a.alarm}|${a.title}|${a.body}',
       for (final (routine, occurrence) in done) 'done $routine@$occurrence',
       if (nudge != null) '${nudge.nudge}|${nudge.title}|${nudge.body}',
@@ -285,6 +287,7 @@ class AlarmSync extends ChangeNotifier {
       done: done,
       nudge: nudge,
       changes: changes,
+      sound: sound,
     );
   }
 
