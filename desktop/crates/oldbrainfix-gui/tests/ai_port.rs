@@ -42,7 +42,8 @@ fn window(app: App) -> Harness<'static, App> {
             },
             app,
         );
-    harness.run();
+    // An open port repaints every 100 ms, so steps, not run().
+    harness.run_steps(4);
     harness
 }
 
@@ -63,7 +64,8 @@ fn click(harness: &mut Harness<'_, App>, label: &str) {
         Some(node) => node.click_accesskit(),
         None => panic!("no {label}"),
     }
-    harness.run();
+    // An open port repaints every 100 ms, so steps, not run().
+    harness.run_steps(4);
 }
 
 /// The AI Task the open port writes into.
@@ -230,7 +232,8 @@ fn a_bundle_is_refused_while_a_task_waits_and_says_why() -> TestResult {
         path: Some(Path::new("changes.obfsync").to_path_buf()),
         ..Default::default()
     }];
-    harness.run();
+    // An open port repaints every 100 ms, so steps, not run().
+    harness.run_steps(4);
     assert_eq!(harness.state().notice(), Some(t.sync_paused_error()));
     // Said at the top, the standing banner back once it is clicked away.
     assert!(shows(&harness, t.sync_paused_error()));
