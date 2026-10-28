@@ -1109,7 +1109,11 @@ fn transcribing_again_without_a_text_is_announced_at_the_top() -> TestResult {
     harness.get_by_label(announced).click();
     harness.run();
     assert!(shows(&harness, "Recording not transcribed"));
-    assert!(shows(&harness, "Whisper made no text from this recording."));
+    // Cause and fix are one line.
+    assert!(shows(
+        &harness,
+        "Whisper made no text from this recording. The file stays on the Note; try again later."
+    ));
     // What was there before stays.
     let section = Notes::new(&store)
         .by_id("note:0000000000000000000000000000000a")?
