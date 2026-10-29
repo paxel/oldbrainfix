@@ -17,6 +17,7 @@ import 'sent_items.dart' show SenderTrust;
 import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
+import 'tallies.dart';
 import 'sync.dart';
 
 /// Sharing an Area with a person from afar (#108, ADR 0023): someone in
@@ -658,7 +659,9 @@ List<Entry> _inArea(Store store, String area, List<Entry> entries) {
       if ((e.entity.startsWith('section:') && e.field == SectionKeys.note ||
               e.entity.startsWith('routine:') && e.field == RoutineKeys.note ||
               e.entity.startsWith(FrogKeys.prefix) &&
-                  e.field == FrogKeys.note) &&
+                  e.field == FrogKeys.note ||
+              e.entity.startsWith(TallyKeys.entryPrefix) &&
+                  e.field == TallyKeys.note) &&
           notes.contains(e.value))
         e.entity,
   };

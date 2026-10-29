@@ -2,7 +2,7 @@
 //! core's signed, append-only entry log (ADR 0002) and of what the
 //! screens read from it and write to it, Notes with their Sections, Areas
 //! and Topics, Routines and Reminders with the alarm plan, the Nudge and
-//! the Missed Summary, Frogs with today's pick, this Device's settings, and the question marks of
+//! the Missed Summary, Frogs with today's pick, Tallies with their entries and charts, this Device's settings, and the question marks of
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
@@ -51,6 +51,8 @@ pub mod shared;
 pub mod signing;
 pub mod store;
 pub mod sync;
+pub mod tallies;
+pub mod tally_units;
 pub mod text_format;
 pub mod transcript_prompts;
 
@@ -81,6 +83,8 @@ pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, Store};
 pub use sync::Moment;
+pub use tallies::{Tallies, Tally, TallyBucket, TallyEntry, TallyField, TallyPeriod};
+pub use tally_units::{TallyRule, UnitKind, UnitSystem};
 pub use text_format::StoredText;
 pub use transcript_prompts::TranscriptPrompts;
 

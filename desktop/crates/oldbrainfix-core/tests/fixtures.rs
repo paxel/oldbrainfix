@@ -2,8 +2,9 @@
 //! (`packages/oldbrainfix_core/tool/gen_fixtures.dart`); this core must
 //! read every log the same, sign every entry the same, and write every
 //! scenario again to the same log, byte for byte. Schedules, the alarm
-//! plan, the Missed Summary, the Nudge and the Frogs offered must come to
-//! the same on the same European wall clock, Europe/Berlin here.
+//! plan, the Missed Summary, the Nudge, the Frogs offered and the charts
+//! of Tallies must come to the same on the same European wall clock,
+//! Europe/Berlin here.
 
 use std::path::{Path, PathBuf};
 
@@ -17,18 +18,21 @@ use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
+use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Frog, Frogs, Importance, Note, Notes,
     NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines,
-    STARTER_SET, Schedule, Search, Section, SigningKey, SimpleRepeat, Store, WireEntry, dart_iso,
-    parse_time,
+    STARTER_SET, Schedule, Search, Section, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry,
+    TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 9] = [
-    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "trash",
+const SCENARIOS: [&str; 10] = [
+    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "tallies",
+    "trash",
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
@@ -833,7 +837,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 9] = [
+    let writers: [(&str, Writer); 10] = [
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
@@ -842,6 +846,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("places", write_places),
         ("routines", write_routines),
         ("sections", write_sections),
+        ("tallies", write_tallies),
         ("trash", write_trash),
     ];
     assert_eq!(writers.map(|(s, _)| s), SCENARIOS);
@@ -1219,6 +1224,320 @@ fn frogs_and_todays_pick_come_to_what_the_dart_core_says() -> TestResult {
     }
     assert_eq!(json!(sections), expected["today"]);
     assert_eq!(store.all_entries()?.len(), before, "today writes nothing");
+    Ok(())
+}
+
+// -------------------------------------------------------------- Tallies
+
+fn utc_at(
+    y: i32,
+    m: u32,
+    d: u32,
+    h: u32,
+    min: u32,
+) -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+    Ok(Utc
+        .with_ymd_and_hms(y, m, d, h, min, 0)
+        .single()
+        .ok_or("a valid date")?)
+}
+
+/// Values by field id.
+fn by_field(pairs: &[(&String, f64)]) -> BTreeMap<String, f64> {
+    pairs.iter().map(|(k, v)| ((*k).clone(), *v)).collect()
+}
+
+/// The generator's `tallies` scenario.
+fn write_tallies(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let tallies = Tallies::new(store);
+    let imperial = UnitSystem::Imperial;
+    let gym = notes.capture("Gym", None, None)?.id;
+    let reps = tallies.add_field(&gym, "Push-ups", "times", Some(20.0), None)?;
+    let bench = tallies.add_field(
+        &gym,
+        "Bench press",
+        "kg",
+        Some(tally_units::to_base(135.0, "kg", imperial)),
+        None,
+    )?;
+    let run = tallies.add_field(&gym, "Run", "km", None, Some(TallyRule::Max))?;
+    let wall = tallies.add_field(&gym, "Wall sit", "min", Some(60.0), None)?;
+    let temp = tallies.add_field(&gym, "Water", "°C", None, None)?;
+    tallies.add(
+        &gym,
+        &by_field(&[(&reps, 20.0), (&bench, 60.0)]),
+        "Morning",
+        Some(utc(2025, 12, 29, 7)?),
+    )?;
+    tallies.add(
+        &gym,
+        &by_field(&[
+            (&reps, 15.0),
+            (&bench, 62.5),
+            (&run, tally_units::to_base(3.1, "km", imperial)),
+            (&temp, tally_units::to_base(-4.5, "°C", UnitSystem::Metric)),
+        ]),
+        "",
+        Some(utc_at(2025, 12, 31, 23, 30)?),
+    )?;
+    let targets = tallies.by_note(&gym)?.ok_or("a Tally")?.targets();
+    tallies.add(&gym, &targets, "", None)?;
+    let evening = tallies.add(
+        &gym,
+        &by_field(&[(&reps, 30.0), (&run, 4000.0)]),
+        "Evening with Tom",
+        Some(utc_at(2026, 1, 1, 22, 59)?),
+    )?;
+    let changed = BTreeMap::from([
+        (reps.clone(), Some(25.0)),
+        (run.clone(), None),
+        (wall.clone(), Some(45.0)),
+    ]);
+    tallies.edit_entry(
+        &evening.id,
+        &changed,
+        Some("Evening"),
+        Some(utc_at(2026, 1, 1, 23, 1)?),
+    )?;
+    let same = BTreeMap::from([(reps.clone(), Some(25.0))]);
+    tallies.edit_entry(&evening.id, &same, Some("Evening"), None)?;
+    let wrong = tallies.add(&gym, &by_field(&[(&reps, 999.0)]), "", None)?;
+    tallies.trash_entry(&wrong.id)?;
+    let back = tallies.add(&gym, &by_field(&[(&reps, 5.0)]), "Stairs", None)?;
+    tallies.trash_entry(&back.id)?;
+    tallies.restore_entry(&back.id)?;
+    tallies.add(
+        &gym,
+        &by_field(&[(&reps, 40.0)]),
+        "Planned",
+        Some(utc(2026, 1, 10, 8)?),
+    )?;
+    tallies.rename_field(&gym, &reps, "Push-ups")?;
+    tallies.rename_field(&gym, &reps, "Press-ups")?;
+    tallies.set_unit(&gym, &bench, "g")?;
+    tallies.set_target(&gym, &wall, None)?;
+    tallies.set_rule(&gym, &run, TallyRule::Sum)?;
+    tallies.hide_field(&gym, &temp)?;
+    tallies.hide_field(&gym, &wall)?;
+    tallies.restore_field(&gym, &wall)?;
+    let reading = notes.capture("Reading", None, None)?.id;
+    let pages = tallies.add_field(&reading, "Pages", "pages", None, None)?;
+    tallies.add(
+        &reading,
+        &by_field(&[(&pages, 12.0)]),
+        "",
+        Some(utc(2025, 11, 30, 21)?),
+    )?;
+    let evenings = notes.capture("Evenings", None, None)?.id;
+    notes.merge(&reading, &evenings)?;
+    tallies.add(&evenings, &by_field(&[(&pages, 8.0)]), "Novel", None)?;
+    let steps = notes.capture("Steps", None, None)?.id;
+    let count = tallies.add_field(&steps, "Steps", "steps", None, None)?;
+    tallies.add(&steps, &by_field(&[(&count, 8000.0)]), "", None)?;
+    notes.trash(&steps)?;
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
+/// A number as the side file holds it: as the log keeps it, or null.
+fn tally_number(value: Option<f64>) -> Value {
+    json!(value.and_then(tally_units::encode_number))
+}
+
+fn tally_entry_json(store: &Store, e: &TallyEntry) -> Result<Value, Box<dyn std::error::Error>> {
+    let values: serde_json::Map<String, Value> = e
+        .values
+        .iter()
+        .map(|(id, v)| (id.clone(), tally_number(Some(*v))))
+        .collect();
+    Ok(json!({
+        "id": e.id,
+        "noteId": e.note_id,
+        "at": dart_iso(e.at),
+        "values": values,
+        "line": e.line,
+        "trashed": iso(e.trashed),
+        "author": store.author_of(&e.id)?.map(|p| p.id),
+    }))
+}
+
+/// The generator's `_units`.
+fn units_json() -> Value {
+    const VALUES: [f64; 7] = [-40.0, 0.0, 1.0, 2.5, 135.0, 1234.5678, 3725.4];
+    const TYPED: [&str; 13] = [
+        "1:30",
+        "1,5",
+        "-4",
+        "12",
+        "0.25",
+        "1:75",
+        "2:00:00",
+        "-0:30",
+        "abc",
+        "1e3",
+        "",
+        "1.",
+        "1000000001",
+    ];
+    let number = |v: f64| json!(tally_units::encode_number(v));
+    let mut units = Vec::new();
+    for unit in KNOWN.iter().map(|k| k.code).chain(["pages"]) {
+        for system in UnitSystem::ALL {
+            let kind = tally_units::kind_of(unit);
+            units.push(json!({
+                "unit": unit,
+                "system": system.name(),
+                "kind": kind.name(),
+                "rule": tally_units::default_rule(kind).name(),
+                "shownUnit": tally_units::shown_unit(unit, system),
+                "toBase": VALUES.iter().map(|v| number(tally_units::to_base(*v, unit, system))).collect::<Vec<_>>(),
+                "fromBase": VALUES.iter().map(|v| number(tally_units::from_base(*v, unit, system))).collect::<Vec<_>>(),
+                "shown": VALUES.iter().map(|v| tally_units::format_shown(*v, unit, system, ",")).collect::<Vec<_>>(),
+                "read": TYPED.iter().map(|t| json!(tally_units::parse_shown(t, unit, system).and_then(tally_units::encode_number))).collect::<Vec<_>>(),
+            }));
+        }
+    }
+    let kept = [
+        20.0,
+        -3.5,
+        0.1 + 0.2,
+        5.0 * 1609.344,
+        0.0000004,
+        0.0000006,
+        -0.0000006,
+        1e9,
+        1e9 + 1.0,
+        f64::NAN,
+    ];
+    let read_back = [
+        "8046.72",
+        "-3.5",
+        "0",
+        "-0",
+        "1.",
+        "01",
+        "1.50",
+        "1e3",
+        " 1",
+        "1.0000001",
+        "1000000000.000001",
+        "1000000000",
+        "",
+    ];
+    let regions: serde_json::Map<String, Value> = ["US", "us", "LR", "MM", "GB", "DE", ""]
+        .iter()
+        .map(|r| {
+            (
+                r.to_string(),
+                json!(tally_units::system_for_region(Some(r)).name()),
+            )
+        })
+        .collect();
+    json!({
+        "units": units,
+        "kept": kept.iter().map(|v| number(*v)).collect::<Vec<_>>(),
+        "readBack": read_back.iter().map(|t| json!(tally_units::decode_micro(Some(t)))).collect::<Vec<_>>(),
+        "regions": regions,
+    })
+}
+
+#[test]
+fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("tallies").join("tallies.json"))?;
+    let read_at = read_json(&fixtures().join("tallies").join("expected.json"))?;
+    let store = load("tallies", read_at["now"].as_str().ok_or("now")?)?;
+    let tallies = Tallies::new(&store);
+    let mut note_ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
+    note_ids.sort();
+    let mut every = serde_json::Map::new();
+    let mut entries = serde_json::Map::new();
+    let mut mine = serde_json::Map::new();
+    let mut removed = serde_json::Map::new();
+    let me = PersonFilter {
+        me: true,
+        ..PersonFilter::default()
+    };
+    for id in &note_ids {
+        let Some(tally) = tallies.by_note(id)? else {
+            continue;
+        };
+        let fields: Vec<Value> = tally
+            .fields
+            .iter()
+            .map(|f| {
+                json!({
+                    "id": f.id,
+                    "noteId": f.note_id,
+                    "name": f.name,
+                    "unit": f.unit,
+                    "kind": f.kind().name(),
+                    "target": tally_number(f.target),
+                    "rule": f.rule.name(),
+                    "hidden": f.hidden,
+                    "hasEntries": f.has_entries,
+                    "added": dart_iso(f.added),
+                })
+            })
+            .collect();
+        every.insert(id.clone(), json!(fields));
+        let mut listed = Vec::new();
+        for e in tallies.entries(id, &PersonFilter::default())? {
+            listed.push(tally_entry_json(&store, &e)?);
+        }
+        entries.insert(id.clone(), json!(listed));
+        let own: Vec<String> = tallies
+            .entries(id, &me)?
+            .into_iter()
+            .map(|e| e.id)
+            .collect();
+        mine.insert(id.clone(), json!(own));
+        let mut gone = Vec::new();
+        for e in tallies.removed_entries(id)? {
+            gone.push(tally_entry_json(&store, &e)?);
+        }
+        removed.insert(id.clone(), json!(gone));
+    }
+    assert_eq!(Value::Object(every), expected["tallies"]);
+    let all: Vec<String> = tallies.all()?.into_iter().map(|t| t.note_id).collect();
+    assert_eq!(json!(all), expected["all"]);
+    assert_eq!(Value::Object(entries), expected["entries"]);
+    assert_eq!(Value::Object(mine), expected["mine"]);
+    assert_eq!(Value::Object(removed), expected["removed"]);
+    let before = store.all_entries()?.len();
+    let mut charts = serde_json::Map::new();
+    for tally in tallies.all()? {
+        let mut by_field = serde_json::Map::new();
+        for field in &tally.fields {
+            let mut by_period = serde_json::Map::new();
+            for period in TallyPeriod::ALL {
+                let bars: Vec<Value> = tallies
+                    .chart(
+                        &tally.note_id,
+                        &field.id,
+                        period,
+                        &berlin,
+                        &PersonFilter::default(),
+                    )?
+                    .into_iter()
+                    .map(|b| {
+                        json!({
+                            "start": b.start.to_string(),
+                            "end": b.end.to_string(),
+                            "value": tally_number(b.value),
+                            "entries": b.entries,
+                        })
+                    })
+                    .collect();
+                by_period.insert(period.name().to_string(), json!(bars));
+            }
+            by_field.insert(field.id.clone(), Value::Object(by_period));
+        }
+        charts.insert(tally.note_id.clone(), Value::Object(by_field));
+    }
+    assert_eq!(Value::Object(charts), expected["charts"]);
+    assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
+    assert_eq!(units_json(), expected["units"]);
     Ok(())
 }
 

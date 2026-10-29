@@ -1,14 +1,15 @@
 //! Finding Notes by what they say, as the Dart core's `Search` finds
 //! them: their text, the Transcripts of their voice recordings, the Photo
 //! Texts of their photos and the same of their Sections (Amends and
-//! merged Notes). A text in a format not known here counts as its source
-//! text.
+//! merged Notes), and the text lines of the entries of a Tally. A text
+//! in a format not known here counts as its source text.
 
 use std::collections::HashMap;
 
 use crate::Result;
 use crate::notes::{Note, Notes, keys};
 use crate::store::Store;
+use crate::tallies::keys as tally_keys;
 use crate::text_format::StoredText;
 
 pub struct Search<'a> {
@@ -21,7 +22,8 @@ impl<'a> Search<'a> {
     }
 
     /// The Notes whose text, Transcripts or Photo Texts, or those of one
-    /// of their Sections, hold `query`, ignoring case, newest capture
+    /// of their Sections, or the text line of an entry of their Tally,
+    /// hold `query`, ignoring case, newest capture
     /// first. The query counts as typed, inner spaces included; only its
     /// ends are trimmed, and a blank one finds everything. With `within`,
     /// only the Notes inside that Area or Topic count (an Area's Topics
@@ -49,10 +51,11 @@ impl<'a> Search<'a> {
             .collect())
     }
 
-    /// The texts of every Section, by the Note they show under, read in
-    /// one pass: a merged Note's text, Transcripts and Photo Texts under
-    /// the end of its Merge chain, an Amend under its Note, or where that
-    /// Note was merged into.
+    /// The texts of every Section and Tally entry, by the Note they show
+    /// under, read in one pass: a merged Note's text, Transcripts and
+    /// Photo Texts under the end of its Merge chain, an Amend or the text
+    /// line of an entry not removed under its Note, or where that Note
+    /// was merged into.
     fn section_texts(&self, notes: &Notes) -> Result<HashMap<String, Vec<String>>> {
         let mut texts: HashMap<String, Vec<String>> = HashMap::new();
         for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
@@ -78,6 +81,22 @@ impl<'a> Search<'a> {
                 .entry(shown_under)
                 .or_default()
                 .push(StoredText::read(fields.get(keys::TEXT)).text);
+        }
+        for id in self.store.entities_of_type(tally_keys::TYPE_ENTRY)? {
+            let fields = self.store.current_fields(&id)?;
+            let (Some(owner), Some(line)) =
+                (fields.get(tally_keys::NOTE), fields.get(tally_keys::LINE))
+            else {
+                continue;
+            };
+            if fields.get(tally_keys::TRASHED).is_some() {
+                continue;
+            }
+            let shown_under = notes
+                .by_id(owner)?
+                .and_then(|n| n.merged_into)
+                .unwrap_or_else(|| owner.to_string());
+            texts.entry(shown_under).or_default().push(line.to_string());
         }
         Ok(texts)
     }

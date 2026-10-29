@@ -180,5 +180,6 @@
   "alarmSoundUnplayable": "Diese Datei lässt sich gerade nicht lesen oder abspielen, deshalb klingelt der eigene Klang von Old Brain Fix.",
   "alarmSoundPick": "Tondatei wählen…",
   "alarmSoundUseOwn": "Eigenen Klang verwenden",
-  "alarmSoundDetail": "Damit klingeln alle Routinen und Erinnerungen auf diesem Computer; Old Brain Fix spielt ihn selbst ab, und ihre Benachrichtigungen bleiben stumm. Ein eskalierter Alarm klingelt mit dem Alarmton des Systems."
+  "alarmSoundDetail": "Damit klingeln alle Routinen und Erinnerungen auf diesem Computer; Old Brain Fix spielt ihn selbst ab, und ihre Benachrichtigungen bleiben stumm. Ein eskalierter Alarm klingelt mit dem Alarmton des Systems.",
+  "unitSystemRegion": "Wie die Region dieses Computers: {system}"
 }

@@ -34,6 +34,7 @@ use crate::shared::{AreaRole, judge_log};
 use crate::signing::{ImportReport, KeyRecord, SigningKey, verify_signature};
 use crate::store::{Store, entry_of};
 use crate::sync::{BLOB_KINDS, cause, split_blob_ref};
+use crate::tallies::keys as tally_keys;
 use crate::{Error, Result};
 
 /// The kind of pending set an offered Area is held in (ADR 0022).
@@ -790,7 +791,8 @@ impl Store {
         for e in entries {
             let child = (e.entity.starts_with("section:") && is(e, note_keys::NOTE))
                 || (e.entity.starts_with("routine:") && is(e, routine_keys::NOTE))
-                || (e.entity.starts_with(frog_keys::PREFIX) && is(e, frog_keys::NOTE));
+                || (e.entity.starts_with(frog_keys::PREFIX) && is(e, frog_keys::NOTE))
+                || (e.entity.starts_with(tally_keys::ENTRY_PREFIX) && is(e, tally_keys::NOTE));
             if child && e.value.as_deref().is_some_and(|v| notes.contains(v)) {
                 inside.insert(e.entity.as_str());
             }

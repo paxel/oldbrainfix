@@ -1,10 +1,12 @@
 import 'notes.dart';
 import 'store.dart';
+import 'tallies.dart';
 import 'text_format.dart';
 
 /// Finding Notes by what they say: their text, the Transcripts of their
 /// voice recordings, the Photo Texts of their photos and the same of
-/// their Sections (Amends and merged Notes). Capture Context joins later.
+/// their Sections (Amends and merged Notes), and the text lines of the
+/// entries of a Tally. Capture Context joins later.
 /// A text in a format not known here counts as its source text.
 class Search {
   final Store store;
@@ -12,7 +14,8 @@ class Search {
   Search(this.store);
 
   /// The Notes whose text, Transcripts or Photo Texts, or those of one of
-  /// their Sections, hold [query], ignoring case, newest capture first.
+  /// their Sections, or the text line of an entry of their Tally, hold
+  /// [query], ignoring case, newest capture first.
   /// The query counts as typed, inner spaces included; only its ends are
   /// trimmed, and a blank one finds everything. With [within], only the
   /// Notes inside that Area or Topic count (an Area's Topics included).
@@ -33,10 +36,11 @@ class Search {
     ];
   }
 
-  /// The texts of every Section, by the Note they show under, read in one
-  /// pass: a merged Note's text, Transcripts and Photo Texts under the end
-  /// of its Merge chain, an Amend under its Note, or where that Note was
-  /// merged into.
+  /// The texts of every Section and Tally entry, by the Note they show
+  /// under, read in one pass: a merged Note's text, Transcripts and Photo
+  /// Texts under the end of its Merge chain, an Amend or the text line of
+  /// an entry not removed under its Note, or where that Note was merged
+  /// into.
   Map<String, List<String>> _sectionTexts(Notes notes) {
     final texts = <String, List<String>>{};
     for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
@@ -61,6 +65,16 @@ class Search {
       (texts[shownUnder] ??= []).add(
         StoredText.read(fields[SectionKeys.text]).text,
       );
+    }
+    for (final id in store.entitiesOfType(TallyKeys.typeEntry)) {
+      final fields = store.currentFields(id);
+      final owner = fields[TallyKeys.note];
+      final line = fields[TallyKeys.line];
+      if (owner == null || line == null || fields[TallyKeys.trashed] != null) {
+        continue;
+      }
+      final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
+      (texts[shownUnder] ??= []).add(line);
     }
     return texts;
   }

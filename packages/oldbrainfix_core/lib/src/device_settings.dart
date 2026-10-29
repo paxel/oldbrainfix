@@ -1,6 +1,7 @@
 import 'nudges.dart';
 import 'schedule.dart';
 import 'store.dart';
+import 'tally_units.dart';
 
 /// Which theme this Device shows: the system's, or a fixed one.
 enum ThemeChoice { system, light, dark }
@@ -25,6 +26,7 @@ extension DeviceSettings on Store {
   static const _streaksOff = 'streaksOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
+  static const _unitSystem = 'unitSystem';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -154,6 +156,22 @@ extension DeviceSettings on Store {
   bool get streaksOn => localSetting(_streaksOff) != 'true';
 
   set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
+
+  /// The system this Device shows the known units of Tallies in, when
+  /// one was chosen; null follows the region.
+  UnitSystem? get chosenUnitSystem =>
+      UnitSystem.values.asNameMap()[localSetting(_unitSystem)];
+
+  /// Null follows the region again.
+  set chosenUnitSystem(UnitSystem? system) => system == null
+      ? removeLocalSetting(_unitSystem)
+      : setLocalSetting(_unitSystem, system.name);
+
+  /// The system this Device shows the known units of Tallies in: the one
+  /// chosen, else the one of [region], the ISO country code the system
+  /// reports.
+  UnitSystem unitSystem(String? region) =>
+      chosenUnitSystem ?? TallyUnits.systemForRegion(region);
 
   /// How fast this Device plays voice recordings: one of
   /// [playbackSpeeds], normal speed when none was chosen. The one Device

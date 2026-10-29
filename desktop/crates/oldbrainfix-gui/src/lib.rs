@@ -43,6 +43,7 @@ pub mod routine_editor;
 pub mod schedule_text;
 pub mod speech;
 pub mod sync_view;
+pub mod tally_view;
 pub mod theme;
 pub mod tray;
 

@@ -51,7 +51,7 @@ fn weekday_long(t: &L10n, weekday: u32) -> &'static str {
 }
 
 /// The short name of `month`, 1 for January to 12 for December.
-fn month_short(t: &L10n, month: u32) -> &'static str {
+pub(crate) fn month_short(t: &L10n, month: u32) -> &'static str {
     match month {
         1 => t.month_short_jan(),
         2 => t.month_short_feb(),

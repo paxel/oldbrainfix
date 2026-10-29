@@ -316,5 +316,7 @@
   "alarmSoundUseOwn": "Use the own chime",
   "@alarmSoundUseOwn": {"description": "In the desktop's Settings: goes back from a chosen sound file to Old Brain Fix's own chime."},
   "alarmSoundDetail": "Every Routine and Reminder rings with it on this computer; Old Brain Fix plays it itself and their notifications stay silent. An escalated alarm rings with the system's alarm sound.",
-  "@alarmSoundDetail": {"description": "In the desktop's Settings, under the alarm sound choice."}
+  "@alarmSoundDetail": {"description": "In the desktop's Settings, under the alarm sound choice."},
+  "unitSystemRegion": "As this computer's region: {system}",
+  "@unitSystemRegion": {"description": "In the desktop's Settings: the unit choice that follows the region the system reports.", "placeholders": {"system": {"type": "String"}}}
 }

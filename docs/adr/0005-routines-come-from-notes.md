@@ -9,3 +9,7 @@ Deleting a Note that spawned Routines asks whether to trash them too; if not, th
 ## Frogs (ADR 0027)
 
 Amended by ADR 0027 (#101): a Note also spawns Frogs, jobs with no time done once, and spawning one takes it out of Unsorted as a Routine does. A Note has one open Frog at a time.
+
+## Tallies (ADR 0028)
+
+Amended by ADR 0028 (#103): a Note made a Tally, by its first field, leaves Unsorted as a Note that spawned something does. A Tally spawns nothing: its fields lie on the Note.

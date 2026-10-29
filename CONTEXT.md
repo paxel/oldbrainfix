@@ -8,7 +8,7 @@ A local-first, privacy-first memory aid for anyone who forgets things. Capturing
 
 **Note**:
 Anything the user captured: text, a voice recording, a photo, or something shared in from another app, together with its Capture Context. The diary entry everything else hangs off.
-_Avoid_: entry, memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
+_Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
 
 **Capture**:
 The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut, a hardware button, the desktop hotkey). Capturing never asks for sorting or unlocking.
@@ -56,7 +56,7 @@ The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. 
 _Avoid_: category, subcategory, tag
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:
@@ -117,6 +117,16 @@ The share of a Routine's Occurrences that were Done over a period, e.g. "92 % th
 **Agenda**:
 The home screen: today's Occurrences, then two Frogs to eat one of, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
 _Avoid_: dashboard, today view, home
+
+### Tallies
+
+**Tally**:
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, shown as a table and as one chart per field by day, week, month or year. German: Strichliste.
+_Avoid_: tracker, log, workout, exercise, habit
+
+**Entry**:
+One record of a Tally: a value for some of its fields, a date, one line of text and its author. German: Eintrag.
+_Avoid_: Section (a Section is a dated part of a Note's text), record, set
 
 ### People and devices
 

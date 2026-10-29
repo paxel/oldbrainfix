@@ -116,6 +116,16 @@ class NoteActions {
   /// as the menu opens.
   final List<MediaRemoval> Function()? removals;
 
+  /// Whether the Note is a Tally, read as the menu opens: the menu then
+  /// offers [onAddEntry], else [onMakeTally].
+  final bool Function()? isTally;
+
+  /// Opens the field page that makes the Note a Tally (#103).
+  final VoidCallback? onMakeTally;
+
+  /// Opens the entry page of the Note's Tally.
+  final VoidCallback? onAddEntry;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -125,6 +135,9 @@ class NoteActions {
     this.calendar,
     this.onAmend,
     this.removals,
+    this.isTally,
+    this.onMakeTally,
+    this.onAddEntry,
     this.onDelete,
   });
 }
@@ -440,9 +453,10 @@ class NoteCard extends StatelessWidget {
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with the Note's Importance as radio buttons, the one it has
-/// marked, then sending, the calendar, adding to the Note, removing a
-/// photo or recording while its text stays, one entry each with the
-/// start of that text under it, and deleting.
+/// marked, then sending, the calendar, adding to the Note, "Add entry" of
+/// a Tally or "Make it a Tally", removing a photo or recording while its
+/// text stays, one entry each with the start of that text under it, and
+/// deleting.
 class _MoreButton extends StatelessWidget {
   final Importance importance;
   final NoteActions actions;
@@ -461,6 +475,7 @@ class _MoreButton extends StatelessWidget {
         final calendar = CalendarScope.of(button).available
             ? actions.calendar?.call()
             : null;
+        final tally = actions.isTally?.call();
         PopupMenuItem<VoidCallback> item(
           String key,
           IconData icon,
@@ -528,6 +543,12 @@ class _MoreButton extends StatelessWidget {
             ),
           if (actions.onAmend case final amend?)
             item('note-amend', Icons.add, t.amend, amend),
+          if (tally == true)
+            if (actions.onAddEntry case final add?)
+              item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
+          if (tally == false)
+            if (actions.onMakeTally case final make?)
+              item('note-make-tally', Icons.bar_chart, t.makeTally, make),
           for (final removal in actions.removals?.call() ?? <MediaRemoval>[])
             PopupMenuItem(
               key: ValueKey('note-remove-${removal.hash}'),

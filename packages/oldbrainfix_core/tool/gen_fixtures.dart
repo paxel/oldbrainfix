@@ -9,7 +9,9 @@
 /// and must read the same. The Routine scenario adds what the alarm plan,
 /// the Missed Summary, the Nudge and the Agenda come to at a few held
 /// moments (`alarms.json`), on a European wall clock; the Frog scenario
-/// what its lists and the Agenda's "Eat a frog" come to (`frogs.json`).
+/// what its lists and the Agenda's "Eat a frog" come to (`frogs.json`);
+/// the Tally scenario its fields, entries and charts, with the units
+/// converted, shown and read (`tallies.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -536,6 +538,112 @@ final _scenarios = <Scenario>[
       notes.capture('Unsorted thought');
     },
   ),
+  (
+    name: 'tallies',
+    about:
+        'Tallies made from Notes: fields with known and typed units, '
+        'targets given in imperial, rules by default and chosen; entries '
+        'with targets, values and text lines, at given times around '
+        'midnight in Central Europe and after the clock held, one changed, '
+        'one removed and one removed and restored; fields renamed, given '
+        'another unit of their kind, their target taken away, their rule '
+        'changed, hidden and hidden and restored; a Tally merged into '
+        'another Note and recorded in there; a Tally in the trash; an '
+        'Unsorted Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final tallies = Tallies(store);
+      final gym = notes.capture('Gym').id;
+      final reps = tallies.addField(
+        gym,
+        name: 'Push-ups',
+        unit: 'times',
+        target: 20,
+      );
+      final bench = tallies.addField(
+        gym,
+        name: 'Bench press',
+        unit: 'kg',
+        target: TallyUnits.toBase(135, 'kg', UnitSystem.imperial),
+      );
+      final run = tallies.addField(
+        gym,
+        name: 'Run',
+        unit: 'km',
+        rule: TallyRule.max,
+      );
+      final wall = tallies.addField(
+        gym,
+        name: 'Wall sit',
+        unit: 'min',
+        target: 60,
+      );
+      final temp = tallies.addField(gym, name: 'Water', unit: '°C');
+      tallies.add(
+        gym,
+        values: {reps: 20, bench: 60},
+        line: 'Morning',
+        at: DateTime.utc(2025, 12, 29, 7),
+      );
+      tallies.add(
+        gym,
+        values: {
+          reps: 15,
+          bench: 62.5,
+          run: TallyUnits.toBase(3.1, 'km', UnitSystem.imperial),
+          temp: TallyUnits.toBase(-4.5, '°C', UnitSystem.metric),
+        },
+        at: DateTime.utc(2025, 12, 31, 23, 30),
+      );
+      tallies.add(gym, values: tallies.byNote(gym)!.targets);
+      final evening = tallies.add(
+        gym,
+        values: {reps: 30, run: 4000},
+        line: 'Evening with Tom',
+        at: DateTime.utc(2026, 1, 1, 22, 59),
+      );
+      tallies.editEntry(
+        evening.id,
+        values: {reps: 25, run: null, wall: 45},
+        line: 'Evening',
+        at: DateTime.utc(2026, 1, 1, 23, 1),
+      );
+      tallies.editEntry(evening.id, values: {reps: 25}, line: 'Evening');
+      tallies.trashEntry(tallies.add(gym, values: {reps: 999}).id);
+      final back = tallies.add(gym, values: {reps: 5}, line: 'Stairs');
+      tallies.trashEntry(back.id);
+      tallies.restoreEntry(back.id);
+      tallies.add(
+        gym,
+        values: {reps: 40},
+        line: 'Planned',
+        at: DateTime.utc(2026, 1, 10, 8),
+      );
+      tallies.renameField(gym, reps, 'Push-ups');
+      tallies.renameField(gym, reps, 'Press-ups');
+      tallies.setUnit(gym, bench, 'g');
+      tallies.setTarget(gym, wall, null);
+      tallies.setRule(gym, run, TallyRule.sum);
+      tallies.hideField(gym, temp);
+      tallies.hideField(gym, wall);
+      tallies.restoreField(gym, wall);
+      final reading = notes.capture('Reading').id;
+      final pages = tallies.addField(reading, name: 'Pages', unit: 'pages');
+      tallies.add(
+        reading,
+        values: {pages: 12},
+        at: DateTime.utc(2025, 11, 30, 21),
+      );
+      final evenings = notes.capture('Evenings').id;
+      notes.merge(reading, evenings);
+      tallies.add(evenings, values: {pages: 8}, line: 'Novel');
+      final steps = notes.capture('Steps').id;
+      final count = tallies.addField(steps, name: 'Steps', unit: 'steps');
+      tallies.add(steps, values: {count: 8000});
+      notes.trash(steps);
+      notes.capture('Unsorted thought');
+    },
+  ),
 ];
 
 /// The European wall clock [days] days on: the scenario's clock moves by
@@ -580,6 +688,189 @@ Map<String, Object?> _frogs(Store store) {
       for (var days = -1; days <= 2; days++)
         section(frogs.today(_frogDay(days))),
     ],
+  };
+}
+
+/// What the Tallies of [store] come to: every Tally with its fields, the
+/// entries of each, everyone's and the user's own, its removed entries,
+/// its charts by day, week, month and year on the European wall clock,
+/// and the units converted, shown and read.
+Map<String, Object?> _tallies(Store store) {
+  final tallies = Tallies(store);
+  String? number(double? value) => value == null || tallyMicro(value) == null
+      ? null
+      : encodeTallyNumber(value);
+  final noteIds = [
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)..sort())
+      if (tallies.isTally(id)) id,
+  ];
+  Map<String, Object?> entry(TallyEntry e) => {
+    'id': e.id,
+    'noteId': e.noteId,
+    'at': e.at.toIso8601String(),
+    'values': {
+      for (final id in e.values.keys.toList()..sort()) id: number(e.values[id]),
+    },
+    'line': e.line,
+    'trashed': e.trashed?.toIso8601String(),
+    'author': store.authorOf(e.id)?.id,
+  };
+  return {
+    'tallies': {
+      for (final id in noteIds)
+        if (tallies.byNote(id) case final tally?)
+          id: [
+            for (final f in tally.fields)
+              {
+                'id': f.id,
+                'noteId': f.noteId,
+                'name': f.name,
+                'unit': f.unit,
+                'kind': f.kind.name,
+                'target': number(f.target),
+                'rule': f.rule.name,
+                'hidden': f.hidden,
+                'hasEntries': f.hasEntries,
+                'added': f.added.toIso8601String(),
+              },
+          ],
+    },
+    'all': [for (final tally in tallies.all()) tally.noteId],
+    'entries': {
+      for (final id in noteIds)
+        id: [for (final e in tallies.entries(id)) entry(e)],
+    },
+    'mine': {
+      for (final id in noteIds)
+        id: [
+          for (final e in tallies.entries(
+            id,
+            filter: const PersonFilter(me: true),
+          ))
+            e.id,
+        ],
+    },
+    'removed': {
+      for (final id in noteIds)
+        id: [for (final e in tallies.removedEntries(id)) entry(e)],
+    },
+    'charts': {
+      for (final tally in tallies.all())
+        tally.noteId: {
+          for (final field in tally.fields)
+            field.id: {
+              for (final period in TallyPeriod.values)
+                period.name: [
+                  for (final bar in tallies.chart(
+                    tally.noteId,
+                    field.id,
+                    period,
+                    _europe,
+                  ))
+                    {
+                      'start': '${bar.start}',
+                      'end': '${bar.end}',
+                      'value': number(bar.value),
+                      'entries': bar.entries,
+                    },
+                ],
+            },
+        },
+    },
+    'units': _units(),
+  };
+}
+
+/// The units of Tallies on both systems: each known unit and a typed
+/// one with numbers converted both ways and shown, numbers read as typed,
+/// numbers kept and read back, and the system of a few regions.
+Map<String, Object?> _units() {
+  String? number(double value) =>
+      tallyMicro(value) == null ? null : encodeTallyNumber(value);
+  const values = [-40.0, 0.0, 1.0, 2.5, 135.0, 1234.5678, 3725.4];
+  const typed = [
+    '1:30',
+    '1,5',
+    '-4',
+    '12',
+    '0.25',
+    '1:75',
+    '2:00:00',
+    '-0:30',
+    'abc',
+    '1e3',
+    '',
+    '1.',
+    '1000000001',
+  ];
+  return {
+    'units': [
+      for (final unit in [...TallyUnits.known.map((k) => k.code), 'pages'])
+        for (final system in UnitSystem.values)
+          {
+            'unit': unit,
+            'system': system.name,
+            'kind': TallyUnits.kindOf(unit).name,
+            'rule': TallyUnits.defaultRule(TallyUnits.kindOf(unit)).name,
+            'shownUnit': TallyUnits.shownUnit(unit, system),
+            'toBase': [
+              for (final v in values)
+                number(TallyUnits.toBase(v, unit, system)),
+            ],
+            'fromBase': [
+              for (final v in values)
+                number(TallyUnits.fromBase(v, unit, system)),
+            ],
+            'shown': [
+              for (final v in values)
+                TallyUnits.formatShown(v, unit, system, decimal: ','),
+            ],
+            'read': [
+              for (final text in typed)
+                switch (TallyUnits.parseShown(text, unit, system)) {
+                  final base? => number(base),
+                  null => null,
+                },
+            ],
+          },
+    ],
+    'kept': [
+      for (final v in [
+        20.0,
+        -3.5,
+        0.1 + 0.2,
+        5 * 1609.344,
+        0.0000004,
+        0.0000006,
+        -0.0000006,
+        1e9,
+        1e9 + 1,
+        double.nan,
+      ])
+        number(v),
+    ],
+    'readBack': [
+      for (final text in [
+        '8046.72',
+        '-3.5',
+        '0',
+        '-0',
+        '1.',
+        '01',
+        '1.50',
+        '1e3',
+        ' 1',
+        '1.0000001',
+        '1000000000.000001',
+        '1000000000',
+        '',
+      ])
+        decodeTallyMicro(text),
+    ],
+    'regions': {
+      for (final region in ['US', 'us', 'LR', 'MM', 'GB', 'DE', ''])
+        region: TallyUnits.systemForRegion(region).name,
+    },
   };
 }
 
@@ -4325,6 +4616,12 @@ Future<void> main(List<String> args) async {
     'those Done, the rotation, the Frogs of each Note, and the "Eat a '
     'frog" section the day before, on and after the clock held, on the '
     'same clock.\n'
+    '- `tallies/tallies.json`: each Tally of the `tallies` log with its '
+    'fields, the Tallies in the lists, the entries of each, everyone\'s '
+    'and the user\'s own, its removed entries, its charts by day, week, month and year on the '
+    'same clock, and the known units and a typed one converted both ways, '
+    'shown and read in both systems, numbers kept and read back, and the '
+    'system of a few regions.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, and what is no code.\n'
     '- `keys.json`: the writer\'s key record, and another key claiming its '
@@ -4562,6 +4859,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/frogs.json'),
           '${_json.convert(_frogs(store))}\n',
+        );
+      }
+      if (store.fieldsWithPrefix(TallyKeys.fieldPrefix).isNotEmpty) {
+        _write(
+          File('${out.path}/tallies.json'),
+          '${_json.convert(_tallies(store))}\n',
         );
       }
       index.writeln('- `${scenario.name}`: ${scenario.about}');

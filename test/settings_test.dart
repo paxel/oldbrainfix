@@ -110,6 +110,38 @@ void main() {
       expect(shown(), Brightness.light);
     });
 
+    testWidgets('show units as the region does until metric or imperial is '
+        'picked as a radio button', (tester) async {
+      tester.platformDispatcher.localeTestValue = const Locale('en', 'US');
+      addTearDown(tester.platformDispatcher.clearLocaleTestValue);
+      await start(tester);
+      await openDeviceSettings(tester);
+      final column = find.byKey(const ValueKey('unitSystem'));
+      await tester.scrollUntilVisible(
+        column,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: column,
+          matching: find.byWidgetPredicate((w) => w is RadioListTile),
+        ),
+        findsNWidgets(3),
+      );
+      expect(find.text('As the phone\'s region: imperial'), findsOneWidget);
+      expect(store.unitSystem('US'), UnitSystem.imperial);
+
+      await tap(tester, find.byKey(const ValueKey('unitSystem-metric')));
+      expect(store.chosenUnitSystem, UnitSystem.metric);
+      expect(store.unitSystem('US'), UnitSystem.metric);
+      expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+
+      await tap(tester, find.byKey(const ValueKey('unitSystem-region')));
+      expect(store.chosenUnitSystem, isNull);
+    });
+
     testWidgets('are kept on this Device and never logged', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);

@@ -42,5 +42,7 @@ export 'src/shared_areas.dart';
 export 'src/signing.dart';
 export 'src/store.dart';
 export 'src/sync.dart';
+export 'src/tallies.dart';
+export 'src/tally_units.dart';
 export 'src/text_format.dart';
 export 'src/transcript_prompts.dart';

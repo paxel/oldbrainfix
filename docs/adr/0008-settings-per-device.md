@@ -7,3 +7,7 @@ Notes, Areas, Routines and their history sync; settings do not. Each Device deci
 Two Devices with alerts on both fire the same Occurrence until a sync tells one of them it is Done (see ADR 0003 for the delay).
 
 A Backup carries none of them but the playback speed of voice recordings, which a restored Device takes over (ADR 0016, #86).
+
+## Units (ADR 0028)
+
+Amended by ADR 0028 (#103): whether a Device shows the known units of Tallies in metric or imperial is a setting of its own, following the region the system reports until one is chosen.

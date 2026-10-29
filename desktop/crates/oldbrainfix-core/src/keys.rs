@@ -20,6 +20,7 @@ use crate::notes::keys as note_keys;
 use crate::places::keys as place_keys;
 use crate::routines::keys as routine_keys;
 use crate::store::Store;
+use crate::tallies::keys as tally_keys;
 use crate::{Error, Result};
 
 /// The scope of everything outside an Area.
@@ -164,7 +165,7 @@ fn rank(id: &str) -> u8 {
         Some("area") => 0,
         Some("topic") => 1,
         Some("note") => 2,
-        Some("section") | Some("routine") | Some("frog") => 3,
+        Some("section") | Some("routine") | Some("frog") | Some(tally_keys::TYPE_ENTRY) => 3,
         _ => 9,
     }
 }
@@ -244,6 +245,7 @@ impl Store {
             Some("section") => note_keys::NOTE,
             Some("routine") => routine_keys::NOTE,
             Some("frog") => frog_keys::NOTE,
+            Some(tally_keys::TYPE_ENTRY) => tally_keys::NOTE,
             _ => return Ok(PERSONAL_SCOPE.to_string()),
         };
         match self.logged(entity, field)? {

@@ -3095,4 +3095,201 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get deleteFrogQuestion =>
       'Delete this Frog? It stays in the trash. Its Note stays.';
+
+  @override
+  String get makeTally => 'Make it a Tally';
+
+  @override
+  String get addTallyEntry => 'Add entry';
+
+  @override
+  String get tallyHeading => 'Tally';
+
+  @override
+  String get tallyNewField => 'New field';
+
+  @override
+  String get tallyField => 'Field';
+
+  @override
+  String get tallyFieldName => 'Name';
+
+  @override
+  String get tallyFieldNameHint => 'e.g. Push-ups, Pages read';
+
+  @override
+  String get tallyFieldNameMissing => 'Give the field a name.';
+
+  @override
+  String get tallyUnit => 'Unit';
+
+  @override
+  String get tallyUnitTyped => 'Another unit';
+
+  @override
+  String get tallyUnitTypedHint => 'e.g. pages, times';
+
+  @override
+  String get tallyUnitFixed =>
+      'Entries hold values for this field, so its kind of unit stays.';
+
+  @override
+  String get unitKindMass => 'Mass';
+
+  @override
+  String get unitKindDistance => 'Distance';
+
+  @override
+  String get unitKindSpeed => 'Speed';
+
+  @override
+  String get unitKindTemperature => 'Temperature';
+
+  @override
+  String get unitKindAngle => 'Angle';
+
+  @override
+  String get unitKindTime => 'Time';
+
+  @override
+  String get tallyTarget => 'Target (optional)';
+
+  @override
+  String get tallyTargetHint => 'Prefilled in every new entry';
+
+  @override
+  String get tallyNotANumber => 'Not a number. Type it like 12, 2.5 or 1:30.';
+
+  @override
+  String get tallyRule => 'A day with several entries counts';
+
+  @override
+  String get tallyRuleSum => 'Their sum';
+
+  @override
+  String get tallyRuleMax => 'The largest';
+
+  @override
+  String get tallyHideField => 'Hide field';
+
+  @override
+  String get tallyHideFieldDetail =>
+      'Its values stay stored and return when it is shown again.';
+
+  @override
+  String get tallyShowField => 'Show field again';
+
+  @override
+  String get tallyFieldHidden => 'Hidden';
+
+  @override
+  String get tallyAddField => 'Add field';
+
+  @override
+  String get tallyFields => 'Fields';
+
+  @override
+  String get tallyNewEntry => 'New entry';
+
+  @override
+  String get tallyEntry => 'Entry';
+
+  @override
+  String get tallyEntryDate => 'Date';
+
+  @override
+  String get tallyEntryLine => 'Line of text';
+
+  @override
+  String get tallyEntryEmpty => 'Enter a value or a line of text.';
+
+  @override
+  String get tallyPeriod => 'One bar per';
+
+  @override
+  String get tallyPeriodDay => 'Day';
+
+  @override
+  String get tallyPeriodWeek => 'Week';
+
+  @override
+  String get tallyPeriodMonth => 'Month';
+
+  @override
+  String get tallyPeriodYear => 'Year';
+
+  @override
+  String get tallyShowEntries => 'Show entries';
+
+  @override
+  String get tallyEntriesMine => 'Mine';
+
+  @override
+  String get tallyEntriesEveryone => 'Everyone\'s';
+
+  @override
+  String get tallyEntries => 'Entries';
+
+  @override
+  String get tallyNoEntries => 'No entries yet.';
+
+  @override
+  String get tallyChartEmpty => 'No values yet.';
+
+  @override
+  String tallyChartRange(String from, String to) {
+    return '$from to $to';
+  }
+
+  @override
+  String tallyChartHighest(String value) {
+    return 'Highest bar: $value';
+  }
+
+  @override
+  String tallyChartLabel(String field, int bars) {
+    return 'Chart of $field, $bars bars';
+  }
+
+  @override
+  String tallyTargetValue(String value) {
+    return 'Target $value';
+  }
+
+  @override
+  String get tallyMoreEntries => 'Show more';
+
+  @override
+  String get tallyRemovedEntries => 'Removed entries';
+
+  @override
+  String get deleteEntryQuestion =>
+      'Delete this entry? It can be restored under \"Removed entries\".';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get settingsUnits => 'Units';
+
+  @override
+  String get settingsUnitsDetail =>
+      'How Tallies show known units. Values are stored in metric either way.';
+
+  @override
+  String unitSystemRegion(String system) {
+    return 'As the phone\'s region: $system';
+  }
+
+  @override
+  String get unitSystemMetric => 'Metric (kg, km, °C)';
+
+  @override
+  String get unitSystemImperial => 'Imperial (lb, mi, °F)';
+
+  @override
+  String get unitSystemMetricName => 'metric';
+
+  @override
+  String get unitSystemImperialName => 'imperial';
 }

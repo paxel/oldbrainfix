@@ -21,8 +21,12 @@ import 'speech_model_screen.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 
+/// How this Device shows the known units of Tallies: as its region
+/// does, or a system chosen.
+enum _UnitChoice { region, metric, imperial }
+
 /// This Device's settings (ADR 0008), reached only through the Profile
-/// page: the theme; the alarm setup, the default Re-nag interval and the
+/// page: the theme; the units of Tallies; the alarm setup, the default Re-nag interval and the
 /// alarm sound; the
 /// Nudges' repeat and Quiet Hours; the Named Places, the Capture Context
 /// switches and the speech model; the calendar mirror; the App Lock and
@@ -52,6 +56,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
   late String? _sound = widget.store.alarmSound;
+  late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
+    null => _UnitChoice.region,
+    UnitSystem.metric => _UnitChoice.metric,
+    UnitSystem.imperial => _UnitChoice.imperial,
+  };
+
+  /// The system of the phone's region, read once.
+  late final UnitSystem _regionUnits = TallyUnits.systemForRegion(
+    WidgetsBinding.instance.platformDispatcher.locale.countryCode,
+  );
 
   void _setTheme(ThemeChoice choice) {
     widget.store.themeChoice = choice;
@@ -75,6 +89,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.store.alarmSound = picked.sound;
     setState(() => _sound = widget.store.alarmSound);
     unawaited(widget.alarms.refresh());
+  }
+
+  void _setUnits(_UnitChoice choice) {
+    widget.store.chosenUnitSystem = switch (choice) {
+      _UnitChoice.region => null,
+      _UnitChoice.metric => UnitSystem.metric,
+      _UnitChoice.imperial => UnitSystem.imperial,
+    };
+    setState(() => _units = choice);
   }
 
   void _setStreaks(bool on) {
@@ -131,6 +154,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
                 onChanged: _setTheme,
+              ),
+            ),
+            SettingsHeading(t.settingsUnits),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+              child: Text(t.settingsUnitsDetail),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: RadioColumn<_UnitChoice>(
+                key: const ValueKey('unitSystem'),
+                value: _units,
+                options: [
+                  RadioOption(
+                    key: const ValueKey('unitSystem-region'),
+                    value: _UnitChoice.region,
+                    title: Text(
+                      t.unitSystemRegion(switch (_regionUnits) {
+                        UnitSystem.metric => t.unitSystemMetricName,
+                        UnitSystem.imperial => t.unitSystemImperialName,
+                      }),
+                    ),
+                  ),
+                  RadioOption(
+                    key: const ValueKey('unitSystem-metric'),
+                    value: _UnitChoice.metric,
+                    title: Text(t.unitSystemMetric),
+                  ),
+                  RadioOption(
+                    key: const ValueKey('unitSystem-imperial'),
+                    value: _UnitChoice.imperial,
+                    title: Text(t.unitSystemImperial),
+                  ),
+                ],
+                onChanged: _setUnits,
               ),
             ),
             SettingsHeading(t.settingsAlarms),

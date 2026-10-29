@@ -20,6 +20,7 @@ use crate::places::{Places, starter_id};
 use crate::routines::keys as routine_keys;
 use crate::signing::KeyRecord;
 use crate::store::Store;
+use crate::tallies::keys as tally_keys;
 
 /// The field prefix of the grants on an Area.
 pub const ROLE_PREFIX: &str = "role:";
@@ -446,7 +447,8 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
     }
 
     for (id, list) in &by_entity {
-        let section = id.starts_with("section:");
+        // A Tally's entry is its author's, as a Section is.
+        let section = id.starts_with("section:") || id.starts_with(tally_keys::ENTRY_PREFIX);
         let frog = id.starts_with(frog_keys::PREFIX);
         if !section && !frog && !id.starts_with("routine:") {
             continue;
@@ -582,7 +584,7 @@ impl Store {
     /// of `ty` (`$type`), as the Dart core's `mayResolve`.
     pub fn may_resolve(&self, entity: &str, ty: &str) -> Result<bool> {
         match ty {
-            "note" | "section" => self.may_change(entity),
+            "note" | "section" | tally_keys::TYPE_ENTRY => self.may_change(entity),
             "routine" | "frog" => self.may_change_routine(entity),
             "area" => self.may_manage(Some(entity)),
             "topic" => self.may_manage(self.area_of(entity)?.as_deref()),
@@ -918,9 +920,8 @@ impl Store {
     }
 
     /// `delta` with the whole history of every Note a filing in it put
-    /// into an Area `wanted` says yes to, with its Sections, Routines and
-    /// Frogs,
-    /// as the Dart core's `withFiled`; by (device, dseq), each entry once.
+    /// into an Area `wanted` says yes to, with its Sections, Routines,
+    /// Frogs and Tally entries, as the Dart core's `withFiled`; by (device, dseq), each entry once.
     pub fn with_filed(
         &self,
         delta: Vec<Entry>,
@@ -944,6 +945,7 @@ impl Store {
             note_keys::TYPE_SECTION,
             routine_keys::TYPE_ROUTINE,
             frog_keys::TYPE_FROG,
+            tally_keys::TYPE_ENTRY,
         ] {
             for id in self.entities_of_type(ty)? {
                 if let Some(note) = self.current(&id, note_keys::NOTE)?

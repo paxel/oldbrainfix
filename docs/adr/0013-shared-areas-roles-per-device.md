@@ -48,3 +48,7 @@ Amended by ADR 0025 (#110): a Member adds Transcripts and Photo Texts to any Not
 ## Frogs (ADR 0027)
 
 Amended by ADR 0027 (#101): a Frog is judged by its Note like a Routine. A Manager spawns, trashes and restores it; a Member writes only its `done`, so every Member can check it off and uncheck it.
+
+## Tallies (ADR 0028)
+
+Amended by ADR 0028 (#103): a Tally's fields lie on its Note and are changed as the Note is, by its owner or a Manager. Its entries are judged like Sections: anyone with a role adds one, and only its author or a Manager changes or removes it.

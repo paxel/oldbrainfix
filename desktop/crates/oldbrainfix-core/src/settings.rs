@@ -8,6 +8,7 @@ use crate::entry::{dart_iso, parse_time};
 use crate::nudges::QuietHours;
 use crate::schedule::ClockTime;
 use crate::store::Store;
+use crate::tally_units::{self, UnitSystem};
 use crate::{Error, Result};
 
 const RENAG_MINUTES: &str = "renagMinutes";
@@ -21,6 +22,7 @@ const LAST_FIRED: &str = "lastFired";
 const CAPTURE_HOTKEY: &str = "captureHotkey";
 const PLAYBACK_SPEED: &str = "playbackSpeed";
 const ALARM_SOUND: &str = "alarmSound";
+const UNIT_SYSTEM: &str = "unitSystem";
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
@@ -211,6 +213,32 @@ impl<'a> DeviceSettings<'a> {
             Some(sound) => self.store.set_local_setting(ALARM_SOUND, sound),
             None => self.store.remove_local_setting(ALARM_SOUND),
         }
+    }
+
+    /// The system this Device shows the known units of Tallies in, when
+    /// one was chosen; `None` follows the region.
+    pub fn chosen_unit_system(&self) -> Result<Option<UnitSystem>> {
+        Ok(self
+            .store
+            .local_setting(UNIT_SYSTEM)?
+            .and_then(|name| UnitSystem::parse(&name)))
+    }
+
+    /// `None` follows the region again.
+    pub fn set_chosen_unit_system(&self, system: Option<UnitSystem>) -> Result<()> {
+        match system {
+            Some(system) => self.store.set_local_setting(UNIT_SYSTEM, system.name()),
+            None => self.store.remove_local_setting(UNIT_SYSTEM),
+        }
+    }
+
+    /// The system this Device shows the known units of Tallies in: the
+    /// one chosen, else the one of `region`, the ISO country code the
+    /// system reports.
+    pub fn unit_system(&self, region: Option<&str>) -> Result<UnitSystem> {
+        Ok(self
+            .chosen_unit_system()?
+            .unwrap_or_else(|| tally_units::system_for_region(region)))
     }
 
     /// How fast this Device plays voice recordings: one of

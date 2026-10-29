@@ -3128,4 +3128,201 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get deleteFrogQuestion =>
       'Diesen Frosch löschen? Er bleibt im Papierkorb. Seine Notiz bleibt.';
+
+  @override
+  String get makeTally => 'Zur Strichliste machen';
+
+  @override
+  String get addTallyEntry => 'Eintrag hinzufügen';
+
+  @override
+  String get tallyHeading => 'Strichliste';
+
+  @override
+  String get tallyNewField => 'Neues Feld';
+
+  @override
+  String get tallyField => 'Feld';
+
+  @override
+  String get tallyFieldName => 'Name';
+
+  @override
+  String get tallyFieldNameHint => 'z. B. Liegestütze, Gelesene Seiten';
+
+  @override
+  String get tallyFieldNameMissing => 'Gib dem Feld einen Namen.';
+
+  @override
+  String get tallyUnit => 'Einheit';
+
+  @override
+  String get tallyUnitTyped => 'Andere Einheit';
+
+  @override
+  String get tallyUnitTypedHint => 'z. B. Seiten, Mal';
+
+  @override
+  String get tallyUnitFixed =>
+      'Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Einheit.';
+
+  @override
+  String get unitKindMass => 'Masse';
+
+  @override
+  String get unitKindDistance => 'Strecke';
+
+  @override
+  String get unitKindSpeed => 'Geschwindigkeit';
+
+  @override
+  String get unitKindTemperature => 'Temperatur';
+
+  @override
+  String get unitKindAngle => 'Winkel';
+
+  @override
+  String get unitKindTime => 'Zeit';
+
+  @override
+  String get tallyTarget => 'Ziel (optional)';
+
+  @override
+  String get tallyTargetHint => 'In jedem neuen Eintrag vorausgefüllt';
+
+  @override
+  String get tallyNotANumber => 'Keine Zahl. Tippe sie wie 12, 2,5 oder 1:30.';
+
+  @override
+  String get tallyRule => 'Ein Tag mit mehreren Einträgen zählt';
+
+  @override
+  String get tallyRuleSum => 'Ihre Summe';
+
+  @override
+  String get tallyRuleMax => 'Den größten Wert';
+
+  @override
+  String get tallyHideField => 'Feld ausblenden';
+
+  @override
+  String get tallyHideFieldDetail =>
+      'Seine Werte bleiben gespeichert und kommen zurück, wenn es wieder gezeigt wird.';
+
+  @override
+  String get tallyShowField => 'Feld wieder zeigen';
+
+  @override
+  String get tallyFieldHidden => 'Ausgeblendet';
+
+  @override
+  String get tallyAddField => 'Feld hinzufügen';
+
+  @override
+  String get tallyFields => 'Felder';
+
+  @override
+  String get tallyNewEntry => 'Neuer Eintrag';
+
+  @override
+  String get tallyEntry => 'Eintrag';
+
+  @override
+  String get tallyEntryDate => 'Datum';
+
+  @override
+  String get tallyEntryLine => 'Textzeile';
+
+  @override
+  String get tallyEntryEmpty => 'Gib einen Wert oder eine Textzeile ein.';
+
+  @override
+  String get tallyPeriod => 'Ein Balken pro';
+
+  @override
+  String get tallyPeriodDay => 'Tag';
+
+  @override
+  String get tallyPeriodWeek => 'Woche';
+
+  @override
+  String get tallyPeriodMonth => 'Monat';
+
+  @override
+  String get tallyPeriodYear => 'Jahr';
+
+  @override
+  String get tallyShowEntries => 'Einträge zeigen';
+
+  @override
+  String get tallyEntriesMine => 'Meine';
+
+  @override
+  String get tallyEntriesEveryone => 'Alle';
+
+  @override
+  String get tallyEntries => 'Einträge';
+
+  @override
+  String get tallyNoEntries => 'Noch keine Einträge.';
+
+  @override
+  String get tallyChartEmpty => 'Noch keine Werte.';
+
+  @override
+  String tallyChartRange(String from, String to) {
+    return '$from bis $to';
+  }
+
+  @override
+  String tallyChartHighest(String value) {
+    return 'Höchster Balken: $value';
+  }
+
+  @override
+  String tallyChartLabel(String field, int bars) {
+    return 'Diagramm von $field, $bars Balken';
+  }
+
+  @override
+  String tallyTargetValue(String value) {
+    return 'Ziel $value';
+  }
+
+  @override
+  String get tallyMoreEntries => 'Mehr zeigen';
+
+  @override
+  String get tallyRemovedEntries => 'Entfernte Einträge';
+
+  @override
+  String get deleteEntryQuestion =>
+      'Diesen Eintrag löschen? Er lässt sich unter „Entfernte Einträge“ wiederherstellen.';
+
+  @override
+  String get edit => 'Bearbeiten';
+
+  @override
+  String get settingsUnits => 'Einheiten';
+
+  @override
+  String get settingsUnitsDetail =>
+      'Wie Strichlisten bekannte Einheiten zeigen. Gespeichert werden die Werte immer metrisch.';
+
+  @override
+  String unitSystemRegion(String system) {
+    return 'Wie die Region des Telefons: $system';
+  }
+
+  @override
+  String get unitSystemMetric => 'Metrisch (kg, km, °C)';
+
+  @override
+  String get unitSystemImperial => 'Angloamerikanisch (lb, mi, °F)';
+
+  @override
+  String get unitSystemMetricName => 'metrisch';
+
+  @override
+  String get unitSystemImperialName => 'angloamerikanisch';
 }

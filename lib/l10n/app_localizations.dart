@@ -4981,6 +4981,372 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete this Frog? It stays in the trash. Its Note stays.'**
   String get deleteFrogQuestion;
+
+  /// A Note card's menu entry that gives the Note its first Tally field (CONTEXT.md: Tally).
+  ///
+  /// In en, this message translates to:
+  /// **'Make it a Tally'**
+  String get makeTally;
+
+  /// Records a new entry in a Tally (CONTEXT.md: Entry).
+  ///
+  /// In en, this message translates to:
+  /// **'Add entry'**
+  String get addTallyEntry;
+
+  /// No description provided for @tallyHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Tally'**
+  String get tallyHeading;
+
+  /// No description provided for @tallyNewField.
+  ///
+  /// In en, this message translates to:
+  /// **'New field'**
+  String get tallyNewField;
+
+  /// No description provided for @tallyField.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get tallyField;
+
+  /// No description provided for @tallyFieldName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get tallyFieldName;
+
+  /// No description provided for @tallyFieldNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Push-ups, Pages read'**
+  String get tallyFieldNameHint;
+
+  /// No description provided for @tallyFieldNameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Give the field a name.'**
+  String get tallyFieldNameMissing;
+
+  /// No description provided for @tallyUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get tallyUnit;
+
+  /// The unit option that takes a unit as typed, such as pages or times.
+  ///
+  /// In en, this message translates to:
+  /// **'Another unit'**
+  String get tallyUnitTyped;
+
+  /// No description provided for @tallyUnitTypedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. pages, times'**
+  String get tallyUnitTypedHint;
+
+  /// No description provided for @tallyUnitFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Entries hold values for this field, so its kind of unit stays.'**
+  String get tallyUnitFixed;
+
+  /// No description provided for @unitKindMass.
+  ///
+  /// In en, this message translates to:
+  /// **'Mass'**
+  String get unitKindMass;
+
+  /// No description provided for @unitKindDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get unitKindDistance;
+
+  /// No description provided for @unitKindSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speed'**
+  String get unitKindSpeed;
+
+  /// No description provided for @unitKindTemperature.
+  ///
+  /// In en, this message translates to:
+  /// **'Temperature'**
+  String get unitKindTemperature;
+
+  /// No description provided for @unitKindAngle.
+  ///
+  /// In en, this message translates to:
+  /// **'Angle'**
+  String get unitKindAngle;
+
+  /// No description provided for @unitKindTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get unitKindTime;
+
+  /// No description provided for @tallyTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target (optional)'**
+  String get tallyTarget;
+
+  /// No description provided for @tallyTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefilled in every new entry'**
+  String get tallyTargetHint;
+
+  /// No description provided for @tallyNotANumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Not a number. Type it like 12, 2.5 or 1:30.'**
+  String get tallyNotANumber;
+
+  /// No description provided for @tallyRule.
+  ///
+  /// In en, this message translates to:
+  /// **'A day with several entries counts'**
+  String get tallyRule;
+
+  /// No description provided for @tallyRuleSum.
+  ///
+  /// In en, this message translates to:
+  /// **'Their sum'**
+  String get tallyRuleSum;
+
+  /// No description provided for @tallyRuleMax.
+  ///
+  /// In en, this message translates to:
+  /// **'The largest'**
+  String get tallyRuleMax;
+
+  /// No description provided for @tallyHideField.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide field'**
+  String get tallyHideField;
+
+  /// No description provided for @tallyHideFieldDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Its values stay stored and return when it is shown again.'**
+  String get tallyHideFieldDetail;
+
+  /// No description provided for @tallyShowField.
+  ///
+  /// In en, this message translates to:
+  /// **'Show field again'**
+  String get tallyShowField;
+
+  /// No description provided for @tallyFieldHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get tallyFieldHidden;
+
+  /// No description provided for @tallyAddField.
+  ///
+  /// In en, this message translates to:
+  /// **'Add field'**
+  String get tallyAddField;
+
+  /// No description provided for @tallyFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Fields'**
+  String get tallyFields;
+
+  /// No description provided for @tallyNewEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'New entry'**
+  String get tallyNewEntry;
+
+  /// No description provided for @tallyEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry'**
+  String get tallyEntry;
+
+  /// No description provided for @tallyEntryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get tallyEntryDate;
+
+  /// No description provided for @tallyEntryLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line of text'**
+  String get tallyEntryLine;
+
+  /// No description provided for @tallyEntryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a value or a line of text.'**
+  String get tallyEntryEmpty;
+
+  /// No description provided for @tallyPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'One bar per'**
+  String get tallyPeriod;
+
+  /// No description provided for @tallyPeriodDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get tallyPeriodDay;
+
+  /// No description provided for @tallyPeriodWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get tallyPeriodWeek;
+
+  /// No description provided for @tallyPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get tallyPeriodMonth;
+
+  /// No description provided for @tallyPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get tallyPeriodYear;
+
+  /// No description provided for @tallyShowEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Show entries'**
+  String get tallyShowEntries;
+
+  /// No description provided for @tallyEntriesMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Mine'**
+  String get tallyEntriesMine;
+
+  /// No description provided for @tallyEntriesEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Everyone\'s'**
+  String get tallyEntriesEveryone;
+
+  /// No description provided for @tallyEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Entries'**
+  String get tallyEntries;
+
+  /// No description provided for @tallyNoEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'No entries yet.'**
+  String get tallyNoEntries;
+
+  /// No description provided for @tallyChartEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No values yet.'**
+  String get tallyChartEmpty;
+
+  /// No description provided for @tallyChartRange.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} to {to}'**
+  String tallyChartRange(String from, String to);
+
+  /// No description provided for @tallyChartHighest.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest bar: {value}'**
+  String tallyChartHighest(String value);
+
+  /// No description provided for @tallyChartLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart of {field}, {bars} bars'**
+  String tallyChartLabel(String field, int bars);
+
+  /// No description provided for @tallyTargetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Target {value}'**
+  String tallyTargetValue(String value);
+
+  /// No description provided for @tallyMoreEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Show more'**
+  String get tallyMoreEntries;
+
+  /// No description provided for @tallyRemovedEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed entries'**
+  String get tallyRemovedEntries;
+
+  /// No description provided for @deleteEntryQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this entry? It can be restored under \"Removed entries\".'**
+  String get deleteEntryQuestion;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @settingsUnits.
+  ///
+  /// In en, this message translates to:
+  /// **'Units'**
+  String get settingsUnits;
+
+  /// No description provided for @settingsUnitsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'How Tallies show known units. Values are stored in metric either way.'**
+  String get settingsUnitsDetail;
+
+  /// No description provided for @unitSystemRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'As the phone\'s region: {system}'**
+  String unitSystemRegion(String system);
+
+  /// No description provided for @unitSystemMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric (kg, km, °C)'**
+  String get unitSystemMetric;
+
+  /// No description provided for @unitSystemImperial.
+  ///
+  /// In en, this message translates to:
+  /// **'Imperial (lb, mi, °F)'**
+  String get unitSystemImperial;
+
+  /// Fills unitSystemRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'metric'**
+  String get unitSystemMetricName;
+
+  /// No description provided for @unitSystemImperialName.
+  ///
+  /// In en, this message translates to:
+  /// **'imperial'**
+  String get unitSystemImperialName;
 }
 
 class _AppLocalizationsDelegate

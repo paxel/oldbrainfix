@@ -24,6 +24,9 @@ import 'schedule_text.dart';
 import 'sent_item_screen.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
+import 'tally_entry_screen.dart';
+import 'tally_field_screen.dart';
+import 'tally_view.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
@@ -263,6 +266,15 @@ NoteActions noteActions(
         : null,
     removals: placed.changes
         ? () => mediaRemovals(context, notes, id, then)
+        : null,
+    isTally: () => Tallies(notes.store).isTally(id),
+    // Only a Note in the lists becomes a Tally (ADR 0028).
+    onMakeTally:
+        placed.changes && !placed.note.isTrashed && !placed.note.isMerged
+        ? () => then(makeTally(context, notes, id))
+        : null,
+    onAddEntry: placed.amends
+        ? () => then(addTallyEntry(context, notes, id))
         : null,
     onDelete: placed.changes
         ? () => then(deleteNote(context, notes, id))
@@ -903,6 +915,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               ),
             ],
             const SizedBox(height: 16),
+            // Nothing while the Note is no Tally.
+            TallySection(notes: widget.notes, noteId: widget.noteId),
             EditorPanel(
               heading: t.importance,
               child: RadioColumn<Importance>(

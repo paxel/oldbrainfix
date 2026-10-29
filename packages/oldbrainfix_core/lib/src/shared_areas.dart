@@ -10,6 +10,7 @@ import 'profiles.dart';
 import 'routines.dart';
 import 'signing.dart';
 import 'store.dart';
+import 'tallies.dart';
 import 'sync.dart';
 
 /// Shared Areas (CONTEXT.md, ADR 0013): an Area other people sync with.
@@ -169,8 +170,8 @@ class JudgedLog {
 /// Which of [entries], the whole raw log, no role allows. Layered, so
 /// nothing depends on what is still to be judged: the grants of every
 /// Area by latest wins; the Topics by their Area; the Notes by their
-/// Area or Topic; the Sections, Routines and Frogs by their Note. Each
-/// entry is
+/// Area or Topic; the Sections, Routines, Frogs and Tally entries by
+/// their Note. Each entry is
 /// judged in the Area its entity was in at that point, by the filings
 /// that count: the last one before it, or the first one for what came
 /// before any.
@@ -313,7 +314,9 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
   }
 
   for (final id in ids) {
-    final section = id.startsWith('section:');
+    // A Tally's entry is its author's, as a Section is.
+    final section =
+        id.startsWith('section:') || id.startsWith(TallyKeys.entryPrefix);
     final frog = id.startsWith(FrogKeys.prefix);
     if (!section && !frog && !id.startsWith('routine:')) continue;
     final list = byEntity[id] ?? const <Entry>[];
@@ -418,7 +421,9 @@ extension SharedAreas on Store {
   /// Whether this Device may pick a version of a Conflict on [entity] of
   /// [type] (`$type`): the pick is an edit like any other.
   bool mayResolve(String entity, String type) => switch (type) {
-    NoteKeys.typeNote || SectionKeys.typeSection => mayChange(entity),
+    NoteKeys.typeNote ||
+    SectionKeys.typeSection ||
+    TallyKeys.typeEntry => mayChange(entity),
     RoutineKeys.typeRoutine || FrogKeys.typeFrog => mayChangeRoutine(entity),
     PlaceKeys.typeArea => mayManage(entity),
     PlaceKeys.typeTopic => mayManage(areaOf(entity)),
@@ -661,8 +666,8 @@ extension SharedAreas on Store {
   }
 
   /// [delta] with the whole history of every Note a filing in it put
-  /// into an Area [wanted] says yes to, with its Sections, Routines and
-  /// Frogs:
+  /// into an Area [wanted] says yes to, with its Sections, Routines,
+  /// Frogs and Tally entries:
   /// a Note captured Unsorted and filed later began below the vector. In
   /// (device, dseq) order, each entry once.
   List<Entry> withFiled(List<Entry> delta, bool Function(String area) wanted) {
@@ -677,6 +682,7 @@ extension SharedAreas on Store {
       SectionKeys.typeSection,
       RoutineKeys.typeRoutine,
       FrogKeys.typeFrog,
+      TallyKeys.typeEntry,
     ]) {
       for (final id in entitiesOfType(type)) {
         if (notes.contains(current(id, SectionKeys.note))) entities.add(id);

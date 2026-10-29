@@ -116,6 +116,16 @@ Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurde
 Der Startbildschirm: die Fälligkeiten von heute, dann gedimmt morgen, mit der Verpasst-Übersicht und der Zahl der unsortierten Notizen obenauf.
 _Avoid_: Dashboard, Tagesansicht, Startseite
 
+## Strichlisten
+
+**Strichliste** [Tally]:
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihre Felder, jedes eine Zahl mit Einheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, gezeigt als Tabelle und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr.
+_Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
+
+**Eintrag** [Entry]:
+Ein Datensatz einer Strichliste: ein Wert für einige ihrer Felder, ein Datum, eine Zeile Text und sein Verfasser.
+_Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz, Satz
+
 ## Menschen und Geräte
 
 **Gerät** [Device]:

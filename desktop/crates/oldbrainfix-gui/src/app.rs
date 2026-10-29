@@ -68,7 +68,7 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CardTaken, ClockTime, Day,
     DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, MissedSummary, Note, Notes,
     NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
-    Routines, Search, Section, Store, Topic, bundle,
+    Routines, Search, Section, Store, Tallies, Topic, UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -100,6 +100,9 @@ use crate::speech::SpeechModel;
 use crate::sync_view::{
     Joiner, SyncAction, SyncHost, bundle_result_text, device_name, import_bundle_result,
     offer_refusal, update_notice_text,
+};
+use crate::tally_view::{
+    self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
 };
 use crate::theme::{self, AREA_PALETTE, Tones};
 
@@ -250,6 +253,8 @@ struct View {
     /// The Frogs the selected Note spawned, oldest first, each with
     /// whether this Device may check it off.
     note_frogs: Vec<(Frog, bool)>,
+    /// The Tally of the selected Note, while it is one (#103).
+    tally: Option<TallyShown>,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -336,6 +341,10 @@ enum Dialog {
     },
     /// Whether the Frog `id` goes to the trash; its Note stays.
     DeleteFrog {
+        id: String,
+    },
+    /// Whether the Tally's entry `id` goes; it can be restored.
+    DeleteEntry {
         id: String,
     },
     /// Sharing the Area `area`: the role the other person gets, and the
@@ -580,6 +589,12 @@ enum Action {
     /// Moves the Frog the dialog asks about to the trash.
     DeleteFrog,
     RestoreFrog(String),
+    /// Something asked of the Tally part of the Note's editor (#103).
+    Tally(TallyAction),
+    /// Something asked of the field page or the entry page.
+    TallyForm(FormIntent),
+    /// Removes the entry the dialog asks about.
+    DeleteEntry,
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
@@ -714,6 +729,9 @@ enum Setting {
     /// The sound file Occurrences ring with; `None` for the app's own
     /// (#102).
     AlarmSound(Option<String>),
+    /// The system Tallies show known units in; `None` follows the
+    /// region (#103).
+    Units(Option<UnitSystem>),
 }
 
 /// The wall clock the window shows days on.
@@ -749,6 +767,13 @@ pub struct App {
     focus: bool,
     /// The Routine or Reminder being made or changed on the right.
     editor: Option<RoutineEditor>,
+    /// The field page or the entry page of a Tally on the right, and how
+    /// the selected Note's Tally is looked at (#103).
+    tally_form: Option<TallyForm>,
+    tally_look: TallyLook,
+    /// The region the system reports, an ISO country code, which picks
+    /// the units Tallies show unless this Device chose them.
+    region: Option<String>,
     /// Bumped by the alerts when a notification changed the log.
     changes: Option<Arc<AtomicU64>>,
     seen_changes: u64,
@@ -959,6 +984,17 @@ fn item_dialog(title: &str) -> rfd::FileDialog {
         .add_filter(oldbrainfix_core::APP_NAME, &[sent::EXTENSION])
 }
 
+/// The region of a system locale such as `en-US`, `de_DE.UTF-8` or
+/// `zh-Hans-CN`: its two-letter country code, or `None` when it names
+/// none.
+pub fn region_of(locale: Option<&str>) -> Option<String> {
+    let tag = locale?.split(['.', '@']).next()?;
+    tag.split(['-', '_'])
+        .skip(1)
+        .find(|part| part.len() == 2 && part.chars().all(|c| c.is_ascii_alphabetic()))
+        .map(str::to_uppercase)
+}
+
 impl App {
     /// The window over `store`, speaking `locale`, showing the Agenda on
     /// the system's local time.
@@ -984,6 +1020,9 @@ impl App {
             dialog: None,
             focus: false,
             editor: None,
+            tally_form: None,
+            tally_look: TallyLook::new(None),
+            region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
             seen_changes: 0,
             wake: None,
@@ -1054,6 +1093,19 @@ impl App {
             Err(e) => app.error = Some(e.to_string()),
         }
         app
+    }
+
+    /// Shows the known units of Tallies as `region`, an ISO country code,
+    /// does, unless this Device chose a system, instead of the system's
+    /// region.
+    pub fn set_region(&mut self, region: Option<&str>) {
+        self.region = region.map(str::to_uppercase);
+        self.refresh();
+    }
+
+    /// The system this Device shows the known units of Tallies in.
+    fn unit_system(&self) -> oldbrainfix_core::Result<UnitSystem> {
+        DeviceSettings::new(&self.store).unit_system(self.region.as_deref())
     }
 
     /// Shows days on `wall` instead of the system's local time.
@@ -2001,6 +2053,18 @@ impl App {
     /// Reads what the panes show from the log. A selected place that is
     /// gone falls back to All Notes.
     fn refresh(&mut self) {
+        // Each Note opened is looked at afresh; a page of another Note's
+        // Tally goes.
+        if self.tally_look.of != self.selected_note {
+            self.tally_look = TallyLook::new(self.selected_note.clone());
+        }
+        if self
+            .tally_form
+            .as_ref()
+            .is_some_and(|f| Some(f.note_id()) != self.selected_note.as_deref())
+        {
+            self.tally_form = None;
+        }
         let mut read = self.read();
         if let (Ok(view), Selection::Place(id)) = (&read, &self.selection)
             && view.area(id).is_none()
@@ -2199,6 +2263,16 @@ impl App {
                 note_frogs.push((frog, may_check));
             }
         }
+        let tally = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => tally_view::read(
+                store,
+                &p.note.id,
+                &self.tally_look,
+                self.unit_system()?,
+                &*self.wall,
+            )?,
+            _ => None,
+        };
         let may = match &detail {
             Some((p, _)) => NoteMay {
                 changes: self.store.may_change(&p.note.id)?,
@@ -2362,6 +2436,7 @@ impl App {
             detail,
             routines: note_routines,
             note_frogs,
+            tally,
             frogs_open,
             frogs_done,
             frogs_done_open: self.store.local_setting(FROGS_DONE_OPEN)?.as_deref() == Some("true"),
@@ -2453,6 +2528,7 @@ impl App {
                 self.save_text()?;
                 self.selected_note = Some(id);
                 self.editor = None;
+                self.tally_form = None;
             }
             Action::Capture(nudge_in) => {
                 // A running recording is ended and kept first; held
@@ -2699,6 +2775,7 @@ impl App {
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
                     self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
+                    self.tally_form = None;
                 }
             }
             Action::NewRoutine { note, reminder } => {
@@ -2708,6 +2785,7 @@ impl App {
                     None => None,
                 };
                 let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                self.tally_form = None;
                 self.editor = Some(RoutineEditor::new(
                     note,
                     reminder,
@@ -2758,6 +2836,22 @@ impl App {
                 }
             }
             Action::RestoreFrog(id) => Frogs::new(&self.store).restore(&id)?,
+            Action::Tally(asked) => self.tally_action(asked)?,
+            Action::TallyForm(intent) => self.tally_form_action(intent)?,
+            Action::DeleteEntry => {
+                if let Some(Dialog::DeleteEntry { id }) = self.dialog.take() {
+                    let tallies = Tallies::new(&self.store);
+                    // A sync while the dialog was open may have taken it.
+                    if tallies.entry_by_id(&id)?.is_some_and(|e| !e.is_trashed()) {
+                        tallies.trash_entry(&id)?;
+                    }
+                    if let Some(TallyForm::Entry(form)) = &self.tally_form
+                        && form.entry.as_ref().is_some_and(|e| e.id == id)
+                    {
+                        self.tally_form = None;
+                    }
+                }
+            }
             Action::Setting(setting) => self.set(setting)?,
             Action::PickAlarmSound => {
                 if let Some(path) = (self.sound_picker)(self.t.alarm_sound_pick()) {
@@ -3158,6 +3252,103 @@ impl App {
         Ok(())
     }
 
+    /// Does what was asked of the Tally part of the Note's editor (#103).
+    fn tally_action(&mut self, asked: TallyAction) -> oldbrainfix_core::Result<()> {
+        let tallies = Tallies::new(&self.store);
+        let system = self.unit_system()?;
+        let note = self.selected_note.clone().unwrap_or_default();
+        match asked {
+            TallyAction::Make(id) => {
+                self.save_text()?;
+                self.editor = None;
+                self.tally_form =
+                    Some(TallyForm::Field(FieldForm::new(&id, None, system, &self.t)));
+            }
+            TallyAction::OpenField(field) => {
+                let field = match field {
+                    Some(id) => tallies.by_note(&note)?.and_then(|t| t.field(&id).cloned()),
+                    None => None,
+                };
+                self.save_text()?;
+                self.editor = None;
+                self.tally_form = Some(TallyForm::Field(FieldForm::new(
+                    &note, field, system, &self.t,
+                )));
+            }
+            TallyAction::AddEntry | TallyAction::EditEntry(_) => {
+                let Some(tally) = tallies.by_note(&note)? else {
+                    return Ok(());
+                };
+                let entry = match &asked {
+                    TallyAction::EditEntry(id) => match tallies.entry_by_id(id)? {
+                        Some(entry) if !entry.is_trashed() => {
+                            let changes = self.store.may_change(id)?;
+                            Some((entry, changes))
+                        }
+                        _ => return Ok(()),
+                    },
+                    _ => None,
+                };
+                let today = Day::today(self.store.now(), &*self.wall);
+                self.save_text()?;
+                self.editor = None;
+                self.tally_form = Some(TallyForm::Entry(EntryForm::new(
+                    &tally,
+                    entry,
+                    (system, today),
+                    &*self.wall,
+                    &self.t,
+                )));
+            }
+            TallyAction::AskDelete(id) => self.dialog = Some(Dialog::DeleteEntry { id }),
+            TallyAction::Restore(id) => tallies.restore_entry(&id)?,
+            TallyAction::Whose(whose) => self.tally_look.whose = Some(whose),
+            TallyAction::Period(period) => self.tally_look.period = period,
+            TallyAction::More => self.tally_look.count += tally_view::PAGE,
+            TallyAction::RemovedOpen(open) => {
+                let value = if open { "true" } else { "false" };
+                self.store
+                    .set_local_setting(tally_view::REMOVED_OPEN, value)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Does what was asked of the field page or the entry page.
+    fn tally_form_action(&mut self, intent: FormIntent) -> oldbrainfix_core::Result<()> {
+        let Some(form) = &mut self.tally_form else {
+            return Ok(());
+        };
+        match intent {
+            FormIntent::Save => {
+                let saved = match form {
+                    TallyForm::Field(form) => form.save(&self.store)?,
+                    TallyForm::Entry(form) => form.save(&self.store, &*self.wall)?,
+                };
+                if saved {
+                    self.tally_form = None;
+                }
+            }
+            FormIntent::Close => self.tally_form = None,
+            FormIntent::Hide(hidden) => {
+                if let TallyForm::Field(form) = form {
+                    form.set_hidden(&self.store, hidden)?;
+                }
+                self.tally_form = None;
+            }
+            FormIntent::Delete => {
+                if let TallyForm::Entry(form) = form
+                    && let Some(entry) = &form.entry
+                {
+                    self.dialog = Some(Dialog::DeleteEntry {
+                        id: entry.id.clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn capture_note(
         &mut self,
         nudge_in: Duration,
@@ -3259,6 +3450,7 @@ impl App {
                 }
             }
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
+            Setting::Units(system) => settings.set_chosen_unit_system(system)?,
         }
         Ok(())
     }
@@ -4215,10 +4407,18 @@ impl App {
             }
             return;
         }
+        if let Some(form) = &mut self.tally_form {
+            if let Some(intent) = form.show(ui, &self.t, tones) {
+                actions.push(Action::TallyForm(intent));
+            }
+            return;
+        }
         let Some((placed, sections)) = &self.view.detail else {
             return;
         };
         let linked = &self.view.routines;
+        let tally = self.view.tally.as_ref();
+        let tally_count = self.tally_look.count;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
         let t = self.t;
@@ -4314,6 +4514,12 @@ impl App {
                             actions,
                         );
                     });
+                }
+                // Nothing while the Note is no Tally.
+                if let Some(tally) = tally {
+                    let mut asked = Vec::new();
+                    tally_view::section(ui, &t, tones, (tally, tally_count), &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Tally));
                 }
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.importance()).strong().color(text));
@@ -4534,6 +4740,16 @@ impl App {
                         actions.push(Action::Trash);
                     }
                 });
+                // Only a Note in the lists becomes a Tally (ADR 0028); one
+                // that is adds entries in its Tally part above.
+                if tally.is_none()
+                    && !note.is_merged()
+                    && ui
+                        .button(RichText::new(t.make_tally()).color(text))
+                        .clicked()
+                {
+                    actions.push(Action::Tally(TallyAction::Make(note.id.clone())));
+                }
             });
     }
 
@@ -4617,6 +4833,15 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.delete()) {
                                 actions.push(Action::DeleteFrog);
+                            }
+                        });
+                    }
+                    Dialog::DeleteEntry { .. } => {
+                        title(ui, t.delete_entry_question());
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::DeleteEntry);
                             }
                         });
                     }
@@ -5612,6 +5837,8 @@ impl App {
         let ai_url = self.ai_port.as_ref().map(AiPort::url);
         let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
         let ai_copied = self.ai_copied;
+        let units = settings.chosen_unit_system().ok().flatten();
+        let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -5740,6 +5967,26 @@ impl App {
                         ui.label(
                             RichText::new(t.time_invalid()).color(ui.visuals().error_fg_color),
                         );
+                    }
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_units()).strong().color(text));
+                    ui.label(RichText::new(t.settings_units_detail()).small().color(weak));
+                    let region = match region_units {
+                        UnitSystem::Metric => t.unit_system_metric_name(),
+                        UnitSystem::Imperial => t.unit_system_imperial_name(),
+                    };
+                    let options = [
+                        (None, t.unit_system_region(region)),
+                        (Some(UnitSystem::Metric), t.unit_system_metric().to_string()),
+                        (
+                            Some(UnitSystem::Imperial),
+                            t.unit_system_imperial().to_string(),
+                        ),
+                    ];
+                    let mut chosen = units;
+                    if radio_column(ui, &mut chosen, options) && chosen != units {
+                        actions.push(Action::Setting(Setting::Units(chosen)));
                     }
                 });
             });
