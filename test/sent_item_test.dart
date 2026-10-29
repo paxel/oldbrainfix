@@ -1,16 +1,21 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/photo_views.dart';
+import 'package:oldbrainfix/src/profile.dart';
 import 'package:oldbrainfix/src/sent_item_screen.dart';
+import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
 import 'fake_profile.dart' show halvesPng;
+import 'fake_voice.dart';
 
 void main() {
   final now = DateTime.utc(2026, 10, 24, 9);
@@ -687,6 +692,80 @@ void main() {
         expect(phone.keptPeople, isEmpty);
         expect(heldSentItems(phone), isEmpty);
         expect(find.byKey(const ValueKey('sentItemsWaiting')), findsNothing);
+      });
+
+      /// Declines, before "Show", Ann's Note that holds [media] on her
+      /// side, and expects nothing of it or of her picture decoded or
+      /// played here.
+      Future<void> declineUnseen(
+        WidgetTester tester,
+        String Function(Notes notes, String id) media,
+        Object? Function(String hash) held,
+      ) async {
+        final note = Notes(ann).capture('Dentist on Friday');
+        final hash = media(Notes(ann), note.id);
+        final bytes = File(fileFrom(note)).readAsBytesSync();
+        final received = receiveSentItem(phone, bytes);
+        expect(received, isA<HeldSentItem>());
+        expect((received as HeldSentItem).sender.picture, isNull);
+
+        final voice = FakeVoice();
+        tester.view.physicalSize = const Size(800, 2400);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          OldBrainFixApp(
+            store: phone,
+            alarms: alarms,
+            announcements: announcements,
+            bundles: files,
+            voice: voice,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('1 Sent Item waiting'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('From Ann'));
+        await tester.pumpAndSettle();
+        expectHidden();
+        for (final shown in [
+          Image,
+          RawImage,
+          ProfileAvatar,
+          NotePhoto,
+          PhotoStrip,
+          PlaybackSpeedButton,
+        ]) {
+          expect(find.byType(shown), findsNothing, reason: '$shown');
+        }
+
+        await tester.tap(find.byKey(const ValueKey('decline-sent')));
+        await tester.pumpAndSettle();
+        expect(announcements.visible, 'Declined: nothing was kept.');
+        expect(voice.played, isEmpty);
+        expect(find.byType(Image), findsNothing);
+        expect(held(hash), isNull);
+        expect(Notes(phone).all(), isEmpty);
+        expect(phone.keptPeople, isEmpty);
+        expect(heldSentItems(phone), isEmpty);
+      }
+
+      testWidgets('Decline before "Show" decodes no photo for display', (
+        tester,
+      ) async {
+        await declineUnseen(
+          tester,
+          (notes, id) => notes.addPhoto(id, halvesPng),
+          phone.photo,
+        );
+      });
+
+      testWidgets('Decline before "Show" loads no recording', (tester) async {
+        await declineUnseen(
+          tester,
+          (notes, id) => notes.addRecording(id, Uint8List.fromList([1, 2, 3])),
+          phone.audio,
+        );
       });
 
       testWidgets('"Decline and block" before "Show" blocks her', (

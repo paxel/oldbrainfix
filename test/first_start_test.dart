@@ -7,6 +7,8 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/host_screen.dart';
+import 'package:oldbrainfix/src/profile.dart';
+import 'package:oldbrainfix/src/profile_screen.dart';
 import 'package:oldbrainfix/src/setup_screen.dart';
 import 'package:oldbrainfix/src/speech_offer_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
@@ -39,7 +41,9 @@ void main() {
 
   setUp(() {
     store = Store.inMemory();
-    desk = Store.inMemory();
+    desk = Store.inMemory()
+      ..applyProfileDefaults(name: 'Desk')
+      ..renameOwnProfile('Ann');
     Places(desk).plantStarterSet({'work'});
     Notes(desk).capture('From the desk');
     hosts = FakeHosts();
@@ -54,11 +58,12 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  /// What the other Device holds comes in, as a sync brings it.
-  void takeDesk() => store.applyEntries(
-    desk.entriesSince(const {}),
-    keys: [desk.ownKeyRecord],
-  );
+  /// What the other Device holds comes in, as a sync brings it, its
+  /// Profile included.
+  void takeDesk() {
+    store.applyEntries(desk.entriesSince(const {}), keys: [desk.ownKeyRecord]);
+    store.takeOwnProfile(desk.ownProfileJson, from: desk.signingKey.publicKey);
+  }
 
   Future<SyncResult> join(
     Store into,
@@ -106,14 +111,25 @@ void main() {
   final restore = find.byKey(const ValueKey('restore-offer'));
 
   /// After the sync: the speech model offer and the alarm setup still
-  /// come, then the Agenda with the other Device's Notes.
+  /// come, then the Agenda with the other Device's Notes. Neither the
+  /// Starter Set nor the Profile's name and picture are asked: the
+  /// Profile is the other Device's, not this Device's defaults.
   Future<void> setUpAfterSync(WidgetTester tester) async {
-    expect(find.byType(StarterSetScreen), findsNothing);
+    void nothingAsked() {
+      expect(find.byType(StarterSetScreen), findsNothing);
+      expect(find.byType(ProfileScreen), findsNothing);
+      expect(find.byType(ProfileQuestionDialog), findsNothing);
+    }
+
+    nothingAsked();
     expect(find.byType(SpeechOfferScreen), findsOneWidget);
     await tap(tester, find.text('Not now'));
+    nothingAsked();
     expect(find.byType(SetupScreen), findsOneWidget);
     expect(store.starterSetOffered, isTrue);
-    expect(store.ownProfile, isNotNull);
+    expect(store.ownProfile?.id, desk.ownProfile!.id);
+    expect(store.ownProfile?.name, 'Ann');
+    expect(store.profileQuestion, isNull);
     expect(Places(store).areas().map((a) => a.name), ['Work']);
   }
 
@@ -174,6 +190,9 @@ void main() {
     }
     await tap(tester, find.text('Done'));
     expect(find.byType(AgendaScreen), findsOneWidget);
+    expect(find.byType(StarterSetScreen), findsNothing);
+    expect(find.byType(ProfileScreen), findsNothing);
+    expect(store.ownProfile?.name, 'Ann');
     // The other Device's Note, Unsorted there and here.
     expect(Notes(store).all().single.text, 'From the desk');
     expect(find.textContaining('1 Unsorted'), findsOneWidget);
