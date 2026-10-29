@@ -9,8 +9,12 @@
 //! Note, and comparing its short code marks it verified (#51). A
 //! stranger's item shows only who it is from until "Show", is accepted,
 //! declined or blocked before it too, and waits behind the Agenda's
-//! "x Sent Items waiting" until decided (#91).
+//! "x Sent Items waiting" until decided (#91); declined before it,
+//! nothing of its sender's picture or its Note's photos and recordings
+//! is decoded or played.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use egui::accesskit::Role;
@@ -21,6 +25,7 @@ use oldbrainfix_core::{
     ClockTime, Day, ImportReport, Notes, OwnProfile, PairedDevice, Routines, Schedule, SigningKey,
     Store,
 };
+use oldbrainfix_gui::media::Player;
 use oldbrainfix_gui::schedule_text::schedule_text;
 use oldbrainfix_gui::{App, Selection};
 
@@ -700,5 +705,101 @@ fn decline_and_block_after_show_blocks_the_stranger() -> TestResult {
     assert!(store.is_blocked(&ann_id)?);
     assert!(store.pending_sets()?.is_empty());
     assert!(Notes::new(store).all()?.is_empty());
+    Ok(())
+}
+
+/// Speakers that only count what they were asked to play.
+struct Speakers(Rc<RefCell<u32>>);
+
+impl Player for Speakers {
+    fn play(&mut self, _bytes: Vec<u8>) -> bool {
+        *self.0.borrow_mut() += 1;
+        true
+    }
+
+    fn stop(&mut self) {}
+
+    fn playing(&self) -> bool {
+        false
+    }
+
+    fn set_speed(&mut self, _speed: f64) {}
+}
+
+/// The names of the textures made from a photo or from `profile`'s
+/// picture.
+fn pictures_drawn(harness: &Harness<'_, App>, profile: &str) -> Vec<String> {
+    let profile = format!("profile:{profile}:");
+    harness
+        .ctx
+        .tex_manager()
+        .read()
+        .allocated()
+        .map(|(_, meta)| meta.name.clone())
+        .filter(|name| name.starts_with("photo") || name.starts_with(&profile))
+        .collect()
+}
+
+#[test]
+fn declining_a_strangers_sent_item_before_show_decodes_no_photo_or_recording() -> TestResult {
+    let png = halves(60, 40)?;
+    let photo = |notes: &Notes<'_>, id: &str| notes.add_photo(id, &png);
+    let recording = |notes: &Notes<'_>, id: &str| notes.add_recording(id, &[1, 2, 3]);
+    type Media<'a> = &'a dyn Fn(&Notes<'_>, &str) -> oldbrainfix_core::Result<String>;
+    let kinds: [(Media, bool); 2] = [(&photo, true), (&recording, false)];
+    for (media, is_photo) in kinds {
+        // Ann has a picture; her Note holds a photo or a recording on
+        // her side.
+        let ann = store(3, "Ann")?;
+        let picture = profile::square_picture(&halves(60, 40)?).ok_or("picture")?;
+        OwnProfile::new(&ann).set_picture(Some(picture))?;
+        let ann_id = OwnProfile::new(&ann).get()?.ok_or("profile")?.id;
+        let note = Notes::new(&ann).capture("Dentist on Friday", None, None)?;
+        let hash = media(&Notes::new(&ann), &note.id)?;
+        let dir = tempfile::tempdir()?;
+        let file = dir.path().join("from-ann.oldbrain");
+        std::fs::write(&file, ann.send_note(&note.id, None, false)?)?;
+
+        let played = Rc::new(RefCell::new(0));
+        let mut app = App::new(store(1, "Ada")?, "en");
+        app.set_player(Box::new(Speakers(played.clone())));
+        app.select(Selection::Agenda);
+        let mut harness = window(app);
+        let images = |h: &Harness<'_, App>| h.query_all_by_role(Role::Image).count();
+        let before = images(&harness);
+        drop_file(&mut harness, &file);
+        harness.run_steps(3);
+        assert!(shows(&harness, "An unknown person"));
+        // Nothing of hers drawn: no picture, no photo, no player.
+        assert!(pictures_drawn(&harness, &ann_id).is_empty());
+        assert_eq!(images(&harness), before);
+        assert!(!shows(&harness, "Play the voice recording"));
+
+        harness.get_by_label("Decline").click_accesskit();
+        harness.run_steps(3);
+        assert_eq!(
+            harness.state().notice(),
+            Some("Declined: nothing was kept.")
+        );
+        assert!(pictures_drawn(&harness, &ann_id).is_empty());
+        assert_eq!(*played.borrow(), 0);
+        let held = harness.state().store();
+        if is_photo {
+            assert!(held.photo(&hash).is_none());
+        } else {
+            assert!(held.audio(&hash).is_none());
+        }
+        assert!(Notes::new(held).all()?.is_empty());
+        assert!(held.kept_people()?.is_empty());
+        assert!(held.pending_sets()?.is_empty());
+        assert!(held.held_sent_items()?.is_empty());
+
+        // "Show" would have drawn her picture: what was checked above
+        // can be seen.
+        drop_file(&mut harness, &file);
+        harness.get_by_label("Show").click_accesskit();
+        harness.run_steps(3);
+        assert!(!pictures_drawn(&harness, &ann_id).is_empty());
+    }
     Ok(())
 }

@@ -2,7 +2,8 @@
 //! is new, adds a Device of their own or restores a Backup, and makes no
 //! Profile before the answer. "Add a Device of mine" pairs either way
 //! round over the loopback and syncs, taking the other Device's Profile
-//! and Notes and skipping the setup; a refusal, a failed join, Cancel and
+//! and Notes and skipping the setup: no Starter Set, and the Profile is
+//! the other Device's, not one from this Device's defaults; a refusal, a failed join, Cancel and
 //! Back return to the three choices with nothing answered.
 
 use std::net::{IpAddr, Ipv4Addr};
@@ -15,8 +16,8 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::join::{SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{Host, PairInfo, decode_pair_code};
 use oldbrainfix_core::{Error, Notes, OwnProfile, Places, SigningKey, Store};
-use oldbrainfix_gui::App;
 use oldbrainfix_gui::backup_view::restore_due;
+use oldbrainfix_gui::{App, Selection};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -105,6 +106,29 @@ fn texts(store: &Store) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         .collect())
 }
 
+/// After the sync no Profile step came: the Profile is the other
+/// Device's, its id `theirs` and its name, not one made from this Device's
+/// defaults, and nothing asks which one is the user's. No Starter Set
+/// came either: only the other Device's Area is here.
+fn the_other_devices_profile(harness: &mut Harness<'_, App>, theirs: &str) -> TestResult {
+    for _ in 0..3 {
+        harness.step();
+    }
+    let desk = harness.state().store();
+    let own = OwnProfile::new(desk).get()?.ok_or("a Profile")?;
+    assert_eq!((own.id.as_str(), own.name.as_str()), (theirs, "Ada"));
+    assert!(OwnProfile::new(desk).question()?.is_none());
+    assert!(!shows(harness, "Which one is you?"));
+    assert_ne!(harness.state().selection(), &Selection::Profile);
+    let areas: Vec<String> = Places::new(desk)
+        .areas()?
+        .into_iter()
+        .map(|a| a.name)
+        .collect();
+    assert_eq!(areas, ["Doctor"]);
+    Ok(())
+}
+
 /// Still on the three choices, nothing answered and no Profile made.
 fn untouched(harness: &Harness<'_, App>) -> TestResult {
     let app = harness.state();
@@ -128,6 +152,7 @@ fn the_three_choices_show_and_no_profile_is_made_before_one() -> TestResult {
 #[test]
 fn a_device_of_mine_joined_by_its_code_brings_everything_and_skips_the_setup() -> TestResult {
     let phone = Arc::new(phone()?);
+    let theirs = OwnProfile::new(&phone).get()?.ok_or("profile")?.id;
     let identity = phone.tls_identity()?;
     let host = Host::start(&identity, "246810", Some(IpAddr::V4(Ipv4Addr::LOCALHOST)))?;
     let code = host.pair_code(true);
@@ -174,7 +199,7 @@ fn a_device_of_mine_joined_by_its_code_brings_everything_and_skips_the_setup() -
     assert!(!restore_due(desk)?);
     harness.state_mut().offer_restore();
     assert!(!harness.state().welcoming());
-    Ok(())
+    the_other_devices_profile(&mut harness, &theirs)
 }
 
 #[test]
@@ -188,9 +213,10 @@ fn a_device_of_mine_joining_this_one_brings_everything_after_continue() -> TestR
         .ok_or("hosting")?
         .pair_code(true);
     assert!(harness.query_by_label("Continue").is_none());
+    let phone = phone()?;
+    let theirs = OwnProfile::new(&phone).get()?.ok_or("profile")?.id;
     let joined = std::thread::spawn(move || -> Result<(), String> {
         let fail = |e: &dyn std::fmt::Display| e.to_string();
-        let phone = phone().map_err(|e| fail(&*e))?;
         let info = decode_pair_code(&code).ok_or("a code")?;
         lan_sync(&phone, &info, "Pixel").map_err(|e| fail(&e))?;
         Ok(())
@@ -217,7 +243,7 @@ fn a_device_of_mine_joining_this_one_brings_everything_after_continue() -> TestR
         .map(|a| a.name)
         .collect();
     assert_eq!(areas, ["Doctor"]);
-    Ok(())
+    the_other_devices_profile(&mut harness, &theirs)
 }
 
 #[test]

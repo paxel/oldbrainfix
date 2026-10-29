@@ -1013,6 +1013,53 @@ fn replace_and_append_take_a_photo_text_over_into_the_notes_text() -> TestResult
 }
 
 #[test]
+fn replace_and_append_take_a_transcript_over_into_the_notes_text() -> TestResult {
+    let store = empty_store()?;
+    let notes = Notes::new(&store);
+    let note = notes.capture("Bike", None, None)?;
+    let hash = notes.add_recording(&note.id, &heard())?;
+    notes.set_transcript(&note.id, &hash, "Lock code 1234")?;
+    let devices: Shared = Rc::default();
+    let mut harness = window(store.clone(), &devices);
+    harness.state_mut().select_note(&note.id);
+    harness.run();
+    assert_eq!(harness.query_all_by_label("Replace Note text").count(), 1);
+    assert_eq!(harness.query_all_by_label("Append to Note text").count(), 1);
+    let text = |store: &Store| -> Result<String, Box<dyn std::error::Error>> {
+        Ok(Notes::new(store).by_id(&note.id)?.ok_or("Bike")?.text)
+    };
+    harness.get_by_label("Append to Note text").click();
+    harness.run();
+    assert_eq!(text(&store)?, "Bike\nLock code 1234");
+    // The editor's field took the new text: a second Append builds on it.
+    harness.get_by_label("Append to Note text").click();
+    harness.run();
+    assert_eq!(text(&store)?, "Bike\nLock code 1234\nLock code 1234");
+    harness.get_by_label("Replace Note text").click();
+    harness.run();
+    assert_eq!(text(&store)?, "Lock code 1234");
+    assert_eq!(harness.state().error(), None);
+    // A Note text edit as any other: a signed entry of this Device, which
+    // a sync carries.
+    let device = store.device_id()?;
+    let edits: Vec<_> = store
+        .all_entries()?
+        .into_iter()
+        .filter(|e| e.entity == note.id && e.field == "text")
+        .collect();
+    assert!(edits.len() > 1, "captured, then edited");
+    assert!(edits.iter().all(|e| e.device == device && e.sig.is_some()));
+    // The Transcript itself stays as it was.
+    let bike = Notes::new(&store).by_id(&note.id)?.ok_or("Bike")?;
+    assert_eq!(
+        bike.transcripts.get(&hash).map(String::as_str),
+        Some("Lock code 1234")
+    );
+    assert!(shows(&harness, "Lock code 1234"));
+    Ok(())
+}
+
+#[test]
 fn removing_a_photo_text_asks_once_and_keeps_the_photo() -> TestResult {
     let store = media_store()?;
     let devices: Shared = Rc::default();
