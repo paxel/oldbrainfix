@@ -1,3 +1,4 @@
+import 'checklists.dart';
 import 'notes.dart';
 import 'schedule.dart';
 import 'sessions.dart';
@@ -385,6 +386,14 @@ class Routines {
         // entry (ADR 0029); a check-off, written below, keeps its moment.
         if (fields[SessionKeys.pool] != null)
           ...SessionMarks.read(store, id, history).doneFromEntries(store),
+        // Spawned from a Checklist, once every Line is checked for it
+        // (ADR 0030).
+        if (fields.keys.any((k) => k.startsWith(ChecklistKeys.checkPrefix)))
+          ...LineChecks.read(
+            store,
+            id,
+            history,
+          ).done(store, {noteId, ?Notes(store).byId(noteId)?.mergedInto}),
         for (final MapEntry(:key, :value) in fields.entries)
           if (key.startsWith(RoutineKeys.donePrefix) && value != null)
             key.substring(RoutineKeys.donePrefix.length): DateTime.parse(value),

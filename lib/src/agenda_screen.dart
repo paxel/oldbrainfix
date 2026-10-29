@@ -13,6 +13,7 @@ import 'area_look.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
+import 'checklist_view.dart';
 import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
 import 'calendar_screen.dart';
@@ -42,14 +43,20 @@ import 'tally_view.dart';
 
 /// An Agenda row with where its Note is filed and whether it shows
 /// Masked, read once per change; for a Session its Session, and today
-/// its picks.
+/// its picks; for a Routine spawned from a Checklist its Lines as checked
+/// for this Occurrence (#121).
 typedef _PlacedRow = ({
   AgendaRow row,
   Area? area,
   bool masked,
   Session? session,
   _ShownPicks? picks,
+  _ShownLines? lines,
 });
+
+/// The Lines of a row's Checklist as checked for its Occurrence, and
+/// whether this Device may check them.
+typedef _ShownLines = ({Checklist list, bool checks});
 
 /// Today's picks of a Session, with whether each shows Masked and opens
 /// its entry form, and whether they swap.
@@ -163,6 +170,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _locks = AreaLocks(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
   late final _sessions = Sessions(widget.notes.store);
+  late final _checklists = Checklists(widget.notes.store);
+
+  /// The Notes of the rows that are Checklists, read in one pass so only
+  /// their rows read their Lines for the Occurrence.
+  Set<String> _listNotes = const {};
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
@@ -359,6 +371,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
     };
     _system = deviceUnitSystem(widget.notes.store);
     final agenda = _routines.agenda(deviceWallClock, days: AgendaScreen.days);
+    _listNotes = _checklists
+        .ofNotes({
+          for (final rows in [
+            agenda.todayRows,
+            agenda.tomorrowRows,
+            ...agenda.laterRows,
+          ])
+            for (final row in rows)
+              if (row.note case final note?) note.id,
+        })
+        .keys
+        .toSet();
     _today = _entries(agenda.today, [
       for (final row in agenda.todayRows) _place(row),
     ]);
@@ -435,6 +459,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
               ],
               swaps: today.canSwap && store.mayCheckOff(id),
             ),
+      lines: switch (_listNotes.contains(row.note?.id)
+          ? _checklists.forOccurrence((
+              routineId: id,
+              occurrence: row.occurrence,
+            ))
+          : null) {
+        final list? when list.count > 0 => (
+          list: list,
+          checks: store.mayCheckOff(id),
+        ),
+        _ => null,
+      },
     );
   }
 
@@ -646,6 +682,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  /// Checks or unchecks the Line [lineId] of [row]'s Checklist for its
+  /// Occurrence only; the last Line checked makes it Done.
+  void _checkLine(AgendaRow row, String lineId, bool checked) {
+    final on = (routineId: row.routine.id, occurrence: row.occurrence);
+    checked
+        ? _checklists.check(lineId, on: on)
+        : _checklists.uncheck(lineId, on: on);
+    _reload();
+  }
+
   void _toggle(AgendaRow row) {
     if (row.done == null) {
       _routines.markDone(row.routine.id, row.occurrence);
@@ -753,7 +799,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
     String locale,
     _PlacedRow placed,
   ) {
-    final (:row, :area, :masked, :picks, session: _) = placed;
+    final (:row, :area, :masked, :picks, :lines, session: _) = placed;
+    // Done from the entries of every pick, or from every Line checked,
+    // stays checked.
+    final complete =
+        (picks?.today.complete ?? false) || (lines?.list.allChecked ?? false);
     return _OccurrenceRow(
       row: row,
       // A Masked row tells nothing of its Area either.
@@ -762,9 +812,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
           ? maskedText(t, locale, row.routine, row.occurrence)
           : null,
       time: occurrenceTime(t, locale, row.occurrence),
-      below: _sessionPart(t, placed),
-      // Done from the entries of every pick stays checked.
-      onToggle: picks?.today.complete ?? false ? null : () => _toggle(row),
+      below: _sessionPart(t, placed) ?? _checklistPart(placed),
+      onToggle: complete ? null : () => _toggle(row),
       onTap: () => _openRow(row),
       onMenu: _rowMenu(row),
     );
@@ -773,7 +822,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// What shows under a Session's title: today its picks, on later days
   /// how many it picks; nothing on a Masked row.
   Widget? _sessionPart(AppLocalizations t, _PlacedRow placed) {
-    final (:row, :masked, :session, :picks, area: _) = placed;
+    final (:row, :masked, :session, :picks, area: _, lines: _) = placed;
     if (masked || session == null) return null;
     if (picks == null) {
       return Text(t.sessionPicks(session.countOn(row.occurrence.day)));
@@ -789,6 +838,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
       onOpen: (i) => opens[i] ? () => _openPick(today, today.picks[i]) : null,
       onAnother: (i) =>
           swaps ? () => _anotherPick(today, today.picks[i]) : null,
+    );
+  }
+
+  /// What shows under the title of a Routine spawned from a Checklist:
+  /// its Lines as checked for this Occurrence, checkable where this
+  /// Device may check it off, on every day shown; nothing on a Masked
+  /// row.
+  Widget? _checklistPart(_PlacedRow placed) {
+    final (:row, :masked, :lines, area: _, session: _, picks: _) = placed;
+    if (masked || lines == null) return null;
+    final (:list, :checks) = lines;
+    return KeyedSubtree(
+      key: ValueKey('row-checklist-${row.routine.id}@${row.occurrence.key}'),
+      child: ChecklistLines(
+        lines: shownLines(list),
+        onCheck: checks ? (id, checked) => _checkLine(row, id, checked) : null,
+      ),
     );
   }
 
@@ -1044,7 +1110,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 sections: () => widget.notes.sections(captured.note.id),
                 checklist: (
                   read: () =>
-                      Checklists(widget.notes.store).byNote(captured.note.id),
+                      Checklists(widget.notes.store)
+                          .shownNow(captured.note.id, deviceWallClock),
                   lists: Checklists(widget.notes.store),
                 ),
                 onTap: _unfoldedId == captured.note.id

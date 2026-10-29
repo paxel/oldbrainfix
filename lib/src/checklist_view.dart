@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'browser.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
+import 'routine_editor_screen.dart';
 import 'two_row_text_field.dart';
 
 /// A Line as it is drawn: its id, its text, whether it is in the group of
@@ -21,9 +22,18 @@ List<ShownLine> shownLines(Checklist list) => [
     ),
 ];
 
-/// What a Note's card knows of its Checklist (#120): [read] gives it, or
-/// null for a Note that is none, read when the card is, never while
-/// building; [lists] checks its Lines.
+/// Whether this Device may check the Lines of [list] as it shows: for
+/// its Occurrence with a role that checks off its Routine (#121), else
+/// with one in its Note's Area.
+bool mayCheckShown(Checklists lists, Checklist list) => switch (list.on) {
+  final on? => lists.store.mayCheckOff(on.routineId),
+  null => lists.mayCheck(list.noteId),
+};
+
+/// What a Note's card knows of its Checklist (#120): [read] gives it as
+/// it shows now (for the Occurrence it is on, #121), or null for a Note
+/// that is none, read when the card is, never while building; [lists]
+/// checks its Lines.
 typedef NoteChecklist = ({Checklist? Function() read, Checklists lists});
 
 /// The Lines of a Checklist, each with its checkbox and its text, struck
@@ -200,14 +210,19 @@ class _CardChecklistState extends State<CardChecklist> {
   }
 
   void _read() {
-    _list = widget.checklist.read();
-    _checks = _list != null && widget.checklist.lists.mayCheck(widget.noteId);
+    final list = _list = widget.checklist.read();
+    _checks = list != null && mayCheckShown(widget.checklist.lists, list);
   }
 
   void _check(String id, bool checked) {
     final lists = widget.checklist.lists;
-    checked ? lists.check(id) : lists.uncheck(id);
-    setState(() => _list = lists.byNote(widget.noteId));
+    final on = _list?.on;
+    checked ? lists.check(id, on: on) : lists.uncheck(id, on: on);
+    // Read anew, not from the list of cards, which still holds the old.
+    setState(() {
+      final list = _list = lists.shownNow(widget.noteId, deviceWallClock);
+      _checks = list != null && mayCheckShown(lists, list);
+    });
   }
 
   @override
@@ -270,6 +285,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
   final _add = TextEditingController();
   Checklist? _list;
   var _checks = false;
+  var _adds = false;
   Set<String> _editable = const {};
 
   @override
@@ -291,8 +307,9 @@ class _ChecklistSectionState extends State<ChecklistSection>
   }
 
   void _load() {
-    final list = _list = _lists.byNote(widget.noteId);
-    _checks = list != null && _lists.mayCheck(widget.noteId);
+    final list = _list = _lists.shownNow(widget.noteId, deviceWallClock);
+    _checks = list != null && mayCheckShown(_lists, list);
+    _adds = list != null && _lists.mayCheck(widget.noteId);
     _editable = {
       for (final line in list?.lines ?? const <Line>[])
         if (_lists.mayEdit(line.id)) line.id,
@@ -300,12 +317,13 @@ class _ChecklistSectionState extends State<ChecklistSection>
   }
 
   void _check(String id, bool checked) {
-    checked ? _lists.check(id) : _lists.uncheck(id);
+    final on = _list?.on;
+    checked ? _lists.check(id, on: on) : _lists.uncheck(id, on: on);
     setState(_load);
   }
 
   void _uncheckAll() {
-    _lists.uncheckAll(widget.noteId);
+    _lists.uncheckAll(widget.noteId, on: _list?.on);
     setState(_load);
   }
 
@@ -509,7 +527,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
               onMenu: _menu,
               editable: _editable,
             ),
-            if (_checks) ...[
+            if (_adds) ...[
               const SizedBox(height: 8),
               TwoRowTextField(
                 key: const ValueKey('checklist-add-text'),

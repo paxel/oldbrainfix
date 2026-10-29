@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 
 use chrono::{DateTime, Duration, Utc};
 
+use crate::checklists::{LineChecks, keys as checklist_keys};
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
@@ -410,6 +411,21 @@ impl<'a> Routines<'a> {
         } else {
             BTreeMap::new()
         };
+        // Spawned from a Checklist, once every Line is checked for it
+        // (ADR 0030).
+        if fields
+            .iter()
+            .any(|(key, _)| key.starts_with(checklist_keys::CHECK_PREFIX))
+        {
+            let mut notes = vec![note_id.to_string()];
+            if let Some(into) = Notes::new(self.store)
+                .by_id(note_id)?
+                .and_then(|n| n.merged_into)
+            {
+                notes.push(into);
+            }
+            done.extend(LineChecks::read(self.store, id, &history)?.done(self.store, &notes)?);
+        }
         for (key, value) in fields.iter() {
             if let (Some(occurrence), Some(value)) = (key.strip_prefix(keys::DONE_PREFIX), value) {
                 done.insert(occurrence.to_string(), parse_time(value)?);

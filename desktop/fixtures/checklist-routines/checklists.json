@@ -1,0 +1,1509 @@
+{
+  "lists": {
+    "note:00000000000000000000000000000001": {
+      "making": "00000000000000000000000000000002",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000003",
+          "text": "Towel",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:00:41.000Z",
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000004",
+          "text": "Shoes",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "W"
+        },
+        {
+          "id": "line:00000000000000000000000000000005",
+          "text": "Laces",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000004",
+          "order": "X"
+        },
+        {
+          "id": "line:00000000000000000000000000000006",
+          "text": "Socks",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000004",
+          "order": "Y"
+        },
+        {
+          "id": "line:00000000000000000000000000000009",
+          "text": "Lock",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "a"
+        }
+      ],
+      "checkedCount": 1,
+      "count": 5
+    },
+    "note:0000000000000000000000000000000a": {
+      "making": "0000000000000000000000000000000b",
+      "lines": [
+        {
+          "id": "line:0000000000000000000000000000000c",
+          "text": "Photo",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:0000000000000000000000000000000d",
+          "text": "Form",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "W"
+        }
+      ],
+      "checkedCount": 0,
+      "count": 2
+    },
+    "note:0000000000000000000000000000000f": {
+      "making": "00000000000000000000000000000014",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000015",
+          "text": "Desk",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000016",
+          "text": "Bin",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "W"
+        }
+      ],
+      "checkedCount": 0,
+      "count": 2
+    },
+    "note:00000000000000000000000000000017": {
+      "making": "00000000000000000000000000000018",
+      "lines": [],
+      "checkedCount": 0,
+      "count": 0
+    }
+  },
+  "ofNotes": [
+    "note:00000000000000000000000000000001",
+    "note:0000000000000000000000000000000a",
+    "note:0000000000000000000000000000000f",
+    "note:00000000000000000000000000000017"
+  ],
+  "mayMake": {
+    "note:00000000000000000000000000000001": false,
+    "note:0000000000000000000000000000000a": false,
+    "note:0000000000000000000000000000000f": false,
+    "note:00000000000000000000000000000017": false,
+    "note:0000000000000000000000000000001a": true,
+    "note:0000000000000000000000000000001c": true
+  },
+  "plain": {
+    "note:00000000000000000000000000000001": "Gym bag\n✓ Towel\nShoes\n  Laces\n  Socks\nLock",
+    "note:0000000000000000000000000000000a": "Passport\nPhoto\nForm",
+    "note:0000000000000000000000000000000f": "Tidy\nDesk\nBin",
+    "note:00000000000000000000000000000017": "Empty"
+  },
+  "rows": [
+    null,
+    null,
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Red",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Lead nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Em space",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Bom",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Trailing",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓x",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Two spaces",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "✓ Twice",
+      "indent": false,
+      "checked": true
+    }
+  ],
+  "split": [
+    "a",
+    "b",
+    "c",
+    "",
+    "d",
+    "",
+    ""
+  ],
+  "after": {
+    "": "V",
+    "V": "W",
+    "Vz": "W",
+    "z": "zV",
+    "zzz": "zzzV",
+    "0V": "1",
+    "Zy": "a"
+  },
+  "between": [
+    [
+      "",
+      "V",
+      "F"
+    ],
+    [
+      "",
+      "1",
+      "0V"
+    ],
+    [
+      "",
+      "0V",
+      "0F"
+    ],
+    [
+      "V",
+      "W",
+      "VV"
+    ],
+    [
+      "V",
+      "V05",
+      "V02"
+    ],
+    [
+      "V",
+      "X",
+      "W"
+    ],
+    [
+      "VV",
+      "W",
+      "VW"
+    ],
+    [
+      "Vz",
+      "W",
+      "VzV"
+    ],
+    [
+      "0",
+      "01",
+      "00V"
+    ],
+    [
+      "y",
+      "z",
+      "yV"
+    ],
+    [
+      "yz",
+      "z",
+      "yzV"
+    ],
+    [
+      "a",
+      "azzzV",
+      "aU"
+    ]
+  ],
+  "valid": {
+    "": false,
+    "V": true,
+    "V0": false,
+    "0": false,
+    "a1": true,
+    "é": false,
+    "a-b": false,
+    "zz": true
+  },
+  "routines": [
+    {
+      "id": "routine:00000000000000000000000000000008",
+      "noteId": "note:00000000000000000000000000000001",
+      "start": "2026-01-01",
+      "times": [
+        "07:00",
+        "18:00"
+      ],
+      "rule": "FREQ=DAILY",
+      "done": {
+        "2026-01-01T07:00": "2026-01-01T10:00:56.000Z",
+        "2026-01-02T18:00": "2026-01-01T10:01:07.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:00:47.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000000e",
+      "noteId": "note:0000000000000000000000000000000a",
+      "start": "2026-01-03",
+      "times": [],
+      "rule": null,
+      "done": {
+        "2026-01-03": "2026-01-01T10:01:45.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:41.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000013",
+      "noteId": "note:0000000000000000000000000000000f",
+      "start": "2026-01-01",
+      "times": [],
+      "rule": "FREQ=DAILY",
+      "done": {
+        "2026-01-01": "2026-01-01T10:02:14.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:02:10.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:00000000000000000000000000000019",
+      "noteId": "note:00000000000000000000000000000017",
+      "start": "2026-01-01",
+      "times": [],
+      "rule": "FREQ=DAILY",
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:02:48.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000001b",
+      "noteId": "note:0000000000000000000000000000001a",
+      "start": "2026-01-01",
+      "times": [
+        "08:00"
+      ],
+      "rule": "FREQ=DAILY",
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:02:58.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    }
+  ],
+  "occurrences": {
+    "routine:00000000000000000000000000000008": {
+      "2026-01-01T07:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:00:48.000Z",
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:00:52.000Z",
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:00:50.000Z",
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:00:52.000Z",
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 4,
+        "count": 5
+      },
+      "2026-01-01T18:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:00:57.000Z",
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 1,
+        "count": 5
+      },
+      "2026-01-02T07:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      },
+      "2026-01-02T18:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      },
+      "2026-01-03T07:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      },
+      "2026-01-03T18:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      },
+      "2026-01-04T07:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      },
+      "2026-01-04T18:00": {
+        "making": "00000000000000000000000000000002",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000003",
+            "text": "Towel",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000004",
+            "text": "Shoes",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          },
+          {
+            "id": "line:00000000000000000000000000000005",
+            "text": "Laces",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "X"
+          },
+          {
+            "id": "line:00000000000000000000000000000006",
+            "text": "Socks",
+            "checked": false,
+            "checkedAt": null,
+            "parent": "line:00000000000000000000000000000004",
+            "order": "Y"
+          },
+          {
+            "id": "line:00000000000000000000000000000009",
+            "text": "Lock",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "a"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 5
+      }
+    },
+    "routine:0000000000000000000000000000000e": {
+      "2026-01-03": {
+        "making": "0000000000000000000000000000000b",
+        "lines": [
+          {
+            "id": "line:0000000000000000000000000000000c",
+            "text": "Photo",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:01:42.000Z",
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:0000000000000000000000000000000d",
+            "text": "Form",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:01:44.000Z",
+            "parent": null,
+            "order": "W"
+          }
+        ],
+        "checkedCount": 2,
+        "count": 2
+      }
+    },
+    "routine:00000000000000000000000000000013": {
+      "2026-01-01": {
+        "making": "00000000000000000000000000000014",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000015",
+            "text": "Desk",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000016",
+            "text": "Bin",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 2
+      },
+      "2026-01-02": {
+        "making": "00000000000000000000000000000014",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000015",
+            "text": "Desk",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000016",
+            "text": "Bin",
+            "checked": true,
+            "checkedAt": "2026-01-01T10:02:31.000Z",
+            "parent": null,
+            "order": "W"
+          }
+        ],
+        "checkedCount": 1,
+        "count": 2
+      },
+      "2026-01-03": {
+        "making": "00000000000000000000000000000014",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000015",
+            "text": "Desk",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000016",
+            "text": "Bin",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 2
+      },
+      "2026-01-04": {
+        "making": "00000000000000000000000000000014",
+        "lines": [
+          {
+            "id": "line:00000000000000000000000000000015",
+            "text": "Desk",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "V"
+          },
+          {
+            "id": "line:00000000000000000000000000000016",
+            "text": "Bin",
+            "checked": false,
+            "checkedAt": null,
+            "parent": null,
+            "order": "W"
+          }
+        ],
+        "checkedCount": 0,
+        "count": 2
+      }
+    },
+    "routine:00000000000000000000000000000019": {
+      "2026-01-01": {
+        "making": "00000000000000000000000000000018",
+        "lines": [],
+        "checkedCount": 0,
+        "count": 0
+      },
+      "2026-01-02": {
+        "making": "00000000000000000000000000000018",
+        "lines": [],
+        "checkedCount": 0,
+        "count": 0
+      },
+      "2026-01-03": {
+        "making": "00000000000000000000000000000018",
+        "lines": [],
+        "checkedCount": 0,
+        "count": 0
+      },
+      "2026-01-04": {
+        "making": "00000000000000000000000000000018",
+        "lines": [],
+        "checkedCount": 0,
+        "count": 0
+      }
+    },
+    "routine:0000000000000000000000000000001b": {}
+  },
+  "now": [
+    {
+      "occurrenceNow": {
+        "note:00000000000000000000000000000001": [
+          "routine:00000000000000000000000000000008",
+          "2026-01-01T18:00"
+        ],
+        "note:0000000000000000000000000000000a": [
+          "routine:0000000000000000000000000000000e",
+          "2026-01-03"
+        ],
+        "note:0000000000000000000000000000000f": [
+          "routine:00000000000000000000000000000013",
+          "2026-01-01"
+        ],
+        "note:00000000000000000000000000000017": [
+          "routine:00000000000000000000000000000019",
+          "2026-01-01"
+        ]
+      },
+      "shownNow": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000004",
+              "text": "Shoes",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Laces",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:00:57.000Z",
+              "parent": "line:00000000000000000000000000000004",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Lock",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "a"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 5
+        },
+        "note:0000000000000000000000000000000a": {
+          "making": "0000000000000000000000000000000b",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Photo",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:42.000Z",
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Form",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:44.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 2,
+          "count": 2
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000014",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Desk",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000016",
+              "text": "Bin",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [],
+          "checkedCount": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:00000000000000000000000000000001": [
+          "routine:00000000000000000000000000000008",
+          "2026-01-02T07:00"
+        ],
+        "note:0000000000000000000000000000000a": [
+          "routine:0000000000000000000000000000000e",
+          "2026-01-03"
+        ],
+        "note:0000000000000000000000000000000f": [
+          "routine:00000000000000000000000000000013",
+          "2026-01-02"
+        ],
+        "note:00000000000000000000000000000017": [
+          "routine:00000000000000000000000000000019",
+          "2026-01-02"
+        ]
+      },
+      "shownNow": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000004",
+              "text": "Shoes",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Laces",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Lock",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "a"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 5
+        },
+        "note:0000000000000000000000000000000a": {
+          "making": "0000000000000000000000000000000b",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Photo",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:42.000Z",
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Form",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:44.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 2,
+          "count": 2
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000014",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Desk",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000016",
+              "text": "Bin",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:02:31.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 1,
+          "count": 2
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [],
+          "checkedCount": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:00000000000000000000000000000001": [
+          "routine:00000000000000000000000000000008",
+          "2026-01-03T07:00"
+        ],
+        "note:0000000000000000000000000000000a": [
+          "routine:0000000000000000000000000000000e",
+          "2026-01-03"
+        ],
+        "note:0000000000000000000000000000000f": [
+          "routine:00000000000000000000000000000013",
+          "2026-01-03"
+        ],
+        "note:00000000000000000000000000000017": [
+          "routine:00000000000000000000000000000019",
+          "2026-01-03"
+        ]
+      },
+      "shownNow": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000004",
+              "text": "Shoes",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Laces",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Lock",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "a"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 5
+        },
+        "note:0000000000000000000000000000000a": {
+          "making": "0000000000000000000000000000000b",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Photo",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:42.000Z",
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Form",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:44.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 2,
+          "count": 2
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000014",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Desk",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000016",
+              "text": "Bin",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [],
+          "checkedCount": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:00000000000000000000000000000001": [
+          "routine:00000000000000000000000000000008",
+          "2026-01-04T07:00"
+        ],
+        "note:0000000000000000000000000000000a": [
+          "routine:0000000000000000000000000000000e",
+          "2026-01-03"
+        ],
+        "note:0000000000000000000000000000000f": [
+          "routine:00000000000000000000000000000013",
+          "2026-01-04"
+        ],
+        "note:00000000000000000000000000000017": [
+          "routine:00000000000000000000000000000019",
+          "2026-01-04"
+        ]
+      },
+      "shownNow": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000004",
+              "text": "Shoes",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Laces",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Lock",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "a"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 5
+        },
+        "note:0000000000000000000000000000000a": {
+          "making": "0000000000000000000000000000000b",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Photo",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:42.000Z",
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Form",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:44.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 2,
+          "count": 2
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000014",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Desk",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000016",
+              "text": "Bin",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [],
+          "checkedCount": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "occurrenceNow": {
+        "note:00000000000000000000000000000001": [
+          "routine:00000000000000000000000000000008",
+          "2026-01-05T07:00"
+        ],
+        "note:0000000000000000000000000000000a": [
+          "routine:0000000000000000000000000000000e",
+          "2026-01-03"
+        ],
+        "note:0000000000000000000000000000000f": [
+          "routine:00000000000000000000000000000013",
+          "2026-01-05"
+        ],
+        "note:00000000000000000000000000000017": [
+          "routine:00000000000000000000000000000019",
+          "2026-01-05"
+        ]
+      },
+      "shownNow": {
+        "note:00000000000000000000000000000001": {
+          "making": "00000000000000000000000000000002",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000003",
+              "text": "Towel",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000004",
+              "text": "Shoes",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            },
+            {
+              "id": "line:00000000000000000000000000000005",
+              "text": "Laces",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "X"
+            },
+            {
+              "id": "line:00000000000000000000000000000006",
+              "text": "Socks",
+              "checked": false,
+              "checkedAt": null,
+              "parent": "line:00000000000000000000000000000004",
+              "order": "Y"
+            },
+            {
+              "id": "line:00000000000000000000000000000009",
+              "text": "Lock",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "a"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 5
+        },
+        "note:0000000000000000000000000000000a": {
+          "making": "0000000000000000000000000000000b",
+          "lines": [
+            {
+              "id": "line:0000000000000000000000000000000c",
+              "text": "Photo",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:42.000Z",
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:0000000000000000000000000000000d",
+              "text": "Form",
+              "checked": true,
+              "checkedAt": "2026-01-01T10:01:44.000Z",
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 2,
+          "count": 2
+        },
+        "note:0000000000000000000000000000000f": {
+          "making": "00000000000000000000000000000014",
+          "lines": [
+            {
+              "id": "line:00000000000000000000000000000015",
+              "text": "Desk",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "V"
+            },
+            {
+              "id": "line:00000000000000000000000000000016",
+              "text": "Bin",
+              "checked": false,
+              "checkedAt": null,
+              "parent": null,
+              "order": "W"
+            }
+          ],
+          "checkedCount": 0,
+          "count": 2
+        },
+        "note:00000000000000000000000000000017": {
+          "making": "00000000000000000000000000000018",
+          "lines": [],
+          "checkedCount": 0,
+          "count": 0
+        }
+      }
+    }
+  ]
+}

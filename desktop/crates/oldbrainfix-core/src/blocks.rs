@@ -75,7 +75,9 @@ fn is_instant(text: &str) -> bool {
 /// Whether `e`, written by a blocked person's Device, is kept (ADR 0021),
 /// as the Dart core's `keptFromBlocked`: only what carries no text,
 /// picture or sound and keeps the Shared Areas whole. That is a
-/// check-off or its undoing (`done@…` on a Routine, `done` on a Frog), a
+/// check-off or its undoing (`done@…` on a Routine, `done` on a Frog,
+/// `checked` on a Checklist's Line, `check@…` on a Routine for one of its
+/// Lines), a
 /// grant (`role:…` on an Area), and a Note's `$type` and filing, which
 /// say where the Routines, Frogs and Sections others hung on it lie; the
 /// Note itself shows
@@ -119,6 +121,19 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
         && let Some(key) = field.strip_prefix(routine_keys::DONE_PREFIX)
     {
         return Occurrence::parse(key).is_some_and(|o| o.key() == key)
+            && value.is_none_or(is_instant);
+    }
+    if kind == "routine"
+        && let Some(rest) = field.strip_prefix(checklist_keys::CHECK_PREFIX)
+    {
+        let Some((key, line)) = rest.split_once('@') else {
+            return false;
+        };
+        return !key.is_empty()
+            && Occurrence::parse(key).is_some_and(|o| o.key() == key)
+            && line
+                .strip_prefix(checklist_keys::LINE_PREFIX)
+                .is_some_and(is_id)
             && value.is_none_or(is_instant);
     }
     if kind == frog_keys::TYPE_FROG && field == frog_keys::DONE
@@ -1158,6 +1173,12 @@ mod tests {
             entry("frog:ab12", "done", None),
             entry("line:ab12", "checked", Some("2026-03-01T08:00:00.000Z")),
             entry("line:ab12", "checked", None),
+            entry(
+                "routine:ab12",
+                "check@2026-03-01T08:00@line:cd34",
+                Some("2026-03-01T08:00:00.000Z"),
+            ),
+            entry("routine:ab12", "check@2026-03-01@line:cd34", None),
             entry("area:starter-household", "role:ab12", None),
             entry("area:ab12", "role:ab12", Some(&member)),
             entry("note:ab12", "$type", Some("note")),
@@ -1202,6 +1223,18 @@ mod tests {
             ),
             entry("line:ab12", "$type", Some("line")),
             entry("line:Rude words", "checked", None),
+            entry(
+                "routine:ab12",
+                "check@2026-03-01@line:cd34",
+                Some("Rude words"),
+            ),
+            entry("routine:ab12", "check@Rude@line:cd34", None),
+            entry("routine:ab12", "check@2026-03-01@line:Rude words", None),
+            entry("routine:ab12", "check@2026-03-01@note:cd34", None),
+            entry("routine:ab12", "check@2026-03-01@line:", None),
+            entry("routine:ab12", "check@2026-03-01", None),
+            entry("routine:ab12", "check@@line:cd34", None),
+            entry("routine:Rude words", "check@2026-03-01@line:cd34", None),
             entry(
                 "area:ab12",
                 "role:ab12",

@@ -10,6 +10,7 @@ import 'look.dart';
 import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'profile.dart';
+import 'routine_editor_screen.dart';
 
 /// Reloads a page's list once after the log changed, never in the middle
 /// of whatever changed it, so what a page opened on top sorted, like the
@@ -610,12 +611,12 @@ List<Widget> diaryCards(
       ]))[note.id] ??
       const [];
   // Their Checklists alike, read anew with every list built, as a check
-  // changes no Note.
+  // changes no Note; each as it shows now, for its Occurrence (#121).
   final lists = Checklists(notes.store);
   Map<String, Checklist>? listed;
-  Checklist? checklistOf(Note note) => (listed ??= lists.ofNotes([
+  Checklist? checklistOf(Note note) => (listed ??= lists.ofNotesNow([
     for (final placed in shown) placed.note.id,
-  ]))[note.id];
+  ], deviceWallClock))[note.id];
   return [
     for (final placed in shown)
       if (placed case (

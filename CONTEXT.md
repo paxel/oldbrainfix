@@ -135,7 +135,7 @@ _Avoid_: workout, training, playlist, set
 ### Checklists
 
 **Checklist**:
-A Note whose Lines are checked off, such as a packing list: its text stays above as title and description, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally and a Checklist; it turns back into a plain Note with every Line a line of its text. German: Checkliste.
+A Note whose Lines are checked off, such as a packing list: its text stays above as title and description, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally and a Checklist; it turns back into a plain Note with every Line a line of its text. A Routine or Reminder spawned from a Checklist starts each Occurrence with every Line unchecked, on all of the user's own Devices and for everyone in a Shared Area alike; the Occurrence is Done once every Line is checked for it, by anyone, or when checked off. German: Checkliste.
 _Avoid_: to-do list, task list, todo
 
 **Line**:

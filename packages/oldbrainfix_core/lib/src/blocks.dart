@@ -31,7 +31,9 @@ final _blockedInstant = RegExp(
 /// Whether [e], written by a blocked person's Device, is kept (ADR 0021):
 /// only what carries no text, picture or sound and keeps the Shared Areas
 /// whole. That is a check-off or its undoing (`done@…` on a Routine,
-/// `done` on a Frog, `checked` on a Checklist's Line), a grant (`role:…` on an Area), and a Note's `$type`
+/// `done` on a Frog, `checked` on a Checklist's Line, `check@…` on a
+/// Routine for one of its Lines), a grant (`role:…` on an Area), and a
+/// Note's `$type`
 /// and filing, which say where the Routines, Frogs and Sections others
 /// hung on it lie; the Note
 /// itself shows nowhere without its capture. Each in its exact shape, so
@@ -50,6 +52,17 @@ bool keptFromBlocked(Entry e) {
   if (kind == 'routine' && e.field.startsWith(RoutineKeys.donePrefix)) {
     final key = e.field.substring(RoutineKeys.donePrefix.length);
     return Occurrence.tryParse(key)?.key == key &&
+        (value == null || _blockedInstant.hasMatch(value));
+  }
+  if (kind == 'routine' && e.field.startsWith(ChecklistKeys.checkPrefix)) {
+    final rest = e.field.substring(ChecklistKeys.checkPrefix.length);
+    final at = rest.indexOf('@');
+    if (at <= 0) return false;
+    final key = rest.substring(0, at);
+    final line = rest.substring(at + 1);
+    return Occurrence.tryParse(key)?.key == key &&
+        line.startsWith(ChecklistKeys.linePrefix) &&
+        _blockedId.hasMatch(line.substring(ChecklistKeys.linePrefix.length)) &&
         (value == null || _blockedInstant.hasMatch(value));
   }
   if (kind == FrogKeys.typeFrog && e.field == FrogKeys.done ||

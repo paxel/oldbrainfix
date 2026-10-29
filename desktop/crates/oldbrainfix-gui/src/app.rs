@@ -48,7 +48,7 @@
 //! and found by the search over All Notes, an Area or a Topic.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -75,8 +75,8 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
     Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
     Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
-    PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search, Section, Sessions, Store,
-    Tallies, Topic, UnitSystem, bundle,
+    PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
+    Section, Sessions, Store, Tallies, Topic, UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -186,6 +186,9 @@ struct Row {
     area: Option<Area>,
     /// For a Session what shows under its title.
     session: Option<SessionPart>,
+    /// For a Routine spawned from a Checklist its Lines as checked for
+    /// this Occurrence, and whether this Device may check them (#121).
+    lines: Option<(Checklist, bool)>,
 }
 
 /// What the Agenda shows.
@@ -270,8 +273,8 @@ struct View {
     /// for the full cards (#114).
     sections: BTreeMap<String, Vec<Section>>,
     /// The Checklists of the Notes listed that are one, read in one pass
-    /// for the cards, each with whether this Device may check its Lines
-    /// (#120).
+    /// for the cards as they show now, each with whether this Device may
+    /// check its Lines (#120, #121).
     checklists: BTreeMap<String, (Checklist, bool)>,
     /// Whether the list shows its Notes compact, by their first line,
     /// as this Device keeps it for that list (#114).
@@ -2749,8 +2752,8 @@ impl App {
         let lists = Checklists::new(store);
         let mut checklists = BTreeMap::new();
         if !listed.is_empty() {
-            for (id, list) in lists.of_notes(&listed)? {
-                let checks = lists.may_check(&id)?;
+            for (id, list) in lists.of_notes_now(&listed, &*self.wall)? {
+                let checks = checklist_view::may_check_shown(store, &list)?;
                 checklists.insert(id, (list, checks));
             }
         }
@@ -2796,7 +2799,7 @@ impl App {
         };
         let (checklist, makes_checklist) = match &detail {
             Some((p, _)) if !p.note.is_trashed() => (
-                checklist_view::read(store, &p.note, may.changes)?,
+                checklist_view::read(store, &p.note, may.changes, &*self.wall)?,
                 lists.may_make(&p.note.id)?,
             ),
             _ => (None, false),
@@ -2866,6 +2869,22 @@ impl App {
                     .map(|s| (s.id().to_string(), s))
                     .collect();
                 let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
+                // The rows' Notes that are Checklists, read in one pass so
+                // only their rows read their Lines for the Occurrence.
+                let row_notes: Vec<String> = agenda
+                    .today_rows
+                    .iter()
+                    .chain(&agenda.tomorrow_rows)
+                    .chain(agenda.later_rows.iter().flatten())
+                    .filter_map(|row| row.note.as_ref().map(|n| n.id.clone()))
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect();
+                let list_notes: HashSet<String> = if row_notes.is_empty() {
+                    HashSet::new()
+                } else {
+                    lists.of_notes(&row_notes)?.into_keys().collect()
+                };
                 let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
                     let area = match &row.note {
                         Some(note) => place(note.clone())?.area,
@@ -2878,7 +2897,30 @@ impl App {
                             .get(&row.routine.id)
                             .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
                     };
-                    Ok(Row { row, area, session })
+                    // A Session's picks win over Lines.
+                    let mut lines = None;
+                    if session.is_none()
+                        && row
+                            .note
+                            .as_ref()
+                            .is_some_and(|n| list_notes.contains(&n.id))
+                    {
+                        let on = RoutineOccurrence {
+                            routine_id: row.routine.id.clone(),
+                            occurrence: row.occurrence,
+                        };
+                        if let Some(list) = lists.for_occurrence(&on)?
+                            && list.count() > 0
+                        {
+                            lines = Some((list, store.may_check_off(&row.routine.id)?));
+                        }
+                    }
+                    Ok(Row {
+                        row,
+                        area,
+                        session,
+                        lines,
+                    })
                 };
                 let mut later = Vec::new();
                 for (i, rows) in agenda.later_rows.iter().enumerate() {
@@ -3986,18 +4028,27 @@ impl App {
             ChecklistAction::ToPlain(note) => self.change_kind(&note, false)?,
             ChecklistAction::UncheckAll(note) => {
                 let lists = Checklists::new(&self.store);
-                if lists.is_checklist(&note)? && lists.may_check(&note)? {
-                    lists.uncheck_all(&note)?;
+                if let Some(list) = lists.shown_now(&note, &*self.wall)?
+                    && checklist_view::may_check_shown(&self.store, &list)?
+                {
+                    match &list.on {
+                        Some(on) => lists.uncheck_all_for(&note, on)?,
+                        None => lists.uncheck_all(&note)?,
+                    }
                 }
             }
-            ChecklistAction::Check(line, checked) => {
+            ChecklistAction::Check(line, checked, on) => {
                 // A sync meanwhile may have taken it.
-                if self.line_of(&line)?.is_some() {
+                if let Some((list, _)) = self.line_of(&line)? {
                     let lists = Checklists::new(&self.store);
-                    if checked {
-                        lists.check(&line)?;
-                    } else {
-                        lists.uncheck(&line)?;
+                    let list = Checklist { on, ..list };
+                    if checklist_view::may_check_shown(&self.store, &list)? {
+                        match (&list.on, checked) {
+                            (Some(on), true) => lists.check_for(&line, on)?,
+                            (Some(on), false) => lists.uncheck_for(&line, on)?,
+                            (None, true) => lists.check(&line)?,
+                            (None, false) => lists.uncheck(&line)?,
+                        }
                     }
                 }
             }
@@ -4027,7 +4078,7 @@ impl App {
             }
             ChecklistAction::Menu(note) => {
                 self.card_menu = match Notes::new(&self.store).by_id(&note)? {
-                    Some(note) => Some(checklist_view::card_menu(&self.store, &note)?),
+                    Some(note) => Some(checklist_view::card_menu(&self.store, &note, &*self.wall)?),
                     None => None,
                 };
             }
@@ -5307,7 +5358,9 @@ impl App {
                     if let Some(picked) = clicks.picked {
                         actions.push(picked);
                     } else if let Some((line, checked)) = clicks.check {
-                        actions.push(Action::Checklist(ChecklistAction::Check(line, checked)));
+                        // For the Occurrence the card shows it on.
+                        let on = self.view.checklists.get(id).and_then(|(l, _)| l.on.clone());
+                        actions.push(Action::Checklist(ChecklistAction::Check(line, checked, on)));
                     } else if let Some(hash) = clicks.photo {
                         actions.push(Action::ViewPhoto(hash));
                     } else if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
@@ -8562,7 +8615,9 @@ pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
 /// ⋮. A click on the text opens its Routine; a right-click on it opens
 /// the menu of ⋮. A Session's row lists its picks under it today, and
 /// how many it picks on later days; once every pick has an entry, its
-/// box stays checked.
+/// box stays checked. A Routine spawned from a Checklist lists its Lines
+/// under it, checked for this Occurrence; once every Line is checked, its
+/// box stays checked too (#121).
 fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -8576,8 +8631,13 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
     embossed(ui, tones, false, colour, |ui| {
-        // Done from the entries of every pick stays checked.
-        let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete());
+        // Done from the entries of every pick, or from every Line
+        // checked, stays checked.
+        let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete())
+            || row
+                .lines
+                .as_ref()
+                .is_some_and(|(list, _)| list.all_checked());
         ui.horizontal(|ui| {
             let label = format!("{}: {time} {title}", t.mark_done());
             let toggled = ui
@@ -8633,6 +8693,20 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 session_view::part(ui, t, part, &mut asked);
             });
             actions.extend(asked.into_iter().map(Action::Session));
+        } else if let Some((list, checks)) = &row.lines {
+            // The Lines go there too, checked for this Occurrence.
+            let mut asked = Vec::new();
+            ui.indent(("row lines", &routine.id, occurrence.key()), |ui| {
+                checklist_view::lines(
+                    ui,
+                    (t, tones),
+                    &checklist_view::shown_lines(list),
+                    (*checks, list.on.as_ref()),
+                    None,
+                    &mut asked,
+                );
+            });
+            actions.extend(asked.into_iter().map(Action::Checklist));
         }
     });
 }
@@ -9017,8 +9091,9 @@ struct CardMedia<'a> {
 
 /// How a card shows its Note (#114): `full`, the whole Note with its
 /// `sections`, or compact, by its first line; its Checklist, if it is
-/// one, with whether this Device may check its Lines, and what the
-/// card's menu offers of it once read for this Note (#120).
+/// one, as it shows now, with whether this Device may check its Lines,
+/// and what the card's menu offers of it once read for this Note
+/// (#120, #121).
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,

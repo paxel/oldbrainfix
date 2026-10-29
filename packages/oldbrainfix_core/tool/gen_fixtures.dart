@@ -14,7 +14,8 @@
 /// converted, shown and read (`tallies.json`); the Session scenario its
 /// pools, picks and what is Done (`sessions.json`); the Checklist
 /// scenario its Lines, what goes back into a plain Note's text, lines of
-/// text read as Lines and the keys that place them (`checklists.json`).
+/// text read as Lines and the keys that place them, and with a Routine
+/// the Lines checked for each Occurrence (`checklists.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -716,6 +717,88 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'checklist-routines',
+    about:
+        'Checklists with a Routine or Reminder: Lines checked for an '
+        'Occurrence until it is Done, a group by its last Line, a parent '
+        'checked with its group and a Line of it unchecked again, "Uncheck '
+        'all" for one Occurrence, another checked off by hand, a Line added '
+        'after one was Done and one deleted, a Reminder Done from its Lines, '
+        'a Checklist back to a plain Note and made again, a Line checked on '
+        'its own, checks no app writes and a Checklist without Lines; a plain '
+        'Routine and an Unsorted Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final lists = Checklists(store);
+      final routines = Routines(store);
+      String line(String note, String text) =>
+          lists.byNote(note)!.lines.firstWhere((l) => l.text == text).id;
+      RoutineOccurrence at(String routine, int day, [ClockTime? time]) =>
+          (routineId: routine, occurrence: Occurrence(Day(2026, 1, day), time));
+      Schedule daily([List<ClockTime> times = const []]) => Schedule(
+        start: Day(2026, 1, 1),
+        times: times,
+        rule: Recurrence(frequency: Frequency.daily),
+      );
+      final gym = notes
+          .capture('Gym bag\nTowel\nShoes\n  Laces\n  Socks\nBottle')
+          .id;
+      lists.make(gym);
+      lists.check(line(gym, 'Towel'));
+      final bag = routines.spawn(gym, daily([_at(7), _at(18)])).id;
+      final first = at(bag, 1, _at(7));
+      lists.check(line(gym, 'Towel'), on: first);
+      lists.check(line(gym, 'Laces'), on: first);
+      lists.check(line(gym, 'Socks'), on: first);
+      lists.check(line(gym, 'Bottle'), on: first);
+      final second = at(bag, 1, _at(18));
+      lists.check(line(gym, 'Shoes'), on: second);
+      lists.uncheck(line(gym, 'Socks'), on: second);
+      final third = at(bag, 2, _at(7));
+      lists.check(line(gym, 'Towel'), on: third);
+      lists.uncheckAll(gym, on: third);
+      routines.markDone(bag, Occurrence(Day(2026, 1, 2), _at(18)));
+      lists.add(gym, 'Lock');
+      lists.delete(line(gym, 'Bottle'));
+      final passport = notes.capture('Passport\nPhoto\nForm').id;
+      lists.make(passport);
+      final office = routines.spawn(passport, Schedule(start: Day(2026, 1, 3)));
+      lists.check(line(passport, 'Photo'), on: at(office.id, 3));
+      lists.check(line(passport, 'Form'), on: at(office.id, 3));
+      final tidy = notes.capture('Tidy\nDesk\nBin').id;
+      lists.make(tidy);
+      final chores = routines.spawn(tidy, daily()).id;
+      lists.check(line(tidy, 'Desk'), on: at(chores, 1));
+      lists.check(line(tidy, 'Bin'), on: at(chores, 1));
+      lists.toPlain(tidy);
+      lists.make(tidy);
+      lists.check(line(tidy, 'Bin'), on: at(chores, 2));
+      // As a modified app would.
+      final key = Occurrence(Day(2026, 1, 2)).key;
+      for (final field in [
+        '${ChecklistKeys.checkPrefix}$key',
+        '${ChecklistKeys.checkPrefix}2026-1-2@${line(tidy, 'Desk')}',
+        '${ChecklistKeys.checkPrefix}$key@note:x',
+        ChecklistKeys.checkFor(
+          Occurrence(Day(2026, 1, 2)),
+          line(passport, 'Photo'),
+        ),
+      ]) {
+        store.append(chores, field, '2026-01-02T09:00:00.000Z');
+      }
+      final empty = notes.capture('Empty').id;
+      lists.make(empty);
+      final idle = routines.spawn(empty, daily()).id;
+      store.append(
+        idle,
+        ChecklistKeys.checkFor(Occurrence(Day(2026, 1, 1)), 'line:none'),
+        '2026-01-01T09:00:00.000Z',
+      );
+      routines.create('Walk the dog', daily([_at(8)]));
+      notes.capture('Unsorted thought');
+    },
+  ),
+  (
     name: 'sessions',
     about:
         'Sessions spawned with their Notes behind the scenes, picking from '
@@ -991,6 +1074,41 @@ Map<String, Object?> _checklists(Store store) {
       for (final k in ['', 'V', 'V0', '0', 'a1', 'é', 'a-b', 'zz'])
         k: LineOrder.isValid(k),
     },
+    'routines': [
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+        if (Routines(store).byId(id) case final routine?) _routine(routine),
+    ],
+    'occurrences': {
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+        if (Routines(store).byId(id) case final routine?)
+          id: {
+            for (final o in routine.schedule.between(
+              Day(2026, 1, 1),
+              Day(2026, 1, 4),
+            ))
+              if (lists.forOccurrence((routineId: id, occurrence: o))
+                  case final list?)
+                o.key: _checklist(list),
+          },
+    },
+    'now': [
+      for (var days = -1; days <= 3; days++)
+        {
+          'occurrenceNow': {
+            for (final id in ids)
+              if (lists.byNote(id) != null)
+                id: switch (lists.occurrenceNow(id, _frogDay(days))) {
+                  null => null,
+                  final on => [on.routineId, on.occurrence.key],
+                },
+          },
+          'shownNow': {
+            for (final MapEntry(:key, :value)
+                in lists.ofNotesNow(ids, _frogDay(days)).entries)
+              key: _checklist(value),
+          },
+        },
+    ],
   };
 }
 
@@ -5364,6 +5482,11 @@ Future<void> main(List<String> args) async {
     'become one, the text each goes back to as a plain Note, lines of text '
     'read as Lines, a text split at its line breaks, and keys made after '
     'and between others and told valid or not.\n'
+    '- `checklist-routines/checklists.json`: the same of the '
+    '`checklist-routines` log, and each Checklist as checked for the '
+    'Occurrences of its Routines and Reminders with what is Done, the '
+    'Occurrence each is on and how it shows from the day before the clock held to three days '
+    'after, on the same clock.\n'
     '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
     '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
     'wrote (`sent.jsonl`, ids counted from 0xa01, at held clocks), the '

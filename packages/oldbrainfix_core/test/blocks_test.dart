@@ -333,6 +333,12 @@ void main() {
         entry('frog:ab12', 'done', null),
         entry('line:ab12', 'checked', '2026-03-01T08:00:00.000Z'),
         entry('line:ab12', 'checked', null),
+        entry(
+          'routine:ab12',
+          'check@2026-03-01T08:00@line:cd34',
+          '2026-03-01T08:00:00.000Z',
+        ),
+        entry('routine:ab12', 'check@2026-03-01@line:cd34', null),
         entry('area:starter-household', 'role:ab12', null),
         entry(
           'area:ab12',
@@ -368,6 +374,14 @@ void main() {
         entry('line:ab12', 'text', '{"format":"plain","text":"Rude"}'),
         entry('line:ab12', r'$type', 'line'),
         entry('line:Rude words', 'checked', null),
+        entry('routine:ab12', 'check@2026-03-01@line:cd34', 'Rude words'),
+        entry('routine:ab12', 'check@Rude@line:cd34', null),
+        entry('routine:ab12', 'check@2026-03-01@line:Rude words', null),
+        entry('routine:ab12', 'check@2026-03-01@note:cd34', null),
+        entry('routine:ab12', 'check@2026-03-01@line:', null),
+        entry('routine:ab12', 'check@2026-03-01', null),
+        entry('routine:ab12', 'check@@line:cd34', null),
+        entry('routine:Rude words', 'check@2026-03-01@line:cd34', null),
         entry(
           'area:ab12',
           'role:ab12',

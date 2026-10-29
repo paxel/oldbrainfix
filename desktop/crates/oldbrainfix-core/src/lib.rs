@@ -62,7 +62,7 @@ pub mod transcript_prompts;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use cards::{CardOpened, CardTaken};
-pub use checklists::{Checklist, Checklists, Line};
+pub use checklists::{Checklist, Checklists, Line, LineChecks, RoutineOccurrence};
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};

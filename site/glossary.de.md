@@ -133,7 +133,7 @@ _Avoid_: Workout, Training, Playlist, Satz
 ## Checklisten
 
 **Checkliste** [Checklist]:
-Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text bleibt oben als Titel und Beschreibung, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste und Checkliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes.
+Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text bleibt oben als Titel und Beschreibung, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste und Checkliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes. Eine Routine oder Erinnerung aus einer Checkliste beginnt jede Fälligkeit ohne abgehakte Zeile, auf allen deinen Geräten und für alle in einem geteilten Bereich gleich; die Fälligkeit ist erledigt, sobald jede Zeile für sie abgehakt ist, von wem auch immer, oder wenn du sie abhakst.
 _Avoid_: To-do-Liste, Aufgabenliste, Todo
 
 **Zeile** [Line]:

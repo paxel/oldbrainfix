@@ -1,4 +1,8 @@
+import 'entry.dart';
 import 'notes.dart';
+import 'profiles.dart';
+import 'routines.dart';
+import 'schedule.dart';
 import 'sent_items.dart';
 import 'shared_areas.dart';
 import 'store.dart';
@@ -47,6 +51,15 @@ abstract final class ChecklistKeys {
 
   /// When it was deleted; absent or null while it is not.
   static const trashed = 'trashed';
+
+  /// On a Routine spawned from a Checklist's Note: the check of the Line
+  /// [lineId] for [occurrence], its value when it was checked, null when
+  /// it was unchecked again. Keyed by the wall-clock Occurrence, as
+  /// `done@` is.
+  static String checkFor(Occurrence occurrence, String lineId) =>
+      '$checkPrefix${occurrence.key}@$lineId';
+
+  static const checkPrefix = 'check@';
 
   /// What marks a checked Line in a plain Note's text.
   static const checkMark = '✓ ';
@@ -152,6 +165,10 @@ class Line {
   bool get inGroup => parent != null;
 }
 
+/// An Occurrence of the Routine [routineId]: one a Checklist is checked
+/// for.
+typedef RoutineOccurrence = ({String routineId, Occurrence occurrence});
+
 /// A Note whose Lines are checked off (CONTEXT.md).
 class Checklist {
   final String noteId;
@@ -163,7 +180,11 @@ class Checklist {
   /// group.
   final List<Line> lines;
 
-  const Checklist(this.noteId, this.making, this.lines);
+  /// The Occurrence its Lines show checked for, or null when they show
+  /// their own checks.
+  final RoutineOccurrence? on;
+
+  const Checklist(this.noteId, this.making, this.lines, {this.on});
 
   /// The Line [id], or null.
   Line? line(String id) {
@@ -221,6 +242,138 @@ class Checklists {
       for (final MapEntry(key: note, value: making) in makings.entries)
         note: Checklist(note, making, _shown(note, raw[note] ?? [])),
     };
+  }
+
+  /// The Checklist of the Note the Routine of [on] was spawned from,
+  /// checked as for that Occurrence: only the checks made for it count,
+  /// so every new Occurrence starts with no Line checked. Null when the
+  /// Routine is none or its Note no Checklist.
+  Checklist? forOccurrence(RoutineOccurrence on) {
+    final routines = Routines(store);
+    final routine = routines.byId(on.routineId);
+    final note = routine == null ? null : routines.note(routine);
+    final list = note == null ? null : byNote(note.id);
+    if (list == null) return null;
+    return _checkedFor(list, on, LineChecks.read(store, on.routineId));
+  }
+
+  /// The Occurrence the Checklist of [noteId] is checked for now, with
+  /// days as [wallClock] shows them; null while the Note has no Routine
+  /// or Reminder out of the trash. Of all of theirs, those on the latest
+  /// day up to today that has any: the first not Done, else the last.
+  /// Before their first day, the first of them.
+  RoutineOccurrence? occurrenceNow(String noteId, WallClock wallClock) =>
+      _now(Routines(store).ofNote(noteId), Day.today(store.clock(), wallClock));
+
+  /// The Checklist of [noteId] as it shows now: checked for the
+  /// Occurrence it is on ([occurrenceNow]), or by its own checks while
+  /// the Note has no Routine or Reminder.
+  Checklist? shownNow(String noteId, WallClock wallClock) =>
+      ofNotesNow([noteId], wallClock)[noteId];
+
+  /// [ofNotes] as [shownNow] shows each, in one pass over the Lines and
+  /// the Routines.
+  Map<String, Checklist> ofNotesNow(
+    Iterable<String> noteIds,
+    WallClock wallClock,
+  ) {
+    final lists = ofNotes(noteIds);
+    if (lists.isEmpty) return lists;
+    final routines = Routines(store);
+    final spawned = <String, List<Routine>>{};
+    for (final routine in routines.all()) {
+      final note = routines.note(routine)?.id;
+      if (note != null && lists.containsKey(note)) {
+        (spawned[note] ??= []).add(routine);
+      }
+    }
+    final today = Day.today(store.clock(), wallClock);
+    return {
+      for (final MapEntry(key: id, value: list) in lists.entries)
+        id: switch (_now(spawned[id] ?? const [], today)) {
+          null => list,
+          final on => _checkedFor(
+            list,
+            on,
+            LineChecks.read(store, on.routineId),
+          ),
+        },
+    };
+  }
+
+  /// [list] with its Lines checked as [checks] hold them for [on].
+  static Checklist _checkedFor(
+    Checklist list,
+    RoutineOccurrence on,
+    LineChecks checks,
+  ) {
+    final key = on.occurrence.key;
+    final groupChecked = <String, bool>{};
+    for (final line in list.lines) {
+      if (line.parent case final parent?) {
+        groupChecked[parent] =
+            (groupChecked[parent] ?? true) && checks.checked(key, line.id);
+      }
+    }
+    return Checklist(list.noteId, list.making, [
+      for (final line in list.lines)
+        Line(
+          id: line.id,
+          noteId: line.noteId,
+          text: line.text,
+          checked: groupChecked[line.id] ?? checks.checked(key, line.id),
+          checkedAt: checks.checkedAt(key, line.id),
+          parent: line.parent,
+          order: line.order,
+        ),
+    ], on: on);
+  }
+
+  /// The Occurrence of [routines] a Checklist is on [today]
+  /// ([occurrenceNow]).
+  static RoutineOccurrence? _now(List<Routine> routines, Day today) {
+    Day? latest;
+    for (final routine in routines) {
+      final day = _lastDay(routine.schedule, today);
+      if (day != null && (latest == null || day > latest)) latest = day;
+    }
+    final found = <(Routine, Occurrence)>[
+      for (final routine in routines)
+        if (latest != null)
+          for (final occurrence in routine.schedule.on(latest))
+            (routine, occurrence)
+        else
+          for (final occurrence in routine.schedule.next(today, 1))
+            (routine, occurrence),
+    ];
+    if (found.isEmpty) return null;
+    found.sort((a, b) {
+      final byTime = a.$2.compareTo(b.$2);
+      return byTime != 0 ? byTime : a.$1.id.compareTo(b.$1.id);
+    });
+    var (routine, occurrence) = found.first;
+    if (latest != null) {
+      (routine, occurrence) = found.firstWhere(
+        (f) => f.$1.doneAt(f.$2) == null,
+        orElse: () => found.last,
+      );
+    }
+    return (routineId: routine.id, occurrence: occurrence);
+  }
+
+  /// The latest day up to [today] on which [schedule] has an Occurrence,
+  /// looked for in ever wider spans before it; null for none.
+  static Day? _lastDay(Schedule schedule, Day today) {
+    final start = schedule.start;
+    if (start > today) return null;
+    for (final span in const [0, 7, 62, 400]) {
+      var from = today.addDays(-span);
+      if (from < start) from = start;
+      final found = schedule.between(from, today);
+      if (found.isNotEmpty) return found.last.day;
+      if (from == start) return null;
+    }
+    return schedule.between(start, today).lastOrNull?.day;
   }
 
   /// Whether this Device may make the Note [noteId] a Checklist: a Note
@@ -436,33 +589,52 @@ class Checklists {
 
   /// Checks the Line [lineId]: a Line with a group checks its whole
   /// group, and the last Line of a group checked checks its parent.
-  /// Every Line that changes gets an entry of its own.
-  void check(String lineId) => _setChecked(lineId, true);
+  /// Every Line that changes gets an entry of its own: on the Line, or
+  /// with [on] on its Routine, for that Occurrence only.
+  void check(String lineId, {RoutineOccurrence? on}) =>
+      _setChecked(lineId, true, on);
 
   /// Unchecks the Line [lineId]: a Line with a group unchecks its whole
-  /// group, and one of a group unchecks its parent.
-  void uncheck(String lineId) => _setChecked(lineId, false);
+  /// group, and one of a group unchecks its parent; with [on] for that
+  /// Occurrence only.
+  void uncheck(String lineId, {RoutineOccurrence? on}) =>
+      _setChecked(lineId, false, on);
 
-  /// Unchecks every Line of the Checklist of [noteId], to use it again.
-  void uncheckAll(String noteId) {
+  /// Unchecks every Line of the Checklist of [noteId], to use it again;
+  /// with [on] for that Occurrence only.
+  void uncheckAll(String noteId, {RoutineOccurrence? on}) {
     final (_, list) = _requireList(noteId);
-    if (!mayCheck(noteId)) {
+    final checks = on == null ? null : _requireOccurrence(on, noteId);
+    if (on == null && !mayCheck(noteId)) {
       throw StateError('no role in the Shared Area of $noteId');
     }
     store.batch(() {
       for (final line in list.lines) {
-        if (_checkedOwn(line.id)) {
+        if (on != null && checks != null) {
+          if (checks.checked(on.occurrence.key, line.id)) {
+            store.append(
+              on.routineId,
+              ChecklistKeys.checkFor(on.occurrence, line.id),
+              null,
+            );
+          }
+        } else if (_checkedOwn(line.id)) {
           store.append(line.id, ChecklistKeys.checked, null);
         }
       }
     });
   }
 
-  void _setChecked(String lineId, bool checked) {
-    final (list, line) = _requireLine(lineId);
-    if (!mayCheck(list.noteId)) {
-      throw StateError('no role in the Shared Area of ${list.noteId}');
+  void _setChecked(String lineId, bool checked, RoutineOccurrence? on) {
+    final (own, ownLine) = _requireLine(lineId);
+    final checks = on == null ? null : _requireOccurrence(on, own.noteId);
+    if (on == null && !mayCheck(own.noteId)) {
+      throw StateError('no role in the Shared Area of ${own.noteId}');
     }
+    final list = on != null && checks != null
+        ? _checkedFor(own, on, checks)
+        : own;
+    final line = list.line(lineId) ?? ownLine;
     final group = list.groupOf(lineId);
     final changed = <Line>[line, ...group];
     if (line.parent case final parent?) {
@@ -476,10 +648,39 @@ class Checklists {
     final at = store.clock().toUtc().toIso8601String();
     store.batch(() {
       for (final l in changed) {
+        if (on != null && checks != null) {
+          if (checks.checked(on.occurrence.key, l.id) == checked) continue;
+          store.append(
+            on.routineId,
+            ChecklistKeys.checkFor(on.occurrence, l.id),
+            checked ? at : null,
+          );
+          continue;
+        }
         if (_checkedOwn(l.id) == checked) continue;
         store.append(l.id, ChecklistKeys.checked, checked ? at : null);
       }
     });
+  }
+
+  /// The checks of the Routine of [on], which must be one out of the
+  /// trash spawned from the Note [noteId], due then, that this Device may
+  /// check off.
+  LineChecks _requireOccurrence(RoutineOccurrence on, String noteId) {
+    final routines = Routines(store);
+    final routine = routines.byId(on.routineId);
+    if (routine == null ||
+        routine.isTrashed ||
+        (routine.noteId != noteId && routines.note(routine)?.id != noteId)) {
+      throw ArgumentError.value(on.routineId, 'on', 'no Routine of $noteId');
+    }
+    if (!routine.schedule.has(on.occurrence)) {
+      throw ArgumentError.value(on.occurrence, 'on', 'not due then');
+    }
+    if (!store.mayCheckOff(on.routineId)) {
+      throw StateError('no role in the Shared Area of ${on.routineId}');
+    }
+    return LineChecks.read(store, on.routineId);
   }
 
   /// Whether the Line [id] itself was checked last.
@@ -623,6 +824,125 @@ class _Raw {
       checked = fields[ChecklistKeys.checked] != null,
       checkedAt = DateTime.tryParse(fields[ChecklistKeys.checked] ?? '')
           ?.toUtc();
+
+  /// The Line [id] of [fields] checked as [check] says.
+  _Raw.checkedBy(this.id, Map<String, String?> fields, Entry? check)
+    : text = StoredText.read(fields[ChecklistKeys.text]).text,
+      order = fields[ChecklistKeys.order],
+      indent = fields[ChecklistKeys.indent] == 'true',
+      checked = check?.value != null,
+      checkedAt = DateTime.tryParse(check?.value ?? '')?.toUtc();
+}
+
+/// The checks of Lines a Routine holds for its Occurrences (ADR 0030),
+/// only what counts: in a Shared Area what the roles allow (ADR 0013),
+/// anywhere else what the user's own Devices wrote.
+class LineChecks {
+  /// By Occurrence key, the check entry of each Line that holds.
+  final Map<String, Map<String, Entry>> byOccurrence;
+
+  const LineChecks._(this.byOccurrence);
+
+  /// Reads the checks of the Routine [id] from [history], its own by
+  /// default.
+  factory LineChecks.read(Store store, String id, [List<Entry>? history]) {
+    final area = store.areaOf(id);
+    final shared = area != null && store.isShared(area);
+    final own = <String, bool>{};
+    final latest = <String, Map<String, Entry>>{};
+    for (final e in history ?? store.history(id)) {
+      if (!e.field.startsWith(ChecklistKeys.checkPrefix)) continue;
+      if (!shared &&
+          !own.putIfAbsent(e.device, () => store.writtenByOwn(e.device))) {
+        continue;
+      }
+      final rest = e.field.substring(ChecklistKeys.checkPrefix.length);
+      final at = rest.indexOf('@');
+      if (at <= 0) continue;
+      final key = rest.substring(0, at);
+      final line = rest.substring(at + 1);
+      if (Occurrence.tryParse(key)?.key != key || !_isLine(line)) continue;
+      final checks = latest.putIfAbsent(key, () => {});
+      final held = checks[line];
+      if (held == null || Store.latestWins(e, held) > 0) checks[line] = e;
+    }
+    return LineChecks._(latest);
+  }
+
+  /// Whether the Line [lineId] itself is checked for the Occurrence
+  /// [key].
+  bool checked(String key, String lineId) =>
+      byOccurrence[key]?[lineId]?.value != null;
+
+  /// When the Line [lineId] was checked for the Occurrence [key], as its
+  /// check says; null while it is not.
+  DateTime? checkedAt(String key, String lineId) =>
+      DateTime.tryParse(byOccurrence[key]?[lineId]?.value ?? '')?.toUtc();
+
+  /// The Occurrences whose every Line is checked, by key, each with the
+  /// moment of its last check: the Lines of the making that check's Line
+  /// belongs to, of a Note of [noteIds], not deleted, but those added
+  /// after it and not checked then. Never one without a Line.
+  Map<String, DateTime> done(Store store, Set<String> noteIds) {
+    if (byOccurrence.isEmpty) return const {};
+    final lines = <String, Map<String, String?>>{};
+    for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
+      final fields = store.currentFields(id);
+      if (noteIds.contains(fields[ChecklistKeys.note])) lines[id] = fields;
+    }
+    final added = <String, DateTime?>{};
+    // When it was added: its earliest `$type`, the same on every Device.
+    DateTime? addedAt(String id) => added.putIfAbsent(id, () {
+      DateTime? first;
+      for (final e in store.history(id)) {
+        if (e.field != ChecklistKeys.type) continue;
+        if (first == null || e.date.isBefore(first)) first = e.date;
+      }
+      return first;
+    });
+    final done = <String, DateTime>{};
+    for (final MapEntry(:key, value: checks) in byOccurrence.entries) {
+      Entry? last;
+      String? lastLine;
+      for (final MapEntry(key: line, value: e) in checks.entries) {
+        if (e.value == null) continue;
+        if (last == null || Store.latestWins(e, last) > 0) {
+          last = e;
+          lastLine = line;
+        }
+      }
+      final of = lines[lastLine];
+      if (last == null || of == null) continue;
+      final note = of[ChecklistKeys.note];
+      final made = of[ChecklistKeys.made];
+      if (note == null || made == null) continue;
+      final raw = <_Raw>[];
+      for (final MapEntry(key: id, value: fields) in lines.entries) {
+        if (fields[ChecklistKeys.note] != note ||
+            fields[ChecklistKeys.made] != made ||
+            fields[ChecklistKeys.trashed] != null) {
+          continue;
+        }
+        final check = checks[id];
+        final at = addedAt(id);
+        if (check?.value == null && at != null && at.isAfter(last.date)) {
+          continue;
+        }
+        raw.add(_Raw.checkedBy(id, fields, check));
+      }
+      if (raw.isEmpty) continue;
+      if (Checklists._shown(note, raw).every((l) => l.checked)) {
+        done[key] = last.date;
+      }
+    }
+    return done;
+  }
+
+  static bool _isLine(String id) =>
+      id.length > ChecklistKeys.linePrefix.length &&
+      id.startsWith(ChecklistKeys.linePrefix) &&
+      !id.contains('@') &&
+      !id.contains(',');
 }
 
 /// One line of a text as it becomes a Line.

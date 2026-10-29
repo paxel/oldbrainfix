@@ -12,13 +12,18 @@
 //! Line, one starting with a space or a tab under the Line above;
 //! "Uncheck all" while one is checked; and "Back to a plain Note" for who
 //! may change the Note.
+//!
+//! A Checklist with a Routine or Reminder (#121) shows on its card and in
+//! its editor as checked for the Occurrence it is on now, and on the
+//! Agenda each Occurrence's row shows its Lines as checked for that
+//! Occurrence; a check made there counts for that Occurrence only.
 
 use std::collections::HashSet;
 
 use egui::{Frame, Id, Key, Modifiers, RichText, Sense, TextEdit, Ui, WidgetInfo};
 use oldbrainfix_core::checklists::split_lines;
 use oldbrainfix_core::sent::SentLine;
-use oldbrainfix_core::{Checklist, Checklists, Line, Note, Store};
+use oldbrainfix_core::{Checklist, Checklists, Line, Note, RoutineOccurrence, Store, WallClock};
 
 use crate::app::{check, embossed, icon_button};
 use crate::icons;
@@ -83,9 +88,11 @@ pub enum ChecklistAction {
     Make(String),
     /// Turns the Checklist of the Note back into a plain Note.
     ToPlain(String),
+    /// Unchecks every Line of the Note's Checklist as it shows now.
     UncheckAll(String),
-    /// Checks the Line with this id, or unchecks it.
-    Check(String, bool),
+    /// Checks the Line with this id, or unchecks it: for the Occurrence
+    /// given, or by its own checks without one.
+    Check(String, bool, Option<RoutineOccurrence>),
     /// Adds every line typed into the add field to the Note's Checklist.
     Add(String),
     /// A step of the menu of the Line with this id.
@@ -99,23 +106,37 @@ pub enum ChecklistAction {
 #[derive(Debug, Clone)]
 pub struct ChecklistShown {
     pub list: Checklist,
-    /// Whether this Device may add Lines and check them.
+    /// Whether this Device may check its Lines as they show.
     pub checks: bool,
+    /// Whether it may add Lines.
+    pub adds: bool,
     /// The Lines it may rename, delete, move and indent, by id.
     pub editable: HashSet<String>,
     /// Whether it may turn it back into a plain Note.
     pub plain: bool,
 }
 
-/// Reads the Checklist of the Note `note`, or `None` while it is none;
-/// `changes` says whether this Device may change the Note.
+/// Whether this Device may check the Lines of `list` as it shows: for
+/// its Occurrence who may check that off, else who may check the Note's
+/// Lines.
+pub fn may_check_shown(store: &Store, list: &Checklist) -> oldbrainfix_core::Result<bool> {
+    match &list.on {
+        Some(on) => store.may_check_off(&on.routine_id),
+        None => Checklists::new(store).may_check(&list.note_id),
+    }
+}
+
+/// Reads the Checklist of the Note `note` as it shows now, days as
+/// `wall` shows them, or `None` while it is none; `changes` says whether
+/// this Device may change the Note.
 pub fn read(
     store: &Store,
     note: &Note,
     changes: bool,
+    wall: &WallClock,
 ) -> oldbrainfix_core::Result<Option<ChecklistShown>> {
     let lists = Checklists::new(store);
-    let Some(list) = lists.by_note(&note.id)? else {
+    let Some(list) = lists.shown_now(&note.id, wall)? else {
         return Ok(None);
     };
     let mut editable = HashSet::new();
@@ -125,7 +146,8 @@ pub fn read(
         }
     }
     Ok(Some(ChecklistShown {
-        checks: lists.may_check(&note.id)?,
+        checks: may_check_shown(store, &list)?,
+        adds: lists.may_check(&note.id)?,
         editable,
         plain: changes && note.text_editable,
         list,
@@ -143,12 +165,17 @@ pub struct CardMenu {
     pub to_plain: bool,
 }
 
-/// Reads what the card menu of `note` offers.
-pub fn card_menu(store: &Store, note: &Note) -> oldbrainfix_core::Result<CardMenu> {
+/// Reads what the card menu of `note` offers, its Checklist as it shows
+/// now with days as `wall` shows them.
+pub fn card_menu(
+    store: &Store,
+    note: &Note,
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<CardMenu> {
     let lists = Checklists::new(store);
-    let list = lists.by_note(&note.id)?;
+    let list = lists.shown_now(&note.id, wall)?;
     let uncheck_all = match &list {
-        Some(list) => list.checked_count() > 0 && lists.may_check(&note.id)?,
+        Some(list) => list.checked_count() > 0 && may_check_shown(store, list)?,
         None => false,
     };
     let to_plain = list.is_some() && note.text_editable && store.may_change(&note.id)?;
@@ -353,14 +380,15 @@ fn grouped(ui: &mut Ui, lines: &[ShownLine], row: &mut dyn FnMut(&mut Ui, &Shown
 pub type LineMenus<'a> = (&'a HashSet<String>, &'a dyn Fn(&str) -> Vec<LineStep>);
 
 /// The Lines of a Checklist, each with its checkbox, checkable with
-/// `checks`, and its text; with `menus`, the Lines whose ids it holds
-/// have ⋮ and a right-click with the steps `steps` gives each. What is
-/// asked goes to `actions`.
+/// `checks` for the Occurrence `on` (by their own checks without one),
+/// and its text; with `menus`, the Lines whose ids it holds have ⋮ and a
+/// right-click with the steps `steps` gives each. What is asked goes to
+/// `actions`.
 pub fn lines(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
-    checks: bool,
+    (checks, on): (bool, Option<&RoutineOccurrence>),
     menus: Option<LineMenus>,
     actions: &mut Vec<ChecklistAction>,
 ) {
@@ -373,7 +401,11 @@ pub fn lines(
                     .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
                     .inner;
                 if toggled.clicked() {
-                    actions.push(ChecklistAction::Check(line.id.clone(), !line.checked));
+                    actions.push(ChecklistAction::Check(
+                        line.id.clone(),
+                        !line.checked,
+                        on.cloned(),
+                    ));
                 }
                 let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
                 let room = if editable.is_some() {
@@ -524,11 +556,11 @@ pub fn section(
             ui,
             (t, tones),
             &lines_shown,
-            shown.checks,
+            (shown.checks, list.on.as_ref()),
             Some((&shown.editable, &steps)),
             actions,
         );
-        if shown.checks {
+        if shown.adds {
             let id = Id::new("checklist add");
             if ui.memory(|m| m.has_focus(id))
                 && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
@@ -612,7 +644,7 @@ pub fn preview(ui: &mut Ui, (t, tones): (&L10n, Tones), lines_sent: &[SentLine])
         ui,
         (t, tones),
         &sent_lines(lines_sent),
-        false,
+        (false, None),
         None,
         &mut ignored,
     );

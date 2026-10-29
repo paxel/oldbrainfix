@@ -283,7 +283,8 @@ NoteActions noteActions(
         : null,
     checklist: () {
       final lists = Checklists(notes.store);
-      final list = lists.byNote(id);
+      // As the card shows it: for the Occurrence it is on (#121).
+      final list = lists.shownNow(id, deviceWallClock);
       void run(bool Function(Notes notes, String id) step) {
         if (step(notes, id)) changed();
       }
@@ -294,9 +295,10 @@ NoteActions noteActions(
         toPlain: list != null && placed.changes && placed.note.textEditable
             ? () => run(checklistToPlain)
             : null,
-        uncheckAll: list != null && list.checkedCount > 0 && lists.mayCheck(id)
+        uncheckAll:
+            list != null && list.checkedCount > 0 && mayCheckShown(lists, list)
             ? () {
-                lists.uncheckAll(id);
+                lists.uncheckAll(id, on: list.on);
                 changed();
               }
             : null,

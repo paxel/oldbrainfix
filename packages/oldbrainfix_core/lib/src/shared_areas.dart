@@ -352,13 +352,15 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
                       null => false,
                     }
               // A Member checks off, and a Session's picks and the
-              // entries recorded for them are anyone's (ADR 0029); the
-              // Frog and the Routine are the Manager's.
+              // entries recorded for them are anyone's (ADR 0029), as
+              // are the checks of Lines for an Occurrence (ADR 0030);
+              // the Frog and the Routine are the Manager's.
               : frog
               ? e.field == FrogKeys.done
               : e.field.startsWith(RoutineKeys.donePrefix) ||
                     e.field.startsWith(SessionKeys.pickPrefix) ||
-                    e.field.startsWith(SessionKeys.entryPrefix),
+                    e.field.startsWith(SessionKeys.entryPrefix) ||
+                    e.field.startsWith(ChecklistKeys.checkPrefix),
       };
       if (!ok) ignored.add(e.id);
     }

@@ -493,11 +493,13 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                         e.field == frog_keys::DONE
                     } else {
                         // So are a Session's picks and the entries
-                        // recorded for them (ADR 0029); the Routine is
-                        // the Manager's.
+                        // recorded for them (ADR 0029), and the checks of
+                        // Lines for an Occurrence (ADR 0030); the Routine
+                        // is the Manager's.
                         e.field.starts_with(routine_keys::DONE_PREFIX)
                             || e.field.starts_with(session_keys::PICK_PREFIX)
                             || e.field.starts_with(session_keys::ENTRY_PREFIX)
+                            || e.field.starts_with(checklist_keys::CHECK_PREFIX)
                     }
                 }
             };

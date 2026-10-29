@@ -27,16 +27,17 @@ use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
     Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Recurrence,
-    RepeatKind, Routine, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
-    SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem,
-    WireEntry, dart_iso, parse_time,
+    RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section,
+    SessionRule, Sessions, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod,
+    TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 12] = [
+const SCENARIOS: [&str; 13] = [
+    "checklist-routines",
     "checklists",
     "edits",
     "formats",
@@ -996,7 +997,8 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 12] = [
+    let writers: [(&str, Writer); 13] = [
+        ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
         ("formats", write_formats),
@@ -1628,6 +1630,98 @@ fn write_checklists(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `checklist-routines` scenario.
+fn write_checklist_routines(store: &Store) -> Built {
+    use oldbrainfix_core::checklists::keys;
+    let notes = Notes::new(store);
+    let lists = Checklists::new(store);
+    let routines = Routines::new(store);
+    let line = |note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(note)?.ok_or("a Checklist")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let on = |routine: &str, day: i64, time: Option<ClockTime>| RoutineOccurrence {
+        routine_id: routine.to_string(),
+        occurrence: Occurrence::new(Day::new(2026, 1, day), time),
+    };
+    let every_day = |times: &[ClockTime]| -> Result<Schedule, Box<dyn std::error::Error>> {
+        Ok(Schedule::new(Day::new(2026, 1, 1), times, daily()).ok_or("a schedule")?)
+    };
+    let gym = notes
+        .capture(
+            "Gym bag\nTowel\nShoes\n  Laces\n  Socks\nBottle",
+            None,
+            None,
+        )?
+        .id;
+    lists.make(&gym)?;
+    lists.check(&line(&gym, "Towel")?)?;
+    let bag = routines
+        .spawn(&gym, &every_day(&[at(7, 0)?, at(18, 0)?])?)?
+        .id;
+    let first = on(&bag, 1, Some(at(7, 0)?));
+    lists.check_for(&line(&gym, "Towel")?, &first)?;
+    lists.check_for(&line(&gym, "Laces")?, &first)?;
+    lists.check_for(&line(&gym, "Socks")?, &first)?;
+    lists.check_for(&line(&gym, "Bottle")?, &first)?;
+    let second = on(&bag, 1, Some(at(18, 0)?));
+    lists.check_for(&line(&gym, "Shoes")?, &second)?;
+    lists.uncheck_for(&line(&gym, "Socks")?, &second)?;
+    let third = on(&bag, 2, Some(at(7, 0)?));
+    lists.check_for(&line(&gym, "Towel")?, &third)?;
+    lists.uncheck_all_for(&gym, &third)?;
+    let evening = Occurrence::new(Day::new(2026, 1, 2), Some(at(18, 0)?));
+    routines.mark_done(&bag, &evening, None)?;
+    lists.add(&gym, "Lock", None, false)?;
+    lists.delete(&line(&gym, "Bottle")?)?;
+    let passport = notes.capture("Passport\nPhoto\nForm", None, None)?.id;
+    lists.make(&passport)?;
+    let office = routines
+        .spawn(&passport, &schedule(Day::new(2026, 1, 3), &[], None)?)?
+        .id;
+    lists.check_for(&line(&passport, "Photo")?, &on(&office, 3, None))?;
+    lists.check_for(&line(&passport, "Form")?, &on(&office, 3, None))?;
+    let tidy = notes.capture("Tidy\nDesk\nBin", None, None)?.id;
+    lists.make(&tidy)?;
+    let chores = routines.spawn(&tidy, &every_day(&[])?)?.id;
+    lists.check_for(&line(&tidy, "Desk")?, &on(&chores, 1, None))?;
+    lists.check_for(&line(&tidy, "Bin")?, &on(&chores, 1, None))?;
+    lists.to_plain(&tidy)?;
+    lists.make(&tidy)?;
+    lists.check_for(&line(&tidy, "Bin")?, &on(&chores, 2, None))?;
+    // As a modified app would.
+    let second_day = Occurrence::new(Day::new(2026, 1, 2), None);
+    let key = second_day.key();
+    let prefix = keys::CHECK_PREFIX;
+    for field in [
+        format!("{prefix}{key}"),
+        format!("{prefix}2026-1-2@{}", line(&tidy, "Desk")?),
+        format!("{prefix}{key}@note:x"),
+        keys::check_for(&second_day, &line(&passport, "Photo")?),
+    ] {
+        store.append(&chores, &field, Some("2026-01-02T09:00:00.000Z"), None)?;
+    }
+    let empty = notes.capture("Empty", None, None)?.id;
+    lists.make(&empty)?;
+    let idle = routines.spawn(&empty, &every_day(&[])?)?.id;
+    let first_day = Occurrence::new(Day::new(2026, 1, 1), None);
+    store.append(
+        &idle,
+        &keys::check_for(&first_day, "line:none"),
+        Some("2026-01-01T09:00:00.000Z"),
+        None,
+    )?;
+    routines.create("Walk the dog", &every_day(&[at(8, 0)?])?)?;
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
 /// A Checklist as the generator's `_checklist` lists it.
 fn checklist_json(list: &Checklist) -> Value {
     json!({
@@ -1668,11 +1762,18 @@ const ROWS: [&str; 17] = [
 
 #[test]
 fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
+    for scenario in ["checklist-routines", "checklists"] {
+        checklists_come_to_what_the_dart_core_says(scenario)?;
+    }
+    Ok(())
+}
+
+fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
     use oldbrainfix_core::checklists::{order, parse_line, split_lines};
-    let dir = fixtures().join("checklists");
+    let dir = fixtures().join(scenario);
     let expected = read_json(&dir.join("checklists.json"))?;
     let read_at = read_json(&dir.join("expected.json"))?;
-    let store = load("checklists", read_at["now"].as_str().ok_or("now")?)?;
+    let store = load(scenario, read_at["now"].as_str().ok_or("now")?)?;
     let lists = Checklists::new(&store);
     let notes = Notes::new(&store);
     let mut ids = store.entities_of_type("note")?;
@@ -1721,6 +1822,65 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
     for (key, valid) in expected["valid"].as_object().ok_or("valid")? {
         assert_eq!(json!(order::is_valid(Some(key))), *valid, "{key}");
     }
+    // With a Routine: what is Done, the Lines as checked for each
+    // Occurrence, and the Occurrence each Checklist is on.
+    let routines = Routines::new(&store);
+    let mut routine_ids = store.entities_of_type("routine")?;
+    routine_ids.sort();
+    let mut all = Vec::new();
+    let mut occurrences = serde_json::Map::new();
+    for id in &routine_ids {
+        let Some(routine) = routines.by_id(id)? else {
+            continue;
+        };
+        all.push(routine_json(&routine));
+        let mut by_key = serde_json::Map::new();
+        for o in routine
+            .schedule
+            .between(Day::new(2026, 1, 1), Day::new(2026, 1, 4))
+        {
+            let at = RoutineOccurrence {
+                routine_id: id.clone(),
+                occurrence: o,
+            };
+            if let Some(list) = lists.for_occurrence(&at)? {
+                by_key.insert(o.key(), checklist_json(&list));
+            }
+        }
+        occurrences.insert(id.clone(), Value::Object(by_key));
+    }
+    assert_eq!(json!(all), expected["routines"], "{scenario}");
+    assert_eq!(
+        Value::Object(occurrences),
+        expected["occurrences"],
+        "{scenario}"
+    );
+    let before = store.all_entries()?.len();
+    let mut days = Vec::new();
+    for days_on in -1..=3 {
+        let wall = frog_day(days_on);
+        let mut now = serde_json::Map::new();
+        for id in &ids {
+            if lists.by_note(id)?.is_none() {
+                continue;
+            }
+            let on = lists
+                .occurrence_now(id, &wall)?
+                .map(|on| json!([on.routine_id, on.occurrence.key()]));
+            now.insert(id.clone(), on.unwrap_or(Value::Null));
+        }
+        let mut shown = serde_json::Map::new();
+        for (id, list) in lists.of_notes_now(&ids, &wall)? {
+            assert_eq!(Some(&list), lists.shown_now(&id, &wall)?.as_ref(), "{id}");
+            shown.insert(id, checklist_json(&list));
+        }
+        days.push(json!({
+            "occurrenceNow": Value::Object(now),
+            "shownNow": Value::Object(shown),
+        }));
+    }
+    assert_eq!(json!(days), expected["now"], "{scenario}");
+    assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
     Ok(())
 }
 

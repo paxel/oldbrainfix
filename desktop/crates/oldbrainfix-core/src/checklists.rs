@@ -4,14 +4,19 @@
 //! entities of their own beside it, each with its text, its place,
 //! whether it is under the Line above and whether it is checked. Every
 //! write appends the same entries, in the same order and read from the
-//! clock as often, as the Dart core's.
+//! clock as often, as the Dart core's. A Routine or Reminder spawned
+//! from a Checklist's Note holds the checks of its Lines for each
+//! Occurrence, so every new one starts with no Line checked.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Utc};
 
-use crate::entry::{dart_iso, parse_time};
+use crate::entry::{Entry, dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
+use crate::routines::{Routine, Routines};
+use crate::schedule::{Day, Occurrence, Schedule, WallClock};
 use crate::sent::keys as sent_keys;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
@@ -50,6 +55,16 @@ pub mod keys {
     pub const CHECKED: &str = "checked";
     /// When it was deleted.
     pub const TRASHED: &str = "trashed";
+    /// On a Routine spawned from a Checklist's Note: the prefix of the
+    /// check of a Line for an Occurrence, its value when it was checked,
+    /// `None` when it was unchecked again.
+    pub const CHECK_PREFIX: &str = "check@";
+
+    /// The check of the Line `line_id` for `occurrence`, keyed by the
+    /// wall-clock Occurrence as `done@` is.
+    pub fn check_for(occurrence: &crate::schedule::Occurrence, line_id: &str) -> String {
+        format!("{CHECK_PREFIX}{}@{line_id}", occurrence.key())
+    }
 
     /// What marks a checked Line in a plain Note's text.
     pub const CHECK_MARK: &str = "✓ ";
@@ -176,6 +191,14 @@ impl Line {
     }
 }
 
+/// An Occurrence of the Routine `routine_id`: one a Checklist is
+/// checked for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoutineOccurrence {
+    pub routine_id: String,
+    pub occurrence: Occurrence,
+}
+
 /// A Note whose Lines are checked off (CONTEXT.md).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Checklist {
@@ -185,6 +208,9 @@ pub struct Checklist {
     /// Every Line, in the order they show: each parent followed by its
     /// group.
     pub lines: Vec<Line>,
+    /// The Occurrence its Lines show checked for, or `None` when they
+    /// show their own checks.
+    pub on: Option<RoutineOccurrence>,
 }
 
 impl Checklist {
@@ -278,6 +304,186 @@ impl Raw {
             checked_at: fields.get(keys::CHECKED).and_then(|v| parse_time(v).ok()),
         }
     }
+
+    /// The Line `id` of `fields` checked as `check` says.
+    fn checked_by(id: String, fields: &Fields, check: Option<&Entry>) -> Raw {
+        let value = check.and_then(|c| c.value.as_deref());
+        Raw {
+            id,
+            text: StoredText::read(fields.get(keys::TEXT)).text,
+            order: fields.get(keys::ORDER).map(str::to_string),
+            indent: fields.get(keys::INDENT) == Some("true"),
+            checked: value.is_some(),
+            checked_at: value.and_then(|v| parse_time(v).ok()),
+        }
+    }
+}
+
+/// The checks of Lines a Routine holds for its Occurrences (ADR 0030),
+/// only what counts: in a Shared Area what the roles allow (ADR 0013),
+/// anywhere else what the user's own Devices wrote.
+#[derive(Debug, Clone, Default)]
+pub struct LineChecks {
+    /// By Occurrence key, the check entry of each Line that holds.
+    pub by_occurrence: BTreeMap<String, BTreeMap<String, Entry>>,
+}
+
+impl LineChecks {
+    /// The checks of the Routine `id`, read from its history.
+    pub fn of(store: &Store, id: &str) -> Result<LineChecks> {
+        let history = store.history(id)?;
+        Self::read(store, id, &history)
+    }
+
+    /// The checks of the Routine `id`, read from `history`.
+    pub fn read(store: &Store, id: &str, history: &[Entry]) -> Result<LineChecks> {
+        let shared = match store.area_of(id)? {
+            Some(area) => store.is_shared(&area)?,
+            None => false,
+        };
+        let mut own = HashMap::new();
+        let mut latest: BTreeMap<String, BTreeMap<String, Entry>> = BTreeMap::new();
+        for e in history {
+            let Some(rest) = e.field.strip_prefix(keys::CHECK_PREFIX) else {
+                continue;
+            };
+            if !shared && !store.written_by_own_in(&e.device, &mut own)? {
+                continue;
+            }
+            let Some((key, line)) = rest.split_once('@') else {
+                continue;
+            };
+            let named = Occurrence::parse(key).is_some_and(|o| o.key() == key);
+            if key.is_empty() || !named || !is_line_id(line) {
+                continue;
+            }
+            let checks = latest.entry(key.to_string()).or_default();
+            let newer = checks
+                .get(line)
+                .is_none_or(|held| Store::latest_wins(e, held) == Ordering::Greater);
+            if newer {
+                checks.insert(line.to_string(), e.clone());
+            }
+        }
+        Ok(LineChecks {
+            by_occurrence: latest,
+        })
+    }
+
+    /// Whether the Line `line_id` itself is checked for the Occurrence
+    /// `key`.
+    pub fn checked(&self, key: &str, line_id: &str) -> bool {
+        self.value(key, line_id).is_some()
+    }
+
+    /// When the Line `line_id` was checked for the Occurrence `key`, as
+    /// its check says.
+    pub fn checked_at(&self, key: &str, line_id: &str) -> Option<DateTime<Utc>> {
+        self.value(key, line_id).and_then(|v| parse_time(v).ok())
+    }
+
+    fn value(&self, key: &str, line_id: &str) -> Option<&str> {
+        self.by_occurrence
+            .get(key)
+            .and_then(|checks| checks.get(line_id))
+            .and_then(|e| e.value.as_deref())
+    }
+
+    /// The Occurrences whose every Line is checked, by key, each with the
+    /// moment of its last check: the Lines of the making that check's
+    /// Line belongs to, of a Note of `note_ids`, not deleted, but those
+    /// added after it and not checked then. Never one without a Line.
+    pub fn done(
+        &self,
+        store: &Store,
+        note_ids: &[String],
+    ) -> Result<BTreeMap<String, DateTime<Utc>>> {
+        let mut done = BTreeMap::new();
+        if self.by_occurrence.is_empty() {
+            return Ok(done);
+        }
+        let mut lines: BTreeMap<String, Fields> = BTreeMap::new();
+        for id in store.entities_of_type(keys::TYPE_LINE)? {
+            let fields = store.current_fields(&id)?;
+            if fields
+                .get(keys::NOTE)
+                .is_some_and(|note| note_ids.iter().any(|n| n == note))
+            {
+                lines.insert(id, fields);
+            }
+        }
+        let mut added: HashMap<String, Option<DateTime<Utc>>> = HashMap::new();
+        for (key, checks) in &self.by_occurrence {
+            let mut last: Option<(&String, &Entry)> = None;
+            for (line, e) in checks {
+                if e.value.is_none() {
+                    continue;
+                }
+                if last.is_none_or(|(_, held)| Store::latest_wins(e, held) == Ordering::Greater) {
+                    last = Some((line, e));
+                }
+            }
+            let Some((last_line, last)) = last else {
+                continue;
+            };
+            let Some(of) = lines.get(last_line) else {
+                continue;
+            };
+            let (Some(note), Some(made)) = (of.get(keys::NOTE), of.get(keys::MADE)) else {
+                continue;
+            };
+            let mut raw = Vec::new();
+            for (id, fields) in &lines {
+                if fields.get(keys::NOTE) != Some(note)
+                    || fields.get(keys::MADE) != Some(made)
+                    || fields.get(keys::TRASHED).is_some()
+                {
+                    continue;
+                }
+                let check = checks.get(id);
+                if check.is_none_or(|c| c.value.is_none()) {
+                    let at = match added.get(id) {
+                        Some(at) => *at,
+                        None => {
+                            let at = added_at(store, id)?;
+                            added.insert(id.clone(), at);
+                            at
+                        }
+                    };
+                    if at.is_some_and(|at| at > last.date_at) {
+                        continue;
+                    }
+                }
+                raw.push(Raw::checked_by(id.clone(), fields, check));
+            }
+            if raw.is_empty() {
+                continue;
+            }
+            if shown(note, raw).iter().all(|l| l.checked) {
+                done.insert(key.clone(), last.date_at);
+            }
+        }
+        Ok(done)
+    }
+}
+
+/// When the Line `id` was added: its earliest `$type`, the same on every
+/// Device.
+fn added_at(store: &Store, id: &str) -> Result<Option<DateTime<Utc>>> {
+    let mut first: Option<DateTime<Utc>> = None;
+    for e in store.history(id)? {
+        if e.field == keys::TYPE && first.is_none_or(|f| e.date_at < f) {
+            first = Some(e.date_at);
+        }
+    }
+    Ok(first)
+}
+
+fn is_line_id(id: &str) -> bool {
+    id.len() > keys::LINE_PREFIX.len()
+        && id.starts_with(keys::LINE_PREFIX)
+        && !id.contains('@')
+        && !id.contains(',')
 }
 
 /// What a new Line holds, as [`write_line`] writes it.
@@ -378,8 +584,87 @@ impl<'a> Checklists<'a> {
                     note_id: note,
                     making,
                     lines,
+                    on: None,
                 },
             );
+        }
+        Ok(out)
+    }
+
+    /// The Checklist of the Note the Routine of `on` was spawned from,
+    /// checked as for that Occurrence: only the checks made for it count,
+    /// so every new Occurrence starts with no Line checked. `None` when the
+    /// Routine is none or its Note no Checklist.
+    pub fn for_occurrence(&self, on: &RoutineOccurrence) -> Result<Option<Checklist>> {
+        let routines = Routines::new(self.store);
+        let Some(routine) = routines.by_id(&on.routine_id)? else {
+            return Ok(None);
+        };
+        let Some(note) = routines.note(&routine)? else {
+            return Ok(None);
+        };
+        let Some(list) = self.by_note(&note.id)? else {
+            return Ok(None);
+        };
+        let checks = LineChecks::of(self.store, &on.routine_id)?;
+        Ok(Some(checked_for(list, on, &checks)))
+    }
+
+    /// The Occurrence the Checklist of `note_id` is checked for now, with
+    /// days as `wall` shows them; `None` while the Note has no Routine or
+    /// Reminder out of the trash. Of all of theirs, those on the latest
+    /// day up to today that has any: the first not Done, else the last.
+    /// Before their first day, the first of them.
+    pub fn occurrence_now(
+        &self,
+        note_id: &str,
+        wall: &WallClock,
+    ) -> Result<Option<RoutineOccurrence>> {
+        let routines = Routines::new(self.store).of_note(note_id)?;
+        Ok(now_of(&routines, Day::today(self.store.now(), wall)))
+    }
+
+    /// The Checklist of `note_id` as it shows now: checked for the
+    /// Occurrence it is on ([`Checklists::occurrence_now`]), or by its own
+    /// checks while the Note has no Routine or Reminder.
+    pub fn shown_now(&self, note_id: &str, wall: &WallClock) -> Result<Option<Checklist>> {
+        Ok(self
+            .of_notes_now(&[note_id.to_string()], wall)?
+            .remove(note_id))
+    }
+
+    /// [`Checklists::of_notes`] as [`Checklists::shown_now`] shows each,
+    /// in one pass over the Lines and the Routines.
+    pub fn of_notes_now(
+        &self,
+        note_ids: &[String],
+        wall: &WallClock,
+    ) -> Result<BTreeMap<String, Checklist>> {
+        let lists = self.of_notes(note_ids)?;
+        if lists.is_empty() {
+            return Ok(lists);
+        }
+        let routines = Routines::new(self.store);
+        let mut spawned: HashMap<String, Vec<Routine>> = HashMap::new();
+        for routine in routines.all()? {
+            if let Some(note) = routines.note(&routine)?
+                && lists.contains_key(&note.id)
+            {
+                spawned.entry(note.id).or_default().push(routine);
+            }
+        }
+        let today = Day::today(self.store.now(), wall);
+        let mut out = BTreeMap::new();
+        for (id, list) in lists {
+            let on = now_of(spawned.get(&id).map(Vec::as_slice).unwrap_or(&[]), today);
+            let shown = match on {
+                None => list,
+                Some(on) => {
+                    let checks = LineChecks::of(self.store, &on.routine_id)?;
+                    checked_for(list, &on, &checks)
+                }
+            };
+            out.insert(id, shown);
         }
         Ok(out)
     }
@@ -680,26 +965,55 @@ impl<'a> Checklists<'a> {
     /// group, and the last Line of a group checked checks its parent.
     /// Every Line that changes gets an entry of its own.
     pub fn check(&self, line_id: &str) -> Result<()> {
-        self.set_checked(line_id, true)
+        self.set_checked(line_id, true, None)
     }
 
     /// Unchecks the Line `line_id`: a Line with a group unchecks its whole
     /// group, and one of a group unchecks its parent.
     pub fn uncheck(&self, line_id: &str) -> Result<()> {
-        self.set_checked(line_id, false)
+        self.set_checked(line_id, false, None)
+    }
+
+    /// [`Checklists::check`] for the Occurrence `on` only: the entries lie
+    /// on its Routine.
+    pub fn check_for(&self, line_id: &str, on: &RoutineOccurrence) -> Result<()> {
+        self.set_checked(line_id, true, Some(on))
+    }
+
+    /// [`Checklists::uncheck`] for the Occurrence `on` only.
+    pub fn uncheck_for(&self, line_id: &str, on: &RoutineOccurrence) -> Result<()> {
+        self.set_checked(line_id, false, Some(on))
     }
 
     /// Unchecks every Line of the Checklist of `note_id`, to use it again.
     pub fn uncheck_all(&self, note_id: &str) -> Result<()> {
+        self.uncheck_all_on(note_id, None)
+    }
+
+    /// [`Checklists::uncheck_all`] for the Occurrence `on` only.
+    pub fn uncheck_all_for(&self, note_id: &str, on: &RoutineOccurrence) -> Result<()> {
+        self.uncheck_all_on(note_id, Some(on))
+    }
+
+    fn uncheck_all_on(&self, note_id: &str, on: Option<&RoutineOccurrence>) -> Result<()> {
         let (_, list) = self.require_list(note_id)?;
-        if !self.may_check(note_id)? {
+        let checks = match on {
+            None => None,
+            Some(on) => Some(self.require_occurrence(on, note_id)?),
+        };
+        if on.is_none() && !self.may_check(note_id)? {
             return Err(Error::Invalid(format!(
                 "no role in the Shared Area of {note_id}"
             )));
         }
         self.store.batch(|| {
             for line in &list.lines {
-                if self.checked_own(&line.id)? {
+                if let (Some(on), Some(checks)) = (on, &checks) {
+                    if checks.checked(&on.occurrence.key(), &line.id) {
+                        let field = keys::check_for(&on.occurrence, &line.id);
+                        self.store.append(&on.routine_id, &field, None, None)?;
+                    }
+                } else if self.checked_own(&line.id)? {
                     self.store.append(&line.id, keys::CHECKED, None, None)?;
                 }
             }
@@ -707,14 +1021,28 @@ impl<'a> Checklists<'a> {
         })
     }
 
-    fn set_checked(&self, line_id: &str, checked: bool) -> Result<()> {
-        let (list, line) = self.require_line(line_id)?;
-        if !self.may_check(&list.note_id)? {
+    fn set_checked(
+        &self,
+        line_id: &str,
+        checked: bool,
+        on: Option<&RoutineOccurrence>,
+    ) -> Result<()> {
+        let (own, own_line) = self.require_line(line_id)?;
+        let checks = match on {
+            None => None,
+            Some(on) => Some(self.require_occurrence(on, &own.note_id)?),
+        };
+        if on.is_none() && !self.may_check(&own.note_id)? {
             return Err(Error::Invalid(format!(
                 "no role in the Shared Area of {}",
-                list.note_id
+                own.note_id
             )));
         }
+        let list = match (on, &checks) {
+            (Some(on), Some(checks)) => checked_for(own, on, checks),
+            _ => own,
+        };
+        let line = list.line(line_id).cloned().unwrap_or(own_line);
         let mut changed: Vec<String> = vec![line.id.clone()];
         changed.extend(list.group_of(line_id).into_iter().map(|l| l.id.clone()));
         if let Some(parent) = &line.parent
@@ -732,14 +1060,55 @@ impl<'a> Checklists<'a> {
         let at = dart_iso(self.store.now());
         self.store.batch(|| {
             for id in &changed {
+                let value = if checked { Some(at.as_str()) } else { None };
+                if let (Some(on), Some(checks)) = (on, &checks) {
+                    if checks.checked(&on.occurrence.key(), id) == checked {
+                        continue;
+                    }
+                    let field = keys::check_for(&on.occurrence, id);
+                    self.store.append(&on.routine_id, &field, value, None)?;
+                    continue;
+                }
                 if self.checked_own(id)? == checked {
                     continue;
                 }
-                let value = if checked { Some(at.as_str()) } else { None };
                 self.store.append(id, keys::CHECKED, value, None)?;
             }
             Ok(())
         })
+    }
+
+    /// The checks of the Routine of `on`, which must be one out of the
+    /// trash spawned from the Note `note_id`, due then, that this Device
+    /// may check off.
+    fn require_occurrence(&self, on: &RoutineOccurrence, note_id: &str) -> Result<LineChecks> {
+        let routines = Routines::new(self.store);
+        let routine = routines.by_id(&on.routine_id)?;
+        let ours = match &routine {
+            Some(r) if !r.is_trashed() => {
+                r.note_id == note_id || routines.note(r)?.is_some_and(|n| n.id == note_id)
+            }
+            _ => false,
+        };
+        let Some(routine) = routine.filter(|_| ours) else {
+            return Err(Error::Invalid(format!(
+                "{} is no Routine of {note_id}",
+                on.routine_id
+            )));
+        };
+        if !routine.schedule.has(&on.occurrence) {
+            return Err(Error::Invalid(format!(
+                "{} is not due then",
+                on.occurrence.key()
+            )));
+        }
+        if !self.store.may_check_off(&on.routine_id)? {
+            return Err(Error::Invalid(format!(
+                "no role in the Shared Area of {}",
+                on.routine_id
+            )));
+        }
+        LineChecks::of(self.store, &on.routine_id)
     }
 
     /// Whether the Line `id` itself was checked last.
@@ -850,6 +1219,84 @@ fn shown(note_id: &str, mut raw: Vec<Raw>) -> Vec<Line> {
             id: r.id,
         })
         .collect()
+}
+
+/// `list` with its Lines checked as `checks` hold them for `on`.
+fn checked_for(list: Checklist, on: &RoutineOccurrence, checks: &LineChecks) -> Checklist {
+    let key = on.occurrence.key();
+    let mut group_checked: HashMap<String, bool> = HashMap::new();
+    for line in &list.lines {
+        if let Some(parent) = &line.parent {
+            let held = group_checked.entry(parent.clone()).or_insert(true);
+            *held = *held && checks.checked(&key, &line.id);
+        }
+    }
+    let lines = list
+        .lines
+        .into_iter()
+        .map(|line| Line {
+            checked: group_checked
+                .get(&line.id)
+                .copied()
+                .unwrap_or_else(|| checks.checked(&key, &line.id)),
+            checked_at: checks.checked_at(&key, &line.id),
+            ..line
+        })
+        .collect();
+    Checklist {
+        note_id: list.note_id,
+        making: list.making,
+        lines,
+        on: Some(on.clone()),
+    }
+}
+
+/// The Occurrence of `routines` a Checklist is on `today`
+/// ([`Checklists::occurrence_now`]).
+fn now_of(routines: &[Routine], today: Day) -> Option<RoutineOccurrence> {
+    let latest = routines
+        .iter()
+        .filter_map(|r| last_day(&r.schedule, today))
+        .max();
+    let mut found: Vec<(&Routine, Occurrence)> = Vec::new();
+    for routine in routines {
+        let occurrences = match latest {
+            Some(day) => routine.schedule.on(day),
+            None => routine.schedule.next(today, 1),
+        };
+        found.extend(occurrences.into_iter().map(|o| (routine, o)));
+    }
+    found.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| utf16_cmp(&a.0.id, &b.0.id)));
+    let picked = match latest {
+        None => found.first(),
+        Some(_) => found
+            .iter()
+            .find(|(r, o)| r.done_at(o).is_none())
+            .or(found.last()),
+    }?;
+    Some(RoutineOccurrence {
+        routine_id: picked.0.id.clone(),
+        occurrence: picked.1,
+    })
+}
+
+/// The latest day up to `today` on which `schedule` has an Occurrence,
+/// looked for in ever wider spans before it.
+fn last_day(schedule: &Schedule, today: Day) -> Option<Day> {
+    let start = schedule.start;
+    if start > today {
+        return None;
+    }
+    for span in [0, 7, 62, 400] {
+        let from = today.add_days(-span).max(start);
+        if let Some(last) = schedule.between(from, today).last() {
+            return Some(last.day);
+        }
+        if from == start {
+            return None;
+        }
+    }
+    schedule.between(start, today).last().map(|o| o.day)
 }
 
 /// The valid keys around the place `pos` of `lines`: the last one before
@@ -1498,5 +1945,335 @@ mod tests {
         assert_eq!(parse_line("✓ "), row("✓", false, false));
         assert_eq!(parse_line("✓x"), row("✓x", false, false));
         assert_eq!(line_text("a\r\n\nb").ok().as_deref(), Some("a b"));
+    }
+
+    // ------------------------------------------ With a Routine (#121)
+
+    /// The wall clock `days` days after the store's now: the tests' clock
+    /// moves by seconds, the Agenda by days. Day 0 is 2026-01-01.
+    fn on_day(days: i64) -> impl Fn(DateTime<Utc>) -> chrono::NaiveDateTime {
+        move |utc| (utc + Duration::days(days)).naive_utc()
+    }
+
+    fn time(hour: u32) -> Made<crate::schedule::ClockTime> {
+        Ok(crate::schedule::ClockTime::new(hour, 0).ok_or("a time")?)
+    }
+
+    fn daily(times: &[crate::schedule::ClockTime]) -> Made<Schedule> {
+        let rule = Some(crate::schedule::Recurrence::every(
+            crate::schedule::Frequency::Daily,
+            1,
+        ));
+        Ok(Schedule::new(Day::new(2026, 1, 1), times, rule).ok_or("a schedule")?)
+    }
+
+    fn spawn(store: &Store, note: &str, schedule: &Schedule) -> Made<String> {
+        Ok(Routines::new(store).spawn(note, schedule)?.id)
+    }
+
+    /// The Occurrence of `routine` on `days` days on, at `time`.
+    fn on(routine: &str, days: i64, time: Option<crate::schedule::ClockTime>) -> RoutineOccurrence {
+        RoutineOccurrence {
+            routine_id: routine.to_string(),
+            occurrence: Occurrence::new(Day::new(2026, 1, 1).add_days(days), time),
+        }
+    }
+
+    /// The Lines as shown for `at`, `[x]` for one checked.
+    fn shown_for(store: &Store, at: &RoutineOccurrence) -> Made<Vec<String>> {
+        let list = Checklists::new(store).for_occurrence(at)?;
+        Ok(list
+            .map(|l| l.lines)
+            .unwrap_or_default()
+            .iter()
+            .map(|l| {
+                format!(
+                    "{}{}{}",
+                    if l.in_group() { "  " } else { "" },
+                    if l.checked { "[x] " } else { "" },
+                    l.text
+                )
+            })
+            .collect())
+    }
+
+    fn done_at(store: &Store, at: &RoutineOccurrence) -> Made<Option<DateTime<Utc>>> {
+        Ok(Routines::new(store)
+            .by_id(&at.routine_id)?
+            .and_then(|r| r.done_at(&at.occurrence)))
+    }
+
+    #[test]
+    fn each_occurrence_starts_unchecked_and_is_done_once_every_line_is_checked() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let note = checklist(&ann, "Gym bag\nTowel\nShoes\n  Laces\nBottle", None)?;
+        let lists = Checklists::new(&ann);
+        lists.check(&id_of(&ann, &note, "Towel")?)?;
+        let routine = spawn(&ann, &note, &daily(&[])?)?;
+        let today = on(&routine, 0, None);
+        // Its own checks show for no Occurrence.
+        assert_eq!(
+            shown_for(&ann, &today)?,
+            ["Towel", "Shoes", "  Laces", "Bottle"]
+        );
+        lists.check_for(&id_of(&ann, &note, "Towel")?, &today)?;
+        lists.check_for(&id_of(&ann, &note, "Laces")?, &today)?;
+        assert_eq!(
+            shown_for(&ann, &today)?,
+            ["[x] Towel", "[x] Shoes", "  [x] Laces", "Bottle"]
+        );
+        assert_eq!(done_at(&ann, &today)?, None);
+        lists.check_for(&id_of(&ann, &note, "Bottle")?, &today)?;
+        let done = done_at(&ann, &today)?;
+        assert!(done.is_some());
+        let rows = Routines::new(&ann).agenda(&on_day(0))?.today_rows;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].done(), done);
+        let list = lists.for_occurrence(&today)?.ok_or("a Checklist")?;
+        assert_eq!(list.on.as_ref(), Some(&today));
+        // The next one starts afresh, with nothing written for it.
+        let before = ann.all_entries()?.len();
+        let tomorrow = on(&routine, 1, None);
+        assert_eq!(
+            shown_for(&ann, &tomorrow)?,
+            ["Towel", "Shoes", "  Laces", "Bottle"]
+        );
+        assert_eq!(done_at(&ann, &tomorrow)?, None);
+        assert_eq!(ann.all_entries()?.len(), before);
+        // Every check lies on the Routine; no Line's own check moved.
+        assert_eq!(
+            lists.by_note(&note)?.ok_or("a Checklist")?.checked_count(),
+            1
+        );
+        // Unchecking a Line undoes the Done; checking it off by hand
+        // still works.
+        lists.uncheck_for(&id_of(&ann, &note, "Laces")?, &today)?;
+        assert_eq!(
+            shown_for(&ann, &today)?,
+            ["[x] Towel", "Shoes", "  Laces", "[x] Bottle"]
+        );
+        assert_eq!(done_at(&ann, &today)?, None);
+        Routines::new(&ann).mark_done(&routine, &tomorrow.occurrence, None)?;
+        assert!(done_at(&ann, &tomorrow)?.is_some());
+        // "Uncheck all" for one Occurrence.
+        lists.check_for(&id_of(&ann, &note, "Shoes")?, &today)?;
+        assert!(done_at(&ann, &today)?.is_some());
+        lists.uncheck_all_for(&note, &today)?;
+        assert_eq!(
+            shown_for(&ann, &today)?,
+            ["Towel", "Shoes", "  Laces", "Bottle"]
+        );
+        assert_eq!(done_at(&ann, &today)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_added_after_done_leaves_it_done_and_no_line_is_never_done() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let note = checklist(&ann, "Shop\nMilk\nEggs", None)?;
+        let routine = spawn(&ann, &note, &daily(&[])?)?;
+        let lists = Checklists::new(&ann);
+        let today = on(&routine, 0, None);
+        lists.check_for(&id_of(&ann, &note, "Milk")?, &today)?;
+        lists.check_for(&id_of(&ann, &note, "Eggs")?, &today)?;
+        let done = done_at(&ann, &today)?;
+        assert!(done.is_some());
+        let bread = lists.add(&note, "Bread", None, false)?;
+        assert_eq!(done_at(&ann, &today)?, done);
+        assert_eq!(shown_for(&ann, &today)?, ["[x] Milk", "[x] Eggs", "Bread"]);
+        // Checked again since, the Line added counts.
+        lists.uncheck_for(&id_of(&ann, &note, "Eggs")?, &today)?;
+        lists.check_for(&id_of(&ann, &note, "Eggs")?, &today)?;
+        assert_eq!(done_at(&ann, &today)?, None);
+        lists.delete(&bread)?;
+        assert!(done_at(&ann, &today)?.is_some());
+        lists.restore(&bread)?;
+        assert_eq!(done_at(&ann, &today)?, None);
+        // No Line, no Done, whatever a modified app marks.
+        let empty = checklist(&ann, "Empty", None)?;
+        let idle = spawn(&ann, &empty, &daily(&[])?)?;
+        let field = keys::check_for(&today.occurrence, "line:x");
+        ann.append(&idle, &field, Some("1"), None)?;
+        assert_eq!(done_at(&ann, &on(&idle, 0, None))?, None);
+        let milk = id_of(&ann, &note, "Milk")?;
+        assert!(lists.check_for(&milk, &on(&idle, 0, None)).is_err());
+        // Back to a plain Note and made again, what was Done stays.
+        let tidy = checklist(&ann, "Tidy\nDesk\nBin", None)?;
+        let chores = spawn(&ann, &tidy, &daily(&[])?)?;
+        let at = on(&chores, 0, None);
+        lists.check_for(&id_of(&ann, &tidy, "Desk")?, &at)?;
+        lists.check_for(&id_of(&ann, &tidy, "Bin")?, &at)?;
+        let done = done_at(&ann, &at)?;
+        lists.to_plain(&tidy)?;
+        assert_eq!(done_at(&ann, &at)?, done);
+        lists.make(&tidy)?;
+        assert_eq!(done_at(&ann, &at)?, done);
+        assert_eq!(shown_for(&ann, &at)?, ["Desk", "Bin"]);
+        Ok(())
+    }
+
+    #[test]
+    fn checks_no_app_writes_are_passed_over() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let note = checklist(&ann, "Shop\nMilk", None)?;
+        let other = checklist(&ann, "Other\nTea", None)?;
+        let routine = spawn(&ann, &note, &daily(&[])?)?;
+        let today = on(&routine, 0, None);
+        let key = today.occurrence.key();
+        let milk = id_of(&ann, &note, "Milk")?;
+        let prefix = keys::CHECK_PREFIX;
+        // As a modified app would.
+        for field in [
+            format!("{prefix}{key}"),
+            format!("{prefix}@{milk}"),
+            format!("{prefix}2026-1-1@{milk}"),
+            format!("{prefix}{key}@line:"),
+            format!("{prefix}{key}@{milk}@x"),
+            format!("{prefix}{key}@note:x"),
+            keys::check_for(&today.occurrence, &id_of(&ann, &other, "Tea")?),
+        ] {
+            ann.append(&routine, &field, Some("2026-01-01T09:00:00.000Z"), None)?;
+        }
+        assert_eq!(shown_for(&ann, &today)?, ["Milk"]);
+        assert_eq!(done_at(&ann, &today)?, None);
+        let read = LineChecks::of(&ann, &routine)?;
+        assert_eq!(read.by_occurrence.keys().collect::<Vec<_>>(), [&key]);
+        // An Occurrence not due, or a Routine of another Note, takes no
+        // check.
+        let lists = Checklists::new(&ann);
+        assert!(
+            lists
+                .check_for(&milk, &on(&routine, 0, Some(time(8)?)))
+                .is_err()
+        );
+        let elsewhere = spawn(&ann, &other, &daily(&[])?)?;
+        assert!(lists.check_for(&milk, &on(&elsewhere, 0, None)).is_err());
+        assert_eq!(lists.for_occurrence(&on("routine:none", 0, None))?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn shown_now_is_the_first_not_done_of_the_latest_day_up_to_today() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let note = checklist(&ann, "Pills\nBlue\nRed", None)?;
+        let lists = Checklists::new(&ann);
+        let blue = id_of(&ann, &note, "Blue")?;
+        let red = id_of(&ann, &note, "Red")?;
+        lists.check(&blue)?;
+        // Without a Routine, its own checks.
+        assert_eq!(lists.occurrence_now(&note, &on_day(0))?, None);
+        let now = lists.shown_now(&note, &on_day(0))?.ok_or("a Checklist")?;
+        assert_eq!((now.checked_count(), now.on), (1, None));
+        let routine = spawn(&ann, &note, &daily(&[time(8)?, time(20)?])?)?;
+        let morning = on(&routine, 0, Some(time(8)?));
+        assert_eq!(
+            lists.occurrence_now(&note, &on_day(0))?,
+            Some(morning.clone())
+        );
+        let now = lists.shown_now(&note, &on_day(0))?.ok_or("a Checklist")?;
+        assert_eq!(now.checked_count(), 0);
+        lists.check_for(&blue, &morning)?;
+        lists.check_for(&red, &morning)?;
+        let evening = on(&routine, 0, Some(time(20)?));
+        assert_eq!(
+            lists.occurrence_now(&note, &on_day(0))?,
+            Some(evening.clone())
+        );
+        Routines::new(&ann).mark_done(&routine, &evening.occurrence, None)?;
+        assert_eq!(lists.occurrence_now(&note, &on_day(0))?, Some(evening));
+        assert_eq!(
+            lists.occurrence_now(&note, &on_day(1))?,
+            Some(on(&routine, 1, Some(time(8)?)))
+        );
+        // A weekly one stays on its day until the next comes; before its
+        // first day, the first.
+        let weekly = checklist(&ann, "Bins\nPaper", None)?;
+        let rule = crate::schedule::Recurrence::parse("FREQ=WEEKLY;BYDAY=MO")?;
+        let mondays = spawn(
+            &ann,
+            &weekly,
+            &Schedule::new(Day::new(2026, 1, 5), &[], Some(rule)).ok_or("weekly")?,
+        )?;
+        for (days, monday) in [(0, 4), (4, 4), (10, 4), (11, 11)] {
+            assert_eq!(
+                lists.occurrence_now(&weekly, &on_day(days))?,
+                Some(on(&mondays, monday, None)),
+                "{days}"
+            );
+        }
+        // Of two Routines, the earlier.
+        let later = checklist(&ann, "Trip\nTent", None)?;
+        let once = |day: i64| Schedule::new(Day::new(2026, 1, 1).add_days(day), &[], None);
+        let trip = spawn(&ann, &later, &once(9).ok_or("once")?)?;
+        let soon = spawn(&ann, &later, &once(4).ok_or("once")?)?;
+        for (days, routine, day) in [(0, &soon, 4), (6, &soon, 4), (9, &trip, 9)] {
+            assert_eq!(
+                lists.occurrence_now(&later, &on_day(days))?,
+                Some(on(routine, day, None)),
+                "{days}"
+            );
+        }
+        // In the trash, the Routine leaves it to its own checks.
+        Routines::new(&ann).trash(&routine)?;
+        assert_eq!(lists.occurrence_now(&note, &on_day(0))?, None);
+        let now = lists.shown_now(&note, &on_day(0))?.ok_or("a Checklist")?;
+        assert_eq!(now.checked_count(), 1);
+        // Many at once, as one by one.
+        let plain = Notes::new(&ann).capture("Plain", None, None)?.id;
+        let ids = [note, weekly, later, plain];
+        let at_once = lists.of_notes_now(&ids, &on_day(1))?;
+        assert_eq!(at_once.len(), 3);
+        for (id, list) in &at_once {
+            assert_eq!(
+                Some(list),
+                lists.shown_now(id, &on_day(1))?.as_ref(),
+                "{id}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_check_another_persons_device_slipped_in_counts_for_nothing() -> TestResult {
+        let (ann, ben, _) = household()?;
+        let note = checklist(&ann, "Shop\nMilk", None)?;
+        let routine = spawn(&ann, &note, &daily(&[])?)?;
+        let today = on(&routine, 0, None);
+        // As a modified app would: Ben slips a check into Ann's own list.
+        let field = keys::check_for(&today.occurrence, &id_of(&ann, &note, "Milk")?);
+        let forged = ben.append(&routine, &field, Some("2026-01-01T09:00:00.000Z"), None)?;
+        let mut report = ImportReport::default();
+        ann.apply_entries(&[forged.wire()], &[], Some(&ben.device_id()?), &mut report)?;
+        let held: Vec<String> = ann.all_entries()?.iter().map(Entry::id).collect();
+        assert!(held.contains(&forged.id()));
+        assert_eq!(shown_for(&ann, &today)?, ["Milk"]);
+        assert_eq!(done_at(&ann, &today)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn in_a_shared_area_a_member_checks_for_everyone() -> TestResult {
+        let (ann, ben, area) = household()?;
+        let note = checklist(&ann, "Shop\nMilk\nEggs", Some(&area))?;
+        let routine = spawn(&ann, &note, &daily(&[])?)?;
+        exchange(&ben, &ann)?;
+        assert_eq!(ben.area_of(&routine)?, Some(area));
+        let today = on(&routine, 0, None);
+        Checklists::new(&ben).check_for(&id_of(&ben, &note, "Milk")?, &today)?;
+        Checklists::new(&ann).check_for(&id_of(&ann, &note, "Eggs")?, &today)?;
+        assert_eq!(done_at(&ann, &today)?, None);
+        exchange(&ben, &ann)?;
+        exchange(&ben, &ann)?;
+        let done = done_at(&ann, &today)?;
+        assert!(done.is_some());
+        assert_eq!(done_at(&ben, &today)?, done);
+        assert_eq!(shown_for(&ann, &today)?, ["[x] Milk", "[x] Eggs"]);
+        // The next Occurrence starts afresh for everyone.
+        assert_eq!(shown_for(&ben, &on(&routine, 1, None))?, ["Milk", "Eggs"]);
+        assert_eq!(
+            Checklists::new(&ben).occurrence_now(&note, &on_day(1))?,
+            Some(on(&routine, 1, None))
+        );
+        Ok(())
     }
 }
