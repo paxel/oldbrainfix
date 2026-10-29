@@ -1,0 +1,32 @@
+<!-- page: title="Install" track="reference" order=5 summary="How to install Old Brain Fix on Android, Linux, macOS and Windows." -->
+<p class="lede">Old Brain Fix is installed from the F-Droid repository or an APK on Android, and from Homebrew, Scoop or a file of the <a href="https://github.com/paxel/oldbrainfix/releases/latest">latest release</a> on the desktop.</p>
+
+<h2>Android</h2>
+<ul>
+  <li><strong>F-Droid</strong>: add the repository <code>https://paxel.github.io/fdroid/repo</code> in your F-Droid client, then install Old Brain Fix from it. Updates arrive through F-Droid.</li>
+  <li><strong>APK</strong>: download <code>oldbrainfix-&lt;version&gt;-android-universal.apk</code> from the latest release and open it. The <code>arm64-v8a</code> and <code>armeabi-v7a</code> APKs are smaller and fit only phones with that processor.</li>
+</ul>
+
+<h2>Linux</h2>
+<ul>
+  <li><strong>Homebrew</strong>: <code>brew install paxel/tap/oldbrainfix</code>. Start the app once; it adds itself to the application menu.</li>
+  <li><strong>Debian, Ubuntu</strong>: download the <code>.deb</code> for your processor (<code>x86_64</code> or <code>arm64</code>) and install it with <code>sudo apt install ./oldbrainfix-&lt;version&gt;-linux-x86_64.deb</code>.</li>
+  <li><strong>Flatpak</strong>: download the <code>.flatpak</code> and install it with <code>flatpak install --user ./oldbrainfix-&lt;version&gt;-linux-x86_64.flatpak</code>. Its runtime comes from Flathub.</li>
+  <li><strong>AppImage</strong>: download the <code>.AppImage</code>, make it executable with <code>chmod +x</code> and start it.</li>
+</ul>
+
+<h2>macOS</h2>
+<ul>
+  <li><strong>Homebrew</strong>: <code>brew install --cask paxel/tap/oldbrainfix</code>. The <code>--cask</code> is needed; without it Homebrew picks the Linux formula of the same name.</li>
+  <li><strong>Disk image</strong>: download the <code>.dmg</code> for your Mac (<code>arm64</code> for Apple silicon, <code>x86_64</code> for Intel) and drag Old Brain Fix into Applications.</li>
+</ul>
+<p>The app is not signed with an Apple Developer certificate. On the first start macOS refuses it: open System Settings, Privacy &amp; Security, and choose Open Anyway.</p>
+
+<h2>Windows</h2>
+<ul>
+  <li><strong>Scoop</strong>: <code>scoop bucket add paxel https://github.com/paxel/scoop-bucket</code>, then <code>scoop install paxel/oldbrainfix</code>.</li>
+  <li><strong>Zip</strong>: download <code>oldbrainfix-&lt;version&gt;-windows-x86_64.zip</code>, unpack it and start <code>oldbrainfix.exe</code>.</li>
+</ul>
+
+<h2>Updates</h2>
+<p>Homebrew (<code>brew upgrade</code>), Scoop (<code>scoop update oldbrainfix</code>) and F-Droid follow new releases. A file from the release page is replaced by the next release's file.</p>

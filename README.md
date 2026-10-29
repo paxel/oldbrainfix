@@ -32,6 +32,19 @@ The documentation, in English and German, is at
 Work in progress. The domain language is in [CONTEXT.md](CONTEXT.md), the
 decisions in [docs/adr](docs/adr), the plan in the GitHub issues.
 
+## Install
+
+| Platform | Install                                                                                                               |
+|----------|-----------------------------------------------------------------------------------------------------------------------|
+| Android  | Add the F-Droid repository `https://paxel.github.io/fdroid/repo`, or the APK from the latest release                  |
+| Linux    | `brew install paxel/tap/oldbrainfix`, or the `.deb`, `.flatpak` or `.AppImage` from the latest release                |
+| macOS    | `brew install --cask paxel/tap/oldbrainfix`, or the `.dmg` from the latest release                                    |
+| Windows  | `scoop bucket add paxel https://github.com/paxel/scoop-bucket`, then `scoop install paxel/oldbrainfix`, or the `.zip` |
+
+The macOS app is not signed with an Apple Developer certificate; on the first
+start, choose Open Anyway in System Settings, Privacy & Security. Details per
+platform are on the [install page](https://paxel.github.io/oldbrainfix/en/reference/install.html).
+
 ## License
 
 Dual-licensed under [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
