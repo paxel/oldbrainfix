@@ -261,7 +261,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.add));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await tester.tap(find.text('Save'));
+      await tester.tap(find.byKey(const ValueKey('captureSave')));
       await tester.pumpAndSettle();
 
       expect(cardTexts(tester), ['nees mor sauce']);
@@ -294,7 +294,8 @@ void main() {
 
       await open(tester, 'Note here');
       await tester.enterText(find.byType(TextField), 'nees mor sauce');
-      await open(tester, 'Save');
+      await tester.tap(find.byKey(const ValueKey('captureSave')));
+      await tester.pumpAndSettle();
       expect(cardTexts(tester), ['nees mor sauce']);
       expect(notes.all().single.place, home.id);
 
