@@ -41,14 +41,14 @@ and F-Droid both take them. `docs/screenshots/play` links to
 
 | # | File             | What is on it                                              |
 |---|------------------|------------------------------------------------------------|
-| 1 | `1-agenda.png`   | Agenda with today's Routines and the Unsorted banner       |
-| 2 | `2-capture.png`  | Capture after the plus, with voice and photo buttons       |
-| 3 | `3-diary.png`    | An Area's diary of Note cards                              |
+| 1 | `1-agenda.png`   | Agenda: today's Routines, two Frogs, the Unsorted banner   |
+| 2 | `2-capture.png`  | Capture with Photo, Voice, Gallery, action row and chips   |
+| 3 | `3-diary.png`    | An Area's diary of Note cards in full                      |
 | 4 | `4-editor.png`   | Note editor with dated parts and Importance                |
-| 5 | `5-routine.png`  | Routine editor with its schedule                           |
+| 5 | `5-fan.png`      | The Agenda's "+" fanned out: Text, Voice, Photo, Gallery   |
 | 6 | `6-alarm.png`    | Alarm ring screen with Done and Snooze                     |
 | 7 | `7-history.png`  | Routine history with Streak and Adherence                  |
-| 8 | `8-dark.png`     | Agenda in the dark theme                                   |
+| 8 | `8-dark.png`     | Agenda in the dark theme, scrolled to the rest of the week |
 
 No tablet frames. Feature graphic (1024 × 500) and hi-res icon (512 × 512)
 are uploaded in the Play Console by hand.

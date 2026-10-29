@@ -16,7 +16,6 @@ import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
-import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -52,10 +51,11 @@ typedef _Texts = ({
   String hooverBags,
   String captureText,
   String home,
+  List<String> frogs,
 });
 
 const _en = (
-  snack: 'Snack: an apple and a handful of nuts',
+  snack: 'Snack: an apple and some nuts',
   walk: 'Walk round the block, 20 minutes',
   plants: 'Water the plants on the balcony',
   timesheet: 'Send the timesheet to Sarah',
@@ -79,10 +79,15 @@ const _en = (
   hooverBags: 'Hoover bags are type G',
   captureText: 'Ask Anna if she still needs the ladder',
   home: 'Home',
+  frogs: [
+    'Sort the receipts for the tax return',
+    'Clear out the shelf in the cellar',
+    'Cancel the old gym membership',
+  ],
 );
 
 const _de = (
-  snack: 'Snack: ein Apfel und eine Handvoll Nüsse',
+  snack: 'Snack: Apfel und ein paar Nüsse',
   walk: 'Runde um den Block, 20 Minuten',
   plants: 'Pflanzen auf dem Balkon gießen',
   timesheet: 'Stundenzettel an Sarah schicken',
@@ -106,6 +111,11 @@ const _de = (
   hooverBags: 'Staubsaugerbeutel sind Typ G',
   captureText: 'Anna fragen, ob sie die Leiter noch braucht',
   home: 'Zuhause',
+  frogs: [
+    'Belege für die Steuererklärung sortieren',
+    'Das Regal im Keller ausmisten',
+    'Den alten Fitnessstudio-Vertrag kündigen',
+  ],
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -215,7 +225,7 @@ class _Seeded {
       );
     }
 
-    // The plants every Tuesday and Friday, all day.
+    // The plants every Monday and Thursday, all day.
     final plantsNote = capture(
       DateTime(2026, 10, 2, 18, 5),
       x.plants,
@@ -226,7 +236,7 @@ class _Seeded {
       plantsNote.id,
       Schedule(
         start: day(6),
-        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=TU,FR'),
+        rule: Recurrence.parse('FREQ=WEEKLY;BYDAY=MO,TH'),
       ),
     );
 
@@ -300,6 +310,18 @@ class _Seeded {
     final visit = notes.amend(boiler.id, x.boilerParts[1]);
     notes.locate(visit.id, home.centre);
 
+    // Frogs put off for a while: two of them offered today.
+    final frogs = Frogs(store);
+    for (final (i, (text, place)) in [
+      (x.frogs[0], work.id),
+      (x.frogs[1], household.id),
+      (x.frogs[2], household.id),
+    ].indexed) {
+      frogs.spawn(
+        capture(DateTime(2026, 10, 8 + 3 * i, 20, 10), text, place: place).id,
+      );
+    }
+
     // Captured on the way, not sorted yet.
     capture(DateTime(2026, 10, 26, 17, 58), x.unsorted[0]);
     capture(DateTime(2026, 10, 26, 19, 4), x.unsorted[1]);
@@ -348,6 +370,25 @@ Future<void> _loadFonts() async {
   final icons = FontLoader('MaterialIcons')
     ..addFont(bytes(File('${dir.path}/MaterialIcons-Regular.otf')));
   await icons.load();
+  // The Frog's emoji, as a phone's own emoji font would show it.
+  final emoji = FontLoader('Noto Color Emoji')
+    ..addFont(
+      bytes(
+        File(
+          [
+            _flutterRoot(),
+            'engine',
+            'src',
+            'flutter',
+            'txt',
+            'third_party',
+            'fonts',
+            'NotoColorEmoji.ttf',
+          ].join(Platform.pathSeparator),
+        ),
+      ),
+    );
+  await emoji.load();
 }
 
 void main() {
@@ -387,8 +428,13 @@ void main() {
             ),
           ),
         );
+        // The brain in the Agenda's title, decoded before the frame.
+        final context = tester.element(find.byType(Navigator));
+        await tester.runAsync(
+          () => precacheImage(const AssetImage('assets/brain.png'), context),
+        );
         await tester.pumpAndSettle();
-        return AppLocalizations.of(tester.element(find.byType(Navigator)));
+        return AppLocalizations.of(context);
       }
 
       Future<void> tap(WidgetTester tester, Finder finder) async {
@@ -470,12 +516,6 @@ void main() {
         expect(find.byType(NoteEditorScreen), findsOneWidget);
       });
 
-      frame('5-routine.png', (tester) async {
-        await start(tester, _Seeded(texts));
-        await tap(tester, find.text(texts.snack).first);
-        expect(find.byType(RoutineEditorScreen), findsOneWidget);
-      });
-
       frame('6-alarm.png', (tester) async {
         final seeded = _Seeded(texts);
         final alarms = FakeAlarms()
@@ -496,10 +536,21 @@ void main() {
         expect(find.byType(RoutineHistoryScreen), findsOneWidget);
       });
 
+      frame('5-fan.png', (tester) async {
+        await start(tester, _Seeded(texts));
+        await tap(tester, find.byIcon(Icons.add));
+        for (final way in ['text', 'voice', 'photo', 'gallery']) {
+          expect(fanEntry(way), findsOneWidget);
+        }
+      });
+
       frame('8-dark.png', (tester) async {
         final seeded = _Seeded(texts);
         seeded.store.themeChoice = ThemeChoice.dark;
-        await start(tester, seeded);
+        final t = await start(tester, seeded);
+        // Scrolled to the rest of the week, dimmed.
+        Scrollable.ensureVisible(tester.element(find.text(t.agendaTomorrow)));
+        await tester.pumpAndSettle();
         expect(find.byType(AgendaScreen), findsOneWidget);
       });
     }

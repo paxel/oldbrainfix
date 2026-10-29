@@ -19,7 +19,16 @@ class FrogIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-    child: Text('\u{1F438}', style: TextStyle(fontSize: size, height: 1)),
+    child: Text(
+      '\u{1F438}',
+      // The emoji font by its name as well, where the text's own font
+      // has no frog and nothing falls back on its own (the screenshots).
+      style: TextStyle(
+        fontSize: size,
+        height: 1,
+        fontFamilyFallback: const ['Noto Color Emoji'],
+      ),
+    ),
   );
 }
 
