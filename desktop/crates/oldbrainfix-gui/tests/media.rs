@@ -583,9 +583,10 @@ fn choosing_a_model_downloads_it_and_keeps_only_that_one() -> TestResult {
     let mut harness = settings(app);
     harness.run();
     harness.get_by_label("Base, 148 MB").click();
-    harness.run();
+    // A download in progress repaints, so step instead of waiting for stillness.
+    harness.run_steps(4);
     assert!(eventually(|| speech.current() == Some(WhisperModel::Base)));
-    harness.run();
+    harness.run_steps(4);
     assert!(shows(
         &harness,
         "The speech model is ready. Voice Notes are transcribed on this computer."
