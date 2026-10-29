@@ -176,18 +176,15 @@ class _LockSettingsSectionState extends State<LockSettingsSection> {
                   leading: const Icon(Icons.timer_outlined),
                   title: Text(t.relockAfter),
                   subtitle: Text(t.relockDetail),
-                  control: DropdownButton<int>(
+                  control: RadioColumn<int>(
                     key: const ValueKey('relock'),
                     value: relock,
-                    onChanged: (minutes) {
-                      if (minutes == null) return;
-                      _setRelock(minutes);
-                    },
-                    items: [
+                    onChanged: _setRelock,
+                    options: [
                       for (final m in relockChoices)
-                        DropdownMenuItem(
+                        RadioOption(
                           value: m,
-                          child: Text(
+                          title: Text(
                             m == 0 ? t.relockAtOnce : t.renagMinutes(m),
                           ),
                         ),

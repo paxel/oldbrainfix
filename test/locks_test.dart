@@ -800,6 +800,43 @@ void main() {
       expect(store.isAreaLocked(doctor.id), isFalse);
     });
 
+    testWidgets('choose the re-lock time in a radio column that keeps a '
+        'value outside the choices', (tester) async {
+      store.relockAfter = const Duration(minutes: 10);
+      await start(tester);
+      await openSettings(tester);
+
+      final column = find.byKey(const ValueKey('relock'));
+      await tester.scrollUntilVisible(
+        column,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: column, matching: find.byType(RadioListTile<int>)),
+        findsNWidgets(5),
+      );
+      int chosen() => tester
+          .widget<RadioGroup<int>>(
+            find.descendant(of: column, matching: find.byType(RadioGroup<int>)),
+          )
+          .groupValue!;
+      expect(chosen(), 10);
+      expect(
+        find.descendant(of: column, matching: find.text('10 min')),
+        findsOneWidget,
+      );
+
+      await tap(
+        tester,
+        find.descendant(of: column, matching: find.text(en.relockAtOnce)),
+      );
+      expect(store.relockAfter, Duration.zero);
+      expect(chosen(), 0);
+      expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+    });
+
     testWidgets('offer biometrics only where the Device has them', (
       tester,
     ) async {
