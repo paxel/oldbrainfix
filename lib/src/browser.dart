@@ -609,6 +609,13 @@ List<Widget> diaryCards(
         for (final placed in shown) placed.note.id,
       ]))[note.id] ??
       const [];
+  // Their Checklists alike, read anew with every list built, as a check
+  // changes no Note.
+  final lists = Checklists(notes.store);
+  Map<String, Checklist>? listed;
+  Checklist? checklistOf(Note note) => (listed ??= lists.ofNotes([
+    for (final placed in shown) placed.note.id,
+  ]))[note.id];
   return [
     for (final placed in shown)
       if (placed case (
@@ -642,6 +649,7 @@ List<Widget> diaryCards(
           ),
           full: !compact || unfolded.contains(note.id),
           sections: () => sectionsOf(note),
+          checklist: (read: () => checklistOf(note), lists: lists),
           // A full Note has nothing to unfold (#114).
           onTap: !compact || unfolded.contains(note.id) || onUnfold == null
               ? null

@@ -1845,6 +1845,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conflictSectionText => 'Text added to a Note';
 
   @override
+  String get conflictLineText => 'Line of a Checklist';
+
+  @override
   String get conflictAreaName => 'Area name';
 
   @override
@@ -2224,6 +2227,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String sentItemRoutineRemoved(String schedule) {
     return 'Removed: $schedule';
+  }
+
+  @override
+  String get sentItemMakesChecklist => 'It becomes a Checklist.';
+
+  @override
+  String get sentItemMakesPlain => 'It becomes a plain Note again.';
+
+  @override
+  String sentItemLineAdded(String text) {
+    return 'New Line: $text';
+  }
+
+  @override
+  String sentItemLineRenamed(String before, String after) {
+    return 'Line: $before → $after';
+  }
+
+  @override
+  String sentItemLineRemoved(String text) {
+    return 'Line removed: $text';
   }
 
   @override
@@ -3154,6 +3178,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addTallyEntry => 'Add entry';
+
+  @override
+  String get makeChecklist => 'Make it a Checklist';
+
+  @override
+  String get checklistToPlain => 'Back to a plain Note';
+
+  @override
+  String get checklistUncheckAll => 'Uncheck all';
+
+  @override
+  String get checklistHeading => 'Checklist';
+
+  @override
+  String checklistCount(int checked, int count) {
+    return '$checked of $count checked';
+  }
+
+  @override
+  String get checklistNewLine => 'New Line';
+
+  @override
+  String get checklistAddLine => 'Add Line';
+
+  @override
+  String get checklistRenameTitle => 'Rename Line';
+
+  @override
+  String get checklistMoveUp => 'Move up';
+
+  @override
+  String get checklistMoveDown => 'Move down';
+
+  @override
+  String get checklistIndent => 'Put under the Line above';
+
+  @override
+  String get checklistOutdent => 'Back to the top level';
+
+  @override
+  String get checklistDeleteQuestion => 'Delete this Line?';
 
   @override
   String get tallyHeading => 'Tally';

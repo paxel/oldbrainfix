@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::checklists::keys as checklist_keys;
 use crate::entry::{Entry, WireEntry};
 use crate::frogs::keys as frog_keys;
 use crate::keys::PERSONAL_SCOPE;
@@ -120,7 +121,9 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
         return Occurrence::parse(key).is_some_and(|o| o.key() == key)
             && value.is_none_or(is_instant);
     }
-    if kind == frog_keys::TYPE_FROG && field == frog_keys::DONE {
+    if kind == frog_keys::TYPE_FROG && field == frog_keys::DONE
+        || kind == checklist_keys::TYPE_LINE && field == checklist_keys::CHECKED
+    {
         return value.is_none_or(is_instant);
     }
     if kind == "area"
@@ -1153,6 +1156,8 @@ mod tests {
             entry("routine:ab12", "done@2026-03-01", None),
             entry("frog:ab12", "done", Some("2026-03-01T08:00:00.000Z")),
             entry("frog:ab12", "done", None),
+            entry("line:ab12", "checked", Some("2026-03-01T08:00:00.000Z")),
+            entry("line:ab12", "checked", None),
             entry("area:starter-household", "role:ab12", None),
             entry("area:ab12", "role:ab12", Some(&member)),
             entry("note:ab12", "$type", Some("note")),
@@ -1189,6 +1194,14 @@ mod tests {
             entry("frog:ab12", "trashed", Some("2026-03-01T08:00:00.000Z")),
             entry("frog:ab12", "$type", Some("frog")),
             entry("frog:Rude words", "done", None),
+            entry("line:ab12", "checked", Some("Rude words")),
+            entry(
+                "line:ab12",
+                "text",
+                Some(r#"{"format":"plain","text":"Rude"}"#),
+            ),
+            entry("line:ab12", "$type", Some("line")),
+            entry("line:Rude words", "checked", None),
             entry(
                 "area:ab12",
                 "role:ab12",

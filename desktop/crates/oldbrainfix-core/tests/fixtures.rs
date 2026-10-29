@@ -3,7 +3,8 @@
 //! read every log the same, sign every entry the same, and write every
 //! scenario again to the same log, byte for byte. Schedules, the alarm
 //! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
-//! of Tallies and the picks of Sessions must come to the same on the
+//! of Tallies, the Lines of Checklists and the picks of Sessions must
+//! come to the same on the
 //! same European wall clock, Europe/Berlin here; the calendar files of
 //! Routines and Reminders must be the same bytes.
 
@@ -24,20 +25,30 @@ use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, CaptureContext, ClockTime, Conflict, Day, Frog, Frogs, Importance,
-    Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine,
-    Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, SigningKey,
-    SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry,
-    dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
+    Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Recurrence,
+    RepeatKind, Routine, Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions,
+    SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem,
+    WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 11] = [
-    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "sessions",
-    "tallies", "trash",
+const SCENARIOS: [&str; 12] = [
+    "checklists",
+    "edits",
+    "formats",
+    "frogs",
+    "media",
+    "notes",
+    "places",
+    "routines",
+    "sections",
+    "sessions",
+    "tallies",
+    "trash",
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
@@ -985,7 +996,8 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 11] = [
+    let writers: [(&str, Writer); 12] = [
+        ("checklists", write_checklists),
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
@@ -1550,6 +1562,166 @@ fn utc_at(
 /// Values by field id.
 fn by_field(pairs: &[(&String, f64)]) -> BTreeMap<String, f64> {
     pairs.iter().map(|(k, v)| ((*k).clone(), *v)).collect()
+}
+
+// ----------------------------------------------------------- Checklists
+
+/// The generator's `checklists` scenario.
+fn write_checklists(store: &Store) -> Built {
+    use oldbrainfix_core::checklists::keys;
+    let notes = Notes::new(store);
+    let lists = Checklists::new(store);
+    let line = |note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(note)?.ok_or("a Checklist")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let trip = notes
+        .capture(
+            "Packing\r\nSocks\n  Blue\n\tRed\n\n✓ Passport\r   \nTent\n  ✓ Pegs",
+            None,
+            None,
+        )?
+        .id;
+    lists.make(&trip)?;
+    lists.check(&line(&trip, "Blue")?)?;
+    lists.check(&line(&trip, "Red")?)?;
+    lists.uncheck(&line(&trip, "Blue")?)?;
+    lists.check(&line(&trip, "Tent")?)?;
+    lists.add(&trip, "Torch", None, false)?;
+    lists.add(&trip, "Map", Some(0), false)?;
+    lists.add(&trip, "Green", Some(3), true)?;
+    lists.rename(&line(&trip, "Red")?, "Red socks")?;
+    lists.move_line(&line(&trip, "Torch")?, Some(&line(&trip, "Pegs")?))?;
+    lists.move_line(&line(&trip, "Socks")?, None)?;
+    lists.indent(&line(&trip, "Passport")?, true)?;
+    lists.indent(&line(&trip, "Passport")?, false)?;
+    lists.delete(&line(&trip, "Tent")?)?;
+    let passport = line(&trip, "Passport")?;
+    lists.delete(&passport)?;
+    lists.restore(&passport)?;
+    let odd = format!("line:{}", "f".repeat(32));
+    store.append(&odd, keys::TYPE, Some(keys::TYPE_LINE), None)?;
+    store.append(&odd, keys::NOTE, Some(&trip), None)?;
+    let making = lists.by_note(&trip)?.ok_or("a Checklist")?.making;
+    store.append(&odd, keys::MADE, Some(&making), None)?;
+    let text = oldbrainfix_core::StoredText::plain("Odd").encode();
+    store.append(&odd, keys::TEXT, Some(&text), None)?;
+    store.append(&odd, keys::ORDER, Some("é"), None)?;
+    lists.add(&trip, "Last", None, false)?;
+    let shop = notes
+        .capture("Shop\nOat milk\nEggs\n  Free range", None, None)?
+        .id;
+    lists.make(&shop)?;
+    lists.check(&line(&shop, "Oat milk")?)?;
+    lists.check(&line(&shop, "Eggs")?)?;
+    lists.uncheck_all(&shop)?;
+    lists.check(&line(&shop, "Free range")?)?;
+    lists.to_plain(&shop)?;
+    lists.make(&shop)?;
+    notes.capture("Unsorted thought\nwith a second line", None, None)?;
+    Ok(())
+}
+
+/// A Checklist as the generator's `_checklist` lists it.
+fn checklist_json(list: &Checklist) -> Value {
+    json!({
+        "making": list.making,
+        "lines": list.lines.iter().map(|l| json!({
+            "id": l.id,
+            "text": l.text,
+            "checked": l.checked,
+            "checkedAt": l.checked_at.map(dart_iso),
+            "parent": l.parent,
+            "order": l.order,
+        })).collect::<Vec<_>>(),
+        "checkedCount": list.checked_count(),
+        "count": list.count(),
+    })
+}
+
+/// The lines of text the generator's `_rows` reads as Lines.
+const ROWS: [&str; 17] = [
+    "",
+    "   ",
+    "Socks",
+    "  Blue",
+    "\tRed",
+    " \u{a0}Nbsp",
+    "\u{a0}Lead nbsp",
+    "\u{2003}Em space",
+    "\u{feff}Bom",
+    "Trailing \u{3000}",
+    "✓ Tent",
+    "  ✓ Pegs",
+    "✓",
+    "✓ ",
+    "✓x",
+    "✓  Two spaces",
+    "✓ ✓ Twice",
+];
+
+#[test]
+fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::checklists::{order, parse_line, split_lines};
+    let dir = fixtures().join("checklists");
+    let expected = read_json(&dir.join("checklists.json"))?;
+    let read_at = read_json(&dir.join("expected.json"))?;
+    let store = load("checklists", read_at["now"].as_str().ok_or("now")?)?;
+    let lists = Checklists::new(&store);
+    let notes = Notes::new(&store);
+    let mut ids = store.entities_of_type("note")?;
+    ids.sort();
+    let mut every = serde_json::Map::new();
+    let mut plain = serde_json::Map::new();
+    let mut may = serde_json::Map::new();
+    for id in &ids {
+        may.insert(id.clone(), json!(lists.may_make(id)?));
+        if let Some(list) = lists.by_note(id)? {
+            every.insert(id.clone(), checklist_json(&list));
+            let title = notes.by_id(id)?.ok_or("the Note")?.text;
+            plain.insert(id.clone(), json!(Checklists::plain_text(&title, &list)));
+        }
+    }
+    assert_eq!(Value::Object(every), expected["lists"]);
+    // The one-pass read gives what each Note's own read does.
+    let at_once = lists.of_notes(&ids)?;
+    for (id, list) in &at_once {
+        assert_eq!(Some(list), lists.by_note(id)?.as_ref(), "{id}");
+    }
+    let keys: Vec<&String> = at_once.keys().collect();
+    assert_eq!(json!(keys), expected["ofNotes"]);
+    assert_eq!(Value::Object(may), expected["mayMake"]);
+    assert_eq!(Value::Object(plain), expected["plain"]);
+    let rows: Vec<Value> = ROWS
+        .iter()
+        .map(|row| match parse_line(row) {
+            None => Value::Null,
+            Some(l) => json!({"text": l.text, "indent": l.indent, "checked": l.checked}),
+        })
+        .collect();
+    assert_eq!(json!(rows), expected["rows"]);
+    assert_eq!(
+        json!(split_lines("a\r\nb\rc\n\nd\r\r\n")),
+        expected["split"]
+    );
+    for (key, after) in expected["after"].as_object().ok_or("after")? {
+        assert_eq!(json!(order::after(key)), *after, "after {key}");
+    }
+    for triple in expected["between"].as_array().ok_or("between")? {
+        let a = triple[0].as_str().ok_or("a")?;
+        let b = triple[1].as_str().ok_or("b")?;
+        assert_eq!(json!(order::between(a, b)), triple[2], "{a} {b}");
+    }
+    for (key, valid) in expected["valid"].as_object().ok_or("valid")? {
+        assert_eq!(json!(order::is_valid(Some(key))), *valid, "{key}");
+    }
+    Ok(())
 }
 
 /// The generator's `tallies` scenario.
@@ -2305,6 +2477,15 @@ fn conflicts_are_found_and_picked_as_the_dart_core_does() -> TestResult {
             map.remove("device");
         }
         assert_eq!(actual, after, "{side}");
+        // The renamed Line kept the version picked, and the later check
+        // or uncheck of each Line stays.
+        let mut found = Vec::new();
+        for id in store.entities_of_type("note")? {
+            if let Some(list) = Checklists::new(store).by_note(&id)? {
+                found.push(checklist_json(&list));
+            }
+        }
+        assert_eq!(found, [expected["checklist"].clone()], "{side}");
     }
     Ok(())
 }
@@ -4067,5 +4248,177 @@ fn an_area_offered_from_afar_goes_as_the_dart_core_offers_and_takes_it() -> Test
     for (hash, _) in files(&dir.join("ann").join("photos"))? {
         assert!(other.photo(&hash).is_none());
     }
+    Ok(())
+}
+
+/// What the generator's `sent-checklist` fixture reads of the Note `id`.
+fn read_of(store: &Store, id: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let note = Notes::new(store).by_id(id)?.ok_or("the Note")?;
+    Ok(json!({
+        "text": note.text,
+        "unsorted": note.is_unsorted(),
+        "list": Checklists::new(store).by_note(id)?.as_ref().map(checklist_json),
+    }))
+}
+
+/// The parts of a Checklist in `c`, as the generator lists them.
+fn list_changes_json(c: &oldbrainfix_core::sent::SentItemChanges) -> Value {
+    json!({
+        "makesChecklist": c.makes_checklist,
+        "makesPlain": c.makes_plain,
+        "linesAdded": c.lines_added.iter().map(|l| json!({
+            "id": l.id,
+            "text": l.text,
+            "indent": l.indent,
+            "checked": l.checked,
+        })).collect::<Vec<_>>(),
+        "linesRenamed": c.lines_renamed.iter().map(|r| json!([r.line, r.before, r.after])).collect::<Vec<_>>(),
+        "linesRemoved": c.lines_removed.iter().map(|l| l.id.clone()).collect::<Vec<_>>(),
+        "textBefore": c.text_before,
+    })
+}
+
+#[test]
+fn a_sent_checklist_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
+    use oldbrainfix_core::sent;
+    let dir = fixtures().join("sent-checklist");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let clock = held_clock("2026-01-03T12:00:00.000Z")?;
+    let at = |time: &str| -> TestResult {
+        *clock.lock() = parse_time(time)?;
+        Ok(())
+    };
+    let held = clock.clone();
+    let mut ada = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    ada.set_local_setting("author", "Ada")?;
+    insert_lines(&ada, &dir.join("sender.jsonl"))?;
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings.as_array().ok_or("settings")? {
+        ada.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    let key = writer_key();
+    let note = ada
+        .entities_of_type("note")?
+        .into_iter()
+        .next()
+        .ok_or("note")?;
+
+    // Sending writes the same entry and the same file, in format 2.
+    counted_ids(&mut ada, 0xa00);
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(lines_after(&ada, mark)?, lines_of(&dir.join("sent.jsonl"))?);
+    let file = std::fs::read(dir.join("checklist.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == file);
+
+    // Ben takes it as the Dart core does.
+    at("2026-01-04T18:00:00.000Z")?;
+    let held = clock.clone();
+    let mut ben = Store::in_memory(Box::new(move || *held.lock()), || Ok(joiner_key()))?;
+    ben.set_local_setting("author", "Ben")?;
+    counted_ids(&mut ben, 0xb00);
+    let mark = ben.current_seq()?;
+    let opened = ben.open_sent_item(&file)?.map_err(|_| "opened")?;
+    let lines: Vec<Value> = opened
+        .item
+        .lines
+        .iter()
+        .flatten()
+        .map(|l| json!({"id": l.id, "text": l.text, "indent": l.indent, "checked": l.checked}))
+        .collect();
+    assert_eq!(json!(lines), expected["lines"]);
+    let got = ben
+        .accept_sent_item(&opened.item, false)?
+        .ok_or("accepted")?;
+    assert_eq!(got, expected["accepted"].as_str().ok_or("accepted")?);
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("accepted.jsonl"))?
+    );
+    assert_eq!(read_of(&ben, &got)?, expected["first"]);
+    let line =
+        |store: &Store, note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+            let list = Checklists::new(store).by_note(note)?.ok_or("a Checklist")?;
+            Ok(list
+                .lines
+                .iter()
+                .find(|l| l.text == text)
+                .ok_or("a Line")?
+                .id
+                .clone())
+        };
+
+    // Ben checks a Line and adds one; Ada renames, deletes and adds.
+    at("2026-01-05T09:00:00.000Z")?;
+    counted_ids(&mut ben, 0xc00);
+    let mark = ben.current_seq()?;
+    Checklists::new(&ben).check(&line(&ben, &got, "Socks")?)?;
+    Checklists::new(&ben).add(&got, "Torch", None, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("receiver.jsonl"))?
+    );
+    at("2026-01-06T10:00:00.000Z")?;
+    counted_ids(&mut ada, 0xd00);
+    let mark = ada.current_seq()?;
+    let lists = Checklists::new(&ada);
+    lists.rename(&line(&ada, &note, "Blue")?, "Blue socks")?;
+    lists.delete(&line(&ada, &note, "Tent")?)?;
+    lists.add(&note, "Pegs", None, true)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("changed.jsonl"))?
+    );
+    at("2026-01-06T11:00:00.000Z")?;
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("update.jsonl"))?
+    );
+    let update = std::fs::read(dir.join("update.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == update);
+
+    // Ben applies it as the Dart core does.
+    at("2026-01-07T08:00:00.000Z")?;
+    counted_ids(&mut ben, 0xe00);
+    let opened = ben.open_sent_item(&update)?.map_err(|_| "update")?;
+    let changes = opened.changes.as_ref().ok_or("changes")?;
+    assert_eq!(list_changes_json(changes), expected["update"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("updated.jsonl"))?
+    );
+    assert_eq!(read_of(&ben, &got)?, expected["second"]);
+
+    // Ada turns it back into a plain Note and sends that; Ben applies it.
+    at("2026-01-08T07:00:00.000Z")?;
+    counted_ids(&mut ada, 0xf00);
+    let mark = ada.current_seq()?;
+    Checklists::new(&ada).to_plain(&note)?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("plain.jsonl"))?
+    );
+    let plain = std::fs::read(dir.join("plain.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == plain);
+    at("2026-01-08T12:00:00.000Z")?;
+    counted_ids(&mut ben, 0x1000);
+    let opened = ben.open_sent_item(&plain)?.map_err(|_| "plain")?;
+    let changes = opened.changes.as_ref().ok_or("changes")?;
+    assert_eq!(list_changes_json(changes), expected["plain"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("plained.jsonl"))?
+    );
+    assert_eq!(read_of(&ben, &got)?, expected["third"]);
     Ok(())
 }

@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'area_look.dart';
 import 'calendar_platform.dart';
+import 'checklist_view.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'ocr_platform.dart';
@@ -130,6 +131,11 @@ class NoteActions {
   /// Opens the entry page of the Note's Tally.
   final VoidCallback? onAddEntry;
 
+  /// What the menu offers of a Checklist (#120), read as the menu opens:
+  /// whether the Note is one, and making it one, turning it back into a
+  /// plain Note and unchecking all of its Lines, each left out when null.
+  final ChecklistMenu Function()? checklist;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -143,9 +149,18 @@ class NoteActions {
     this.isTally,
     this.onMakeTally,
     this.onAddEntry,
+    this.checklist,
     this.onDelete,
   });
 }
+
+/// The Checklist entries of a card's ⋮ as the menu opens (#120).
+typedef ChecklistMenu = ({
+  bool isList,
+  VoidCallback? make,
+  VoidCallback? toPlain,
+  VoidCallback? uncheckAll,
+});
 
 /// A Note drawn as a softly embossed card, top to bottom: the Profile of
 /// the other person who wrote it, picture and name (none on the user's
@@ -217,6 +232,10 @@ class NoteCard extends StatelessWidget {
   /// Shown where the action row goes, e.g. the trash's restore.
   final Widget? footer;
 
+  /// The Note's Checklist, if it is one: its Lines on a [full] card, how
+  /// many are checked on a compact one (#120); nothing when null.
+  final NoteChecklist? checklist;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -244,6 +263,7 @@ class NoteCard extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.footer,
+    this.checklist,
   });
 
   @override
@@ -266,6 +286,7 @@ class NoteCard extends StatelessWidget {
     final important = note.importance == Importance.important;
     final footer = this.footer;
     final actions = this.actions;
+    final checklist = this.checklist;
     final acts =
         onFile != null ||
         onSchedule != null ||
@@ -365,7 +386,18 @@ class NoteCard extends StatelessWidget {
                     ),
                     const Divider(height: 24),
                     if (full)
-                      _FullNote(note: note, when: when, sections: sections)
+                      _FullNote(
+                        note: note,
+                        when: when,
+                        sections: sections,
+                        list: checklist == null
+                            ? null
+                            : CardChecklist(
+                                noteId: note.id,
+                                checklist: checklist,
+                                full: true,
+                              ),
+                      )
                     else ...[
                       // A photo Note may have no words.
                       if (note.text.isNotEmpty)
@@ -375,6 +407,12 @@ class NoteCard extends StatelessWidget {
                           style: text.bodyLarge,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      if (checklist != null)
+                        CardChecklist(
+                          noteId: note.id,
+                          checklist: checklist,
+                          full: false,
                         ),
                       if (note.photos.isNotEmpty) ...[
                         if (note.text.isNotEmpty) const SizedBox(height: 8),
@@ -532,7 +570,8 @@ class NoteActionRow extends StatelessWidget {
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with Edit, then the Note's Importance as radio buttons, the one it has
 /// marked, then sending, the calendar, adding to the Note, "Add entry" of
-/// a Tally or "Make it a Tally", removing a photo or recording while its
+/// a Tally or "Make it a Tally", "Make it a Checklist" or, for one,
+/// "Uncheck all" and "Back to a plain Note", removing a photo or recording while its
 /// text stays, one entry each with the start of that text under it, and
 /// deleting.
 class _MoreButton extends StatelessWidget {
@@ -554,6 +593,7 @@ class _MoreButton extends StatelessWidget {
             ? actions.calendar?.call()
             : null;
         final tally = actions.isTally?.call();
+        final list = actions.checklist?.call();
         PopupMenuItem<VoidCallback> item(
           String key,
           IconData icon,
@@ -628,9 +668,21 @@ class _MoreButton extends StatelessWidget {
           if (tally == true)
             if (actions.onAddEntry case final add?)
               item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
-          if (tally == false)
+          // A Checklist is no Tally, and a Tally no Checklist.
+          if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)
               item('note-make-tally', Icons.bar_chart, t.makeTally, make),
+          if (list?.make case final make?)
+            item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
+          if (list?.uncheckAll case final uncheck?)
+            item(
+              'note-uncheck-all',
+              Icons.check_box_outline_blank,
+              t.checklistUncheckAll,
+              uncheck,
+            ),
+          if (list?.toPlain case final plain?)
+            item('note-to-plain', Icons.notes, t.checklistToPlain, plain),
           for (final removal in actions.removals?.call() ?? <MediaRemoval>[])
             PopupMenuItem(
               key: ValueKey('note-remove-${removal.hash}'),
@@ -839,7 +891,15 @@ class _FullNote extends StatefulWidget {
   final DateFormat when;
   final List<Section> Function()? sections;
 
-  const _FullNote({required this.note, required this.when, this.sections});
+  /// The Note's Checklist, under its text.
+  final Widget? list;
+
+  const _FullNote({
+    required this.note,
+    required this.when,
+    this.sections,
+    this.list,
+  });
 
   @override
   State<_FullNote> createState() => _FullNoteState();
@@ -881,6 +941,7 @@ class _FullNoteState extends State<_FullNote> {
           recordings: note.recordings,
           transcripts: note.transcripts,
           removedRecordings: note.removedRecordings,
+          list: widget.list,
         ),
         for (final section in _sections)
           Column(
@@ -922,6 +983,9 @@ class _Whole extends StatelessWidget {
   final Map<String, String> transcripts;
   final List<String> removedRecordings;
 
+  /// A Checklist's Lines, right under the text.
+  final Widget? list;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -931,14 +995,25 @@ class _Whole extends StatelessWidget {
     required this.recordings,
     required this.transcripts,
     required this.removedRecordings,
+    this.list,
   });
 
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge;
+    final list = this.list;
     final parts = <Widget>[
       // A photo Note may have no words.
-      if (text.isNotEmpty) Text(text, style: style),
+      if (text.isNotEmpty && list == null) Text(text, style: style),
+      // It keeps its own space: it is nothing on a Note that is none.
+      if (list != null)
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (text.isNotEmpty) Text(text, style: style),
+            list,
+          ],
+        ),
       for (final hash in photos)
         Column(
           key: ValueKey(hash),

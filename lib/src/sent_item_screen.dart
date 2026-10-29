@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'bundle_platform.dart';
+import 'checklist_view.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
@@ -579,6 +580,28 @@ class _SentItemScreenState extends State<SentItemScreen> {
                         text: t.sentItemTextYours,
                       ),
                   ],
+                  if (changes.makesChecklist)
+                    _Line(
+                      icon: Icons.checklist,
+                      text: t.sentItemMakesChecklist,
+                    ),
+                  if (changes.makesPlain)
+                    _Line(icon: Icons.notes, text: t.sentItemMakesPlain),
+                  for (final l in changes.linesAdded)
+                    _Line(
+                      icon: Icons.playlist_add,
+                      text: t.sentItemLineAdded(l.text),
+                    ),
+                  for (final r in changes.linesRenamed)
+                    _Line(
+                      icon: Icons.edit_outlined,
+                      text: t.sentItemLineRenamed(r.before, r.after),
+                    ),
+                  for (final l in changes.linesRemoved)
+                    _Line(
+                      icon: Icons.playlist_remove,
+                      text: t.sentItemLineRemoved(l.text),
+                    ),
                   for (final s in changes.sectionsAdded)
                     _Line(
                       icon: Icons.add,
@@ -611,7 +634,26 @@ class _SentItemScreenState extends State<SentItemScreen> {
             ),
           EditorPanel(
             heading: t.noteTitle,
-            child: Text(item.text, style: text.bodyLarge),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(item.text, style: text.bodyLarge),
+                // The Lines of a Checklist, to look at, not to check.
+                if (item.lines case final lines? when full)
+                  ChecklistLines(
+                    key: const ValueKey('sent-lines'),
+                    lines: [
+                      for (final l in lines)
+                        (
+                          id: l.id,
+                          text: l.text,
+                          inGroup: l.indent,
+                          checked: l.checked,
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
           if (full && item.routines.isNotEmpty)
             EditorPanel(

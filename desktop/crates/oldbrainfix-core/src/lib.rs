@@ -2,7 +2,7 @@
 //! core's signed, append-only entry log (ADR 0002) and of what the
 //! screens read from it and write to it, Notes with their Sections, Areas
 //! and Topics, Routines and Reminders with the alarm plan, the Nudge,
-//! the Missed Summary and their calendar file, Frogs with today's pick, Tallies with their entries and charts, this Device's settings, and the question marks of
+//! the Missed Summary and their calendar file, Frogs with today's pick, Tallies with their entries and charts, Checklists with their Lines, this Device's settings, and the question marks of
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
@@ -21,6 +21,7 @@ pub mod box_keys;
 pub mod bundle;
 pub mod cards;
 pub mod changes_nudges;
+pub mod checklists;
 pub mod conflicts;
 pub mod discovery;
 pub mod entry;
@@ -61,6 +62,7 @@ pub mod transcript_prompts;
 
 pub use alarms::{Alarms, MissedSummary, PlannedAlarm};
 pub use cards::{CardOpened, CardTaken};
+pub use checklists::{Checklist, Checklists, Line};
 pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};

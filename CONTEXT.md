@@ -56,7 +56,7 @@ The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. 
 _Avoid_: category, subcategory, tag
 
 **Unsorted**:
-The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
+The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally or a Checklist, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
 _Avoid_: uncategorized, inbox
 
 **Nudge**:
@@ -132,6 +132,16 @@ _Avoid_: Section (a Section is a dated part of a Note's text), record, set
 A Routine that picks a few Tallies from its pool for each Occurrence, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. German: Einheit.
 _Avoid_: workout, training, playlist, set
 
+### Checklists
+
+**Checklist**:
+A Note whose Lines are checked off, such as a packing list: its text stays above as title and description, every Line has its checkbox, and a Line can have a group of Lines under it, two levels at most. Checking every Line of a group checks its parent, checking the parent checks its whole group, and unchecking one Line of the group unchecks the parent. A Note is at most one of a Tally and a Checklist; it turns back into a plain Note with every Line a line of its text. German: Checkliste.
+_Avoid_: to-do list, task list, todo
+
+**Line**:
+One line of a Checklist: a text, whether it is checked, and its place, at the top or in the group of the Line above. Each check and uncheck of it is an entry of its own; the Note's text is never edited by it. German: Zeile.
+_Avoid_: item, task, to-do, entry (that is a Tally's)
+
 ### People and devices
 
 **Device**:
@@ -151,7 +161,7 @@ _Avoid_: reminder (that is a different thing), sync reminder
 A person who may do everything in a Shared Area.
 
 **Member**:
-A person in a Shared Area who may add and amend Notes and check off Occurrences and Frogs, but not change Routines, Reminders, Frogs or other people's Notes.
+A person in a Shared Area who may add and amend Notes, check off Occurrences and Frogs, and add and check Lines of any Checklist, but not change Routines, Reminders, Frogs, other people's Notes or the Lines of their Checklists.
 _Avoid_: guest, viewer
 
 **Sent Item**:

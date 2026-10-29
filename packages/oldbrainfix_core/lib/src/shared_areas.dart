@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'area_keys.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'frogs.dart';
 import 'notes.dart';
@@ -171,8 +172,8 @@ class JudgedLog {
 /// Which of [entries], the whole raw log, no role allows. Layered, so
 /// nothing depends on what is still to be judged: the grants of every
 /// Area by latest wins; the Topics by their Area; the Notes by their
-/// Area or Topic; the Sections, Routines, Frogs and Tally entries by
-/// their Note. Each entry is
+/// Area or Topic; the Sections, Routines, Frogs, Tally entries and
+/// Checklist Lines by their Note. Each entry is
 /// judged in the Area its entity was in at that point, by the filings
 /// that count: the last one before it, or the first one for what came
 /// before any.
@@ -319,7 +320,8 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
     final section =
         id.startsWith('section:') || id.startsWith(TallyKeys.entryPrefix);
     final frog = id.startsWith(FrogKeys.prefix);
-    if (!section && !frog && !id.startsWith('routine:')) continue;
+    final line = id.startsWith(ChecklistKeys.linePrefix);
+    if (!section && !frog && !line && !id.startsWith('routine:')) continue;
     final list = byEntity[id] ?? const <Entry>[];
     String? note;
     for (final e in list) {
@@ -339,6 +341,16 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
           section
               ? ownerIn(area, list) == areas[area]?.personOf(e.device) &&
                     ownerIn(area, list) != null
+              // A Member checks any Line and adds their own; the rest
+              // is for the author of the Line or of its Note (ADR 0030).
+              : line
+              ? e.field == ChecklistKeys.checked ||
+                    switch (areas[area]?.personOf(e.device)) {
+                      final writer? =>
+                        writer == ownerIn(area, list) ||
+                            writer == ownerIn(area, byEntity[note] ?? const []),
+                      null => false,
+                    }
               // A Member checks off, and a Session's picks and the
               // entries recorded for them are anyone's (ADR 0029); the
               // Frog and the Routine are the Manager's.
@@ -429,6 +441,7 @@ extension SharedAreas on Store {
     NoteKeys.typeNote ||
     SectionKeys.typeSection ||
     TallyKeys.typeEntry => mayChange(entity),
+    ChecklistKeys.typeLine => Checklists(this).mayEdit(entity),
     RoutineKeys.typeRoutine || FrogKeys.typeFrog => mayChangeRoutine(entity),
     PlaceKeys.typeArea => mayManage(entity),
     PlaceKeys.typeTopic => mayManage(areaOf(entity)),
@@ -672,7 +685,7 @@ extension SharedAreas on Store {
 
   /// [delta] with the whole history of every Note a filing in it put
   /// into an Area [wanted] says yes to, with its Sections, Routines,
-  /// Frogs and Tally entries:
+  /// Frogs, Tally entries and Checklist Lines:
   /// a Note captured Unsorted and filed later began below the vector. In
   /// (device, dseq) order, each entry once.
   List<Entry> withFiled(List<Entry> delta, bool Function(String area) wanted) {
@@ -688,6 +701,7 @@ extension SharedAreas on Store {
       RoutineKeys.typeRoutine,
       FrogKeys.typeFrog,
       TallyKeys.typeEntry,
+      ChecklistKeys.typeLine,
     ]) {
       for (final id in entitiesOfType(type)) {
         if (notes.contains(current(id, SectionKeys.note))) entities.add(id);

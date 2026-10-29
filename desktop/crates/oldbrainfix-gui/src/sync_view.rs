@@ -18,6 +18,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use egui::{Color32, Rect, RichText, Ui, Vec2};
 use oldbrainfix_core::bundle::{BundleResult, import_bundle};
+use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::conflicts::{RADIUS, SCHEDULE_UNIT};
 use oldbrainfix_core::join::{JoinResult, SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{
@@ -29,7 +30,7 @@ use oldbrainfix_core::offers::OfferError;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::sync::{FOLDER_SOURCE, UpdateNeeded};
 use oldbrainfix_core::{
-    AreaRole, Conflict, Entry, Error, Fields, Invite, PairedDevice, Places, ProfileChoice,
+    AreaRole, Conflict, Entry, Error, Fields, Invite, Notes, PairedDevice, Places, ProfileChoice,
     Routines, Store, StoredText,
 };
 
@@ -532,7 +533,7 @@ impl SyncHost {
                                 .strong()
                                 .color(text),
                         );
-                        if let Some(note) = routine_note(store, conflict) {
+                        if let Some(note) = conflict_note(store, conflict) {
                             ui.label(RichText::new(note).color(text));
                         }
                         // In a Shared Area only who may change it picks; a
@@ -1055,6 +1056,7 @@ pub fn conflict_label(t: &L10n, conflict: &Conflict) -> &'static str {
     match (conflict.entity_type.as_str(), conflict.unit.as_str()) {
         (note_keys::TYPE_NOTE, note_keys::TEXT) => t.conflict_note_text(),
         (note_keys::TYPE_SECTION, note_keys::TEXT) => t.conflict_section_text(),
+        (checklist_keys::TYPE_LINE, checklist_keys::TEXT) => t.conflict_line_text(),
         (place_keys::TYPE_AREA, place_keys::NAME) => t.conflict_area_name(),
         (place_keys::TYPE_TOPIC, place_keys::NAME) => t.conflict_topic_name(),
         (NAMED_PLACE, place_keys::NAME) => t.conflict_place_name(),
@@ -1067,8 +1069,21 @@ pub fn conflict_label(t: &L10n, conflict: &Conflict) -> &'static str {
 /// A Named Place's `$type`, the Dart core's `NamedPlaceKeys.typeNamedPlace`.
 const NAMED_PLACE: &str = "namedPlace";
 
-/// The text of the Note a schedule Conflict's Routine comes from.
-fn routine_note(store: &Store, conflict: &Conflict) -> Option<String> {
+/// The text of the Note a Conflict belongs to: the Note a schedule
+/// Conflict's Routine comes from, or the Note of a Checklist's Line
+/// (#120).
+fn conflict_note(store: &Store, conflict: &Conflict) -> Option<String> {
+    if conflict.entity_type == checklist_keys::TYPE_LINE {
+        let note = store
+            .current(&conflict.entity, checklist_keys::NOTE)
+            .ok()
+            .flatten()?;
+        return Notes::new(store)
+            .by_id(&note)
+            .ok()
+            .flatten()
+            .map(|n| n.text);
+    }
     if conflict.unit != SCHEDULE_UNIT {
         return None;
     }

@@ -2990,6 +2990,12 @@ abstract class AppLocalizations {
   /// **'Text added to a Note'**
   String get conflictSectionText;
 
+  /// No description provided for @conflictLineText.
+  ///
+  /// In en, this message translates to:
+  /// **'Line of a Checklist'**
+  String get conflictLineText;
+
   /// No description provided for @conflictAreaName.
   ///
   /// In en, this message translates to:
@@ -3571,6 +3577,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Removed: {schedule}'**
   String sentItemRoutineRemoved(String schedule);
+
+  /// No description provided for @sentItemMakesChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'It becomes a Checklist.'**
+  String get sentItemMakesChecklist;
+
+  /// No description provided for @sentItemMakesPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'It becomes a plain Note again.'**
+  String get sentItemMakesPlain;
+
+  /// No description provided for @sentItemLineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'New Line: {text}'**
+  String sentItemLineAdded(String text);
+
+  /// No description provided for @sentItemLineRenamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Line: {before} → {after}'**
+  String sentItemLineRenamed(String before, String after);
+
+  /// No description provided for @sentItemLineRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Line removed: {text}'**
+  String sentItemLineRemoved(String text);
 
   /// No description provided for @sentItemNoChanges.
   ///
@@ -5095,6 +5131,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add entry'**
   String get addTallyEntry;
+
+  /// Makes a Note a Checklist: its first line stays its text, every other line becomes a Line (CONTEXT.md: Checklist, Line).
+  ///
+  /// In en, this message translates to:
+  /// **'Make it a Checklist'**
+  String get makeChecklist;
+
+  /// Turns a Checklist back into a plain Note, every Line a line of its text.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to a plain Note'**
+  String get checklistToPlain;
+
+  /// Unchecks every Line of a Checklist, to use it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncheck all'**
+  String get checklistUncheckAll;
+
+  /// No description provided for @checklistHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist'**
+  String get checklistHeading;
+
+  /// A compact card of a Checklist: how many of its Lines are checked.
+  ///
+  /// In en, this message translates to:
+  /// **'{checked} of {count} checked'**
+  String checklistCount(int checked, int count);
+
+  /// The hint of the field that adds Lines to a Checklist; each line typed becomes one.
+  ///
+  /// In en, this message translates to:
+  /// **'New Line'**
+  String get checklistNewLine;
+
+  /// No description provided for @checklistAddLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Line'**
+  String get checklistAddLine;
+
+  /// No description provided for @checklistRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename Line'**
+  String get checklistRenameTitle;
+
+  /// No description provided for @checklistMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get checklistMoveUp;
+
+  /// No description provided for @checklistMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get checklistMoveDown;
+
+  /// No description provided for @checklistIndent.
+  ///
+  /// In en, this message translates to:
+  /// **'Put under the Line above'**
+  String get checklistIndent;
+
+  /// Takes a Line out of the group it is in.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the top level'**
+  String get checklistOutdent;
+
+  /// No description provided for @checklistDeleteQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this Line?'**
+  String get checklistDeleteQuestion;
 
   /// No description provided for @tallyHeading.
   ///

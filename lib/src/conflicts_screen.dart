@@ -100,9 +100,15 @@ class _ConflictCard extends StatelessWidget {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final when = DateFormat.yMd(locale).add_Hm();
+    // What it belongs to: the Note of a Routine or of a Checklist's Line.
     final note = conflict.unit == scheduleUnit
         ? switch (Routines(store).byId(conflict.entity)) {
             final routine? => Routines(store).note(routine)?.text,
+            null => null,
+          }
+        : conflict.type == ChecklistKeys.typeLine
+        ? switch (store.current(conflict.entity, ChecklistKeys.note)) {
+            final id? => Notes(store).byId(id)?.text,
             null => null,
           }
         : null;
@@ -161,8 +167,9 @@ class _ConflictCard extends StatelessWidget {
 }
 
 /// [conflicts] without those about what a closed locked Area hides: a
-/// Note filed in it, a Section of such a Note, a Routine spawned from
-/// one, or one of its Topics. Area names show, as they do in the list.
+/// Note filed in it, a Section of such a Note, a Line of its Checklist,
+/// a Routine spawned from one, or one of its Topics. Area names show, as
+/// they do in the list.
 List<Conflict> visibleConflicts(
   Store store,
   AppLock? lock,
@@ -177,6 +184,10 @@ List<Conflict> visibleConflicts(
         return note != null && lock.hides(note);
       case SectionKeys.typeSection:
         final noteId = store.current(c.entity, SectionKeys.note);
+        final note = noteId == null ? null : notes.byId(noteId);
+        return note != null && lock.hides(note);
+      case ChecklistKeys.typeLine:
+        final noteId = store.current(c.entity, ChecklistKeys.note);
         final note = noteId == null ? null : notes.byId(noteId);
         return note != null && lock.hides(note);
       case RoutineKeys.typeRoutine:
@@ -202,6 +213,7 @@ String conflictLabel(AppLocalizations t, Conflict conflict) => switch ((
 )) {
   (NoteKeys.typeNote, NoteKeys.text) => t.conflictNoteText,
   (SectionKeys.typeSection, SectionKeys.text) => t.conflictSectionText,
+  (ChecklistKeys.typeLine, ChecklistKeys.text) => t.conflictLineText,
   (PlaceKeys.typeArea, PlaceKeys.name) => t.conflictAreaName,
   (PlaceKeys.typeTopic, PlaceKeys.name) => t.conflictTopicName,
   (NamedPlaceKeys.typeNamedPlace, NamedPlaceKeys.name) => t.conflictPlaceName,

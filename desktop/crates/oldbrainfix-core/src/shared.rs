@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use serde_json::{Value, json};
 
 use crate::Result;
+use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
 use crate::keys::{AreaKey, PERSONAL_SCOPE};
@@ -451,7 +452,8 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
         // A Tally's entry is its author's, as a Section is.
         let section = id.starts_with("section:") || id.starts_with(tally_keys::ENTRY_PREFIX);
         let frog = id.starts_with(frog_keys::PREFIX);
-        if !section && !frog && !id.starts_with("routine:") {
+        let line = id.starts_with(checklist_keys::LINE_PREFIX);
+        if !section && !frog && !line && !id.starts_with("routine:") {
             continue;
         }
         let note = list
@@ -473,6 +475,19 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                     if section {
                         let owner = judged.owner_in(area, list);
                         owner == judged.person_of(area, &e.device) && owner.is_some()
+                    } else if line {
+                        // A Member checks any Line and adds their own; the
+                        // rest is for the author of the Line or of its Note
+                        // (ADR 0030).
+                        let note_list = note
+                            .as_ref()
+                            .and_then(|n| by_entity.get(n))
+                            .unwrap_or(&empty);
+                        e.field == checklist_keys::CHECKED
+                            || judged.person_of(area, &e.device).is_some_and(|writer| {
+                                judged.owner_in(area, list) == Some(writer)
+                                    || judged.owner_in(area, note_list) == Some(writer)
+                            })
                     } else if frog {
                         // A Member checks off; the Frog is the Manager's.
                         e.field == frog_keys::DONE
@@ -591,6 +606,7 @@ impl Store {
     pub fn may_resolve(&self, entity: &str, ty: &str) -> Result<bool> {
         match ty {
             "note" | "section" | tally_keys::TYPE_ENTRY => self.may_change(entity),
+            checklist_keys::TYPE_LINE => Checklists::new(self).may_edit(entity),
             "routine" | "frog" => self.may_change_routine(entity),
             "area" => self.may_manage(Some(entity)),
             "topic" => self.may_manage(self.area_of(entity)?.as_deref()),
@@ -927,7 +943,8 @@ impl Store {
 
     /// `delta` with the whole history of every Note a filing in it put
     /// into an Area `wanted` says yes to, with its Sections, Routines,
-    /// Frogs and Tally entries, as the Dart core's `withFiled`; by (device, dseq), each entry once.
+    /// Frogs, Tally entries and Checklist Lines, as the Dart core's
+    /// `withFiled`; by (device, dseq), each entry once.
     pub fn with_filed(
         &self,
         delta: Vec<Entry>,
@@ -952,6 +969,7 @@ impl Store {
             routine_keys::TYPE_ROUTINE,
             frog_keys::TYPE_FROG,
             tally_keys::TYPE_ENTRY,
+            checklist_keys::TYPE_LINE,
         ] {
             for id in self.entities_of_type(ty)? {
                 if let Some(note) = self.current(&id, note_keys::NOTE)?

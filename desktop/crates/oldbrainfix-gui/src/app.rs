@@ -63,6 +63,7 @@ use egui::{
 use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::bundle::BundleResult;
+use oldbrainfix_core::checklists::keys as checklist_keys;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
@@ -72,10 +73,10 @@ use oldbrainfix_core::sent::{
 };
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
-    ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite,
-    MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places,
-    Profile, QuietHours, Routine, Routines, Search, Section, Sessions, Store, Tallies, Topic,
-    UnitSystem, bundle,
+    Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
+    Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
+    PersonFilter, Places, Profile, QuietHours, Routine, Routines, Search, Section, Sessions, Store,
+    Tallies, Topic, UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -87,6 +88,7 @@ use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
 use crate::backups;
 use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
+use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_sync;
 use crate::frogs_view::{self, FrogAction, FrogShown};
@@ -267,6 +269,10 @@ struct View {
     /// The Sections of each Note listed, oldest first, read in one pass
     /// for the full cards (#114).
     sections: BTreeMap<String, Vec<Section>>,
+    /// The Checklists of the Notes listed that are one, read in one pass
+    /// for the cards, each with whether this Device may check its Lines
+    /// (#120).
+    checklists: BTreeMap<String, (Checklist, bool)>,
     /// Whether the list shows its Notes compact, by their first line,
     /// as this Device keeps it for that list (#114).
     compact: bool,
@@ -281,6 +287,10 @@ struct View {
     note_frogs: Vec<(Frog, bool)>,
     /// The Tally of the selected Note, while it is one (#103).
     tally: Option<TallyShown>,
+    /// The Checklist of the selected Note, while it is one, and whether
+    /// this Device may make the selected Note one (#120).
+    checklist: Option<ChecklistShown>,
+    makes_checklist: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -374,6 +384,15 @@ enum Dialog {
     },
     /// Whether the Tally's entry `id` goes; it can be restored.
     DeleteEntry {
+        id: String,
+    },
+    /// The new text of the Checklist's Line `id` (#120).
+    RenameLine {
+        id: String,
+        text: String,
+    },
+    /// Whether the Checklist's Line `id` goes.
+    DeleteLine {
         id: String,
     },
     /// Sharing the Area `area`: the role the other person gets, and the
@@ -666,6 +685,12 @@ enum Action {
     TallyForm(FormIntent),
     /// Removes the entry the dialog asks about.
     DeleteEntry,
+    /// Something asked of a Checklist, on a card or in the editor (#120).
+    Checklist(ChecklistAction),
+    /// Gives the Line the dialog renames its new text.
+    RenameLine,
+    /// Deletes the Line the dialog asks about.
+    DeleteLine,
     Setting(Setting),
     /// Asks the system's dialog for the sound file Occurrences ring with.
     PickAlarmSound,
@@ -857,6 +882,10 @@ pub struct App {
     /// the selected Note's Tally is looked at (#103).
     tally_form: Option<TallyForm>,
     tally_look: TallyLook,
+    /// What the Checklist part of the editor's field holds, to add as
+    /// Lines, and what the menu of the card last opened offers (#120).
+    line_text: String,
+    card_menu: Option<CardMenu>,
     /// The region the system reports, an ISO country code, which picks
     /// the units Tallies show unless this Device chose them.
     region: Option<String>,
@@ -1133,6 +1162,8 @@ impl App {
             editor: None,
             tally_form: None,
             tally_look: TallyLook::new(None),
+            line_text: String::new(),
+            card_menu: None,
             region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
             seen_changes: 0,
@@ -2548,6 +2579,7 @@ impl App {
             self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
             self.text_of = shown.map(|n| n.id.clone());
             self.amend.clear();
+            self.line_text.clear();
         }
         self.kick();
     }
@@ -2714,6 +2746,14 @@ impl App {
         } else {
             notes.sections_of(&listed)?
         };
+        let lists = Checklists::new(store);
+        let mut checklists = BTreeMap::new();
+        if !listed.is_empty() {
+            for (id, list) in lists.of_notes(&listed)? {
+                let checks = lists.may_check(&id)?;
+                checklists.insert(id, (list, checks));
+            }
+        }
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
         let compact = match cards_key(&self.selection, &self.people, is_area) {
             Some(key) => {
@@ -2753,6 +2793,13 @@ impl App {
                 amends: self.store.may_write_in(&p.note.id)?,
             },
             None => NoteMay::default(),
+        };
+        let (checklist, makes_checklist) = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => (
+                checklist_view::read(store, &p.note, may.changes)?,
+                lists.may_make(&p.note.id)?,
+            ),
+            _ => (None, false),
         };
         let mut removable = HashSet::new();
         let mut text_removable = HashSet::new();
@@ -2942,6 +2989,7 @@ impl App {
             text_changeable,
             notes: placed,
             sections,
+            checklists,
             compact,
             detail,
             capture_spawns: capture_choices::may_spawn(
@@ -2951,6 +2999,8 @@ impl App {
             routines: note_routines,
             note_frogs,
             tally,
+            checklist,
+            makes_checklist,
             frogs_open,
             all_routines,
             frogs_done,
@@ -3019,6 +3069,7 @@ impl App {
                 | Action::Rename(_)
                 | Action::StartMerge
                 | Action::Share(_)
+                | Action::Checklist(ChecklistAction::Step(_, LineStep::Rename))
         ) {
             self.focus = true;
         }
@@ -3436,6 +3487,23 @@ impl App {
                     {
                         self.tally_form = None;
                     }
+                }
+            }
+            Action::Checklist(asked) => self.checklist_action(asked)?,
+            Action::RenameLine => {
+                if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
+                    && let Some(named) = checklist_view::renamed(&text)
+                    // A sync while the dialog was open may have taken it.
+                    && self.line_of(&id)?.is_some()
+                {
+                    Checklists::new(&self.store).rename(&id, &named)?;
+                }
+            }
+            Action::DeleteLine => {
+                if let Some(Dialog::DeleteLine { id }) = self.dialog.take()
+                    && self.line_of(&id)?.is_some()
+                {
+                    Checklists::new(&self.store).delete(&id)?;
                 }
             }
             Action::Setting(setting) => self.set(setting)?,
@@ -3908,6 +3976,102 @@ impl App {
             } => Sessions::new(&self.store).another(&session, &occurrence, &note_id)?,
         }
         Ok(())
+    }
+
+    /// Does what was asked of a Checklist, on a card or in the editor
+    /// (#120).
+    fn checklist_action(&mut self, asked: ChecklistAction) -> oldbrainfix_core::Result<()> {
+        match asked {
+            ChecklistAction::Make(note) => self.change_kind(&note, true)?,
+            ChecklistAction::ToPlain(note) => self.change_kind(&note, false)?,
+            ChecklistAction::UncheckAll(note) => {
+                let lists = Checklists::new(&self.store);
+                if lists.is_checklist(&note)? && lists.may_check(&note)? {
+                    lists.uncheck_all(&note)?;
+                }
+            }
+            ChecklistAction::Check(line, checked) => {
+                // A sync meanwhile may have taken it.
+                if self.line_of(&line)?.is_some() {
+                    let lists = Checklists::new(&self.store);
+                    if checked {
+                        lists.check(&line)?;
+                    } else {
+                        lists.uncheck(&line)?;
+                    }
+                }
+            }
+            ChecklistAction::Add(note) => {
+                if checklist_view::add_typed(&self.store, &note, &self.line_text)? {
+                    self.line_text.clear();
+                }
+            }
+            ChecklistAction::Step(id, step) => {
+                let Some((list, line)) = self.line_of(&id)? else {
+                    return Ok(());
+                };
+                let lists = Checklists::new(&self.store);
+                match step {
+                    LineStep::Rename => {
+                        self.dialog = Some(Dialog::RenameLine {
+                            id,
+                            text: line.text,
+                        });
+                    }
+                    LineStep::Up => checklist_view::move_up(&self.store, &list, &line)?,
+                    LineStep::Down => checklist_view::move_down(&self.store, &list, &line)?,
+                    LineStep::Indent => lists.indent(&id, true)?,
+                    LineStep::Outdent => lists.indent(&id, false)?,
+                    LineStep::Delete => self.dialog = Some(Dialog::DeleteLine { id }),
+                }
+            }
+            ChecklistAction::Menu(note) => {
+                self.card_menu = match Notes::new(&self.store).by_id(&note)? {
+                    Some(note) => Some(checklist_view::card_menu(&self.store, &note)?),
+                    None => None,
+                };
+            }
+        }
+        Ok(())
+    }
+
+    /// Makes the Note `note` a Checklist, or with `make` false a plain
+    /// Note again, where this Device may. On the Note shown, what is
+    /// typed into its text goes in first, and the field then holds the
+    /// text it has now, so that leaving it writes nothing old back.
+    fn change_kind(&mut self, note: &str, make: bool) -> oldbrainfix_core::Result<()> {
+        let shown = self.selected_note.as_deref() == Some(note);
+        if shown {
+            self.save_text()?;
+        }
+        let lists = Checklists::new(&self.store);
+        if make {
+            if !lists.may_make(note)? {
+                return Ok(());
+            }
+            lists.make(note)?;
+        } else {
+            if !lists.is_checklist(note)? {
+                return Ok(());
+            }
+            lists.to_plain(note)?;
+        }
+        if shown && let Some(now) = Notes::new(&self.store).by_id(note)? {
+            self.text = now.text;
+        }
+        Ok(())
+    }
+
+    /// The Line `id` with its Checklist, while it shows in one.
+    fn line_of(&self, id: &str) -> oldbrainfix_core::Result<Option<(Checklist, Line)>> {
+        let Some(note) = self.store.current(id, checklist_keys::NOTE)? else {
+            return Ok(None);
+        };
+        let Some(list) = Checklists::new(&self.store).by_note(&note)? else {
+            return Ok(None);
+        };
+        let line = list.line(id).cloned();
+        Ok(line.map(|line| (list, line)))
     }
 
     /// Does what was asked of the Tally part of the Note's editor (#103).
@@ -5122,6 +5286,8 @@ impl App {
                     let look = CardLook {
                         full: !self.view.compact || self.unfolded.contains(id),
                         sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
+                        checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
+                        menu: self.card_menu.as_ref(),
                     };
                     let clicks = note_card(
                         ui,
@@ -5135,7 +5301,14 @@ impl App {
                     // A click unfolds a compact Note and does nothing to a
                     // full one; a double-click or Edit opens the editor
                     // (UI laws, "Desktop").
-                    if let Some(hash) = clicks.photo {
+                    if clicks.menu_opened {
+                        actions.push(Action::Checklist(ChecklistAction::Menu(id.clone())));
+                    }
+                    if let Some(picked) = clicks.picked {
+                        actions.push(picked);
+                    } else if let Some((line, checked)) = clicks.check {
+                        actions.push(Action::Checklist(ChecklistAction::Check(line, checked)));
+                    } else if let Some(hash) = clicks.photo {
                         actions.push(Action::ViewPhoto(hash));
                     } else if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
                         && author.clicked()
@@ -5272,6 +5445,9 @@ impl App {
         let linked = &self.view.routines;
         let tally = self.view.tally.as_ref();
         let tally_count = self.tally_look.count;
+        let checklist = self.view.checklist.as_ref();
+        let makes_checklist = self.view.makes_checklist;
+        let typed = &mut self.line_text;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
         let t = self.t;
@@ -5340,6 +5516,13 @@ impl App {
                         actions.push(Action::SaveText);
                     }
                 });
+                // Under the text field, as the Lines are under the text on
+                // a card; nothing while the Note is no Checklist.
+                if let Some(shown) = checklist {
+                    let mut asked = Vec::new();
+                    checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Checklist));
+                }
                 let media = [
                     &note.photos,
                     &note.recordings,
@@ -5545,13 +5728,23 @@ impl App {
                             .frame(Frame::NONE),
                     );
                     let ready = !amend.trim().is_empty();
-                    let add = ui.add_enabled(
-                        ready,
-                        egui::Button::new(RichText::new(t.amend()).color(text)),
-                    );
-                    if add.clicked() {
-                        actions.push(Action::Amend);
-                    }
+                    ui.horizontal_wrapped(|ui| {
+                        let add = ui.add_enabled(
+                            ready,
+                            egui::Button::new(RichText::new(t.amend()).color(text)),
+                        );
+                        if add.clicked() {
+                            actions.push(Action::Amend);
+                        }
+                        // A plain Note becomes a Checklist of its text.
+                        if makes_checklist
+                            && ui
+                                .button(RichText::new(t.make_checklist()).color(text))
+                                .clicked()
+                        {
+                            actions.push(Action::Checklist(ChecklistAction::Make(note.id.clone())));
+                        }
+                    });
                 });
                 if ui
                     .button(RichText::new(t.send_button()).color(text))
@@ -5578,8 +5771,10 @@ impl App {
                     }
                 });
                 // Only a Note in the lists becomes a Tally (ADR 0028); one
-                // that is adds entries in its Tally part above.
+                // that is adds entries in its Tally part above. A
+                // Checklist is no Tally (ADR 0030).
                 if tally.is_none()
+                    && checklist.is_none()
                     && !note.is_merged()
                     && ui
                         .button(RichText::new(t.make_tally()).color(text))
@@ -5679,6 +5874,19 @@ impl App {
                             cancel(ui, &t, actions);
                             if destructive(ui, t.delete()) {
                                 actions.push(Action::DeleteEntry);
+                            }
+                        });
+                    }
+                    Dialog::RenameLine { text, .. } => {
+                        let form = (t.checklist_rename_title(), t.save(), Action::RenameLine);
+                        line_form(ui, &t, form, (text, focus), actions);
+                    }
+                    Dialog::DeleteLine { .. } => {
+                        title(ui, t.checklist_delete_question());
+                        ui.horizontal(|ui| {
+                            cancel(ui, &t, actions);
+                            if destructive(ui, t.delete()) {
+                                actions.push(Action::DeleteLine);
                             }
                         });
                     }
@@ -7216,6 +7424,31 @@ fn name_form(
     });
 }
 
+/// Asks for a Line's text (#120): `(title, verb, done)` say what for.
+/// Enter takes it.
+fn line_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (heading, verb, done): (&str, &str, Action),
+    (text, focus): (&mut String, bool),
+    actions: &mut Vec<Action>,
+) {
+    title(ui, heading);
+    let field = focused_field(ui, (&mut *text, focus), "line", t.checklist_rename_title());
+    let ready = checklist_view::renamed(text).is_some();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(done.clone());
+    }
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        let words = ui.visuals().text_color();
+        let button = egui::Button::new(RichText::new(verb).color(words));
+        if ui.add_enabled(ready, button).clicked() {
+            actions.push(done);
+        }
+    });
+}
+
 /// How an Area is shared: the role, and the button that shows the
 /// invite's code. Nobody types a name: the other person's Profile shows
 /// when their phone joins, to confirm (ADR 0017). Below, "Share with…"
@@ -7726,6 +7959,21 @@ fn sent_item_form(
                         line(t.sent_item_text_yours().to_string());
                     }
                 }
+                if changes.makes_checklist {
+                    line(t.sent_item_makes_checklist().to_string());
+                }
+                if changes.makes_plain {
+                    line(t.sent_item_makes_plain().to_string());
+                }
+                for l in &changes.lines_added {
+                    line(t.sent_item_line_added(&l.text));
+                }
+                for r in &changes.lines_renamed {
+                    line(t.sent_item_line_renamed(&r.before, &r.after));
+                }
+                for l in &changes.lines_removed {
+                    line(t.sent_item_line_removed(&l.text));
+                }
                 for s in &changes.sections_added {
                     line(t.sent_item_section_added(&s.text));
                 }
@@ -7750,6 +7998,10 @@ fn sent_item_form(
             ui.label(RichText::new(&item.text).color(text));
             if !full {
                 return;
+            }
+            // The Lines of a Checklist, to look at, not to check.
+            if let Some(lines) = &item.lines {
+                checklist_view::preview(ui, (t, tones), lines);
             }
             if !item.routines.is_empty() {
                 ui.label(RichText::new(t.routines_heading()).strong().color(text));
@@ -8764,21 +9016,29 @@ struct CardMedia<'a> {
 }
 
 /// How a card shows its Note (#114): `full`, the whole Note with its
-/// `sections`, or compact, by its first line.
+/// `sections`, or compact, by its first line; its Checklist, if it is
+/// one, with whether this Device may check its Lines, and what the
+/// card's menu offers of it once read for this Note (#120).
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
     sections: &'a [Section],
+    checklist: Option<(&'a Checklist, bool)>,
+    menu: Option<&'a CardMenu>,
 }
 
 /// What can be clicked on a card: the card, the author's picture on
-/// another person's Note, Edit, and the photo of a full card clicked, by
-/// hash.
+/// another person's Note, Edit, the photo of a full card clicked, by
+/// hash, the Line checked or unchecked on it, whether its menu opened
+/// and what was picked in it (#120).
 struct CardClicks {
     card: egui::Response,
     author: Option<egui::Response>,
     edit: egui::Response,
     photo: Option<String>,
+    check: Option<(String, bool)>,
+    menu_opened: bool,
+    picked: Option<Action>,
 }
 
 /// The bar button of a Note list's full/compact switch (#114): it says
@@ -8872,12 +9132,16 @@ fn whole(
 /// recording being transcribed, for [`whole`].
 type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 
-/// A Note as a card (UI laws, "Cards"): when it was captured, with Edit,
-/// and where it is filed, its Area's colour down the left edge and icon
-/// before the place; then, as `look` says, the whole Note under its
-/// Capture Context with every Section oldest first, each under its own,
-/// its photos opening full screen on a click; or, compact, where it was
-/// captured, its first line and its media. Important cards carry the
+/// A Note as a card (UI laws, "Cards"): when it was captured, with ⋮
+/// (but in the trash) and Edit, and where it is filed, its Area's colour
+/// down the left edge and icon before the place; then, as `look` says,
+/// the whole Note under its Capture Context, a Checklist's Lines under
+/// its text, checkable, with every Section oldest first, each under its
+/// own, its photos opening full screen on a click; or, compact, where it
+/// was captured, its first line, how many of its Lines are checked and
+/// its media. ⋮ and a right-click open the same menu: Edit, then making
+/// it a Checklist, "Uncheck all" and "Back to a plain Note" as this
+/// Device may (#120). Important cards carry the
 /// accent marker and a stronger emboss; unimportant ones are dimmed. A
 /// `draggable` card can be dropped onto an Area or Topic; a `selected`
 /// one is outlined while its editor shows.
@@ -8899,8 +9163,11 @@ fn note_card(
         .and_then(|a| area_colour(a.colour.as_deref()));
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
-    // The photos shown in full, where they lie.
+    let mut more_rect = None;
+    // The photos shown in full, where they lie, and the checkboxes of
+    // its Lines.
     let mut shown = Vec::new();
+    let mut boxes = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -8937,8 +9204,8 @@ fn note_card(
                 } else {
                     ui.label(RichText::new(when(t, note.captured)).small().color(weak));
                     // Where, and that the editor shows more (UI laws,
-                    // "Cards"); room is left for Edit.
-                    let room = (ui.available_width() - 56.0).max(0.0);
+                    // "Cards"); room is left for ⋮ and Edit.
+                    let room = (ui.available_width() - 88.0).max(0.0);
                     if let Some(at) = where_captured(&note.context) {
                         icons::show(ui, icons::CONTEXT_WHERE, 14.0, weak);
                         ui.allocate_ui(egui::vec2(room, 20.0), |ui| {
@@ -8954,6 +9221,13 @@ fn note_card(
                     edit_rect = ui
                         .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
                         .0;
+                    // A Note in the trash is restored, not changed.
+                    if !note.is_trashed() {
+                        more_rect = Some(
+                            ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                                .0,
+                        );
+                    }
                 });
             });
             if look.full {
@@ -8988,7 +9262,25 @@ fn note_card(
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
                     let part = Part::of_note(note);
-                    shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
+                    if let Some((list, _)) = look.checklist {
+                        // Its Lines right under its text.
+                        if !part.text.is_empty() {
+                            let text = ui.visuals().text_color();
+                            ui.label(RichText::new(part.text).size(16.0).color(text));
+                        }
+                        let lines = checklist_view::shown_lines(list);
+                        boxes = checklist_view::card_lines(ui, tones, &lines);
+                        shown.extend(media_view::whole_media(
+                            ui,
+                            t,
+                            (&mut *photos, store),
+                            part.photos,
+                            part.recordings,
+                            transcribing,
+                        ));
+                    } else {
+                        shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
+                    }
                     for section in look.sections {
                         ui.separator();
                         capture_context(ui, t, section.captured, &section.context);
@@ -9001,6 +9293,9 @@ fn note_card(
             // A photo Note may have no words.
             if let Some(first) = note.text.trim().lines().next() {
                 ui.add(egui::Label::new(RichText::new(first).size(16.0).color(text)).truncate());
+            }
+            if let Some((list, _)) = look.checklist {
+                checklist_view::card_count(ui, t, list);
             }
             if !note.photos.is_empty() {
                 media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
@@ -9080,6 +9375,41 @@ fn note_card(
         let fg = dim(ui.visuals().text_color());
         icons::paint(ui.painter(), edit_rect.shrink(2.0), icons::EDIT, fg);
     }
+    // ⋮ and a right-click on the card open the same menu, read as it
+    // opens (#120).
+    let mut menu_opened = resp.secondary_clicked();
+    let mut picked = None;
+    let menu = look.menu.filter(|m| m.note == note.id);
+    let mut entries = |ui: &mut Ui| {
+        let text = ui.visuals().text_color();
+        if ui.button(RichText::new(t.edit()).color(text)).clicked() {
+            picked = Some(Action::SelectNote(note.id.clone()));
+        }
+        if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
+            picked = Some(Action::Checklist(asked));
+        }
+    };
+    if let Some(more_rect) = more_rect {
+        let title = row_title(t, Some(note));
+        let label = checklist_view::menu_label(t, title.lines().next().unwrap_or_default());
+        let more = ui.interact(more_rect, Id::new(("more", &note.id)), Sense::click());
+        more.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+        if ui.is_rect_visible(more_rect) {
+            if more.hovered() {
+                let fill = ui.visuals().widgets.hovered.weak_bg_fill;
+                ui.painter().rect_filled(more_rect, 6.0, fill);
+            }
+            let fg = ui.visuals().weak_text_color();
+            icons::paint(ui.painter(), more_rect.shrink(2.0), icons::MORE_VERT, fg);
+        }
+        menu_opened |= more.clicked();
+        let more = more.on_hover_text(&label);
+        egui::Popup::menu(&more).show(&mut entries);
+        resp.context_menu(&mut entries);
+    }
+    if menu_opened {
+        ui.ctx().request_repaint();
+    }
     // A click on a photo opens it full screen (UI laws, "Cards").
     let mut photo = None;
     for (i, (hash, rect)) in shown.into_iter().enumerate() {
@@ -9088,11 +9418,16 @@ fn note_card(
             photo = Some(hash);
         }
     }
+    let checks = look.checklist.is_some_and(|(_, checks)| checks);
+    let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
         edit: edit.on_hover_text(t.edit()),
         photo,
+        check,
+        menu_opened,
+        picked,
     }
 }
 

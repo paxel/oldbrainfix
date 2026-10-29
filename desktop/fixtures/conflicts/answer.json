@@ -5,51 +5,85 @@
   "entries": [
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 18,
+      "dseq": 40,
       "entity": "note:00000000000000000000000000000001",
       "field": "text",
       "value": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}",
-      "date": "2026-01-01T10:00:28.000Z",
+      "date": "2026-01-01T10:00:55.000Z",
       "author": "Ada",
-      "recorded": "2026-01-01T10:00:28.000Z",
+      "recorded": "2026-01-01T10:00:55.000Z",
       "ctx": "",
-      "sig": "PmYce9OQm1ODMULGXLm0Dm/0hVey7PUZmTJNV5PKJQlOMrpvU/LZQIlR4mmA0Qb7G5wkoV62lDgReeo/mZ5DAQ=="
+      "sig": "dX+XV/RbJBLhZDOLCVb9bKAc8ns3sgcdL8hpu8pzDFHloH81dVBrhyfwdduUo7EI+RnpxBAbvyMBFDvIpoBXDw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 19,
+      "dseq": 41,
       "entity": "area:00000000000000000000000000000003",
       "field": "name",
       "value": "House",
-      "date": "2026-01-01T10:00:29.000Z",
+      "date": "2026-01-01T10:00:56.000Z",
       "author": "Ada",
-      "recorded": "2026-01-01T10:00:29.000Z",
+      "recorded": "2026-01-01T10:00:56.000Z",
       "ctx": "",
-      "sig": "LmWS4sJU8zsbQnACbM44ByIKXwXzOjiqTEcisA2sm5HD1TS5mfj0UexjsXtR9W/LUuCAgeunlaWq7jH6ptlgCA=="
+      "sig": "3XQi5dR4JQ9HXB7m90o2hkdT+AjShQc60ekpEZVAczQcxMgxHm50Lm3b8xnYaYByeHzQbJnNPhF6e1poO5x0Dw=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 20,
+      "dseq": 42,
       "entity": "routine:00000000000000000000000000000006",
       "field": "times",
       "value": "09:00",
-      "date": "2026-01-01T10:00:31.000Z",
+      "date": "2026-01-01T10:00:58.000Z",
       "author": "Ada",
-      "recorded": "2026-01-01T10:00:31.000Z",
+      "recorded": "2026-01-01T10:00:58.000Z",
       "ctx": "",
-      "sig": "usEcoQCL9Z6pdxOQ9OcaLCSXtQZjsis0hjUQUHlBLZN6cyOQEa4dXtmaoIY2qLFqVUj7i8Z9MCRCtTIKCSBRCw=="
+      "sig": "LF4rihxcI26AlSTpL5dOnDLCuocldEUStcayEWOCZa4BVK/qtDiLUt5wAAUehrDDBoeeI9MGEwKCOAmhjRkoCQ=="
     },
     {
       "device": "65b60673d6ed884bf01c2c222d82ada0",
-      "dseq": 21,
+      "dseq": 43,
       "entity": "note:00000000000000000000000000000002",
       "field": "text",
       "value": "{\"format\":\"plain\",\"text\":\"Call mum tonight\"}",
-      "date": "2026-01-01T10:00:33.000Z",
+      "date": "2026-01-01T10:01:00.000Z",
       "author": "Ada",
-      "recorded": "2026-01-01T10:00:33.000Z",
+      "recorded": "2026-01-01T10:01:00.000Z",
       "ctx": "c945cbf2a5602002141e2fb9d17054d6:3",
-      "sig": "twRWAxqctGCKLX/ZbRImWgY6oN5sZu9CfS/P1OoIg7Rheae5Uo5HplbnjlEATDdDXODh6WkC0OQepVi1Ife6CQ=="
+      "sig": "JnXPlNDlqTAJTCfCbdexA7UrHN/O0uncUtMaMUkqEIajWtZD9jCxxHox8tONjtHrzL0ceoDnInT5qzKsEvXGCw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 44,
+      "entity": "line:00000000000000000000000000000009",
+      "field": "text",
+      "value": "{\"format\":\"plain\",\"text\":\"Thick socks\"}",
+      "date": "2026-01-01T10:01:04.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:01:04.000Z",
+      "ctx": "",
+      "sig": "I6KOt/0VZByhrhTw8jrwUZnZ0BhTpIaslL5w/LicMB8CKWDAVzbI/WOFDzKAOXBN1CLwDeNcKmg54qFT1ullAw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 45,
+      "entity": "line:0000000000000000000000000000000a",
+      "field": "checked",
+      "value": null,
+      "date": "2026-01-01T10:01:06.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:01:06.000Z",
+      "sig": "te+1eLAhYuR1hrsYQ7sltZT5eaIdiCN5tIRgvOhboFDMDQVQsDyA+ccwnNz9xmng6ySB5uAXkeh2TJFbKNPKBw=="
+    },
+    {
+      "device": "65b60673d6ed884bf01c2c222d82ada0",
+      "dseq": 46,
+      "entity": "line:0000000000000000000000000000000b",
+      "field": "checked",
+      "value": "2026-01-01T10:01:11.000Z",
+      "date": "2026-01-01T10:01:12.000Z",
+      "author": "Ada",
+      "recorded": "2026-01-01T10:01:12.000Z",
+      "sig": "dGHCaB9xP5FXOXC7F5z6z02KY/M4H88SDHrsvC2KuURR+HNMuoIB92+LriCIUchHD1JtlU2iOZwKLtTFzy4zAg=="
     }
   ],
   "wantBlobs": [],

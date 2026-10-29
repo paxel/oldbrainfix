@@ -1,12 +1,14 @@
 //! Finding Notes by what they say, as the Dart core's `Search` finds
 //! them: their text, the Transcripts of their voice recordings, the Photo
 //! Texts of their photos and the same of their Sections (Amends and
-//! merged Notes), and the text lines of the entries of a Tally. A text
-//! in a format not known here counts as its source text.
+//! merged Notes), the text lines of the entries of a Tally and the Lines
+//! of a Checklist. A text in a format not known here counts as its
+//! source text.
 
 use std::collections::HashMap;
 
 use crate::Result;
+use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::notes::{Note, Notes, keys};
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
@@ -22,8 +24,8 @@ impl<'a> Search<'a> {
     }
 
     /// The Notes whose text, Transcripts or Photo Texts, or those of one
-    /// of their Sections, or the text line of an entry of their Tally,
-    /// hold `query`, ignoring case, newest capture
+    /// of their Sections, or the text line of an entry of their Tally, or
+    /// a Line of their Checklist, hold `query`, ignoring case, newest capture
     /// first. The query counts as typed, inner spaces included; only its
     /// ends are trimmed, and a blank one finds everything. With `within`,
     /// only the Notes inside that Area or Topic count (an Area's Topics
@@ -97,6 +99,37 @@ impl<'a> Search<'a> {
                 .and_then(|n| n.merged_into)
                 .unwrap_or_else(|| owner.to_string());
             texts.entry(shown_under).or_default().push(line.to_string());
+        }
+        let mut makings: HashMap<String, Option<String>> = HashMap::new();
+        for id in self.store.entities_of_type(checklist_keys::TYPE_LINE)? {
+            let fields = self.store.current_fields(&id)?;
+            let Some(owner) = fields.get(checklist_keys::NOTE) else {
+                continue;
+            };
+            if fields.get(checklist_keys::TRASHED).is_some() {
+                continue;
+            }
+            let making = match makings.get(owner) {
+                Some(making) => making.clone(),
+                None => {
+                    let making = Checklists::new(self.store)
+                        .by_note(owner)?
+                        .map(|l| l.making);
+                    makings.insert(owner.to_string(), making.clone());
+                    making
+                }
+            };
+            if making.is_none() || fields.get(checklist_keys::MADE) != making.as_deref() {
+                continue;
+            }
+            let shown_under = notes
+                .by_id(owner)?
+                .and_then(|n| n.merged_into)
+                .unwrap_or_else(|| owner.to_string());
+            texts
+                .entry(shown_under)
+                .or_default()
+                .push(StoredText::read(fields.get(checklist_keys::TEXT)).text);
         }
         Ok(texts)
     }

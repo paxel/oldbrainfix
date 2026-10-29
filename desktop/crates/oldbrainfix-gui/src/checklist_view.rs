@@ -1,0 +1,631 @@
+//! Checklists on the desktop's screen (#120, ADR 0030), as the phone's
+//! `checklist_view.dart` draws them: the Lines of a Checklist, each with
+//! its checkbox and its text, struck through in place once checked, the
+//! group of a Line drawn as one frame under it; on a full card checkable,
+//! on a compact one "x of y checked"; and the Checklist part of a Note's
+//! editor.
+//!
+//! The editor's part lists the Lines to check; for who may change a
+//! Line, ⋮ and a right-click with Rename, Move up, Move down, putting it
+//! under the Line above or back to the top level, and Delete; a field and
+//! "Add Line" for anyone with a role in its Area, every line typed one
+//! Line, one starting with a space or a tab under the Line above;
+//! "Uncheck all" while one is checked; and "Back to a plain Note" for who
+//! may change the Note.
+
+use std::collections::HashSet;
+
+use egui::{Frame, Id, Key, Modifiers, RichText, Sense, TextEdit, Ui, WidgetInfo};
+use oldbrainfix_core::checklists::split_lines;
+use oldbrainfix_core::sent::SentLine;
+use oldbrainfix_core::{Checklist, Checklists, Line, Note, Store};
+
+use crate::app::{check, embossed, icon_button};
+use crate::icons;
+use crate::l10n::L10n;
+use crate::theme::Tones;
+
+/// A Line as it is drawn: its id, its text, whether it is in the group
+/// of the Line above it and whether it shows checked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShownLine {
+    pub id: String,
+    pub text: String,
+    pub in_group: bool,
+    pub checked: bool,
+}
+
+impl ShownLine {
+    fn of_line(line: &Line) -> ShownLine {
+        ShownLine {
+            id: line.id.clone(),
+            text: line.text.clone(),
+            in_group: line.in_group(),
+            checked: line.checked,
+        }
+    }
+
+    fn of_sent(line: &SentLine) -> ShownLine {
+        ShownLine {
+            id: line.id.clone(),
+            text: line.text.clone(),
+            in_group: line.indent,
+            checked: line.checked,
+        }
+    }
+}
+
+/// The Lines of `list` as they are drawn.
+pub fn shown_lines(list: &Checklist) -> Vec<ShownLine> {
+    list.lines.iter().map(ShownLine::of_line).collect()
+}
+
+/// The Lines of a Sent Item as they are drawn.
+pub fn sent_lines(lines: &[SentLine]) -> Vec<ShownLine> {
+    lines.iter().map(ShownLine::of_sent).collect()
+}
+
+/// What the menu of a Line does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineStep {
+    Rename,
+    Up,
+    Down,
+    Indent,
+    Outdent,
+    Delete,
+}
+
+/// Something asked of a Checklist, on a card or in the editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChecklistAction {
+    /// Makes the Note with this id a Checklist.
+    Make(String),
+    /// Turns the Checklist of the Note back into a plain Note.
+    ToPlain(String),
+    UncheckAll(String),
+    /// Checks the Line with this id, or unchecks it.
+    Check(String, bool),
+    /// Adds every line typed into the add field to the Note's Checklist.
+    Add(String),
+    /// A step of the menu of the Line with this id.
+    Step(String, LineStep),
+    /// Reads what the menu of the card of the Note with this id offers,
+    /// as it opens.
+    Menu(String),
+}
+
+/// The Checklist of the selected Note as its editor shows it.
+#[derive(Debug, Clone)]
+pub struct ChecklistShown {
+    pub list: Checklist,
+    /// Whether this Device may add Lines and check them.
+    pub checks: bool,
+    /// The Lines it may rename, delete, move and indent, by id.
+    pub editable: HashSet<String>,
+    /// Whether it may turn it back into a plain Note.
+    pub plain: bool,
+}
+
+/// Reads the Checklist of the Note `note`, or `None` while it is none;
+/// `changes` says whether this Device may change the Note.
+pub fn read(
+    store: &Store,
+    note: &Note,
+    changes: bool,
+) -> oldbrainfix_core::Result<Option<ChecklistShown>> {
+    let lists = Checklists::new(store);
+    let Some(list) = lists.by_note(&note.id)? else {
+        return Ok(None);
+    };
+    let mut editable = HashSet::new();
+    for line in &list.lines {
+        if lists.may_edit(&line.id)? {
+            editable.insert(line.id.clone());
+        }
+    }
+    Ok(Some(ChecklistShown {
+        checks: lists.may_check(&note.id)?,
+        editable,
+        plain: changes && note.text_editable,
+        list,
+    }))
+}
+
+/// What the menu of a Note's card offers of a Checklist (#120), read as
+/// it opens: making it one, unchecking all of its Lines and turning it
+/// back into a plain Note.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CardMenu {
+    pub note: String,
+    pub make: bool,
+    pub uncheck_all: bool,
+    pub to_plain: bool,
+}
+
+/// Reads what the card menu of `note` offers.
+pub fn card_menu(store: &Store, note: &Note) -> oldbrainfix_core::Result<CardMenu> {
+    let lists = Checklists::new(store);
+    let list = lists.by_note(&note.id)?;
+    let uncheck_all = match &list {
+        Some(list) => list.checked_count() > 0 && lists.may_check(&note.id)?,
+        None => false,
+    };
+    let to_plain = list.is_some() && note.text_editable && store.may_change(&note.id)?;
+    Ok(CardMenu {
+        note: note.id.clone(),
+        make: list.is_none() && lists.may_make(&note.id)?,
+        uncheck_all,
+        to_plain,
+    })
+}
+
+/// The Lines on the level of `line`: its group, or the top.
+fn level<'a>(list: &'a Checklist, line: &Line) -> Vec<&'a Line> {
+    match &line.parent {
+        Some(parent) => list.group_of(parent),
+        None => list.lines.iter().filter(|l| !l.in_group()).collect(),
+    }
+}
+
+/// The Line `line` goes before when it moves up, or `None` at the top of
+/// its level; and whether it can move down: Lines of a group move within
+/// it, Lines at the top past the next one with its group.
+fn neighbours(list: &Checklist, line: &Line) -> (Option<String>, bool) {
+    let level = level(list, line);
+    let Some(at) = level.iter().position(|l| l.id == line.id) else {
+        return (None, false);
+    };
+    let before = at.checked_sub(1).map(|i| level[i].id.clone());
+    (before, at + 1 < level.len())
+}
+
+/// The steps the menu of `line` offers, as `list` stands.
+pub fn steps(list: &Checklist, line: &Line) -> Vec<LineStep> {
+    let at = list.lines.iter().position(|l| l.id == line.id);
+    let (before, after) = neighbours(list, line);
+    let mut steps = vec![LineStep::Rename];
+    if before.is_some() {
+        steps.push(LineStep::Up);
+    }
+    if after {
+        steps.push(LineStep::Down);
+    }
+    if !line.in_group() && at.is_some_and(|at| at > 0) {
+        steps.push(LineStep::Indent);
+    }
+    if line.in_group() {
+        steps.push(LineStep::Outdent);
+    }
+    steps.push(LineStep::Delete);
+    steps
+}
+
+/// Moves `line` one place up on its level.
+pub fn move_up(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_core::Result<()> {
+    match neighbours(list, line).0 {
+        Some(before) => Checklists::new(store).move_line(&line.id, Some(&before)),
+        None => Ok(()),
+    }
+}
+
+/// Moves `line` one place down on its level: past the next Line of its
+/// group, or past the next Line at the top with that one's group.
+pub fn move_down(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_core::Result<()> {
+    let lists = Checklists::new(store);
+    let level = level(list, line);
+    let Some(at) = level.iter().position(|l| l.id == line.id) else {
+        return Ok(());
+    };
+    if at + 2 < level.len() {
+        return lists.move_line(&line.id, Some(&level[at + 2].id));
+    }
+    if !line.in_group() {
+        return lists.move_line(&line.id, None);
+    }
+    // Last but one of its group: after the group's last Line, under it
+    // again.
+    let Some(last) = level
+        .last()
+        .and_then(|last| list.lines.iter().position(|l| l.id == last.id))
+    else {
+        return Ok(());
+    };
+    let before = list.lines.get(last + 1).map(|l| l.id.clone());
+    lists.move_line(&line.id, before.as_deref())?;
+    lists.indent(&line.id, true)
+}
+
+/// Adds a Line to the Checklist of `note_id` for every line of `typed`
+/// that is not blank, one that starts with a space or a tab under the
+/// Line above; whether any was added.
+pub fn add_typed(store: &Store, note_id: &str, typed: &str) -> oldbrainfix_core::Result<bool> {
+    let lists = Checklists::new(store);
+    let rows: Vec<String> = split_lines(typed)
+        .into_iter()
+        .filter(|row| !row.trim().is_empty())
+        .collect();
+    for row in &rows {
+        let indent = row.starts_with(' ') || row.starts_with('\t');
+        lists.add(note_id, row, None, indent)?;
+    }
+    Ok(!rows.is_empty())
+}
+
+/// A Line's new text as the rename dialog took it: on one line, trimmed;
+/// `None` when nothing is left.
+pub fn renamed(text: &str) -> Option<String> {
+    let named = text
+        .split(['\r', '\n'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let named = named.trim();
+    (!named.is_empty()).then(|| named.to_string())
+}
+
+/// The label of a Line's ⋮.
+pub fn menu_label(t: &L10n, line: &str) -> String {
+    format!("{}: {line}", t.more())
+}
+
+/// The words of a step of a Line's menu.
+fn step_label(t: &L10n, step: LineStep) -> &'static str {
+    match step {
+        LineStep::Rename => t.rename(),
+        LineStep::Up => t.checklist_move_up(),
+        LineStep::Down => t.checklist_move_down(),
+        LineStep::Indent => t.checklist_indent(),
+        LineStep::Outdent => t.checklist_outdent(),
+        LineStep::Delete => t.delete(),
+    }
+}
+
+/// The menu of a Line, from its ⋮ and a right-click on it: the step
+/// clicked.
+fn line_menu(ui: &mut Ui, t: &L10n, steps: &[LineStep]) -> Option<LineStep> {
+    let text = ui.visuals().text_color();
+    let mut picked = None;
+    for step in steps {
+        if ui
+            .button(RichText::new(step_label(t, *step)).color(text))
+            .clicked()
+        {
+            picked = Some(*step);
+        }
+    }
+    picked
+}
+
+/// A Line's text, struck through and dimmed once checked.
+fn line_text(ui: &Ui, line: &ShownLine) -> RichText {
+    let words = RichText::new(&line.text).size(16.0);
+    if line.checked {
+        words.strikethrough().color(ui.visuals().weak_text_color())
+    } else {
+        words.color(ui.visuals().text_color())
+    }
+}
+
+/// The frame a group is drawn in, under its parent.
+fn group_frame(ui: &Ui) -> Frame {
+    let stroke = ui.visuals().weak_text_color().gamma_multiply(0.5);
+    Frame::NONE
+        .stroke(egui::Stroke::new(1.0, stroke))
+        .corner_radius(12.0)
+        .inner_margin(egui::Margin::same(4))
+}
+
+/// Draws `lines` one after another, each group as one frame under its
+/// parent, every Line by `row`.
+fn grouped(ui: &mut Ui, lines: &[ShownLine], row: &mut dyn FnMut(&mut Ui, &ShownLine)) {
+    let mut at = 0;
+    while at < lines.len() {
+        if !lines[at].in_group {
+            row(ui, &lines[at]);
+            at += 1;
+        }
+        let start = at;
+        while at < lines.len() && lines[at].in_group {
+            at += 1;
+        }
+        if start == at {
+            continue;
+        }
+        let group = &lines[start..at];
+        ui.horizontal(|ui| {
+            ui.add_space(20.0);
+            group_frame(ui).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    for line in group {
+                        row(ui, line);
+                    }
+                });
+            });
+        });
+    }
+}
+
+/// The Lines that have a menu, by id, and the steps the menu of each
+/// gives.
+pub type LineMenus<'a> = (&'a HashSet<String>, &'a dyn Fn(&str) -> Vec<LineStep>);
+
+/// The Lines of a Checklist, each with its checkbox, checkable with
+/// `checks`, and its text; with `menus`, the Lines whose ids it holds
+/// have ⋮ and a right-click with the steps `steps` gives each. What is
+/// asked goes to `actions`.
+pub fn lines(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &[ShownLine],
+    checks: bool,
+    menus: Option<LineMenus>,
+    actions: &mut Vec<ChecklistAction>,
+) {
+    let weak = ui.visuals().weak_text_color();
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 4.0;
+        grouped(ui, shown, &mut |ui, line| {
+            ui.horizontal(|ui| {
+                let toggled = ui
+                    .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
+                    .inner;
+                if toggled.clicked() {
+                    actions.push(ChecklistAction::Check(line.id.clone(), !line.checked));
+                }
+                let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
+                let room = if editable.is_some() {
+                    (ui.available_width() - 32.0).max(40.0)
+                } else {
+                    ui.available_width()
+                };
+                // Its words take the right-click where it has a menu.
+                let sense = if editable.is_some() {
+                    Sense::click()
+                } else {
+                    Sense::hover()
+                };
+                let words = ui
+                    .allocate_ui(egui::vec2(room, 0.0), |ui| {
+                        ui.add(egui::Label::new(line_text(ui, line)).sense(sense))
+                    })
+                    .inner;
+                let Some((_, steps)) = editable else {
+                    return;
+                };
+                let steps = steps(&line.id);
+                let mut picked = None;
+                words.context_menu(|ui| picked = picked.or(line_menu(ui, t, &steps)));
+                // ⋮ at the right edge, as on an Agenda row.
+                let more = ui
+                    .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak)
+                    })
+                    .inner;
+                egui::Popup::menu(&more).show(|ui| picked = picked.or(line_menu(ui, t, &steps)));
+                if let Some(step) = picked {
+                    actions.push(ChecklistAction::Step(line.id.clone(), step));
+                }
+            });
+        });
+    });
+}
+
+/// A Line's checkbox drawn on a card, where the card takes the clicks:
+/// its place, the Line's id, text and whether it shows checked.
+#[derive(Debug, Clone)]
+pub struct CardBox {
+    pub rect: egui::Rect,
+    pub line: ShownLine,
+}
+
+/// The Lines of a Checklist on a full card (#120), under its text, each
+/// checkbox only painted: the card lies over them, so [`card_checks`]
+/// takes their clicks once the card is.
+pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox> {
+    let mut boxes = Vec::new();
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 4.0;
+        grouped(ui, shown, &mut |ui, line| {
+            ui.horizontal(|ui| {
+                let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+                paint_box(ui, tones, rect, line.checked, false);
+                ui.add(egui::Label::new(line_text(ui, line)));
+                boxes.push(CardBox {
+                    rect,
+                    line: line.clone(),
+                });
+            });
+        });
+    });
+    boxes
+}
+
+fn paint_box(ui: &Ui, tones: Tones, rect: egui::Rect, checked: bool, hovered: bool) {
+    if hovered {
+        ui.painter()
+            .rect_filled(rect, 6.0, ui.visuals().widgets.hovered.weak_bg_fill);
+    }
+    let (icon, colour) = if checked {
+        (icons::CHECKED, tones.accent)
+    } else {
+        (icons::UNCHECKED, ui.visuals().text_color())
+    };
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, colour);
+}
+
+/// Takes the clicks on the checkboxes `boxes` of the card of the Note
+/// `note`, painted by [`card_lines`], checkable with `checks`: the Line
+/// clicked and whether it is checked now.
+pub fn card_checks(
+    ui: &mut Ui,
+    tones: Tones,
+    note: &str,
+    boxes: &[CardBox],
+    checks: bool,
+) -> Option<(String, bool)> {
+    let mut clicked = None;
+    let sense = if checks {
+        Sense::click()
+    } else {
+        Sense::hover()
+    };
+    for b in boxes {
+        let id = Id::new(("card line", note, &b.line.id));
+        let resp = ui.interact(b.rect, id, sense);
+        resp.widget_info(|| {
+            WidgetInfo::selected(
+                egui::WidgetType::Checkbox,
+                checks,
+                b.line.checked,
+                &b.line.text,
+            )
+        });
+        if checks && resp.hovered() && ui.is_rect_visible(b.rect) {
+            paint_box(ui, tones, b.rect, b.line.checked, true);
+        }
+        if resp.clicked() {
+            clicked = Some((b.line.id.clone(), !b.line.checked));
+        }
+        if checks {
+            resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+    }
+    clicked
+}
+
+/// How many Lines of `list` are checked, on a compact card.
+pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
+    let text = ui.visuals().text_color();
+    let said = t.checklist_count(list.checked_count() as i64, list.count() as i64);
+    ui.label(RichText::new(said).size(14.0).color(text));
+}
+
+/// The Checklist part of a Note's editor (#120), under its text: its
+/// Lines, the field `typed` to add Lines, and "Uncheck all" and "Back to
+/// a plain Note" as `shown` allows.
+pub fn section(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &ChecklistShown,
+    typed: &mut String,
+    actions: &mut Vec<ChecklistAction>,
+) {
+    let text = ui.visuals().text_color();
+    let list = &shown.list;
+    let note = &list.note_id;
+    embossed(ui, tones, false, None, |ui| {
+        ui.label(RichText::new(t.checklist_heading()).strong().color(text));
+        let lines_shown = shown_lines(list);
+        let steps = |id: &str| list.line(id).map(|l| steps(list, l)).unwrap_or_default();
+        lines(
+            ui,
+            (t, tones),
+            &lines_shown,
+            shown.checks,
+            Some((&shown.editable, &steps)),
+            actions,
+        );
+        if shown.checks {
+            let id = Id::new("checklist add");
+            if ui.memory(|m| m.has_focus(id))
+                && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
+                && !typed.trim().is_empty()
+            {
+                actions.push(ChecklistAction::Add(note.clone()));
+            }
+            ui.add(
+                TextEdit::multiline(typed)
+                    .id(id)
+                    .hint_text(t.checklist_new_line())
+                    .text_color(text)
+                    .desired_rows(1)
+                    .desired_width(f32::INFINITY),
+            );
+            let add = ui.add_enabled(
+                !typed.trim().is_empty(),
+                egui::Button::new(RichText::new(t.checklist_add_line()).color(text)),
+            );
+            if add.clicked() {
+                actions.push(ChecklistAction::Add(note.clone()));
+            }
+        }
+        let uncheck = shown.checks && list.checked_count() > 0;
+        if uncheck || shown.plain {
+            ui.horizontal_wrapped(|ui| {
+                if uncheck
+                    && ui
+                        .button(RichText::new(t.checklist_uncheck_all()).color(text))
+                        .clicked()
+                {
+                    actions.push(ChecklistAction::UncheckAll(note.clone()));
+                }
+                if shown.plain
+                    && ui
+                        .button(RichText::new(t.checklist_to_plain()).color(text))
+                        .clicked()
+                {
+                    actions.push(ChecklistAction::ToPlain(note.clone()));
+                }
+            });
+        }
+    });
+}
+
+/// The Checklist entries of a card's menu as `menu` offers them: the
+/// action clicked.
+pub fn card_menu_entries(ui: &mut Ui, t: &L10n, menu: &CardMenu) -> Option<ChecklistAction> {
+    let text = ui.visuals().text_color();
+    let note = &menu.note;
+    let entries = [
+        (
+            menu.make,
+            t.make_checklist(),
+            ChecklistAction::Make(note.clone()),
+        ),
+        (
+            menu.uncheck_all,
+            t.checklist_uncheck_all(),
+            ChecklistAction::UncheckAll(note.clone()),
+        ),
+        (
+            menu.to_plain,
+            t.checklist_to_plain(),
+            ChecklistAction::ToPlain(note.clone()),
+        ),
+    ];
+    let mut picked = None;
+    for (shown, label, action) in entries {
+        if shown && ui.button(RichText::new(label).color(text)).clicked() {
+            picked = Some(action);
+        }
+    }
+    picked
+}
+
+/// The Lines of a Sent Item's preview, to look at, not to check.
+pub fn preview(ui: &mut Ui, (t, tones): (&L10n, Tones), lines_sent: &[SentLine]) {
+    let mut ignored = Vec::new();
+    lines(
+        ui,
+        (t, tones),
+        &sent_lines(lines_sent),
+        false,
+        None,
+        &mut ignored,
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_renamed_line_is_one_trimmed_line_or_nothing() {
+        assert_eq!(renamed("  Milk \r\n oat ").as_deref(), Some("Milk   oat"));
+        assert_eq!(renamed(" \n "), None);
+        assert_eq!(renamed("Bread").as_deref(), Some("Bread"));
+    }
+}

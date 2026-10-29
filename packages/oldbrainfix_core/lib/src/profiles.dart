@@ -9,6 +9,7 @@ import 'package:meta/meta.dart';
 import 'area_keys.dart';
 import 'area_offers.dart';
 import 'backup.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
 import 'frogs.dart';

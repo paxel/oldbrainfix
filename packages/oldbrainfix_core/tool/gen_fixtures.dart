@@ -12,7 +12,9 @@
 /// what its lists and the Agenda's "Eat a frog" come to (`frogs.json`);
 /// the Tally scenario its fields, entries and charts, with the units
 /// converted, shown and read (`tallies.json`); the Session scenario its
-/// pools, picks and what is Done (`sessions.json`).
+/// pools, picks and what is Done (`sessions.json`); the Checklist
+/// scenario its Lines, what goes back into a plain Note's text, lines of
+/// text read as Lines and the keys that place them (`checklists.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -656,6 +658,64 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'checklists',
+    about:
+        'Checklists made from Notes: lines split at every line break, blank '
+        'ones skipped, indented ones under the line above at two levels at '
+        'most, marked ones checked; a Line of a group checked until its '
+        'parent shows checked, one unchecked again, a parent checked with '
+        'its group; Lines added at the end, at the top and into a group, '
+        'renamed, moved into a group and with their group to the end, '
+        'indented and back, a parent deleted with its group brought up, '
+        'one deleted and restored, and one placed by a key no app writes; '
+        '"Uncheck all", back to a plain Note and made again; an Unsorted '
+        'Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final lists = Checklists(store);
+      String line(String note, String text) =>
+          lists.byNote(note)!.lines.firstWhere((l) => l.text == text).id;
+      final trip = notes
+          .capture(
+            'Packing\r\nSocks\n  Blue\n\tRed\n\n✓ Passport\r   \nTent\n  ✓ Pegs',
+          )
+          .id;
+      lists.make(trip);
+      lists.check(line(trip, 'Blue'));
+      lists.check(line(trip, 'Red'));
+      lists.uncheck(line(trip, 'Blue'));
+      lists.check(line(trip, 'Tent'));
+      lists.add(trip, 'Torch');
+      lists.add(trip, 'Map', at: 0);
+      lists.add(trip, 'Green', at: 3, indent: true);
+      lists.rename(line(trip, 'Red'), 'Red socks');
+      lists.move(line(trip, 'Torch'), before: line(trip, 'Pegs'));
+      lists.move(line(trip, 'Socks'));
+      lists.indent(line(trip, 'Passport'));
+      lists.indent(line(trip, 'Passport'), under: false);
+      lists.delete(line(trip, 'Tent'));
+      final passport = line(trip, 'Passport');
+      lists.delete(passport);
+      lists.restore(passport);
+      final odd = 'line:${'f' * 32}';
+      store.append(odd, ChecklistKeys.type, ChecklistKeys.typeLine);
+      store.append(odd, ChecklistKeys.note, trip);
+      store.append(odd, ChecklistKeys.made, lists.byNote(trip)!.making);
+      store.append(odd, ChecklistKeys.text, StoredText.plain('Odd').encode());
+      store.append(odd, ChecklistKeys.order, 'é');
+      lists.add(trip, 'Last');
+      final shop = notes.capture('Shop\nOat milk\nEggs\n  Free range').id;
+      lists.make(shop);
+      lists.check(line(shop, 'Oat milk'));
+      lists.check(line(shop, 'Eggs'));
+      lists.uncheckAll(shop);
+      lists.check(line(shop, 'Free range'));
+      lists.toPlain(shop);
+      lists.make(shop);
+      notes.capture('Unsorted thought\nwith a second line');
+    },
+  ),
+  (
     name: 'sessions',
     about:
         'Sessions spawned with their Notes behind the scenes, picking from '
@@ -842,6 +902,98 @@ Map<String, Object?> _sessions(Store store) {
 /// entries of each, everyone's and the user's own, its removed entries,
 /// its charts by day, week, month and year on the European wall clock,
 /// and the units converted, shown and read.
+/// A Checklist as the fixtures list it.
+Map<String, Object?> _checklist(Checklist list) => {
+  'making': list.making,
+  'lines': [
+    for (final l in list.lines)
+      {
+        'id': l.id,
+        'text': l.text,
+        'checked': l.checked,
+        'checkedAt': l.checkedAt?.toIso8601String(),
+        'parent': l.parent,
+        'order': l.order,
+      },
+  ],
+  'checkedCount': list.checkedCount,
+  'count': list.count,
+};
+
+/// The lines of text the fixtures read as Lines: blanks, indents of
+/// every kind of white space, and marks.
+const _rows = [
+  '',
+  '   ',
+  'Socks',
+  '  Blue',
+  '\tRed',
+  ' \u00a0Nbsp',
+  '\u00a0Lead nbsp',
+  '\u2003Em space',
+  '\ufeffBom',
+  'Trailing \u3000',
+  '✓ Tent',
+  '  ✓ Pegs',
+  '✓',
+  '✓ ',
+  '✓x',
+  '✓  Two spaces',
+  '✓ ✓ Twice',
+];
+
+/// Each Checklist of [store] with its Lines, the one-pass read of them
+/// all, which Notes may become one, what each goes back to as a plain
+/// Note, and how lines of text and keys are read and made.
+Map<String, Object?> _checklists(Store store) {
+  final lists = Checklists(store);
+  final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
+  final keys = ['', 'V', 'Vz', 'z', 'zzz', '0V', 'Zy'];
+  final pairs = [
+    ['', 'V'],
+    ['', '1'],
+    ['', '0V'],
+    ['V', 'W'],
+    ['V', 'V05'],
+    ['V', 'X'],
+    ['VV', 'W'],
+    ['Vz', 'W'],
+    ['0', '01'],
+    ['y', 'z'],
+    ['yz', 'z'],
+    ['a', 'azzzV'],
+  ];
+  return {
+    'lists': {
+      for (final id in ids)
+        if (lists.byNote(id) case final list?) id: _checklist(list),
+    },
+    'ofNotes': [...lists.ofNotes(ids).keys],
+    'mayMake': {for (final id in ids) id: lists.mayMake(id)},
+    'plain': {
+      for (final id in ids)
+        if (lists.byNote(id) case final list?)
+          id: Checklists.plainText(Notes(store).byId(id)!.text, list),
+    },
+    'rows': [
+      for (final row in _rows)
+        switch (parseLine(row)) {
+          null => null,
+          final l => {'text': l.text, 'indent': l.indent, 'checked': l.checked},
+        },
+    ],
+    'split': splitLines('a\r\nb\rc\n\nd\r\r\n'),
+    'after': {for (final k in keys) k: LineOrder.after(k)},
+    'between': [
+      for (final [a, b] in pairs) [a, b, LineOrder.between(a, b)],
+    ],
+    'valid': {
+      for (final k in ['', 'V', 'V0', '0', 'a1', 'é', 'a-b', 'zz'])
+        k: LineOrder.isValid(k),
+    },
+  };
+}
+
 Map<String, Object?> _tallies(Store store) {
   final tallies = Tallies(store);
   String? number(double? value) => value == null || tallyMicro(value) == null
@@ -2169,10 +2321,22 @@ void _conflictsFixture(Directory root) {
         rule: Recurrence.parse('FREQ=DAILY'),
       ),
     );
+    final packing = Notes(host).capture('Packing\nSocks\n✓ Tent\nMap').id;
+    Checklists(host).make(packing);
+    String line(String text) =>
+        Checklists(host)
+            .byNote(packing)!
+            .lines
+            .firstWhere((l) => l.text == text)
+            .id;
+    final socks = line('Socks');
+    final tent = line('Tent');
+    final map = line('Map');
     _meet(joiner, host);
     // Offline on both: the same text, the same Area name and the same
     // schedule changed apart; the same value written on both; a Topic
-    // renamed on one side only.
+    // renamed on one side only; a Line renamed apart, and Lines checked
+    // and unchecked apart, the later one winning.
     Notes(joiner).edit(milk.id, 'Buy oat milk');
     Notes(host).edit(milk.id, 'Buy milk and eggs');
     Places(host).rename(house.id, 'House');
@@ -2196,6 +2360,14 @@ void _conflictsFixture(Directory root) {
     Notes(host).edit(mum.id, 'Call mum tonight');
     Notes(joiner).edit(mum.id, 'Call mum tonight');
     Places(joiner).rename(kitchen.id, 'Cooking');
+    Checklists(joiner).rename(socks, 'Wool socks');
+    Checklists(host).rename(socks, 'Thick socks');
+    Checklists(host).uncheck(tent);
+    Checklists(joiner).uncheck(tent);
+    Checklists(joiner).check(tent);
+    Checklists(host).check(map);
+    Checklists(joiner).check(map);
+    Checklists(joiner).uncheck(map);
 
     _writeDevice(host, out, 'host');
     _writeDevice(joiner, out, 'joiner');
@@ -2235,13 +2407,16 @@ void _conflictsFixture(Directory root) {
     _meet(joiner, host);
     final expected = _expected(host)..remove('device');
     final joined = _expected(joiner)..remove('device');
+    final list = _checklist(Checklists(host).byNote(packing)!);
     if (jsonEncode(expected) != jsonEncode(joined) ||
+        jsonEncode(list) !=
+            jsonEncode(_checklist(Checklists(joiner).byNote(packing)!)) ||
         host.conflicts().isNotEmpty) {
       throw StateError('the picks of the conflicts fixture did not land');
     }
     _write(
       File('${out.path}/expected.json'),
-      '${_json.convert({'now': _held?.toIso8601String(), 'conflicts': found, 'picks': picks, 'after': expected})}\n',
+      '${_json.convert({'now': _held?.toIso8601String(), 'conflicts': found, 'picks': picks, 'after': expected, 'checklist': list})}\n',
     );
   } finally {
     host.close();
@@ -2974,6 +3149,146 @@ void _sentFixture(Directory root) {
           'stale': stale,
         },
         'cancel': {'version': toCancel.item.version, 'state': toCancel.state.name, 'trust': toCancel.trust.name, ..._received(ben, accepted), 'elsewhere': elsewhere, 'forged': 'notFromSender', 'impostor': 'notASentItem'},
+      })}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+  }
+}
+
+/// Ada sends a Checklist to Ben, who accepts it and makes it his own;
+/// she changes it, then turns it back into a plain Note, and he applies
+/// both updates (ADR 0030). Everything after her log is at held clocks.
+void _sentChecklistFixture(Directory root) {
+  final out = Directory('${root.path}/sent-checklist')
+    ..createSync(recursive: true);
+  final ada = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ben');
+  try {
+    final note = Notes(ada).capture('Packing\nSocks\n  Blue\n✓ Tent\nMap').id;
+    Checklists(ada).make(note);
+    _write(File('${out.path}/sender.jsonl'), _log(ada));
+    ada.applyProfileDefaults(name: 'Ada');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert([
+        for (final (key, value) in ada.localSettingsWithPrefix('profile')) [key, value],
+      ])}\n',
+    );
+    String line(Store store, String note, String text) =>
+        Checklists(store)
+            .byNote(note)!
+            .lines
+            .firstWhere((l) => l.text == text)
+            .id;
+    Map<String, Object?> changesOf(SentItemChanges c) => {
+      'makesChecklist': c.makesChecklist,
+      'makesPlain': c.makesPlain,
+      'linesAdded': [
+        for (final l in c.linesAdded)
+          {
+            'id': l.id,
+            'text': l.text,
+            'indent': l.indent,
+            'checked': l.checked,
+          },
+      ],
+      'linesRenamed': [
+        for (final r in c.linesRenamed) [r.line, r.before, r.after],
+      ],
+      'linesRemoved': [for (final l in c.linesRemoved) l.id],
+      'textBefore': c.textBefore,
+    };
+    Map<String, Object?> readOf(Store store, String id) => {
+      'text': Notes(store).byId(id)!.text,
+      'unsorted': Notes(store).byId(id)!.isUnsorted,
+      'list': switch (Checklists(store).byNote(id)) {
+        final list? => _checklist(list),
+        null => null,
+      },
+    };
+
+    var ids = 0xa00;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    _held = DateTime.utc(2026, 1, 3, 12);
+    var mark = ada.currentSeq();
+    final item = sentItemOf(ada, note);
+    _writeAfter(ada, mark, File('${out.path}/sent.jsonl'));
+    final file = encodeSentItem(item, ada.signingKey);
+    File('${out.path}/checklist.$sentItemExtension').writeAsBytesSync(file);
+
+    ids = 0xb00;
+    _held = DateTime.utc(2026, 1, 4, 18);
+    mark = ben.currentSeq();
+    final opened = openSentItem(ben, file);
+    final got =
+        acceptSentItem(ben, opened.item) ??
+        (throw StateError('Ben did not accept it'));
+    _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
+    final first = readOf(ben, got);
+
+    ids = 0xc00;
+    _held = DateTime.utc(2026, 1, 5, 9);
+    mark = ben.currentSeq();
+    Checklists(ben).check(line(ben, got, 'Socks'));
+    Checklists(ben).add(got, 'Torch');
+    _writeAfter(ben, mark, File('${out.path}/receiver.jsonl'));
+
+    ids = 0xd00;
+    _held = DateTime.utc(2026, 1, 6, 10);
+    mark = ada.currentSeq();
+    Checklists(ada).rename(line(ada, note, 'Blue'), 'Blue socks');
+    Checklists(ada).delete(line(ada, note, 'Tent'));
+    Checklists(ada).add(note, 'Pegs', indent: true);
+    _writeAfter(ada, mark, File('${out.path}/changed.jsonl'));
+    _held = DateTime.utc(2026, 1, 6, 11);
+    mark = ada.currentSeq();
+    final update = encodeSentItem(sentItemOf(ada, note), ada.signingKey);
+    _writeAfter(ada, mark, File('${out.path}/update.jsonl'));
+    File('${out.path}/update.$sentItemExtension').writeAsBytesSync(update);
+
+    ids = 0xe00;
+    _held = DateTime.utc(2026, 1, 7, 8);
+    final toUpdate = openSentItem(ben, update);
+    final changes = toUpdate.changes ?? (throw StateError('no update'));
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toUpdate.item);
+    _writeAfter(ben, mark, File('${out.path}/updated.jsonl'));
+    final second = readOf(ben, got);
+
+    ids = 0xf00;
+    _held = DateTime.utc(2026, 1, 8, 7);
+    mark = ada.currentSeq();
+    Checklists(ada).toPlain(note);
+    final plain = encodeSentItem(sentItemOf(ada, note), ada.signingKey);
+    _writeAfter(ada, mark, File('${out.path}/plain.jsonl'));
+    File('${out.path}/plain.$sentItemExtension').writeAsBytesSync(plain);
+
+    ids = 0x1000;
+    _held = DateTime.utc(2026, 1, 8, 12);
+    final toPlain = openSentItem(ben, plain);
+    final plainChanges = toPlain.changes ?? (throw StateError('no update'));
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toPlain.item);
+    _writeAfter(ben, mark, File('${out.path}/plained.jsonl'));
+    final third = readOf(ben, got);
+
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'lines': [
+          for (final l in opened.item.lines ?? const <SentLine>[]) {'id': l.id, 'text': l.text, 'indent': l.indent, 'checked': l.checked},
+        ],
+        'accepted': got,
+        'first': first,
+        'update': changesOf(changes),
+        'second': second,
+        'plain': changesOf(plainChanges),
+        'third': third,
       })}\n',
     );
   } finally {
@@ -5043,6 +5358,24 @@ Future<void> main(List<String> args) async {
     'same clock, and the known units and a typed one converted both ways, '
     'shown and read in both systems, numbers kept and read back, and the '
     'system of a few regions.\n'
+    '- `checklists/checklists.json`: each Checklist of the `checklists` '
+    'log with its Lines in the order they show, their parents, what shows '
+    'checked and their keys, the one-pass read of them, which Notes may '
+    'become one, the text each goes back to as a plain Note, lines of text '
+    'read as Lines, a text split at its line breaks, and keys made after '
+    'and between others and told valid or not.\n'
+    '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
+    '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
+    'wrote (`sent.jsonl`, ids counted from 0xa01, at held clocks), the '
+    'file in format 2 (`checklist.$sentItemExtension`), what Ben\'s '
+    'accepting wrote (`accepted.jsonl`, from 0xb01); Ben checks a Line '
+    'and adds one (`receiver.jsonl`, from 0xc01); Ada renames, deletes and '
+    'adds Lines (`changed.jsonl`, from 0xd01) and sends the update '
+    '(`update.jsonl`, `update.$sentItemExtension`), which Ben applies '
+    '(`updated.jsonl`, from 0xe01); Ada turns it back into a plain Note '
+    'and sends that (`plain.jsonl`, `plain.$sentItemExtension`), which Ben '
+    'applies (`plained.jsonl`, from 0x1001); what he reads and the changes '
+    'at each step (`expected.json`).\n'
     '- `sessions/sessions.json`: each Session of the `sessions` log with '
     'its pool, counts and rule, the Tallies it picks from and may pick, '
     'its Routine with what is Done, from entries too, and today\'s '
@@ -5067,11 +5400,13 @@ Future<void> main(List<String> args) async {
     'still had the defaults (`profile.json`), and what both read after '
     'the joiner took it in (`expected.json`).\n'
     '- `conflicts/`: two Devices that met once, then edited the same Note '
-    'text, Area name and Routine schedule apart, wrote the same value on '
-    'both sides and renamed a Topic on one side only: their logs, the '
+    'text, Area name, Routine schedule and Checklist Line apart, wrote the '
+    'same value on both sides, renamed a Topic on one side only and checked '
+    'and unchecked Lines apart: their logs, the '
     'session between them, the Conflicts both find (`expected.json`), the '
     'host keeping the older version of each (`picks.jsonl`, at the '
-    'held clock), and what both read after a second session.\n'
+    'held clock), and what both read after a second session, the '
+    'Checklist with the later check or uncheck of each Line among it.\n'
     '- `crypto.json`: messages sealed with XChaCha20-Poly1305 under given '
     'keys, nonces and what they are bound to; a key\'s id; a blob\'s name '
     'in the shared folder.\n'
@@ -5254,6 +5589,7 @@ Future<void> main(List<String> args) async {
   await _bundle(root);
   await _sharedFixture(root);
   _sentFixture(root);
+  _sentChecklistFixture(root);
   await _backupFixture(root);
   _profilesFixture(root);
   _cardsFixture(root);
@@ -5300,6 +5636,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/tallies.json'),
           '${_json.convert(_tallies(store))}\n',
+        );
+      }
+      if (store.entitiesOfType(ChecklistKeys.typeLine).isNotEmpty) {
+        _write(
+          File('${out.path}/checklists.json'),
+          '${_json.convert(_checklists(store))}\n',
         );
       }
       index.writeln('- `${scenario.name}`: ${scenario.about}');

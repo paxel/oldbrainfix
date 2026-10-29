@@ -331,6 +331,8 @@ void main() {
         entry('routine:ab12', 'done@2026-03-01', null),
         entry('frog:ab12', 'done', '2026-03-01T08:00:00.000Z'),
         entry('frog:ab12', 'done', null),
+        entry('line:ab12', 'checked', '2026-03-01T08:00:00.000Z'),
+        entry('line:ab12', 'checked', null),
         entry('area:starter-household', 'role:ab12', null),
         entry(
           'area:ab12',
@@ -362,6 +364,10 @@ void main() {
         entry('frog:ab12', 'trashed', '2026-03-01T08:00:00.000Z'),
         entry('frog:ab12', r'$type', 'frog'),
         entry('frog:Rude words', 'done', null),
+        entry('line:ab12', 'checked', 'Rude words'),
+        entry('line:ab12', 'text', '{"format":"plain","text":"Rude"}'),
+        entry('line:ab12', r'$type', 'line'),
+        entry('line:Rude words', 'checked', null),
         entry(
           'area:ab12',
           'role:ab12',

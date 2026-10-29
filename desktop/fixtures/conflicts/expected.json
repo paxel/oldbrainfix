@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:35.000Z",
+  "now": "2026-01-02T10:01:16.000Z",
   "conflicts": [
     {
       "entity": "area:00000000000000000000000000000003",
@@ -10,17 +10,41 @@
         {
           "entry": "c945cbf2a5602002141e2fb9d17054d6:5",
           "device": "c945cbf2a5602002141e2fb9d17054d6",
-          "recorded": "2026-01-01T10:00:30.000Z",
+          "recorded": "2026-01-01T10:00:57.000Z",
           "values": {
             "name": "Home"
           }
         },
         {
-          "entry": "65b60673d6ed884bf01c2c222d82ada0:19",
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:41",
           "device": "65b60673d6ed884bf01c2c222d82ada0",
-          "recorded": "2026-01-01T10:00:29.000Z",
+          "recorded": "2026-01-01T10:00:56.000Z",
           "values": {
             "name": "House"
+          }
+        }
+      ]
+    },
+    {
+      "entity": "line:00000000000000000000000000000009",
+      "unit": "text",
+      "type": "line",
+      "resolvable": true,
+      "versions": [
+        {
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:44",
+          "device": "65b60673d6ed884bf01c2c222d82ada0",
+          "recorded": "2026-01-01T10:01:04.000Z",
+          "values": {
+            "text": "{\"format\":\"plain\",\"text\":\"Thick socks\"}"
+          }
+        },
+        {
+          "entry": "c945cbf2a5602002141e2fb9d17054d6:9",
+          "device": "c945cbf2a5602002141e2fb9d17054d6",
+          "recorded": "2026-01-01T10:01:03.000Z",
+          "values": {
+            "text": "{\"format\":\"plain\",\"text\":\"Wool socks\"}"
           }
         }
       ]
@@ -32,9 +56,9 @@
       "resolvable": true,
       "versions": [
         {
-          "entry": "65b60673d6ed884bf01c2c222d82ada0:18",
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:40",
           "device": "65b60673d6ed884bf01c2c222d82ada0",
-          "recorded": "2026-01-01T10:00:28.000Z",
+          "recorded": "2026-01-01T10:00:55.000Z",
           "values": {
             "text": "{\"format\":\"plain\",\"text\":\"Buy milk and eggs\"}"
           }
@@ -42,7 +66,7 @@
         {
           "entry": "c945cbf2a5602002141e2fb9d17054d6:4",
           "device": "c945cbf2a5602002141e2fb9d17054d6",
-          "recorded": "2026-01-01T10:00:27.000Z",
+          "recorded": "2026-01-01T10:00:54.000Z",
           "values": {
             "text": "{\"format\":\"plain\",\"text\":\"Buy oat milk\"}"
           }
@@ -58,7 +82,7 @@
         {
           "entry": "c945cbf2a5602002141e2fb9d17054d6:6",
           "device": "c945cbf2a5602002141e2fb9d17054d6",
-          "recorded": "2026-01-01T10:00:32.000Z",
+          "recorded": "2026-01-01T10:00:59.000Z",
           "values": {
             "start": "2026-01-05",
             "times": "08:00",
@@ -66,9 +90,9 @@
           }
         },
         {
-          "entry": "65b60673d6ed884bf01c2c222d82ada0:20",
+          "entry": "65b60673d6ed884bf01c2c222d82ada0:42",
           "device": "65b60673d6ed884bf01c2c222d82ada0",
-          "recorded": "2026-01-01T10:00:31.000Z",
+          "recorded": "2026-01-01T10:00:58.000Z",
           "values": {
             "start": "2026-01-05",
             "times": "09:00",
@@ -85,6 +109,11 @@
       1
     ],
     [
+      "line:00000000000000000000000000000009",
+      "text",
+      1
+    ],
+    [
       "note:00000000000000000000000000000001",
       "text",
       1
@@ -96,7 +125,7 @@
     ]
   ],
   "after": {
-    "now": "2026-01-02T10:00:35.000Z",
+    "now": "2026-01-02T10:01:16.000Z",
     "areas": [
       {
         "id": "area:00000000000000000000000000000003",
@@ -204,9 +233,40 @@
         "removedTranscripts": [],
         "removedPhotoTexts": [],
         "wordless": "photo"
+      },
+      {
+        "id": "note:00000000000000000000000000000007",
+        "text": "Packing",
+        "textFormat": "plain",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:25.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "place": null,
+        "importance": "normal",
+        "trashed": null,
+        "mergedInto": null,
+        "spawned": true,
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": [],
+        "wordless": "photo"
       }
     ],
     "all": [
+      "note:00000000000000000000000000000007",
       "note:00000000000000000000000000000005",
       "note:00000000000000000000000000000002",
       "note:00000000000000000000000000000001"
@@ -221,6 +281,7 @@
       "topic:00000000000000000000000000000004": []
     },
     "sections": {
+      "note:00000000000000000000000000000007": [],
       "note:00000000000000000000000000000005": [],
       "note:00000000000000000000000000000002": [],
       "note:00000000000000000000000000000001": []
@@ -230,6 +291,7 @@
     "removable": {},
     "search": {
       "": [
+        "note:00000000000000000000000000000007",
         "note:00000000000000000000000000000005",
         "note:00000000000000000000000000000002",
         "note:00000000000000000000000000000001"
@@ -244,7 +306,9 @@
       "müller": [],
       "called": [],
       "loop": [],
-      " e ": [],
+      " e ": [
+        "note:00000000000000000000000000000007"
+      ],
       "heading": [],
       "format": [],
       "4711": []
@@ -254,5 +318,36 @@
       "topic:00000000000000000000000000000004": []
     },
     "conflicts": []
+  },
+  "checklist": {
+    "making": "00000000000000000000000000000008",
+    "lines": [
+      {
+        "id": "line:00000000000000000000000000000009",
+        "text": "Wool socks",
+        "checked": false,
+        "checkedAt": null,
+        "parent": null,
+        "order": "V"
+      },
+      {
+        "id": "line:0000000000000000000000000000000a",
+        "text": "Tent",
+        "checked": true,
+        "checkedAt": "2026-01-01T10:01:09.000Z",
+        "parent": null,
+        "order": "W"
+      },
+      {
+        "id": "line:0000000000000000000000000000000b",
+        "text": "Map",
+        "checked": false,
+        "checkedAt": null,
+        "parent": null,
+        "order": "X"
+      }
+    ],
+    "checkedCount": 1,
+    "count": 3
   }
 }

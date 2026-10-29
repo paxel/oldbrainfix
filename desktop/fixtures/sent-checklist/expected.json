@@ -1,0 +1,178 @@
+{
+  "lines": [
+    {
+      "id": "line:00000000000000000000000000000003",
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "id": "line:00000000000000000000000000000004",
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "id": "line:00000000000000000000000000000005",
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "id": "line:00000000000000000000000000000006",
+      "text": "Map",
+      "indent": false,
+      "checked": false
+    }
+  ],
+  "accepted": "note:00000000000000000000000000000b01",
+  "first": {
+    "text": "Packing",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000b03",
+          "text": "Socks",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000b04",
+          "text": "Blue",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000b03",
+          "order": "W"
+        },
+        {
+          "id": "line:00000000000000000000000000000b05",
+          "text": "Tent",
+          "checked": true,
+          "checkedAt": "2026-01-04T18:00:00.000Z",
+          "parent": null,
+          "order": "X"
+        },
+        {
+          "id": "line:00000000000000000000000000000b06",
+          "text": "Map",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "Y"
+        }
+      ],
+      "checkedCount": 1,
+      "count": 4
+    }
+  },
+  "update": {
+    "makesChecklist": false,
+    "makesPlain": false,
+    "linesAdded": [
+      {
+        "id": "line:00000000000000000000000000000d01",
+        "text": "Pegs",
+        "indent": true,
+        "checked": false
+      }
+    ],
+    "linesRenamed": [
+      [
+        "line:00000000000000000000000000000b04",
+        "Blue",
+        "Blue socks"
+      ]
+    ],
+    "linesRemoved": [
+      "line:00000000000000000000000000000b05"
+    ],
+    "textBefore": null
+  },
+  "second": {
+    "text": "Packing",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000b03",
+          "text": "Socks",
+          "checked": true,
+          "checkedAt": "2026-01-05T09:00:00.000Z",
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000b04",
+          "text": "Blue socks",
+          "checked": true,
+          "checkedAt": "2026-01-05T09:00:00.000Z",
+          "parent": "line:00000000000000000000000000000b03",
+          "order": "W"
+        },
+        {
+          "id": "line:00000000000000000000000000000b06",
+          "text": "Map",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "Y"
+        },
+        {
+          "id": "line:00000000000000000000000000000c01",
+          "text": "Torch",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "Z"
+        },
+        {
+          "id": "line:00000000000000000000000000000e01",
+          "text": "Pegs",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000c01",
+          "order": "a"
+        }
+      ],
+      "checkedCount": 2,
+      "count": 5
+    }
+  },
+  "plain": {
+    "makesChecklist": false,
+    "makesPlain": false,
+    "linesAdded": [],
+    "linesRenamed": [],
+    "linesRemoved": [
+      "line:00000000000000000000000000000b03",
+      "line:00000000000000000000000000000b04",
+      "line:00000000000000000000000000000b06",
+      "line:00000000000000000000000000000e01"
+    ],
+    "textBefore": "Packing"
+  },
+  "third": {
+    "text": "Packing\nSocks\n  Blue socks\nMap\n  Pegs",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000c01",
+          "text": "Torch",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "Z"
+        }
+      ],
+      "checkedCount": 0,
+      "count": 1
+    }
+  }
+}

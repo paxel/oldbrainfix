@@ -1042,6 +1042,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 ),
                 full: _unfoldedId == captured.note.id,
                 sections: () => widget.notes.sections(captured.note.id),
+                checklist: (
+                  read: () =>
+                      Checklists(widget.notes.store).byNote(captured.note.id),
+                  lists: Checklists(widget.notes.store),
+                ),
                 onTap: _unfoldedId == captured.note.id
                     ? null
                     : () => setState(() => _unfoldedId = captured.note.id),

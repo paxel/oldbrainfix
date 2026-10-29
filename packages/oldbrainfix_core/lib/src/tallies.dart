@@ -1,3 +1,4 @@
+import 'checklists.dart';
 import 'notes.dart';
 import 'profiles.dart';
 import 'schedule.dart';
@@ -215,7 +216,8 @@ class Tallies {
 
   /// Adds a field to the Note [noteId], which makes it a Tally the first
   /// time and takes it out of Unsorted; returns the field's id. [target]
-  /// is in the base unit; [rule] defaults by the kind of [unit].
+  /// is in the base unit; [rule] defaults by the kind of [unit]. A Note
+  /// that is a list, such as a Checklist, is never a Tally too.
   String addField(
     String noteId, {
     required String name,
@@ -226,6 +228,9 @@ class Tallies {
     final note = Notes(store).byId(noteId);
     if (note == null || note.isTrashed || note.isMerged) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
+    }
+    if (parseListKind(store.current(noteId, ChecklistKeys.kind)) != null) {
+      throw StateError('$noteId is a list');
     }
     if (!store.mayChange(noteId)) {
       throw StateError('may not change $noteId');

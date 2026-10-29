@@ -7,9 +7,9 @@
 //! #51). The receiver previews it and accepts it into Unsorted, keeping
 //! the Profile, or declines and nothing is kept.
 //!
-//! What travels is the Note's text, the texts of its Sections and the
-//! schedules of its Routines and Reminders; never its Capture Context,
-//! photos or voice recordings.
+//! What travels is the Note's text, the texts of its Sections, the
+//! schedules of its Routines and Reminders and the Lines of its
+//! Checklist; never its Capture Context, photos or voice recordings.
 
 use std::collections::HashMap;
 
@@ -19,6 +19,9 @@ use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
 
 use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of, wrap_key, x25519};
+use crate::checklists::{
+    Checklists, Line, NewLine, keys as checklist_keys, order as line_order, write_line,
+};
 use crate::entry::{dart_iso, parse_time};
 use crate::keys::{AREA_KEY_BYTES, SEAL_NONCE_BYTES, seal, unseal};
 use crate::notes::keys as note_keys;
@@ -28,7 +31,7 @@ use crate::routines::keys as routine_keys;
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
 use crate::store::{ACCEPTED_PENDING_PREFIX, Fields, Store};
 use crate::text_format::{self, StoredText};
-use crate::{Error, Notes, Result, Routine, Routines, Schedule};
+use crate::{Error, Notes, Result, Routine, Routines, Schedule, Tallies};
 
 /// The file ending of a Sent Item.
 pub const EXTENSION: &str = "oldbrain";
@@ -40,11 +43,15 @@ pub const MIME_TYPE: &str = "application/vnd.oldbrainfix.item";
 /// never written (ADR 0019).
 pub const FORMAT: i64 = 1;
 
-/// Whether `json` is in the format this version reads.
+/// The format of a file whose Note is a Checklist: a version that does
+/// not know Lines refuses it rather than keep its text alone (ADR 0030).
+pub const LIST_FORMAT: i64 = 2;
+
+/// Whether `json` is in a format this version reads.
 fn in_format(json: &Value) -> bool {
     match json.get("format") {
         None => true,
-        Some(format) => format.as_i64() == Some(FORMAT),
+        Some(format) => matches!(format.as_i64(), Some(FORMAT | LIST_FORMAT)),
     }
 }
 
@@ -99,6 +106,16 @@ pub struct SentRoutine {
     pub schedule: Schedule,
 }
 
+/// A Line of a Sent Item's Checklist: the sender's id for it, its text,
+/// whether it is under the Line above and whether it shows checked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SentLine {
+    pub id: String,
+    pub text: String,
+    pub indent: bool,
+    pub checked: bool,
+}
+
 /// What a Sent Item holds, as signed.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SentItem {
@@ -118,6 +135,9 @@ pub struct SentItem {
     pub text_version: i64,
     pub sections: Vec<SentSection>,
     pub routines: Vec<SentRoutine>,
+    /// The Lines of the Note's Checklist, in the order they show; `None`
+    /// for a Note that is none.
+    pub lines: Option<Vec<SentLine>>,
 }
 
 /// Builds a JSON object in key order, the same with or without
@@ -164,11 +184,29 @@ impl SentItem {
                 object(pairs)
             })
             .collect();
-        let mut note = vec![
-            ("format", json!(self.text_format)),
+        let mut note = vec![("format", json!(self.text_format))];
+        if let Some(lines) = &self.lines {
+            let lines: Vec<Value> = lines
+                .iter()
+                .map(|l| {
+                    let mut pairs = Vec::new();
+                    if l.checked {
+                        pairs.push(("checked", json!(true)));
+                    }
+                    pairs.push(("id", json!(l.id)));
+                    if l.indent {
+                        pairs.push(("indent", json!(true)));
+                    }
+                    pairs.push(("text", json!(l.text)));
+                    object(pairs)
+                })
+                .collect();
+            note.push(("lines", Value::Array(lines)));
+        }
+        note.extend([
             ("sections", Value::Array(sections)),
             ("text", json!(self.text)),
-        ];
+        ]);
         if self.text_version != text_format::VERSION {
             note.push(("v", json!(self.text_version)));
         }
@@ -241,6 +279,10 @@ impl SentItem {
                 schedule: Routines::schedule_of(&Fields::new(fields))?,
             });
         }
+        let lines = match note.get("lines") {
+            None => None,
+            Some(lines) => Some(sent_lines(lines)?),
+        };
         Some(SentItem {
             id: id.to_string(),
             version,
@@ -252,8 +294,28 @@ impl SentItem {
             text_version: text_version_of(note)?,
             sections,
             routines,
+            lines,
         })
     }
+}
+
+/// The Lines `json` holds; `None` when they are no Lines.
+fn sent_lines(json: &Value) -> Option<Vec<SentLine>> {
+    let flag = |l: &Value, key: &str| match l.get(key) {
+        None | Some(Value::Null) => Some(false),
+        Some(Value::Bool(b)) => Some(*b),
+        Some(_) => None,
+    };
+    let mut out = Vec::new();
+    for l in json.as_array()? {
+        out.push(SentLine {
+            id: l.get("id")?.as_str()?.to_string(),
+            text: l.get("text")?.as_str()?.to_string(),
+            indent: flag(l, "indent")?,
+            checked: flag(l, "checked")?,
+        });
+    }
+    Some(out)
 }
 
 /// The format a text of `json` says it is in: plain when it says none,
@@ -428,6 +490,17 @@ impl Store {
         }
         let mut routines = Routines::new(self).of_note(note_id)?;
         routines.sort_by(|a, b| a.id.cmp(&b.id));
+        let lines = Checklists::new(self).by_note(note_id)?.map(|list| {
+            list.lines
+                .iter()
+                .map(|l| SentLine {
+                    id: l.id.clone(),
+                    text: l.text.clone(),
+                    indent: l.in_group(),
+                    checked: l.checked,
+                })
+                .collect()
+        });
         Ok(SentItem {
             id,
             version,
@@ -455,6 +528,7 @@ impl Store {
                     schedule: r.schedule,
                 })
                 .collect(),
+            lines,
         })
     }
 
@@ -728,7 +802,11 @@ impl Store {
     /// sender's Routines and Reminders, known by the sender's id for each,
     /// rescheduled, added or taken away. Those the receiver put in the
     /// trash on their own stay there; when the Note is in the trash
-    /// (`restores`) those that went with it count.
+    /// (`restores`) those that went with it count. The sender's Lines,
+    /// known by the sender's id for each, are added, renamed when the
+    /// sender changed their text since, or taken away; the Note follows
+    /// the sender into a Checklist, and out of one once no Line of the
+    /// receiver's own is left. A Tally here takes none of it.
     fn changes(&self, note_id: &str, item: &SentItem, restores: bool) -> Result<SentItemChanges> {
         let notes = Notes::new(self);
         let text = StoredText::read(self.current(note_id, note_keys::TEXT)?.as_deref());
@@ -787,6 +865,7 @@ impl Store {
             .filter(|(from, r)| !item.routines.iter().any(|s| s.id == *from) && live(r))
             .map(|(_, r)| r)
             .collect();
+        let lists = self.list_changes(note_id, item)?;
         Ok(SentItemChanges {
             text_before: changed.then(|| text.text.clone()),
             text_edited: changed && sent.as_ref().is_some_and(|s| *s != text),
@@ -800,11 +879,76 @@ impl Store {
             routines_added,
             routines_removed,
             restores,
+            makes_checklist: lists.makes_checklist,
+            makes_plain: lists.makes_plain,
+            lines_added: lists.lines_added,
+            lines_renamed: lists.lines_renamed,
+            lines_removed: lists.lines_removed,
         })
     }
 
-    /// The text the sender last sent for the Note `note_id`: the newest
-    /// text written with its link, as accepting and applying write both
+    /// What the update `item` changes on the Checklist of the Note
+    /// `note_id`, as [`Store::changes`] says; only the parts of a
+    /// Checklist are set.
+    fn list_changes(&self, note_id: &str, item: &SentItem) -> Result<SentItemChanges> {
+        if Tallies::new(self).is_tally(note_id)? {
+            return Ok(SentItemChanges::default());
+        }
+        let here = Checklists::new(self).by_note(note_id)?;
+        let mut theirs: Vec<(String, Line)> = Vec::new();
+        let mut own = HashMap::new();
+        for l in here.iter().flat_map(|list| list.lines.iter()) {
+            if let Some(from) = self.own_current(&l.id, keys::RECEIVED, &mut own)?
+                && !theirs.iter().any(|(f, _)| *f == from)
+            {
+                theirs.push((from, l.clone()));
+            }
+        }
+        let Some(lines) = &item.lines else {
+            let Some(here) = here else {
+                return Ok(SentItemChanges::default());
+            };
+            let removed: Vec<Line> = theirs.into_iter().map(|(_, l)| l).collect();
+            return Ok(SentItemChanges {
+                makes_plain: !removed.is_empty() && removed.len() == here.lines.len(),
+                lines_removed: removed,
+                ..SentItemChanges::default()
+            });
+        };
+        let mut added = Vec::new();
+        let mut renamed = Vec::new();
+        for l in lines {
+            let Some((_, held)) = theirs.iter().find(|(f, _)| *f == l.id) else {
+                added.push(l.clone());
+                continue;
+            };
+            let incoming = StoredText::plain(&l.text);
+            let current =
+                StoredText::read(self.current(&held.id, checklist_keys::TEXT)?.as_deref());
+            let sent = self.last_sent_text(&held.id)?;
+            if incoming != current && sent.as_ref().is_none_or(|s| incoming != *s) {
+                renamed.push(SentRename {
+                    line: held.id.clone(),
+                    before: held.text.clone(),
+                    after: l.text.clone(),
+                });
+            }
+        }
+        Ok(SentItemChanges {
+            makes_checklist: here.is_none(),
+            lines_added: added,
+            lines_renamed: renamed,
+            lines_removed: theirs
+                .into_iter()
+                .filter(|(from, _)| !lines.iter().any(|l| l.id == *from))
+                .map(|(_, l)| l)
+                .collect(),
+            ..SentItemChanges::default()
+        })
+    }
+
+    /// The text the sender last sent for the Note or Line `note_id`: the
+    /// newest text written with its link, as accepting and applying write both
     /// at once. Only what one's own Devices wrote counts.
     fn last_sent_text(&self, note_id: &str) -> Result<Option<StoredText>> {
         let mut own = HashMap::new();
@@ -847,7 +991,49 @@ impl Store {
         for r in &item.routines {
             self.write_routine(&id, r)?;
         }
+        if let Some(lines) = &item.lines {
+            self.write_checklist(&id, lines)?;
+        }
         Ok(id)
+    }
+
+    /// Makes the Note `note_id` a Checklist of `lines`, knowing the
+    /// sender's id for each; not spawned, so a new Note stays in Unsorted.
+    fn write_checklist(&self, note_id: &str, lines: &[SentLine]) -> Result<()> {
+        let making = self.new_id()?;
+        let kind = checklist_keys::kind_of(&making);
+        self.append(note_id, checklist_keys::KIND, Some(&kind), None)?;
+        self.write_lines(note_id, &making, lines, "", true)
+    }
+
+    /// Writes `lines` into the making `making` of the Note `note_id`,
+    /// placed after the key `after` in their order; with `first`, the
+    /// first of them is never under a Line above.
+    fn write_lines(
+        &self,
+        note_id: &str,
+        making: &str,
+        lines: &[SentLine],
+        after: &str,
+        first: bool,
+    ) -> Result<()> {
+        let mut key = after.to_string();
+        for (i, l) in lines.iter().enumerate() {
+            key = line_order::after(&key);
+            write_line(
+                self,
+                note_id,
+                making,
+                &NewLine {
+                    text: &l.text,
+                    order: &key,
+                    indent: l.indent && !(first && i == 0),
+                    checked: l.checked,
+                    received: Some(&l.id),
+                },
+            )?;
+        }
+        Ok(())
     }
 
     /// Applies the update `item` to the Note `note_id` as `changes` says,
@@ -890,6 +1076,32 @@ impl Store {
         }
         for r in &changes.routines_removed {
             self.append(&r.id, routine_keys::TRASHED, Some(&at), None)?;
+        }
+        if changes.makes_checklist {
+            self.write_checklist(note_id, &changes.lines_added)?;
+        } else if !changes.lines_added.is_empty()
+            && let Some(list) = Checklists::new(self).by_note(note_id)?
+        {
+            let last = list
+                .lines
+                .iter()
+                .filter_map(|l| l.order.as_deref())
+                .rfind(|key| line_order::is_valid(Some(key)))
+                .unwrap_or("")
+                .to_string();
+            self.write_lines(note_id, &list.making, &changes.lines_added, &last, false)?;
+        }
+        for r in &changes.lines_renamed {
+            let from = self.current(&r.line, keys::RECEIVED)?;
+            let text = StoredText::plain(&r.after).encode();
+            self.append(&r.line, checklist_keys::TEXT, Some(&text), Some(now))?;
+            self.append(&r.line, keys::RECEIVED, from.as_deref(), Some(now))?;
+        }
+        for l in &changes.lines_removed {
+            self.append(&l.id, checklist_keys::TRASHED, Some(&at), None)?;
+        }
+        if changes.makes_plain {
+            self.append(note_id, checklist_keys::KIND, None, None)?;
         }
         Ok(())
     }
@@ -1027,6 +1239,15 @@ impl SentItemState {
     }
 }
 
+/// A Line of a Checklist an update gives another text: the one here, its
+/// text now and the one it gets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SentRename {
+    pub line: String,
+    pub before: String,
+    pub after: String,
+}
+
 /// A Routine or Reminder an update gives another schedule: the one here,
 /// its schedule now and the one it gets.
 #[derive(Debug, Clone, PartialEq)]
@@ -1055,6 +1276,18 @@ pub struct SentItemChanges {
     pub routines_removed: Vec<Routine>,
     /// Whether the Note is in the trash here: applying brings it back.
     pub restores: bool,
+    /// Whether the Note becomes a Checklist here, with the Lines of
+    /// `lines_added`.
+    pub makes_checklist: bool,
+    /// Whether the Note becomes a plain Note again here: the sender's is
+    /// none, and no Line of the receiver's own is left.
+    pub makes_plain: bool,
+    /// The sender's Lines not here yet, added at the end in their order.
+    pub lines_added: Vec<SentLine>,
+    /// The sender's Lines here whose text the sender changed since.
+    pub lines_renamed: Vec<SentRename>,
+    /// The sender's Lines here that they took away: deleted, restorable.
+    pub lines_removed: Vec<Line>,
 }
 
 impl SentItemChanges {
@@ -1066,11 +1299,17 @@ impl SentItemChanges {
             && self.routines_added.is_empty()
             && self.routines_removed.is_empty()
             && !self.restores
+            && !self.makes_checklist
+            && !self.makes_plain
+            && self.lines_added.is_empty()
+            && self.lines_renamed.is_empty()
+            && self.lines_removed.is_empty()
     }
 }
 
 /// The file `item` goes out as, signed by `key`: signed only when `to`
-/// is empty, else encrypted to each X25519 key of `to`. The bytes come
+/// is empty, else encrypted to each X25519 key of `to`; one carrying a
+/// Checklist says it is in [`LIST_FORMAT`]. The bytes come
 /// from `random` as the Dart core draws them: the content key, the
 /// content's nonce, then per recipient its ephemeral secret and nonce.
 pub fn encode(
@@ -1080,12 +1319,16 @@ pub fn encode(
     random: &mut dyn FnMut(usize) -> Result<Vec<u8>>,
 ) -> Result<Vec<u8>> {
     let payload = item.encode();
-    let signed = object(vec![
+    let listed = item.lines.is_some();
+    let mut pairs = Vec::new();
+    if listed {
+        pairs.push(("format", json!(LIST_FORMAT)));
+    }
+    pairs.extend([
         ("item", json!(payload)),
         ("sig", json!(key.sign(&signed_bytes(&payload)))),
-    ])
-    .to_string()
-    .into_bytes();
+    ]);
+    let signed = object(pairs).to_string().into_bytes();
     if to.is_empty() {
         return Ok(signed);
     }
@@ -1110,12 +1353,15 @@ pub fn encode(
             ("key", json!(BASE64.encode(wrapped))),
         ]));
     }
-    Ok(object(vec![
+    let mut pairs = Vec::new();
+    if listed {
+        pairs.push(("format", json!(LIST_FORMAT)));
+    }
+    pairs.extend([
         ("sealed", json!(BASE64.encode(sealed))),
         ("to", Value::Array(stanzas)),
-    ])
-    .to_string()
-    .into_bytes())
+    ]);
+    Ok(object(pairs).to_string().into_bytes())
 }
 
 fn array<const N: usize>(bytes: Vec<u8>) -> Result<[u8; N]> {
@@ -1975,6 +2221,7 @@ mod tests {
             text_version: text_format::VERSION,
             sections: Vec::new(),
             routines: Vec::new(),
+            lines: None,
         };
         let file = encode(&item, &eve.signing_key()?, &[], &mut |n| Ok(vec![0; n]))?;
         assert_eq!(
@@ -2051,6 +2298,7 @@ mod tests {
             text_version: text_format::VERSION,
             sections: Vec::new(),
             routines: Vec::new(),
+            lines: None,
         };
         let file = encode(&item, &eve.signing_key()?, &[], &mut |n| Ok(vec![0; n]))?;
         let fake = ben.open_sent_item(&file)?.map_err(|_| "fake")?;

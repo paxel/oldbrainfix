@@ -1,0 +1,304 @@
+{
+  "lists": {
+    "note:00000000000000000000000000000001": {
+      "making": "00000000000000000000000000000002",
+      "lines": [
+        {
+          "id": "line:0000000000000000000000000000000a",
+          "text": "Map",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "F"
+        },
+        {
+          "id": "line:00000000000000000000000000000006",
+          "text": "Passport",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:00:29.000Z",
+          "parent": null,
+          "order": "Y"
+        },
+        {
+          "id": "line:00000000000000000000000000000009",
+          "text": "Torch",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "ZV"
+        },
+        {
+          "id": "line:00000000000000000000000000000008",
+          "text": "Pegs",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:00:42.000Z",
+          "parent": null,
+          "order": "a"
+        },
+        {
+          "id": "line:00000000000000000000000000000003",
+          "text": "Socks",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "b"
+        },
+        {
+          "id": "line:00000000000000000000000000000004",
+          "text": "Blue",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000003",
+          "order": "c"
+        },
+        {
+          "id": "line:0000000000000000000000000000000b",
+          "text": "Green",
+          "checked": false,
+          "checkedAt": null,
+          "parent": "line:00000000000000000000000000000003",
+          "order": "d"
+        },
+        {
+          "id": "line:00000000000000000000000000000005",
+          "text": "Red socks",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:00:52.000Z",
+          "parent": "line:00000000000000000000000000000003",
+          "order": "e"
+        },
+        {
+          "id": "line:0000000000000000000000000000000c",
+          "text": "Last",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "f"
+        },
+        {
+          "id": "line:ffffffffffffffffffffffffffffffff",
+          "text": "Odd",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "é"
+        }
+      ],
+      "checkedCount": 3,
+      "count": 10
+    },
+    "note:0000000000000000000000000000000d": {
+      "making": "00000000000000000000000000000012",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000013",
+          "text": "Oat milk",
+          "checked": false,
+          "checkedAt": null,
+          "parent": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000014",
+          "text": "Eggs",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:02:34.000Z",
+          "parent": null,
+          "order": "W"
+        },
+        {
+          "id": "line:00000000000000000000000000000015",
+          "text": "Free range",
+          "checked": true,
+          "checkedAt": "2026-01-01T10:02:41.000Z",
+          "parent": "line:00000000000000000000000000000014",
+          "order": "X"
+        }
+      ],
+      "checkedCount": 2,
+      "count": 3
+    }
+  },
+  "ofNotes": [
+    "note:00000000000000000000000000000001",
+    "note:0000000000000000000000000000000d"
+  ],
+  "mayMake": {
+    "note:00000000000000000000000000000001": false,
+    "note:0000000000000000000000000000000d": false,
+    "note:00000000000000000000000000000016": true
+  },
+  "plain": {
+    "note:00000000000000000000000000000001": "Packing\nMap\n✓ Passport\nTorch\n✓ Pegs\nSocks\n  Blue\n  Green\n  ✓ Red socks\nLast\nOdd",
+    "note:0000000000000000000000000000000d": "Shop\nOat milk\n✓ Eggs\n  ✓ Free range"
+  },
+  "rows": [
+    null,
+    null,
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Red",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Lead nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Em space",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Bom",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Trailing",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓x",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Two spaces",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "✓ Twice",
+      "indent": false,
+      "checked": true
+    }
+  ],
+  "split": [
+    "a",
+    "b",
+    "c",
+    "",
+    "d",
+    "",
+    ""
+  ],
+  "after": {
+    "": "V",
+    "V": "W",
+    "Vz": "W",
+    "z": "zV",
+    "zzz": "zzzV",
+    "0V": "1",
+    "Zy": "a"
+  },
+  "between": [
+    [
+      "",
+      "V",
+      "F"
+    ],
+    [
+      "",
+      "1",
+      "0V"
+    ],
+    [
+      "",
+      "0V",
+      "0F"
+    ],
+    [
+      "V",
+      "W",
+      "VV"
+    ],
+    [
+      "V",
+      "V05",
+      "V02"
+    ],
+    [
+      "V",
+      "X",
+      "W"
+    ],
+    [
+      "VV",
+      "W",
+      "VW"
+    ],
+    [
+      "Vz",
+      "W",
+      "VzV"
+    ],
+    [
+      "0",
+      "01",
+      "00V"
+    ],
+    [
+      "y",
+      "z",
+      "yV"
+    ],
+    [
+      "yz",
+      "z",
+      "yzV"
+    ],
+    [
+      "a",
+      "azzzV",
+      "aU"
+    ]
+  ],
+  "valid": {
+    "": false,
+    "V": true,
+    "V0": false,
+    "0": false,
+    "a1": true,
+    "é": false,
+    "a-b": false,
+    "zz": true
+  }
+}

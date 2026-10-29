@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'area_keys.dart';
 import 'box_keys.dart';
 import 'changes_nudges.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
 import 'frogs.dart';
@@ -661,7 +662,9 @@ List<Entry> _inArea(Store store, String area, List<Entry> entries) {
               e.entity.startsWith(FrogKeys.prefix) &&
                   e.field == FrogKeys.note ||
               e.entity.startsWith(TallyKeys.entryPrefix) &&
-                  e.field == TallyKeys.note) &&
+                  e.field == TallyKeys.note ||
+              e.entity.startsWith(ChecklistKeys.linePrefix) &&
+                  e.field == ChecklistKeys.note) &&
           notes.contains(e.value))
         e.entity,
   };

@@ -8,6 +8,7 @@ import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
 import 'calendar_platform.dart';
+import 'checklist_view.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
 import 'failure_dialog.dart';
@@ -280,6 +281,27 @@ NoteActions noteActions(
     onAddEntry: placed.amends
         ? () => then(addTallyEntry(context, notes, id))
         : null,
+    checklist: () {
+      final lists = Checklists(notes.store);
+      final list = lists.byNote(id);
+      void run(bool Function(Notes notes, String id) step) {
+        if (step(notes, id)) changed();
+      }
+
+      return (
+        isList: list != null,
+        make: lists.mayMake(id) ? () => run(makeChecklist) : null,
+        toPlain: list != null && placed.changes && placed.note.textEditable
+            ? () => run(checklistToPlain)
+            : null,
+        uncheckAll: list != null && list.checkedCount > 0 && lists.mayCheck(id)
+            ? () {
+                lists.uncheckAll(id);
+                changed();
+              }
+            : null,
+      );
+    },
     onDelete: placed.changes
         ? () => then(deleteNote(context, notes, id))
         : null,
@@ -366,6 +388,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   /// Whether this Device may Amend the Note: anywhere it holds a role.
   bool _amends = true;
 
+  /// Whether this Device may make the Note a Checklist, and whether it is
+  /// one (#120).
+  bool _makesList = false;
+  bool _isList = false;
+
   @override
   void initState() {
     super.initState();
@@ -434,6 +461,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final note = widget.notes.byId(widget.noteId);
     _placed = note == null ? null : placeNote(widget.places, note);
     _amends = widget.notes.store.mayWriteIn(widget.noteId);
+    final lists = Checklists(widget.notes.store);
+    _makesList = lists.mayMake(widget.noteId);
+    _isList = lists.isChecklist(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
     final notes = widget.notes;
@@ -758,6 +788,24 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
+  /// Makes the Note a Checklist of its text as typed: the field then holds
+  /// its first line, the rest are its Lines.
+  void _makeChecklist() {
+    _saveText();
+    if (!makeChecklist(widget.notes, widget.noteId)) return;
+    setState(_load);
+    _text.text = _placed?.note.text ?? '';
+  }
+
+  /// Turns the Checklist back into a plain Note: the field then holds
+  /// every Line as a line of its text.
+  void _toPlain() {
+    _saveText();
+    if (!checklistToPlain(widget.notes, widget.noteId)) return;
+    setState(_load);
+    _text.text = _placed?.note.text ?? '';
+  }
+
   /// Asks once whether the Note goes to the trash, with the same dialog
   /// as the card's Delete, and closes the editor when it went.
   Future<void> _trash() async {
@@ -841,6 +889,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   ),
                 ),
               ),
+            ),
+            // Nothing while the Note is no Checklist.
+            ChecklistSection(
+              notes: widget.notes,
+              noteId: widget.noteId,
+              onToPlain: _isList && changes && note.textEditable
+                  ? _toPlain
+                  : null,
             ),
             for (final hash in note.photos) ...[
               const SizedBox(height: 16),
@@ -1109,14 +1165,25 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            if (amends)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  onPressed: _amend,
-                  icon: const Icon(Icons.add),
-                  label: Text(t.amend),
-                ),
+            if (amends || _makesList)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (amends)
+                    FilledButton.tonalIcon(
+                      onPressed: _amend,
+                      icon: const Icon(Icons.add),
+                      label: Text(t.amend),
+                    ),
+                  if (_makesList)
+                    FilledButton.tonalIcon(
+                      key: const ValueKey('checklist-make'),
+                      onPressed: _makeChecklist,
+                      icon: const Icon(Icons.checklist),
+                      label: Text(t.makeChecklist),
+                    ),
+                ],
               ),
           ],
         ),

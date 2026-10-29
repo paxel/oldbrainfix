@@ -1782,6 +1782,7 @@ mod tests {
                     text_version: crate::text_format::VERSION,
                     sections: Vec::new(),
                     routines: Vec::new(),
+                    lines: None,
                 };
                 accepted(
                     &ben,

@@ -18,6 +18,7 @@ use chrono::{DateTime, Utc};
 use serde_json::{Map, Value, json};
 
 use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of, hkdf_sha256, x25519};
+use crate::checklists::keys as checklist_keys;
 use crate::entry::{ENTRY_VERSION, Entry, WireEntry};
 use crate::folder::{SyncFolder, entries_sealed_with};
 use crate::frogs::keys as frog_keys;
@@ -792,7 +793,9 @@ impl Store {
             let child = (e.entity.starts_with("section:") && is(e, note_keys::NOTE))
                 || (e.entity.starts_with("routine:") && is(e, routine_keys::NOTE))
                 || (e.entity.starts_with(frog_keys::PREFIX) && is(e, frog_keys::NOTE))
-                || (e.entity.starts_with(tally_keys::ENTRY_PREFIX) && is(e, tally_keys::NOTE));
+                || (e.entity.starts_with(tally_keys::ENTRY_PREFIX) && is(e, tally_keys::NOTE))
+                || (e.entity.starts_with(checklist_keys::LINE_PREFIX)
+                    && is(e, checklist_keys::NOTE));
             if child && e.value.as_deref().is_some_and(|v| notes.contains(v)) {
                 inside.insert(e.entity.as_str());
             }

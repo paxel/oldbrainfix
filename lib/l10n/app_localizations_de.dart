@@ -1861,6 +1861,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get conflictSectionText => 'Zur Notiz hinzugefügter Text';
 
   @override
+  String get conflictLineText => 'Zeile einer Checkliste';
+
+  @override
   String get conflictAreaName => 'Name eines Bereichs';
 
   @override
@@ -2244,6 +2247,27 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String sentItemRoutineRemoved(String schedule) {
     return 'Entfernt: $schedule';
+  }
+
+  @override
+  String get sentItemMakesChecklist => 'Sie wird zur Checkliste.';
+
+  @override
+  String get sentItemMakesPlain => 'Sie wird wieder eine einfache Notiz.';
+
+  @override
+  String sentItemLineAdded(String text) {
+    return 'Neue Zeile: $text';
+  }
+
+  @override
+  String sentItemLineRenamed(String before, String after) {
+    return 'Zeile: $before → $after';
+  }
+
+  @override
+  String sentItemLineRemoved(String text) {
+    return 'Zeile entfernt: $text';
   }
 
   @override
@@ -3189,6 +3213,47 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get addTallyEntry => 'Eintrag hinzufügen';
+
+  @override
+  String get makeChecklist => 'Zur Checkliste machen';
+
+  @override
+  String get checklistToPlain => 'Wieder eine einfache Notiz';
+
+  @override
+  String get checklistUncheckAll => 'Alle Haken entfernen';
+
+  @override
+  String get checklistHeading => 'Checkliste';
+
+  @override
+  String checklistCount(int checked, int count) {
+    return '$checked von $count abgehakt';
+  }
+
+  @override
+  String get checklistNewLine => 'Neue Zeile';
+
+  @override
+  String get checklistAddLine => 'Zeile hinzufügen';
+
+  @override
+  String get checklistRenameTitle => 'Zeile umbenennen';
+
+  @override
+  String get checklistMoveUp => 'Nach oben';
+
+  @override
+  String get checklistMoveDown => 'Nach unten';
+
+  @override
+  String get checklistIndent => 'Unter die Zeile darüber';
+
+  @override
+  String get checklistOutdent => 'Zurück auf die oberste Ebene';
+
+  @override
+  String get checklistDeleteQuestion => 'Diese Zeile löschen?';
 
   @override
   String get tallyHeading => 'Strichliste';

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'area_keys.dart';
 import 'box_keys.dart';
+import 'checklists.dart';
 import 'entry.dart';
 import 'notes.dart';
 import 'pairing.dart';
@@ -14,6 +15,7 @@ import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'tallies.dart';
 import 'text_format.dart';
 
 /// Sent Items (CONTEXT.md, ADR 0009, 0015): one Note with its Routines
@@ -26,9 +28,9 @@ import 'text_format.dart';
 /// it into Unsorted, keeping the Profile, or declines and nothing is
 /// kept.
 ///
-/// What travels is the Note's text, the texts of its Sections and the
-/// schedules of its Routines and Reminders; never its Capture Context,
-/// photos or voice recordings.
+/// What travels is the Note's text, the texts of its Sections, the
+/// schedules of its Routines and Reminders and the Lines of its
+/// Checklist; never its Capture Context, photos or voice recordings.
 const sentItemExtension = 'oldbrain';
 
 /// The type a Sent Item is shared as.
@@ -38,10 +40,17 @@ const sentItemMimeType = 'application/vnd.oldbrainfix.item';
 /// never written (ADR 0019).
 const sentItemFormat = 1;
 
-/// Whether [json] is in the format this version reads.
+/// The format of a file whose Note is a Checklist: a version that does
+/// not know Lines refuses it rather than keep its text alone (ADR 0030).
+const sentItemListFormat = 2;
+
+/// Whether [json] is in a format this version reads.
 bool _inFormat(Object? json) =>
     json is Map &&
-    (json.containsKey('format') ? json['format'] : 1) == sentItemFormat;
+    switch (json.containsKey('format') ? json['format'] : 1) {
+      sentItemFormat || sentItemListFormat => true,
+      _ => false,
+    };
 
 /// A file larger than this is no Sent Item: it holds only texts.
 const maxSentItemBytes = 1 << 20;
@@ -141,6 +150,22 @@ class SentRoutine {
   const SentRoutine(this.id, this.schedule);
 }
 
+/// A Line of a Sent Item's Checklist: the sender's id for it, its text,
+/// whether it is under the Line above and whether it shows checked.
+class SentLine {
+  final String id;
+  final String text;
+  final bool indent;
+  final bool checked;
+
+  const SentLine(
+    this.id,
+    this.text, {
+    this.indent = false,
+    this.checked = false,
+  });
+}
+
 /// What a Sent Item holds, as signed.
 class SentItem {
   /// The Sent Item's id: the same every time the same Device sends the
@@ -167,6 +192,10 @@ class SentItem {
   final List<SentSection> sections;
   final List<SentRoutine> routines;
 
+  /// The Lines of the Note's Checklist, in the order they show; null for
+  /// a Note that is none.
+  final List<SentLine>? lines;
+
   const SentItem({
     required this.id,
     required this.version,
@@ -177,6 +206,7 @@ class SentItem {
     this.textVersion = TextFormats.version,
     this.sections = const [],
     this.routines = const [],
+    this.lines,
     this.cancel = false,
   });
 
@@ -190,6 +220,16 @@ class SentItem {
     if (cancel) 'kind': _cancelKind,
     'note': {
       'format': textFormat,
+      if (lines case final lines?)
+        'lines': [
+          for (final l in lines)
+            {
+              if (l.checked) 'checked': true,
+              'id': l.id,
+              if (l.indent) 'indent': true,
+              'text': l.text,
+            },
+        ],
       'sections': [
         for (final s in sections)
           {
@@ -259,6 +299,8 @@ class SentItem {
             return null;
           }
         }
+        final lines = _lines(json['note']);
+        if (lines == null) return null;
         final scheduled = <SentRoutine>[];
         for (final r in routines) {
           if (r is! Map) return null;
@@ -290,6 +332,7 @@ class SentItem {
           textVersion: noteVersion,
           sections: parts,
           routines: scheduled,
+          lines: lines.$1,
           cancel: kind == _cancelKind,
         );
       }
@@ -297,6 +340,26 @@ class SentItem {
       return null;
     }
     return null;
+  }
+
+  /// The Lines the note [json] carries, null in the record when it is no
+  /// Checklist; null when they are no Lines.
+  static (List<SentLine>?,)? _lines(Object? json) {
+    if (json is! Map || !json.containsKey('lines')) return (null,);
+    final lines = json['lines'];
+    if (lines is! List) return null;
+    final out = <SentLine>[];
+    for (final l in lines) {
+      if (l case {'id': final String id, 'text': final String text}) {
+        final indent = l['indent'] ?? false;
+        final checked = l['checked'] ?? false;
+        if (indent is! bool || checked is! bool) return null;
+        out.add(SentLine(id, text, indent: indent, checked: checked));
+      } else {
+        return null;
+      }
+    }
+    return (out,);
   }
 
   /// The format a text of [json] says it is in: plain when it says none,
@@ -384,7 +447,8 @@ List<Recipient> sentItemRecipients(Store store) {
 }
 
 /// The Sent Item the Note [noteId] goes out as now: its text, the texts
-/// of its Sections and its Routines and Reminders, under the id it went
+/// of its Sections, its Routines and Reminders and the Lines of its
+/// Checklist, under the id it went
 /// out with from this Device before and the next version, or a new id.
 /// Records the id and version on the Note, so sending it again keeps
 /// them; a Note this Device may not change goes out under a new id each
@@ -418,6 +482,7 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   }
   final routines = Routines(store).ofNote(noteId)
     ..sort((a, b) => a.id.compareTo(b.id));
+  final list = Checklists(store).byNote(noteId);
   return SentItem(
     id: id,
     version: version,
@@ -438,6 +503,12 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
           ),
     ],
     routines: [for (final r in routines) SentRoutine(r.id, r.schedule)],
+    lines: list == null
+        ? null
+        : [
+            for (final l in list.lines)
+              SentLine(l.id, l.text, indent: l.inGroup, checked: l.checked),
+          ],
   );
 }
 
@@ -446,7 +517,8 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
 /// key, the nonces and the ephemeral keys come from [random] in this
 /// order: content key, nonce of the content, then per recipient its
 /// ephemeral secret and the nonce of its key; the fixture generator
-/// hands in a counter.
+/// hands in a counter. A file carrying a Checklist says it is in
+/// [sentItemListFormat].
 Uint8List encodeSentItem(
   SentItem item,
   SigningKey key, {
@@ -455,8 +527,13 @@ Uint8List encodeSentItem(
 }) {
   final bytesOf = random ?? secretBytes;
   final payload = item.encode();
+  final listed = item.lines != null;
   final signed = utf8.encode(
-    jsonEncode({'item': payload, 'sig': key.sign(_signedBytes(payload))}),
+    jsonEncode({
+      if (listed) 'format': sentItemListFormat,
+      'item': payload,
+      'sig': key.sign(_signedBytes(payload)),
+    }),
   );
   if (to.isEmpty) return signed;
   final content = bytesOf(areaKeyBytes);
@@ -487,7 +564,11 @@ Uint8List encodeSentItem(
     });
   }
   return utf8.encode(
-    jsonEncode({'sealed': base64.encode(sealed), 'to': stanzas}),
+    jsonEncode({
+      if (listed) 'format': sentItemListFormat,
+      'sealed': base64.encode(sealed),
+      'to': stanzas,
+    }),
   );
 }
 
@@ -547,6 +628,16 @@ enum SentItemState {
   nothingToCancel,
 }
 
+/// A Line of a Checklist an update gives another text: the one here, its
+/// text now and the one it gets.
+class SentRename {
+  final String line;
+  final String before;
+  final String after;
+
+  const SentRename(this.line, this.before, this.after);
+}
+
 /// A Routine or Reminder an update gives another schedule: the one
 /// here, its schedule now and the one it gets.
 class SentReschedule {
@@ -581,6 +672,23 @@ class SentItemChanges {
   /// Whether the Note is in the trash here: applying brings it back.
   final bool restores;
 
+  /// Whether the Note becomes a Checklist here, with the Lines of
+  /// [linesAdded].
+  final bool makesChecklist;
+
+  /// Whether the Note becomes a plain Note again here: the sender's is
+  /// none, and no Line of the receiver's own is left.
+  final bool makesPlain;
+
+  /// The sender's Lines not here yet, added at the end in their order.
+  final List<SentLine> linesAdded;
+
+  /// The sender's Lines here whose text the sender changed since.
+  final List<SentRename> linesRenamed;
+
+  /// The sender's Lines here that they took away: deleted, restorable.
+  final List<Line> linesRemoved;
+
   const SentItemChanges({
     this.textBefore,
     this.textEdited = false,
@@ -589,6 +697,11 @@ class SentItemChanges {
     this.routinesAdded = const [],
     this.routinesRemoved = const [],
     this.restores = false,
+    this.makesChecklist = false,
+    this.makesPlain = false,
+    this.linesAdded = const [],
+    this.linesRenamed = const [],
+    this.linesRemoved = const [],
   });
 
   /// Whether nothing but the version changes.
@@ -598,7 +711,12 @@ class SentItemChanges {
       rescheduled.isEmpty &&
       routinesAdded.isEmpty &&
       routinesRemoved.isEmpty &&
-      !restores;
+      !restores &&
+      !makesChecklist &&
+      !makesPlain &&
+      linesAdded.isEmpty &&
+      linesRenamed.isEmpty &&
+      linesRemoved.isEmpty;
 }
 
 /// A Sent Item opened here, to preview.
@@ -1106,6 +1224,10 @@ _Held? _held(Store store, SentItem item) {
 /// sender's id for each, rescheduled, added or taken away. Those the
 /// receiver put in the trash on their own stay there, untouched; when
 /// the Note is in the trash ([restores]) those that went with it count.
+/// The sender's Lines, known by the sender's id for each, are added,
+/// renamed when the sender changed their text since, or taken away; the
+/// Note follows the sender into a Checklist, and out of one once no Line
+/// of the receiver's own is left. A Tally here takes none of it.
 SentItemChanges _changes(
   Store store,
   String noteId,
@@ -1149,6 +1271,7 @@ SentItemChanges _changes(
     }
   }
   final kept = {for (final r in item.routines) r.id};
+  final lists = _listChanges(store, noteId, item);
   return SentItemChanges(
     textBefore: changed ? text.text : null,
     textEdited: changed && sent != null && text != sent,
@@ -1163,12 +1286,84 @@ SentItemChanges _changes(
         if (!kept.contains(from) && live(r)) r,
     ],
     restores: restores,
+    makesChecklist: lists.makesChecklist,
+    makesPlain: lists.makesPlain,
+    linesAdded: lists.added,
+    linesRenamed: lists.renamed,
+    linesRemoved: lists.removed,
   );
 }
 
-/// The text the sender last sent for the Note [noteId]: the newest text
-/// written with its link, as accepting and applying write both at once;
-/// null when there is none. Only what one's own Devices wrote counts.
+/// What the update [item] changes on the Checklist of the Note [noteId],
+/// as [_changes] says.
+({
+  bool makesChecklist,
+  bool makesPlain,
+  List<SentLine> added,
+  List<SentRename> renamed,
+  List<Line> removed,
+})
+_listChanges(Store store, String noteId, SentItem item) {
+  const none = (
+    makesChecklist: false,
+    makesPlain: false,
+    added: <SentLine>[],
+    renamed: <SentRename>[],
+    removed: <Line>[],
+  );
+  if (Tallies(store).isTally(noteId)) return none;
+  final here = Checklists(store).byNote(noteId);
+  final theirs = <String, Line>{};
+  final own = <String, bool>{};
+  for (final l in here?.lines ?? const <Line>[]) {
+    final from = store.currentByOwn(l.id, SentKeys.received, own);
+    if (from != null) theirs.putIfAbsent(from, () => l);
+  }
+  final lines = item.lines;
+  if (lines == null) {
+    if (here == null) return none;
+    final removed = theirs.values.toList();
+    return (
+      makesChecklist: false,
+      makesPlain: removed.isNotEmpty && removed.length == here.lines.length,
+      added: <SentLine>[],
+      renamed: <SentRename>[],
+      removed: removed,
+    );
+  }
+  final added = <SentLine>[];
+  final renamed = <SentRename>[];
+  for (final l in lines) {
+    final held = theirs[l.id];
+    if (held == null) {
+      added.add(l);
+      continue;
+    }
+    final incoming = StoredText.plain(l.text);
+    final sent = _lastSentText(store, held.id);
+    if (incoming !=
+            StoredText.read(store.current(held.id, ChecklistKeys.text)) &&
+        (sent == null || incoming != sent)) {
+      renamed.add(SentRename(held.id, held.text, l.text));
+    }
+  }
+  final kept = {for (final l in lines) l.id};
+  return (
+    makesChecklist: here == null,
+    makesPlain: false,
+    added: added,
+    renamed: renamed,
+    removed: [
+      for (final MapEntry(key: from, value: l) in theirs.entries)
+        if (!kept.contains(from)) l,
+    ],
+  );
+}
+
+/// The text the sender last sent for the Note or Line [noteId]: the
+/// newest text written with its link, as accepting and applying write
+/// both at once; null when there is none. Only what one's own Devices
+/// wrote counts.
 StoredText? _lastSentText(Store store, String noteId) {
   final history = store.history(noteId);
   final own = <String, bool>{};
@@ -1219,13 +1414,49 @@ String _acceptNew(Store store, SentItem item) {
   for (final r in item.routines) {
     _writeRoutine(store, id, r);
   }
+  if (item.lines case final lines?) _writeChecklist(store, id, lines);
   return id;
+}
+
+/// Makes the Note [noteId] a Checklist of [lines], knowing the sender's
+/// id for each; not spawned, so a new Note stays in Unsorted.
+void _writeChecklist(Store store, String noteId, List<SentLine> lines) {
+  final making = Store.newId();
+  store.append(noteId, ChecklistKeys.kind, ChecklistKeys.kindOf(making));
+  _writeLines(store, noteId, making, lines, after: '', first: true);
+}
+
+/// Writes [lines] into the making [making] of the Note [noteId], placed
+/// after the key [after] in their order; with [first], the first of them
+/// is never under a Line above.
+void _writeLines(
+  Store store,
+  String noteId,
+  String making,
+  List<SentLine> lines, {
+  required String after,
+  bool first = false,
+}) {
+  var key = after;
+  for (final (i, l) in lines.indexed) {
+    key = LineOrder.after(key);
+    writeLine(
+      store,
+      noteId,
+      making,
+      text: l.text,
+      order: key,
+      indent: l.indent && !(first && i == 0),
+      checked: l.checked,
+      received: l.id,
+    );
+  }
 }
 
 /// Applies the update [item] to the Note [noteId] as [changes] says, at
 /// [now], in one go: back from the trash first when it is there, then
 /// its text, its link, the Sections added, the Routines and Reminders
-/// rescheduled, added and taken away.
+/// rescheduled, added and taken away, then its Checklist.
 void _apply(
   Store store,
   String noteId,
@@ -1260,6 +1491,26 @@ void _apply(
   for (final r in changes.routinesRemoved) {
     store.append(r.id, RoutineKeys.trashed, at);
   }
+  if (changes.makesChecklist) {
+    _writeChecklist(store, noteId, changes.linesAdded);
+  } else if (Checklists(store).byNote(noteId) case final list?
+      when changes.linesAdded.isNotEmpty) {
+    var last = '';
+    for (final l in list.lines) {
+      if (l.order case final key? when LineOrder.isValid(key)) last = key;
+    }
+    _writeLines(store, noteId, list.making, changes.linesAdded, after: last);
+  }
+  for (final r in changes.linesRenamed) {
+    final from = store.current(r.line, SentKeys.received);
+    final text = StoredText.plain(r.after).encode();
+    store.append(r.line, ChecklistKeys.text, text, date: now);
+    store.append(r.line, SentKeys.received, from, date: now);
+  }
+  for (final l in changes.linesRemoved) {
+    store.append(l.id, ChecklistKeys.trashed, at);
+  }
+  if (changes.makesPlain) store.append(noteId, ChecklistKeys.kind, null);
 }
 
 /// Moves the Note [noteId] to the trash for the cancellation [item], at

@@ -7,6 +7,7 @@ import 'package:cryptography/cryptography.dart'
     show Mac, SecretBox, SecretBoxAuthenticationError, SecretKeyData;
 import 'package:cryptography/dart.dart' show DartXchacha20;
 
+import 'checklists.dart';
 import 'frogs.dart';
 import 'notes.dart';
 import 'places.dart';
@@ -217,7 +218,7 @@ extension AreaKeys on Store {
 
   /// The scope [entity] is sealed under, from where it is now: an Area
   /// itself; a Topic by its Area; a Note by its Area or Topic; a Section,
-  /// a Routine, a Frog or a Tally's entry by its Note; everything else,
+  /// a Routine, a Frog, a Tally's entry or a Checklist's Line by its Note; everything else,
   /// and whatever is in no Area, [personalScope]. Read from the log alone: a pending change
   /// (ADR 0022) moves nothing into an Area before it is accepted.
   String scopeOf(String entity) {
@@ -235,6 +236,8 @@ extension AreaKeys on Store {
       next = logged(entity, FrogKeys.note);
     } else if (entity.startsWith(TallyKeys.entryPrefix)) {
       next = logged(entity, TallyKeys.note);
+    } else if (entity.startsWith(ChecklistKeys.linePrefix)) {
+      next = logged(entity, ChecklistKeys.note);
     }
     // Each step goes to a kind further up, so the walk ends.
     if (next == null || !_above(entity, next)) return personalScope;
@@ -251,7 +254,11 @@ extension AreaKeys on Store {
       'area' => 0,
       'topic' => 1,
       'note' => 2,
-      'section' || 'routine' || 'frog' || TallyKeys.typeEntry => 3,
+      'section' ||
+      'routine' ||
+      'frog' ||
+      TallyKeys.typeEntry ||
+      ChecklistKeys.typeLine => 3,
       _ => 9,
     };
     return rank(next) < rank(entity);

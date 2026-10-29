@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use chrono::{DateTime, Utc};
 
+use crate::checklists::{keys as checklist_keys, parse_list_kind};
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Notes, keys as note_keys};
 use crate::people::PersonFilter;
@@ -240,7 +241,8 @@ impl<'a> Tallies<'a> {
     /// Adds a field to the Note `note_id`, which makes it a Tally the
     /// first time and takes it out of Unsorted; returns the field's id.
     /// `target` is in the base unit; `rule` defaults by the kind of
-    /// `unit`.
+    /// `unit`. A Note that is a list, such as a Checklist, is never a
+    /// Tally too.
     pub fn add_field(
         &self,
         note_id: &str,
@@ -255,6 +257,10 @@ impl<'a> Tallies<'a> {
                 "not a Note in the lists: {note_id}"
             )));
         };
+        let kind = self.store.current(note_id, checklist_keys::KIND)?;
+        if parse_list_kind(kind.as_deref()).is_some() {
+            return Err(Error::Invalid(format!("{note_id} is a list")));
+        }
         if !self.store.may_change(note_id)? {
             return Err(Error::Invalid(format!("may not change {note_id}")));
         }
