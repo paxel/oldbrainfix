@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
@@ -466,6 +467,44 @@ void main() {
         const Duration(seconds: 3),
       );
       await tester.pumpAndSettle();
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+    });
+
+    testWidgets('a slow drag turns past a third, springs back short of it', (
+      tester,
+    ) async {
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      final third = tester.getSize(find.byType(BrowserSwipes)).width / 3;
+      // The drag only counts once the finger moved past the touch slop.
+      final past = third + kTouchSlop + 10;
+      final short = third - 10;
+
+      Future<void> drag(double dx) async {
+        await tester.timedDrag(
+          find.byType(BrowserSwipes),
+          Offset(dx, 0),
+          const Duration(seconds: 3),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await drag(-short);
+      expect(find.byType(AgendaScreen), findsOneWidget);
+      expect(find.byType(AreasScreen), findsNothing);
+      expect(pageLeft(tester, AgendaScreen), 0);
+
+      await drag(-past);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+
+      await drag(short);
+      expect(find.byType(AreasScreen), findsOneWidget);
+      expect(find.byType(AgendaScreen), findsNothing);
+      expect(pageLeft(tester, AreasScreen), 0);
+
+      await drag(past);
       expect(find.byType(AreasScreen), findsNothing);
       expect(find.byType(AgendaScreen), findsOneWidget);
     });

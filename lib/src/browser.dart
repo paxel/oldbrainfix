@@ -300,8 +300,8 @@ class _Followed extends Animation<double>
 /// above the Areas list: there swipe left opens it and swipe right,
 /// with [back] false, does nothing. Wraps a level's whole page.
 ///
-/// The pages follow the finger; letting go past the middle or with a
-/// fling completes the change, otherwise it springs back. Going back
+/// The pages follow the finger; letting go past a third of the way or
+/// with a fling completes the change, otherwise it springs back. Going back
 /// moves this level's [BrowserRoute] like the system's back gesture.
 /// Going forward cannot push while the finger is down (the navigator
 /// would cancel the finger), so the next level shows as a preview
@@ -339,6 +339,10 @@ class _BrowserSwipesState extends State<BrowserSwipes>
   /// Above this horizontal speed (pixels per second) letting go is a
   /// fling: it goes the way it flings, wherever the finger is.
   static const _minSpeed = 300.0;
+
+  /// How far along the way, 0 to 1, a slow drag must be let go to
+  /// complete; short of it the pages spring back.
+  static const _turnAt = 1 / 3;
 
   /// How far the next level's preview is in, 0 to 1.
   late final _pull = AnimationController(
@@ -440,7 +444,7 @@ class _BrowserSwipesState extends State<BrowserSwipes>
     // Positive is the way the swipe goes.
     final along = forward ? -speed : speed;
     final complete =
-        along > _minSpeed || (along >= -_minSpeed && _progress > 0.5);
+        along > _minSpeed || (along >= -_minSpeed && _progress > _turnAt);
     final moving = _moving;
     final next = _next;
     _reset();
