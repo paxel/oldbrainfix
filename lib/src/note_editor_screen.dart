@@ -27,6 +27,7 @@ import 'system_bars.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
 import 'tally_view.dart';
+import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
 /// Opens the editor of [note]; returns once the user left it.
@@ -96,7 +97,7 @@ Future<bool> amendNote(
 }) async {
   final text = await showDialog<String>(
     context: context,
-    builder: (_) => const _AmendDialog(),
+    builder: (_) => _AmendDialog(twoRows: notes.store.twoRowEditorOn),
   );
   final trimmed = text?.trim();
   if (!context.mounted || trimmed == null || trimmed.isEmpty) return false;
@@ -336,6 +337,7 @@ class NoteEditorScreen extends StatefulWidget {
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final _text = TextEditingController();
+  late final _twoRows = widget.notes.store.twoRowEditorOn;
   late final AppLifecycleListener _lifecycle;
   Timer? _draftTimer;
   PlacedNote? _placed;
@@ -828,11 +830,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               strong: note.importance == Importance.important,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
+                child: TwoRowTextField(
                   controller: _text,
+                  twoRows: _twoRows,
                   readOnly: !changes || !note.textEditable,
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
                   style: Theme.of(context).textTheme.bodyLarge,
                   decoration: const InputDecoration(
                     filled: false,
@@ -1250,7 +1251,10 @@ class _RemoveDialog extends StatelessWidget {
 
 /// Asks for the text of a new Section.
 class _AmendDialog extends StatefulWidget {
-  const _AmendDialog();
+  /// Whether the text is typed in two rows (UI laws, "Text editor").
+  final bool twoRows;
+
+  const _AmendDialog({required this.twoRows});
 
   @override
   State<_AmendDialog> createState() => _AmendDialogState();
@@ -1268,25 +1272,35 @@ class _AmendDialogState extends State<_AmendDialog> {
   @override
   Widget build(BuildContext context) {
     final t = context.t;
-    return AlertDialog(
-      title: Text(t.amend),
-      content: TextField(
-        controller: _text,
-        autofocus: true,
-        maxLines: null,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(hintText: t.amendHint),
+    final media = MediaQuery.of(context);
+    final keyboard = media.viewInsets.bottom;
+    // The dialog stays clear of the bottom row above the keyboard.
+    final below = widget.twoRows && keyboard > 0
+        ? keyboard + TwoRowTextField.rowHeight
+        : keyboard;
+    return MediaQuery(
+      data: media.copyWith(
+        viewInsets: media.viewInsets.copyWith(bottom: below),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(t.cancel),
+      child: AlertDialog(
+        title: Text(t.amend),
+        content: TwoRowTextField(
+          controller: _text,
+          twoRows: widget.twoRows,
+          autofocus: true,
+          decoration: InputDecoration(hintText: t.amendHint),
         ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(_text.text),
-          child: Text(t.add),
-        ),
-      ],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_text.text),
+            child: Text(t.add),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -137,6 +137,18 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the two-row editor is on until this Device switches it off', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.twoRowEditorOn, isTrue);
+    store.twoRowEditorOn = false;
+    expect(store.twoRowEditorOn, isFalse);
+    expect(store.localSetting('twoRowEditorOff'), 'true');
+    store.twoRowEditorOn = true;
+    expect(store.twoRowEditorOn, isTrue);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('recordings play at normal speed until this Device chooses one', () {
     final store = Store.inMemory();
     addTearDown(store.close);

@@ -213,6 +213,31 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - An editor with several fields is a full-screen page with Save in the
   top bar; secondary state changes are rows at the bottom of the page.
 
+## Text editor
+
+- **The Note editor and Amend type in two rows** on the phone and the
+  tablet, unless Settings of this Device switch it off, which gives the
+  system's text field back. The desktop keeps its own field.
+- The top row is the whole text in the system's text field, so the
+  keyboard's suggestions, autocorrect, swipe typing and voice input
+  work. A tap puts the cursor at the nearest word boundary; there is no
+  magnifier and no dragging the cursor. A long press selects as usual,
+  with Copy, Cut and Delete in the system's menu.
+- The bottom row shows one line of the text around the cursor, directly
+  above the keyboard, only while the keyboard is open; it is a bar of
+  the field, not a sheet, and never takes the keyboard's focus. It
+  rides on the keyboard and never sits on the screen's bottom edge, so
+  it is no bottom bar. **◀ and ▶ move the cursor one character** (an
+  emoji is one); held, they repeat, faster the longer they are held.
+- **A long press on the bottom row starts selecting** where the cursor
+  is and never moves it. While selecting, ◀ and ▶ show in inverted
+  colours and move only the selection's moving end; the system's menu
+  offers Copy, Cut and Delete; typing replaces the selection and ends
+  selecting; another long press ends it with the cursor at the moving
+  end.
+- A screen reader reads both rows and the buttons by name, and the
+  character the cursor passes.
+
 ## The bar
 
 - **One bar on every phone page.** On a phone the buttons sit on their

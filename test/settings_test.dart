@@ -162,12 +162,15 @@ void main() {
       );
       await tap(tester, find.byKey(const ValueKey('quietHours')));
       await tap(tester, find.byKey(const ValueKey('streaks')));
+      expect(store.twoRowEditorOn, isTrue);
+      await tap(tester, find.byKey(const ValueKey('twoRowEditor')));
 
       expect(store.themeChoice, ThemeChoice.light);
       expect(store.renagInterval, const Duration(minutes: 30));
       expect(store.nudgeRepeat, const Duration(minutes: 10));
       expect(store.quietHoursOn, isFalse);
       expect(store.streaksOn, isFalse);
+      expect(store.twoRowEditorOn, isFalse);
       expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
     });
 

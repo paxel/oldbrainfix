@@ -28,6 +28,7 @@ extension DeviceSettings on Store {
   static const _agendaCalendar = 'agendaCalendar';
   static const _agendaCalendars = 'agendaCalendars';
   static const _streaksOff = 'streaksOff';
+  static const _twoRowEditorOff = 'twoRowEditorOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
   static const _unitSystem = 'unitSystem';
@@ -184,6 +185,13 @@ extension DeviceSettings on Store {
   bool get streaksOn => localSetting(_streaksOff) != 'true';
 
   set streaksOn(bool on) => setLocalSetting(_streaksOff, '${!on}');
+
+  /// Whether the Note editor and Amend on this Device type in two rows,
+  /// the bottom one above the keyboard; on unless switched off, which
+  /// gives the system's text field back.
+  bool get twoRowEditorOn => localSetting(_twoRowEditorOff) != 'true';
+
+  set twoRowEditorOn(bool on) => setLocalSetting(_twoRowEditorOff, '${!on}');
 
   /// The system this Device shows the known units of Tallies in, when
   /// one was chosen; null follows the region.

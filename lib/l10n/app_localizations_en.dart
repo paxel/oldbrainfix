@@ -3505,4 +3505,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get photoTextLabel => 'Photo Text';
+
+  @override
+  String get settingsTyping => 'Typing';
+
+  @override
+  String get twoRowEditor => 'Type in two rows';
+
+  @override
+  String get twoRowEditorDetail =>
+      'In the Note editor and when adding to a Note, a line above the keyboard shows the text around the cursor, with buttons that move it one character.';
+
+  @override
+  String get cursorBack => 'Cursor back one character';
+
+  @override
+  String get cursorForward => 'Cursor forward one character';
+
+  @override
+  String get selectionBack => 'Selection end back one character';
+
+  @override
+  String get selectionForward => 'Selection end forward one character';
+
+  @override
+  String get cursorLine => 'Text around the cursor';
+
+  @override
+  String get cursorLineSelect => 'start selecting';
+
+  @override
+  String get cursorLineStopSelecting => 'stop selecting';
+
+  @override
+  String get cursorSpace => 'Space';
+
+  @override
+  String get cursorNewLine => 'New line';
 }

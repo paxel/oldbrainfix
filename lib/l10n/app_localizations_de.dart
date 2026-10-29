@@ -3539,4 +3539,41 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get photoTextLabel => 'Fototext';
+
+  @override
+  String get settingsTyping => 'Schreiben';
+
+  @override
+  String get twoRowEditor => 'In zwei Zeilen schreiben';
+
+  @override
+  String get twoRowEditorDetail =>
+      'Im Notiz-Editor und beim Hinzufügen zu einer Notiz zeigt eine Zeile über der Tastatur den Text um den Cursor, mit Knöpfen, die ihn um ein Zeichen bewegen.';
+
+  @override
+  String get cursorBack => 'Cursor ein Zeichen zurück';
+
+  @override
+  String get cursorForward => 'Cursor ein Zeichen vor';
+
+  @override
+  String get selectionBack => 'Auswahlende ein Zeichen zurück';
+
+  @override
+  String get selectionForward => 'Auswahlende ein Zeichen vor';
+
+  @override
+  String get cursorLine => 'Text um den Cursor';
+
+  @override
+  String get cursorLineSelect => 'Auswahl beginnen';
+
+  @override
+  String get cursorLineStopSelecting => 'Auswahl beenden';
+
+  @override
+  String get cursorSpace => 'Leerzeichen';
+
+  @override
+  String get cursorNewLine => 'Zeilenumbruch';
 }

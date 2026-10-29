@@ -937,5 +937,17 @@
   "showNotesCompact": "Notizen kompakt zeigen",
   "showNotesFull": "Notizen vollständig zeigen",
   "transcriptLabel": "Transkript",
-  "photoTextLabel": "Fototext"
+  "photoTextLabel": "Fototext",
+  "settingsTyping": "Schreiben",
+  "twoRowEditor": "In zwei Zeilen schreiben",
+  "twoRowEditorDetail": "Im Notiz-Editor und beim Hinzufügen zu einer Notiz zeigt eine Zeile über der Tastatur den Text um den Cursor, mit Knöpfen, die ihn um ein Zeichen bewegen.",
+  "cursorBack": "Cursor ein Zeichen zurück",
+  "cursorForward": "Cursor ein Zeichen vor",
+  "selectionBack": "Auswahlende ein Zeichen zurück",
+  "selectionForward": "Auswahlende ein Zeichen vor",
+  "cursorLine": "Text um den Cursor",
+  "cursorLineSelect": "Auswahl beginnen",
+  "cursorLineStopSelecting": "Auswahl beenden",
+  "cursorSpace": "Leerzeichen",
+  "cursorNewLine": "Zeilenumbruch"
 }

@@ -5671,6 +5671,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Photo Text'**
   String get photoTextLabel;
+
+  /// Section title in Settings for how text is typed.
+  ///
+  /// In en, this message translates to:
+  /// **'Typing'**
+  String get settingsTyping;
+
+  /// Switch in Settings for the two-row text editor of the Note editor and Amend.
+  ///
+  /// In en, this message translates to:
+  /// **'Type in two rows'**
+  String get twoRowEditor;
+
+  /// No description provided for @twoRowEditorDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'In the Note editor and when adding to a Note, a line above the keyboard shows the text around the cursor, with buttons that move it one character.'**
+  String get twoRowEditorDetail;
+
+  /// Screen reader label of the left button of the line above the keyboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor back one character'**
+  String get cursorBack;
+
+  /// No description provided for @cursorForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Cursor forward one character'**
+  String get cursorForward;
+
+  /// Screen reader label of the left button while selecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection end back one character'**
+  String get selectionBack;
+
+  /// No description provided for @selectionForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection end forward one character'**
+  String get selectionForward;
+
+  /// Screen reader label of the line above the keyboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Text around the cursor'**
+  String get cursorLine;
+
+  /// Screen reader hint of the long press on the line above the keyboard.
+  ///
+  /// In en, this message translates to:
+  /// **'start selecting'**
+  String get cursorLineSelect;
+
+  /// No description provided for @cursorLineStopSelecting.
+  ///
+  /// In en, this message translates to:
+  /// **'stop selecting'**
+  String get cursorLineStopSelecting;
+
+  /// Spoken when the cursor passes a space.
+  ///
+  /// In en, this message translates to:
+  /// **'Space'**
+  String get cursorSpace;
+
+  /// Spoken when the cursor passes a line break.
+  ///
+  /// In en, this message translates to:
+  /// **'New line'**
+  String get cursorNewLine;
 }
 
 class _AppLocalizationsDelegate

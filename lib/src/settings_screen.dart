@@ -54,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late ThemeChoice _theme = widget.store.themeChoice;
   late Duration _renag = widget.store.renagInterval;
   late bool _streaksOn = widget.store.streaksOn;
+  late bool _twoRows = widget.store.twoRowEditorOn;
   late String? _sound = widget.store.alarmSound;
   late _UnitChoice _units = switch (widget.store.chosenUnitSystem) {
     null => _UnitChoice.region,
@@ -102,6 +103,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setStreaks(bool on) {
     widget.store.streaksOn = on;
     setState(() => _streaksOn = on);
+  }
+
+  void _setTwoRows(bool on) {
+    widget.store.twoRowEditorOn = on;
+    setState(() => _twoRows = on);
   }
 
   Future<void> _push(Widget screen) =>
@@ -286,6 +292,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 places: Places(widget.store),
               ),
             ],
+            SettingsHeading(t.settingsTyping),
+            SettingsSection(
+              children: [
+                SwitchBelow(
+                  switchKey: const ValueKey('twoRowEditor'),
+                  leading: const Icon(Icons.keyboard_outlined),
+                  value: _twoRows,
+                  onChanged: _setTwoRows,
+                  title: Text(t.twoRowEditor),
+                  subtitle: Text(t.twoRowEditorDetail),
+                ),
+              ],
+            ),
             SettingsHeading(t.settingsHistory),
             SettingsSection(
               children: [
