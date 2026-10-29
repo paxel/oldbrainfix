@@ -1,5 +1,6 @@
 import 'notes.dart';
 import 'schedule.dart';
+import 'sessions.dart';
 import 'shared_areas.dart';
 import 'store.dart';
 
@@ -154,7 +155,12 @@ class Routines {
 
   /// Spawns a Routine (or a Reminder, when [schedule] happens once) from
   /// the Note [noteId]. The Note leaves Unsorted; it can spawn several.
-  Routine spawn(String noteId, Schedule schedule) {
+  /// [within] writes more of it in the same batch, given its id.
+  Routine spawn(
+    String noteId,
+    Schedule schedule, {
+    void Function(String id)? within,
+  }) {
     final note = Notes(store).byId(noteId);
     if (note == null || note.isTrashed || note.isMerged) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note in the lists');
@@ -174,6 +180,7 @@ class Routines {
           store.clock().toUtc().toIso8601String(),
         );
       }
+      within?.call(id);
     });
     return byId(id)!;
   }
@@ -333,7 +340,8 @@ class Routines {
     final escalation = int.tryParse(fields[RoutineKeys.escalation] ?? '');
     final trashed = fields[RoutineKeys.trashed];
     DateTime? scheduledAt;
-    for (final entry in store.history(id)) {
+    final history = store.history(id);
+    for (final entry in history) {
       // Leaving the trash bounds what was asked for like a new schedule.
       if (!RoutineKeys.scheduleFields.contains(entry.field) &&
           entry.field != RoutineKeys.trashed) {
@@ -353,6 +361,10 @@ class Routines {
       trashed: trashed == null ? null : DateTime.parse(trashed),
       trashedWith: trashed == null ? null : fields[RoutineKeys.trashedWith],
       done: {
+        // A Session's Occurrence is Done too once every pick has an
+        // entry (ADR 0029); a check-off, written below, keeps its moment.
+        if (fields[SessionKeys.pool] != null)
+          ...SessionMarks.read(store, id, history).doneFromEntries(store),
         for (final MapEntry(:key, :value) in fields.entries)
           if (key.startsWith(RoutineKeys.donePrefix) && value != null)
             key.substring(RoutineKeys.donePrefix.length): DateTime.parse(value),

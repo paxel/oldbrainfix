@@ -24,6 +24,18 @@ Future<bool> editTallyEntry(
   TallyEntryScreen(notes: notes, noteId: noteId, entryId: entryId),
 );
 
+/// The entry page for a new entry of the Tally of [noteId] that [record]
+/// saves, such as for a Session's pick; whether one was saved.
+Future<bool> recordTallyEntry(
+  BuildContext context,
+  Notes notes,
+  String noteId,
+  void Function(Map<String, double> values, String line) record,
+) => _open(
+  context,
+  TallyEntryScreen(notes: notes, noteId: noteId, record: record),
+);
+
 Future<bool> _open(BuildContext context, Widget screen) async =>
     await Navigator.of(context)
         .push<bool>(MaterialPageRoute(builder: (_) => screen)) ??
@@ -35,6 +47,10 @@ Future<bool> _open(BuildContext context, Widget screen) async =>
 /// for, today for a new one; and one line of text. A value left empty is
 /// none. An entry that exists has Delete in the bar, which asks once; it
 /// can be restored. Leaving without Save changes nothing.
+///
+/// With [record], a new entry is saved through it instead, such as for a
+/// Session's pick (ADR 0029); it counts for now, so the date does not
+/// show.
 class TallyEntryScreen extends StatefulWidget {
   final Notes notes;
   final String noteId;
@@ -42,11 +58,16 @@ class TallyEntryScreen extends StatefulWidget {
   /// The entry shown; null for a new one.
   final String? entryId;
 
+  /// Saves a new entry's values, by field id in the base unit, and its
+  /// line; null to add it to the Tally as any.
+  final void Function(Map<String, double> values, String line)? record;
+
   const TallyEntryScreen({
     super.key,
     required this.notes,
     required this.noteId,
     this.entryId,
+    this.record,
   });
 
   @override
@@ -179,15 +200,15 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
       showField(_lineFocus);
       return;
     }
+    final values = {
+      for (final MapEntry(:key, :value) in parsed.entries) key: ?value,
+    };
     if (entry == null) {
-      _tallies.add(
-        widget.noteId,
-        values: {
-          for (final MapEntry(:key, :value) in parsed.entries) key: ?value,
-        },
-        line: line,
-        at: _at(),
-      );
+      if (widget.record case final record?) {
+        record(values, line);
+      } else {
+        _tallies.add(widget.noteId, values: values, line: line, at: _at());
+      }
     } else {
       _tallies.editEntry(
         entry.id,
@@ -258,19 +279,20 @@ class _TallyEntryScreenState extends State<TallyEntryScreen> {
                   ),
                 ),
               ),
-            EditorPanel(
-              heading: t.tallyEntryDate,
-              child: Material(
-                type: MaterialType.transparency,
-                child: ListTile(
-                  key: const ValueKey('tally-entry-date'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event_outlined),
-                  title: Text(date.format(_day)),
-                  onTap: _pickDay,
+            if (entry != null || widget.record == null)
+              EditorPanel(
+                heading: t.tallyEntryDate,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    key: const ValueKey('tally-entry-date'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.event_outlined),
+                    title: Text(date.format(_day)),
+                    onTap: _pickDay,
+                  ),
                 ),
               ),
-            ),
             EditorPanel(
               child: TextField(
                 key: const ValueKey('tally-entry-line'),

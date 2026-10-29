@@ -38,7 +38,7 @@ pub fn day_text(t: &L10n, day: Day) -> String {
 }
 
 /// The full name of `weekday`, 1 for Monday to 7 for Sunday.
-fn weekday_long(t: &L10n, weekday: u32) -> &'static str {
+pub fn weekday_long(t: &L10n, weekday: u32) -> &'static str {
     match weekday {
         1 => t.weekday_long_mon(),
         2 => t.weekday_long_tue(),

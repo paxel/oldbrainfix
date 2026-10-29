@@ -13,6 +13,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::entry::{dart_iso, parse_time};
 use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
+use crate::sessions::{SessionMarks, keys as session_keys};
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::{Error, Result};
 
@@ -134,6 +135,17 @@ impl<'a> Routines<'a> {
     /// Spawns a Routine (or a Reminder, when `schedule` happens once) from
     /// the Note `note_id`. The Note leaves Unsorted; it can spawn several.
     pub fn spawn(&self, note_id: &str, schedule: &Schedule) -> Result<Routine> {
+        self.spawn_with(note_id, schedule, |_| Ok(()))
+    }
+
+    /// [`Routines::spawn`], with `within` writing more of it in the same
+    /// batch, given its id.
+    pub fn spawn_with(
+        &self,
+        note_id: &str,
+        schedule: &Schedule,
+        within: impl FnOnce(&str) -> Result<()>,
+    ) -> Result<Routine> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let Some(note) = note.filter(|n| !n.is_trashed() && !n.is_merged()) else {
             return Err(Error::Invalid(format!(
@@ -158,7 +170,7 @@ impl<'a> Routines<'a> {
                 let at = dart_iso(s.now());
                 s.append(note_id, note_keys::SPAWNED, Some(&at), None)?;
             }
-            Ok(())
+            within(&id)
         })?;
         self.by_id(&id)?
             .ok_or_else(|| Error::Invalid("the spawned Routine is gone".into()))
@@ -349,7 +361,8 @@ impl<'a> Routines<'a> {
             .filter(|e| *e >= 1);
         let trashed = fields.get(keys::TRASHED).map(parse_time).transpose()?;
         let mut scheduled_at: Option<DateTime<Utc>> = None;
-        for entry in self.store.history(id)? {
+        let history = self.store.history(id)?;
+        for entry in &history {
             // Leaving the trash bounds what was asked for like a new
             // schedule.
             if !keys::SCHEDULE_FIELDS.contains(&entry.field.as_str())
@@ -361,7 +374,13 @@ impl<'a> Routines<'a> {
                 scheduled_at = Some(entry.date_at);
             }
         }
-        let mut done = BTreeMap::new();
+        // A Session's Occurrence is Done too once every pick has an
+        // entry (ADR 0029); a check-off, written below, keeps its moment.
+        let mut done = if fields.get(session_keys::POOL).is_some() {
+            SessionMarks::read(self.store, id, &history)?.done_from_entries(self.store)?
+        } else {
+            BTreeMap::new()
+        };
         for (key, value) in fields.iter() {
             if let (Some(occurrence), Some(value)) = (key.strip_prefix(keys::DONE_PREFIX), value) {
                 done.insert(occurrence.to_string(), parse_time(value)?);

@@ -52,3 +52,7 @@ Amended by ADR 0027 (#101): a Frog is judged by its Note like a Routine. A Manag
 ## Tallies (ADR 0028)
 
 Amended by ADR 0028 (#103): a Tally's fields lie on its Note and are changed as the Note is, by its owner or a Manager. Its entries are judged like Sections: anyone with a role adds one, and only its author or a Manager changes or removes it.
+
+## Sessions (ADR 0029)
+
+Amended by ADR 0029 (#104): a Member writes a Session's picks and the marks of the entries recorded for them (`pick@` and `entry@` on its Routine) as they write `done@`, so everyone in the Area gets the same picks and shares one Done; the pool, counts and rule are the Manager's.

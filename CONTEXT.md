@@ -128,6 +128,10 @@ _Avoid_: tracker, log, workout, exercise, habit
 One record of a Tally: a value for some of its fields, a date, one line of text and its author. German: Eintrag.
 _Avoid_: Section (a Section is a dated part of a Note's text), record, set
 
+**Session**:
+A Routine that picks a few Tallies from its pool for each Occurrence, as many as its count says for that weekday, by its rule: Random, Rolling (through the pool in its order, continuing where it stopped) or Least selected (the fewest entries first). The picks are the same on all of the user's own Devices and for everyone in a Shared Area, and "Another one" swaps one of them. An Occurrence of it is Done once every pick has an entry from it, by anyone, or when checked off. German: Einheit.
+_Avoid_: workout, training, playlist, set
+
 ### People and devices
 
 **Device**:

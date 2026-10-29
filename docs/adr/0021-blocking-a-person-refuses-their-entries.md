@@ -70,3 +70,7 @@ Amended for #91: a block also deletes every stranger's Sent Item held until "Sho
 ## Frogs (ADR 0027)
 
 Amended by ADR 0027 (#101): a blocked person's check-off of a Frog is kept like one of an Occurrence, in its exact shape: `done` on `frog:<id>`, null or an instant.
+
+## Sessions (ADR 0029)
+
+Amended by ADR 0029 (#104): a blocked person's picks of a Session and the marks of their entries for them are no check-offs; they are refused and deleted like the rest of their writing.

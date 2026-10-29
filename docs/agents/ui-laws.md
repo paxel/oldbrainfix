@@ -81,8 +81,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   The three are actions, not a choice of value: a tap saves the Note
   with that Nudge time, so the radio-button law does not apply to them.
 - After saving, the new Note's card shows with its enrich options
-  (Area or Topic, Routine, Reminder). Enriching is never required;
-  leaving keeps the Note Unsorted.
+  (Area or Topic, Routine, Reminder, Frog, Session). Enriching is never
+  required; leaving keeps the Note Unsorted.
 
 ## Agenda
 
@@ -101,6 +101,16 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Checked off today, there all day.** An Occurrence checked off today
   stays on the Agenda for the day as Done, box checked and title struck
   through; the box unchecks it. Checking off opens nothing.
+- **A Session's row today lists its picks under its title**, in the
+  order picked, each Tally's name with its targets ("Push-ups 20 times,
+  Wall sit 1:00"), struck through once it has an entry. Tapping a pick
+  opens its entry form, prefilled with the targets; saving records it
+  for this Occurrence. Each pick without an entry offers "Another one"
+  while the pool holds a Tally not picked. The row's own box checks the
+  Occurrence off as any Routine's; once every pick has an entry it is
+  Done and stays checked, and removing an entry undoes that. Tomorrow
+  and later days show only the title and how many it picks: the picks
+  are made on the day.
 
 ## Cards
 

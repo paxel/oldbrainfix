@@ -343,6 +343,19 @@ impl<'a> Tallies<'a> {
         line: &str,
         at: Option<DateTime<Utc>>,
     ) -> Result<TallyEntry> {
+        self.add_with(note_id, values, line, at, |_| Ok(()))
+    }
+
+    /// [`Tallies::add`], with `within` writing more in the same batch,
+    /// given the entry's id.
+    pub fn add_with(
+        &self,
+        note_id: &str,
+        values: &BTreeMap<String, f64>,
+        line: &str,
+        at: Option<DateTime<Utc>>,
+        within: impl FnOnce(&str) -> Result<()>,
+    ) -> Result<TallyEntry> {
         let tally = self.by_note(note_id)?;
         let note = Notes::new(self.store).by_id(note_id)?;
         let (Some(tally), Some(note)) = (tally, note) else {
@@ -383,7 +396,7 @@ impl<'a> Tallies<'a> {
             if !text.is_empty() {
                 s.append(&id, keys::LINE, Some(text), Some(now))?;
             }
-            Ok(())
+            within(&id)
         })?;
         self.entry_by_id(&id)?
             .ok_or_else(|| Error::Invalid("the recorded entry is gone".into()))

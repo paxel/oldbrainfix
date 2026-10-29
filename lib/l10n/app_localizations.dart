@@ -797,7 +797,7 @@ abstract class AppLocalizations {
   /// No description provided for @routineOrReminder.
   ///
   /// In en, this message translates to:
-  /// **'Routine, Reminder or Frog'**
+  /// **'Routine, Reminder, Frog or Session'**
   String get routineOrReminder;
 
   /// No description provided for @routine.
@@ -4967,7 +4967,7 @@ abstract class AppLocalizations {
   /// No description provided for @frogsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No open Frogs. \"Routine, Reminder or Frog\" on a Note\'s card makes one.'**
+  /// **'No open Frogs. \"Routine, Reminder, Frog or Session\" on a Note\'s card makes one.'**
   String get frogsEmpty;
 
   /// A Frog from a locked Area set to Masked, on the Agenda.
@@ -5347,6 +5347,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'imperial'**
   String get unitSystemImperialName;
+
+  /// A Routine that picks Tallies from a pool for each Occurrence (CONTEXT.md: Session).
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get session;
+
+  /// No description provided for @newSession.
+  ///
+  /// In en, this message translates to:
+  /// **'New Session'**
+  String get newSession;
+
+  /// The Tallies a Session picks from (CONTEXT.md: Session).
+  ///
+  /// In en, this message translates to:
+  /// **'Pool'**
+  String get sessionPool;
+
+  /// No description provided for @sessionPoolExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'The Tallies it picks from.'**
+  String get sessionPoolExplain;
+
+  /// No description provided for @sessionPoolOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Rolling goes through them from the top; drag a handle to change the order.'**
+  String get sessionPoolOrder;
+
+  /// No description provided for @sessionPoolNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No Tallies yet. \"Make it a Tally\" in a Note\'s ⋮ makes one.'**
+  String get sessionPoolNone;
+
+  /// No description provided for @sessionPoolMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose at least one Tally.'**
+  String get sessionPoolMissing;
+
+  /// The drag handle of a Tally in a Session's pool.
+  ///
+  /// In en, this message translates to:
+  /// **'Move {name}'**
+  String sessionMove(String name);
+
+  /// No description provided for @sessionCount.
+  ///
+  /// In en, this message translates to:
+  /// **'How many it picks each time'**
+  String get sessionCount;
+
+  /// No description provided for @sessionCountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Type a number from 1 to 99.'**
+  String get sessionCountInvalid;
+
+  /// No description provided for @sessionWeekdayCounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Count per weekday'**
+  String get sessionWeekdayCounts;
+
+  /// No description provided for @sessionWeekdayCountsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Every day the same} =1{1 weekday with its own count} other{{count} weekdays with their own count}}'**
+  String sessionWeekdayCountsSummary(int count);
+
+  /// No description provided for @sessionWeekdayCountsExplain.
+  ///
+  /// In en, this message translates to:
+  /// **'A weekday left empty picks as many as every day.'**
+  String get sessionWeekdayCountsExplain;
+
+  /// No description provided for @sessionWeekdayCountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'As every day'**
+  String get sessionWeekdayCountHint;
+
+  /// No description provided for @sessionRule.
+  ///
+  /// In en, this message translates to:
+  /// **'How it picks'**
+  String get sessionRule;
+
+  /// No description provided for @sessionRuleRandom.
+  ///
+  /// In en, this message translates to:
+  /// **'Random'**
+  String get sessionRuleRandom;
+
+  /// No description provided for @sessionRuleRandomDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'A new random pick each time.'**
+  String get sessionRuleRandomDetail;
+
+  /// No description provided for @sessionRuleRolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Rolling'**
+  String get sessionRuleRolling;
+
+  /// No description provided for @sessionRuleRollingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Through the pool in its order, continuing where it stopped.'**
+  String get sessionRuleRollingDetail;
+
+  /// No description provided for @sessionRuleLeast.
+  ///
+  /// In en, this message translates to:
+  /// **'Least selected'**
+  String get sessionRuleLeast;
+
+  /// No description provided for @sessionRuleLeastDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The Tallies with the fewest entries first.'**
+  String get sessionRuleLeastDetail;
+
+  /// Swaps a Tally a Session picked on the Agenda for the next by its rule.
+  ///
+  /// In en, this message translates to:
+  /// **'Another one'**
+  String get sessionAnother;
+
+  /// A Session's row on a later day of the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Picks 1 Tally} other{Picks {count} Tallies}}'**
+  String sessionPicks(int count);
+
+  /// No description provided for @sessionNothingToPick.
+  ///
+  /// In en, this message translates to:
+  /// **'None of its Tallies is left to pick.'**
+  String get sessionNothingToPick;
+
+  /// A Tally a Session picked from a locked Area set to Masked, on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Tally'**
+  String get maskedTally;
 }
 
 class _AppLocalizationsDelegate

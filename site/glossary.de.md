@@ -126,6 +126,10 @@ _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 Ein Datensatz einer Strichliste: ein Wert für einige ihrer Felder, ein Datum, eine Zeile Text und sein Verfasser.
 _Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz), Datensatz, Satz
 
+**Einheit** [Session]:
+Eine Routine, die für jede Fälligkeit einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst.
+_Avoid_: Workout, Training, Playlist, Satz
+
 ## Menschen und Geräte
 
 **Gerät** [Device]:

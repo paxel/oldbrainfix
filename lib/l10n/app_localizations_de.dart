@@ -406,7 +406,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get newRoutineTooltip => 'Neue Routine oder Erinnerung';
 
   @override
-  String get routineOrReminder => 'Routine, Erinnerung oder Frosch';
+  String get routineOrReminder => 'Routine, Erinnerung, Frosch oder Einheit';
 
   @override
   String get routine => 'Routine';
@@ -3120,7 +3120,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get frogsEmpty =>
-      'Keine offenen Frösche. „Routine, Erinnerung oder Frosch“ auf der Karte einer Notiz macht einen.';
+      'Keine offenen Frösche. „Routine, Erinnerung, Frosch oder Einheit“ auf der Karte einer Notiz macht einen.';
 
   @override
   String get maskedFrog => 'Privater Frosch';
@@ -3325,4 +3325,104 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get unitSystemImperialName => 'angloamerikanisch';
+
+  @override
+  String get session => 'Einheit';
+
+  @override
+  String get newSession => 'Neue Einheit';
+
+  @override
+  String get sessionPool => 'Vorrat';
+
+  @override
+  String get sessionPoolExplain => 'Die Strichlisten, aus denen sie auswählt.';
+
+  @override
+  String get sessionPoolOrder =>
+      'Reihum geht sie von oben nach unten durch; zum Ändern der Reihenfolge an einem Griff ziehen.';
+
+  @override
+  String get sessionPoolNone =>
+      'Noch keine Strichlisten. „Zur Strichliste machen“ im ⋮ einer Notiz macht eine.';
+
+  @override
+  String get sessionPoolMissing => 'Wähle mindestens eine Strichliste.';
+
+  @override
+  String sessionMove(String name) {
+    return '$name verschieben';
+  }
+
+  @override
+  String get sessionCount => 'Wie viele sie jedes Mal auswählt';
+
+  @override
+  String get sessionCountInvalid => 'Gib eine Zahl von 1 bis 99 ein.';
+
+  @override
+  String get sessionWeekdayCounts => 'Anzahl je Wochentag';
+
+  @override
+  String sessionWeekdayCountsSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Wochentage mit eigener Anzahl',
+      one: '1 Wochentag mit eigener Anzahl',
+      zero: 'Jeden Tag gleich',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sessionWeekdayCountsExplain =>
+      'Ein leer gelassener Wochentag wählt so viele wie jeder Tag.';
+
+  @override
+  String get sessionWeekdayCountHint => 'Wie jeden Tag';
+
+  @override
+  String get sessionRule => 'Wie sie auswählt';
+
+  @override
+  String get sessionRuleRandom => 'Zufällig';
+
+  @override
+  String get sessionRuleRandomDetail => 'Jedes Mal neu zufällig.';
+
+  @override
+  String get sessionRuleRolling => 'Reihum';
+
+  @override
+  String get sessionRuleRollingDetail =>
+      'Der Reihe nach durch den Vorrat, weiter, wo sie stehen blieb.';
+
+  @override
+  String get sessionRuleLeast => 'Am seltensten';
+
+  @override
+  String get sessionRuleLeastDetail =>
+      'Die Strichlisten mit den wenigsten Einträgen zuerst.';
+
+  @override
+  String get sessionAnother => 'Noch eine';
+
+  @override
+  String sessionPicks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wählt $count Strichlisten',
+      one: 'Wählt 1 Strichliste',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sessionNothingToPick =>
+      'Keine ihrer Strichlisten ist mehr zur Auswahl.';
+
+  @override
+  String get maskedTally => 'Private Strichliste';
 }

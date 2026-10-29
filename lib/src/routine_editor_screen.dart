@@ -10,13 +10,15 @@ import 'note_card.dart';
 import 'note_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
+import 'session_editor.dart';
 import 'system_bars.dart';
 
 /// The Device's wall clock: what its own clock shows for an instant.
 DateTime deviceWallClock(DateTime utc) => utc.toLocal();
 
-/// Spawns [spawn] from [note]: a Routine or Reminder through its editor,
-/// a Frog at once, which needs nothing more; true when one was made.
+/// Spawns [spawn] from [note]: a Routine, Reminder or Session through its
+/// editor, a Frog at once, which needs nothing more; true when one was
+/// made.
 Future<bool> spawnFromNote(
   BuildContext context,
   Notes notes,
@@ -35,6 +37,7 @@ Future<bool> spawnFromNote(
       places: places,
       noteId: note.id,
       reminder: spawn == Spawn.reminder,
+      session: spawn == Spawn.session,
     ),
   );
 }
@@ -74,6 +77,10 @@ Future<bool> _push(BuildContext context, Widget screen) async =>
 /// edit. A saved Routine's history
 /// opens from the top bar, and its calendar button adds it, as saved,
 /// to the calendar or shares it as a calendar file.
+///
+/// A Session (#104) has its pool, count, weekdays' counts and rule on top
+/// of the schedule ([SessionFields]); Save says under each field what to
+/// fix there.
 class RoutineEditorScreen extends StatefulWidget {
   /// The Re-nag intervals offered, in minutes.
   static const renagChoices = [5, 10, 15, 30, 60];
@@ -91,6 +98,9 @@ class RoutineEditorScreen extends StatefulWidget {
   /// A new one starts as a Reminder: once, at the next full hour.
   final bool reminder;
 
+  /// A new one is a Session, spawned from [noteId].
+  final bool session;
+
   const RoutineEditorScreen({
     super.key,
     required this.notes,
@@ -98,6 +108,7 @@ class RoutineEditorScreen extends StatefulWidget {
     this.routineId,
     this.noteId,
     this.reminder = false,
+    this.session = false,
   });
 
   @override
@@ -117,6 +128,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   late final Day _today;
   Routine? _routine;
   Note? _note;
+
+  /// The Session edited, when it is one.
+  Session? _session;
+  SessionDraft? _draft;
 
   bool _advanced = false;
   RepeatKind _kind = RepeatKind.every;
@@ -172,6 +187,10 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         : _routines.byId(widget.routineId ?? '');
     _routine = routine;
     if (routine != null) {
+      final session = _session = Sessions(widget.notes.store).byId(routine.id);
+      if (session != null) {
+        _draft = SessionDraft.of(widget.notes.store, routine.id, session);
+      }
       _note = _routines.note(routine);
       _renag = routine.renag;
       _escalation = routine.escalation;
@@ -179,6 +198,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     } else {
       final noteId = widget.noteId;
       _note = noteId == null ? null : widget.notes.byId(noteId);
+      if (widget.session && noteId != null) {
+        _draft = SessionDraft.of(widget.notes.store, noteId);
+      }
       if (widget.reminder) {
         // The next full hour, today or just after midnight.
         final wall = deviceWallClock(now.toUtc());
@@ -197,6 +219,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   void dispose() {
     _text.dispose();
     _rule.dispose();
+    _draft?.dispose();
     super.dispose();
   }
 
@@ -374,14 +397,25 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   void _save() {
     final schedule = _schedule;
     if (schedule == null) return;
+    final draft = _draft;
+    if (draft != null && !draft.valid) {
+      setState(() => draft.checked = true);
+      // The weekday to fix comes into view.
+      if (!draft.weekdaysValid) draft.weekdays.expand();
+      return;
+    }
     final routine = _routine;
     final note = _note;
+    final session = _session;
     final String id;
     if (routine != null) {
       _routines.reschedule(routine.id, schedule);
+      if (draft != null && session != null) draft.save(session);
       id = routine.id;
     } else if (note != null) {
-      id = _routines.spawn(note.id, schedule).id;
+      id = draft == null
+          ? _routines.spawn(note.id, schedule).id
+          : draft.spawn(note.id, schedule);
     } else {
       final text = _text.text.trim();
       if (text.isEmpty) return;
@@ -466,7 +500,9 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
         _schedule?.once ??
         (_advanced ? _rule.text.trim().isEmpty : _kind == RepeatKind.once);
     final routine = _routine;
-    final title = routine == null
+    final title = _draft != null
+        ? (routine == null ? t.newSession : t.session)
+        : routine == null
         ? (once ? t.newReminder : t.newRoutine)
         : (once ? t.reminder : t.routine);
     final note = _note;
@@ -569,6 +605,8 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
                   ),
           ),
         const SizedBox(height: 16),
+        if (_draft case final draft?)
+          SessionFields(draft: draft, onChanged: () => setState(() {})),
         EditorPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

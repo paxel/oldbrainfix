@@ -18,8 +18,8 @@ use chrono::{DateTime, Duration, Utc};
 use egui::{Id, RichText, Sense, TextEdit, Ui, WidgetInfo, WidgetType};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    Day, PersonFilter, Profile, Store, Tallies, Tally, TallyBucket, TallyEntry, TallyField,
-    TallyPeriod, TallyRule, UnitKind, UnitSystem, WallClock,
+    Day, Error, Occurrence, PersonFilter, Profile, Sessions, Store, Tallies, Tally, TallyBucket,
+    TallyEntry, TallyField, TallyPeriod, TallyRule, UnitKind, UnitSystem, WallClock,
 };
 
 use crate::app::{embossed, icon_button, radio_column, when};
@@ -994,6 +994,9 @@ impl FieldForm {
 /// click; the day it counts for, today for a new one, at the same time
 /// of day; and one line of text. A value left empty is none. An entry
 /// that exists has Delete, which asks once; it can be restored.
+///
+/// For a Session's pick (ADR 0029) a new entry is recorded for its
+/// Occurrence instead; it counts for now, so the day does not show.
 #[derive(Debug, Clone)]
 pub struct EntryForm {
     pub note_id: String,
@@ -1011,6 +1014,8 @@ pub struct EntryForm {
     invalid: HashSet<String>,
     empty: bool,
     focus: Option<String>,
+    /// The Session and its Occurrence a new entry is recorded for.
+    pick: Option<(String, Occurrence)>,
 }
 
 impl EntryForm {
@@ -1054,7 +1059,17 @@ impl EntryForm {
             system,
             invalid: HashSet::new(),
             empty: false,
+            pick: None,
         }
+    }
+
+    /// Records a new entry for the pick of `occurrence` of the Session
+    /// `session`.
+    pub fn for_pick(mut self, session: &str, occurrence: Occurrence) -> EntryForm {
+        if self.entry.is_none() {
+            self.pick = Some((session.to_string(), occurrence));
+        }
+        self
     }
 
     /// Writes the entry when nothing needs fixing; whether it did.
@@ -1100,7 +1115,22 @@ impl EntryForm {
                     .into_iter()
                     .filter_map(|(id, value)| Some((id, value?)))
                     .collect();
-                tallies.add(&self.note_id, &values, &line, at)?;
+                let recorded = match &self.pick {
+                    Some((session, occurrence)) => {
+                        let sessions = Sessions::new(store);
+                        match sessions.record(session, occurrence, &self.note_id, &values, &line) {
+                            // The pick changed meanwhile, such as by a
+                            // sync: the entry still goes to its Tally, so
+                            // nothing typed is lost.
+                            Err(Error::Invalid(_)) => false,
+                            done => done.map(|_| true)?,
+                        }
+                    }
+                    None => false,
+                };
+                if !recorded {
+                    tallies.add(&self.note_id, &values, &line, at)?;
+                }
             }
             Some(entry) => {
                 // Only those typed anew: one shown rounded stays as it is.
@@ -1156,10 +1186,13 @@ impl EntryForm {
                         }
                     });
                 }
-                embossed(ui, tones, false, None, |ui| {
-                    let label = ui.label(RichText::new(t.tally_entry_date()).strong().color(text));
-                    self.day_editor(ui, t, (label.id, focus.as_deref() == Some(DAY_FIELD)));
-                });
+                if self.pick.is_none() {
+                    embossed(ui, tones, false, None, |ui| {
+                        let label =
+                            ui.label(RichText::new(t.tally_entry_date()).strong().color(text));
+                        self.day_editor(ui, t, (label.id, focus.as_deref() == Some(DAY_FIELD)));
+                    });
+                }
                 embossed(ui, tones, false, None, |ui| {
                     let label = ui.label(RichText::new(t.tally_entry_line()).strong().color(text));
                     let field = ui

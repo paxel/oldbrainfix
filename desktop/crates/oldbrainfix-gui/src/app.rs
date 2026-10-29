@@ -45,7 +45,7 @@
 //! and found by the search over All Notes, an Area or a Topic.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -68,7 +68,7 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CardTaken, ClockTime, Day,
     DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, MissedSummary, Note, Notes,
     NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
-    Routines, Search, Section, Store, Tallies, Topic, UnitSystem, bundle,
+    Routines, Search, Section, Sessions, Store, Tallies, Topic, UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -96,6 +96,8 @@ use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::ring::{self, Rung};
 use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
+use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
+use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
     Joiner, SyncAction, SyncHost, bundle_result_text, device_name, import_bundle_result,
@@ -166,6 +168,8 @@ struct Placed {
 struct Row {
     row: AgendaRow,
     area: Option<Area>,
+    /// For a Session what shows under its title.
+    session: Option<SessionPart>,
 }
 
 /// What the Agenda shows.
@@ -576,6 +580,10 @@ enum Action {
         note: Option<String>,
         reminder: bool,
     },
+    /// A new Session from the Note with this id (#104).
+    NewSession(String),
+    /// Something asked of a Session's row on the Agenda.
+    Session(SessionAction),
     Editor(Intent),
     /// Deletes the edited Routine, asked.
     DeleteRoutine,
@@ -2331,13 +2339,36 @@ impl App {
         let agenda = match self.selection {
             Selection::Agenda => {
                 let wall = &*self.wall;
+                // Read as the Agenda shows, never while it is drawn, and
+                // before the rows read their Done: today's picks are
+                // written for everyone the Session reaches when they are
+                // new (ADR 0029), and reading again writes nothing.
+                let sessions = Sessions::new(store);
+                let system = self.unit_system()?;
+                let mut picked = HashMap::new();
+                for today in sessions.pick_today(wall)? {
+                    let key = (today.session.id().to_string(), today.occurrence.key());
+                    picked.insert(key, PicksShown::read(store, &self.t, today, system)?);
+                }
+                let counts: HashMap<String, _> = sessions
+                    .all()?
+                    .into_iter()
+                    .map(|s| (s.id().to_string(), s))
+                    .collect();
                 let agenda = routines.agenda_over(wall, AGENDA_DAYS)?;
                 let row = |row: AgendaRow| -> oldbrainfix_core::Result<Row> {
                     let area = match &row.note {
                         Some(note) => place(note.clone())?.area,
                         None => None,
                     };
-                    Ok(Row { row, area })
+                    let key = (row.routine.id.clone(), row.occurrence.key());
+                    let session = match picked.get(&key) {
+                        Some(shown) => Some(SessionPart::Today(Box::new(shown.clone()))),
+                        None => counts
+                            .get(&row.routine.id)
+                            .map(|s| SessionPart::Later(s.count_on(row.occurrence.day))),
+                    };
+                    Ok(Row { row, area, session })
                 };
                 let mut later = Vec::new();
                 for (i, rows) in agenda.later_rows.iter().enumerate() {
@@ -2774,7 +2805,12 @@ impl App {
                     let note = routines.note(&routine)?;
                     let today = Day::today(self.store.now(), &*self.wall);
                     let renag = DeviceSettings::new(&self.store).renag_interval()?;
-                    self.editor = Some(RoutineEditor::edit(&routine, note, today, renag));
+                    let mut editor = RoutineEditor::edit(&routine, note, today, renag);
+                    if let Some(session) = Sessions::new(&self.store).by_id(&id)? {
+                        let draft = SessionDraft::of(&self.store, &self.t, &id, Some(&session))?;
+                        editor = editor.with_session(draft, Some(session));
+                    }
+                    self.editor = Some(editor);
                     self.tally_form = None;
                 }
             }
@@ -2794,12 +2830,27 @@ impl App {
                     renag,
                 ));
             }
+            Action::NewSession(id) => {
+                self.save_text()?;
+                let note = Notes::new(&self.store).by_id(&id)?;
+                let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                let draft = SessionDraft::of(&self.store, &self.t, &id, None)?;
+                self.tally_form = None;
+                let editor = RoutineEditor::new(note, false, self.store.now(), &*self.wall, renag);
+                self.editor = Some(editor.with_session(draft, None));
+            }
+            Action::Session(asked) => self.session_action(asked)?,
             Action::Editor(intent) => match intent {
                 Intent::Save => {
-                    if let Some(editor) = &self.editor {
-                        editor.save(&self.store)?;
+                    if let Some(editor) = &mut self.editor
+                        && editor.save(&self.store)?.is_some()
+                    {
                         self.editor = None;
                     }
+                }
+                Intent::Session(SessionIntent::WeekdaysOpen(open)) => {
+                    let value = if open { "true" } else { "false" };
+                    self.store.set_local_setting(WEEKDAYS_OPEN, value)?;
                 }
                 Intent::Delete => {
                     let reminder = self.editor.as_ref().is_some_and(RoutineEditor::once);
@@ -3248,6 +3299,48 @@ impl App {
                 let value = if open { "true" } else { "false" };
                 self.store.set_local_setting(FROGS_DONE_OPEN, value)?;
             }
+        }
+        Ok(())
+    }
+
+    /// Does what was asked of a Session's row on the Agenda (#104): a
+    /// pick's entry form opens on the right with its Tally's Note
+    /// selected, which shows once it is saved.
+    fn session_action(&mut self, asked: SessionAction) -> oldbrainfix_core::Result<()> {
+        match asked {
+            SessionAction::Open {
+                session,
+                occurrence,
+                note_id,
+                entry,
+            } => {
+                let tallies = Tallies::new(&self.store);
+                let Some(tally) = tallies.by_note(&note_id)? else {
+                    return Ok(());
+                };
+                let entry = match entry {
+                    Some(id) => match tallies.entry_by_id(&id)? {
+                        Some(entry) if !entry.is_trashed() => {
+                            let changes = self.store.may_change(&id)?;
+                            Some((entry, changes))
+                        }
+                        _ => return Ok(()),
+                    },
+                    None => None,
+                };
+                let today = Day::today(self.store.now(), &*self.wall);
+                let system = self.unit_system()?;
+                self.save_text()?;
+                self.editor = None;
+                self.selected_note = Some(note_id);
+                let form = EntryForm::new(&tally, entry, (system, today), &*self.wall, &self.t);
+                self.tally_form = Some(TallyForm::Entry(form.for_pick(&session, occurrence)));
+            }
+            SessionAction::Another {
+                session,
+                occurrence,
+                note_id,
+            } => Sessions::new(&self.store).another(&session, &occurrence, &note_id)?,
         }
         Ok(())
     }
@@ -4677,8 +4770,8 @@ impl App {
                         ui.label(RichText::new(t.only_managers()).small().color(weak));
                         return;
                     }
-                    // "Routine, Reminder or Frog"; a Note has one open
-                    // Frog at a time.
+                    // "Routine, Reminder, Frog or Session"; a Note has one
+                    // open Frog at a time.
                     let frog_open = note_frogs.iter().any(|(f, _)| !f.is_done());
                     ui.horizontal(|ui| {
                         for (reminder, label) in [(false, t.routine()), (true, t.reminder())] {
@@ -4691,6 +4784,9 @@ impl App {
                         }
                         if !frog_open && ui.button(RichText::new(t.frog()).color(text)).clicked() {
                             actions.push(Action::SpawnFrog(note.id.clone()));
+                        }
+                        if ui.button(RichText::new(t.session()).color(text)).clicked() {
+                            actions.push(Action::NewSession(note.id.clone()));
                         }
                     });
                 });
@@ -7414,7 +7510,9 @@ pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
 
 /// One Occurrence on the Agenda as an embossed row: the box to check it
 /// off, its time, its Note's text, and its Area's colour and icon. A
-/// click on the text opens its Routine.
+/// click on the text opens its Routine. A Session's row lists its picks
+/// under it today, and how many it picks on later days; once every pick
+/// has an entry, its box stays checked.
 fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -7428,9 +7526,14 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
     let title = row_title(t, row.row.note.as_ref());
     let time = occurrence_time(t, &occurrence);
     embossed(ui, tones, false, colour, |ui| {
+        // Done from the entries of every pick stays checked.
+        let complete = matches!(&row.session, Some(SessionPart::Today(s)) if s.today.complete());
         ui.horizontal(|ui| {
             let label = format!("{}: {time} {title}", t.mark_done());
-            if check(ui, tones, done, &label).clicked() {
+            let toggled = ui
+                .add_enabled_ui(!complete, |ui| check(ui, tones, done, &label))
+                .inner;
+            if toggled.clicked() {
                 actions.push(Action::Toggle(routine.id.clone(), occurrence));
             }
             ui.add_space(4.0);
@@ -7465,6 +7568,14 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 }
             });
         });
+        // The picks go under the title, outside its click.
+        if let Some(part) = &row.session {
+            let mut asked = Vec::new();
+            ui.indent(("session part", &routine.id, occurrence.key()), |ui| {
+                session_view::part(ui, t, part, &mut asked);
+            });
+            actions.extend(asked.into_iter().map(Action::Session));
+        }
     });
 }
 

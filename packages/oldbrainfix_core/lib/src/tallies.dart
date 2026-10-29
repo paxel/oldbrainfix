@@ -295,12 +295,14 @@ class Tallies {
 
   /// Records an entry in the Tally of [noteId]: [values] by field id, in
   /// the base unit, and a text [line], counting for [at] or the store's
-  /// now. Anyone with a role in its Area may.
+  /// now. Anyone with a role in its Area may. [within] writes more in
+  /// the same batch, given the entry's id.
   TallyEntry add(
     String noteId, {
     Map<String, double> values = const {},
     String line = '',
     DateTime? at,
+    void Function(String id)? within,
   }) {
     final tally = byNote(noteId);
     final note = Notes(store).byId(noteId);
@@ -334,6 +336,7 @@ class Tallies {
       if (text.isNotEmpty) {
         store.append(id, TallyKeys.line, text, date: now);
       }
+      within?.call(id);
     });
     return entryById(id)!;
   }

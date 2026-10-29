@@ -46,6 +46,7 @@ pub mod routines;
 pub mod schedule;
 pub mod search;
 pub mod sent;
+pub mod sessions;
 pub mod settings;
 pub mod shared;
 pub mod signing;
@@ -78,6 +79,7 @@ pub use schedule::{
     SimpleRepeat, WallClock,
 };
 pub use search::Search;
+pub use sessions::{Session, SessionMarks, SessionOccurrence, SessionPick, SessionRule, Sessions};
 pub use settings::DeviceSettings;
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};

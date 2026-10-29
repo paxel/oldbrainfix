@@ -2,9 +2,9 @@
 //! (`packages/oldbrainfix_core/tool/gen_fixtures.dart`); this core must
 //! read every log the same, sign every entry the same, and write every
 //! scenario again to the same log, byte for byte. Schedules, the alarm
-//! plan, the Missed Summary, the Nudge, the Frogs offered and the charts
-//! of Tallies must come to the same on the same European wall clock,
-//! Europe/Berlin here.
+//! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
+//! of Tallies and the picks of Sessions must come to the same on the
+//! same European wall clock, Europe/Berlin here.
 
 use std::path::{Path, PathBuf};
 
@@ -22,17 +22,17 @@ use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Frog, Frogs, Importance, Note, Notes,
     NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines,
-    STARTER_SET, Schedule, Search, Section, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry,
-    TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, SigningKey, SimpleRepeat, Store,
+    Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 10] = [
-    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "tallies",
-    "trash",
+const SCENARIOS: [&str; 11] = [
+    "edits", "formats", "frogs", "media", "notes", "places", "routines", "sections", "sessions",
+    "tallies", "trash",
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
@@ -837,7 +837,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 10] = [
+    let writers: [(&str, Writer); 11] = [
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
@@ -846,6 +846,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("places", write_places),
         ("routines", write_routines),
         ("sections", write_sections),
+        ("sessions", write_sessions),
         ("tallies", write_tallies),
         ("trash", write_trash),
     ];
@@ -1223,6 +1224,162 @@ fn frogs_and_todays_pick_come_to_what_the_dart_core_says() -> TestResult {
         }));
     }
     assert_eq!(json!(sections), expected["today"]);
+    assert_eq!(store.all_entries()?.len(), before, "today writes nothing");
+    Ok(())
+}
+
+// ------------------------------------------------------------- Sessions
+
+/// The generator's `sessions` scenario.
+fn write_sessions(store: &Store) -> Built {
+    let notes = Notes::new(store);
+    let tallies = Tallies::new(store);
+    let sessions = Sessions::new(store);
+    let tally =
+        |name: &str, unit: &str, target: f64| -> Result<String, Box<dyn std::error::Error>> {
+            let id = notes.capture(name, None, None)?.id;
+            tallies.add_field(&id, name, unit, Some(target), None)?;
+            Ok(id)
+        };
+    let targets = |id: &str| -> Result<BTreeMap<String, f64>, Box<dyn std::error::Error>> {
+        Ok(tallies.by_note(id)?.ok_or("a Tally")?.targets())
+    };
+    let push_ups = tally("Push-ups", "times", 20.0)?;
+    let sit_ups = tally("Sit-ups", "times", 25.0)?;
+    let bridge = tally("Half bridge", "times", 15.0)?;
+    let wall_sit = tally("Wall sit", "s", 60.0)?;
+    let plank = tally("Plank", "s", 45.0)?;
+    let pages = tally("Reading", "pages", 12.0)?;
+    let video = tally("Media time", "h", 3600.0)?;
+    let every_day = |times: &[ClockTime]| -> Result<Schedule, Box<dyn std::error::Error>> {
+        Ok(Schedule::new(Day::new(2026, 1, 1), times, daily()).ok_or("a schedule")?)
+    };
+    let pool = |ids: &[&String]| -> Vec<String> { ids.iter().map(|id| (*id).clone()).collect() };
+    let sport = sessions.create(
+        "Sport",
+        &every_day(&[at(7, 0)?])?,
+        &pool(&[&push_ups, &sit_ups, &bridge, &wall_sit, &plank]),
+        3,
+        SessionRule::Rolling,
+    )?;
+    sessions.set_count_on(sport.id(), 6, Some(1))?;
+    let learn = sessions.create(
+        "Learn",
+        &every_day(&[])?,
+        &pool(&[&pages, &video, &push_ups]),
+        1,
+        SessionRule::Least,
+    )?;
+    let stretch = sessions.create(
+        "Stretch",
+        &every_day(&[at(18, 0)?])?,
+        &pool(&[&bridge, &wall_sit, &plank, &sit_ups]),
+        2,
+        SessionRule::Random,
+    )?;
+    tallies.add(&pages, &BTreeMap::new(), "Novel", None)?;
+    sessions.pick_today(&frog_day(0))?;
+    sessions.pick_today(&frog_day(0))?;
+    let morning = Occurrence::new(Day::new(2026, 1, 1), Some(at(7, 0)?));
+    sessions.another(sport.id(), &morning, &sit_ups)?;
+    sessions.record(sport.id(), &morning, &push_ups, &targets(&push_ups)?, "")?;
+    sessions.record(sport.id(), &morning, &wall_sit, &targets(&wall_sit)?, "")?;
+    sessions.record(sport.id(), &morning, &bridge, &BTreeMap::new(), "Shaky")?;
+    let all_day = Occurrence::new(Day::new(2026, 1, 1), None);
+    let first = sessions
+        .on(learn.id(), &all_day)?
+        .picks
+        .first()
+        .ok_or("a pick")?
+        .note_id
+        .clone();
+    sessions.record(learn.id(), &all_day, &first, &targets(&first)?, "")?;
+    let evening = Occurrence::new(Day::new(2026, 1, 1), Some(at(18, 0)?));
+    Routines::new(store).mark_done(stretch.id(), &evening, None)?;
+    sessions.pick_today(&frog_day(1))?;
+    let next = Occurrence::new(Day::new(2026, 1, 2), Some(at(7, 0)?));
+    let done = sessions.record(sport.id(), &next, &sit_ups, &BTreeMap::new(), "Too much")?;
+    tallies.trash_entry(&done.id)?;
+    notes.trash(&plank)?;
+    sessions.pick_today(&frog_day(1))?;
+    sessions.pick_today(&frog_day(2))?;
+    sessions.pick_today(&frog_day(4))?;
+    Routines::new(store).create("Walk the dog", &every_day(&[at(8, 0)?])?)?;
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
+#[test]
+fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
+    let expected = read_json(&fixtures().join("sessions").join("sessions.json"))?;
+    let read_at = read_json(&fixtures().join("sessions").join("expected.json"))?;
+    let store = load("sessions", read_at["now"].as_str().ok_or("now")?)?;
+    let sessions = Sessions::new(&store);
+    let routines = Routines::new(&store);
+    let mut every = Vec::new();
+    for s in sessions.all()? {
+        let counts: serde_json::Map<String, Value> = s
+            .counts
+            .iter()
+            .map(|(weekday, count)| (weekday.to_string(), json!(count)))
+            .collect();
+        every.push(json!({
+            "id": s.id(),
+            "noteId": s.routine.note_id,
+            "pool": s.pool,
+            "count": s.count,
+            "counts": counts,
+            "rule": s.rule.name(),
+            "picksFrom": sessions.pool(&s)?,
+            "choices": sessions.choices(s.id())?,
+        }));
+    }
+    assert_eq!(json!(every), expected["sessions"]);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut all = Vec::new();
+    for id in &ids {
+        if let Some(routine) = routines.by_id(id)? {
+            all.push(routine_json(&routine));
+        }
+    }
+    assert_eq!(json!(all), expected["routines"]);
+    let before = store.all_entries()?.len();
+    let mut days = Vec::new();
+    for days_on in -1..=4 {
+        let mut shown = Vec::new();
+        for o in sessions.today(&frog_day(days_on))? {
+            let picks: Vec<Value> = o
+                .picks
+                .iter()
+                .map(|p| {
+                    let targets: serde_json::Map<String, Value> = p
+                        .tally
+                        .as_ref()
+                        .map(|t| t.targets())
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|(field, target)| (field, tally_number(Some(target))))
+                        .collect();
+                    json!({
+                        "noteId": p.note_id,
+                        "text": p.note.as_ref().map(|n| n.text.clone()),
+                        "targets": targets,
+                        "entries": p.entries.iter().map(|e| e.id.clone()).collect::<Vec<_>>(),
+                    })
+                })
+                .collect();
+            shown.push(json!({
+                "session": o.session.id(),
+                "occurrence": o.occurrence.key(),
+                "picks": picks,
+                "canSwap": o.can_swap,
+                "complete": o.complete(),
+            }));
+        }
+        days.push(json!(shown));
+    }
+    assert_eq!(json!(days), expected["today"]);
     assert_eq!(store.all_entries()?.len(), before, "today writes nothing");
     Ok(())
 }

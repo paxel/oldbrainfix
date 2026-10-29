@@ -66,7 +66,8 @@ void main() {
   }
 
   group('making a Frog', () {
-    testWidgets('a captured Note\'s card offers "Routine, Reminder or Frog"; '
+    testWidgets('a captured Note\'s card offers "Routine, Reminder, Frog or '
+        'Session"; '
         'the Frog takes it out of Unsorted and shows under today', (
       tester,
     ) async {
@@ -76,7 +77,7 @@ void main() {
       await tap(tester, find.text('Save'));
       expect(notes.unsorted(), hasLength(1));
 
-      await tap(tester, find.byTooltip('Routine, Reminder or Frog'));
+      await tap(tester, find.byTooltip('Routine, Reminder, Frog or Session'));
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.text('Routine'), findsOneWidget);
       expect(find.text('Reminder'), findsOneWidget);
@@ -265,7 +266,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'No open Frogs. "Routine, Reminder or Frog" on a Note\'s card '
+          'No open Frogs. "Routine, Reminder, Frog or Session" on a Note\'s '
+          'card '
           'makes one.',
         ),
         findsOneWidget,

@@ -195,7 +195,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Household'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Routine, Reminder or Frog'), findsNothing);
+    expect(find.byTooltip('Routine, Reminder, Frog or Session'), findsNothing);
   });
 
   testWidgets('a Member may not remove the recording of someone else\'s '

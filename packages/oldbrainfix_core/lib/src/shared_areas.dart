@@ -8,6 +8,7 @@ import 'pairing.dart';
 import 'places.dart';
 import 'profiles.dart';
 import 'routines.dart';
+import 'sessions.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'tallies.dart';
@@ -338,10 +339,14 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
           section
               ? ownerIn(area, list) == areas[area]?.personOf(e.device) &&
                     ownerIn(area, list) != null
-              // A Member checks off; the Frog is the Manager's.
+              // A Member checks off, and a Session's picks and the
+              // entries recorded for them are anyone's (ADR 0029); the
+              // Frog and the Routine are the Manager's.
               : frog
               ? e.field == FrogKeys.done
-              : e.field.startsWith(RoutineKeys.donePrefix),
+              : e.field.startsWith(RoutineKeys.donePrefix) ||
+                    e.field.startsWith(SessionKeys.pickPrefix) ||
+                    e.field.startsWith(SessionKeys.entryPrefix),
       };
       if (!ok) ignored.add(e.id);
     }

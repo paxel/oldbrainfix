@@ -318,5 +318,13 @@
   "alarmSoundDetail": "Every Routine and Reminder rings with it on this computer; Old Brain Fix plays it itself and their notifications stay silent. An escalated alarm rings with the system's alarm sound.",
   "@alarmSoundDetail": {"description": "In the desktop's Settings, under the alarm sound choice."},
   "unitSystemRegion": "As this computer's region: {system}",
-  "@unitSystemRegion": {"description": "In the desktop's Settings: the unit choice that follows the region the system reports.", "placeholders": {"system": {"type": "String"}}}
+  "@unitSystemRegion": {"description": "In the desktop's Settings: the unit choice that follows the region the system reports.", "placeholders": {"system": {"type": "String"}}},
+  "sessionPoolNoneDesk": "No Tallies yet. \"Make it a Tally\" in a Note's editor makes one.",
+  "@sessionPoolNoneDesk": {"description": "The desktop's Session editor without any Tally to pick; a Tally is made in the Note editor there, not in a ⋮."},
+  "sessionPoolOrderDesk": "Rolling goes through them from the top; the arrows change the order.",
+  "@sessionPoolOrderDesk": {"description": "Under the desktop's pool of a Rolling Session, which has up and down buttons instead of drag handles."},
+  "sessionMoveUp": "Move {name} up",
+  "@sessionMoveUp": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place up.", "placeholders": {"name": {"type": "String"}}},
+  "sessionMoveDown": "Move {name} down",
+  "@sessionMoveDown": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place down.", "placeholders": {"name": {"type": "String"}}}
 }

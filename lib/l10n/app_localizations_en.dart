@@ -403,7 +403,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newRoutineTooltip => 'New Routine or Reminder';
 
   @override
-  String get routineOrReminder => 'Routine, Reminder or Frog';
+  String get routineOrReminder => 'Routine, Reminder, Frog or Session';
 
   @override
   String get routine => 'Routine';
@@ -3087,7 +3087,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get frogsEmpty =>
-      'No open Frogs. \"Routine, Reminder or Frog\" on a Note\'s card makes one.';
+      'No open Frogs. \"Routine, Reminder, Frog or Session\" on a Note\'s card makes one.';
 
   @override
   String get maskedFrog => 'Private Frog';
@@ -3292,4 +3292,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unitSystemImperialName => 'imperial';
+
+  @override
+  String get session => 'Session';
+
+  @override
+  String get newSession => 'New Session';
+
+  @override
+  String get sessionPool => 'Pool';
+
+  @override
+  String get sessionPoolExplain => 'The Tallies it picks from.';
+
+  @override
+  String get sessionPoolOrder =>
+      'Rolling goes through them from the top; drag a handle to change the order.';
+
+  @override
+  String get sessionPoolNone =>
+      'No Tallies yet. \"Make it a Tally\" in a Note\'s ⋮ makes one.';
+
+  @override
+  String get sessionPoolMissing => 'Choose at least one Tally.';
+
+  @override
+  String sessionMove(String name) {
+    return 'Move $name';
+  }
+
+  @override
+  String get sessionCount => 'How many it picks each time';
+
+  @override
+  String get sessionCountInvalid => 'Type a number from 1 to 99.';
+
+  @override
+  String get sessionWeekdayCounts => 'Count per weekday';
+
+  @override
+  String sessionWeekdayCountsSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count weekdays with their own count',
+      one: '1 weekday with its own count',
+      zero: 'Every day the same',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sessionWeekdayCountsExplain =>
+      'A weekday left empty picks as many as every day.';
+
+  @override
+  String get sessionWeekdayCountHint => 'As every day';
+
+  @override
+  String get sessionRule => 'How it picks';
+
+  @override
+  String get sessionRuleRandom => 'Random';
+
+  @override
+  String get sessionRuleRandomDetail => 'A new random pick each time.';
+
+  @override
+  String get sessionRuleRolling => 'Rolling';
+
+  @override
+  String get sessionRuleRollingDetail =>
+      'Through the pool in its order, continuing where it stopped.';
+
+  @override
+  String get sessionRuleLeast => 'Least selected';
+
+  @override
+  String get sessionRuleLeastDetail =>
+      'The Tallies with the fewest entries first.';
+
+  @override
+  String get sessionAnother => 'Another one';
+
+  @override
+  String sessionPicks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Picks $count Tallies',
+      one: 'Picks 1 Tally',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sessionNothingToPick => 'None of its Tallies is left to pick.';
+
+  @override
+  String get maskedTally => 'Private Tally';
 }

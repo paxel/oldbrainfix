@@ -13,3 +13,7 @@ Amended by ADR 0027 (#101): a Note also spawns Frogs, jobs with no time done onc
 ## Tallies (ADR 0028)
 
 Amended by ADR 0028 (#103): a Note made a Tally, by its first field, leaves Unsorted as a Note that spawned something does. A Tally spawns nothing: its fields lie on the Note.
+
+## Sessions (ADR 0029)
+
+Amended by ADR 0029 (#104): a Session is a kind of Routine, spawned from a Note like any, that picks Tallies from a pool for each Occurrence.

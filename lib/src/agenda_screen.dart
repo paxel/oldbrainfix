@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
+
 import 'alarm_sync.dart';
 import 'app_lock.dart';
 import 'area_look.dart';
@@ -31,12 +33,30 @@ import 'profile_screen.dart';
 import 'routine_editor_screen.dart';
 import 'routine_history_screen.dart';
 import 'schedule_text.dart';
+import 'session_view.dart';
 import 'setup_screen.dart';
 import 'system_bars.dart';
+import 'tally_view.dart';
 
 /// An Agenda row with where its Note is filed and whether it shows
-/// Masked, read once per change.
-typedef _PlacedRow = ({AgendaRow row, Area? area, bool masked});
+/// Masked, read once per change; for a Session its Session, and today
+/// its picks.
+typedef _PlacedRow = ({
+  AgendaRow row,
+  Area? area,
+  bool masked,
+  Session? session,
+  _ShownPicks? picks,
+});
+
+/// Today's picks of a Session, with whether each shows Masked and opens
+/// its entry form, and whether they swap.
+typedef _ShownPicks = ({
+  SessionOccurrence today,
+  List<bool> masked,
+  List<bool> opens,
+  bool swaps,
+});
 
 /// A Frog of the "Eat a frog" section with its Note and Area, and
 /// whether it shows Masked.
@@ -73,6 +93,12 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// checked off, only that one shows, struck through, for the day. Its
 /// heading opens the Frog view; it shows while a Frog is open or one was
 /// eaten today. A Frog of a Masked Area shows masked, as an Occurrence.
+///
+/// A Session's row today lists its picks (ADR 0029), written for
+/// everyone the Session reaches as it loads: each opens its entry form
+/// and has "Another one" until it has an entry. Once each has one, the
+/// box stays checked. On later days the row says how many it picks. A
+/// Masked row lists none, and a pick from a Masked Area shows masked.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -118,6 +144,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _alarms = Alarms(widget.notes.store);
   late final _locks = AreaLocks(widget.notes.store);
   late final _frogs = Frogs(widget.notes.store);
+  late final _sessions = Sessions(widget.notes.store);
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
@@ -127,6 +154,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   /// The days after tomorrow, each with its rows.
   List<({Day day, List<_PlacedRow> rows})> _later = const [];
   var _unsorted = 0;
+
+  /// Today's Occurrences of Sessions with their picks, by Session id and
+  /// Occurrence key, and the units their targets show in.
+  Map<String, SessionOccurrence> _sessionsToday = const {};
+  var _system = UnitSystem.metric;
 
   /// Today's "Eat a frog" section, and its Frogs as they show.
   FrogsToday? _frogsToday;
@@ -212,6 +244,13 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   void _load() {
+    // Writes today's picks when they are new, before the rows read their
+    // Done; the reload that follows writes nothing.
+    _sessionsToday = {
+      for (final today in _sessions.pickToday(deviceWallClock))
+        _sessionKey(today.session.id, today.occurrence): today,
+    };
+    _system = deviceUnitSystem(widget.notes.store);
     final agenda = _routines.agenda(deviceWallClock, days: AgendaScreen.days);
     _today = [for (final row in agenda.todayRows) _place(row)];
     _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
@@ -249,14 +288,39 @@ class _AgendaScreenState extends State<AgendaScreen> {
         : placeNote(widget.places, captured);
   }
 
-  _PlacedRow _place(AgendaRow row) => (
-    row: row,
-    area: switch (row.note) {
-      final note? => placeNote(widget.places, note).area,
-      null => null,
-    },
-    masked: _locks.masks(row.routine),
-  );
+  static String _sessionKey(String id, Occurrence occurrence) =>
+      '$id@${occurrence.key}';
+
+  _PlacedRow _place(AgendaRow row) {
+    final store = widget.notes.store;
+    final id = row.routine.id;
+    final today = _sessionsToday[_sessionKey(id, row.occurrence)];
+    return (
+      row: row,
+      area: switch (row.note) {
+        final note? => placeNote(widget.places, note).area,
+        null => null,
+      },
+      masked: _locks.masks(row.routine),
+      session: today?.session ?? _sessions.byId(row.routine.id),
+      picks: today == null
+          ? null
+          : (
+              today: today,
+              masked: [
+                for (final pick in today.picks)
+                  switch (pick.note) {
+                    final note? => _masksNote(note),
+                    null => false,
+                  },
+              ],
+              opens: [
+                for (final pick in today.picks) opensPick(store, id, pick),
+              ],
+              swaps: today.canSwap && store.mayCheckOff(id),
+            ),
+    );
+  }
 
   /// Whether [note] shows Masked here: it is filed in a locked Area set
   /// to Masked, as [AreaLocks.masks] says of a Routine.
@@ -502,6 +566,63 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  Future<void> _openPick(SessionOccurrence today, SessionPick pick) async {
+    if (!await _openAreaOfNote(pick.note) || !mounted) return;
+    await openPick(context, widget.notes, today, pick);
+    if (!mounted) return;
+    _closeAreas();
+    _reload();
+  }
+
+  void _anotherPick(SessionOccurrence today, SessionPick pick) {
+    _sessions.another(today.session.id, today.occurrence, pick.noteId);
+    _reload();
+  }
+
+  _OccurrenceRow _occurrenceRow(
+    AppLocalizations t,
+    String locale,
+    _PlacedRow placed,
+  ) {
+    final (:row, :area, :masked, :picks, session: _) = placed;
+    return _OccurrenceRow(
+      row: row,
+      // A Masked row tells nothing of its Area either.
+      area: masked ? null : area,
+      masked: masked
+          ? maskedText(t, locale, row.routine, row.occurrence)
+          : null,
+      time: occurrenceTime(t, locale, row.occurrence),
+      below: _sessionPart(t, placed),
+      // Done from the entries of every pick stays checked.
+      onToggle: picks?.today.complete ?? false ? null : () => _toggle(row),
+      onTap: () => _openRow(row),
+      onMenu: row.routine.isReminder ? null : (at) => _rowMenu(row, at),
+    );
+  }
+
+  /// What shows under a Session's title: today its picks, on later days
+  /// how many it picks; nothing on a Masked row.
+  Widget? _sessionPart(AppLocalizations t, _PlacedRow placed) {
+    final (:row, :masked, :session, :picks, area: _) = placed;
+    if (masked || session == null) return null;
+    if (picks == null) {
+      return Text(t.sessionPicks(session.countOn(row.occurrence.day)));
+    }
+    final (:today, masked: hidden, :opens, :swaps) = picks;
+    final decimal = decimalSign(context);
+    return SessionPicks(
+      today: today,
+      texts: [
+        for (final (i, pick) in today.picks.indexed)
+          hidden[i] ? t.maskedTally : pickText(t, pick, _system, decimal),
+      ],
+      onOpen: (i) => opens[i] ? () => _openPick(today, today.picks[i]) : null,
+      onAnother: (i) =>
+          swaps ? () => _anotherPick(today, today.picks[i]) : null,
+    );
+  }
+
   void _toggleFrog(Frog frog) {
     if (frog.isDone) {
       _frogs.unmarkDone(frog.id);
@@ -567,19 +688,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
     List<Widget> rows(List<_PlacedRow> rows) => [
-      for (final (:row, :area, :masked) in rows)
-        _OccurrenceRow(
-          row: row,
-          // A Masked row tells nothing of its Area either.
-          area: masked ? null : area,
-          masked: masked
-              ? maskedText(t, locale, row.routine, row.occurrence)
-              : null,
-          time: occurrenceTime(t, locale, row.occurrence),
-          onToggle: () => _toggle(row),
-          onTap: () => _openRow(row),
-          onMenu: row.routine.isReminder ? null : (at) => _rowMenu(row, at),
-        ),
+      for (final placed in rows) _occurrenceRow(t, locale, placed),
     ];
     // Swipe left opens the notes browser, as the magnifier does.
     return BrowserSwipes(
@@ -929,7 +1038,12 @@ class _OccurrenceRow extends StatelessWidget {
   /// full.
   final String? masked;
   final String time;
-  final VoidCallback onToggle;
+
+  /// What shows under the title, such as a Session's picks.
+  final Widget? below;
+
+  /// Checks it off or unchecks it; the box is disabled when null.
+  final VoidCallback? onToggle;
   final VoidCallback onTap;
   final void Function(Offset at)? onMenu;
 
@@ -938,6 +1052,7 @@ class _OccurrenceRow extends StatelessWidget {
     required this.area,
     this.masked,
     required this.time,
+    this.below,
     required this.onToggle,
     required this.onTap,
     this.onMenu,
@@ -981,7 +1096,10 @@ class _OccurrenceRow extends StatelessWidget {
                       Checkbox(
                         value: done,
                         semanticLabel: t.markDone,
-                        onChanged: (_) => onToggle(),
+                        onChanged: switch (onToggle) {
+                          null => null,
+                          final onToggle => (_) => onToggle(),
+                        },
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -999,6 +1117,7 @@ class _OccurrenceRow extends StatelessWidget {
                                     : null,
                               ),
                             ),
+                            ?below,
                           ],
                         ),
                       ),

@@ -503,8 +503,9 @@ class BrowserSearchField extends StatelessWidget {
 }
 
 /// Notes as a diary of cards, each with "file into…", "merge into…",
-/// with [onSchedule] Routine, Reminder or Frog, and ⋮ for the rest the Note
-/// editor offers, as far as this Device may; tapping a card opens it.
+/// with [onSchedule] Routine, Reminder, Frog or Session, and ⋮ for the
+/// rest the Note editor offers, as far as this Device may; tapping a
+/// card opens it.
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
 /// [showPlace] says which cards name where they are filed: those the
 /// screen does not name already.

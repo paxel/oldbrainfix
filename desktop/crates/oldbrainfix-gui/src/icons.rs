@@ -40,6 +40,13 @@ pub const PERSON: char = '\u{e491}';
 pub const MAIL_UNREAD: char = '\u{f1b6}';
 /// `group_add_outlined`, as the phone marks Areas shared from afar.
 pub const GROUP_ADD: char = '\u{f0d8}';
+pub const ARROW_UP: char = '\u{e0a0}';
+pub const ARROW_DOWN: char = '\u{e097}';
+/// `check_circle_outline` and `radio_button_unchecked`, as the phone marks
+/// a Session's picks with an entry and without.
+pub const PICK_DONE: char = '\u{e15a}';
+pub const PICK_OPEN: char = '\u{e504}';
+pub const SWAP: char = '\u{e625}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

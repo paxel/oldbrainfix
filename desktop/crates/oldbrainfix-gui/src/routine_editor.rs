@@ -3,8 +3,10 @@
 //! new Note), its schedule in a simple editor (once, every N days, weeks,
 //! months or years, chosen weekdays) or as an RRULE in the advanced mode,
 //! its start day and times of day, the next Occurrences, its own Re-nag
-//! interval or this Device's default, and Escalation. Save writes it;
-//! leaving without saving drops the edit.
+//! interval or this Device's default, and Escalation. A Session (#104)
+//! has its pool, count, weekdays' counts and rule on top of the schedule
+//! ([`SessionDraft`]); Save says under each field what to fix. Save
+//! writes it; leaving without saving drops the edit.
 
 use std::collections::BTreeSet;
 
@@ -13,13 +15,14 @@ use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
 use oldbrainfix_core::{
     ClockTime, Day, Note, Occurrence, Recurrence, RepeatKind, RepeatUnit, Routine, Routines,
-    Schedule, SimpleRepeat, Store,
+    Schedule, Session, SimpleRepeat, Store,
 };
 
 use crate::app::{embossed, icon_button, pill, radio_column};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, desktop_simple, occurrence_time, weekday_text};
+use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::theme::Tones;
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
@@ -40,6 +43,8 @@ pub enum Intent {
     Close,
     /// Show the Note it comes from.
     OpenNote(String),
+    /// Something asked of a Session's part.
+    Session(SessionIntent),
 }
 
 /// One Routine or Reminder being made or changed.
@@ -78,6 +83,9 @@ pub struct RoutineEditor {
     schedule: Option<Schedule>,
     rule_error: Option<String>,
     next: Vec<Occurrence>,
+    /// A Session's part, with the Session as it was opened; `None` for a
+    /// new one.
+    session: Option<(SessionDraft, Option<Session>)>,
 }
 
 impl RoutineEditor {
@@ -131,9 +139,22 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            session: None,
         };
         editor.update();
         editor
+    }
+
+    /// Makes it a Session: `draft` for its part, `session` as it was
+    /// opened, `None` for a new one.
+    pub fn with_session(mut self, draft: SessionDraft, session: Option<Session>) -> RoutineEditor {
+        self.session = Some((draft, session));
+        self
+    }
+
+    /// The Session's part, when it is one.
+    pub fn session(&self) -> Option<&SessionDraft> {
+        self.session.as_ref().map(|(draft, _)| draft)
     }
 
     /// The editor of `routine`, which links back to `note`.
@@ -170,6 +191,7 @@ impl RoutineEditor {
             schedule: None,
             rule_error: None,
             next: Vec::new(),
+            session: None,
         };
         match desktop_simple(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
@@ -272,23 +294,40 @@ impl RoutineEditor {
         }
     }
 
-    /// Writes the Routine; its id.
-    pub fn save(&self, store: &Store) -> oldbrainfix_core::Result<String> {
+    /// Writes the Routine; its id, or `None` when a Session's part needs
+    /// fixing first, which then says so under its fields and writes
+    /// nothing.
+    pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
         let routines = Routines::new(store);
         let Some(schedule) = &self.schedule else {
             return Err(oldbrainfix_core::Error::Invalid("no schedule".into()));
         };
-        let id = match (&self.routine, &self.note) {
-            (Some(id), _) => {
+        if let Some((draft, _)) = &mut self.session
+            && !draft.valid()
+        {
+            let was_open = draft.weekdays_open;
+            draft.check();
+            // The weekday to fix comes into view, and stays so here.
+            if draft.weekdays_open && !was_open {
+                store.set_local_setting(WEEKDAYS_OPEN, "true")?;
+            }
+            return Ok(None);
+        }
+        let id = match (&self.routine, &self.note, &self.session) {
+            (Some(id), _, session) => {
                 routines.reschedule(id, schedule)?;
+                if let Some((draft, Some(session))) = session {
+                    draft.save(store, session)?;
+                }
                 id.clone()
             }
-            (None, Some(note)) => routines.spawn(&note.id, schedule)?.id,
-            (None, None) => routines.create(&self.text, schedule)?.id,
+            (None, Some(note), Some((draft, _))) => draft.spawn(store, &note.id, schedule)?,
+            (None, Some(note), None) => routines.spawn(&note.id, schedule)?.id,
+            (None, None, _) => routines.create(&self.text, schedule)?.id,
         };
         routines.set_renag(&id, self.renag.map(Duration::minutes))?;
         routines.set_escalation(&id, self.escalation)?;
-        Ok(id)
+        Ok(Some(id))
     }
 
     /// Draws the editor; what was asked of it.
@@ -299,6 +338,8 @@ impl RoutineEditor {
         let weak = ui.visuals().weak_text_color();
         let once = self.once();
         let heading = match (&self.routine, once) {
+            _ if self.session.is_some() && self.routine.is_none() => t.new_session(),
+            _ if self.session.is_some() => t.session(),
             (None, true) => t.new_reminder(),
             (None, false) => t.new_routine(),
             (Some(_), true) => t.reminder(),
@@ -349,6 +390,11 @@ impl RoutineEditor {
                         }
                     }
                 });
+                if let Some((draft, _)) = &mut self.session
+                    && let Some(asked) = draft.show(ui, t, tones)
+                {
+                    intent = Some(Intent::Session(asked));
+                }
                 embossed(ui, tones, false, None, |ui| {
                     ui.horizontal(|ui| {
                         for (advanced, label) in

@@ -14,8 +14,9 @@ import 'profile.dart';
 import 'speech_platform.dart';
 import 'voice_platform.dart';
 
-/// What a Note's card spawns from it: "Routine, Reminder or Frog".
-enum Spawn { routine, reminder, frog }
+/// What a Note's card spawns from it: "Routine, Reminder, Frog or
+/// Session".
+enum Spawn { routine, reminder, frog, session }
 
 /// A Note with the Area and Topic it is filed in, read once per change.
 /// A Note with where it is filed, what this Device may do to it in a
@@ -151,8 +152,8 @@ class NoteActions {
 /// with the start of its Transcript under it, and the start of each
 /// Transcript and Photo Text whose recording or photo was removed; a
 /// separator; and
-/// its action row, icons only: file it, spawn a Routine, Reminder or Frog
-/// from it, merge it, and ⋮ for the rest with words. Its Area's colour runs
+/// its action row, icons only: file it, spawn a Routine, Reminder, Frog or
+/// Session from it, merge it, and ⋮ for the rest with words. Its Area's colour runs
 /// down the left edge and its icon leads the place line. An important
 /// Note gets an accent marker and a stronger emboss, an unimportant one
 /// is dimmed (UI laws, "Cards").
@@ -181,8 +182,8 @@ class NoteCard extends StatelessWidget {
   /// Opens "merge into…"; no button when null.
   final VoidCallback? onMerge;
 
-  /// Spawns a Routine, Reminder or Frog from the Note, picked from a menu
-  /// that opens at the button; no button when null.
+  /// Spawns a Routine, Reminder, Frog or Session from the Note, picked
+  /// from a menu that opens at the button; no button when null.
   final ValueChanged<Spawn>? onSchedule;
 
   /// The ⋮ menu's actions; no ⋮ when null.
@@ -419,6 +420,10 @@ class NoteCard extends StatelessWidget {
                                 PopupMenuItem(
                                   value: Spawn.frog,
                                   child: Text(t.frog),
+                                ),
+                                PopupMenuItem(
+                                  value: Spawn.session,
+                                  child: Text(t.session),
                                 ),
                               ],
                             ),

@@ -11,7 +11,8 @@
 /// moments (`alarms.json`), on a European wall clock; the Frog scenario
 /// what its lists and the Agenda's "Eat a frog" come to (`frogs.json`);
 /// the Tally scenario its fields, entries and charts, with the units
-/// converted, shown and read (`tallies.json`).
+/// converted, shown and read (`tallies.json`); the Session scenario its
+/// pools, picks and what is Done (`sessions.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -644,6 +645,88 @@ final _scenarios = <Scenario>[
       notes.capture('Unsorted thought');
     },
   ),
+  (
+    name: 'sessions',
+    about:
+        'Sessions spawned with their Notes behind the scenes, picking from '
+        'Tallies by each rule: Rolling at 07:00 with a Saturday of its own '
+        'count, Least selected all day after an entry made on the Tally '
+        'itself, Random at 18:00 by its hash; today\'s picks asked for '
+        'again, "Another one", picks recorded until one Occurrence is Done '
+        'from its entries, another checked off; the next days\' picks, an '
+        'entry recorded and removed, a Tally of a pick trashed and replaced '
+        'in its place, a day nobody looked; a plain Routine and an Unsorted '
+        'Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final tallies = Tallies(store);
+      final sessions = Sessions(store);
+      String tally(String name, String unit, double target) {
+        final id = notes.capture(name).id;
+        tallies.addField(id, name: name, unit: unit, target: target);
+        return id;
+      }
+
+      Map<String, double> targets(String id) => tallies.byNote(id)!.targets;
+      final pushUps = tally('Push-ups', 'times', 20);
+      final sitUps = tally('Sit-ups', 'times', 25);
+      final bridge = tally('Half bridge', 'times', 15);
+      final wallSit = tally('Wall sit', 's', 60);
+      final plank = tally('Plank', 's', 45);
+      final pages = tally('Reading', 'pages', 12);
+      final video = tally('Media time', 'h', 3600);
+      Schedule daily([List<ClockTime> times = const []]) => Schedule(
+        start: Day(2026, 1, 1),
+        times: times,
+        rule: Recurrence(frequency: Frequency.daily),
+      );
+      final sport = sessions.create(
+        'Sport',
+        daily([_at(7)]),
+        pool: [pushUps, sitUps, bridge, wallSit, plank],
+        count: 3,
+        rule: SessionRule.rolling,
+      );
+      sessions.setCountOn(sport.id, DateTime.saturday, 1);
+      final learn = sessions.create(
+        'Learn',
+        daily(),
+        pool: [pages, video, pushUps],
+        count: 1,
+        rule: SessionRule.least,
+      );
+      final stretch = sessions.create(
+        'Stretch',
+        daily([_at(18)]),
+        pool: [bridge, wallSit, plank, sitUps],
+        count: 2,
+        rule: SessionRule.random,
+      );
+      tallies.add(pages, line: 'Novel');
+      sessions.pickToday(_frogDay(0));
+      sessions.pickToday(_frogDay(0));
+      final morning = Occurrence(Day(2026, 1, 1), _at(7));
+      sessions.another(sport.id, morning, sitUps);
+      sessions.record(sport.id, morning, pushUps, values: targets(pushUps));
+      sessions.record(sport.id, morning, wallSit, values: targets(wallSit));
+      sessions.record(sport.id, morning, bridge, line: 'Shaky');
+      final allDay = Occurrence(Day(2026, 1, 1));
+      final first = sessions.on(learn.id, allDay).picks.first.noteId;
+      sessions.record(learn.id, allDay, first, values: targets(first));
+      Routines(store)
+          .markDone(stretch.id, Occurrence(Day(2026, 1, 1), _at(18)));
+      sessions.pickToday(_frogDay(1));
+      final next = Occurrence(Day(2026, 1, 2), _at(7));
+      final done = sessions.record(sport.id, next, sitUps, line: 'Too much');
+      tallies.trashEntry(done.id);
+      notes.trash(plank);
+      sessions.pickToday(_frogDay(1));
+      sessions.pickToday(_frogDay(2));
+      sessions.pickToday(_frogDay(4));
+      Routines(store).create('Walk the dog', daily([_at(8)]));
+      notes.capture('Unsorted thought');
+    },
+  ),
 ];
 
 /// The European wall clock [days] days on: the scenario's clock moves by
@@ -687,6 +770,60 @@ Map<String, Object?> _frogs(Store store) {
     'today': [
       for (var days = -1; days <= 2; days++)
         section(frogs.today(_frogDay(days))),
+    ],
+  };
+}
+
+/// What the Sessions of [store] come to: each Session with its pool,
+/// counts and rule, what it picks from and may pick, its Routine with
+/// what is Done, and today's Occurrences with their picks the day
+/// before the clock held and the days after, written nowhere.
+Map<String, Object?> _sessions(Store store) {
+  final sessions = Sessions(store);
+  final routines = Routines(store);
+  Map<String, Object?> occurrence(SessionOccurrence o) => {
+    'session': o.session.id,
+    'occurrence': o.occurrence.key,
+    'picks': [
+      for (final pick in o.picks)
+        {
+          'noteId': pick.noteId,
+          'text': pick.note?.text,
+          'targets': {
+            for (final MapEntry(:key, :value)
+                in (pick.tally?.targets ?? const <String, double>{}).entries)
+              key: encodeTallyNumber(value),
+          },
+          'entries': [for (final e in pick.entries) e.id],
+        },
+    ],
+    'canSwap': o.canSwap,
+    'complete': o.complete,
+  };
+  return {
+    'sessions': [
+      for (final s in sessions.all())
+        {
+          'id': s.id,
+          'noteId': s.routine.noteId,
+          'pool': s.pool,
+          'count': s.count,
+          'counts': {
+            for (final weekday in s.counts.keys.toList()..sort())
+              '$weekday': s.counts[weekday],
+          },
+          'rule': s.rule.name,
+          'picksFrom': sessions.pool(s),
+          'choices': sessions.choices(s.id),
+        },
+    ],
+    'routines': [
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+        if (routines.byId(id) case final routine?) _routine(routine),
+    ],
+    'today': [
+      for (var days = -1; days <= 4; days++)
+        [for (final o in sessions.today(_frogDay(days))) occurrence(o)],
     ],
   };
 }
@@ -4622,6 +4759,12 @@ Future<void> main(List<String> args) async {
     'same clock, and the known units and a typed one converted both ways, '
     'shown and read in both systems, numbers kept and read back, and the '
     'system of a few regions.\n'
+    '- `sessions/sessions.json`: each Session of the `sessions` log with '
+    'its pool, counts and rule, the Tallies it picks from and may pick, '
+    'its Routine with what is Done, from entries too, and today\'s '
+    'Occurrences with their picks, their targets and the entries recorded '
+    'for them, the day before, on and after the clock held, on the same '
+    'clock.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, and what is no code.\n'
     '- `keys.json`: the writer\'s key record, and another key claiming its '
@@ -4849,7 +4992,8 @@ Future<void> main(List<String> args) async {
         File('${out.path}/expected.json'),
         '${_json.convert(_expected(store))}\n',
       );
-      if (store.entitiesOfType(RoutineKeys.typeRoutine).isNotEmpty) {
+      // The held moments are those of the Routine scenario.
+      if (scenario.name == 'routines') {
         _write(
           File('${out.path}/alarms.json'),
           '${_json.convert(_alarms(store))}\n',
@@ -4859,6 +5003,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/frogs.json'),
           '${_json.convert(_frogs(store))}\n',
+        );
+      }
+      if (store.fieldsWithPrefix(SessionKeys.pool).isNotEmpty) {
+        _write(
+          File('${out.path}/sessions.json'),
+          '${_json.convert(_sessions(store))}\n',
         );
       }
       if (store.fieldsWithPrefix(TallyKeys.fieldPrefix).isNotEmpty) {
