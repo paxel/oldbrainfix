@@ -77,6 +77,10 @@ _Avoid_: Pflicht, Aufgabe, Gewohnheit, To-do
 Eine Routine, die nur einmal stattfindet.
 _Avoid_: Alarm, Termin, Ereignis
 
+**Frosch** [Frog]:
+Eine Aufgabe einer Notiz ohne Uhrzeit, einmal zu erledigen, auf der Agenda angeboten, damit du jeden Tag einen isst.
+_Avoid_: Hausarbeit, Aufgabe, To-do
+
 **Fälligkeit** [Occurrence]:
 Ein fälliger Moment einer Routine, etwa Dienstag 08:00. Jede Fälligkeit wird für sich abgehakt.
 _Avoid_: Instanz, Slot
