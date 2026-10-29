@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'app_lock.dart';
+import 'area_look.dart';
 import 'browser.dart';
 import 'calendar_platform.dart';
 import 'l10n.dart';
+import 'look.dart';
+import 'note_card.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -24,7 +27,8 @@ Future<void> openAllRoutines(
 /// Every Routine and Reminder in alphabetical order of its name, also
 /// those beyond the Agenda's week; a tap opens its editor. Export hands
 /// one calendar file of all of them to the app the user chooses. Those
-/// of closed locked Areas stay out, of the file too.
+/// of closed locked Areas stay out, of the file too. Each card carries
+/// its Area's colour and icon, as on the Agenda.
 class AllRoutinesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -42,8 +46,9 @@ class AllRoutinesScreen extends StatefulWidget {
 class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
   late final _routines = Routines(widget.notes.store);
 
-  /// Each with the name it shows, read once per change.
-  List<(Routine, String)>? _rows;
+  /// Each with the name it shows and its Note's Area, read once per
+  /// change.
+  List<(Routine, String, Area?)>? _rows;
 
   @override
   void didChangeDependencies() {
@@ -55,17 +60,20 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
   void _load() {
     final t = context.t;
     final lock = LockScope.of(context);
-    final names = {
+    final shown = {
       for (final r in _routines.all())
         if (!(lock?.hidesRoutine(r) ?? false))
           r: switch (_routines.note(r)) {
-            null => t.noteGone,
-            final note => noteText(t, note),
+            null => (t.noteGone, null),
+            final note => (
+              noteText(t, note),
+              placeNote(widget.places, note).area,
+            ),
           },
     };
     _rows = [
-      for (final r in routinesByName(names.keys, (r) => names[r] ?? ''))
-        (r, names[r] ?? ''),
+      for (final r in routinesByName(shown.keys, (r) => shown[r]?.$1 ?? ''))
+        (r, shown[r]?.$1 ?? '', shown[r]?.$2),
     ];
   }
 
@@ -75,17 +83,16 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
     setState(_load);
   }
 
-  Future<void> _export(List<(Routine, String)> rows) => shareRoutinesFile(
-    context,
-    _routines,
-    [for (final (routine, _) in rows) routine],
-  );
+  Future<void> _export(List<(Routine, String, Area?)> rows) =>
+      shareRoutinesFile(context, _routines, [
+        for (final (routine, _, _) in rows) routine,
+      ]);
 
   @override
   Widget build(BuildContext context) {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
-    final rows = _rows ?? const <(Routine, String)>[];
+    final rows = _rows ?? const <(Routine, String, Area?)>[];
     return Scaffold(
       appBar: AppBar(
         title: Text(t.allRoutinesTitle),
@@ -105,19 +112,74 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
           if (rows.isEmpty)
             BrowserEmpty(text: t.allRoutinesEmpty)
           else
-            for (final (routine, name) in rows)
-              ListTile(
+            for (final (routine, name, area) in rows)
+              _RoutineCard(
                 key: ValueKey('routine-${routine.id}'),
+                routine: routine,
+                name: name,
+                area: area,
+                schedule: scheduleText(t, locale, routine.schedule),
+                onTap: () => _open(routine),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One Routine or Reminder as an embossed card: its kind, its name, its
+/// schedule, and its Area's colour down the side and its icon, as the
+/// Agenda's rows show them.
+class _RoutineCard extends StatelessWidget {
+  final Routine routine;
+  final String name;
+  final Area? area;
+  final String schedule;
+  final VoidCallback onTap;
+
+  const _RoutineCard({
+    super.key,
+    required this.routine,
+    required this.name,
+    required this.area,
+    required this.schedule,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = areaColour(area?.colour);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Embossed(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          // The row's ink shows on the card, not under it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: Container(
+              decoration: colour == null
+                  ? null
+                  : BoxDecoration(
+                      border: Border(left: BorderSide(color: colour, width: 6)),
+                    ),
+              child: ListTile(
                 leading: Icon(
                   routine.isReminder
                       ? Icons.notifications_outlined
                       : Icons.repeat,
                 ),
                 title: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                subtitle: Text(scheduleText(t, locale, routine.schedule)),
-                onTap: () => _open(routine),
+                subtitle: Text(schedule),
+                trailing: switch (areaIconData(area?.icon)) {
+                  final icon? => Icon(icon, size: 20, color: colour),
+                  null => null,
+                },
+                onTap: onTap,
               ),
-        ],
+            ),
+          ),
+        ),
       ),
     );
   }

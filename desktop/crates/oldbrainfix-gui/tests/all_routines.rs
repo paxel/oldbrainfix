@@ -13,8 +13,11 @@ use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::{
-    ClockTime, Day, Recurrence, Routine, Routines, Schedule, SigningKey, Store, parse_time,
+    ClockTime, Day, Notes, Places, Recurrence, Routine, Routines, Schedule, SigningKey, Store,
+    parse_time,
 };
+use oldbrainfix_gui::app::area_colour;
+use oldbrainfix_gui::icons;
 use oldbrainfix_gui::schedule_text::schedule_text;
 use oldbrainfix_gui::{App, Selection};
 
@@ -334,5 +337,77 @@ fn without_any_the_page_says_so_and_has_nothing_to_export() -> TestResult {
     harness.get_by_label("Exportieren").click_accesskit();
     harness.run();
     assert!(!called.load(std::sync::atomic::Ordering::SeqCst));
+    Ok(())
+}
+
+/// Every shape painted in the last frame, those inside others too.
+fn painted(harness: &Harness<'_, App>) -> Vec<egui::Shape> {
+    fn flat(shape: &egui::Shape, into: &mut Vec<egui::Shape>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| flat(s, into)),
+            shape => into.push(shape.clone()),
+        }
+    }
+    let mut shapes = Vec::new();
+    for clipped in &harness.output().shapes {
+        flat(&clipped.shape, &mut shapes);
+    }
+    shapes
+}
+
+/// Whether a band of `colour` is painted inside `card`.
+fn band_in(shapes: &[egui::Shape], card: egui::Rect, colour: egui::Color32) -> bool {
+    shapes.iter().any(|shape| match shape {
+        egui::Shape::Path(path) => {
+            path.fill == colour
+                && !path.points.is_empty()
+                && path.points.iter().all(|p| card.expand(1.0).contains(*p))
+        }
+        _ => false,
+    })
+}
+
+/// Whether the glyph `icon` is painted in `colour` inside `card`.
+fn icon_in(shapes: &[egui::Shape], card: egui::Rect, icon: char, colour: egui::Color32) -> bool {
+    shapes.iter().any(|shape| match shape {
+        egui::Shape::Text(text) => {
+            text.galley.job.text == icon.to_string()
+                && text
+                    .galley
+                    .job
+                    .sections
+                    .iter()
+                    .all(|s| s.format.color == colour)
+                && card.contains(text.visual_bounding_rect().center())
+        }
+        _ => false,
+    })
+}
+
+#[test]
+fn a_card_shows_its_areas_colour_and_icon_and_an_unsorted_one_neither() -> TestResult {
+    let store = store()?;
+    let places = Places::new(&store);
+    let household = places.add_area("Household")?;
+    places.set_colour(&household.id, Some("2E7D6B"))?;
+    places.set_icon(&household.id, Some("home"))?;
+    let course = routine(&store, "Course")?;
+    Notes::new(&store).file(&course.note_id, &household.id)?;
+    let colour = area_colour(Some("2E7D6B")).ok_or("a colour")?;
+    let icon = icons::area_icon(Some("home")).ok_or("an icon")?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::AllRoutines);
+    let mut harness = window(app);
+    // A frame more, with the icon font bound by the first.
+    harness.run();
+
+    let shapes = painted(&harness);
+    let filed = cards(&harness, "Course").next().ok_or("its card")?.rect();
+    assert!(band_in(&shapes, filed, colour));
+    assert!(icon_in(&shapes, filed, icon, colour));
+    // Unsorted: no band and no Area icon at all.
+    let unsorted = cards(&harness, "Dentist").next().ok_or("its card")?.rect();
+    assert!(!band_in(&shapes, unsorted, colour));
+    assert!(!icon_in(&shapes, unsorted, icon, colour));
     Ok(())
 }

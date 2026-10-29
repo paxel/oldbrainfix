@@ -611,9 +611,14 @@ void main() {
 
   group('lists elsewhere leave a closed Area out', () {
     /// [screen] with the app's lock above it, the way the app shows it.
-    Future<void> show(WidgetTester tester, Widget screen) async {
+    Future<void> show(
+      WidgetTester tester,
+      Widget screen, {
+      List<String> open = const [],
+    }) async {
       final lock = AppLock(store: store);
       addTearDown(lock.dispose);
+      open.forEach(lock.openArea);
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -683,6 +688,57 @@ void main() {
       final (_, ics) = calendar.shared.single;
       expect(ics, contains('SUMMARY:Water plants'));
       expect(ics, isNot(contains('Pills')));
+    });
+
+    testWidgets('all Routines and Reminders: each card carries its Area\'s '
+        'colour and icon, an opened Masked Area\'s too', (tester) async {
+      final (:doctor, note: _, routine: _) = lockedDoctor();
+      places.setColour(doctor.id, 'C62828');
+      places.setIcon(doctor.id, 'health');
+      final home = places.addArea('Home');
+      places.setColour(home.id, '2E7D32');
+      places.setIcon(home.id, 'garden');
+      routines.spawn(
+        notes.capture('Water plants', place: home.id).id,
+        daily(12),
+      );
+      routines.create('Call Mum', daily(18));
+      await show(
+        tester,
+        AllRoutinesScreen(notes: notes, places: places),
+        open: [doctor.id],
+      );
+
+      Finder card(String text) => find.ancestor(
+        of: find.text(text),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('routine-'),
+        ),
+      );
+      Color? edge(Finder card) => tester
+          .widgetList<Container>(
+            find.descendant(of: card, matching: find.byType(Container)),
+          )
+          .map((c) => c.decoration)
+          .whereType<BoxDecoration>()
+          .map((d) => d.border)
+          .whereType<Border>()
+          .where((b) => b.left != BorderSide.none)
+          .map((b) => b.left.color)
+          .singleOrNull;
+      Color? icon(Finder card, IconData data) => tester
+          .widget<Icon>(find.descendant(of: card, matching: find.byIcon(data)))
+          .color;
+
+      expect(edge(card('Water plants')), const Color(0xFF2E7D32));
+      expect(icon(card('Water plants'), Icons.yard), const Color(0xFF2E7D32));
+      // Open, the Masked Area's Routine shows in full, with its mark.
+      expect(edge(card('Pills')), const Color(0xFFC62828));
+      expect(icon(card('Pills'), Icons.favorite), const Color(0xFFC62828));
+      // Unsorted, it carries no Area's mark.
+      expect(edge(card('Call Mum')), isNull);
     });
   });
 

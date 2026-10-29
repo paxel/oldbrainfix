@@ -285,9 +285,9 @@ struct View {
     frogs_open: Vec<FrogShown>,
     frogs_done: Vec<FrogShown>,
     frogs_done_open: bool,
-    /// Every Routine and Reminder in alphabetical order with its name,
-    /// while their page shows (#115).
-    all_routines: Vec<(Routine, String)>,
+    /// Every Routine and Reminder in alphabetical order with its name
+    /// and its Note's Area, while their page shows (#115).
+    all_routines: Vec<(Routine, String, Option<Area>)>,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
@@ -2753,7 +2753,11 @@ impl App {
             let name = |r: &Routine| names.get(&r.id).cloned().unwrap_or_default();
             for routine in routines_by_name(all, name) {
                 let name = names.get(&routine.id).cloned().unwrap_or_default();
-                all_routines.push((routine, name));
+                let area = match routines.note(&routine)? {
+                    Some(note) => place(note)?.area,
+                    None => None,
+                };
+                all_routines.push((routine, name, area));
             }
         }
         let (frogs_open, frogs_done) = if self.selection == Selection::Frogs {
@@ -3140,7 +3144,7 @@ impl App {
                     .view
                     .all_routines
                     .iter()
-                    .map(|(routine, _)| routine.clone())
+                    .map(|(routine, ..)| routine.clone())
                     .collect();
                 self.save_calendar_file(&all)?;
             }
@@ -7537,7 +7541,19 @@ pub(crate) fn clickable_card(
     (id, label): (Id, &str),
     content: impl FnOnce(&mut Ui),
 ) -> bool {
-    let card = embossed(ui, tones, false, None, content);
+    banded_clickable_card(ui, tones, (id, label), None, content)
+}
+
+/// A [`clickable_card`] with an Area's colour `band` down its left side,
+/// as an Agenda row has it.
+pub(crate) fn banded_clickable_card(
+    ui: &mut Ui,
+    tones: Tones,
+    (id, label): (Id, &str),
+    band: Option<Color32>,
+    content: impl FnOnce(&mut Ui),
+) -> bool {
+    let card = embossed(ui, tones, false, band, content);
     let card = ui.interact(card.rect, id, Sense::click());
     card.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, label));
     card.on_hover_cursor(egui::CursorIcon::PointingHand)

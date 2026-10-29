@@ -2,13 +2,14 @@
 //! Reminder in alphabetical order of its name, also those beyond the
 //! Agenda's week; a click opens its editor, and Export saves one
 //! calendar file of all of them, as the phone's `AllRoutinesScreen`.
+//! Each card carries its Area's colour and icon, as on the Agenda.
 
 use std::collections::HashMap;
 
 use egui::{Id, RichText, Ui};
-use oldbrainfix_core::{Note, Routine, Routines};
+use oldbrainfix_core::{Area, Note, Routine, Routines};
 
-use crate::app::{clickable_card, icon_button};
+use crate::app::{area_colour, banded_clickable_card, icon_button};
 use crate::icons;
 use crate::l10n::{self, L10n};
 use crate::schedule_text::schedule_text;
@@ -49,13 +50,14 @@ pub fn names(
 }
 
 /// The page: its heading with Export, and each of `rows`, a Routine with
-/// its name, as a card with its schedule; a plain line while there is
-/// none.
+/// its name and its Note's Area, as a card with its schedule, the Area's
+/// colour down its side and its icon at the end; a plain line while
+/// there is none. An Unsorted one has neither.
 pub fn page(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
-    rows: &[(Routine, String)],
+    rows: &[(Routine, String, Option<Area>)],
     actions: &mut Vec<AllRoutinesAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -81,10 +83,12 @@ pub fn page(
         .show(ui, |ui| {
             ui.spacing_mut().item_spacing.y = 12.0;
             ui.add_space(4.0);
-            for (routine, name) in rows {
+            for (routine, name, area) in rows {
                 let first = name.trim().lines().next().unwrap_or_default();
                 let id = Id::new(("all routines", &routine.id));
-                let clicked = clickable_card(ui, tones, (id, first), |ui| {
+                let colour = area.as_ref().and_then(|a| area_colour(a.colour.as_deref()));
+                let card = (id, first);
+                let clicked = banded_clickable_card(ui, tones, card, colour, |ui| {
                     ui.horizontal(|ui| {
                         let icon = if routine.is_reminder() {
                             icons::REMINDER
@@ -92,13 +96,23 @@ pub fn page(
                             icons::REPEAT
                         };
                         icons::show(ui, icon, 20.0, weak);
+                        let width = (ui.available_width() - 32.0).max(40.0);
                         ui.vertical(|ui| {
+                            ui.set_max_width(width);
                             ui.add(
                                 egui::Label::new(RichText::new(first).size(15.0).color(text))
                                     .truncate(),
                             );
                             let when = schedule_text(t, &routine.schedule);
                             ui.label(RichText::new(when).small().color(weak));
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if let Some(icon) = area
+                                .as_ref()
+                                .and_then(|a| icons::area_icon(a.icon.as_deref()))
+                            {
+                                icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
+                            }
                         });
                     });
                 });
