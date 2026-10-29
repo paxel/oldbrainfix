@@ -1547,13 +1547,13 @@ abstract class AppLocalizations {
   /// No description provided for @captureContextIntro.
   ///
   /// In en, this message translates to:
-  /// **'Besides when and where, a Note can record more of what was going on. Each of these is off until you switch it on, and stays in the Note on your own devices.'**
+  /// **'Besides when and where, a Note can record more of what was going on. This is off until you switch it on, and stays in the Note on your own devices.'**
   String get captureContextIntro;
 
   /// No description provided for @calendarContextSwitch.
   ///
   /// In en, this message translates to:
-  /// **'Calendar event'**
+  /// **'Note the running appointment'**
   String get calendarContextSwitch;
 
   /// No description provided for @calendarContextDetail.
@@ -2084,34 +2084,58 @@ abstract class AppLocalizations {
   /// **'No app can take the calendar file.'**
   String get nothingTakesCalendarFile;
 
-  /// No description provided for @calendarExportTooltip.
+  /// No description provided for @share.
   ///
   /// In en, this message translates to:
-  /// **'Export to calendar'**
-  String get calendarExportTooltip;
+  /// **'Share'**
+  String get share;
 
-  /// No description provided for @calendarExportTitle.
+  /// No description provided for @exportCalendarFile.
   ///
   /// In en, this message translates to:
-  /// **'Calendar export'**
-  String get calendarExportTitle;
+  /// **'Export'**
+  String get exportCalendarFile;
 
-  /// No description provided for @calendarExportAll.
+  /// No description provided for @allRoutinesTitle.
   ///
   /// In en, this message translates to:
   /// **'All Routines and Reminders'**
-  String get calendarExportAll;
+  String get allRoutinesTitle;
 
-  /// No description provided for @calendarExportEmpty.
+  /// No description provided for @allRoutinesEmpty.
   ///
   /// In en, this message translates to:
   /// **'No Routines or Reminders yet.'**
-  String get calendarExportEmpty;
+  String get allRoutinesEmpty;
+
+  /// No description provided for @calendarPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar'**
+  String get calendarPageTitle;
+
+  /// No description provided for @calendarReadHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Read from your calendar'**
+  String get calendarReadHeading;
+
+  /// No description provided for @calendarWriteHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Write to your calendar'**
+  String get calendarWriteHeading;
+
+  /// No description provided for @settingsCalendarDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'What is read from your calendar and what is written to it.'**
+  String get settingsCalendarDetail;
 
   /// No description provided for @calendarMirrorSwitch.
   ///
   /// In en, this message translates to:
-  /// **'Keep in a calendar'**
+  /// **'Write Routines and Reminders into a calendar'**
   String get calendarMirrorSwitch;
 
   /// No description provided for @calendarMirrorDetail.
@@ -2129,7 +2153,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarMirrorExplainTitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep them in your calendar?'**
+  /// **'Write them into your calendar?'**
   String get calendarMirrorExplainTitle;
 
   /// No description provided for @calendarMirrorExplainBody.
@@ -2249,7 +2273,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsCaptureContextDetail.
   ///
   /// In en, this message translates to:
-  /// **'Calendar event and Bluetooth device with each Note.'**
+  /// **'Bluetooth device with each Note.'**
   String get settingsCaptureContextDetail;
 
   /// No description provided for @settingsSpeechModelDetail.

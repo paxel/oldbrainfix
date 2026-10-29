@@ -226,25 +226,37 @@ void main() {
     final calendarSwitch = find.byKey(const ValueKey('context-calendar'));
     final bluetoothSwitch = find.byKey(const ValueKey('context-bluetooth'));
 
+    /// The Capture Context page, from Settings: the Bluetooth device.
     Future<void> openPage(WidgetTester tester) async {
-      await start(tester);
       await openDeviceSettings(tester);
       await tester.ensureVisible(find.text('Capture Context'));
       await tap(tester, find.text('Capture Context'));
+    }
+
+    /// The Calendar page, from the Agenda's bar: the running appointment.
+    Future<void> openCalendar(WidgetTester tester) async {
+      await tap(tester, find.byKey(const ValueKey('calendarPage')));
+      expect(find.text('Read from your calendar'), findsOneWidget);
     }
 
     bool isOn(WidgetTester tester, Finder finder) =>
         tester.widget<Switch>(finder).value;
 
     testWidgets('are off until switched on', (tester) async {
-      await openPage(tester);
+      await start(tester);
+      await openCalendar(tester);
       expect(isOn(tester, calendarSwitch), isFalse);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await openPage(tester);
       expect(isOn(tester, bluetoothSwitch), isFalse);
+      expect(calendarSwitch, findsNothing, reason: 'on the Calendar page');
     });
 
     testWidgets('switching on explains first, then asks', (tester) async {
       source.allowed.clear();
-      await openPage(tester);
+      await start(tester);
+      await openCalendar(tester);
       await tap(tester, calendarSwitch);
       expect(find.text('Remember your appointment?'), findsOneWidget);
       expect(source.asked, isEmpty, reason: 'the explanation comes first');
@@ -252,7 +264,10 @@ void main() {
       expect(source.asked, [ContextKind.calendar]);
       expect(store.calendarContextOn, isTrue);
       expect(isOn(tester, calendarSwitch), isTrue);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
+      await openPage(tester);
       await tap(tester, bluetoothSwitch);
       expect(find.text('Remember what was connected?'), findsOneWidget);
       await tap(tester, find.text('Allow'));
@@ -262,6 +277,7 @@ void main() {
 
     testWidgets('"Not now" leaves it off and never asks', (tester) async {
       source.allowed.clear();
+      await start(tester);
       await openPage(tester);
       await tap(tester, bluetoothSwitch);
       await tap(tester, find.text('Not now'));
@@ -276,7 +292,8 @@ void main() {
       source
         ..allowed.clear()
         ..grantOnAsk = false;
-      await openPage(tester);
+      await start(tester);
+      await openCalendar(tester);
       await tap(tester, calendarSwitch);
       await tap(tester, find.text('Allow'));
       expect(store.calendarContextOn, isFalse);
@@ -291,20 +308,41 @@ void main() {
         ..calendarContextOn = true
         ..bluetoothContextOn = true;
       source.allowed.remove(ContextKind.bluetooth);
-      await openPage(tester);
+      await start(tester);
+      await openCalendar(tester);
       expect(isOn(tester, calendarSwitch), isTrue);
-      expect(isOn(tester, bluetoothSwitch), isFalse);
       await tap(tester, calendarSwitch);
       expect(store.calendarContextOn, isFalse);
       expect(isOn(tester, calendarSwitch), isFalse);
       expect(source.asked, isEmpty);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await openPage(tester);
+      expect(isOn(tester, bluetoothSwitch), isFalse);
+    });
+
+    testWidgets('the Agenda bar keeps its order', (tester) async {
+      await start(tester);
+      final xs = [
+        for (final key in ['allRoutines', 'calendarPage', 'profile'])
+          tester.getTopLeft(find.byKey(ValueKey(key))).dx,
+      ];
+      final newRoutine = tester.getTopLeft(find.byIcon(Icons.add_alarm)).dx;
+      expect(
+        [xs[0], xs[1], newRoutine, xs[2]],
+        [
+          ...[xs[0], xs[1], newRoutine, xs[2]]..sort(),
+        ],
+      );
     });
 
     testWidgets('are not offered without a source', (tester) async {
       await tester.pumpWidget(OldBrainFixApp(store: store));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('calendarPage')), findsNothing);
       await openDeviceSettings(tester);
       expect(find.text('Capture Context'), findsNothing);
+      expect(find.byKey(const ValueKey('calendarPage')), findsNothing);
     });
   });
 

@@ -119,6 +119,18 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   days after it, each under its weekday and date, dimmed alike. Every
   day shows, an empty one with "Nothing planned". The later days'
   Occurrences can be checked off today.
+- **The Agenda's bar**, in this order: All Routines and Reminders,
+  Calendar, new Routine, then the Profile picture in the corner. All
+  Routines and Reminders lists every one alphabetically by name, also
+  those beyond the week, and a tap opens its editor; its bar's Export
+  writes one calendar file of all of them. Calendar opens the Calendar
+  page: "Read from your calendar" (the appointment running at Capture)
+  and "Write to your calendar" (the calendar mirror); Settings has a row
+  leading to the same page. Nothing on the Agenda selects rows to share.
+- **Every Occurrence row has ⋮**, which opens the same menu as a long
+  press: History for a Routine, and Share, which hands the Routine as
+  its whole series with its end, or the Reminder, to another app as a
+  calendar file. A Masked row asks for its Area to open first.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/calendar_screen.dart';
 import 'package:oldbrainfix/src/settings_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -58,9 +59,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the Calendar page through its row in Settings.
   Future<void> openSettings(WidgetTester tester) async {
     await openDeviceSettings(tester);
     expect(find.byType(SettingsScreen), findsOneWidget);
+    await tap(tester, find.byKey(const ValueKey('calendarPage')));
+    expect(find.byType(CalendarScreen), findsOneWidget);
   }
 
   final mirrorSwitch = find.descendant(
@@ -79,11 +83,15 @@ void main() {
       final foreign = mirror.addForeign('1', 'Dentist');
       await start(tester);
       await openSettings(tester);
-      expect(find.text('Keep in a calendar'), findsOneWidget);
+      expect(find.text('Write to your calendar'), findsOneWidget);
+      expect(
+        find.text('Write Routines and Reminders into a calendar'),
+        findsOneWidget,
+      );
       expect(switchedOn(tester), isFalse);
 
       await tap(tester, mirrorSwitch);
-      expect(find.text('Keep them in your calendar?'), findsOneWidget);
+      expect(find.text('Write them into your calendar?'), findsOneWidget);
       await tap(tester, find.text('Allow'));
       expect(mirror.requests, 1);
       // The calendars to pick from, where the finger is.
@@ -175,7 +183,10 @@ void main() {
       await tap(tester, find.text('Personal'));
       expect(mirror.mirroredIn('1').keys, [uid(pills, 8)]);
 
-      await tap(tester, find.text('Keep in a calendar'));
+      await tap(
+        tester,
+        find.text('Write Routines and Reminders into a calendar'),
+      );
       await tap(tester, find.text('Family'));
       expect(store.mirrorCalendar, (id: '2', name: 'Family'));
       expect(mirror.mirroredIn('1'), isEmpty);

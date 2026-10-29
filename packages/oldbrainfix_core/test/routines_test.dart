@@ -520,4 +520,58 @@ void main() {
       expect(routines.all().map((r) => r.id), [routine.id]);
     });
   });
+
+  group('by name', () {
+    Routine named(String id) => Routine(
+      id: id,
+      noteId: 'note:$id',
+      schedule: Schedule(start: today),
+    );
+    List<String> order(Map<String, String> names) => [
+      for (final r in routinesByName([
+        for (final id in names.keys) named(id),
+      ], (r) => names[r.id] ?? ''))
+        r.id,
+    ];
+
+    test('alphabetical, whatever the case', () {
+      expect(
+        order({
+          'routine:1': 'Cherry',
+          'routine:2': 'apple',
+          'routine:3': 'Banana',
+        }),
+        ['routine:2', 'routine:3', 'routine:1'],
+      );
+    });
+
+    test('equal names go by id', () {
+      expect(
+        order({
+          'routine:b': 'Pills',
+          'routine:a': 'pills',
+          'routine:c': 'PILLS',
+        }),
+        ['routine:a', 'routine:b', 'routine:c'],
+      );
+    });
+
+    test('a name counts by its first line, trimmed', () {
+      expect(
+        order({
+          'routine:1': '  Zebra',
+          'routine:2': 'Mango\nAardvark',
+          'routine:3': '\n Kiwi ',
+        }),
+        ['routine:3', 'routine:2', 'routine:1'],
+      );
+    });
+
+    test('by code units, not a language: an umlaut after z', () {
+      expect(
+        order({'routine:1': 'Ärzte', 'routine:2': 'zoo', 'routine:3': 'Arzt'}),
+        ['routine:3', 'routine:2', 'routine:1'],
+      );
+    });
+  });
 }

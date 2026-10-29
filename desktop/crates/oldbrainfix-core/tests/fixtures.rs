@@ -4,7 +4,8 @@
 //! scenario again to the same log, byte for byte. Schedules, the alarm
 //! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
 //! of Tallies and the picks of Sessions must come to the same on the
-//! same European wall clock, Europe/Berlin here.
+//! same European wall clock, Europe/Berlin here; the calendar files of
+//! Routines and Reminders must be the same bytes.
 
 use std::path::{Path, PathBuf};
 
@@ -12,11 +13,13 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
+use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::question_marks::{self, SHAPES};
+use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
@@ -1936,6 +1939,80 @@ fn rules_schedules_and_instants_come_out_as_the_dart_core_has_them() -> TestResu
         );
     }
     Ok(())
+}
+
+#[test]
+fn calendar_files_and_the_list_by_name_come_out_as_the_dart_core_has_them() -> TestResult {
+    let fixture = read_json(&fixtures().join("ics.json"))?;
+    let stamp = parse_time(fixture["stamp"].as_str().ok_or("stamp")?)?;
+    let mut routines = Vec::new();
+    let mut texts = BTreeMap::new();
+    for case in fixture["routines"].as_array().ok_or("routines")? {
+        let s = |k: &str| case[k].as_str().ok_or(format!("{k} is text"));
+        let times: Vec<ClockTime> = case["times"]
+            .as_array()
+            .ok_or("times")?
+            .iter()
+            .filter_map(|t| t.as_str().and_then(ClockTime::parse))
+            .collect();
+        let start = Day::parse(s("start")?).ok_or("start")?;
+        let id = s("id")?.to_string();
+        texts.insert(id.clone(), s("text")?.to_string());
+        routines.push(bare_routine(
+            &id,
+            schedule(start, &times, case["rule"].as_str())?,
+        ));
+    }
+    let text_of = |r: &Routine| texts.get(&r.id).cloned().unwrap_or_default();
+    for file in fixture["files"].as_array().ok_or("files")? {
+        let ids: Vec<&str> = file["routines"]
+            .as_array()
+            .ok_or("ids")?
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        let picked: Vec<&Routine> = ids
+            .iter()
+            .filter_map(|id| routines.iter().find(|r| r.id == *id))
+            .collect();
+        assert_eq!(picked.len(), ids.len());
+        let ours = routines_ics(picked, text_of, stamp);
+        assert_eq!(ours, file["ics"].as_str().ok_or("ics")?, "{ids:?}");
+    }
+    let ids = |list: Vec<Routine>| json!(list.into_iter().map(|r| r.id).collect::<Vec<_>>());
+    assert_eq!(
+        ids(routines_by_name(routines.clone(), text_of)),
+        fixture["byName"]
+    );
+    let mut names = BTreeMap::new();
+    let mut listed = Vec::new();
+    for pair in fixture["names"].as_array().ok_or("names")? {
+        let id = pair[0].as_str().ok_or("id")?;
+        names.insert(id.to_string(), pair[1].as_str().ok_or("name")?.to_string());
+        listed.push(bare_routine(id, schedule(Day::new(2026, 1, 1), &[], None)?));
+    }
+    let name_of = |r: &Routine| names.get(&r.id).cloned().unwrap_or_default();
+    assert_eq!(
+        ids(routines_by_name(listed, name_of)),
+        fixture["namesByName"]
+    );
+    Ok(())
+}
+
+/// A Routine with `id` on `schedule` and nothing else, as the generator
+/// builds them for calendar files.
+fn bare_routine(id: &str, schedule: Schedule) -> Routine {
+    Routine {
+        id: id.to_string(),
+        note_id: format!("note:{id}"),
+        schedule,
+        done: BTreeMap::new(),
+        renag: None,
+        escalation: None,
+        scheduled_at: None,
+        trashed: None,
+        trashed_with: None,
+    }
 }
 
 // ------------------------------------------------------------ LAN sync

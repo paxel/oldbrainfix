@@ -1,8 +1,8 @@
 //! Core of the Old Brain Fix desktop app: a reimplementation of the Dart
 //! core's signed, append-only entry log (ADR 0002) and of what the
 //! screens read from it and write to it, Notes with their Sections, Areas
-//! and Topics, Routines and Reminders with the alarm plan, the Nudge and
-//! the Missed Summary, Frogs with today's pick, Tallies with their entries and charts, this Device's settings, and the question marks of
+//! and Topics, Routines and Reminders with the alarm plan, the Nudge,
+//! the Missed Summary and their calendar file, Frogs with today's pick, Tallies with their entries and charts, this Device's settings, and the question marks of
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
@@ -27,6 +27,7 @@ pub mod entry;
 pub mod error;
 pub mod folder;
 pub mod frogs;
+pub mod ics;
 pub mod join;
 pub mod keys;
 pub mod lan;

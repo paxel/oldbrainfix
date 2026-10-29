@@ -189,5 +189,8 @@
   "captureKeysHintSorted": "Strg+Enter speichert sie.",
   "popupKeysHintSorted": "Enter speichert sie. Esc behält Getipptes genauso; leer schließt es nur.",
   "captureChoicePlaceDesk": "In: {place}",
-  "removeChoice": "{choice} entfernen"
+  "removeChoice": "{choice} entfernen",
+  "calendarFileSaveTitle": "Kalenderdatei speichern",
+  "calendarFileSaved": "Die Kalenderdatei ist gespeichert. Eine Kalender-App kann sie von dort importieren.",
+  "occurrenceMenu": "Mehr zu {title}"
 }

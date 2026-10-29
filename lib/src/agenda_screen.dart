@@ -12,8 +12,9 @@ import 'area_look.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
 import 'browser.dart';
-import 'calendar_export_screen.dart';
+import 'all_routines_screen.dart';
 import 'calendar_platform.dart';
+import 'calendar_screen.dart';
 import 'capture_fan.dart';
 import 'capture_requests.dart';
 import 'capture_screen.dart';
@@ -58,6 +59,9 @@ typedef _ShownPicks = ({
   bool swaps,
 });
 
+/// What the menu of an Occurrence's row does.
+enum _RowChoice { history, share }
+
 /// A Frog of the "Eat a frog" section with its Note and Area, and
 /// whether it shows Masked.
 typedef _ShownFrog = ({PlacedFrog placed, bool masked});
@@ -70,9 +74,11 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// fans out Text, Voice, Photo and Gallery to capture a Note, whose card
 /// then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
-/// the notes browser; the app bar makes a Routine without a Note, opens
-/// the calendar export, and has the gear in its corner, the only way to
-/// Settings. A red
+/// the notes browser; the app bar opens the list of all Routines and
+/// Reminders and the Calendar page, makes a Routine without a Note, and
+/// has the Profile picture in its corner, the only way to Settings. Each
+/// row's ⋮, or a long press on it, shares its Routine or Reminder as a
+/// calendar file, and a Routine's leads to its history. A red
 /// banner on top shows while alarms lack a permission, and leads to the
 /// setup. Below it the Missed Summary shows until "seen", and under it
 /// the "x Unsorted" banner while Notes are Unsorted, opening them, and
@@ -506,6 +512,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  Future<void> _openAllRoutines() async {
+    await openAllRoutines(context, widget.notes, widget.places);
+    if (!mounted) return;
+    _routineEdited();
+  }
+
+  Future<void> _openCalendar() async {
+    await openCalendarPage(context, widget.notes.store);
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _newRoutine() async {
     await newRoutine(context, widget.notes, widget.places);
     if (!mounted) return;
@@ -546,24 +564,62 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _routineEdited();
   }
 
-  /// A long press on a Routine's row opens a menu where the finger is,
-  /// leading to its history.
-  Future<void> _rowMenu(AgendaRow row, Offset at) async {
+  /// The ⋮ of an Occurrence's row, or a long press on it, opens a menu
+  /// where the finger is: a Routine's history, and Share, which hands the
+  /// Routine as its whole series, or the Reminder, to another app as a
+  /// calendar file. Both open a locked Area first, as a Masked row tells
+  /// nothing until then. Null when there is nothing to offer.
+  void Function(Offset at)? _rowMenu(AgendaRow row) {
+    final history = !row.routine.isReminder;
+    final share = CalendarScope.of(context).available;
+    if (!history && !share) return null;
+    return (at) => _showRowMenu(row, at, history: history, share: share);
+  }
+
+  Future<void> _showRowMenu(
+    AgendaRow row,
+    Offset at, {
+    required bool history,
+    required bool share,
+  }) async {
     final t = context.t;
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
-    final choice = await showMenu<bool>(
+    PopupMenuItem<_RowChoice> item(
+      _RowChoice value,
+      IconData icon,
+      String label,
+    ) => PopupMenuItem(
+      key: ValueKey('row-${value.name}'),
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon),
+          const SizedBox(width: 12),
+          Flexible(child: Text(label)),
+        ],
+      ),
+    );
+    final choice = await showMenu<_RowChoice>(
       context: context,
       position: RelativeRect.fromRect(
         overlay.globalToLocal(at) & Size.zero,
         Offset.zero & overlay.size,
       ),
-      items: [PopupMenuItem(value: true, child: Text(t.historyTitle))],
+      items: [
+        if (history) item(_RowChoice.history, Icons.history, t.historyTitle),
+        if (share) item(_RowChoice.share, Icons.share_outlined, t.share),
+      ],
     );
-    if (!mounted || choice != true) return;
+    if (!mounted || choice == null) return;
     if (!await _openAreaOf(row) || !mounted) return;
-    await openHistory(context, widget.notes, row.routine);
+    switch (choice) {
+      case _RowChoice.history:
+        await openHistory(context, widget.notes, row.routine);
+      case _RowChoice.share:
+        await shareRoutinesFile(context, _routines, [row.routine]);
+    }
     if (!mounted) return;
     _closeAreas();
     _reload();
@@ -600,7 +656,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       // Done from the entries of every pick stays checked.
       onToggle: picks?.today.complete ?? false ? null : () => _toggle(row),
       onTap: () => _openRow(row),
-      onMenu: row.routine.isReminder ? null : (at) => _rowMenu(row, at),
+      onMenu: _rowMenu(row),
     );
   }
 
@@ -717,10 +773,17 @@ class _AgendaScreenState extends State<AgendaScreen> {
             ],
           ),
           actions: [
-            if (CalendarScope.of(context).available)
+            IconButton(
+              key: const ValueKey('allRoutines'),
+              tooltip: t.allRoutinesTitle,
+              onPressed: _openAllRoutines,
+              icon: const Icon(Icons.format_list_bulleted),
+            ),
+            if (hasCalendarPage(context))
               IconButton(
-                tooltip: t.calendarExportTooltip,
-                onPressed: () => openCalendarExport(context, widget.notes),
+                key: const ValueKey('calendarPage'),
+                tooltip: t.calendarPageTitle,
+                onPressed: _openCalendar,
                 icon: const Icon(Icons.event_outlined),
               ),
             IconButton(
@@ -1041,9 +1104,9 @@ class _NothingPlanned extends StatelessWidget {
 }
 
 /// One Occurrence as an embossed row: the box to check it off, its time,
-/// its Note's text, and its Area's colour and icon. Tapping the row
+/// its Note's text, its Area's colour and icon, and ⋮. Tapping the row
 /// opens its Routine; a long press opens [onMenu] where the finger is,
-/// when there is one.
+/// and ⋮ opens it at the button, when there is one.
 class _OccurrenceRow extends StatelessWidget {
   final AgendaRow row;
   final Area? area;
@@ -1104,7 +1167,12 @@ class _OccurrenceRow extends StatelessWidget {
                             left: BorderSide(color: colour, width: 6),
                           ),
                         ),
-                  padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+                  padding: EdgeInsets.fromLTRB(
+                    4,
+                    4,
+                    onMenu == null ? 16 : 4,
+                    4,
+                  ),
                   child: Row(
                     children: [
                       Checkbox(
@@ -1149,6 +1217,25 @@ class _OccurrenceRow extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 8),
                           child: Icon(icon, size: 20, color: colour),
+                        ),
+                      if (onMenu case final onMenu?)
+                        // The same menu as the long press, at the button.
+                        Builder(
+                          builder: (button) => IconButton(
+                            key: ValueKey('row-menu-${row.routine.id}'),
+                            tooltip: t.more,
+                            icon: const Icon(Icons.more_vert),
+                            onPressed: () {
+                              final box =
+                                  button.findRenderObject() as RenderBox?;
+                              if (box == null) return;
+                              onMenu(
+                                box.localToGlobal(
+                                  box.size.bottomLeft(Offset.zero),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                     ],
                   ),

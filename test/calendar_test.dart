@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
-import 'package:oldbrainfix/src/calendar_export_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/calendar_platform.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
@@ -60,7 +60,10 @@ void main() {
   }
 
   final calendarButton = find.byTooltip('Calendar');
-  final exportButton = find.byTooltip('Export to calendar');
+  final allButton = find.byKey(const ValueKey('allRoutines'));
+  final exportButton = find.byTooltip('Export');
+  Finder rowMenu(Routine routine) =>
+      find.byKey(ValueKey('row-menu-${routine.id}'));
   const share = 'Share as calendar file';
 
   group('Add to calendar', () {
@@ -162,15 +165,63 @@ void main() {
     ) async {
       final note = notes.capture('pills');
       routines.spawn(note.id, daily([at(8)]));
+      final dentist = routines.create(
+        'dentist',
+        Schedule(start: Day(2026, 10, 24), times: [at(14, 30)]),
+      );
       await start(tester, platform: const NoCalendar());
+      // A Reminder has nothing else in its menu, so no ⋮ either.
+      expect(rowMenu(dentist), findsNothing);
+      await tap(tester, allButton);
+      expect(find.text('dentist'), findsOneWidget);
       expect(exportButton, findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
       await edit(tester, note.id);
       expect(calendarButton, findsNothing);
     });
   });
 
-  group('ICS export', () {
-    testWidgets('shares all Routines and Reminders with rules and alarms', (
+  group('All Routines and Reminders', () {
+    testWidgets('lists every one by name, also beyond the week', (
+      tester,
+    ) async {
+      routines.create('pills', daily([at(8)]));
+      routines.create(
+        'Dentist',
+        Schedule(start: Day(2026, 11, 3), times: [at(14, 30)]),
+      );
+      routines.create(
+        'birthday',
+        Schedule(
+          start: Day(2027, 3, 1),
+          times: [at(9)],
+          rule: Recurrence.parse('FREQ=YEARLY'),
+        ),
+      );
+      await start(tester);
+      expect(find.text('birthday'), findsNothing, reason: 'not this week');
+
+      await tap(tester, allButton);
+      expect(find.byType(AllRoutinesScreen), findsOneWidget);
+      final ys = [
+        for (final name in ['birthday', 'Dentist', 'pills'])
+          tester.getTopLeft(find.text(name)).dy,
+      ];
+      expect(ys, [...ys]..sort());
+      // Nothing to pick: the list opens, it does not select.
+      expect(find.byType(Checkbox), findsNothing);
+    });
+
+    testWidgets('a tap opens the editor', (tester) async {
+      routines.create('pills', daily([at(8)]));
+      await start(tester);
+      await tap(tester, allButton);
+      await tap(tester, find.text('pills'));
+      expect(find.byType(RoutineEditorScreen), findsOneWidget);
+    });
+
+    testWidgets('Export shares all of them with rules and alarms', (
       tester,
     ) async {
       final pills = routines.create('pills', daily([at(8), at(20)]));
@@ -179,61 +230,40 @@ void main() {
         Schedule(start: Day(2026, 11, 3), times: [at(14, 30)]),
       );
       await start(tester);
-      await tap(tester, exportButton);
-      expect(find.byType(CalendarExportScreen), findsOneWidget);
-      expect(find.text('pills'), findsOneWidget);
-      expect(find.text('dentist'), findsOneWidget);
+      await tap(tester, allButton);
 
-      await tap(tester, find.byTooltip(share));
+      await tap(tester, exportButton);
       final (name, ics) = calendar.shared.single;
       expect(name, 'oldbrainfix.ics');
+      expect(
+        ics,
+        routinesIcs(
+          [dentist, pills],
+          (r) => r.id == pills.id ? 'pills' : 'dentist',
+          stamp: now,
+        ),
+      );
       expect(ics, contains('UID:${pills.id}-0800@oldbrainfix'));
       expect(ics, contains('UID:${pills.id}-2000@oldbrainfix'));
       expect(ics, contains('UID:${dentist.id}-1430@oldbrainfix'));
-      expect(ics, contains('RRULE:FREQ=DAILY'));
       expect('BEGIN:VALARM'.allMatches(ics), hasLength(3));
-    });
-
-    testWidgets('shares only what is picked', (tester) async {
-      final pills = routines.create('pills', daily([at(8)]));
-      final dentist = routines.create(
-        'dentist',
-        Schedule(start: Day(2026, 11, 3), times: [at(14, 30)]),
-      );
-      await start(tester);
-      await tap(tester, exportButton);
-
-      await tap(tester, find.text('pills'));
-      await tap(tester, find.byTooltip(share));
-      final (_, ics) = calendar.shared.single;
-      expect(ics, isNot(contains(pills.id)));
-      expect(ics, contains(dentist.id));
-    });
-
-    testWidgets('"All" drops and picks everything together', (tester) async {
-      routines.create('pills', daily([at(8)]));
-      await start(tester);
-      await tap(tester, exportButton);
-
-      await tap(tester, find.text('All Routines and Reminders'));
-      final shareButton = find.byTooltip(share);
-      expect(
-        tester
-            .widget<IconButton>(
-              find.ancestor(of: shareButton, matching: find.byType(IconButton)),
-            )
-            .onPressed,
-        isNull,
-      );
-      await tap(tester, find.text('All Routines and Reminders'));
-      await tap(tester, shareButton);
-      expect(calendar.shared, hasLength(1));
     });
 
     testWidgets('nothing to export says so', (tester) async {
       await start(tester);
-      await tap(tester, exportButton);
+      await tap(tester, allButton);
       expect(find.text('No Routines or Reminders yet.'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: exportButton,
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
     });
 
     testWidgets('when no app takes the file it says so at the top', (
@@ -242,9 +272,62 @@ void main() {
       calendar.hasShareTarget = false;
       routines.create('pills', daily([at(8)]));
       await start(tester);
+      await tap(tester, allButton);
       await tap(tester, exportButton);
-      await tap(tester, find.byTooltip(share));
       expect(find.text('No app can take the calendar file.'), findsOneWidget);
+    });
+  });
+
+  group('Share one', () {
+    testWidgets('a Routine is shared as its whole series with its end', (
+      tester,
+    ) async {
+      final pills = routines.create(
+        'pills',
+        Schedule(
+          start: Day(2026, 10, 24),
+          times: [at(8), at(20)],
+          rule: Recurrence.parse('FREQ=DAILY;COUNT=5'),
+        ),
+      );
+      final other = routines.create('water plants', daily([at(9)]));
+      await start(tester);
+
+      await tap(tester, rowMenu(pills).first);
+      expect(find.text('History'), findsOneWidget);
+      await tap(tester, find.text('Share'));
+      final (name, ics) = calendar.shared.single;
+      expect(name, 'oldbrainfix.ics');
+      expect(ics, routinesIcs([pills], (_) => 'pills', stamp: now));
+      expect(ics, contains('RRULE:FREQ=DAILY;UNTIL=20261026T080000'));
+      expect(ics, isNot(contains(other.id)));
+    });
+
+    testWidgets('a Reminder is shared as its one event', (tester) async {
+      final dentist = routines.create(
+        'dentist',
+        Schedule(start: Day(2026, 10, 25), times: [at(14, 30)]),
+      );
+      routines.create('pills', daily([at(8)]));
+      await start(tester);
+
+      await tap(tester, rowMenu(dentist));
+      expect(find.text('History'), findsNothing);
+      await tap(tester, find.text('Share'));
+      final (_, ics) = calendar.shared.single;
+      expect(ics, routinesIcs([dentist], (_) => 'dentist', stamp: now));
+      expect(ics, isNot(contains('RRULE')));
+      expect('BEGIN:VEVENT'.allMatches(ics), hasLength(1));
+    });
+
+    testWidgets('a long press opens the same menu', (tester) async {
+      final pills = routines.create('pills', daily([at(8)]));
+      await start(tester);
+      await tester.longPress(find.text('pills').first);
+      await tester.pumpAndSettle();
+      await tap(tester, find.text('Share'));
+      final (_, ics) = calendar.shared.single;
+      expect(ics, contains(pills.id));
     });
   });
 }

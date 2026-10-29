@@ -63,6 +63,12 @@ pub const CONTEXT_APP: char = '\u{e08f}';
 pub const CONTEXT_CALENDAR: char = '\u{f02f}';
 pub const CONTEXT_BLUETOOTH: char = '\u{e0e4}';
 pub const MORE: char = '\u{e402}';
+/// `format_list_bulleted`, as the phone's Agenda bar opens All Routines
+/// and Reminders; `more_vert`, as an Occurrence's ⋮; and
+/// `file_upload_outlined`, as that page's Export.
+pub const ALL_ROUTINES: char = '\u{e2b8}';
+pub const MORE_VERT: char = '\u{e404}';
+pub const EXPORT: char = '\u{f05d}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

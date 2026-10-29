@@ -961,10 +961,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get captureContextIntro =>
-      'Außer wann und wo kann eine Notiz noch mehr darüber festhalten, was gerade los war. Alles hier ist aus, bis du es einschaltest, und bleibt in der Notiz auf deinen eigenen Geräten.';
+      'Außer wann und wo kann eine Notiz noch mehr darüber festhalten, was gerade los war. Das ist aus, bis du es einschaltest, und bleibt in der Notiz auf deinen eigenen Geräten.';
 
   @override
-  String get calendarContextSwitch => 'Kalendertermin';
+  String get calendarContextSwitch => 'Laufenden Termin notieren';
 
   @override
   String get calendarContextDetail =>
@@ -982,7 +982,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calendarExplainBody =>
-      'Old Brain Fix kann notieren, welcher Kalendertermin gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+      'Old Brain Fix kann notieren, welcher Termin in deinem Kalender gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
 
   @override
   String get bluetoothExplainTitle => 'Merken, was verbunden war?';
@@ -1299,19 +1299,33 @@ class AppLocalizationsDe extends AppLocalizations {
       'Keine App kann die Kalenderdatei annehmen.';
 
   @override
-  String get calendarExportTooltip => 'In den Kalender exportieren';
+  String get share => 'Teilen';
 
   @override
-  String get calendarExportTitle => 'Kalenderexport';
+  String get exportCalendarFile => 'Exportieren';
 
   @override
-  String get calendarExportAll => 'Alle Routinen und Erinnerungen';
+  String get allRoutinesTitle => 'Alle Routinen und Erinnerungen';
 
   @override
-  String get calendarExportEmpty => 'Noch keine Routinen oder Erinnerungen.';
+  String get allRoutinesEmpty => 'Noch keine Routinen oder Erinnerungen.';
 
   @override
-  String get calendarMirrorSwitch => 'Im Kalender führen';
+  String get calendarPageTitle => 'Kalender';
+
+  @override
+  String get calendarReadHeading => 'Aus deinem Kalender lesen';
+
+  @override
+  String get calendarWriteHeading => 'In deinen Kalender schreiben';
+
+  @override
+  String get settingsCalendarDetail =>
+      'Was aus deinem Kalender gelesen und was in ihn geschrieben wird.';
+
+  @override
+  String get calendarMirrorSwitch =>
+      'Routinen und Erinnerungen in einen Kalender schreiben';
 
   @override
   String get calendarMirrorDetail =>
@@ -1323,7 +1337,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get calendarMirrorExplainTitle => 'Im Kalender führen?';
+  String get calendarMirrorExplainTitle => 'In deinen Kalender schreiben?';
 
   @override
   String get calendarMirrorExplainBody =>
@@ -1393,8 +1407,7 @@ class AppLocalizationsDe extends AppLocalizations {
       '„Zuhause“ oder „Arbeit“ statt Koordinaten. Sie gehören zu deinen Notizen, nicht nur zu diesem Handy.';
 
   @override
-  String get settingsCaptureContextDetail =>
-      'Kalendertermin und Bluetooth-Gerät zu jeder Notiz.';
+  String get settingsCaptureContextDetail => 'Bluetooth-Gerät zu jeder Notiz.';
 
   @override
   String get settingsSpeechModelDetail => 'Für Transkripte von Sprachnotizen.';

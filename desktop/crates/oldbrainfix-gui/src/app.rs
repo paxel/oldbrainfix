@@ -62,8 +62,10 @@ use egui::{
 };
 use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
+use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::offers::{self, HeldAreaOffer, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
+use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
@@ -78,6 +80,7 @@ use oldbrainfix_core::{
 use crate::about_view;
 use crate::ai_view::{self, AiAction, Client, ReviewShown};
 use crate::alerts::Event;
+use crate::all_routines_view::{self, AllRoutinesAction};
 use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
@@ -147,6 +150,9 @@ pub enum Selection {
     /// The Frog view (#101): the open Frogs, oldest first, and the
     /// folded "Done" section; reached from the Agenda's "Eat a frog".
     Frogs,
+    /// Every Routine and Reminder by name, also those beyond the
+    /// Agenda's week (#115), with Export; reached from the Agenda's bar.
+    AllRoutines,
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -279,6 +285,9 @@ struct View {
     frogs_open: Vec<FrogShown>,
     frogs_done: Vec<FrogShown>,
     frogs_done_open: bool,
+    /// Every Routine and Reminder in alphabetical order with its name,
+    /// while their page shows (#115).
+    all_routines: Vec<(Routine, String)>,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
@@ -604,6 +613,12 @@ enum Action {
     /// "Seen" on the Missed Summary.
     Seen,
     OpenRoutine(String),
+    /// Saves one calendar file of every Routine and Reminder, in the
+    /// order their page lists them (#115).
+    ExportRoutines,
+    /// Saves the Routine with this id as a calendar file, its whole
+    /// series with its end, or the Reminder (#115).
+    ShareRoutine(String),
     /// A new Routine, or Reminder, from the Note, or with its Note made
     /// behind the scenes.
     NewRoutine {
@@ -884,6 +899,8 @@ pub struct App {
     bundle_opener: FolderPicker,
     /// Asks where to save a Sent Item.
     item_saver: FileSaver,
+    /// Asks where to save a calendar file, of one Routine or of all.
+    calendar_saver: FileSaver,
     /// Files handed over from outside the window, to open.
     handed: Option<Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>>,
     /// What a bundle saved or imported did, announced at the top until
@@ -1031,6 +1048,18 @@ fn item_dialog(title: &str) -> rfd::FileDialog {
         .add_filter(oldbrainfix_core::APP_NAME, &[sent::EXTENSION])
 }
 
+/// The save dialog's filter for a calendar file.
+fn calendar_dialog(title: &str) -> rfd::FileDialog {
+    rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter("iCalendar", &[CALENDAR_EXTENSION])
+}
+
+/// What a calendar file ends in, and the name one is proposed under, as
+/// the phone's `calendarFileName`.
+const CALENDAR_EXTENSION: &str = "ics";
+const CALENDAR_FILE_NAME: &str = "oldbrainfix.ics";
+
 /// The region of a system locale such as `en-US`, `de_DE.UTF-8` or
 /// `zh-Hans-CN`: its two-letter country code, or `None` when it names
 /// none.
@@ -1108,6 +1137,9 @@ impl App {
             }),
             bundle_opener: Box::new(|title| bundle_dialog(title).pick_file()),
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
+            calendar_saver: Box::new(|title, name| {
+                calendar_dialog(title).set_file_name(name).save_file()
+            }),
             handed: None,
             notice: None,
             updates: std::collections::VecDeque::new(),
@@ -1374,6 +1406,39 @@ impl App {
     /// Hands in the dialog asking where to save a Sent Item.
     pub fn set_item_saver(&mut self, saver: FileSaver) {
         self.item_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save a calendar file.
+    pub fn set_calendar_saver(&mut self, saver: FileSaver) {
+        self.calendar_saver = saver;
+    }
+
+    /// Saves `list` as one calendar file where the user says, made at the
+    /// store's now, each titled with its Note's text: every one for
+    /// Export, or one Routine as its whole series or one Reminder for
+    /// Share. The desktop has no share sheet; the file is what a calendar
+    /// app imports. Backing out of the dialog writes nothing.
+    fn save_calendar_file(&mut self, list: &[Routine]) -> oldbrainfix_core::Result<()> {
+        let t = self.t;
+        let names = all_routines_view::names(&t, &Routines::new(&self.store), list)?;
+        let ics = routines_ics(
+            list,
+            |r| names.get(&r.id).cloned().unwrap_or_default(),
+            self.store.now(),
+        );
+        let Some(mut path) =
+            (self.calendar_saver)(t.calendar_file_save_title(), CALENDAR_FILE_NAME)
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != CALENDAR_EXTENSION) {
+            path.set_extension(CALENDAR_EXTENSION);
+        }
+        self.notice = Some(match std::fs::write(&path, ics) {
+            Ok(()) => t.calendar_file_saved().to_string(),
+            Err(e) => format!("{} ({e})", t.send_failed()),
+        });
+        Ok(())
     }
 
     /// Asks `picker` for the files of "From file…" instead of the
@@ -2258,7 +2323,8 @@ impl App {
             | Selection::SentItemsWaiting
             | Selection::AreaOffersWaiting
             | Selection::AiReview
-            | Selection::Frogs => Vec::new(),
+            | Selection::Frogs
+            | Selection::AllRoutines => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -2529,6 +2595,16 @@ impl App {
             }
             trashed_frogs.sort_by_key(|(frog, ..)| std::cmp::Reverse(frog.trashed));
         }
+        let mut all_routines = Vec::new();
+        if self.selection == Selection::AllRoutines {
+            let all = routines.all()?;
+            let names = all_routines_view::names(&self.t, &routines, &all)?;
+            let name = |r: &Routine| names.get(&r.id).cloned().unwrap_or_default();
+            for routine in routines_by_name(all, name) {
+                let name = names.get(&routine.id).cloned().unwrap_or_default();
+                all_routines.push((routine, name));
+            }
+        }
         let (frogs_open, frogs_done) = if self.selection == Selection::Frogs {
             (shown_frogs(frogs.open()?)?, shown_frogs(frogs.done()?)?)
         } else {
@@ -2565,6 +2641,7 @@ impl App {
             note_frogs,
             tally,
             frogs_open,
+            all_routines,
             frogs_done,
             frogs_done_open: self.store.local_setting(FROGS_DONE_OPEN)?.as_deref() == Some("true"),
             agenda,
@@ -2907,6 +2984,20 @@ impl App {
                 Routines::new(&self.store).mark_done(&routine, &occurrence, None)?;
             }
             Action::Seen => Alarms::new(&self.store).mark_seen()?,
+            Action::ExportRoutines => {
+                let all: Vec<Routine> = self
+                    .view
+                    .all_routines
+                    .iter()
+                    .map(|(routine, _)| routine.clone())
+                    .collect();
+                self.save_calendar_file(&all)?;
+            }
+            Action::ShareRoutine(id) => {
+                if let Some(routine) = Routines::new(&self.store).by_id(&id)? {
+                    self.save_calendar_file(&[routine])?;
+                }
+            }
             Action::OpenRoutine(id) => {
                 self.save_text()?;
                 let routines = Routines::new(&self.store);
@@ -3764,7 +3855,7 @@ impl App {
             }
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
             Selection::AiReview => Some(Selection::Settings),
-            Selection::Frogs => Some(Selection::Agenda),
+            Selection::Frogs | Selection::AllRoutines => Some(Selection::Agenda),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
@@ -4345,6 +4436,7 @@ impl App {
             Selection::AreaOffersWaiting => self.t.area_offers_waiting_title().to_string(),
             Selection::AiReview => self.t.ai_review_title().to_string(),
             Selection::Frogs => self.t.frogs_title().to_string(),
+            Selection::AllRoutines => self.t.all_routines_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -4511,6 +4603,15 @@ impl App {
                 );
                 frogs_view::frogs_page(ui, &self.t, tones, lists, &mut asked);
                 actions.extend(asked.into_iter().map(Action::Frog));
+                return;
+            }
+            Selection::AllRoutines => {
+                let mut asked = Vec::new();
+                all_routines_view::page(ui, &self.t, tones, &self.view.all_routines, &mut asked);
+                actions.extend(asked.into_iter().map(|asked| match asked {
+                    AllRoutinesAction::Open(id) => Action::OpenRoutine(id),
+                    AllRoutinesAction::Export => Action::ExportRoutines,
+                }));
                 return;
             }
             Selection::Sync => {
@@ -5457,7 +5558,12 @@ impl App {
         let text = ui.visuals().text_color();
         ui.horizontal(|ui| {
             ui.heading(RichText::new(t.agenda_title()).color(text));
-            ui.add_space((ui.available_width() - 60.0).max(0.0));
+            // As the phone's bar, without its Calendar (UI laws, "The
+            // Agenda's bar").
+            ui.add_space((ui.available_width() - 92.0).max(0.0));
+            if icon_button(ui, icons::ALL_ROUTINES, t.all_routines_title(), text).clicked() {
+                actions.push(Action::Select(Selection::AllRoutines));
+            }
             if icon_button(ui, icons::ADD_ALARM, t.new_routine_tooltip(), text).clicked() {
                 actions.push(Action::NewRoutine {
                     note: None,
@@ -7771,10 +7877,11 @@ pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
 }
 
 /// One Occurrence on the Agenda as an embossed row: the box to check it
-/// off, its time, its Note's text, and its Area's colour and icon. A
-/// click on the text opens its Routine. A Session's row lists its picks
-/// under it today, and how many it picks on later days; once every pick
-/// has an entry, its box stays checked.
+/// off, its time, its Note's text, its Area's colour and icon, and its
+/// ⋮. A click on the text opens its Routine; a right-click on it opens
+/// the menu of ⋮. A Session's row lists its picks under it today, and
+/// how many it picks on later days; once every pick has an entry, its
+/// box stays checked.
 fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<Action>) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
@@ -7799,7 +7906,7 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 actions.push(Action::Toggle(routine.id.clone(), occurrence));
             }
             ui.add_space(4.0);
-            let width = (ui.available_width() - 56.0).max(40.0);
+            let width = (ui.available_width() - 84.0).max(40.0);
             let body = ui.vertical(|ui| {
                 ui.set_max_width(width);
                 ui.label(RichText::new(&time).strong().color(text));
@@ -7817,7 +7924,12 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
             if open.clicked() {
                 actions.push(Action::OpenRoutine(routine.id.clone()));
             }
+            // The same menu from a right-click and from ⋮.
+            let mut share = false;
+            open.context_menu(|ui| share |= occurrence_menu(ui, t));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
+                egui::Popup::menu(&more).show(|ui| share |= occurrence_menu(ui, t));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -7829,6 +7941,9 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                     icons::show(ui, icons::REMINDER, 18.0, weak);
                 }
             });
+            if share {
+                actions.push(Action::ShareRoutine(routine.id.clone()));
+            }
         });
         // The picks go under the title, outside its click.
         if let Some(part) = &row.session {
@@ -7839,6 +7954,15 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
             actions.extend(asked.into_iter().map(Action::Session));
         }
     });
+}
+
+/// An Occurrence's menu, from a right-click on it or its ⋮: Share, which
+/// saves its Routine as the whole series with its end, or its Reminder,
+/// as a calendar file. The desktop has no Routine history, which the
+/// phone's menu leads to too. Whether Share was clicked.
+fn occurrence_menu(ui: &mut Ui, t: &L10n) -> bool {
+    let text = ui.visuals().text_color();
+    ui.button(RichText::new(t.share()).color(text)).clicked()
 }
 
 /// How many Missed Occurrences of one Routine show to check off.

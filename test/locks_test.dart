@@ -8,8 +8,9 @@ import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/app_lock.dart';
 import 'package:oldbrainfix/src/areas_screen.dart';
-import 'package:oldbrainfix/src/calendar_export_screen.dart';
+import 'package:oldbrainfix/src/all_routines_screen.dart';
 import 'package:oldbrainfix/src/calendar_mirror.dart';
+import 'package:oldbrainfix/src/calendar_platform.dart';
 import 'package:oldbrainfix/src/capture_requests.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/file_into_screen.dart';
@@ -42,6 +43,7 @@ void main() {
   late FakeBiometrics biometrics;
   late FakePhotos photos;
   late FakeCaptureRequests requests;
+  late FakeCalendar calendar;
   // 09:00 on Saturday, 24 October 2026, on the test machine's clock.
   var now = DateTime(2026, 10, 24, 9);
   final en = lookupAppLocalizations(const Locale('en'));
@@ -62,6 +64,7 @@ void main() {
     biometrics = FakeBiometrics(can: false);
     photos = FakePhotos();
     requests = FakeCaptureRequests();
+    calendar = FakeCalendar();
     // Few rounds, so the tests stay quick; the hash says how many.
     store.setPin(pin, iterations: 10);
   });
@@ -93,7 +96,7 @@ void main() {
         lock: biometrics,
         photos: photos,
         requests: requests,
-        calendar: FakeCalendar(),
+        calendar: calendar,
         mirror: mirror ?? const NoMirror(),
         mirrorDelay: const Duration(milliseconds: 100),
       ),
@@ -498,6 +501,25 @@ void main() {
       expect(find.byType(RoutineEditorScreen), findsOneWidget);
     });
 
+    testWidgets('asks for the PIN before a Masked row shares its file', (
+      tester,
+    ) async {
+      final (:routine, doctor: _, note: _) = lockedDoctor();
+      await start(tester);
+
+      await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
+      await tap(tester, find.text(en.share));
+      expect(find.byKey(const ValueKey('pinField')), findsOneWidget);
+      await tap(tester, find.widgetWithText(TextButton, en.cancel));
+      expect(calendar.shared, isEmpty, reason: 'the title stays hidden');
+
+      await tap(tester, find.byKey(ValueKey('row-menu-${routine.id}')).first);
+      await tap(tester, find.text(en.share));
+      await enterPin(tester, pin);
+      final (_, ics) = calendar.shared.single;
+      expect(ics, contains('SUMMARY:Pills'));
+    });
+
     testWidgets('shows a Reminder Masked as "Private Reminder"', (
       tester,
     ) async {
@@ -642,13 +664,25 @@ void main() {
       expect(find.text('Garden'), findsOneWidget);
     });
 
-    testWidgets('the calendar export, and so its file', (tester) async {
+    testWidgets('all Routines and Reminders, and so the exported file', (
+      tester,
+    ) async {
       lockedDoctor();
       routines.create('Water plants', daily(12));
-      await show(tester, CalendarExportScreen(notes: notes));
+      await show(
+        tester,
+        CalendarScope(
+          calendar: calendar,
+          child: AllRoutinesScreen(notes: notes, places: places),
+        ),
+      );
 
       expect(find.text('Water plants'), findsOneWidget);
       expect(find.textContaining('Pills'), findsNothing);
+      await tap(tester, find.byTooltip(en.exportCalendarFile));
+      final (_, ics) = calendar.shared.single;
+      expect(ics, contains('SUMMARY:Water plants'));
+      expect(ics, isNot(contains('Pills')));
     });
   });
 

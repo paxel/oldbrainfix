@@ -956,10 +956,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get captureContextIntro =>
-      'Besides when and where, a Note can record more of what was going on. Each of these is off until you switch it on, and stays in the Note on your own devices.';
+      'Besides when and where, a Note can record more of what was going on. This is off until you switch it on, and stays in the Note on your own devices.';
 
   @override
-  String get calendarContextSwitch => 'Calendar event';
+  String get calendarContextSwitch => 'Note the running appointment';
 
   @override
   String get calendarContextDetail =>
@@ -1291,19 +1291,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingTakesCalendarFile => 'No app can take the calendar file.';
 
   @override
-  String get calendarExportTooltip => 'Export to calendar';
+  String get share => 'Share';
 
   @override
-  String get calendarExportTitle => 'Calendar export';
+  String get exportCalendarFile => 'Export';
 
   @override
-  String get calendarExportAll => 'All Routines and Reminders';
+  String get allRoutinesTitle => 'All Routines and Reminders';
 
   @override
-  String get calendarExportEmpty => 'No Routines or Reminders yet.';
+  String get allRoutinesEmpty => 'No Routines or Reminders yet.';
 
   @override
-  String get calendarMirrorSwitch => 'Keep in a calendar';
+  String get calendarPageTitle => 'Calendar';
+
+  @override
+  String get calendarReadHeading => 'Read from your calendar';
+
+  @override
+  String get calendarWriteHeading => 'Write to your calendar';
+
+  @override
+  String get settingsCalendarDetail =>
+      'What is read from your calendar and what is written to it.';
+
+  @override
+  String get calendarMirrorSwitch =>
+      'Write Routines and Reminders into a calendar';
 
   @override
   String get calendarMirrorDetail =>
@@ -1315,7 +1329,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get calendarMirrorExplainTitle => 'Keep them in your calendar?';
+  String get calendarMirrorExplainTitle => 'Write them into your calendar?';
 
   @override
   String get calendarMirrorExplainBody =>
@@ -1385,8 +1399,7 @@ class AppLocalizationsEn extends AppLocalizations {
       '“Home” or “Work” instead of coordinates. Kept with your Notes, not just on this phone.';
 
   @override
-  String get settingsCaptureContextDetail =>
-      'Calendar event and Bluetooth device with each Note.';
+  String get settingsCaptureContextDetail => 'Bluetooth device with each Note.';
 
   @override
   String get settingsSpeechModelDetail => 'For Transcripts of voice Notes.';

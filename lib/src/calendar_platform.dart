@@ -159,6 +159,25 @@ Future<void> shareCalendarFile(
   announcements?.announce(text);
 }
 
+/// Offers [list] as one calendar file, made at the store's now, each
+/// titled with its Note's text: every one for Export, or one Routine as
+/// its whole series or one Reminder for Share. Says so at the top when
+/// no app can take it.
+Future<void> shareRoutinesFile(
+  BuildContext context,
+  Routines routines,
+  List<Routine> list,
+) async {
+  final t = context.t;
+  final announcements = AnnouncementsScope.of(context);
+  final ics = routinesIcs(list, (routine) {
+    final note = routines.note(routine);
+    return note == null ? t.noteGone : noteText(t, note);
+  }, stamp: routines.store.clock());
+  if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
+  announcements?.announce(t.nothingTakesCalendarFile);
+}
+
 /// The calendar button of an app bar: does its only choice at once, or
 /// opens a menu of [choices] where the finger is. Nothing shows without
 /// a calendar or without choices.

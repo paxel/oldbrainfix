@@ -334,5 +334,11 @@
   "captureChoicePlaceDesk": "Into: {place}",
   "@captureChoicePlaceDesk": {"description": "On the desktop's capture popup and capture field: the Area or Topic picked for the Note, saved with it; the desktop font has no arrow.", "placeholders": {"place": {"type": "String"}}},
   "removeChoice": "Remove {choice}",
-  "@removeChoice": {"description": "The button on a choice shown on the desktop's capture popup or capture field that drops it before it is saved.", "placeholders": {"choice": {"type": "String"}}}
+  "@removeChoice": {"description": "The button on a choice shown on the desktop's capture popup or capture field that drops it before it is saved.", "placeholders": {"choice": {"type": "String"}}},
+  "calendarFileSaveTitle": "Save the calendar file",
+  "@calendarFileSaveTitle": {"description": "Title of the desktop's save dialog for Share in an Occurrence's ⋮ and Export on All Routines and Reminders; the desktop saves the .ics file where the user says instead of a share sheet."},
+  "calendarFileSaved": "The calendar file is saved. A calendar app can import it from there.",
+  "@calendarFileSaved": {"description": "Announced at the top of the desktop once Share or Export saved the calendar file."},
+  "occurrenceMenu": "More for {title}",
+  "@occurrenceMenu": {"description": "The ⋮ button on an Occurrence row of the desktop's Agenda, for screen readers.", "placeholders": {"title": {"type": "String"}}}
 }

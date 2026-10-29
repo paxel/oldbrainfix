@@ -1,6 +1,8 @@
 /// Routines and Reminders as calendar events: the iCalendar file (RFC
-/// 5545) for an export, and the same events one by one for a calendar
-/// app's insert screen (adapted from Catlog's ics.dart).
+/// 5545) for an export of all of them or to share one, and the same
+/// events one by one for a calendar app's insert screen (adapted from
+/// Catlog's ics.dart). The desktop core writes the same file byte for
+/// byte (`ics.rs`).
 ///
 /// Times are floating: the Device's wall clock without a zone, as the
 /// schedule itself is (ADR 0006). An 08:00 Routine is 08:00 wherever the
@@ -106,6 +108,17 @@ List<CalendarEvent> routineEvents(Routine routine, String text) {
       ),
   ];
 }
+
+/// [routines] as one iCalendar file, every event of each in turn, each
+/// titled by [textOf]: the export of all of them, or one Routine with
+/// its whole series and its end, or one Reminder, to share.
+String routinesIcs(
+  Iterable<Routine> routines,
+  String Function(Routine routine) textOf, {
+  required DateTime stamp,
+}) => writeIcs([
+  for (final routine in routines) ...routineEvents(routine, textOf(routine)),
+], stamp: stamp);
 
 /// [events] as an iCalendar file (RFC 5545), each with an alarm when it
 /// starts (an all-day one at [allDayAlarmTime], as the app rings it).

@@ -105,6 +105,26 @@ class Routine {
   DateTime? doneAt(Occurrence occurrence) => done[occurrence.key];
 }
 
+/// [routines] in alphabetical order of their names, as the list of all
+/// Routines and Reminders shows them; [nameOf] gives the title the app
+/// shows for one. A name counts by its first line, trimmed, in lower
+/// case, compared by UTF-16 code units; equal names go by id, so the
+/// order is the same every time and on every Device.
+List<Routine> routinesByName(
+  Iterable<Routine> routines,
+  String Function(Routine routine) nameOf,
+) {
+  final keyed = [for (final r in routines) (r, _nameKey(nameOf(r)))];
+  keyed.sort((a, b) {
+    final byName = a.$2.compareTo(b.$2);
+    return byName != 0 ? byName : a.$1.id.compareTo(b.$1.id);
+  });
+  return [for (final (routine, _) in keyed) routine];
+}
+
+String _nameKey(String name) =>
+    name.trim().split(RegExp(r'\r?\n')).first.trim().toLowerCase();
+
 /// One row of the Agenda: an Occurrence of a Routine, with the Note it
 /// comes from and whether it is Done.
 class AgendaRow {

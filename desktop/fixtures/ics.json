@@ -1,0 +1,359 @@
+{
+  "stamp": "2026-10-24T07:05:09.250Z",
+  "routines": [
+    {
+      "id": "routine:weekly",
+      "start": "2026-10-24",
+      "times": [
+        "07:30"
+      ],
+      "rule": "FREQ=WEEKLY;BYDAY=MO,TH",
+      "text": "Bins, recycling; paper\nput out by 7, not later"
+    },
+    {
+      "id": "routine:monthly",
+      "start": "2026-10-24",
+      "times": [
+        "18:00",
+        "09:15"
+      ],
+      "rule": "FREQ=MONTHLY;BYDAY=-1FR",
+      "text": "Miete überweisen – Konto prüfen ✓ 💶"
+    },
+    {
+      "id": "routine:yearly",
+      "start": "2027-03-14",
+      "times": [],
+      "rule": "FREQ=YEARLY",
+      "text": "Omas Geburtstag 🎂"
+    },
+    {
+      "id": "routine:count",
+      "start": "2026-10-24",
+      "times": [
+        "08:00",
+        "20:00"
+      ],
+      "rule": "FREQ=DAILY;COUNT=7",
+      "text": "Antibiotics"
+    },
+    {
+      "id": "routine:cutoff",
+      "start": "2026-10-24",
+      "times": [
+        "08:00",
+        "20:00"
+      ],
+      "rule": "FREQ=DAILY;COUNT=1",
+      "text": "Once really"
+    },
+    {
+      "id": "routine:until",
+      "start": "2026-10-24",
+      "times": [
+        "17:00"
+      ],
+      "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU;UNTIL=20261231;WKST=SU",
+      "text": "Physio"
+    },
+    {
+      "id": "routine:allday-until",
+      "start": "2026-10-24",
+      "times": [],
+      "rule": "FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20270630T120000Z",
+      "text": "Water meter"
+    },
+    {
+      "id": "routine:byhour",
+      "start": "2026-10-24",
+      "times": [],
+      "rule": "FREQ=DAILY;BYHOUR=20,8;BYMINUTE=30",
+      "text": "Pills"
+    },
+    {
+      "id": "routine:never",
+      "start": "2026-10-24",
+      "times": [
+        "08:00"
+      ],
+      "rule": "FREQ=DAILY;UNTIL=20261001",
+      "text": "Gone"
+    },
+    {
+      "id": "routine:dentist",
+      "start": "2026-11-03",
+      "times": [
+        "14:30"
+      ],
+      "rule": null,
+      "text": "Dentist, Dr. Müller; bring the card\\ and the letter"
+    },
+    {
+      "id": "routine:party",
+      "start": "2026-12-31",
+      "times": [],
+      "rule": null,
+      "text": "﻿  Silvester \r\nParty\rwith a lone CR\n\n  "
+    },
+    {
+      "id": "routine:long",
+      "start": "2026-10-25",
+      "times": [
+        "06:05"
+      ],
+      "rule": "FREQ=DAILY;INTERVAL=3",
+      "text": "Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Medikament für Oma ü 💊, Ende"
+    },
+    {
+      "id": "routine:exact",
+      "start": "2026-10-25",
+      "times": [
+        "06:05"
+      ],
+      "rule": null,
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "id": "routine:blank",
+      "start": "2026-10-26",
+      "times": [],
+      "rule": null,
+      "text": "   "
+    }
+  ],
+  "files": [
+    {
+      "routines": [
+        "routine:weekly",
+        "routine:monthly",
+        "routine:yearly",
+        "routine:count",
+        "routine:cutoff",
+        "routine:until",
+        "routine:allday-until",
+        "routine:byhour",
+        "routine:never",
+        "routine:dentist",
+        "routine:party",
+        "routine:long",
+        "routine:exact",
+        "routine:blank"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:weekly-0730@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261026T073000\r\nDURATION:PT15M\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,TH\r\nSUMMARY:Bins\\, recycling\\; paper\r\nDESCRIPTION:Bins\\, recycling\\; paper\\nput out by 7\\, not later\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Bins\\, recycling\\; paper\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:monthly-0915@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261030T091500\r\nDURATION:PT15M\r\nRRULE:FREQ=MONTHLY;BYDAY=-1FR\r\nSUMMARY:Miete überweisen – Konto prüfen ✓ 💶\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Miete überweisen – Konto prüfen ✓ 💶\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:monthly-1800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261030T180000\r\nDURATION:PT15M\r\nRRULE:FREQ=MONTHLY;BYDAY=-1FR\r\nSUMMARY:Miete überweisen – Konto prüfen ✓ 💶\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Miete überweisen – Konto prüfen ✓ 💶\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:yearly@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20270314\r\nDTEND;VALUE=DATE:20270315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Omas Geburtstag 🎂\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Omas Geburtstag 🎂\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:count-0800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T080000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261027T080000\r\nSUMMARY:Antibiotics\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Antibiotics\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:count-2000@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T200000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261027T080000\r\nSUMMARY:Antibiotics\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Antibiotics\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:cutoff-0800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T080000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261024T080000\r\nSUMMARY:Once really\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Once really\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:until-1700@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261103T170000\r\nDURATION:PT15M\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T235900;BYDAY=TU;WKST=SU\r\nSUMMARY:Physio\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Physio\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:allday-until@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\nRRULE:FREQ=MONTHLY;UNTIL=20270630;BYMONTHDAY=-1\r\nSUMMARY:Water meter\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Water meter\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:byhour-0830@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T083000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Pills\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Pills\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:byhour-2030@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T203000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Pills\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Pills\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:dentist-1430@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261103T143000\r\nDURATION:PT15M\r\nSUMMARY:Dentist\\, Dr. Müller\\; bring the card\\\\ and the letter\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Dentist\\, Dr. Müller\\; bring the card\\\\ and the letter\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:party@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261231\r\nDTEND;VALUE=DATE:20270101\r\nSUMMARY:Silvester\r\nDESCRIPTION:Silvester \\nParty\\nwith a lone CR\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Silvester\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:long-0605@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261025T060500\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;INTERVAL=3\r\nSUMMARY:Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikam\r\n ent für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma \r\n ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medi\r\n kament für Oma ü 💊\\, Ende\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Med\r\n ikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für O\r\n ma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, M\r\n edikament für Oma ü 💊\\, Ende\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:exact-0605@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261025T060500\r\nDURATION:PT15M\r\nSUMMARY:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n xxxx\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:blank@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261026\r\nDTEND;VALUE=DATE:20261027\r\nSUMMARY:\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:weekly"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:weekly-0730@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261026T073000\r\nDURATION:PT15M\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,TH\r\nSUMMARY:Bins\\, recycling\\; paper\r\nDESCRIPTION:Bins\\, recycling\\; paper\\nput out by 7\\, not later\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Bins\\, recycling\\; paper\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:monthly"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:monthly-0915@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261030T091500\r\nDURATION:PT15M\r\nRRULE:FREQ=MONTHLY;BYDAY=-1FR\r\nSUMMARY:Miete überweisen – Konto prüfen ✓ 💶\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Miete überweisen – Konto prüfen ✓ 💶\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:monthly-1800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261030T180000\r\nDURATION:PT15M\r\nRRULE:FREQ=MONTHLY;BYDAY=-1FR\r\nSUMMARY:Miete überweisen – Konto prüfen ✓ 💶\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Miete überweisen – Konto prüfen ✓ 💶\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:yearly"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:yearly@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20270314\r\nDTEND;VALUE=DATE:20270315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Omas Geburtstag 🎂\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Omas Geburtstag 🎂\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:count"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:count-0800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T080000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261027T080000\r\nSUMMARY:Antibiotics\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Antibiotics\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:count-2000@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T200000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261027T080000\r\nSUMMARY:Antibiotics\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Antibiotics\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:cutoff"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:cutoff-0800@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T080000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;UNTIL=20261024T080000\r\nSUMMARY:Once really\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Once really\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:until"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:until-1700@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261103T170000\r\nDURATION:PT15M\r\nRRULE:FREQ=WEEKLY;INTERVAL=2;UNTIL=20261231T235900;BYDAY=TU;WKST=SU\r\nSUMMARY:Physio\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Physio\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:allday-until"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:allday-until@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\nRRULE:FREQ=MONTHLY;UNTIL=20270630;BYMONTHDAY=-1\r\nSUMMARY:Water meter\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Water meter\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:byhour"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:byhour-0830@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T083000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Pills\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Pills\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:routine:byhour-2030@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261024T203000\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY\r\nSUMMARY:Pills\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Pills\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:never"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:dentist"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:dentist-1430@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261103T143000\r\nDURATION:PT15M\r\nSUMMARY:Dentist\\, Dr. Müller\\; bring the card\\\\ and the letter\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Dentist\\, Dr. Müller\\; bring the card\\\\ and the letter\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:party"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:party@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261231\r\nDTEND;VALUE=DATE:20270101\r\nSUMMARY:Silvester\r\nDESCRIPTION:Silvester \\nParty\\nwith a lone CR\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Silvester\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:long"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:long-0605@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261025T060500\r\nDURATION:PT15M\r\nRRULE:FREQ=DAILY;INTERVAL=3\r\nSUMMARY:Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikam\r\n ent für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma \r\n ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medi\r\n kament für Oma ü 💊\\, Ende\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Med\r\n ikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für O\r\n ma ü 💊\\, Medikament für Oma ü 💊\\, Medikament für Oma ü 💊\\, M\r\n edikament für Oma ü 💊\\, Ende\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:exact"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:exact-0605@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART:20261025T060500\r\nDURATION:PT15M\r\nSUMMARY:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\r\n xxxx\r\nTRIGGER:PT0M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    },
+    {
+      "routines": [
+        "routine:blank"
+      ],
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Old Brain Fix//Routines//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:routine:blank@oldbrainfix\r\nDTSTAMP:20261024T070509Z\r\nDTSTART;VALUE=DATE:20261026\r\nDTEND;VALUE=DATE:20261027\r\nSUMMARY:\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:\r\nTRIGGER:PT540M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+    }
+  ],
+  "byName": [
+    "routine:blank",
+    "routine:count",
+    "routine:weekly",
+    "routine:dentist",
+    "routine:never",
+    "routine:long",
+    "routine:monthly",
+    "routine:yearly",
+    "routine:cutoff",
+    "routine:until",
+    "routine:byhour",
+    "routine:party",
+    "routine:allday-until",
+    "routine:exact"
+  ],
+  "names": [
+    [
+      "routine:b",
+      "Pills"
+    ],
+    [
+      "routine:a",
+      "pills"
+    ],
+    [
+      "routine:c",
+      "PILLS"
+    ],
+    [
+      "routine:d",
+      "  Zebra"
+    ],
+    [
+      "routine:e",
+      "Mango\nAardvark"
+    ],
+    [
+      "routine:f",
+      "\r\n Kiwi "
+    ],
+    [
+      "routine:g",
+      "Ärzte"
+    ],
+    [
+      "routine:h",
+      "zoo"
+    ],
+    [
+      "routine:i",
+      "Arzt"
+    ],
+    [
+      "routine:j",
+      "İstanbul"
+    ],
+    [
+      "routine:k",
+      "istanbul"
+    ],
+    [
+      "routine:l",
+      "ΣΑΣ"
+    ],
+    [
+      "routine:m",
+      "σας"
+    ],
+    [
+      "routine:n",
+      "﻿Apfel"
+    ],
+    [
+      "routine:o",
+      "Straße"
+    ],
+    [
+      "routine:p",
+      "STRASSE"
+    ],
+    [
+      "routine:q",
+      "ẞ"
+    ],
+    [
+      "routine:r",
+      "🍎 Apple"
+    ],
+    [
+      "routine:s",
+      "Ａ wide"
+    ],
+    [
+      "routine:t",
+      ""
+    ],
+    [
+      "routine:u",
+      "Ωmega"
+    ],
+    [
+      "routine:v",
+      "Line\rbreak"
+    ]
+  ],
+  "namesByName": [
+    "routine:t",
+    "routine:n",
+    "routine:i",
+    "routine:j",
+    "routine:k",
+    "routine:f",
+    "routine:v",
+    "routine:e",
+    "routine:a",
+    "routine:b",
+    "routine:c",
+    "routine:p",
+    "routine:o",
+    "routine:d",
+    "routine:h",
+    "routine:q",
+    "routine:g",
+    "routine:m",
+    "routine:l",
+    "routine:u",
+    "routine:r",
+    "routine:s"
+  ]
+}

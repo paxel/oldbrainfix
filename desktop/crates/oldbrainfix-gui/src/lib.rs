@@ -14,6 +14,7 @@
 pub mod about_view;
 pub mod ai_view;
 pub mod alerts;
+pub mod all_routines_view;
 pub mod app;
 pub mod auto_sync;
 pub mod autostart;

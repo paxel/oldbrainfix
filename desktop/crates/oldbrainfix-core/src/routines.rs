@@ -15,6 +15,7 @@ use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{ClockTime, Day, Occurrence, Recurrence, Schedule, WallClock};
 use crate::sessions::{SessionMarks, keys as session_keys};
 use crate::store::{Fields, Store, utf16_cmp};
+use crate::transcript_prompts::{dart_trim, lower};
 use crate::{Error, Result};
 
 /// Field keys of a Routine.
@@ -85,6 +86,34 @@ impl Routine {
     pub fn done_at(&self, occurrence: &Occurrence) -> Option<DateTime<Utc>> {
         self.done.get(&occurrence.key()).copied()
     }
+}
+
+/// `routines` in alphabetical order of their names, as the list of all
+/// Routines and Reminders shows them; `name_of` gives the title the app
+/// shows for one. A name counts by its first line, trimmed, in lower
+/// case, compared by UTF-16 code units, as the Dart core's
+/// `routinesByName`; equal names go by id, so the order is the same
+/// every time and on every Device.
+pub fn routines_by_name(
+    routines: impl IntoIterator<Item = Routine>,
+    mut name_of: impl FnMut(&Routine) -> String,
+) -> Vec<Routine> {
+    let mut keyed: Vec<(Routine, String)> = routines
+        .into_iter()
+        .map(|routine| {
+            let key = name_key(&name_of(&routine));
+            (routine, key)
+        })
+        .collect();
+    keyed.sort_by(|a, b| utf16_cmp(&a.1, &b.1).then_with(|| utf16_cmp(&a.0.id, &b.0.id)));
+    keyed.into_iter().map(|(routine, _)| routine).collect()
+}
+
+/// The first line of `name`, trimmed and in lower case as Dart's `trim`
+/// and `toLowerCase` have it.
+fn name_key(name: &str) -> String {
+    let first = dart_trim(name).split('\n').next().unwrap_or_default();
+    lower(dart_trim(first))
 }
 
 /// One row of the Agenda: an Occurrence of a Routine, with the Note it
@@ -678,5 +707,86 @@ mod tests {
         // All-day first, then by time.
         assert_eq!(texts(&agenda.later_rows[3]), ["dentist", "pills"]);
         Ok(())
+    }
+
+    /// The ids of `names`, given in this order, listed by name.
+    fn named_order(names: &[(&str, &str)]) -> Vec<String> {
+        let given = names.iter().map(|(id, _)| Routine {
+            id: id.to_string(),
+            note_id: format!("note:{id}"),
+            schedule: daily_at_eight(),
+            done: BTreeMap::new(),
+            renag: None,
+            escalation: None,
+            scheduled_at: None,
+            trashed: None,
+            trashed_with: None,
+        });
+        let name_of = |r: &Routine| {
+            names
+                .iter()
+                .find(|(id, _)| *id == r.id)
+                .map(|(_, name)| name.to_string())
+                .unwrap_or_default()
+        };
+        routines_by_name(given, name_of)
+            .into_iter()
+            .map(|r| r.id)
+            .collect()
+    }
+
+    #[test]
+    fn by_name_alphabetical_whatever_the_case() {
+        let order = named_order(&[
+            ("routine:1", "Cherry"),
+            ("routine:2", "apple"),
+            ("routine:3", "Banana"),
+        ]);
+        assert_eq!(order, ["routine:2", "routine:3", "routine:1"]);
+    }
+
+    #[test]
+    fn by_name_equal_names_go_by_id() {
+        let order = named_order(&[
+            ("routine:b", "Pills"),
+            ("routine:a", "pills"),
+            ("routine:c", "PILLS"),
+        ]);
+        assert_eq!(order, ["routine:a", "routine:b", "routine:c"]);
+    }
+
+    #[test]
+    fn by_name_a_name_counts_by_its_first_line_trimmed() {
+        let order = named_order(&[
+            ("routine:1", "  Zebra"),
+            ("routine:2", "Mango\nAardvark"),
+            ("routine:3", "\u{feff}\n Kiwi "),
+        ]);
+        assert_eq!(order, ["routine:3", "routine:2", "routine:1"]);
+    }
+
+    #[test]
+    fn by_name_lowers_as_dart_does_and_compares_utf16() {
+        // Dart lowers ΣΑΣ to σασ, with no final sigma, so σας comes first;
+        // U+1F34E comes before U+FF41 in UTF-16, not in code points.
+        let order = named_order(&[
+            ("routine:1", "ΣΑΣ"),
+            ("routine:2", "σας"),
+            ("routine:3", "\u{ff21}"),
+            ("routine:4", "\u{1f34e}"),
+            ("routine:5", "Ärzte"),
+            ("routine:6", "zoo"),
+        ]);
+        assert_eq!(
+            order,
+            [
+                "routine:6",
+                "routine:5",
+                "routine:2",
+                "routine:1",
+                "routine:4",
+                "routine:3"
+            ]
+        );
     }
 }

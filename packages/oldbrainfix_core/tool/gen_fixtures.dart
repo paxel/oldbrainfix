@@ -16,8 +16,9 @@
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
-/// question-mark scatter, and RRULEs with their Occurrences and the
-/// instants of daylight-saving days (`schedules.json`).
+/// question-mark scatter, RRULEs with their Occurrences and the
+/// instants of daylight-saving days (`schedules.json`), and Routines
+/// and Reminders as calendar files and by name (`ics.json`).
 library;
 
 import 'dart:convert';
@@ -1904,6 +1905,189 @@ Map<String, Object?> _schedules() {
           instant.toIso8601String(),
           hours.defer(instant, _europe).toUtc().toIso8601String(),
         ],
+    ],
+  };
+}
+
+/// Routines and Reminders as calendar files at a held stamp: weekly,
+/// monthly and yearly Routines, ends by COUNT and UNTIL, times from
+/// BYHOUR, one that never happens, timed and all-day Reminders, and
+/// titles with commas, semicolons, line breaks, non-ASCII and lines
+/// long enough to fold; the export of all of them and each shared on
+/// its own. Then the list of all of them by name, and names as typed.
+Map<String, Object?> _ics() {
+  final stamp = DateTime.utc(2026, 10, 24, 7, 5, 9, 250);
+  final routines =
+      <
+        (String id, Day start, List<ClockTime> times, String? rule, String text)
+      >[
+        (
+          'routine:weekly',
+          Day(2026, 10, 24),
+          [_at(7, 30)],
+          'FREQ=WEEKLY;BYDAY=MO,TH',
+          'Bins, recycling; paper\nput out by 7, not later',
+        ),
+        (
+          'routine:monthly',
+          Day(2026, 10, 24),
+          [_at(18), _at(9, 15)],
+          'FREQ=MONTHLY;BYDAY=-1FR',
+          'Miete überweisen – Konto prüfen ✓ 💶',
+        ),
+        (
+          'routine:yearly',
+          Day(2027, 3, 14),
+          [],
+          'FREQ=YEARLY',
+          'Omas Geburtstag 🎂',
+        ),
+        (
+          'routine:count',
+          Day(2026, 10, 24),
+          [_at(8), _at(20)],
+          'FREQ=DAILY;COUNT=7',
+          'Antibiotics',
+        ),
+        (
+          'routine:cutoff',
+          Day(2026, 10, 24),
+          [_at(8), _at(20)],
+          'FREQ=DAILY;COUNT=1',
+          'Once really',
+        ),
+        (
+          'routine:until',
+          Day(2026, 10, 24),
+          [_at(17)],
+          'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU;UNTIL=20261231;WKST=SU',
+          'Physio',
+        ),
+        (
+          'routine:allday-until',
+          Day(2026, 10, 24),
+          [],
+          'FREQ=MONTHLY;BYMONTHDAY=-1;UNTIL=20270630T120000Z',
+          'Water meter',
+        ),
+        (
+          'routine:byhour',
+          Day(2026, 10, 24),
+          [],
+          'FREQ=DAILY;BYHOUR=20,8;BYMINUTE=30',
+          'Pills',
+        ),
+        (
+          'routine:never',
+          Day(2026, 10, 24),
+          [_at(8)],
+          'FREQ=DAILY;UNTIL=20261001',
+          'Gone',
+        ),
+        (
+          'routine:dentist',
+          Day(2026, 11, 3),
+          [_at(14, 30)],
+          null,
+          'Dentist, Dr. Müller; bring the card\\ and the letter',
+        ),
+        (
+          'routine:party',
+          Day(2026, 12, 31),
+          [],
+          null,
+          '﻿  Silvester \r\nParty\rwith a lone CR\n\n  ',
+        ),
+        (
+          'routine:long',
+          Day(2026, 10, 25),
+          [_at(6, 5)],
+          'FREQ=DAILY;INTERVAL=3',
+          '${'Medikament für Oma ü 💊, ' * 8}Ende',
+        ),
+        ('routine:exact', Day(2026, 10, 25), [_at(6, 5)], null, 'x' * 67),
+        ('routine:blank', Day(2026, 10, 26), [], null, '   '),
+      ];
+  final built = [
+    for (final (id, start, times, rule, text) in routines)
+      (
+        Routine(
+          id: id,
+          noteId: 'note:$id',
+          schedule: Schedule(
+            start: start,
+            times: times,
+            rule: rule == null ? null : Recurrence.parse(rule),
+          ),
+        ),
+        text,
+      ),
+  ];
+  final texts = {for (final (r, text) in built) r.id: text};
+  String textOf(Routine r) => texts[r.id] ?? '';
+  final all = [for (final (r, _) in built) r];
+  final names = <(String, String)>[
+    ('routine:b', 'Pills'),
+    ('routine:a', 'pills'),
+    ('routine:c', 'PILLS'),
+    ('routine:d', '  Zebra'),
+    ('routine:e', 'Mango\nAardvark'),
+    ('routine:f', '\r\n Kiwi '),
+    ('routine:g', 'Ärzte'),
+    ('routine:h', 'zoo'),
+    ('routine:i', 'Arzt'),
+    ('routine:j', 'İstanbul'),
+    ('routine:k', 'istanbul'),
+    ('routine:l', 'ΣΑΣ'),
+    ('routine:m', 'σας'),
+    ('routine:n', '﻿Apfel'),
+    ('routine:o', 'Straße'),
+    ('routine:p', 'STRASSE'),
+    ('routine:q', 'ẞ'),
+    ('routine:r', '🍎 Apple'),
+    ('routine:s', 'Ａ wide'),
+    ('routine:t', ''),
+    ('routine:u', 'Ωmega'),
+    ('routine:v', 'Line\rbreak'),
+  ];
+  final named = {for (final (id, name) in names) id: name};
+  final listed = [
+    for (final (id, _) in names)
+      Routine(
+        id: id,
+        noteId: 'note:$id',
+        schedule: Schedule(start: Day(2026, 1, 1)),
+      ),
+  ];
+  return {
+    'stamp': stamp.toIso8601String(),
+    'routines': [
+      for (final (id, start, times, rule, text) in routines)
+        {
+          'id': id,
+          'start': '$start',
+          'times': [for (final t in times) '$t'],
+          'rule': rule,
+          'text': text,
+        },
+    ],
+    'files': [
+      {
+        'routines': [for (final r in all) r.id],
+        'ics': routinesIcs(all, textOf, stamp: stamp),
+      },
+      for (final r in all)
+        {
+          'routines': [r.id],
+          'ics': routinesIcs([r], textOf, stamp: stamp),
+        },
+    ],
+    'byName': [for (final r in routinesByName(all, textOf)) r.id],
+    'names': [
+      for (final (id, name) in names) [id, name],
+    ],
+    'namesByName': [
+      for (final r in routinesByName(listed, (r) => named[r.id] ?? '')) r.id,
     ],
   };
 }
@@ -4841,6 +5025,11 @@ Future<void> main(List<String> args) async {
     '- `schedules.json`: RRULEs read, written back or refused, schedules '
     'with their Occurrences, days normalised, and the instants of '
     'wall-clock times around daylight-saving switches in Central Europe.\n'
+    '- `ics.json`: Routines and Reminders as calendar files at a held '
+    'stamp, the export of all of them and each shared on its own, with '
+    'ends by COUNT and UNTIL, timed and all-day events and titles that '
+    'need escaping and folding; the list of all of them by name, and '
+    'names as typed in that order.\n'
     '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
     'Nudge of the `routines` log at held moments with this Device\'s '
     'settings, on the same clock.\n'
@@ -5048,6 +5237,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/schedules.json'),
     '${_json.convert(_schedules())}\n',
   );
+  _write(File('${root.path}/ics.json'), '${_json.convert(_ics())}\n');
   _write(
     File('${root.path}/pair_codes.json'),
     '${_json.convert(_pairCodes())}\n',

@@ -309,6 +309,89 @@ void main() {
     });
   });
 
+  group('to export or share', () {
+    final bins = routine(
+      schedule(
+        'FREQ=WEEKLY;BYDAY=TU;UNTIL=20261124',
+        start: Day(2026, 10, 24),
+        times: [at(7), at(19)],
+      ),
+      id: 'routine:bins',
+    );
+    final dentist = routine(
+      schedule(null, start: Day(2026, 11, 3), times: [at(14, 30)]),
+      id: 'routine:dentist',
+    );
+    final party = routine(
+      schedule(null, start: Day(2026, 12, 31)),
+      id: 'routine:party',
+    );
+    final texts = {
+      'routine:bins': 'Bins out',
+      'routine:dentist': 'Dentist',
+      'routine:party': 'Party',
+    };
+    String textOf(Routine r) => texts[r.id] ?? '';
+
+    test('one Routine is its whole series, with its end', () {
+      final ics = routinesIcs([bins], textOf, stamp: stamp);
+      expect(ics, writeIcs(routineEvents(bins, 'Bins out'), stamp: stamp));
+      expect('BEGIN:VEVENT'.allMatches(ics), hasLength(2));
+      for (final (uid, start) in [
+        ('routine:bins-0700@oldbrainfix', 'DTSTART:20261027T070000'),
+        ('routine:bins-1900@oldbrainfix', 'DTSTART:20261027T190000'),
+      ]) {
+        final lines = event(ics, uid);
+        expect(lines, contains(start));
+        expect(
+          lines,
+          contains('RRULE:FREQ=WEEKLY;UNTIL=20261124T235900;BYDAY=TU'),
+        );
+        expect(lines, contains('SUMMARY:Bins out'));
+      }
+    });
+
+    test('one Reminder is its one event', () {
+      final ics = routinesIcs([dentist], textOf, stamp: stamp);
+      expect('BEGIN:VEVENT'.allMatches(ics), hasLength(1));
+      final lines = event(ics, 'routine:dentist-1430@oldbrainfix');
+      expect(lines, contains('DTSTART:20261103T143000'));
+      expect(lines.where((l) => l.startsWith('RRULE')), isEmpty);
+    });
+
+    test('all of them in turn, each with its own title', () {
+      final ics = routinesIcs([party, bins, dentist], textOf, stamp: stamp);
+      final uids = [
+        for (final line in unfolded(ics))
+          if (line.startsWith('UID:')) line.substring(4),
+      ];
+      expect(uids, [
+        'routine:party@oldbrainfix',
+        'routine:bins-0700@oldbrainfix',
+        'routine:bins-1900@oldbrainfix',
+        'routine:dentist-1430@oldbrainfix',
+      ]);
+      expect(
+        event(ics, 'routine:party@oldbrainfix'),
+        contains('SUMMARY:Party'),
+      );
+      expect(
+        event(ics, 'routine:dentist-1430@oldbrainfix'),
+        contains('SUMMARY:Dentist'),
+      );
+    });
+
+    test('the same Routines at the same stamp are the same bytes', () {
+      String file() =>
+          routinesIcs([bins, dentist, party], textOf, stamp: stamp);
+      expect(file(), file());
+      expect(
+        routinesIcs(const [], textOf, stamp: stamp),
+        writeIcs(const [], stamp: stamp),
+      );
+    });
+  });
+
   group('a Note on its own', () {
     test('has no start and no rule', () {
       final event = CalendarEvent.ofText('note:n1', 'Ring the plumber');
