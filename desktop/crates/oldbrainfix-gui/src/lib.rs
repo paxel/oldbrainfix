@@ -20,6 +20,7 @@ pub mod autostart;
 pub mod background;
 pub mod backup_view;
 pub mod backups;
+pub mod capture_choices;
 pub mod cli;
 pub mod enrich;
 pub mod folder_sync;

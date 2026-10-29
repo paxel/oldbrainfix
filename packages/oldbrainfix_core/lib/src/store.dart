@@ -504,8 +504,11 @@ class Store {
   List<Entry> entriesAfter(int seq) =>
       _entries('SELECT * FROM entries WHERE seq > ? ORDER BY seq', [seq]);
 
-  /// Runs [body] in one transaction.
+  /// Runs [body] in one transaction. A batch inside another one joins
+  /// it: the outer one commits, or rolls back on an error from anywhere
+  /// inside, and listeners hear it once.
   T batch<T>(T Function() body) {
+    if (!_db.autocommit) return body();
     _db.execute('BEGIN');
     _inBatch = true;
     final T result;

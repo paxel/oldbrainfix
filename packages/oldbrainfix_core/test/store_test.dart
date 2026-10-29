@@ -52,6 +52,38 @@ void main() {
     expect(store.allEntries(), isEmpty);
   });
 
+  test('a batch inside a batch joins it: committed and heard once, or '
+      'rolled back as a whole', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    var heard = 0;
+    store.addListener(() => heard++);
+    store.batch(() {
+      store.append('note:a', 'text', 'one');
+      store.batch(() => store.append('note:b', 'text', 'two'));
+      expect(heard, 0, reason: 'nothing is heard before the commit');
+      expect(store.current('note:b', 'text'), 'two');
+      store.append('note:c', 'text', 'three');
+    });
+    expect(heard, 1);
+    expect(store.allEntries(), hasLength(3));
+    expect(
+      () => store.batch(() {
+        store.append('note:d', 'text', 'four');
+        store.batch(() {
+          store.append('note:e', 'text', 'five');
+          throw StateError('boom');
+        });
+      }),
+      throwsStateError,
+    );
+    expect(heard, 1, reason: 'a failing batch changed nothing');
+    expect(store.allEntries(), hasLength(3));
+    expect(store.current('note:d', 'text'), isNull);
+    store.append('note:f', 'text', 'six');
+    expect(heard, 2, reason: 'out of the batch, appends are heard again');
+  });
+
   test('the log and the Device identity survive a reopen', () {
     final dir = Directory.systemTemp.createTempSync('obf');
     addTearDown(() => dir.deleteSync(recursive: true));

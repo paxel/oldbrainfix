@@ -129,8 +129,8 @@ void main() {
       expect(alarms.nudge?.nudge.at, now.toUtc().add(const Duration(hours: 1)));
     });
 
-    testWidgets('shows the choices when capturing into an Area too; the '
-        'filed Note is not nudged', (tester) async {
+    testWidgets('capturing into an Area shows one Save instead of the '
+        'choices; the filed Note is not nudged', (tester) async {
       final area = Places(store).addArea('Household');
       await tester.pumpWidget(
         MaterialApp(
@@ -143,10 +143,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('nudge10')), findsOneWidget);
+      expect(find.byKey(const ValueKey('nudge10')), findsNothing);
       await tester.enterText(find.byType(TextField), 'descale the kettle');
-      await tap(tester, find.byKey(const ValueKey('nudge30')));
+      await tap(tester, find.byKey(const ValueKey('captureSave')));
       expect(notes.all().single.place, area.id);
+      expect(notes.all().single.nudge, isNull);
       expect(notes.unsorted(), isEmpty);
       expect(Alarms(store).nudge(deviceWallClock), isNull);
     });

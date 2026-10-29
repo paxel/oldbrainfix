@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'capture_choices.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
@@ -11,6 +12,17 @@ import 'tally_view.dart';
 /// [noteId]; whether it was saved, which makes the Note a Tally.
 Future<bool> makeTally(BuildContext context, Notes notes, String noteId) =>
     openTallyField(context, notes, noteId, null);
+
+/// "Make it a Tally" on a capture screen (#113): the page for the first
+/// field of the Note being captured, which is not written yet; the field
+/// as saved, for Capture to write with the Note, or null when it was
+/// left without Save.
+Future<TallyFieldChoice?> chooseTallyField(BuildContext context, Notes notes) =>
+    Navigator.of(context).push(
+      MaterialPageRoute<TallyFieldChoice>(
+        builder: (_) => TallyFieldScreen(notes: notes),
+      ),
+    );
 
 /// The page of the field [fieldId] of the Tally of [noteId], or of a new
 /// one when null; whether it saved or hid something.
@@ -38,7 +50,10 @@ Future<bool> openTallyField(
 /// Leaving without Save changes nothing.
 class TallyFieldScreen extends StatefulWidget {
   final Notes notes;
-  final String noteId;
+
+  /// The Note whose Tally it is; null for the Note being captured, not
+  /// written yet, whose new field Save pops as a [TallyFieldChoice].
+  final String? noteId;
 
   /// The field shown; null for a new one.
   final String? fieldId;
@@ -46,7 +61,7 @@ class TallyFieldScreen extends StatefulWidget {
   const TallyFieldScreen({
     super.key,
     required this.notes,
-    required this.noteId,
+    this.noteId,
     this.fieldId,
   });
 
@@ -60,9 +75,10 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
 
   late final _tallies = Tallies(widget.notes.store);
   late final UnitSystem _system = deviceUnitSystem(widget.notes.store);
-  late final TallyField? _field = widget.fieldId == null
-      ? null
-      : _tallies.byNote(widget.noteId)?.field(widget.fieldId ?? '');
+  late final TallyField? _field = switch ((widget.noteId, widget.fieldId)) {
+    (final noteId?, final fieldId?) => _tallies.byNote(noteId)?.field(fieldId),
+    _ => null,
+  };
   late final _name = TextEditingController(text: _field?.name ?? '');
   late String _unit = switch (_field) {
     final field? when TallyUnits.byCode(field.unit) != null => field.unit,
@@ -159,16 +175,25 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
       showField(_targetFocus);
       return;
     }
+    final noteId = widget.noteId;
+    if (noteId == null) {
+      Navigator.of(context).pop<TallyFieldChoice>((
+        name: name,
+        unit: unit,
+        target: target,
+        rule: _rule,
+      ));
+      return;
+    }
     if (field == null) {
       _tallies.addField(
-        widget.noteId,
+        noteId,
         name: name,
         unit: unit,
         target: target,
         rule: _rule,
       );
     } else {
-      final noteId = widget.noteId;
       if (name != field.name) _tallies.renameField(noteId, field.id, name);
       final unitChanged = unit != field.unit;
       if (unitChanged) _tallies.setUnit(noteId, field.id, unit);
@@ -182,10 +207,13 @@ class _TallyFieldScreenState extends State<TallyFieldScreen> {
   }
 
   void _setHidden(TallyField field, bool hidden) {
+    // A field shown is one of a written Note.
+    final noteId = widget.noteId;
+    if (noteId == null) return;
     if (hidden) {
-      _tallies.hideField(widget.noteId, field.id);
+      _tallies.hideField(noteId, field.id);
     } else {
-      _tallies.restoreField(widget.noteId, field.id);
+      _tallies.restoreField(noteId, field.id);
     }
     Navigator.of(context).pop(true);
   }

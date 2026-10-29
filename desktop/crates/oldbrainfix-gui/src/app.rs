@@ -23,8 +23,11 @@
 //! text is being typed, where Alt+arrows move the cursor.
 //!
 //! The capture field records voice too: the microphone's button starts
-//! at once and one big stop button ends it and keeps the Note, as do the
-//! Nudge times (UI laws, "Capture"). A picture pasted from the clipboard
+//! at once and one big stop button ends it and leaves it on the field,
+//! saved with the Note by the Nudge times or Save (UI laws, "Capture").
+//! Once something is typed, the Note card's buttons show above them;
+//! what they set up shows at the top of the field and is saved with the
+//! Note, all of it or nothing (#113). A picture pasted from the clipboard
 //! becomes a photo Note, with what is typed; pictures and sound files
 //! chosen with "From file…" or dropped onto the window (where the system
 //! hands drops over: not on Wayland) become one Note with their photos
@@ -78,6 +81,7 @@ use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
 use crate::backups;
+use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
 use crate::enrich::Enricher;
 use crate::folder_sync;
 use crate::frogs_view::{self, FrogAction, FrogShown};
@@ -252,6 +256,8 @@ struct View {
     notes: Vec<Placed>,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
+    /// Whether the Note being captured may spawn where it goes (#113).
+    capture_spawns: bool,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
     /// The Frogs the selected Note spawned, oldest first, each with
@@ -516,8 +522,12 @@ enum Action {
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
+    /// Something asked of the capture's buttons or its choices (#113).
+    CaptureChoice(Ask),
     /// Starts recording voice into the Note being captured.
     Record,
+    /// Ends the recording and holds it on the capture field.
+    StopRecording,
     /// Plays the voice recording with this hash, or stops it playing.
     Play(String),
     /// Plays recordings at this speed from now on, the one playing
@@ -762,8 +772,10 @@ pub struct App {
     /// How far the Notes list is scrolled, for the parallax.
     scrolled: f32,
     trail: Trail,
-    /// The capture field's text.
+    /// The capture field's text, and what was set up for its Note, not
+    /// written yet (#113).
     capture: String,
+    capture_choices: CaptureChoices,
     /// The selected Note's text as it is being edited, and that Note.
     text: String,
     text_of: Option<String>,
@@ -804,8 +816,9 @@ pub struct App {
     playing: Option<String>,
     /// How fast recordings play, 1 being normal speed; a Device setting.
     speed: f64,
-    /// A recording that ended but could not be kept yet.
-    recorded: Option<Vec<u8>>,
+    /// The recordings that ended, held on the capture field until its
+    /// Note is saved.
+    recorded: Vec<Vec<u8>>,
     clipboard: Option<Box<dyn Clipboard>>,
     /// The background threads making Transcripts and Photo Texts.
     transcriber: Option<Enricher>,
@@ -1022,6 +1035,7 @@ impl App {
             scrolled: 0.0,
             trail: Trail::default(),
             capture: String::new(),
+            capture_choices: CaptureChoices::default(),
             text: String::new(),
             text_of: None,
             amend: String::new(),
@@ -1043,7 +1057,7 @@ impl App {
             player: None,
             playing: None,
             speed,
-            recorded: None,
+            recorded: Vec::new(),
             clipboard: None,
             transcriber: None,
             reader: None,
@@ -2040,7 +2054,7 @@ impl App {
     /// capture field's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the selected Note's edited text.
     pub fn flush(&mut self) {
-        if !self.capture.trim().is_empty() || self.recording() || self.recorded.is_some() {
+        if !self.capture.trim().is_empty() || self.recording() || !self.recorded.is_empty() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
         self.apply(Action::SaveText);
@@ -2069,7 +2083,7 @@ impl App {
         if self
             .tally_form
             .as_ref()
-            .is_some_and(|f| Some(f.note_id()) != self.selected_note.as_deref())
+            .is_some_and(|f| !f.capturing() && Some(f.note_id()) != self.selected_note.as_deref())
         {
             self.tally_form = None;
         }
@@ -2087,6 +2101,16 @@ impl App {
                 self.error = None;
             }
             Err(e) => self.error = Some(e.to_string()),
+        }
+        // An Area or Topic deleted meanwhile is no place to capture into.
+        if let Some(place) = &self.capture_choices.place
+            && self.view.area(place).is_none()
+            && self.view.topic(place).is_none()
+        {
+            self.capture_choices.place = None;
+            let place = self.capture_place();
+            self.view.capture_spawns =
+                capture_choices::may_spawn(&self.store, place.as_deref()).unwrap_or(true);
         }
         self.read_at = self.store.now();
         self.arrived = self.conflicts_arrived();
@@ -2465,6 +2489,10 @@ impl App {
             text_changeable,
             notes: placed,
             detail,
+            capture_spawns: capture_choices::may_spawn(
+                &self.store,
+                self.capture_place().as_deref(),
+            )?,
             routines: note_routines,
             note_frogs,
             tally,
@@ -2568,11 +2596,15 @@ impl App {
                     && r.recording()
                     && let Some(bytes) = r.stop()
                 {
-                    self.recorded = Some(bytes);
+                    self.recorded.push(bytes);
                 }
-                let recording = self.recorded.clone();
-                self.capture_note(nudge_in, &[], recording.as_slice())?;
-                self.recorded = None;
+                self.capture_note(nudge_in, &[], &[])?;
+            }
+            Action::CaptureChoice(asked) => self.capture_choice(asked)?,
+            Action::StopRecording => {
+                if let Some(bytes) = self.recorder.as_mut().and_then(|r| r.stop()) {
+                    self.recorded.push(bytes);
+                }
             }
             Action::Record => {
                 if let Some(player) = &mut self.player {
@@ -2841,13 +2873,21 @@ impl App {
             }
             Action::Session(asked) => self.session_action(asked)?,
             Action::Editor(intent) => match intent {
-                Intent::Save => {
-                    if let Some(editor) = &mut self.editor
-                        && editor.save(&self.store)?.is_some()
-                    {
-                        self.editor = None;
+                Intent::Save => match &mut self.editor {
+                    // Set up for the Note being captured: held with it.
+                    Some(editor) if editor.capturing() => {
+                        if let Some(choice) = editor.choice(&self.store)? {
+                            self.capture_choices.schedules.push(choice);
+                            self.editor = None;
+                        }
                     }
-                }
+                    Some(editor) => {
+                        if editor.save(&self.store)?.is_some() {
+                            self.editor = None;
+                        }
+                    }
+                    None => {}
+                },
                 Intent::Session(SessionIntent::WeekdaysOpen(open)) => {
                     let value = if open { "true" } else { "false" };
                     self.store.set_local_setting(WEEKDAYS_OPEN, value)?;
@@ -3412,9 +3452,19 @@ impl App {
         let Some(form) = &mut self.tally_form else {
             return Ok(());
         };
+        let form_capturing = form.capturing();
         match intent {
             FormIntent::Save => {
                 let saved = match form {
+                    // The first field of the Note being captured: held
+                    // with it.
+                    TallyForm::Field(form) if form_capturing => match form.choice() {
+                        Some(field) => {
+                            self.capture_choices.tally = Some(field);
+                            true
+                        }
+                        None => false,
+                    },
                     TallyForm::Field(form) => form.save(&self.store)?,
                     TallyForm::Entry(form) => form.save(&self.store, &*self.wall)?,
                 };
@@ -3448,27 +3498,74 @@ impl App {
         photos: &[Vec<u8>],
         recordings: &[Vec<u8>],
     ) -> oldbrainfix_core::Result<()> {
-        let text = self.capture.trim();
-        if text.is_empty() && photos.is_empty() && recordings.is_empty() {
+        let place = self.capture_place();
+        // The recordings held on the field go into the same Note.
+        let mut recordings = recordings.to_vec();
+        recordings.extend(self.recorded.iter().cloned());
+        let Some(note) = capture_choices::capture(
+            &self.store,
+            &self.capture,
+            place.as_deref(),
+            nudge_in,
+            (photos, &recordings),
+            &self.capture_choices,
+        )?
+        else {
             return Ok(());
-        }
-        // Captured inside an Area or Topic, the Note is filed there, as
-        // the phone's "Note here".
-        let place = match &self.selection {
-            Selection::Place(id) => Some(id.as_str()),
-            _ => None,
         };
-        let note = Notes::new(&self.store).capture_with(
-            text,
-            place,
-            Some(nudge_in),
-            photos,
-            recordings,
-        )?;
+        // Only once all of it is written: a failed save keeps it here.
         self.capture.clear();
+        self.recorded.clear();
+        self.capture_choices = CaptureChoices::default();
         self.save_text()?;
         self.selected_note = Some(note.id);
         self.editor = None;
+        self.tally_form = None;
+        Ok(())
+    }
+
+    /// Where the Note being captured goes: the Area or Topic picked with
+    /// "File into…", else the one shown, as the phone's "Note here";
+    /// Unsorted without either.
+    fn capture_place(&self) -> Option<String> {
+        self.capture_choices
+            .place
+            .clone()
+            .or_else(|| match &self.selection {
+                Selection::Place(id) => Some(id.clone()),
+                _ => None,
+            })
+    }
+
+    /// Does what was asked of the capture's buttons or its choices: a
+    /// Routine, Reminder, Session or Tally opens its page on the right,
+    /// which hands its choice back to the capture (#113).
+    fn capture_choice(&mut self, asked: Ask) -> oldbrainfix_core::Result<()> {
+        let place = self.capture_place();
+        match self.capture_choices.take(asked, &self.store)? {
+            None => {}
+            Some(Opens::Schedule { reminder, session }) => {
+                self.save_text()?;
+                let renag = DeviceSettings::new(&self.store).renag_interval()?;
+                let now = self.store.now();
+                let mut editor =
+                    RoutineEditor::choose(&self.capture, reminder, now, &*self.wall, renag);
+                if session {
+                    // The Tallies of where it goes; while Unsorted, any.
+                    let entity = place.as_deref().unwrap_or("");
+                    let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
+                    editor = editor.with_session(draft, None);
+                }
+                self.tally_form = None;
+                self.editor = Some(editor);
+            }
+            Some(Opens::Tally) => {
+                self.save_text()?;
+                self.editor = None;
+                let system = self.unit_system()?;
+                self.tally_form = Some(TallyForm::Field(FieldForm::choose(system, &self.t)));
+            }
+        }
         Ok(())
     }
 
@@ -4167,10 +4264,19 @@ impl App {
     }
 
     /// The capture field (UI laws, "Capture"): it never asks anything.
-    /// Once something is typed, the Nudge times show; Ctrl+Enter takes
-    /// the 1 h one.
+    /// Once something is typed, the Note card's buttons show (#113),
+    /// whose choices show at the top, not saved yet, and under them the
+    /// Nudge times, Ctrl+Enter taking the 1 h one; a Note filed or with
+    /// something set up gets one Save instead and no Nudge.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
+        let place = self.capture_place();
+        let sorted = self.capture_choices.sorted(place.as_deref());
+        // The Area shown is where it goes, not a choice to drop.
+        let place_chip = self.capture_choices.place.as_ref().and_then(|id| {
+            capture_choices::place_name(&t, &self.view.areas, id).map(|name| (name, true))
+        });
+        let spawns = self.view.capture_spawns;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture");
@@ -4184,10 +4290,14 @@ impl App {
         embossed(ui, tones, false, None, |ui| {
             let focused = ui.memory(|m| m.has_focus(id));
             if focused
-                && !self.capture.trim().is_empty()
+                && (!self.capture.trim().is_empty() || !self.recorded.is_empty())
                 && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
             {
                 actions.push(Action::Capture(Notes::default_nudge()));
+            }
+            // Announcements and choices go to the top (UI laws).
+            if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, place_chip) {
+                actions.push(Action::CaptureChoice(asked));
             }
             ui.add(
                 TextEdit::multiline(&mut self.capture)
@@ -4199,12 +4309,17 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            // A stopped recording stays here until the Note is saved.
+            for _ in &self.recorded {
+                ui.horizontal(|ui| {
+                    icons::show(ui, icons::MIC, 18.0, text);
+                    ui.label(RichText::new(t.voice_recording()).color(text));
+                });
+            }
             if has_recorder {
                 match media_view::voice_button(ui, &t, recording) {
                     Some(Voice::Record) => actions.push(Action::Record),
-                    Some(Voice::StopAndSave) => {
-                        actions.push(Action::Capture(Notes::default_nudge()));
-                    }
+                    Some(Voice::Stop) => actions.push(Action::StopRecording),
                     None => {}
                 }
             }
@@ -4232,10 +4347,27 @@ impl App {
                 });
                 ui.label(RichText::new(t.from_file_hint()).small().color(weak));
             }
-            if self.capture.trim().is_empty() && recording.is_none() {
+            if self.capture.trim().is_empty() && recording.is_none() && self.recorded.is_empty() {
                 return;
             }
             ui.add_space(4.0);
+            let offer = (self.view.areas.as_slice(), spawns);
+            if let Some(asked) = capture_choices::action_row(ui, &t, &self.capture_choices, offer) {
+                actions.push(Action::CaptureChoice(asked));
+            }
+            ui.add_space(4.0);
+            if sorted {
+                // A sorted Note needs no Nudge (#113).
+                if ui.button(RichText::new(t.save()).color(text)).clicked() {
+                    actions.push(Action::Capture(Notes::default_nudge()));
+                }
+                ui.label(
+                    RichText::new(t.capture_keys_hint_sorted())
+                        .small()
+                        .color(weak),
+                );
+                return;
+            }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
             ui.horizontal(|ui| {
                 let choices = [
@@ -4661,28 +4793,12 @@ impl App {
                     if !may.changes {
                         return;
                     }
-                    ui.menu_button(RichText::new(t.file_into()).color(text), |ui| {
-                        for (area, topics) in areas {
-                            let mut file = |ui: &mut Ui, id: &str, label: String, indent| {
-                                ui.horizontal(|ui| {
-                                    ui.add_space(indent);
-                                    if ui.button(RichText::new(label).color(text)).clicked() {
-                                        actions.push(Action::File {
-                                            note: note.id.clone(),
-                                            place: id.to_string(),
-                                        });
-                                    }
-                                });
-                            };
-                            file(ui, &area.id, area_name(&t, area), 0.0);
-                            for topic in topics {
-                                file(ui, &topic.id, topic_name(&t, topic), 16.0);
-                            }
-                        }
-                        if areas.is_empty() {
-                            ui.label(RichText::new(t.no_areas_yet()).color(weak));
-                        }
-                    });
+                    if let Some(place) = capture_choices::file_into_menu(ui, &t, areas) {
+                        actions.push(Action::File {
+                            note: note.id.clone(),
+                            place,
+                        });
+                    }
                     ui.label(RichText::new(t.drag_to_file()).small().color(weak));
                 });
                 for section in sections {
@@ -4773,7 +4889,8 @@ impl App {
                     // "Routine, Reminder, Frog or Session"; a Note has one
                     // open Frog at a time.
                     let frog_open = note_frogs.iter().any(|(f, _)| !f.is_done());
-                    ui.horizontal(|ui| {
+                    // Wrapped, so the four never widen the pane.
+                    ui.horizontal_wrapped(|ui| {
                         for (reminder, label) in [(false, t.routine()), (true, t.reminder())] {
                             if ui.button(RichText::new(label).color(text)).clicked() {
                                 actions.push(Action::NewRoutine {

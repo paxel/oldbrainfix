@@ -322,21 +322,21 @@ fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
     );
     assert!(field(&harness, "What's on your mind?").rect().width() > 0.0);
 
-    // Inside a Topic the Note is filed there; Ctrl+Enter takes 1 h.
+    // Inside a Topic the Note is filed there, sorted: one Save instead
+    // of the Nudge times, and Ctrl+Enter saves it without a Nudge (#113).
     harness.get_by_label("Kitchen").click();
     harness.run();
     field(&harness, "What's on your mind?").click();
     harness.run();
     typing(&harness).type_text("  Buy descaler ");
     harness.run();
+    assert!(harness.query_by_label("30 min").is_none());
+    assert!(harness.query_by_label("Ctrl+Enter saves it.").is_some());
     harness.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
     harness.run();
     let descaler = find(harness.state(), "Buy descaler")?;
     assert_eq!(descaler.place, Some(place(harness.state(), "Kitchen")?));
-    assert_eq!(
-        nudge(&harness, &descaler.id)?,
-        Some(dart_iso(now + Duration::hours(1)))
-    );
+    assert_eq!(nudge(&harness, &descaler.id)?, None);
     assert!(card(&harness, "Buy descaler").rect().width() > 0.0);
     Ok(())
 }

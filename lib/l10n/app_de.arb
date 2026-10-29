@@ -267,7 +267,7 @@
   "moreCaptureContext": "Mehr zur Erfassung",
   "recordVoice": "Sprache aufnehmen",
   "recording": "Aufnahme läuft …",
-  "stopAndSave": "Beenden und speichern",
+  "stopRecording": "Beenden",
   "voiceRecording": "Sprachaufnahme",
   "playRecording": "Sprachaufnahme abspielen",
   "stopPlaying": "Anhalten",
@@ -908,5 +908,11 @@
   "sessionAnother": "Noch eine",
   "sessionPicks": "{count, plural, =1{Wählt 1 Strichliste} other{Wählt {count} Strichlisten}}",
   "sessionNothingToPick": "Keine ihrer Strichlisten ist mehr zur Auswahl.",
-  "maskedTally": "Private Strichliste"
+  "maskedTally": "Private Strichliste",
+  "captureChoicePlace": "→ {place}",
+  "captureChoiceRoutine": "Routine: {schedule}",
+  "captureChoiceReminder": "Erinnerung: {schedule}",
+  "captureChoiceSession": "Einheit: {schedule}",
+  "captureChoiceTally": "Strichliste: {field}",
+  "noteBeingCaptured": "Die Notiz, die gerade erfasst wird"
 }

@@ -185,5 +185,9 @@
   "sessionPoolNoneDesk": "Noch keine Strichlisten. „Zur Strichliste machen“ im Editor einer Notiz macht eine.",
   "sessionPoolOrderDesk": "Reihum geht sie von oben nach unten durch; die Pfeile ändern die Reihenfolge.",
   "sessionMoveUp": "{name} nach oben verschieben",
-  "sessionMoveDown": "{name} nach unten verschieben"
+  "sessionMoveDown": "{name} nach unten verschieben",
+  "captureKeysHintSorted": "Strg+Enter speichert sie.",
+  "popupKeysHintSorted": "Enter speichert sie. Esc behält Getipptes genauso; leer schließt es nur.",
+  "captureChoicePlaceDesk": "In: {place}",
+  "removeChoice": "{choice} entfernen"
 }

@@ -56,7 +56,7 @@ fn popup_over(store: Arc<Store>, locale: &str) -> Harness<'static, Popup> {
     let count = saved.clone();
     popup.on_saved(Box::new(move || count.set(count.get() + 1)));
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(460.0, 210.0))
+        .with_size(egui::vec2(480.0, 340.0))
         .build_ui_state(
             |ui, state: &mut Popup| {
                 App::install(ui.ctx());
@@ -113,7 +113,7 @@ fn the_nudge_buttons_keep_it_with_their_time() -> TestResult {
     }
     // All of it fits the popup's window.
     let hint = harness.get_by_label_contains("Enter saves it with a Nudge in 1 h.");
-    assert!(hint.rect().bottom() <= 210.0, "{:?}", hint.rect());
+    assert!(hint.rect().bottom() <= 340.0, "{:?}", hint.rect());
     // Nothing typed: the buttons rest.
     harness.get_by_label("10 min").click();
     harness.run();
@@ -141,9 +141,20 @@ fn enter_on_a_nudge_button_takes_that_buttons_time() -> TestResult {
     let mut harness = popup_over(store.clone(), "en");
     typing(&harness).type_text("Water the plants");
     harness.run();
-    harness.key_press(Key::Tab);
-    harness.run();
-    assert!(harness.get_by_label("10 min").is_focused());
+    // The Note card's buttons come first, above the Nudge times.
+    for label in [
+        "File into…",
+        "Routine",
+        "Reminder",
+        "Frog",
+        "Session",
+        "More",
+        "10 min",
+    ] {
+        harness.key_press(Key::Tab);
+        harness.run();
+        assert!(harness.get_by_label(label).is_focused(), "{label}");
+    }
     harness.key_press(Key::Enter);
     harness.run();
     assert!(harness.state().closed);

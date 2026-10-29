@@ -363,10 +363,16 @@ impl Store {
         (self.ids)()
     }
 
-    /// Runs `body` in one transaction: all of its entries or none. Not
-    /// to be nested.
+    /// Runs `body` in one transaction: all of its entries or none. A
+    /// batch inside another one joins it: the outer one commits, or rolls
+    /// back on an error from anywhere inside, as the Dart core's `batch`.
     pub fn batch<T>(&self, body: impl FnOnce() -> Result<T>) -> Result<T> {
         let db = self.db.lock();
+        // The outer batch holds the connection until it ends, so an open
+        // transaction here is this thread's own.
+        if !db.is_autocommit() {
+            return body();
+        }
         let tx = db.unchecked_transaction()?;
         let out = body();
         // Rolled back or not, what was worked out from inside is stale.
@@ -1696,6 +1702,35 @@ pub(crate) mod tests {
         assert!(store.all_entries()?.is_empty());
         store.batch(|| store.append("note:a", "text", Some("kept"), None))?;
         assert_eq!(store.all_entries()?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_batch_inside_a_batch_joins_it() -> Result<()> {
+        let store = store();
+        let before = store.generation.load(std::sync::atomic::Ordering::SeqCst);
+        store.batch(|| {
+            store.append("note:a", "text", Some("one"), None)?;
+            store.batch(|| store.append("note:b", "text", Some("two"), None))?;
+            assert_eq!(store.current("note:b", "text")?.as_deref(), Some("two"));
+            store.append("note:c", "text", Some("three"), None)
+        })?;
+        assert_eq!(store.all_entries()?.len(), 3);
+        let after = store.generation.load(std::sync::atomic::Ordering::SeqCst);
+        // Each append counts once, the batch once at its end, not twice.
+        assert_eq!(after - before, 4);
+        let failed: Result<()> = store.batch(|| {
+            store.append("note:d", "text", Some("four"), None)?;
+            store.batch(|| {
+                store.append("note:e", "text", Some("five"), None)?;
+                Err(Error::Invalid("on purpose".into()))
+            })
+        });
+        assert!(failed.is_err());
+        assert_eq!(store.all_entries()?.len(), 3, "the outer write is gone too");
+        assert_eq!(store.current("note:d", "text")?, None);
+        store.batch(|| store.append("note:f", "text", Some("six"), None))?;
+        assert_eq!(store.all_entries()?.len(), 4, "the next batch commits");
         Ok(())
     }
 

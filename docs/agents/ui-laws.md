@@ -75,14 +75,35 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   point (widget, tile, shortcut, hardware button) opens its capture
   screen directly, with no fan and no screen in between.
 - Voice recording starts at once and **ends by tapping one big stop
-  button**. No hold-to-talk, no stop on silence.
+  button**. No hold-to-talk, no stop on silence. After Stop, and after
+  the photo or the pictures picked, the user is on the capture screen
+  with the recording or photo on it, the buttons and room to type.
+  Leaving saves.
 - Every capture screen shows three buttons at the bottom: remind me in
   **10 min, 30 min, 1 h**. Leaving without tapping one means 1 h.
   The three are actions, not a choice of value: a tap saves the Note
   with that Nudge time, so the radio-button law does not apply to them.
-- After saving, the new Note's card shows with its enrich options
-  (Area or Topic, Routine, Reminder, Frog, Session). Enriching is never
-  required; leaving keeps the Note Unsorted.
+- **Above them sits the Note card's action row**, on every capture
+  path (text, Voice, Photo, Gallery, share, widget, tile, shortcut,
+  hardware button): File into…, Routine, Reminder, Frog or Session, and
+  ⋮ with the Importance and Make it a Tally. Each opens its usual page
+  and comes back to the capture screen with the choice shown at the top
+  ("→ Household"), not saved yet; the user can keep typing or add more.
+  All of it is optional.
+- **Everything is saved together** when the user leaves the screen or
+  taps a save button. Nothing is half-saved: for an empty Note nothing
+  is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
+  on an empty Note.
+- **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, or
+  a Routine, Reminder, Frog, Session or Tally is set up, the three
+  Nudge buttons become one Save and no Nudge is set; leaving saves too.
+- Behind the App Lock, the row offers neither File into… nor the
+  Session, which would show the Areas and the Tallies. File into… lists
+  a closed locked Area without its Topics.
+- After saving, the new Note's card shows with the same options, for
+  whatever was not done while capturing (merging into another Note
+  among them). Enriching is never required; a Note left without an
+  Area or Topic stays Unsorted.
 
 ## Agenda
 

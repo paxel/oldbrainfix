@@ -184,7 +184,7 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
 }
 
 #[test]
-fn recording_starts_at_once_and_the_big_stop_button_keeps_the_note() -> TestResult {
+fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
@@ -195,9 +195,15 @@ fn recording_starts_at_once_and_the_big_stop_button_keeps_the_note() -> TestResu
     assert!(shows(&harness, "Recording… 1:15"));
     // While recording, the Nudge times keep it too.
     assert!(shows(&harness, "10 min"));
-    harness.get_by_label("Stop and save").click();
+    harness.get_by_label("Stop").click();
     harness.run();
     assert!(!harness.state().recording());
+    // Stopped, it stays on the capture field with the buttons, unsaved.
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert!(shows(&harness, "Voice recording"));
+    assert!(shows(&harness, "Routine"));
+    harness.get_by_label("1 h").click();
+    harness.run();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     let note = &notes[0];
@@ -620,7 +626,7 @@ fn popup(store: Arc<Store>, devices: &Shared) -> Harness<'static, Popup> {
     let mut popup = CapturePopup::new(store, "en");
     popup.set_recorder(Box::new(FakeMic(devices.clone())));
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(460.0, 280.0))
+        .with_size(egui::vec2(480.0, 340.0))
         .build_ui_state(
             |ui, state: &mut Popup| {
                 App::install(ui.ctx());
@@ -638,7 +644,7 @@ fn popup(store: Arc<Store>, devices: &Shared) -> Harness<'static, Popup> {
 }
 
 #[test]
-fn the_popup_records_and_its_stop_button_keeps_the_note() -> TestResult {
+fn the_popup_records_and_keeps_the_recording_stopped_until_left() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     devices.borrow_mut().mic = true;
@@ -646,13 +652,25 @@ fn the_popup_records_and_its_stop_button_keeps_the_note() -> TestResult {
     harness.get_by_label("Record voice").click();
     harness.run();
     assert!(harness.state().popup.recording());
-    let stop = harness.get_by_label("Stop and save");
-    assert!(stop.rect().bottom() <= 280.0, "{:?}", stop.rect());
-    stop.click();
+    // All of it fits the popup's window while recording.
+    let hint = harness.get_by_label_contains("Enter saves it with a Nudge in 1 h.");
+    assert!(hint.rect().bottom() <= 340.0, "{:?}", hint.rect());
+    harness.get_by_label("Stop").click();
+    harness.run();
+    // Stopped, the popup stays with the recording and room to type.
+    assert!(!harness.state().closed);
+    assert!(!harness.state().popup.recording());
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert!(harness.query_by_label("Voice recording").is_some());
+    harness.get_by(|n| n.is_focused()).type_text("Tyres");
+    harness.run();
+    // Leaving saves it all together.
+    harness.key_press(Key::Escape);
     harness.run();
     assert!(harness.state().closed);
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
+    assert_eq!(notes[0].text, "Tyres");
     assert_eq!(notes[0].recordings.len(), 1);
     Ok(())
 }
@@ -840,7 +858,9 @@ fn record_note<S>(harness: &mut Harness<'_, S>, devices: &Shared) {
     devices.borrow_mut().mic = true;
     harness.get_by_label("Record voice").click();
     harness.run();
-    harness.get_by_label("Stop and save").click();
+    harness.get_by_label("Stop").click();
+    harness.run();
+    harness.get_by_label("1 h").click();
     harness.run();
 }
 
@@ -914,7 +934,9 @@ fn the_playback_speed_is_written_the_german_way_in_german() -> TestResult {
     devices.borrow_mut().mic = true;
     harness.get_by_label("Sprache aufnehmen").click();
     harness.run();
-    harness.get_by_label("Beenden und speichern").click();
+    harness.get_by_label("Beenden").click();
+    harness.run();
+    harness.get_by_label("1 Std.").click();
     harness.run();
     assert!(shows(&harness, "1,5×"));
     harness.get_by_label("1,5×").click();

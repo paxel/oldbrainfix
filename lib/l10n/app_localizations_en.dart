@@ -1019,7 +1019,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get recording => 'Recording…';
 
   @override
-  String get stopAndSave => 'Stop and save';
+  String get stopRecording => 'Stop';
 
   @override
   String get voiceRecording => 'Voice recording';
@@ -3391,4 +3391,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get maskedTally => 'Private Tally';
+
+  @override
+  String captureChoicePlace(String place) {
+    return '→ $place';
+  }
+
+  @override
+  String captureChoiceRoutine(String schedule) {
+    return 'Routine: $schedule';
+  }
+
+  @override
+  String captureChoiceReminder(String schedule) {
+    return 'Reminder: $schedule';
+  }
+
+  @override
+  String captureChoiceSession(String schedule) {
+    return 'Session: $schedule';
+  }
+
+  @override
+  String captureChoiceTally(String field) {
+    return 'Tally: $field';
+  }
+
+  @override
+  String get noteBeingCaptured => 'The Note being captured';
 }

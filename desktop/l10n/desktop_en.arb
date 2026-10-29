@@ -326,5 +326,13 @@
   "sessionMoveUp": "Move {name} up",
   "@sessionMoveUp": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place up.", "placeholders": {"name": {"type": "String"}}},
   "sessionMoveDown": "Move {name} down",
-  "@sessionMoveDown": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place down.", "placeholders": {"name": {"type": "String"}}}
+  "@sessionMoveDown": {"description": "In the desktop's Session editor: the button that moves a Tally of the pool one place down.", "placeholders": {"name": {"type": "String"}}},
+  "captureKeysHintSorted": "Ctrl+Enter saves it.",
+  "@captureKeysHintSorted": {"description": "Under the desktop's capture field while something is typed for a Note that is filed or has something set up, which needs no Nudge."},
+  "popupKeysHintSorted": "Enter saves it. Esc keeps what is typed the same way; empty, it just closes.",
+  "@popupKeysHintSorted": {"description": "Under the text field of the desktop's capture popup for a Note that is filed or has something set up, which needs no Nudge."},
+  "captureChoicePlaceDesk": "Into: {place}",
+  "@captureChoicePlaceDesk": {"description": "On the desktop's capture popup and capture field: the Area or Topic picked for the Note, saved with it; the desktop font has no arrow.", "placeholders": {"place": {"type": "String"}}},
+  "removeChoice": "Remove {choice}",
+  "@removeChoice": {"description": "The button on a choice shown on the desktop's capture popup or capture field that drops it before it is saved.", "placeholders": {"choice": {"type": "String"}}}
 }

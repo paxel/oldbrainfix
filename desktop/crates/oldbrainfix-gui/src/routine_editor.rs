@@ -6,7 +6,10 @@
 //! interval or this Device's default, and Escalation. A Session (#104)
 //! has its pool, count, weekdays' counts and rule on top of the schedule
 //! ([`SessionDraft`]); Save says under each field what to fix. Save
-//! writes it; leaving without saving drops the edit.
+//! writes it; leaving without saving drops the edit. Opened from a
+//! capture for the Note not written yet (#113), Save hands back what was
+//! set up instead ([`RoutineEditor::choice`]), as the phone's
+//! `chooseSchedule`.
 
 use std::collections::BTreeSet;
 
@@ -19,6 +22,7 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{embossed, icon_button, pill, radio_column};
+use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, desktop_simple, occurrence_time, weekday_text};
@@ -60,6 +64,9 @@ pub struct RoutineEditor {
     from_note: bool,
     /// The text of the Note made behind the scenes.
     pub text: String,
+    /// The text so far of the Note being captured, not written yet, that
+    /// a new one is set up for; `None` otherwise.
+    capture: Option<String>,
     pub advanced: bool,
     pub kind: RepeatKind,
     pub every: i64,
@@ -122,6 +129,7 @@ impl RoutineEditor {
             from_note: note.is_some(),
             note,
             text: String::new(),
+            capture: None,
             advanced: false,
             kind,
             every: 1,
@@ -143,6 +151,27 @@ impl RoutineEditor {
         };
         editor.update();
         editor
+    }
+
+    /// A new Routine, or a Reminder when `reminder`, set up for the Note
+    /// being captured with `text` so far: Save hands it back as a
+    /// [`ScheduleChoice`] instead of writing it.
+    pub fn choose(
+        text: &str,
+        reminder: bool,
+        now: DateTime<Utc>,
+        wall: &dyn Fn(DateTime<Utc>) -> NaiveDateTime,
+        device_renag: Duration,
+    ) -> RoutineEditor {
+        let mut editor = RoutineEditor::new(None, reminder, now, wall, device_renag);
+        editor.from_note = true;
+        editor.capture = Some(text.trim().to_string());
+        editor
+    }
+
+    /// Whether it is set up for the Note being captured.
+    pub fn capturing(&self) -> bool {
+        self.capture.is_some()
     }
 
     /// Makes it a Session: `draft` for its part, `session` as it was
@@ -170,6 +199,7 @@ impl RoutineEditor {
             note,
             from_note: true,
             text: String::new(),
+            capture: None,
             advanced: false,
             kind: RepeatKind::Every,
             every: 1,
@@ -285,7 +315,7 @@ impl RoutineEditor {
         if self.schedule.is_none() {
             return false;
         }
-        if self.routine.is_some() {
+        if self.routine.is_some() || self.capture.is_some() {
             return true;
         }
         match &self.note {
@@ -294,25 +324,53 @@ impl RoutineEditor {
         }
     }
 
+    /// Whether a Session's part needs fixing, which then says so under
+    /// its fields.
+    fn session_to_fix(&mut self, store: &Store) -> oldbrainfix_core::Result<bool> {
+        let Some((draft, _)) = &mut self.session else {
+            return Ok(false);
+        };
+        if draft.valid() {
+            return Ok(false);
+        }
+        let was_open = draft.weekdays_open;
+        draft.check();
+        // The weekday to fix comes into view, and stays so here.
+        if draft.weekdays_open && !was_open {
+            store.set_local_setting(WEEKDAYS_OPEN, "true")?;
+        }
+        Ok(true)
+    }
+
+    /// What was set up for the Note being captured, written nowhere;
+    /// `None` while there is no schedule or a Session's part needs
+    /// fixing, which then says so under its fields.
+    pub fn choice(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<ScheduleChoice>> {
+        let Some(schedule) = self.schedule.clone() else {
+            return Ok(None);
+        };
+        if self.session_to_fix(store)? {
+            return Ok(None);
+        }
+        Ok(Some(ScheduleChoice {
+            schedule,
+            renag: self.renag.map(Duration::minutes),
+            escalation: self.escalation,
+            session: self.session.as_ref().map(|(draft, _)| draft.choice()),
+        }))
+    }
+
     /// Writes the Routine; its id, or `None` when a Session's part needs
     /// fixing first, which then says so under its fields and writes
     /// nothing.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
+        if self.session_to_fix(store)? {
+            return Ok(None);
+        }
         let routines = Routines::new(store);
         let Some(schedule) = &self.schedule else {
             return Err(oldbrainfix_core::Error::Invalid("no schedule".into()));
         };
-        if let Some((draft, _)) = &mut self.session
-            && !draft.valid()
-        {
-            let was_open = draft.weekdays_open;
-            draft.check();
-            // The weekday to fix comes into view, and stays so here.
-            if draft.weekdays_open && !was_open {
-                store.set_local_setting(WEEKDAYS_OPEN, "true")?;
-            }
-            return Ok(None);
-        }
         let id = match (&self.routine, &self.note, &self.session) {
             (Some(id), _, session) => {
                 routines.reschedule(id, schedule)?;
@@ -366,6 +424,18 @@ impl RoutineEditor {
                         return;
                     }
                     ui.label(RichText::new(t.from_note()).strong().color(text));
+                    if let Some(captured) = &self.capture {
+                        let shown = if captured.is_empty() {
+                            t.note_being_captured()
+                        } else {
+                            captured.as_str()
+                        };
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::NOTE, 18.0, text);
+                            ui.label(RichText::new(shown).color(text));
+                        });
+                        return;
+                    }
                     match &self.note {
                         None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
                         Some(note) if note.is_trashed() => {

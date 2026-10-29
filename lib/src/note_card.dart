@@ -391,55 +391,13 @@ class NoteCard extends StatelessWidget {
                         compact: true,
                       ),
                     if (acts || footer != null) const Divider(height: 24),
-                    // Icons only, so the row stays one line in every
-                    // language; the words show on a long press.
                     if (acts)
-                      Row(
-                        key: const ValueKey('note-actions'),
-                        children: [
-                          if (onFile != null)
-                            IconButton(
-                              tooltip: t.fileInto,
-                              onPressed: onFile,
-                              icon: const Icon(Icons.drive_file_move_outline),
-                            ),
-                          if (onSchedule case final onSchedule?)
-                            PopupMenuButton<Spawn>(
-                              tooltip: t.routineOrReminder,
-                              icon: const Icon(Icons.alarm_add_outlined),
-                              onSelected: onSchedule,
-                              itemBuilder: (_) => [
-                                PopupMenuItem(
-                                  value: Spawn.routine,
-                                  child: Text(t.routine),
-                                ),
-                                PopupMenuItem(
-                                  value: Spawn.reminder,
-                                  child: Text(t.reminder),
-                                ),
-                                PopupMenuItem(
-                                  value: Spawn.frog,
-                                  child: Text(t.frog),
-                                ),
-                                PopupMenuItem(
-                                  value: Spawn.session,
-                                  child: Text(t.session),
-                                ),
-                              ],
-                            ),
-                          if (onMerge != null)
-                            IconButton(
-                              tooltip: t.mergeInto,
-                              onPressed: onMerge,
-                              icon: const Icon(Icons.call_merge),
-                            ),
-                          const Spacer(),
-                          if (actions != null)
-                            _MoreButton(
-                              importance: note.importance,
-                              actions: actions,
-                            ),
-                        ],
+                      NoteActionRow(
+                        importance: note.importance,
+                        onFile: onFile,
+                        onSchedule: onSchedule,
+                        onMerge: onMerge,
+                        actions: actions,
                       ),
                     ?footer,
                   ],
@@ -453,6 +411,76 @@ class NoteCard extends StatelessWidget {
     return note.importance == Importance.unimportant
         ? Opacity(opacity: unimportantOpacity, child: card)
         : card;
+  }
+}
+
+/// A Note's action row, icons only, so it stays one line in every
+/// language; the words show on a long press: file it, spawn one of
+/// [spawns] from it (a Routine, Reminder, Frog or Session), merge it, and
+/// ⋮ for the rest with words. Each is left out when its callback is
+/// null. The card draws it, and so does a capture screen (#113).
+class NoteActionRow extends StatelessWidget {
+  /// The Importance ⋮ marks.
+  final Importance importance;
+  final VoidCallback? onFile;
+  final ValueChanged<Spawn>? onSchedule;
+  final VoidCallback? onMerge;
+  final NoteActions? actions;
+
+  /// What the spawn menu offers, in this order.
+  final List<Spawn> spawns;
+
+  const NoteActionRow({
+    super.key = const ValueKey('note-actions'),
+    required this.importance,
+    this.onFile,
+    this.onSchedule,
+    this.onMerge,
+    this.actions,
+    this.spawns = Spawn.values,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final actions = this.actions;
+    return Row(
+      children: [
+        if (onFile != null)
+          IconButton(
+            tooltip: t.fileInto,
+            onPressed: onFile,
+            icon: const Icon(Icons.drive_file_move_outline),
+          ),
+        if (onSchedule case final onSchedule? when spawns.isNotEmpty)
+          PopupMenuButton<Spawn>(
+            tooltip: t.routineOrReminder,
+            icon: const Icon(Icons.alarm_add_outlined),
+            onSelected: onSchedule,
+            itemBuilder: (_) => [
+              for (final spawn in spawns)
+                PopupMenuItem(
+                  value: spawn,
+                  child: Text(switch (spawn) {
+                    Spawn.routine => t.routine,
+                    Spawn.reminder => t.reminder,
+                    Spawn.frog => t.frog,
+                    Spawn.session => t.session,
+                  }),
+                ),
+            ],
+          ),
+        if (onMerge != null)
+          IconButton(
+            tooltip: t.mergeInto,
+            onPressed: onMerge,
+            icon: const Icon(Icons.call_merge),
+          ),
+        const Spacer(),
+        if (actions != null)
+          _MoreButton(importance: importance, actions: actions),
+      ],
+    );
   }
 }
 

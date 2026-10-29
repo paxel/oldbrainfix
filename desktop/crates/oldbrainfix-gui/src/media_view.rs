@@ -372,8 +372,9 @@ fn speed_button(ui: &mut Ui, t: &L10n, speed: f64) -> Option<f64> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Voice {
     Record,
-    /// The big stop button: end the recording and keep the Note.
-    StopAndSave,
+    /// The big stop button: end the recording and hold it on the
+    /// capture, with the rest, until the Note is saved.
+    Stop,
 }
 
 /// The microphone's button, or while `recording` runs, how long it has
@@ -404,12 +405,12 @@ pub fn voice_button(ui: &mut Ui, t: &L10n, recording: Option<Duration>) -> Optio
             .color(text),
         );
     });
-    let big = egui::Button::new(RichText::new(t.stop_and_save()).size(18.0).color(text))
+    let big = egui::Button::new(RichText::new(t.stop_recording()).size(18.0).color(text))
         .min_size(egui::vec2(ui.available_width(), 44.0));
     if ui.add(big).clicked() {
         stop = true;
     }
-    stop.then_some(Voice::StopAndSave)
+    stop.then_some(Voice::Stop)
 }
 
 /// What the speech model's card asked for.

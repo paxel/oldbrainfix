@@ -632,6 +632,7 @@ void main() {
       await openTextCapture(tester);
       await tap(tester, find.byIcon(Icons.mic_none));
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
+      await tap(tester, find.text('Save'));
 
       // Saved and back on the Agenda while Whisper still works.
       expect(find.byType(CaptureScreen), findsNothing);

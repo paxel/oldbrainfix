@@ -1646,11 +1646,11 @@ abstract class AppLocalizations {
   /// **'Recording…'**
   String get recording;
 
-  /// No description provided for @stopAndSave.
+  /// The big button that ends a voice recording on the capture screen; the screen stays.
   ///
   /// In en, this message translates to:
-  /// **'Stop and save'**
-  String get stopAndSave;
+  /// **'Stop'**
+  String get stopRecording;
 
   /// No description provided for @voiceRecording.
   ///
@@ -5497,6 +5497,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Private Tally'**
   String get maskedTally;
+
+  /// On a capture screen: the Area or Topic picked for the Note, saved with it.
+  ///
+  /// In en, this message translates to:
+  /// **'→ {place}'**
+  String captureChoicePlace(String place);
+
+  /// On a capture screen: a Routine set up for the Note, saved with it.
+  ///
+  /// In en, this message translates to:
+  /// **'Routine: {schedule}'**
+  String captureChoiceRoutine(String schedule);
+
+  /// No description provided for @captureChoiceReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder: {schedule}'**
+  String captureChoiceReminder(String schedule);
+
+  /// No description provided for @captureChoiceSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session: {schedule}'**
+  String captureChoiceSession(String schedule);
+
+  /// On a capture screen: the first field of the Tally the Note becomes.
+  ///
+  /// In en, this message translates to:
+  /// **'Tally: {field}'**
+  String captureChoiceTally(String field);
+
+  /// In the Routine editor opened from a capture screen, for a Note without text yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note being captured'**
+  String get noteBeingCaptured;
 }
 
 class _AppLocalizationsDelegate

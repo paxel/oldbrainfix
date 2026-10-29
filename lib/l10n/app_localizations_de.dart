@@ -1024,7 +1024,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get recording => 'Aufnahme läuft …';
 
   @override
-  String get stopAndSave => 'Beenden und speichern';
+  String get stopRecording => 'Beenden';
 
   @override
   String get voiceRecording => 'Sprachaufnahme';
@@ -3425,4 +3425,32 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get maskedTally => 'Private Strichliste';
+
+  @override
+  String captureChoicePlace(String place) {
+    return '→ $place';
+  }
+
+  @override
+  String captureChoiceRoutine(String schedule) {
+    return 'Routine: $schedule';
+  }
+
+  @override
+  String captureChoiceReminder(String schedule) {
+    return 'Erinnerung: $schedule';
+  }
+
+  @override
+  String captureChoiceSession(String schedule) {
+    return 'Einheit: $schedule';
+  }
+
+  @override
+  String captureChoiceTally(String field) {
+    return 'Strichliste: $field';
+  }
+
+  @override
+  String get noteBeingCaptured => 'Die Notiz, die gerade erfasst wird';
 }

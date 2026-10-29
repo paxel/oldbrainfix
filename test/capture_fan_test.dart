@@ -173,6 +173,7 @@ void main() {
       expect(voice.starts, 1);
       expect(fanEntry('text'), findsNothing);
       await tap(tester, find.byKey(const ValueKey('stopRecording')));
+      await tap(tester, find.text('Save'));
       expectFanOpen(false);
       expect(find.byType(AgendaScreen), findsOneWidget);
     });

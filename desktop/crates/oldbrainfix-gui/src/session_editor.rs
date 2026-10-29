@@ -3,7 +3,8 @@
 //! pool as a checkbox per Tally, ordered with up and down buttons for
 //! Rolling; the count; the weekdays' own counts in a fold, open as last
 //! left on this Device; and the rule as radio buttons. Nothing is written
-//! before Save, and then only what changed.
+//! before Save, and then only what changed. For a Note being captured
+//! (#113) Save hands the draft back as a [`SessionChoice`].
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -12,6 +13,7 @@ use oldbrainfix_core::sessions::keys::MAX_COUNT;
 use oldbrainfix_core::{Notes, Schedule, Session, SessionRule, Sessions, Store};
 
 use crate::app::{embossed, icon_button, row_title};
+use crate::capture_choices::SessionChoice;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::weekday_long;
@@ -146,6 +148,23 @@ impl SessionDraft {
         }
     }
 
+    /// What the draft holds as plain values, kept after the editor is
+    /// gone; read while it is [`SessionDraft::valid`].
+    pub fn choice(&self) -> SessionChoice {
+        let counts = self
+            .counts
+            .iter()
+            .enumerate()
+            .filter_map(|(i, typed)| Some((i as u32 + 1, Self::count_of(typed)?)))
+            .collect();
+        SessionChoice {
+            pool: self.pool(),
+            count: Self::count_of(&self.count).unwrap_or(1),
+            counts,
+            rule: self.rule,
+        }
+    }
+
     /// Spawns the Session from the Note `note_id` on `schedule`; its id.
     pub fn spawn(
         &self,
@@ -153,18 +172,7 @@ impl SessionDraft {
         note_id: &str,
         schedule: &Schedule,
     ) -> oldbrainfix_core::Result<String> {
-        let sessions = Sessions::new(store);
-        let count = Self::count_of(&self.count).unwrap_or(1);
-        let id = sessions
-            .spawn(note_id, schedule, &self.pool(), count, self.rule)?
-            .routine
-            .id;
-        for (i, typed) in self.counts.iter().enumerate() {
-            if let Some(own) = Self::count_of(typed) {
-                sessions.set_count_on(&id, i as u32 + 1, Some(own))?;
-            }
-        }
-        Ok(id)
+        self.choice().spawn(store, note_id, schedule)
     }
 
     /// Writes what changed of `session`.

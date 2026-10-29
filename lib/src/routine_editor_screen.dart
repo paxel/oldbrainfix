@@ -4,6 +4,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 
 import 'calendar_platform.dart';
+import 'capture_choices.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
@@ -41,6 +42,28 @@ Future<bool> spawnFromNote(
     ),
   );
 }
+
+/// Opens the editor of a new Routine, Reminder or Session ([spawn]) for
+/// the Note being captured, [draft], which is not written yet (#113):
+/// Save hands back what was set up, for Capture to write with the Note;
+/// null when it was left without Save.
+Future<ScheduleChoice?> chooseSchedule(
+  BuildContext context,
+  Notes notes,
+  Places places,
+  CaptureDraft draft, {
+  required Spawn spawn,
+}) => Navigator.of(context).push(
+  MaterialPageRoute<ScheduleChoice>(
+    builder: (_) => RoutineEditorScreen(
+      notes: notes,
+      places: places,
+      capture: draft,
+      reminder: spawn == Spawn.reminder,
+      session: spawn == Spawn.session,
+    ),
+  ),
+);
 
 /// Opens the editor for a new Routine whose Note is made behind the
 /// scenes; true when one was made.
@@ -98,8 +121,12 @@ class RoutineEditorScreen extends StatefulWidget {
   /// A new one starts as a Reminder: once, at the next full hour.
   final bool reminder;
 
-  /// A new one is a Session, spawned from [noteId].
+  /// A new one is a Session, spawned from [noteId] or [capture].
   final bool session;
+
+  /// The Note being captured, not written yet, that a new one is for
+  /// (#113): Save pops it as a [ScheduleChoice] instead of writing it.
+  final CaptureDraft? capture;
 
   const RoutineEditorScreen({
     super.key,
@@ -109,6 +136,7 @@ class RoutineEditorScreen extends StatefulWidget {
     this.noteId,
     this.reminder = false,
     this.session = false,
+    this.capture,
   });
 
   @override
@@ -198,8 +226,13 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     } else {
       final noteId = widget.noteId;
       _note = noteId == null ? null : widget.notes.byId(noteId);
-      if (widget.session && noteId != null) {
-        _draft = SessionDraft.of(widget.notes.store, noteId);
+      // A Note being captured offers the Tallies of where it goes; while
+      // Unsorted, any of the user's.
+      if (widget.session && (noteId != null || widget.capture != null)) {
+        _draft = SessionDraft.of(
+          widget.notes.store,
+          noteId ?? widget.capture?.place ?? '',
+        );
       }
       if (widget.reminder) {
         // The next full hour, today or just after midnight.
@@ -389,7 +422,7 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
   /// in the lists to spawn from, or a text for one.
   bool get _canSave {
     if (_schedule == null) return false;
-    if (_routine != null) return true;
+    if (_routine != null || widget.capture != null) return true;
     final note = _note;
     return note == null ? _text.text.trim().isNotEmpty : !note.isTrashed;
   }
@@ -402,6 +435,17 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
       setState(() => draft.checked = true);
       // The weekday to fix comes into view.
       if (!draft.weekdaysValid) draft.weekdays.expand();
+      return;
+    }
+    if (widget.capture != null) {
+      Navigator.of(context).pop(
+        ScheduleChoice(
+          schedule,
+          renag: _renag,
+          escalation: _escalation,
+          session: draft?.choice,
+        ),
+      );
       return;
     }
     final routine = _routine;
@@ -551,7 +595,25 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
             padding: const EdgeInsets.only(bottom: 16),
             child: Text(t.onlyManagers),
           ),
-        if (widget.noteId == null && routine == null)
+        if (widget.capture case final capture?)
+          EditorPanel(
+            heading: t.fromNote,
+            child: Row(
+              children: [
+                const Icon(Icons.sticky_note_2_outlined),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    capture.text.trim().isEmpty
+                        ? t.noteBeingCaptured
+                        : capture.text.trim(),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (widget.noteId == null && routine == null)
           Embossed(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

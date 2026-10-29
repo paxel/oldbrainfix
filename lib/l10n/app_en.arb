@@ -581,7 +581,8 @@
   "moreCaptureContext": "More about the capture",
   "recordVoice": "Record voice",
   "recording": "Recording…",
-  "stopAndSave": "Stop and save",
+  "stopRecording": "Stop",
+  "@stopRecording": {"description": "The big button that ends a voice recording on the capture screen; the screen stays."},
   "voiceRecording": "Voice recording",
   "playRecording": "Play the voice recording",
   "stopPlaying": "Stop",
@@ -1794,5 +1795,17 @@
   "@sessionPicks": {"description": "A Session's row on a later day of the Agenda.", "placeholders": {"count": {"type": "int"}}},
   "sessionNothingToPick": "None of its Tallies is left to pick.",
   "maskedTally": "Private Tally",
-  "@maskedTally": {"description": "A Tally a Session picked from a locked Area set to Masked, on the Agenda."}
+  "@maskedTally": {"description": "A Tally a Session picked from a locked Area set to Masked, on the Agenda."},
+  "captureChoicePlace": "→ {place}",
+  "@captureChoicePlace": {"description": "On a capture screen: the Area or Topic picked for the Note, saved with it.", "placeholders": {"place": {"type": "String"}}},
+  "captureChoiceRoutine": "Routine: {schedule}",
+  "@captureChoiceRoutine": {"description": "On a capture screen: a Routine set up for the Note, saved with it.", "placeholders": {"schedule": {"type": "String"}}},
+  "captureChoiceReminder": "Reminder: {schedule}",
+  "@captureChoiceReminder": {"placeholders": {"schedule": {"type": "String"}}},
+  "captureChoiceSession": "Session: {schedule}",
+  "@captureChoiceSession": {"placeholders": {"schedule": {"type": "String"}}},
+  "captureChoiceTally": "Tally: {field}",
+  "@captureChoiceTally": {"description": "On a capture screen: the first field of the Tally the Note becomes.", "placeholders": {"field": {"type": "String"}}},
+  "noteBeingCaptured": "The Note being captured",
+  "@noteBeingCaptured": {"description": "In the Routine editor opened from a capture screen, for a Note without text yet."}
 }

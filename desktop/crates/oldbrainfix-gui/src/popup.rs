@@ -3,30 +3,56 @@
 //! open. It never asks anything: Enter keeps the text with a Nudge in
 //! 1 h, the three buttons with theirs, and leaving it with Esc or its
 //! close button keeps what is typed the same way as Enter, as leaving the
-//! phone's capture screen does; empty, it just closes. The Note stays
-//! Unsorted.
+//! phone's capture screen does; empty, it just closes.
+//!
+//! Above the Nudge buttons sit the Note card's buttons (#113): "File
+//! into…", Routine, Reminder, Frog and Session where this Device may
+//! spawn, and "More" with the Importance and "Make it a Tally". Routine,
+//! Reminder, Session and the Tally open their page in the popup, grown
+//! for it, which hands its choice back; every choice shows at the top,
+//! not saved yet, with a button that drops it. All of it is saved with
+//! the Note in one go when the popup is left or saved, nothing of it for
+//! an empty Note. A Note filed or with something set up gets one Save
+//! instead of the Nudge buttons and no Nudge. Esc on a page goes back to
+//! the capture without its choice, as do Alt+Left and the mouse's back
+//! button.
 //!
 //! Its microphone button records voice into the same Note: recording
-//! starts at once, and one big stop button ends it and keeps the Note
-//! with a Nudge in 1 h; the Nudge times, Enter, Esc and closing keep it
-//! as well, so a recording is never lost.
+//! starts at once, and one big stop button ends it and leaves it on the
+//! popup, with the buttons and room to type; it is saved with the rest.
+//! The Nudge times, Save, Enter, Esc and closing end a recording still
+//! running and keep it as well, so a recording is never lost.
 //!
 //! Closing the popup gives the keyboard back to the window that had it
 //! where the system does so for a closed window: on X11, Windows and
 //! macOS mostly. On Wayland the compositor decides that, and whether the
-//! popup stays on top at all (winit has no window levels there).
+//! popup stays on top at all (winit has no window levels there), and
+//! whether it grows for a page.
 
 use std::sync::Arc;
 
 use chrono::Duration;
-use egui::{FontId, Frame, Id, Key, Margin, Modifiers, RichText, TextEdit, Ui, ViewportCommand};
-use oldbrainfix_core::{APP_ID, Note, Notes, Store};
+use egui::{
+    FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, TextEdit, Ui,
+    ViewportCommand,
+};
+use oldbrainfix_core::{APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic};
 
+use crate::app::{local_wall, region_of};
+use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
 use crate::cli::note_text;
+use crate::icons;
 use crate::l10n::L10n;
 use crate::media::Recorder;
 use crate::media_view::{self, Voice};
+use crate::routine_editor::{Intent, RoutineEditor};
+use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
+use crate::tally_view::{FieldForm, FormIntent, TallyForm};
 use crate::theme;
+
+/// The popup's size, and its size while a page shows.
+const SIZE: [f32; 2] = [480.0, 340.0];
+const PAGE_SIZE: [f32; 2] = [560.0, 680.0];
 
 /// What the popup is after a frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +77,18 @@ pub fn capture(
         .map(Some)
 }
 
+/// A page a button opened over the capture, handing its choice back.
+enum Page {
+    Schedule(Box<RoutineEditor>),
+    Tally(Box<TallyForm>),
+}
+
+/// What was asked of the page shown.
+enum PageAsk {
+    Schedule(Intent),
+    Tally(FormIntent),
+}
+
 pub struct CapturePopup {
     store: Arc<Store>,
     t: L10n,
@@ -61,14 +99,24 @@ pub struct CapturePopup {
     error: Option<String>,
     saved: Option<Box<dyn Fn()>>,
     recorder: Option<Box<dyn Recorder>>,
-    /// A recording that ended but could not be kept yet.
-    recorded: Option<Vec<u8>>,
+    /// The recordings that ended, held until the Note is saved.
+    recorded: Vec<Vec<u8>>,
+    /// What was set up for the Note, not written yet.
+    choices: CaptureChoices,
+    /// The Areas with their Topics "File into…" lists, read as the popup
+    /// opens.
+    areas: Vec<(Area, Vec<Topic>)>,
+    /// Whether this Device may spawn from the Note where it goes.
+    spawns: bool,
+    page: Option<Page>,
+    /// The region the system reports, for the units of a Tally.
+    region: Option<String>,
 }
 
 impl CapturePopup {
     /// An empty popup over `store`, speaking `locale`.
     pub fn new(store: Arc<Store>, locale: &str) -> CapturePopup {
-        CapturePopup {
+        let mut popup = CapturePopup {
             store,
             t: L10n::new(locale),
             text: String::new(),
@@ -76,8 +124,15 @@ impl CapturePopup {
             error: None,
             saved: None,
             recorder: None,
-            recorded: None,
-        }
+            recorded: Vec::new(),
+            choices: CaptureChoices::default(),
+            areas: Vec::new(),
+            spawns: true,
+            page: None,
+            region: region_of(sys_locale::get_locale().as_deref()),
+        };
+        popup.read_places();
+        popup
     }
 
     /// The microphone voice Notes are recorded with.
@@ -100,7 +155,7 @@ impl CapturePopup {
         egui::ViewportBuilder::default()
             .with_title(self.t.capture_tooltip())
             .with_app_id(APP_ID)
-            .with_inner_size([460.0, 280.0])
+            .with_inner_size(SIZE)
             .with_resizable(false)
             .with_minimize_button(false)
             .with_maximize_button(false)
@@ -113,18 +168,64 @@ impl CapturePopup {
         &self.text
     }
 
+    /// What was set up for the Note and not saved yet.
+    pub fn choices(&self) -> &CaptureChoices {
+        &self.choices
+    }
+
+    /// Whether a page opened from the capture shows.
+    pub fn page_open(&self) -> bool {
+        self.page.is_some()
+    }
+
     /// What went wrong saving, as announced at the top.
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
 
-    /// Takes the keyboard again, as when the hotkey is pressed once more.
+    /// Takes the keyboard again, as when the hotkey is pressed once more,
+    /// and reads the Areas and Topics again.
     pub fn refocus(&mut self) {
         self.focus = true;
+        self.read_places();
     }
 
-    /// Leaving: keeps what is typed with a Nudge in 1 h. Stays open when
-    /// that failed, so nothing is lost.
+    /// Reads the Areas with their Topics, and whether the Note may spawn
+    /// where it goes.
+    fn read_places(&mut self) {
+        let places = Places::new(&self.store);
+        let read = places.areas().and_then(|areas| {
+            areas
+                .into_iter()
+                .map(|area| {
+                    let topics = places.topics(&area.id)?;
+                    Ok((area, topics))
+                })
+                .collect::<oldbrainfix_core::Result<Vec<_>>>()
+        });
+        match read {
+            Ok(areas) => self.areas = areas,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        // An Area or Topic deleted meanwhile is no place to go.
+        if let Some(place) = &self.choices.place
+            && capture_choices::place_name(&self.t, &self.areas, place).is_none()
+        {
+            self.choices.place = None;
+        }
+        self.read_spawns();
+    }
+
+    fn read_spawns(&mut self) {
+        match capture_choices::may_spawn(&self.store, self.choices.place.as_deref()) {
+            Ok(spawns) => self.spawns = spawns,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// Leaving: keeps what is typed with a Nudge in 1 h, and all that was
+    /// set up for it; a page open goes without its choice. Stays open
+    /// when that failed, so nothing is lost.
     pub fn leave(&mut self) -> Outcome {
         self.save(Notes::default_nudge())
     }
@@ -135,22 +236,24 @@ impl CapturePopup {
             && recorder.recording()
             && let Some(bytes) = recorder.stop()
         {
-            self.recorded = Some(bytes);
+            self.recorded.push(bytes);
         }
-        let saved = match self.recorded.clone() {
-            None => capture(&self.store, &self.text, nudge_in),
-            Some(recording) => {
-                let text = note_text(&self.text).unwrap_or_default();
-                Notes::new(&self.store)
-                    .capture_with(text, None, Some(nudge_in), &[], &[recording])
-                    .map(Some)
-            }
-        };
+        let saved = capture_choices::capture(
+            &self.store,
+            &self.text,
+            self.choices.place.as_deref(),
+            nudge_in,
+            (&[], &self.recorded),
+            &self.choices,
+        );
         match saved {
+            // Only once all of it is written: a failed save keeps it here.
             Ok(saved) => {
                 self.text.clear();
-                self.recorded = None;
+                self.recorded.clear();
                 self.error = None;
+                self.choices = CaptureChoices::default();
+                self.page = None;
                 if saved.is_some()
                     && let Some(saved) = &self.saved
                 {
@@ -179,14 +282,20 @@ impl CapturePopup {
             .filter(|r| r.recording())
             .map(|r| r.elapsed());
         let typed =
-            note_text(&self.text).is_some() || recording.is_some() || self.recorded.is_some();
+            note_text(&self.text).is_some() || recording.is_some() || !self.recorded.is_empty();
         // Enter on a focused button is that button's.
         let in_field = ui.memory(|m| m.has_focus(id));
-        let (enter, escape, closing) = ui.input_mut(|i| {
+        let typing = ui.ctx().text_edit_focused();
+        let paged = self.page.is_some();
+        let (enter, escape, closing, back) = ui.input_mut(|i| {
             (
                 in_field && i.consume_key(Modifiers::NONE, Key::Enter),
                 i.consume_key(Modifiers::NONE, Key::Escape),
                 i.viewport().close_requested(),
+                // A page goes back as a level does (UI laws, "Desktop").
+                paged
+                    && (i.pointer.button_pressed(PointerButton::Extra1)
+                        || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))),
             )
         });
         if closing {
@@ -196,6 +305,14 @@ impl CapturePopup {
             }
             return left;
         }
+        if paged {
+            if escape || back {
+                self.close_page(ui.ctx());
+            } else {
+                self.show_page(ui);
+            }
+            return Outcome::Open;
+        }
         if escape {
             return self.leave();
         }
@@ -204,7 +321,14 @@ impl CapturePopup {
         }
         let mut picked = None;
         let mut record = false;
+        let mut stop = false;
+        let mut asked = None;
+        let held = self.recorded.len();
         let has_recorder = self.recorder.is_some();
+        let sorted = self.choices.sorted(self.choices.place.as_deref());
+        let place_chip = self.choices.place.as_ref().and_then(|place| {
+            capture_choices::place_name(&t, &self.areas, place).map(|name| (name, true))
+        });
         Frame::NONE
             .fill(tones.background)
             .inner_margin(Margin::same(16))
@@ -213,6 +337,9 @@ impl CapturePopup {
                 if let Some(error) = &self.error {
                     // Announcements go to the top (UI laws).
                     ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                }
+                if let Some(chip) = capture_choices::chips(ui, &t, &self.choices, place_chip) {
+                    asked = Some(chip);
                 }
                 let field = ui.add(
                     TextEdit::singleline(&mut self.text)
@@ -230,31 +357,63 @@ impl CapturePopup {
                     field.request_focus();
                     ui.ctx().send_viewport_cmd(ViewportCommand::Focus);
                 }
+                for _ in 0..held {
+                    ui.horizontal(|ui| {
+                        icons::show(ui, icons::MIC, 18.0, text);
+                        ui.label(RichText::new(t.voice_recording()).color(text));
+                    });
+                }
                 if has_recorder {
                     match media_view::voice_button(ui, &t, recording) {
                         Some(Voice::Record) => record = true,
-                        Some(Voice::StopAndSave) => picked = Some(Notes::default_nudge()),
+                        Some(Voice::Stop) => stop = true,
                         None => {}
                     }
                 }
-                ui.add_space(8.0);
-                ui.label(RichText::new(t.nudge_heading()).strong().color(text));
-                ui.horizontal(|ui| {
-                    let choices = [
-                        (t.snooze10(), Duration::minutes(10)),
-                        (t.snooze30(), Duration::minutes(30)),
-                        (t.snooze60(), Notes::default_nudge()),
-                    ];
-                    for (label, nudge_in) in choices {
-                        let button = egui::Button::new(RichText::new(label).color(text));
-                        if ui.add_enabled(typed, button).clicked() {
-                            picked = Some(nudge_in);
-                        }
-                    }
-                });
                 ui.add_space(4.0);
-                ui.label(RichText::new(t.popup_keys_hint()).small().color(weak));
+                let offer = (self.areas.as_slice(), self.spawns);
+                if let Some(button) = capture_choices::action_row(ui, &t, &self.choices, offer) {
+                    asked = Some(button);
+                }
+                ui.add_space(4.0);
+                if sorted {
+                    // A sorted Note needs no Nudge (#113).
+                    let save = egui::Button::new(RichText::new(t.save()).color(text));
+                    if ui.add_enabled(typed, save).clicked() {
+                        picked = Some(Notes::default_nudge());
+                    }
+                } else {
+                    ui.label(RichText::new(t.nudge_heading()).strong().color(text));
+                    ui.horizontal(|ui| {
+                        let choices = [
+                            (t.snooze10(), Duration::minutes(10)),
+                            (t.snooze30(), Duration::minutes(30)),
+                            (t.snooze60(), Notes::default_nudge()),
+                        ];
+                        for (label, nudge_in) in choices {
+                            let button = egui::Button::new(RichText::new(label).color(text));
+                            if ui.add_enabled(typed, button).clicked() {
+                                picked = Some(nudge_in);
+                            }
+                        }
+                    });
+                }
+                ui.add_space(4.0);
+                let hint = if sorted {
+                    t.popup_keys_hint_sorted()
+                } else {
+                    t.popup_keys_hint()
+                };
+                ui.label(RichText::new(hint).small().color(weak));
             });
+        // Stopped, the recording stays here with the rest (UI laws).
+        if stop
+            && let Some(recorder) = &mut self.recorder
+            && let Some(bytes) = recorder.stop()
+        {
+            self.recorded.push(bytes);
+            self.focus = true;
+        }
         if record && let Some(recorder) = &mut self.recorder {
             if recorder.start() {
                 self.error = None;
@@ -262,9 +421,126 @@ impl CapturePopup {
                 self.error = Some(t.microphone_missing().to_string());
             }
         }
+        if let Some(asked) = asked {
+            self.ask(ui.ctx(), asked);
+        }
         match picked {
             Some(nudge_in) => self.save(nudge_in),
             None => Outcome::Open,
+        }
+    }
+
+    /// Takes what was asked of the buttons or the choices; a page it
+    /// opens shows in the popup, grown for it.
+    fn ask(&mut self, ctx: &egui::Context, asked: Ask) {
+        let opened = self
+            .choices
+            .take(asked, &self.store)
+            .and_then(|opens| opens.map(|opens| self.page_for(opens)).transpose());
+        match opened {
+            Ok(Some(page)) => {
+                self.page = Some(page);
+                ctx.send_viewport_cmd(ViewportCommand::InnerSize(PAGE_SIZE.into()));
+            }
+            Ok(None) => {}
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        self.read_spawns();
+    }
+
+    /// The page for a new Routine, Reminder or Session, or the Tally's
+    /// first field, of the Note being captured.
+    fn page_for(&self, opens: Opens) -> oldbrainfix_core::Result<Page> {
+        let settings = DeviceSettings::new(&self.store);
+        match opens {
+            Opens::Schedule { reminder, session } => {
+                let renag = settings.renag_interval()?;
+                let now = self.store.now();
+                let mut editor =
+                    RoutineEditor::choose(&self.text, reminder, now, &local_wall, renag);
+                if session {
+                    // The Tallies of where it goes; while Unsorted, any.
+                    let entity = self.choices.place.as_deref().unwrap_or("");
+                    let draft = SessionDraft::of(&self.store, &self.t, entity, None)?;
+                    editor = editor.with_session(draft, None);
+                }
+                Ok(Page::Schedule(Box::new(editor)))
+            }
+            Opens::Tally => {
+                let system = settings.unit_system(self.region.as_deref())?;
+                let form = FieldForm::choose(system, &self.t);
+                Ok(Page::Tally(Box::new(TallyForm::Field(form))))
+            }
+        }
+    }
+
+    /// Back to the capture, its size and the field.
+    fn close_page(&mut self, ctx: &egui::Context) {
+        self.page = None;
+        self.focus = true;
+        ctx.send_viewport_cmd(ViewportCommand::InnerSize(SIZE.into()));
+    }
+
+    /// Draws the page and takes the choice it hands back.
+    fn show_page(&mut self, ui: &mut Ui) {
+        let t = self.t;
+        let tones = theme::tones(ui.visuals());
+        let mut asked = None;
+        Frame::NONE
+            .fill(tones.background)
+            .inner_margin(Margin::same(16))
+            .show(ui, |ui| {
+                ui.set_min_size(ui.available_size());
+                if let Some(error) = &self.error {
+                    ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                }
+                asked = match &mut self.page {
+                    Some(Page::Schedule(editor)) => {
+                        editor.show(ui, &t, tones).map(PageAsk::Schedule)
+                    }
+                    Some(Page::Tally(form)) => form.show(ui, &t, tones).map(PageAsk::Tally),
+                    None => None,
+                };
+            });
+        let Some(asked) = asked else {
+            return;
+        };
+        match self.page_asked(asked) {
+            Ok(true) => self.close_page(ui.ctx()),
+            Ok(false) => {}
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    /// Does what was asked of the page; whether it is done with.
+    fn page_asked(&mut self, asked: PageAsk) -> oldbrainfix_core::Result<bool> {
+        match (asked, &mut self.page) {
+            (PageAsk::Schedule(Intent::Save), Some(Page::Schedule(editor))) => {
+                let Some(choice) = editor.choice(&self.store)? else {
+                    return Ok(false);
+                };
+                self.choices.schedules.push(choice);
+                Ok(true)
+            }
+            (PageAsk::Schedule(Intent::Session(SessionIntent::WeekdaysOpen(open))), _) => {
+                let value = if open { "true" } else { "false" };
+                self.store.set_local_setting(WEEKDAYS_OPEN, value)?;
+                Ok(false)
+            }
+            (PageAsk::Tally(FormIntent::Save), Some(Page::Tally(form))) => {
+                let TallyForm::Field(form) = form.as_mut() else {
+                    return Ok(false);
+                };
+                let Some(field) = form.choice() else {
+                    return Ok(false);
+                };
+                self.choices.tally = Some(field);
+                Ok(true)
+            }
+            (PageAsk::Schedule(Intent::Close) | PageAsk::Tally(FormIntent::Close), _) => Ok(true),
+            // A page of a Note not written yet deletes, hides and links
+            // to nothing.
+            _ => Ok(false),
         }
     }
 }

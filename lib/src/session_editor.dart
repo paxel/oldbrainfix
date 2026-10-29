@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 
+import 'capture_choices.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_editor_screen.dart';
@@ -116,25 +117,20 @@ class SessionDraft {
 
   bool get valid => pool.isNotEmpty && countValid && weekdaysValid;
 
+  /// What the draft holds as plain values, kept after it is disposed;
+  /// read while it is [valid].
+  SessionChoice get choice => (
+    pool: pool,
+    count: countOf(count.text) ?? 1,
+    counts: {
+      for (var day = 1; day <= 7; day++) day: ?countOf(counts[day]?.text ?? ''),
+    },
+    rule: rule,
+  );
+
   /// Spawns the Session from the Note [noteId] on [schedule]; its id.
-  String spawn(String noteId, Schedule schedule) {
-    final sessions = Sessions(store);
-    final id = sessions
-        .spawn(
-          noteId,
-          schedule,
-          pool: pool,
-          count: countOf(count.text) ?? 1,
-          rule: rule,
-        )
-        .id;
-    for (var day = 1; day <= 7; day++) {
-      if (countOf(counts[day]?.text ?? '') case final own?) {
-        sessions.setCountOn(id, day, own);
-      }
-    }
-    return id;
-  }
+  String spawn(String noteId, Schedule schedule) =>
+      spawnSession(store, noteId, schedule, choice);
 
   /// Writes what changed of [session].
   void save(Session session) {

@@ -23,6 +23,7 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{embossed, icon_button, radio_column, when};
+use crate::capture_choices::TallyFieldChoice;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::profile_view;
@@ -642,6 +643,11 @@ impl TallyForm {
         }
     }
 
+    /// Whether it is the field page of the Note being captured.
+    pub fn capturing(&self) -> bool {
+        matches!(self, TallyForm::Field(form) if form.capturing)
+    }
+
     pub fn show(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<FormIntent> {
         match self {
             TallyForm::Field(form) => form.show(ui, t, tones),
@@ -684,10 +690,15 @@ fn field_error(ui: &mut Ui, error: &str) {
 /// kind once entries hold values for it; its target, optional; and how a
 /// day with several entries counts, which follows the kind of unit until
 /// it is picked. A field that exists has "Hide field", or "Show field
-/// again", at the bottom. Leaving without Save changes nothing.
+/// again", at the bottom. Leaving without Save changes nothing. For the
+/// Note being captured (#113) Save hands the field back instead
+/// ([`FieldForm::choice`]), as the phone's `chooseTallyField`.
 #[derive(Debug, Clone)]
 pub struct FieldForm {
     pub note_id: String,
+    /// Whether it is the first field of the Note being captured, which
+    /// is not written yet.
+    capturing: bool,
     /// The field shown; `None` for a new one.
     field: Option<TallyField>,
     pub name: String,
@@ -735,6 +746,7 @@ impl FieldForm {
             .unwrap_or_default();
         FieldForm {
             note_id: note_id.to_string(),
+            capturing: false,
             name: field.as_ref().map(|f| f.name.clone()).unwrap_or_default(),
             unit,
             typed,
@@ -766,8 +778,62 @@ impl FieldForm {
         }
     }
 
+    /// The page of the first field of the Note being captured.
+    pub fn choose(system: UnitSystem, t: &L10n) -> FieldForm {
+        FieldForm {
+            capturing: true,
+            ..FieldForm::new("", None, system, t)
+        }
+    }
+
+    /// The field as typed, written nowhere; `None` while something needs
+    /// fixing, which then says so under its field.
+    pub fn choice(&mut self) -> Option<TallyFieldChoice> {
+        let (name, unit, target) = self.checked()?;
+        Some(TallyFieldChoice {
+            name,
+            unit,
+            target,
+            rule: self.rule,
+        })
+    }
+
     /// Writes the field when nothing needs fixing; whether it did.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<bool> {
+        let Some((name, unit, target)) = self.checked() else {
+            return Ok(false);
+        };
+        let target_text = self.target.trim().to_string();
+        let tallies = Tallies::new(store);
+        let note = &self.note_id;
+        match &self.field {
+            None => {
+                tallies.add_field(note, &name, &unit, target, Some(self.rule))?;
+            }
+            Some(field) => {
+                if name != field.name {
+                    tallies.rename_field(note, &field.id, &name)?;
+                }
+                let unit_changed = unit != field.unit;
+                if unit_changed {
+                    tallies.set_unit(note, &field.id, &unit)?;
+                }
+                // Read again in the unit now shown next to it.
+                if unit_changed || target_text != self.target_as_opened {
+                    tallies.set_target(note, &field.id, target)?;
+                }
+                if self.rule != field.rule {
+                    tallies.set_rule(note, &field.id, self.rule)?;
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    /// The name, unit and target as typed, the target in the base unit;
+    /// `None` while one needs fixing, which then says so under its field
+    /// and takes the keyboard.
+    fn checked(&mut self) -> Option<(String, String, Option<f64>)> {
         let name = self.name.trim().to_string();
         let unit = self.chosen_unit();
         let target_text = self.target.trim().to_string();
@@ -793,32 +859,9 @@ impl FieldForm {
             None
         };
         if self.focus.is_some() {
-            return Ok(false);
+            return None;
         }
-        let tallies = Tallies::new(store);
-        let note = &self.note_id;
-        match &self.field {
-            None => {
-                tallies.add_field(note, &name, &unit, target, Some(self.rule))?;
-            }
-            Some(field) => {
-                if name != field.name {
-                    tallies.rename_field(note, &field.id, &name)?;
-                }
-                let unit_changed = unit != field.unit;
-                if unit_changed {
-                    tallies.set_unit(note, &field.id, &unit)?;
-                }
-                // Read again in the unit now shown next to it.
-                if unit_changed || target_text != self.target_as_opened {
-                    tallies.set_target(note, &field.id, target)?;
-                }
-                if self.rule != field.rule {
-                    tallies.set_rule(note, &field.id, self.rule)?;
-                }
-            }
-        }
-        Ok(true)
+        Some((name, unit, target))
     }
 
     /// Hides the field shown, or shows it again.

@@ -164,7 +164,8 @@ void main() {
       await tap(tester, stop);
     });
 
-    testWidgets('the stop button saves the Note, nudged in 1 h', (
+    testWidgets('the stop button comes back to the capture screen with the '
+        'recording and room to type; Save keeps both, nudged in 1 h', (
       tester,
     ) async {
       await start(tester);
@@ -174,9 +175,22 @@ void main() {
 
       expect(voice.stops, 1);
       expect(voice.recording, isFalse);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(stop, findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(CaptureScreen),
+          matching: find.byType(RecordingButton),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('note-actions')), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'plumber');
+      await tap(tester, find.text('Save'));
+
       expect(find.byType(CaptureScreen), findsNothing);
       final note = notes.all().single;
-      expect(note.text, '');
+      expect(note.text, 'plumber');
       expect(note.recordings, [store.putAudio(first)]);
       expect(notes.recordingBytes(note.recordings.single), first);
       expect(note.isUnsorted, isTrue);
@@ -327,6 +341,7 @@ void main() {
       await openCapture(tester);
       await tap(tester, mic);
       await tap(tester, stop);
+      await tap(tester, find.text('Save'));
       final play = find.descendant(
         of: find.byType(NoteCard),
         matching: find.byIcon(Icons.play_arrow),
@@ -417,6 +432,14 @@ void main() {
       await openCapture(tester);
       await tap(tester, mic);
       await tap(tester, stop);
+      // Save, in the language shown.
+      await tap(
+        tester,
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.byType(TextButton),
+        ),
+      );
     }
 
     testWidgets('changes at once, while playing, and is kept', (tester) async {
