@@ -181,6 +181,7 @@ Future<int> importBundleFile(
   final navigator = Navigator.of(context);
   BundleResult? result;
   String? failure;
+  Exception? offerRefused;
   try {
     result = await importBundle(store, path);
   } on NotABundle {
@@ -188,9 +189,13 @@ Future<int> importBundleFile(
   } on BundleNeedsUpdate {
     failure = t.bundleNeedsUpdate;
   } on Exception catch (e) {
-    // An Area offer refused says why; whatever else broke on the way
-    // leaves nothing half-taken.
-    failure = areaOfferRefusal(t, e) ?? t.bundleFailed;
+    // An Area offer refused says why behind the tap; whatever else broke
+    // on the way leaves nothing half-taken.
+    if (areaOfferRefusal(t, e) == null) {
+      failure = t.bundleFailed;
+    } else {
+      offerRefused = e;
+    }
   } on Object {
     // Whatever else broke on the way: nothing half-taken stays.
     failure = t.bundleFailed;
@@ -200,6 +205,10 @@ Future<int> importBundleFile(
     } on FileSystemException {
       // Gone already.
     }
+  }
+  if (offerRefused != null) {
+    announceAreaOfferRefused(t, announcements, navigator, offerRefused);
+    return 0;
   }
   if (failure != null || result == null) {
     announcements?.announce(failure ?? t.bundleFailed);

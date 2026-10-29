@@ -98,6 +98,24 @@ void main() {
     await tap(tester, find.byKey(const ValueKey('add-person-open')));
   }
 
+  /// Taps the failure announced as [announced] and expects its dialog to
+  /// say [cause] and [fix], with Close and Report; closes it.
+  Future<void> expectFailure(
+    WidgetTester tester,
+    String announced, {
+    required String title,
+    required String cause,
+    required String fix,
+  }) async {
+    await tap(tester, find.text(announced));
+    expect(find.text(title), findsOneWidget);
+    expect(find.text('$cause $fix'), findsOneWidget);
+    expect(find.byKey(const ValueKey('failureDetails')), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    await tap(tester, find.text('Close'));
+    expect(find.byType(AlertDialog), findsNothing);
+  }
+
   /// The person page on top.
   PersonScreen shownPerson(WidgetTester tester) =>
       tester.widget<PersonScreen>(find.byType(PersonScreen));
@@ -116,12 +134,22 @@ void main() {
       expect(ann.openProfileCard(shared).taken, CardTaken.added);
     });
 
-    testWidgets('no app to take it is announced', (tester) async {
+    testWidgets('no app to take it is announced, why and what to do '
+        'behind the tap', (tester) async {
       platform.shares = false;
       await start(tester);
       await openProfilePage(tester);
       await tap(tester, find.byKey(const ValueKey('sendProfile')));
-      expect(find.text('No app here can take the link.'), findsOneWidget);
+      expect(find.text('No app here can take the link.'), findsNothing);
+      await expectFailure(
+        tester,
+        'Your Profile card was not sent.',
+        title: 'Profile card not sent',
+        cause: 'No app here can take the link.',
+        fix:
+            'Show your QR for them to scan instead, or install a messenger '
+            'and send it again.',
+      );
     });
 
     testWidgets('"Show my QR" shows the link as a QR that holds it', (
@@ -189,7 +217,19 @@ void main() {
       await tester.tap(find.text('send'));
       await tester.pumpAndSettle();
       expect(platform.shared, isEmpty);
-      expect(find.text('Sync with your other Device first.'), findsOneWidget);
+      expect(announcements.visible, 'Your Profile card could not be made.');
+      await tester.tap(find.text('Your Profile card could not be made.'));
+      await tester.pumpAndSettle();
+      expect(find.text('No Profile card yet'), findsOneWidget);
+      expect(
+        find.text(
+          'This Device joins your Profile only once it has synced with '
+          'another of your Devices. Sync with your other Device first, '
+          'then try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Report'), findsOneWidget);
     });
   });
 
@@ -244,12 +284,12 @@ void main() {
       await start(tester);
       await openAddPerson(tester);
       await tap(tester, find.byKey(const ValueKey('add-person-scan')));
-      expect(
-        find.text(
-          'No QR code found in the picture. Try a little closer, or ask for '
-          'the link.',
-        ),
-        findsOneWidget,
+      await expectFailure(
+        tester,
+        'The picture could not be read.',
+        title: 'No QR code found',
+        cause: 'No QR code was found in the picture.',
+        fix: 'Try a picture taken a little closer, or ask for the link.',
       );
       expect(find.byType(AddPersonScreen), findsOneWidget);
     });
@@ -282,7 +322,13 @@ void main() {
       await start(tester);
       await openAddPerson(tester);
       await paste(tester, store.profileCard()!);
-      expect(find.text('This is your own Profile card.'), findsOneWidget);
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This is your own Profile card.',
+        fix: 'To add someone, open their card, not yours.',
+      );
       expect(find.byType(PersonScreen), findsNothing);
       expect(store.peopleShown, isEmpty);
     });
@@ -295,9 +341,14 @@ void main() {
       await start(tester);
       await openAddPerson(tester);
       await paste(tester, ann.profileCard()!);
-      expect(
-        find.text('This card is from a person you blocked. Nothing was added.'),
-        findsOneWidget,
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This card is from a person you blocked.',
+        fix:
+            'To take what they send, unblock them on their Profile under '
+            'People, then ask them to send it again.',
       );
       expect(find.byType(PersonScreen), findsNothing);
     });
@@ -312,12 +363,12 @@ void main() {
         offerBack: false,
       ), replace: true);
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'This card names a person in People but was not made by them. '
-          'Nothing was added.',
-        ),
-        findsOneWidget,
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This card names a person in People but was not made by them.',
+        fix: 'Ask the person for their card again, in person if you can.',
       );
       expect(find.byType(PersonScreen), findsNothing);
     });
@@ -364,12 +415,12 @@ void main() {
       await start(tester);
       platform.tapCard('$profileCardLink.');
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'This is not a Profile card, or it was changed on the way. Ask for '
-          'the link again.',
-        ),
-        findsOneWidget,
+      await expectFailure(
+        tester,
+        'Nobody was added from the card.',
+        title: 'Nobody added',
+        cause: 'This is not a Profile card, or it was changed on the way.',
+        fix: 'Ask for the link again.',
       );
     });
 

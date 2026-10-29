@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
+import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
@@ -28,14 +29,37 @@ String areaOfferLine(AppLocalizations t, HeldAreaOffer offer) {
   );
 }
 
-/// What a refused Area offer is announced as; null for anything else.
-String? areaOfferRefusal(AppLocalizations t, Object error) => switch (error) {
-  AreaOfferNotForUs() => t.areaOfferNotForUs,
-  AreaOfferFromBlocked() => t.areaOfferFromBlocked,
-  AreaOfferRefused() => t.areaOfferRefused,
-  NotAnAreaOffer() => t.notAnAreaOffer,
-  _ => null,
-};
+/// Why an Area offer was refused as [error] says, and what to do; null
+/// for anything else.
+(String, String)? areaOfferRefusal(AppLocalizations t, Object error) =>
+    switch (error) {
+      AreaOfferNotForUs() => (t.areaOfferNotForUs, t.areaOfferAskAgainFix),
+      AreaOfferFromBlocked() => (t.areaOfferFromBlocked, t.blockedFix),
+      AreaOfferRefused() => (t.areaOfferRefused, t.areaOfferOwnFix),
+      NotAnAreaOffer() => (t.notAnAreaOffer, t.areaOfferAskAgainFix),
+      _ => null,
+    };
+
+/// Announces that an Area offer was not taken; the tap opens why and
+/// what to do ([areaOfferRefusal]), [error] as the full text.
+void announceAreaOfferRefused(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+  Object error,
+) {
+  final (cause, fix) =
+      areaOfferRefusal(t, error) ?? (t.notAnAreaOffer, t.areaOfferAskAgainFix);
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.areaOfferNotTaken,
+    title: t.areaOfferNotTakenTitle,
+    cause: cause,
+    fix: fix,
+    details: '$error',
+  );
+}
 
 /// The preview of an Area shared with the user from afar (#108, ADR
 /// 0023), held until Accept or Decline: who shares it, with their picture
@@ -69,12 +93,23 @@ class _AreaOfferScreenState extends State<AreaOfferScreen> {
     Navigator.of(context).pop();
   }
 
+  /// Announces that the offer was refused as [error] says, and closes.
+  void _refuse(Object error) {
+    announceAreaOfferRefused(
+      context.t,
+      AnnouncementsScope.of(context),
+      Navigator.of(context, rootNavigator: true),
+      error,
+    );
+    Navigator.of(context).pop();
+  }
+
   /// Opens the sharer's Profile; once the user blocked them there, the
   /// offer is gone with the block, and the preview closes.
   Future<void> _openSharer() async {
     await openPerson(context, offer.sender.id);
     if (!mounted || !store.isBlocked(offer.sender.id)) return;
-    _leave(context.t.areaOfferFromBlocked);
+    _refuse(const AreaOfferFromBlocked());
   }
 
   Future<void> _compare(String name) async {
@@ -108,13 +143,11 @@ class _AreaOfferScreenState extends State<AreaOfferScreen> {
       acceptAreaOffer(store, offer.id, verified: _matched ?? false);
     } on StateError {
       // Decided meanwhile; a block drops it too.
-      return _leave(
-        store.isBlocked(offer.sender.id)
-            ? t.areaOfferFromBlocked
-            : t.areaOfferGone,
-      );
+      return store.isBlocked(offer.sender.id)
+          ? _refuse(const AreaOfferFromBlocked())
+          : _leave(t.areaOfferGone);
     } on Exception catch (e) {
-      return _leave(areaOfferRefusal(t, e) ?? t.notAnAreaOffer);
+      return _refuse(e);
     }
     final folders = FolderScope.of(context);
     final auto = AutoSyncScope.of(context);

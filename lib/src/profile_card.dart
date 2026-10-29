@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:qr/qr.dart';
 
-import 'announcements.dart';
+import 'failure_dialog.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
@@ -21,8 +21,8 @@ import 'system_bars.dart';
 
 /// Shares the own Profile card through the app the user picks, the link
 /// last so nothing after it joins the card; [back] when it answers a card
-/// the user opened. Announces why when there is no card yet or no app
-/// takes it; returns whether it was handed over.
+/// the user opened. Announces a failure when there is no card yet or no
+/// app takes it, why behind the tap; returns whether it was handed over.
 Future<bool> sendProfileCard(
   BuildContext context,
   Store store,
@@ -30,22 +30,44 @@ Future<bool> sendProfileCard(
   bool back = false,
 }) async {
   final t = context.t;
-  final announcements = AnnouncementsScope.of(context);
   final link = store.profileCard(back: back);
   if (link == null) {
-    announcements?.announce(t.profileCardNotYet);
+    _announceNoCard(context);
     return false;
   }
   final shared = await platform.shareText(t.profileCardText(link));
-  if (!shared) announcements?.announce(t.profileCardNoApp);
+  if (!shared && context.mounted) {
+    announceFailure(
+      context,
+      t.profileCardNotSent,
+      title: t.profileCardNotSentTitle,
+      cause: t.profileCardNoApp,
+      fix: t.profileCardNoAppFix,
+      details: 'profile card: no app took the link',
+    );
+  }
   return shared;
 }
 
-/// Shows the own Profile card as a QR, or why there is none yet.
+/// Announces that no Profile card could be made yet, why behind the tap.
+void _announceNoCard(BuildContext context) {
+  final t = context.t;
+  announceFailure(
+    context,
+    t.profileCardNotMade,
+    title: t.profileCardNotMadeTitle,
+    cause: t.profileCardNotYetCause,
+    fix: t.profileCardNotYet,
+    details: 'profile card: this Device is not bound to the Profile yet',
+  );
+}
+
+/// Shows the own Profile card as a QR, or announces that there is none
+/// yet.
 Future<void> showProfileQr(BuildContext context, Store store) async {
   final link = store.profileCard();
   if (link == null) {
-    AnnouncementsScope.of(context)?.announce(context.t.profileCardNotYet);
+    _announceNoCard(context);
     return;
   }
   await Navigator.of(
@@ -75,8 +97,8 @@ List<List<bool>>? profileCardQr(String link) {
 
 /// Opens the card in [text] and shows what it did: the person's Profile
 /// when they are in People now, with "Send yours back" when they were
-/// new here, else why nothing was added. [inPerson] only for a QR the
-/// camera just scanned.
+/// new here, else that nobody was added, why behind the tap. [inPerson]
+/// only for a QR the camera just scanned.
 Future<void> openCardText(
   BuildContext context,
   Store store,
@@ -96,16 +118,24 @@ Future<void> showCardOpened(
   required bool replace,
 }) async {
   final t = context.t;
-  final message = switch (opened.taken) {
+  final why = switch (opened.taken) {
     CardTaken.added || CardTaken.updated || CardTaken.unchanged => null,
-    CardTaken.own => t.cardOwn,
-    CardTaken.blocked => t.cardBlocked,
-    CardTaken.refused => t.cardRefused,
-    CardTaken.unreadable => t.cardUnreadable,
+    CardTaken.own => (t.cardOwn, t.cardOwnFix),
+    CardTaken.blocked => (t.cardBlocked, t.blockedFix),
+    CardTaken.refused => (t.cardRefused, t.cardRefusedFix),
+    CardTaken.unreadable => (t.cardUnreadableCause, t.cardAskAgainFix),
   };
   final id = opened.id;
-  if (message != null || id == null) {
-    AnnouncementsScope.of(context)?.announce(message ?? t.cardUnreadable);
+  if (why != null || id == null) {
+    final (cause, fix) = why ?? (t.cardUnreadableCause, t.cardAskAgainFix);
+    announceFailure(
+      context,
+      t.cardNotAdded,
+      title: t.cardNotAddedTitle,
+      cause: cause,
+      fix: fix,
+      details: 'profile card: ${opened.taken.name}',
+    );
     return;
   }
   final route = personRoute(context, id, offerBack: opened.offerBack);
@@ -222,7 +252,15 @@ class _AddPersonScreenState extends State<AddPersonScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (text == null) {
-      AnnouncementsScope.of(context)?.announce(context.t.cardNoQr);
+      final t = context.t;
+      announceFailure(
+        context,
+        t.cardNotRead,
+        title: t.cardNotReadTitle,
+        cause: t.cardNoQr,
+        fix: t.cardNoQrFix,
+        details: 'profile card: no QR code in the picture',
+      );
       return;
     }
     await _opened(widget.store.openProfileCard(text, inPerson: inPerson));

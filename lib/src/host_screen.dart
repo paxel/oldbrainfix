@@ -7,6 +7,7 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
 import 'conflicts_screen.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'profile.dart';
@@ -238,7 +239,8 @@ class _HostScreenState extends State<HostScreen> {
     return sure ?? false;
   }
 
-  /// A session completed: what it brought is said at the top.
+  /// A session completed: that it did is said at the top, what it
+  /// brought behind the tap.
   void _session(SyncSession session) {
     widget.onSession?.call(session);
     if (!mounted) return;
@@ -246,27 +248,41 @@ class _HostScreenState extends State<HostScreen> {
     final t = context.t;
     final store = widget.store;
     final announcements = AnnouncementsScope.of(context);
-    if (widget.inviting != null) {
-      final who = profileDisplayName(t, _confirmed?.profile.name ?? '');
-      announcements?.announce(t.shareDone(widget.area, who));
-    } else {
-      announcements?.announce(
-        t.syncCameIn(session.name, session.applied.length),
+    // The root navigator outlives this page: an announcement may be
+    // tapped after leaving it.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final (done, brought) = widget.inviting != null
+        ? (
+            t.hostShareDone,
+            t.shareDone(
+              widget.area,
+              profileDisplayName(t, _confirmed?.profile.name ?? ''),
+            ),
+          )
+        : (t.hostSyncDone, t.syncCameIn(session.name, session.applied.length));
+    announcements?.announce(
+      done,
+      onTap: () => unawaited(_showBrought(navigator.context, done, brought)),
+    );
+    final refused = session.report.refusedCount;
+    if (refused > 0) {
+      announceFailure(
+        context,
+        t.hostRefused(refused),
+        title: t.hostRefusedTitle,
+        cause: t.syncRefused(refused),
+        fix: t.hostRefusedFix,
+        details: 'refused: $refused',
       );
     }
-    final refused = session.report.refusedCount;
-    if (refused > 0) announcements?.announce(t.syncRefused(refused));
     final conflicts = visibleConflicts(
       store,
       LockScope.of(context),
       session.conflicts,
     ).length;
     if (conflicts > 0) {
-      // The root navigator outlives this page: the announcement may be
-      // tapped after leaving it.
-      final navigator = Navigator.of(context, rootNavigator: true);
       announcements?.announce(
-        t.syncConflicts(conflicts),
+        t.hostConflicts(conflicts),
         onTap: () => navigator.push(
           MaterialPageRoute<void>(
             builder: (_) => ConflictsScreen(store: store),
@@ -443,3 +459,20 @@ class QrPainter extends CustomPainter {
   @override
   bool shouldRepaint(QrPainter oldDelegate) => oldDelegate.modules != modules;
 }
+
+/// What a session in person brought, behind the tap on its announcement
+/// [title]: [brought], and Close.
+Future<void> _showBrought(BuildContext context, String title, String brought) =>
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(brought),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.t.close),
+          ),
+        ],
+      ),
+    );

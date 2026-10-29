@@ -4526,10 +4526,10 @@ abstract class AppLocalizations {
   /// **'Report'**
   String get report;
 
-  /// Announcement after a sound file was shared in that this phone cannot transcribe; the Note is kept.
+  /// Announcement after a sound file was shared in that this phone cannot transcribe; the Note is kept. The count only picks the grammar and is never shown.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{A shared recording cannot be transcribed.} other{{count} shared recordings cannot be transcribed.}}'**
+  /// **'{count, plural, =1{A shared recording cannot be transcribed.} other{Shared recordings cannot be transcribed.}}'**
   String sharedRecordingFailed(int count);
 
   /// Title of the dialog explaining why a shared recording cannot be transcribed.
@@ -4628,10 +4628,10 @@ abstract class AppLocalizations {
   /// **'Declined and blocked: nothing was kept.'**
   String get sentItemBlocked;
 
-  /// Announced instead of the preview of a Sent Item from a blocked person; shows nothing of it.
+  /// The cause in the dialog behind 'sentItemNotTaken' when a Sent Item comes from a blocked person; shows nothing of it.
   ///
   /// In en, this message translates to:
-  /// **'Refused: this file comes from a person you blocked.'**
+  /// **'This file comes from a person you blocked.'**
   String get sentItemFromBlocked;
 
   /// In the hidden preview of a stranger's Sent Item, under who it is from.
@@ -4706,13 +4706,13 @@ abstract class AppLocalizations {
   /// **'My Profile for Old Brain Fix:\n{link}'**
   String profileCardText(String link);
 
-  /// Announced when no Profile card can be made yet: this Device's key is not bound to the Profile until it synced with another of the user's Devices.
+  /// The fix in the dialog behind 'profileCardNotMade': this Device's key is not bound to the Profile until it synced with another of the user's Devices.
   ///
   /// In en, this message translates to:
-  /// **'Sync with your other Device first.'**
+  /// **'Sync with your other Device first, then try again.'**
   String get profileCardNotYet;
 
-  /// Announced when no app takes the shared Profile card.
+  /// The cause in the dialog behind 'profileCardNotSent': no app took the shared Profile card.
   ///
   /// In en, this message translates to:
   /// **'No app here can take the link.'**
@@ -4778,10 +4778,10 @@ abstract class AppLocalizations {
   /// **'Add'**
   String get personAddOpen;
 
-  /// Announced when a photo or picture shows no QR code.
+  /// The cause in the dialog behind 'cardNotRead': a photo or picture shows no QR code.
   ///
   /// In en, this message translates to:
-  /// **'No QR code found in the picture. Try a little closer, or ask for the link.'**
+  /// **'No QR code was found in the picture.'**
   String get cardNoQr;
 
   /// When a Profile card cannot be read or its signature does not hold.
@@ -4799,13 +4799,13 @@ abstract class AppLocalizations {
   /// When the Profile card is a blocked person's.
   ///
   /// In en, this message translates to:
-  /// **'This card is from a person you blocked. Nothing was added.'**
+  /// **'This card is from a person you blocked.'**
   String get cardBlocked;
 
   /// When the Profile card names a person kept here under other keys.
   ///
   /// In en, this message translates to:
-  /// **'This card names a person in People but was not made by them. Nothing was added.'**
+  /// **'This card names a person in People but was not made by them.'**
   String get cardRefused;
 
   /// On a person's Profile just added from their card: shares the own Profile card back.
@@ -4886,34 +4886,34 @@ abstract class AppLocalizations {
   /// **'You send changes as a file from their Profile page.'**
   String get transportBundleDetail;
 
-  /// Announcement when writing the file of a Shared Area failed.
+  /// Announced when sharing an Area from afar failed; the tap opens the dialog with the cause and the fix.
   ///
   /// In en, this message translates to:
-  /// **'The Area could not be shared. Nothing was lost; try again.'**
+  /// **'The Area could not be shared.'**
   String get shareAfarFailed;
 
-  /// Announcement when a received Area file was sealed for other Devices.
+  /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file was sealed for other Devices.
   ///
   /// In en, this message translates to:
-  /// **'This shared Area is meant for another person or another of your Devices. Ask the sender to share it again with you.'**
+  /// **'This shared Area is meant for another person or another of your Devices.'**
   String get areaOfferNotForUs;
 
-  /// Announcement when a received Area file comes from a blocked person.
+  /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file comes from a blocked person.
   ///
   /// In en, this message translates to:
-  /// **'Refused: this shared Area comes from a person you blocked.'**
+  /// **'This shared Area comes from a person you blocked.'**
   String get areaOfferFromBlocked;
 
-  /// Announcement when a received Area file offers an Area this Device holds as its own.
+  /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file offers an Area this Device holds as its own.
   ///
   /// In en, this message translates to:
-  /// **'Refused: this Area is your own on this Device already.'**
+  /// **'This Area is your own on this Device already.'**
   String get areaOfferRefused;
 
-  /// Announcement when a received Area file is damaged or not signed by its sender.
+  /// The cause in the dialog behind 'areaOfferNotTaken' when a received Area file is damaged or not signed by its sender.
   ///
   /// In en, this message translates to:
-  /// **'This file holds no shared Area this app can read. Ask the sender to share it again.'**
+  /// **'This file holds no shared Area this app can read.'**
   String get notAnAreaOffer;
 
   /// Announcement when an Area file came in while the app was locked.
@@ -5743,6 +5743,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New line'**
   String get cursorNewLine;
+
+  /// Announced when no Profile card can be made yet; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Profile card could not be made.'**
+  String get profileCardNotMade;
+
+  /// Title of the dialog behind 'profileCardNotMade'.
+  ///
+  /// In en, this message translates to:
+  /// **'No Profile card yet'**
+  String get profileCardNotMadeTitle;
+
+  /// The cause in the dialog behind 'profileCardNotMade'.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device joins your Profile only once it has synced with another of your Devices.'**
+  String get profileCardNotYetCause;
+
+  /// Announced when no app takes the shared Profile card; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Profile card was not sent.'**
+  String get profileCardNotSent;
+
+  /// Title of the dialog behind 'profileCardNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile card not sent'**
+  String get profileCardNotSentTitle;
+
+  /// The fix in the dialog behind 'profileCardNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Show your QR for them to scan instead, or install a messenger and send it again.'**
+  String get profileCardNoAppFix;
+
+  /// Announced when an opened Profile card added nobody to People; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody was added from the card.'**
+  String get cardNotAdded;
+
+  /// Title of the dialog behind 'cardNotAdded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody added'**
+  String get cardNotAddedTitle;
+
+  /// The fix in the dialog when the user opened their own Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'To add someone, open their card, not yours.'**
+  String get cardOwnFix;
+
+  /// The fix in the dialog when a card names a person in People but was not made by them.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the person for their card again, in person if you can.'**
+  String get cardRefusedFix;
+
+  /// The cause in the dialog when an opened text is no Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a Profile card, or it was changed on the way.'**
+  String get cardUnreadableCause;
+
+  /// The fix in the dialog when an opened text is no Profile card.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for the link again.'**
+  String get cardAskAgainFix;
+
+  /// Announced when no QR code is found in a photo or picture; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture could not be read.'**
+  String get cardNotRead;
+
+  /// Title of the dialog behind 'cardNotRead'.
+  ///
+  /// In en, this message translates to:
+  /// **'No QR code found'**
+  String get cardNotReadTitle;
+
+  /// The fix in the dialog behind 'cardNotRead'.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a picture taken a little closer, or ask for the link.'**
+  String get cardNoQrFix;
+
+  /// The fix in a failure dialog when something comes from a person the user blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'To take what they send, unblock them on their Profile under People, then ask them to send it again.'**
+  String get blockedFix;
+
+  /// Announced when sharing an Area in person finished; the tap shows with whom.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharing finished.'**
+  String get hostShareDone;
+
+  /// Announced when a sync in person finished; the tap shows with which Device and how much came in.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync finished.'**
+  String get hostSyncDone;
+
+  /// Announced when a sync in person refused changes; the tap opens the dialog with the count, cause and fix. The count only picks the grammar and is never shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{A change was refused.} other{Changes were refused.}}'**
+  String hostRefused(int count);
+
+  /// Title of the dialog behind 'hostRefused'.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes refused'**
+  String get hostRefusedTitle;
+
+  /// The fix in the dialog behind 'hostRefused'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing of them was kept; the rest came in. If it happens again, report it.'**
+  String get hostRefusedFix;
+
+  /// Announced when a sync in person found Conflicts; the tap opens them. The count only picks the grammar and is never shown.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Something was changed on both Devices. Tap to pick which version stays.} other{Some things were changed on both Devices. Tap to pick which versions stay.}}'**
+  String hostConflicts(int count);
+
+  /// Announced when a shared Area is refused; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The shared Area was not taken.'**
+  String get areaOfferNotTaken;
+
+  /// Title of the dialog behind 'areaOfferNotTaken'.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared Area not taken'**
+  String get areaOfferNotTakenTitle;
+
+  /// The fix in the dialog when a shared Area is meant for someone else or cannot be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the sender to share it again with you.'**
+  String get areaOfferAskAgainFix;
+
+  /// The fix in the dialog when a shared Area is the user's own already.
+  ///
+  /// In en, this message translates to:
+  /// **'It is among your Areas already; nothing needs doing.'**
+  String get areaOfferOwnFix;
+
+  /// Announced when a Sent Item is refused; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was not taken.'**
+  String get sentItemNotTaken;
+
+  /// Title of the dialog behind 'sentItemNotTaken'.
+  ///
+  /// In en, this message translates to:
+  /// **'File not taken'**
+  String get sentItemNotTakenTitle;
+
+  /// The fix in the dialog when a Sent Item cannot be read, is for someone else or is not signed by its sender.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the sender to send it again.'**
+  String get sentItemAskAgainFix;
+
+  /// Title of the dialog behind 'shareAfarFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Area not shared'**
+  String get shareAfarFailedTitle;
+
+  /// The cause in the dialog behind 'shareAfarFailed' when writing the file failed.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for the shared Area could not be written.'**
+  String get shareAfarFailedCause;
+
+  /// The fix in the dialog behind 'shareAfarFailed' when writing the file failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was lost; try again.'**
+  String get shareAfarFailedFix;
+
+  /// The fix in the dialog behind 'shareAfarFailed' when no app takes the file.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a messenger, or choose a shared folder, then share again.'**
+  String get shareAfarNoAppFix;
+
+  /// Announced when no app takes the calendar file of Routines; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The calendar file was not shared.'**
+  String get calendarFileNotShared;
+
+  /// Title of the dialog behind 'calendarFileNotShared'.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar file not shared'**
+  String get calendarFileNotSharedTitle;
+
+  /// The fix in the dialog behind 'calendarFileNotShared'.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a calendar app that opens .ics files, then try again.'**
+  String get calendarFileFix;
+
+  /// Announced when the calendar's appointments cannot be turned on for the Agenda; the tap opens the dialog with the cause and the fix.
+  ///
+  /// In en, this message translates to:
+  /// **'The calendar cannot be shown on the Agenda.'**
+  String get agendaCalendarFailed;
+
+  /// Title of the dialog behind 'agendaCalendarFailed'.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar not shown'**
+  String get agendaCalendarFailedTitle;
+
+  /// The cause in the dialog behind 'agendaCalendarFailed' when reading the calendar is not allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix may not read your calendar.'**
+  String get agendaCalendarNotAllowedCause;
+
+  /// The fix in the dialog behind 'agendaCalendarFailed' when reading the calendar is not allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'You can allow it in the system settings, then turn this on again.'**
+  String get agendaCalendarAllowFix;
+
+  /// The fix in the dialog behind 'agendaCalendarFailed' when the phone has no calendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a calendar account in the phone\'s settings, then turn this on again.'**
+  String get agendaCalendarAddFix;
 }
 
 class _AppLocalizationsDelegate

@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'bundle_platform.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'note_editor_screen.dart';
 import 'person_screen.dart';
@@ -189,8 +190,8 @@ Future<int> openReceivedFile(
     announcements?.announce(t.sentItemNotForUs);
   } on SentItemNotFromSender {
     announcements?.announce(t.sentItemNotFromSender);
-  } on SentItemFromBlocked {
-    announcements?.announce(t.sentItemFromBlocked);
+  } on SentItemFromBlocked catch (e) {
+    _announceRefused(t, announcements, navigator, e);
   }
   return 0;
 }
@@ -279,7 +280,12 @@ class _SentItemScreenState extends State<SentItemScreen> {
 
   /// Closes the preview of an item whose sender is blocked now.
   void _closeBlocked(BuildContext context) {
-    AnnouncementsScope.of(context)?.announce(context.t.sentItemFromBlocked);
+    _announceRefused(
+      context.t,
+      AnnouncementsScope.of(context),
+      Navigator.of(context, rootNavigator: true),
+      const SentItemFromBlocked(),
+    );
     Navigator.of(context).pop();
   }
 
@@ -325,19 +331,29 @@ class _SentItemScreenState extends State<SentItemScreen> {
       });
     } on SentItemNotFromSender {
       announcements?.announce(t.sentItemNotFromSender);
-    } on SentItemFromBlocked {
-      announcements?.announce(t.sentItemFromBlocked);
+    } on SentItemFromBlocked catch (e) {
+      _announceRefused(
+        t,
+        announcements,
+        Navigator.of(context, rootNavigator: true),
+        e,
+      );
     } on NotASentItem {
       announcements?.announce(t.sentItemUnreadable);
     } on SentItemNotForUs {
       announcements?.announce(t.sentItemNotForUs);
     } on StateError {
       // The held item went meanwhile: a block drops it too.
-      announcements?.announce(
-        store.isBlocked(opened.sender.id)
-            ? t.sentItemFromBlocked
-            : t.sentItemGone,
-      );
+      if (store.isBlocked(opened.sender.id)) {
+        _announceRefused(
+          t,
+          announcements,
+          Navigator.of(context, rootNavigator: true),
+          const SentItemFromBlocked(),
+        );
+      } else {
+        announcements?.announce(t.sentItemGone);
+      }
     }
     Navigator.of(context).pop();
   }
@@ -627,14 +643,36 @@ class _SentItemScreenState extends State<SentItemScreen> {
   }
 }
 
-/// What a refused Sent Item is announced as; null for anything else.
-String? _refused(AppLocalizations t, Exception error) => switch (error) {
-  NotASentItem() => t.sentItemUnreadable,
-  SentItemNotForUs() => t.sentItemNotForUs,
-  SentItemNotFromSender() => t.sentItemNotFromSender,
-  SentItemFromBlocked() => t.sentItemFromBlocked,
+/// Why a Sent Item was refused as [error] says, and what to do; null
+/// for anything else.
+(String, String)? _refused(AppLocalizations t, Object error) => switch (error) {
+  NotASentItem() => (t.sentItemUnreadable, t.sentItemAskAgainFix),
+  SentItemNotForUs() => (t.sentItemNotForUs, t.sentItemAskAgainFix),
+  SentItemNotFromSender() => (t.sentItemNotFromSender, t.sentItemAskAgainFix),
+  SentItemFromBlocked() => (t.sentItemFromBlocked, t.blockedFix),
   _ => null,
 };
+
+/// Announces that a Sent Item was not taken; the tap opens why and what
+/// to do ([_refused]), [error] as the full text.
+void _announceRefused(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+  Object error,
+) {
+  final (cause, fix) =
+      _refused(t, error) ?? (t.sentItemUnreadable, t.sentItemAskAgainFix);
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.sentItemNotTaken,
+    title: t.sentItemNotTakenTitle,
+    cause: cause,
+    fix: fix,
+    details: '$error',
+  );
+}
 
 /// The preview of a stranger's Sent Item, held until "Show" (#91, ADR
 /// 0015, 0022): only who it is from and that they are unknown here, not
@@ -670,17 +708,20 @@ class _HeldSentItemScreenState extends State<HeldSentItemScreen> {
     Navigator.of(context).pop();
   }
 
-  /// Announces why the item cannot go on, as [error] says, and closes.
+  /// Announces that the item cannot go on, why as [error] says behind
+  /// the tap, and closes.
   void _refuse(Object error) {
-    final t = context.t;
-    _leave(switch (error) {
-      // Decided meanwhile; a block drops it too.
-      StateError() when store.isBlocked(widget.held.sender.id) =>
-        t.sentItemFromBlocked,
-      StateError() => t.sentItemGone,
-      final Exception e => _refused(t, e) ?? t.sentItemUnreadable,
-      _ => t.sentItemUnreadable,
-    });
+    // Decided meanwhile; a block drops it too.
+    if (error is StateError && !store.isBlocked(widget.held.sender.id)) {
+      return _leave(context.t.sentItemGone);
+    }
+    _announceRefused(
+      context.t,
+      AnnouncementsScope.of(context),
+      Navigator.of(context, rootNavigator: true),
+      error is StateError ? const SentItemFromBlocked() : error,
+    );
+    Navigator.of(context).pop();
   }
 
   void _show() {

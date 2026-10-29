@@ -44,6 +44,29 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
+  /// Expects the refusal of a blocked person's file announced without
+  /// anything of it, taps it as its strip does and expects the failure
+  /// dialog with why and what to do; closes it.
+  Future<void> expectBlockedRefusal(WidgetTester tester) async {
+    expect(announcements.visible, 'The file was not taken.');
+    final action = announcements.visibleAction;
+    announcements.dismiss();
+    action?.call();
+    await tester.pumpAndSettle();
+    expect(find.text('File not taken'), findsOneWidget);
+    expect(
+      find.text(
+        'This file comes from a person you blocked. To take what they '
+        'send, unblock them on their Profile under People, then ask them '
+        'to send it again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Report'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+  }
+
   /// [other] is another person's Device paired by invite with [store],
   /// its key met in person.
   void meet(Store store, Store other, String name) {
@@ -696,10 +719,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('accept-sent')));
         await tester.pumpAndSettle();
         expect(find.byType(HeldSentItemScreen), findsNothing);
-        expect(
-          announcements.visible,
-          'Refused: this file comes from a person you blocked.',
-        );
+        await expectBlockedRefusal(tester);
         expect(Notes(phone).all(), isEmpty);
       });
 
@@ -759,10 +779,7 @@ void main() {
         await app(tester);
         files.open(fileFrom(Notes(ann).capture('Party at mine')));
         await tester.pumpAndSettle();
-        expect(
-          announcements.visible,
-          'Refused: this file comes from a person you blocked.',
-        );
+        await expectBlockedRefusal(tester);
         expect(find.byType(SentItemScreen), findsNothing);
         expect(find.textContaining('Party'), findsNothing);
         expect(Notes(phone).all().map((n) => n.text), ['Dentist']);
@@ -779,10 +796,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('accept-sent')));
         await tester.pumpAndSettle();
         expect(find.byType(SentItemScreen), findsNothing);
-        expect(
-          announcements.visible,
-          'Refused: this file comes from a person you blocked.',
-        );
+        await expectBlockedRefusal(tester);
         expect(Notes(phone).all(), isEmpty);
       });
 
@@ -802,10 +816,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(SentItemScreen), findsNothing);
         expect(find.text('Party'), findsNothing);
-        expect(
-          announcements.visible,
-          'Refused: this file comes from a person you blocked.',
-        );
+        await expectBlockedRefusal(tester);
       });
     });
   });

@@ -2834,7 +2834,7 @@ class AppLocalizationsDe extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count geteilte Aufnahmen können nicht transkribiert werden.',
+      other: 'Geteilte Aufnahmen können nicht transkribiert werden.',
       one: 'Eine geteilte Aufnahme kann nicht transkribiert werden.',
     );
     return '$_temp0';
@@ -2904,7 +2904,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemFromBlocked =>
-      'Abgewiesen: Diese Datei kommt von einer Person, die du blockiert hast.';
+      'Diese Datei kommt von einer Person, die du blockiert hast.';
 
   @override
   String get sentItemStranger =>
@@ -2958,7 +2958,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileCardNotYet =>
-      'Synchronisiere zuerst mit deinem anderen Gerät.';
+      'Synchronisiere zuerst mit deinem anderen Gerät und versuche es dann noch einmal.';
 
   @override
   String get profileCardNoApp => 'Keine App hier kann den Link annehmen.';
@@ -2997,8 +2997,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get personAddOpen => 'Hinzufügen';
 
   @override
-  String get cardNoQr =>
-      'Im Bild ist kein QR-Code zu finden. Versuch es etwas näher oder lass dir den Link schicken.';
+  String get cardNoQr => 'Im Bild ist kein QR-Code zu finden.';
 
   @override
   String get cardUnreadable =>
@@ -3009,11 +3008,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cardBlocked =>
-      'Diese Karte ist von einer Person, die du blockiert hast. Es wurde nichts hinzugefügt.';
+      'Diese Karte ist von einer Person, die du blockiert hast.';
 
   @override
   String get cardRefused =>
-      'Diese Karte nennt eine Person unter Personen, stammt aber nicht von ihr. Es wurde nichts hinzugefügt.';
+      'Diese Karte nennt eine Person unter Personen, stammt aber nicht von ihr.';
 
   @override
   String get personSendBack => 'Deins zurückschicken';
@@ -3066,24 +3065,23 @@ class AppLocalizationsDe extends AppLocalizations {
       'Du schickst Änderungen als Datei von ihrer Profilseite aus.';
 
   @override
-  String get shareAfarFailed =>
-      'Der Bereich konnte nicht geteilt werden. Nichts ging verloren; versuche es noch einmal.';
+  String get shareAfarFailed => 'Der Bereich konnte nicht geteilt werden.';
 
   @override
   String get areaOfferNotForUs =>
-      'Dieser geteilte Bereich ist für eine andere Person oder ein anderes deiner Geräte. Bitte die Person, ihn noch einmal mit dir zu teilen.';
+      'Dieser geteilte Bereich ist für eine andere Person oder ein anderes deiner Geräte.';
 
   @override
   String get areaOfferFromBlocked =>
-      'Abgewiesen: Dieser geteilte Bereich kommt von einer Person, die du blockiert hast.';
+      'Dieser geteilte Bereich kommt von einer Person, die du blockiert hast.';
 
   @override
   String get areaOfferRefused =>
-      'Abgewiesen: Dieser Bereich gehört auf diesem Gerät schon dir.';
+      'Dieser Bereich gehört auf diesem Gerät schon dir.';
 
   @override
   String get notAnAreaOffer =>
-      'Diese Datei enthält keinen geteilten Bereich, den diese App lesen kann. Bitte die Person, ihn noch einmal zu teilen.';
+      'Diese Datei enthält keinen geteilten Bereich, den diese App lesen kann.';
 
   @override
   String get areaOfferWaits => 'Ein geteilter Bereich wartet in der Agenda.';
@@ -3576,4 +3574,164 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cursorNewLine => 'Zeilenumbruch';
+
+  @override
+  String get profileCardNotMade =>
+      'Deine Profilkarte konnte nicht erstellt werden.';
+
+  @override
+  String get profileCardNotMadeTitle => 'Noch keine Profilkarte';
+
+  @override
+  String get profileCardNotYetCause =>
+      'Dieses Gerät gehört erst zu deinem Profil, wenn es mit einem anderen deiner Geräte synchronisiert hat.';
+
+  @override
+  String get profileCardNotSent => 'Deine Profilkarte wurde nicht gesendet.';
+
+  @override
+  String get profileCardNotSentTitle => 'Profilkarte nicht gesendet';
+
+  @override
+  String get profileCardNoAppFix =>
+      'Zeig stattdessen deinen QR-Code zum Scannen, oder installiere einen Messenger und sende sie noch einmal.';
+
+  @override
+  String get cardNotAdded => 'Aus der Karte wurde niemand hinzugefügt.';
+
+  @override
+  String get cardNotAddedTitle => 'Niemand hinzugefügt';
+
+  @override
+  String get cardOwnFix =>
+      'Um jemanden hinzuzufügen, öffne die Karte dieser Person, nicht deine.';
+
+  @override
+  String get cardRefusedFix =>
+      'Lass dir die Karte von der Person noch einmal geben, wenn möglich persönlich.';
+
+  @override
+  String get cardUnreadableCause =>
+      'Das ist keine Profilkarte, oder sie wurde unterwegs verändert.';
+
+  @override
+  String get cardAskAgainFix => 'Lass dir den Link noch einmal schicken.';
+
+  @override
+  String get cardNotRead => 'Das Bild konnte nicht gelesen werden.';
+
+  @override
+  String get cardNotReadTitle => 'Kein QR-Code gefunden';
+
+  @override
+  String get cardNoQrFix =>
+      'Versuch es mit einem Bild aus etwas größerer Nähe oder lass dir den Link schicken.';
+
+  @override
+  String get blockedFix =>
+      'Um anzunehmen, was die Person sendet, heb auf ihrem Profil unter Personen die Blockierung auf und lass es dir dann noch einmal senden.';
+
+  @override
+  String get hostShareDone => 'Teilen abgeschlossen.';
+
+  @override
+  String get hostSyncDone => 'Synchronisierung abgeschlossen.';
+
+  @override
+  String hostRefused(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Änderungen wurden abgewiesen.',
+      one: 'Eine Änderung wurde abgewiesen.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostRefusedTitle => 'Änderungen abgewiesen';
+
+  @override
+  String get hostRefusedFix =>
+      'Davon wurde nichts übernommen; der Rest kam an. Wenn es wieder passiert, melde es.';
+
+  @override
+  String hostConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Einiges wurde auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassungen bleiben.',
+      one: 'Etwas wurde auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassung bleibt.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaOfferNotTaken =>
+      'Der geteilte Bereich wurde nicht übernommen.';
+
+  @override
+  String get areaOfferNotTakenTitle => 'Geteilter Bereich nicht übernommen';
+
+  @override
+  String get areaOfferAskAgainFix =>
+      'Bitte die Person, ihn noch einmal mit dir zu teilen.';
+
+  @override
+  String get areaOfferOwnFix =>
+      'Er ist schon unter deinen Bereichen; es ist nichts zu tun.';
+
+  @override
+  String get sentItemNotTaken => 'Die Datei wurde nicht übernommen.';
+
+  @override
+  String get sentItemNotTakenTitle => 'Datei nicht übernommen';
+
+  @override
+  String get sentItemAskAgainFix =>
+      'Bitte die Person, es noch einmal zu senden.';
+
+  @override
+  String get shareAfarFailedTitle => 'Bereich nicht geteilt';
+
+  @override
+  String get shareAfarFailedCause =>
+      'Die Datei für den geteilten Bereich konnte nicht geschrieben werden.';
+
+  @override
+  String get shareAfarFailedFix =>
+      'Nichts ging verloren; versuche es noch einmal.';
+
+  @override
+  String get shareAfarNoAppFix =>
+      'Installiere einen Messenger oder wähle einen geteilten Ordner und teile dann noch einmal.';
+
+  @override
+  String get calendarFileNotShared => 'Die Kalenderdatei wurde nicht geteilt.';
+
+  @override
+  String get calendarFileNotSharedTitle => 'Kalenderdatei nicht geteilt';
+
+  @override
+  String get calendarFileFix =>
+      'Installiere eine Kalender-App, die .ics-Dateien öffnet, und versuche es dann noch einmal.';
+
+  @override
+  String get agendaCalendarFailed =>
+      'Der Kalender kann nicht in der Agenda gezeigt werden.';
+
+  @override
+  String get agendaCalendarFailedTitle => 'Kalender nicht gezeigt';
+
+  @override
+  String get agendaCalendarNotAllowedCause =>
+      'Old Brain Fix darf deinen Kalender nicht lesen.';
+
+  @override
+  String get agendaCalendarAllowFix =>
+      'Du kannst es in den Systemeinstellungen erlauben und das dann wieder einschalten.';
+
+  @override
+  String get agendaCalendarAddFix =>
+      'Richte in den Einstellungen des Telefons ein Kalenderkonto ein und schalte das dann wieder ein.';
 }

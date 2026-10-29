@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'announcements.dart';
 import 'crash_guard.dart';
 import 'l10n.dart';
 
@@ -69,3 +70,50 @@ Future<void> showFailure(
     );
   },
 );
+
+/// Announces at the top that a job failed, in [text], which carries no
+/// values; its tap opens [showFailure] with the [title], [cause], [fix]
+/// and [details]. The navigator is taken now, so the tap still works
+/// once the page it came from has closed.
+void announceFailure(
+  BuildContext context,
+  String text, {
+  required String title,
+  required String cause,
+  required String fix,
+  required String details,
+}) => announceFailureWith(
+  AnnouncementsScope.of(context),
+  Navigator.of(context, rootNavigator: true),
+  text,
+  title: title,
+  cause: cause,
+  fix: fix,
+  details: details,
+);
+
+/// [announceFailure] with the [announcements] and the [navigator] taken
+/// before an await.
+void announceFailureWith(
+  Announcements? announcements,
+  NavigatorState navigator,
+  String text, {
+  required String title,
+  required String cause,
+  required String fix,
+  required String details,
+}) {
+  if (announcements == null) return;
+  announcements.announce(
+    text,
+    onTap: () => unawaited(
+      showFailure(
+        navigator.context,
+        title: title,
+        cause: cause,
+        fix: fix,
+        details: details,
+      ),
+    ),
+  );
+}

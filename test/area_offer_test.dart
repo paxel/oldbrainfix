@@ -63,6 +63,27 @@ void main() {
 
   String idOf(Store store) => store.ownProfile!.id;
 
+  /// Expects the visible announcement to be [announced] alone, taps it as
+  /// its strip does and expects the failure dialog to say [cause] and
+  /// [fix], with Report; closes it.
+  Future<void> expectFailure(
+    WidgetTester tester,
+    String announced, {
+    required String cause,
+    required String fix,
+  }) async {
+    expect(announcements.visible, announced);
+    final action = announcements.visibleAction;
+    announcements.dismiss();
+    action?.call();
+    await tester.pumpAndSettle();
+    expect(find.text('$cause $fix'), findsOneWidget);
+    expect(find.byKey(const ValueKey('failureDetails')), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+  }
+
   /// A copy of [path], as the platform hands over what it imports.
   String copy(String path) {
     final to = '${dir.path}/in-${n++}';
@@ -247,7 +268,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('transport-share')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, 'No app here can take the bundle.');
+      await expectFailure(
+        tester,
+        'The Area could not be shared.',
+        cause: 'No app here can take the bundle.',
+        fix:
+            'Install a messenger, or choose a shared folder, then share '
+            'again.',
+      );
       expect(find.byType(ShareAreaScreen), findsOneWidget);
     });
   });
@@ -291,6 +319,27 @@ void main() {
       expect(ben.syncFolder, 'content://tree/primary%3ASync');
       expect(ben.transportWith(idOf(ann)), Transport.folder);
       expect(find.byType(AreaOfferScreen), findsNothing);
+    });
+
+    testWidgets('a block that comes before Accept refuses it, why behind '
+        'the tap', (tester) async {
+      final o = await offered();
+      await app(tester, [copy(o.file)]);
+      expect(find.byType(AreaOfferScreen), findsOneWidget);
+      // As if another of the user's Devices blocked her, by sync.
+      ben.blockPerson(idOf(ann));
+      await tester.tap(find.byKey(const ValueKey('accept-offer')));
+      await tester.pumpAndSettle();
+      expect(find.byType(AreaOfferScreen), findsNothing);
+      await expectFailure(
+        tester,
+        'The shared Area was not taken.',
+        cause: 'This shared Area comes from a person you blocked.',
+        fix:
+            'To take what they send, unblock them on their Profile under '
+            'People, then ask them to send it again.',
+      );
+      expect(ben.writingKey(o.area), isNull);
     });
 
     testWidgets('Decline keeps nothing', (tester) async {
@@ -363,9 +412,13 @@ void main() {
         final o = await offered();
         ben.blockPerson(idOf(ann));
         await app(tester, [copy(o.file)]);
-        expect(
-          announcements.visible,
-          'Refused: this shared Area comes from a person you blocked.',
+        await expectFailure(
+          tester,
+          'The shared Area was not taken.',
+          cause: 'This shared Area comes from a person you blocked.',
+          fix:
+              'To take what they send, unblock them on their Profile under '
+              'People, then ask them to send it again.',
         );
         expect(ben.pendingSets, isEmpty);
       });
@@ -374,7 +427,12 @@ void main() {
         final o = await offered();
         ben.append(o.area, PlaceKeys.type, PlaceKeys.typeArea);
         await app(tester, [copy(o.file)]);
-        expect(announcements.visible, contains('your own on this Device'));
+        await expectFailure(
+          tester,
+          'The shared Area was not taken.',
+          cause: 'This Area is your own on this Device already.',
+          fix: 'It is among your Areas already; nothing needs doing.',
+        );
         expect(ben.pendingSets, isEmpty);
       });
 
@@ -387,7 +445,14 @@ void main() {
         ben.close();
         ben = cat;
         await app(tester, [copy(o.file)]);
-        expect(announcements.visible, contains('meant for another person'));
+        await expectFailure(
+          tester,
+          'The shared Area was not taken.',
+          cause:
+              'This shared Area is meant for another person or another of '
+              'your Devices.',
+          fix: 'Ask the sender to share it again with you.',
+        );
         expect(cat.pendingSets, isEmpty);
       });
 
@@ -401,10 +466,11 @@ void main() {
         final file = '${dir.path}/broken';
         File(file).writeAsBytesSync(broken);
         await app(tester, [file]);
-        expect(
-          announcements.visible,
-          'This file holds no shared Area this app can read. Ask the sender '
-          'to share it again.',
+        await expectFailure(
+          tester,
+          'The shared Area was not taken.',
+          cause: 'This file holds no shared Area this app can read.',
+          fix: 'Ask the sender to share it again with you.',
         );
         expect(ben.pendingSets, isEmpty);
       });

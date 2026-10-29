@@ -274,7 +274,16 @@ void main() {
       await start(tester);
       await tap(tester, allButton);
       await tap(tester, exportButton);
-      expect(find.text('No app can take the calendar file.'), findsOneWidget);
+      await tap(tester, find.text('The calendar file was not shared.'));
+      expect(find.text('Calendar file not shared'), findsOneWidget);
+      expect(
+        find.text(
+          'No app can take the calendar file. Install a calendar app that '
+          'opens .ics files, then try again.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Report'), findsOneWidget);
     });
   });
 

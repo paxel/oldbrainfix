@@ -196,7 +196,7 @@ void main() {
       expect(notes.all().single.recordings, hasLength(1));
     });
 
-    testWidgets('names a file without sound, counting the failed ones', (
+    testWidgets('names a file without sound, listing the failed ones', (
       tester,
     ) async {
       await start(tester);
@@ -216,10 +216,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(notes.all().single.recordings, hasLength(3));
 
-      await tap(
-        tester,
-        find.text('2 shared recordings cannot be transcribed.'),
-      );
+      await tap(tester, find.text('Shared recordings cannot be transcribed.'));
       expect(
         find.textContaining('No sound was found in the shared file'),
         findsOneWidget,

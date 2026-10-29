@@ -128,6 +128,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Taps the visible announcement, as its strip at the top does.
+  Future<void> tapAnnouncement(WidgetTester tester) async {
+    final action = announcements.visibleAction;
+    announcements.dismiss();
+    action?.call();
+    await tester.pumpAndSettle();
+  }
+
   /// Opens this Device's code from Sync.
   Future<void> showCode(WidgetTester tester) async {
     await open(tester, SyncScreen(store: phone, host: hosts.start));
@@ -175,8 +183,45 @@ void main() {
 
     hosts.onSession(sessionWith('Tablet'));
     await tester.pumpAndSettle();
-    expect(announcements.visible, 'Synced with Tablet: nothing new came in.');
+    // Only that it finished; with whom and what came in behind the tap.
+    expect(announcements.visible, 'Sync finished.');
+    await tapAnnouncement(tester);
+    expect(
+      find.text('Synced with Tablet: nothing new came in.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
     expect(hosts.last.stopped, isFalse, reason: 'stays for the photos');
+  });
+
+  testWidgets('refused changes are announced without their count, the fix '
+      'behind the tap', (tester) async {
+    await showCode(tester);
+    final session = sessionWith('Tablet');
+    session.report.refused[('ann', 'tablet')] = 2;
+    hosts.onSession(session);
+    await tester.pumpAndSettle();
+    expect(announcements.visible, 'Sync finished.');
+    announcements.dismiss();
+    await tester.pumpAndSettle();
+
+    expect(announcements.visible, 'Changes were refused.');
+    await tapAnnouncement(tester);
+    expect(find.text('Changes refused'), findsOneWidget);
+    expect(
+      find.textContaining(
+        '2 changes were refused: their signatures did not match. '
+        'Nothing of them was kept; the rest came in.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('refused: 2'), findsOneWidget);
+    expect(find.text('Report'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('without a network it says so and tries again', (tester) async {
@@ -283,7 +328,13 @@ void main() {
 
     hosts.onSession(sessionWith('Tablet'));
     await tester.pumpAndSettle();
-    expect(announcements.visible, 'Garden is now shared with Ann.');
+    // No names in the announcement: the Area and the person are behind
+    // the tap.
+    expect(announcements.visible, 'Sharing finished.');
+    await tapAnnouncement(tester);
+    expect(find.text('Garden is now shared with Ann.'), findsOneWidget);
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
 
     await tester.pageBack();
     await tester.pumpAndSettle();

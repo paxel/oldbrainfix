@@ -2808,7 +2808,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count shared recordings cannot be transcribed.',
+      other: 'Shared recordings cannot be transcribed.',
       one: 'A shared recording cannot be transcribed.',
     );
     return '$_temp0';
@@ -2877,7 +2877,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sentItemFromBlocked =>
-      'Refused: this file comes from a person you blocked.';
+      'This file comes from a person you blocked.';
 
   @override
   String get sentItemStranger => 'An unknown person: not among your People.';
@@ -2928,7 +2928,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get profileCardNotYet => 'Sync with your other Device first.';
+  String get profileCardNotYet =>
+      'Sync with your other Device first, then try again.';
 
   @override
   String get profileCardNoApp => 'No app here can take the link.';
@@ -2967,8 +2968,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personAddOpen => 'Add';
 
   @override
-  String get cardNoQr =>
-      'No QR code found in the picture. Try a little closer, or ask for the link.';
+  String get cardNoQr => 'No QR code was found in the picture.';
 
   @override
   String get cardUnreadable =>
@@ -2978,12 +2978,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cardOwn => 'This is your own Profile card.';
 
   @override
-  String get cardBlocked =>
-      'This card is from a person you blocked. Nothing was added.';
+  String get cardBlocked => 'This card is from a person you blocked.';
 
   @override
   String get cardRefused =>
-      'This card names a person in People but was not made by them. Nothing was added.';
+      'This card names a person in People but was not made by them.';
 
   @override
   String get personSendBack => 'Send yours back';
@@ -3035,24 +3034,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'You send changes as a file from their Profile page.';
 
   @override
-  String get shareAfarFailed =>
-      'The Area could not be shared. Nothing was lost; try again.';
+  String get shareAfarFailed => 'The Area could not be shared.';
 
   @override
   String get areaOfferNotForUs =>
-      'This shared Area is meant for another person or another of your Devices. Ask the sender to share it again with you.';
+      'This shared Area is meant for another person or another of your Devices.';
 
   @override
   String get areaOfferFromBlocked =>
-      'Refused: this shared Area comes from a person you blocked.';
+      'This shared Area comes from a person you blocked.';
 
   @override
   String get areaOfferRefused =>
-      'Refused: this Area is your own on this Device already.';
+      'This Area is your own on this Device already.';
 
   @override
   String get notAnAreaOffer =>
-      'This file holds no shared Area this app can read. Ask the sender to share it again.';
+      'This file holds no shared Area this app can read.';
 
   @override
   String get areaOfferWaits => 'A shared Area is waiting on the Agenda.';
@@ -3542,4 +3540,159 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cursorNewLine => 'New line';
+
+  @override
+  String get profileCardNotMade => 'Your Profile card could not be made.';
+
+  @override
+  String get profileCardNotMadeTitle => 'No Profile card yet';
+
+  @override
+  String get profileCardNotYetCause =>
+      'This Device joins your Profile only once it has synced with another of your Devices.';
+
+  @override
+  String get profileCardNotSent => 'Your Profile card was not sent.';
+
+  @override
+  String get profileCardNotSentTitle => 'Profile card not sent';
+
+  @override
+  String get profileCardNoAppFix =>
+      'Show your QR for them to scan instead, or install a messenger and send it again.';
+
+  @override
+  String get cardNotAdded => 'Nobody was added from the card.';
+
+  @override
+  String get cardNotAddedTitle => 'Nobody added';
+
+  @override
+  String get cardOwnFix => 'To add someone, open their card, not yours.';
+
+  @override
+  String get cardRefusedFix =>
+      'Ask the person for their card again, in person if you can.';
+
+  @override
+  String get cardUnreadableCause =>
+      'This is not a Profile card, or it was changed on the way.';
+
+  @override
+  String get cardAskAgainFix => 'Ask for the link again.';
+
+  @override
+  String get cardNotRead => 'The picture could not be read.';
+
+  @override
+  String get cardNotReadTitle => 'No QR code found';
+
+  @override
+  String get cardNoQrFix =>
+      'Try a picture taken a little closer, or ask for the link.';
+
+  @override
+  String get blockedFix =>
+      'To take what they send, unblock them on their Profile under People, then ask them to send it again.';
+
+  @override
+  String get hostShareDone => 'Sharing finished.';
+
+  @override
+  String get hostSyncDone => 'Sync finished.';
+
+  @override
+  String hostRefused(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Changes were refused.',
+      one: 'A change was refused.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hostRefusedTitle => 'Changes refused';
+
+  @override
+  String get hostRefusedFix =>
+      'Nothing of them was kept; the rest came in. If it happens again, report it.';
+
+  @override
+  String hostConflicts(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Some things were changed on both Devices. Tap to pick which versions stay.',
+      one: 'Something was changed on both Devices. Tap to pick which version stays.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get areaOfferNotTaken => 'The shared Area was not taken.';
+
+  @override
+  String get areaOfferNotTakenTitle => 'Shared Area not taken';
+
+  @override
+  String get areaOfferAskAgainFix =>
+      'Ask the sender to share it again with you.';
+
+  @override
+  String get areaOfferOwnFix =>
+      'It is among your Areas already; nothing needs doing.';
+
+  @override
+  String get sentItemNotTaken => 'The file was not taken.';
+
+  @override
+  String get sentItemNotTakenTitle => 'File not taken';
+
+  @override
+  String get sentItemAskAgainFix => 'Ask the sender to send it again.';
+
+  @override
+  String get shareAfarFailedTitle => 'Area not shared';
+
+  @override
+  String get shareAfarFailedCause =>
+      'The file for the shared Area could not be written.';
+
+  @override
+  String get shareAfarFailedFix => 'Nothing was lost; try again.';
+
+  @override
+  String get shareAfarNoAppFix =>
+      'Install a messenger, or choose a shared folder, then share again.';
+
+  @override
+  String get calendarFileNotShared => 'The calendar file was not shared.';
+
+  @override
+  String get calendarFileNotSharedTitle => 'Calendar file not shared';
+
+  @override
+  String get calendarFileFix =>
+      'Install a calendar app that opens .ics files, then try again.';
+
+  @override
+  String get agendaCalendarFailed =>
+      'The calendar cannot be shown on the Agenda.';
+
+  @override
+  String get agendaCalendarFailedTitle => 'Calendar not shown';
+
+  @override
+  String get agendaCalendarNotAllowedCause =>
+      'Old Brain Fix may not read your calendar.';
+
+  @override
+  String get agendaCalendarAllowFix =>
+      'You can allow it in the system settings, then turn this on again.';
+
+  @override
+  String get agendaCalendarAddFix =>
+      'Add a calendar account in the phone\'s settings, then turn this on again.';
 }

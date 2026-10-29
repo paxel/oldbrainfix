@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
+import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
@@ -85,6 +86,20 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
   }
 
   void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
+
+  /// Announces that sharing from afar failed; the tap opens [cause],
+  /// [fix] and [details].
+  void _announceAfarFailed(String cause, String fix, String details) {
+    final t = context.t;
+    announceFailure(
+      context,
+      t.shareAfarFailed,
+      title: t.shareAfarFailedTitle,
+      cause: cause,
+      fix: fix,
+      details: details,
+    );
+  }
 
   /// Shows a code for their Device to join with, inviting it with the
   /// role chosen; once one joined, back to where sharing began.
@@ -240,20 +255,28 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
       );
       if (!mounted) return;
       if (path == null) {
-        _announce(t.shareAfarFailed);
+        _announceAfarFailed(
+          t.shareAfarFailedCause,
+          t.shareAfarFailedFix,
+          'share from afar: no path to write the file to',
+        );
         return;
       }
       await writeAreaOffer(store, path, _areaId, person);
       final shared = await bundles.share(path);
       if (!mounted) return;
       if (shared == ShareOutcome.noApp) {
-        _announce(t.bundleNoApp);
+        _announceAfarFailed(
+          t.bundleNoApp,
+          t.shareAfarNoAppFix,
+          'share from afar: no app took the file',
+        );
         return;
       }
       Navigator.of(context).pop(true);
-    } on Object {
+    } on Object catch (e) {
       if (!mounted) return;
-      _announce(t.shareAfarFailed);
+      _announceAfarFailed(t.shareAfarFailedCause, t.shareAfarFailedFix, '$e');
     } finally {
       if (mounted) {
         setState(() => _busy = false);

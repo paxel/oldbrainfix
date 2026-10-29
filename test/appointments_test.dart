@@ -148,6 +148,30 @@ void main() {
       );
     });
 
+    testWidgets('a phone without a calendar says what to do behind the tap', (
+      tester,
+    ) async {
+      source = FakeAppointments(allowOnRequest: true, calendars: const []);
+      await start(tester);
+      await tap(tester, calendarButton);
+      await tap(tester, agendaSwitch);
+      await tap(tester, find.text('Allow'));
+      expect(find.byType(AgendaCalendarsScreen), findsNothing);
+
+      await tap(
+        tester,
+        find.text('The calendar cannot be shown on the Agenda.'),
+      );
+      expect(
+        find.text(
+          'There is no calendar on this device to read from. Add a calendar '
+          "account in the phone's settings, then turn this on again.",
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Report'), findsOneWidget);
+    });
+
     testWidgets('refused access leaves it off and says so', (tester) async {
       source.allowOnRequest = false;
       await start(tester);
@@ -155,13 +179,21 @@ void main() {
       await tap(tester, agendaSwitch);
       await tap(tester, find.text('Allow'));
 
+      // Only that it failed; why and what to do behind the tap.
+      await tap(
+        tester,
+        find.text('The calendar cannot be shown on the Agenda.'),
+      );
+      expect(find.text('Calendar not shown'), findsOneWidget);
       expect(
         find.text(
-          'Old Brain Fix may not read your calendar. '
-          'You can allow it in the system settings.',
+          'Old Brain Fix may not read your calendar. You can allow it in the '
+          'system settings, then turn this on again.',
         ),
         findsOneWidget,
       );
+      expect(find.text('Report'), findsOneWidget);
+      await tap(tester, find.text('Close'));
       expect(find.byType(AgendaCalendarsScreen), findsNothing);
       expect(tester.widget<Switch>(agendaSwitch).value, isFalse);
       expect(store.agendaCalendarOn, isFalse);

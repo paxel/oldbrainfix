@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'schedule_text.dart';
 
@@ -161,8 +162,8 @@ Future<void> shareCalendarFile(
 
 /// Offers [list] as one calendar file, made at the store's now, each
 /// titled with its Note's text: every one for Export, or one Routine as
-/// its whole series or one Reminder for Share. Says so at the top when
-/// no app can take it.
+/// its whole series or one Reminder for Share. Announces a failure when
+/// no app can take it, why behind the tap.
 Future<void> shareRoutinesFile(
   BuildContext context,
   Routines routines,
@@ -170,12 +171,21 @@ Future<void> shareRoutinesFile(
 ) async {
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
   final ics = routinesIcs(list, (routine) {
     final note = routines.note(routine);
     return note == null ? t.noteGone : noteText(t, note);
   }, stamp: routines.store.clock());
   if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
-  announcements?.announce(t.nothingTakesCalendarFile);
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.calendarFileNotShared,
+    title: t.calendarFileNotSharedTitle,
+    cause: t.nothingTakesCalendarFile,
+    fix: t.calendarFileFix,
+    details: 'calendar file: no app took it',
+  );
 }
 
 /// The calendar button of an app bar: does its only choice at once, or

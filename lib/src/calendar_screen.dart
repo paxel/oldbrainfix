@@ -6,6 +6,7 @@ import 'appointments.dart';
 import 'calendar_mirror.dart';
 import 'capture_context_screen.dart';
 import 'context_platform.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'settings_screen.dart';
@@ -263,9 +264,22 @@ class _AgendaCalendarSwitchState extends State<AgendaCalendarSwitch> {
     }
   }
 
+  /// Announces that the calendar cannot be shown on the Agenda; the tap
+  /// opens [cause], [fix] and [details].
+  void _announceFailed(String cause, String fix, String details) {
+    final t = context.t;
+    announceFailure(
+      context,
+      t.agendaCalendarFailed,
+      title: t.agendaCalendarFailedTitle,
+      cause: cause,
+      fix: fix,
+      details: details,
+    );
+  }
+
   Future<void> _switch(bool on) => _hold(() async {
     final source = AppointmentScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
     final t = context.t;
     if (!on) {
       widget.store.agendaCalendarOn = false;
@@ -274,7 +288,13 @@ class _AgendaCalendarSwitchState extends State<AgendaCalendarSwitch> {
     }
     if (!await source.granted() &&
         (!mounted || !await explainAndAskAppointments(context, source))) {
-      if (mounted) announcements?.announce(t.calendarNotAllowed);
+      if (mounted) {
+        _announceFailed(
+          t.agendaCalendarNotAllowedCause,
+          t.agendaCalendarAllowFix,
+          'agenda calendar: reading not allowed',
+        );
+      }
       return;
     }
     if (!mounted) return;
@@ -286,13 +306,16 @@ class _AgendaCalendarSwitchState extends State<AgendaCalendarSwitch> {
   /// Opens the list of calendars to pick from.
   Future<void> _pick() async {
     final source = AppointmentScope.of(context);
-    final announcements = AnnouncementsScope.of(context);
     final t = context.t;
     final calendars = await source.calendars();
     if (!mounted) return;
     setState(() => _calendars = calendars);
     if (calendars.isEmpty) {
-      announcements?.announce(t.agendaCalendarNoCalendar);
+      _announceFailed(
+        t.agendaCalendarNoCalendar,
+        t.agendaCalendarAddFix,
+        'agenda calendar: no calendar on this device',
+      );
       return;
     }
     await Navigator.of(context).push(
