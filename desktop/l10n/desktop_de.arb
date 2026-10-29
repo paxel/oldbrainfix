@@ -73,7 +73,7 @@
   "fromFile": "Aus Datei…",
   "fromFileTitle": "Bilder oder Tondateien wählen",
   "fromFileHint": "Hier gewählte oder auf das Fenster gezogene Bilder und Tondateien werden mit dem Getippten zu einer Notiz.",
-  "fileRecordingFailed": "{count, plural, =1{Eine Aufnahme aus einer Datei kann nicht transkribiert werden.} other{{count} Aufnahmen aus Dateien können nicht transkribiert werden.}}",
+  "fileRecordingFailed": "{count, plural, =1{Eine Aufnahme aus einer Datei kann nicht transkribiert werden.} other{Aufnahmen aus Dateien können nicht transkribiert werden.}}",
   "fileRecordingUnreadable": "In der Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.",
   "fileRecordingUnsupported": "Dieser Computer kann das Format der Datei nicht lesen.",
   "fileRecordingFix": "Die Datei bleibt unverändert in der Notiz; schreib selbst in die Notiz, was sie sagt, oder füge sie noch einmal als m4a, mp3 oder Ogg Opus hinzu.",
@@ -192,5 +192,14 @@
   "removeChoice": "{choice} entfernen",
   "calendarFileSaveTitle": "Kalenderdatei speichern",
   "calendarFileSaved": "Die Kalenderdatei ist gespeichert. Eine Kalender-App kann sie von dort importieren.",
-  "occurrenceMenu": "Mehr zu {title}"
+  "occurrenceMenu": "Mehr zu {title}",
+  "calendarFileNotSaved": "Die Kalenderdatei wurde nicht gespeichert.",
+  "calendarFileNotSavedTitle": "Kalenderdatei nicht gespeichert",
+  "calendarFileNotSavedCause": "Die Kalenderdatei ließ sich am gewählten Ort nicht schreiben.",
+  "calendarFileNotSavedFix": "Nichts ging verloren; wähl einen anderen Ordner und speichere sie noch einmal.",
+  "changesNotSaved": "Die Änderungen wurden nicht gespeichert.",
+  "changesNotSavedTitle": "Änderungen nicht gespeichert",
+  "changesNotSavedCause": "Die Datei mit den Änderungen ließ sich nicht schreiben.",
+  "changesNotSavedFix": "Nichts ging verloren; die Änderungen warten weiter aufs Senden. Versuch es noch einmal.",
+  "changesNothingNew": "Nichts Neues zu senden."
 }

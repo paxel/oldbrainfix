@@ -536,10 +536,16 @@ fn decline_and_block_in_a_preview_blocks_the_sender_and_refuses_their_items() ->
     // Another item of his shows nothing.
     drop_bytes(&mut harness, &dir, "again.oldbrain", &again)?;
     assert!(!harness.state().previewing());
-    assert_eq!(
-        harness.state().notice(),
-        Some("Refused: this file comes from a person you blocked.")
-    );
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
+    // The click says why and what to do.
+    click(&mut harness, "The file was not taken.");
+    assert!(shows(&harness, "File not taken"));
+    assert!(shows(
+        &harness,
+        "This file comes from a person you blocked."
+    ));
+    assert!(shows(&harness, "unblock them on their Profile"));
+    assert_eq!(harness.state().notice(), None);
     Ok(())
 }
 
@@ -551,10 +557,7 @@ fn a_preview_whose_sender_is_blocked_meanwhile_is_not_accepted() -> TestResult {
     harness.state().store().block_person(&ben_id, false)?;
     click(&mut harness, "Accept");
     assert!(!harness.state().previewing());
-    assert_eq!(
-        harness.state().notice(),
-        Some("Refused: this file comes from a person you blocked.")
-    );
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
     let store = harness.state().store();
     assert!(Notes::new(store).all()?.iter().all(|n| n.text != "Dentist"));
     Ok(())
@@ -571,10 +574,7 @@ fn blocking_from_the_senders_profile_closes_the_preview() -> TestResult {
     assert!(harness.state().store().is_blocked(&ben_id)?);
     click(&mut harness, "Close");
     assert!(!harness.state().previewing());
-    assert_eq!(
-        harness.state().notice(),
-        Some("Refused: this file comes from a person you blocked.")
-    );
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
     Ok(())
 }
 

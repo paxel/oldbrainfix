@@ -63,7 +63,7 @@ use egui::{
 use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
 use oldbrainfix_core::ics::routines_ics;
-use oldbrainfix_core::offers::{self, HeldAreaOffer, Transport};
+use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
 use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::sent::{
@@ -110,8 +110,8 @@ use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
-    Joiner, SyncAction, SyncHost, bundle_result_text, device_name, import_bundle_result,
-    offer_refusal, update_notice_text,
+    Joiner, SyncAction, SyncHost, bundle_error_text, bundle_result_text, device_name,
+    import_bundle_result, offer_refusal, update_notice_text,
 };
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
@@ -491,6 +491,17 @@ enum Dialog {
     RejectAi,
 }
 
+/// What came of saving the changes for one person (#109).
+#[derive(Debug, Clone, PartialEq)]
+enum ChangesSent {
+    Saved,
+    NothingNew,
+    /// Refused while an AI Task waits.
+    Paused,
+    /// Not saved: whose, and the full text of why.
+    Failed(String),
+}
+
 /// A person in People an Area can go to from afar (#108): with a Device
 /// whose key is known here, not blocked; as the user sees them, and
 /// whether their code was compared in person.
@@ -754,6 +765,8 @@ enum Action {
     /// Shows why reading a photo (`true`) or transcribing a recording
     /// again brought no text.
     ShowAgainFailed(bool),
+    /// Shows the failure behind the notice at the top.
+    ShowNoticeFailure,
     /// Something asked of the Backups card on the Profile page.
     Backup(BackupAction),
     /// Something asked of the own Profile on the Profile page.
@@ -906,6 +919,10 @@ pub struct App {
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
+    /// The failure dialog behind the notice it was announced with (UI
+    /// laws, "Announcements"): the click on that notice opens it; a
+    /// later notice says something else and leaves it closed.
+    notice_failure: Option<(String, Dialog)>,
     /// Syncs that need an update of the app here or on another Device,
     /// each announced once until clicked away (ADR 0019).
     updates: std::collections::VecDeque<String>,
@@ -1142,6 +1159,7 @@ impl App {
             }),
             handed: None,
             notice: None,
+            notice_failure: None,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -1434,10 +1452,18 @@ impl App {
         if path.extension().is_none_or(|e| e != CALENDAR_EXTENSION) {
             path.set_extension(CALENDAR_EXTENSION);
         }
-        self.notice = Some(match std::fs::write(&path, ics) {
-            Ok(()) => t.calendar_file_saved().to_string(),
-            Err(e) => format!("{} ({e})", t.send_failed()),
-        });
+        match std::fs::write(&path, ics) {
+            Ok(()) => self.notice = Some(t.calendar_file_saved().to_string()),
+            Err(e) => self.announce_failure(
+                t.calendar_file_not_saved(),
+                t.calendar_file_not_saved_title(),
+                (
+                    t.calendar_file_not_saved_cause(),
+                    t.calendar_file_not_saved_fix(),
+                ),
+                format!("calendar file: {e}"),
+            ),
+        }
         Ok(())
     }
 
@@ -1462,9 +1488,78 @@ impl App {
         )
     }
 
-    /// What a bundle saved or imported did, as announced.
+    /// What a bundle saved or imported did, or that a job failed, as
+    /// announced.
     pub fn notice(&self) -> Option<&str> {
         self.notice.as_deref()
+    }
+
+    /// Announces at the top that a job failed, in `said`, which carries
+    /// no values (UI laws, "Announcements"); its click opens the failure
+    /// dialog with `title`, the cause and the fix, and the full
+    /// `details`.
+    fn announce_failure(
+        &mut self,
+        said: &str,
+        title: &str,
+        (cause, fix): (&str, &str),
+        details: String,
+    ) {
+        self.notice = Some(said.to_string());
+        self.notice_failure = Some((
+            said.to_string(),
+            Dialog::Failure {
+                title: title.to_string(),
+                cause: cause.to_string(),
+                fix: fix.to_string(),
+                details,
+            },
+        ));
+    }
+
+    /// Announces that a Sent Item was not taken, refused as `error`
+    /// says; the click opens why and what to do.
+    fn announce_not_taken(&mut self, error: OpenError) {
+        let t = self.t;
+        self.announce_failure(
+            t.sent_item_not_taken(),
+            t.sent_item_not_taken_title(),
+            refused(&t, error),
+            format!("sent item: {error:?}"),
+        );
+    }
+
+    /// Announces that an Area shared from afar was not taken, refused as
+    /// `error` says; the click opens why and what to do.
+    fn announce_offer_not_taken(&mut self, error: OfferError) {
+        let t = self.t;
+        self.announce_failure(
+            t.area_offer_not_taken(),
+            t.area_offer_not_taken_title(),
+            offer_refusal(&t, error),
+            format!("area offer: {error:?}"),
+        );
+    }
+
+    /// Announces that no Profile card can be made yet, as before this
+    /// Device synced with another of the user's; the click opens why.
+    fn announce_card_not_made(&mut self) {
+        let t = self.t;
+        self.announce_failure(
+            t.profile_card_not_made(),
+            t.profile_card_not_made_title(),
+            (t.profile_card_not_yet_cause(), t.profile_card_not_yet()),
+            "profile card: this Device is not bound to the Profile yet".into(),
+        );
+    }
+
+    /// The failure dialog behind the notice shown, if it was announced
+    /// with one.
+    fn failure_behind_notice(&self) -> Option<&Dialog> {
+        match (&self.notice, &self.notice_failure) {
+            (Some(notice), Some((said, dialog))) if notice == said => Some(dialog),
+            _ => None,
+        }
     }
 
     /// Saves a bundle for the paired Device `device`, or of everything,
@@ -1530,8 +1625,16 @@ impl App {
                     blocking: None,
                 });
             }
-            Ok(Err(e)) => self.notice = Some(refused(&self.t, e).to_string()),
-            Err(e) => self.notice = Some(format!("{} ({e})", self.t.sent_item_unreadable())),
+            Ok(Err(e)) => self.announce_not_taken(e),
+            Err(e) => {
+                let t = self.t;
+                self.announce_failure(
+                    t.sent_item_not_taken(),
+                    t.sent_item_not_taken_title(),
+                    (t.sent_item_unreadable(), t.sent_item_ask_again_fix()),
+                    e.to_string(),
+                );
+            }
         }
     }
 
@@ -1560,7 +1663,7 @@ impl App {
             Some(Ok(opened)) => self.preview(Box::new(opened), Some(id)),
             Some(Err(e)) => {
                 self.dialog = None;
-                self.notice = Some(refused(&self.t, e).to_string());
+                self.announce_not_taken(e);
             }
             None => {
                 self.dialog = None;
@@ -1593,7 +1696,7 @@ impl App {
         let state = match self.store.show_held_sent_item(id)? {
             Some(Ok(opened)) => opened.state,
             Some(Err(e)) => {
-                self.notice = Some(refused(&t, e).to_string());
+                self.announce_not_taken(e);
                 return Ok(());
             }
             None => {
@@ -1608,7 +1711,10 @@ impl App {
                 SentItemState::Cancel => t.sent_item_trashed(),
                 _ => t.sent_item_accepted(),
             },
-            Err(oldbrainfix_core::Error::FromBlocked) => t.sent_item_from_blocked(),
+            Err(oldbrainfix_core::Error::FromBlocked) => {
+                self.announce_not_taken(OpenError::FromBlocked);
+                return Ok(());
+            }
             // Decided meanwhile.
             Err(oldbrainfix_core::Error::Invalid(_)) => t.sent_item_gone(),
             Err(e) => return Err(e),
@@ -1718,7 +1824,7 @@ impl App {
         let shared = match self.store.share_area_with(&area, &person, role, transport) {
             Ok(shared) => shared,
             Err(e) => {
-                self.notice = Some(ai_view::failed_text(&t, t.share_afar_failed(), &e));
+                self.announce_afar_failed(&e);
                 return Ok(());
             }
         };
@@ -1728,17 +1834,32 @@ impl App {
         if self.trail.area.as_deref() == Some(area.as_str()) {
             self.trail.area = Some(shared.clone());
         }
-        self.notice = Some(
-            match bundle::write_area_offer_now(&self.store, &path, &shared, &person) {
-                Ok(_) => t.sent_saved().to_string(),
-                Err(e) => ai_view::failed_text(&t, t.share_afar_failed(), &e),
-            },
-        );
+        match bundle::write_area_offer_now(&self.store, &path, &shared, &person) {
+            Ok(_) => self.notice = Some(t.sent_saved().to_string()),
+            Err(e) => self.announce_afar_failed(&e),
+        }
         // The Area goes into the folder as well.
         if transport == Transport::Folder {
             self.folder_now()?;
         }
         Ok(())
+    }
+
+    /// Announces that sharing from afar failed as `error` says; the click
+    /// opens the cause, the fix and the full text. A refusal while an AI
+    /// Task waits says so instead, as it does everywhere.
+    fn announce_afar_failed(&mut self, error: &oldbrainfix_core::Error) {
+        let t = self.t;
+        if let oldbrainfix_core::Error::SyncPaused = error {
+            self.notice = Some(t.sync_paused_error().to_string());
+            return;
+        }
+        self.announce_failure(
+            t.share_afar_failed(),
+            t.share_afar_failed_title(),
+            (t.share_afar_failed_cause(), t.share_afar_failed_fix()),
+            format!("share from afar: {error}"),
+        );
     }
 
     /// Accepts the Area shared from afar the dialog shows (#108), the
@@ -1756,16 +1877,16 @@ impl App {
         {
             Ok(_) => {}
             Err(oldbrainfix_core::Error::Offer(e)) => {
-                self.notice = Some(offer_refusal(&t, e).to_string());
+                self.announce_offer_not_taken(e);
                 return Ok(());
             }
             // Decided meanwhile; a block drops it too.
             Err(oldbrainfix_core::Error::Invalid(_)) => {
-                self.notice = Some(if self.store.is_blocked(&held.sender.id)? {
-                    t.area_offer_from_blocked().to_string()
+                if self.store.is_blocked(&held.sender.id)? {
+                    self.announce_offer_not_taken(OfferError::FromBlocked);
                 } else {
-                    t.area_offer_gone().to_string()
-                });
+                    self.notice = Some(t.area_offer_gone().to_string());
+                }
                 return Ok(());
             }
             Err(e) => return Err(e),
@@ -1795,8 +1916,8 @@ impl App {
         };
         let id = id.clone();
         let title = self.t.person_send_changes_title().to_string();
-        if let Some(said) = self.send_changes_to(&id, &title)? {
-            self.notice = Some(said);
+        if let Some(sent) = self.send_changes_to(&id, &title)? {
+            self.announce_changes(&[sent]);
         }
         Ok(())
     }
@@ -1809,39 +1930,62 @@ impl App {
         let Some(planned) = Alarms::new(&self.store).changes_nudge(&*self.wall)? else {
             return Ok(());
         };
-        let mut said: Vec<String> = Vec::new();
+        let mut sent = Vec::new();
         for id in &planned.people {
             let shown = self.store.person_shown(id)?;
             let name = profile_view::display_name(&self.t, &shown.name).to_string();
             let title = self.t.changes_save_title(&name);
-            if let Some(text) = self.send_changes_to(id, &title)?
-                && !said.contains(&text)
-            {
-                said.push(text);
+            if let Some(one) = self.send_changes_to(id, &title)? {
+                sent.push(one);
             }
         }
-        if !said.is_empty() {
-            self.notice = Some(said.join("\n"));
-        }
+        self.announce_changes(&sent);
         Ok(())
+    }
+
+    /// Announces what came of saving the changes `sent` for one person or
+    /// more, once (UI laws, "Announcements"): a failure whose click opens
+    /// each one's full text, else that they are saved, else that nothing
+    /// was new; nothing when every dialog was cancelled.
+    fn announce_changes(&mut self, sent: &[ChangesSent]) {
+        let t = self.t;
+        let failed: Vec<&str> = sent
+            .iter()
+            .filter_map(|s| match s {
+                ChangesSent::Failed(details) => Some(details.as_str()),
+                _ => None,
+            })
+            .collect();
+        if !failed.is_empty() {
+            self.announce_failure(
+                t.changes_not_saved(),
+                t.changes_not_saved_title(),
+                (t.changes_not_saved_cause(), t.changes_not_saved_fix()),
+                failed.join("\n"),
+            );
+        } else if sent.contains(&ChangesSent::Paused) {
+            self.notice = Some(t.sync_paused_error().to_string());
+        } else if sent.contains(&ChangesSent::Saved) {
+            self.notice = Some(t.sent_saved().to_string());
+        } else if !sent.is_empty() {
+            self.notice = Some(t.changes_nothing_new().to_string());
+        }
     }
 
     /// Saves a bundle of what is new for the person `id` where the save
     /// dialog titled `title` says, and only once it is saved counts the
     /// changes up to the log's mark, read before writing, as sent to them
-    /// (#109). What to announce; `None` when the dialog was cancelled.
+    /// (#109). What came of it; `None` when the dialog was cancelled.
     fn send_changes_to(
         &mut self,
         id: &str,
         title: &str,
-    ) -> oldbrainfix_core::Result<Option<String>> {
-        let t = self.t;
+    ) -> oldbrainfix_core::Result<Option<ChangesSent>> {
         if self.store.sync_paused()? {
-            return Ok(Some(t.sync_paused_error().to_string()));
+            return Ok(Some(ChangesSent::Paused));
         }
-        let name = profile_view::display_name(&t, &self.store.person_shown(id)?.name).to_string();
         if self.store.entries_for_person(id)?.is_empty() {
-            return Ok(Some(t.bundle_nothing_new(&name)));
+            return Ok(Some(ChangesSent::NothingNew));
         }
         let day = (self.wall)(self.store.now()).date();
         let theirs = self.store.person_theirs(id)?.name;
@@ -1857,10 +2001,16 @@ impl App {
             match bundle::write_person_bundle_now(&self.store, &path, id) {
                 Ok(Some(_)) => {
                     self.store.note_changes_sent(id, seq)?;
-                    t.sent_saved().to_string()
+                    ChangesSent::Saved
                 }
-                Ok(None) => t.bundle_nothing_new(&name),
-                Err(e) => ai_view::failed_text(&t, t.bundle_failed(), &e),
+                Ok(None) => ChangesSent::NothingNew,
+                Err(oldbrainfix_core::Error::SyncPaused) => ChangesSent::Paused,
+                Err(e) => {
+                    let name =
+                        profile_view::display_name(&self.t, &self.store.person_shown(id)?.name)
+                            .to_string();
+                    ChangesSent::Failed(format!("{name}: {e}"))
+                }
             },
         ))
     }
@@ -1868,7 +2018,7 @@ impl App {
     /// Imports the bundle at `path` and announces what came in; one
     /// offering an Area shared from afar (#108) shows its preview instead.
     fn import_bundle(&mut self, path: &std::path::Path) {
-        match import_bundle_result(&self.t, &self.store, path) {
+        match import_bundle_result(&self.store, path) {
             Ok(result) => match result.offer {
                 Some(held) => {
                     self.dialog = Some(Dialog::AreaOffer {
@@ -1879,7 +2029,8 @@ impl App {
                 }
                 None => self.notice = Some(bundle_result_text(&self.t, &result)),
             },
-            Err(said) => self.notice = Some(said),
+            Err(oldbrainfix_core::Error::Offer(e)) => self.announce_offer_not_taken(e),
+            Err(e) => self.notice = Some(bundle_error_text(&self.t, e)),
         }
         self.refresh();
         // The alerts plan again: a Done in the bundle closes its alarm.
@@ -3189,7 +3340,7 @@ impl App {
                         .accept_sent_item(&opened.item, compared == Compared::Match);
                     if let Err(oldbrainfix_core::Error::FromBlocked) = accepted {
                         // Its sender was blocked since it opened.
-                        self.notice = Some(self.t.sent_item_from_blocked().to_string());
+                        self.announce_not_taken(OpenError::FromBlocked);
                         return Ok(());
                     }
                     accepted?;
@@ -3456,6 +3607,14 @@ impl App {
                     });
                 }
             }
+            // Never over another dialog: the notice waits until it is
+            // closed.
+            Action::ShowNoticeFailure if self.dialog.is_none() => {
+                self.dialog = self.failure_behind_notice().cloned();
+                self.notice = None;
+                self.notice_failure = None;
+            }
+            Action::ShowNoticeFailure => {}
             Action::ShowAgainFailed(photo) => {
                 self.again_failed = None;
                 let t = self.t;
@@ -4221,15 +4380,25 @@ impl App {
                     }
                 });
         } else if let Some(notice) = self.notice.clone() {
-            // What a bundle did, until clicked away.
+            // What a bundle did, until clicked away; a failure's click
+            // opens why.
+            let failed = self.failure_behind_notice().is_some();
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
                     let label = egui::Label::new(RichText::new(notice).color(colour))
                         .sense(egui::Sense::click());
-                    if ui.add(label).on_hover_text(self.t.close()).clicked() {
-                        self.notice = None;
+                    let mut response = ui.add(label);
+                    if !failed {
+                        response = response.on_hover_text(self.t.close());
+                    }
+                    if response.clicked() {
+                        if failed {
+                            actions.push(Action::ShowNoticeFailure);
+                        } else {
+                            self.notice = None;
+                        }
                     }
                 });
         } else if let Some(update) = self.updates.front().cloned() {
@@ -5855,7 +6024,7 @@ impl App {
             if let Some(Dialog::SentItem { opened, .. }) = &mut self.dialog {
                 if self.store.is_blocked(&opened.sender.id)? {
                     self.dialog = None;
-                    self.notice = Some(self.t.sent_item_from_blocked().to_string());
+                    self.announce_not_taken(OpenError::FromBlocked);
                 } else if opened.trust != SenderTrust::Unknown {
                     opened.sender = self.store.person_shown(&opened.sender.id)?;
                 }
@@ -5864,7 +6033,7 @@ impl App {
             if let Some(Dialog::AreaOffer { held, .. }) = &mut self.dialog {
                 if self.store.is_blocked(&held.sender.id)? {
                     self.dialog = None;
-                    self.notice = Some(self.t.area_offer_from_blocked().to_string());
+                    self.announce_offer_not_taken(OfferError::FromBlocked);
                 } else if held.trust != SenderTrust::Unknown {
                     held.sender = self.store.person_shown(&held.sender.id)?;
                 }
@@ -6020,7 +6189,7 @@ impl App {
                     self.copy = Some(self.t.profile_card_text(&link));
                     *back = SendBack::Copied;
                 }
-                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+                None => self.announce_card_not_made(),
             },
             PersonAction::CodesCompared(true) => {
                 *comparing = Comparing::Not;
@@ -6126,11 +6295,11 @@ impl App {
                     self.copy = Some(self.t.profile_card_text(&link));
                     self.card_form.copied = true;
                 }
-                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+                None => self.announce_card_not_made(),
             },
             ProfileAction::ShowQr => match self.store.profile_card(false)? {
                 Some(link) => self.dialog = Some(Dialog::ProfileQr { link }),
-                None => self.notice = Some(self.t.profile_card_not_yet().to_string()),
+                None => self.announce_card_not_made(),
             },
             ProfileAction::OpenCard => {
                 // Never in person here: the desktop scans nothing.
@@ -7121,13 +7290,14 @@ fn send_form(
     });
 }
 
-/// What a Sent Item refused as `error` is announced as.
-fn refused(t: &L10n, error: OpenError) -> &'static str {
+/// Why a Sent Item was refused as `error` says, and what to do, as the
+/// phone's `_refused`.
+fn refused(t: &L10n, error: OpenError) -> (&'static str, &'static str) {
     match error {
-        OpenError::NotForUs => t.sent_item_not_for_us(),
-        OpenError::NotASentItem => t.sent_item_unreadable(),
-        OpenError::NotFromSender => t.sent_item_not_from_sender(),
-        OpenError::FromBlocked => t.sent_item_from_blocked(),
+        OpenError::NotForUs => (t.sent_item_not_for_us(), t.sent_item_ask_again_fix()),
+        OpenError::NotASentItem => (t.sent_item_unreadable(), t.sent_item_ask_again_fix()),
+        OpenError::NotFromSender => (t.sent_item_not_from_sender(), t.sent_item_ask_again_fix()),
+        OpenError::FromBlocked => (t.sent_item_from_blocked(), t.blocked_fix()),
     }
 }
 

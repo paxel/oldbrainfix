@@ -379,9 +379,18 @@ fn an_offer_refused_says_why() -> TestResult {
     assert!(!harness.state().previewing());
     assert_eq!(
         harness.state().notice(),
-        Some("Refused: this shared Area comes from a person you blocked.")
+        Some("The shared Area was not taken.")
     );
     assert!(harness.state().store().pending_sets()?.is_empty());
+    // The click says why and what to do.
+    click(&mut harness, "The shared Area was not taken.");
+    assert!(shows(&harness, "Shared Area not taken"));
+    assert!(shows(
+        &harness,
+        "This shared Area comes from a person you blocked."
+    ));
+    assert!(shows(&harness, "unblock them on their Profile"));
+    assert_eq!(harness.state().notice(), None);
 
     // Sealed for another person's Devices.
     let carl = device(3, "Carl")?;
@@ -390,22 +399,71 @@ fn an_offer_refused_says_why() -> TestResult {
     assert!(!harness.state().previewing());
     assert_eq!(
         harness.state().notice(),
-        Some(
-            "This shared Area is meant for another person or another of your Devices. \
-             Ask the sender to share it again with you."
-        )
+        Some("The shared Area was not taken.")
     );
+    click(&mut harness, "The shared Area was not taken.");
+    assert!(shows(
+        &harness,
+        "This shared Area is meant for another person or another of your Devices."
+    ));
+    assert!(shows(
+        &harness,
+        "Ask the sender to share it again with you."
+    ));
 
-    // The others, each in words of its own.
+    // The others, each with a cause and a fix of its own.
     let t = L10n::new("en");
     assert_eq!(
         offer_refusal(&t, OfferError::Refused),
-        "Refused: this Area is your own on this Device already."
+        (
+            "This Area is your own on this Device already.",
+            "It is among your Areas already; nothing needs doing."
+        )
     );
     assert_eq!(
         offer_refusal(&t, OfferError::NotAnOffer),
-        "This file holds no shared Area this app can read. Ask the sender to share it again."
+        (
+            "This file holds no shared Area this app can read.",
+            "Ask the sender to share it again with you."
+        )
     );
+    Ok(())
+}
+
+#[test]
+fn an_offer_that_could_not_be_saved_says_so_without_the_error_and_the_click_says_why() -> TestResult
+{
+    let (ann, _ben, area, _ben_id) = met()?;
+    let dir = tempfile::tempdir()?;
+    let nowhere = dir.path().join("gone").join("for-ben.obfsync");
+    let titles = Arc::new(Mutex::new(Vec::new()));
+    let mut desk = app(ann, Selection::Place(area), "en");
+    desk.set_bundle_dialogs(saver(nowhere.clone(), titles), Box::new(|_| None));
+    let mut harness = window(desk);
+    open_share(&mut harness, "Household");
+    click(&mut harness, "Share with…");
+    click(&mut harness, "Ben");
+    click(&mut harness, "Files through a messenger");
+    click(&mut harness, "Share");
+    assert!(!nowhere.exists());
+    // Only that it failed: no error text, no path.
+    assert_eq!(
+        harness.state().notice(),
+        Some("The Area could not be shared.")
+    );
+    assert!(!shows(&harness, &dir.path().to_string_lossy()));
+    click(&mut harness, "The Area could not be shared.");
+    assert_eq!(harness.state().notice(), None);
+    assert!(shows(&harness, "Area not shared"));
+    assert!(shows(
+        &harness,
+        "The file for the shared Area could not be written."
+    ));
+    assert!(shows(&harness, "Nothing was lost; try again."));
+    assert!(shows(&harness, "share from afar:"));
+    assert!(shows(&harness, "Report"));
+    click(&mut harness, "Close");
+    assert!(!shows(&harness, "Area not shared"));
     Ok(())
 }
 
@@ -440,10 +498,7 @@ fn send_changes_saves_a_bundle_for_the_person_or_says_nothing_is_new() -> TestRe
     write_person_bundle_now(&ben, &back, &ann_id)?.ok_or("a bundle back")?;
     import_bundle(harness.state().store(), &back)?;
     click(&mut harness, "Send changes to Ben");
-    assert_eq!(
-        harness.state().notice(),
-        Some("Nothing new to send to Ben.")
-    );
+    assert_eq!(harness.state().notice(), Some("Nothing new to send."));
     assert_eq!(titles.lock().map_err(|e| e.to_string())?.len(), 1);
     Ok(())
 }
@@ -504,7 +559,7 @@ fn blocking_the_sharer_on_their_profile_drops_the_offer() -> TestResult {
     assert!(!harness.state().previewing());
     assert_eq!(
         harness.state().notice(),
-        Some("Refused: this shared Area comes from a person you blocked.")
+        Some("The shared Area was not taken.")
     );
     assert!(harness.state().store().pending_sets()?.is_empty());
     Ok(())
@@ -596,13 +651,21 @@ fn a_bundle_that_could_not_be_saved_counts_as_not_sent() -> TestResult {
         Box::new(|_| None),
     );
     desk.set_changes_wanted(wanted);
-    let harness = window(desk);
+    let mut harness = window(desk);
     assert_eq!(
         asked.lock().map_err(|e| e.to_string())?[0].0,
         "Änderungen für Ben zum Senden speichern"
     );
     assert!(!nowhere.exists());
-    assert!(harness.state().notice().is_some_and(|n| !n.is_empty()));
+    // One announcement, naming nobody; the click says why and whose.
+    assert_eq!(
+        harness.state().notice(),
+        Some("Die Änderungen wurden nicht gespeichert.")
+    );
+    click(&mut harness, "Die Änderungen wurden nicht gespeichert.");
+    assert!(shows(&harness, "Änderungen nicht gespeichert"));
+    assert!(shows(&harness, "warten weiter aufs Senden"));
+    assert!(shows(&harness, "Ben: "));
     let waiting = harness.state().store().waiting_for_changes()?;
     assert!(waiting.contains_key(&ben));
     Ok(())

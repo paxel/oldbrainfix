@@ -225,6 +225,48 @@ fn export_saves_one_calendar_file_of_all_of_them_in_the_pages_order() -> TestRes
 }
 
 #[test]
+fn a_calendar_file_that_could_not_be_saved_says_so_and_the_click_says_why() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let nowhere = dir.path().join("gone").join("all.ics");
+    let mut app = saving_to(App::new(store()?, "en"), &nowhere);
+    app.select(Selection::AllRoutines);
+    let mut harness = window(app);
+
+    harness.get_by_label("Export").click_accesskit();
+    harness.run();
+    assert!(!nowhere.exists());
+    // Only that it failed, in its own words: no error text, no path.
+    assert_eq!(
+        harness.state().notice(),
+        Some("The calendar file was not saved.")
+    );
+    assert!(!shows(&harness, &dir.path().to_string_lossy()));
+    harness
+        .get_by_label("The calendar file was not saved.")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().notice(), None);
+    assert!(shows(&harness, "Calendar file not saved"));
+    assert!(shows(
+        &harness,
+        "The calendar file could not be written where you chose."
+    ));
+    assert!(shows(
+        &harness,
+        "Nothing was lost; choose another folder and save it again."
+    ));
+    assert!(shows(&harness, "calendar file:"));
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, "Calendar file not saved"));
+    Ok(())
+}
+
+#[test]
 fn share_in_an_occurrences_menu_saves_its_routine_as_a_series_or_its_reminder() -> TestResult {
     let store = store()?;
     let course = routine(&store, "Course")?;

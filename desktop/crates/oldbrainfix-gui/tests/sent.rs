@@ -262,10 +262,23 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
     let other = dir.path().join("for-ben.oldbrain");
     std::fs::write(&other, ann.send_note(&note.id, to.first(), false)?)?;
     drop_file(&mut harness, &other);
+    // Announced without why; the click opens why and what to do.
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
+    assert!(!shows(&harness, "encrypted for someone else"));
+    harness.get_by_label("The file was not taken.").click();
+    harness.run();
+    assert!(shows(&harness, "File not taken"));
     assert!(shows(&harness, "encrypted for someone else"));
+    assert!(shows(&harness, "Ask the sender to send it again."));
+    assert!(shows(&harness, "Report"));
+    harness.get_by_label("Close").click_accesskit();
+    harness.run();
     let damaged = dir.path().join("damaged.oldbrain");
     std::fs::write(&damaged, b"{\"format\":1}")?;
     drop_file(&mut harness, &damaged);
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
+    harness.get_by_label("The file was not taken.").click();
+    harness.run();
     assert!(shows(&harness, "cannot be read"));
     Ok(())
 }
@@ -397,7 +410,12 @@ fn an_update_shows_what_changes_and_a_cancellation_trashes_the_note() -> TestRes
     std::fs::write(&forged_file, forged)?;
     drop_file(&mut harness, &forged_file);
     assert!(!harness.state().previewing());
-    assert!(shows(&harness, "Refused:"));
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
+    harness.get_by_label("The file was not taken.").click();
+    harness.run();
+    assert!(shows(&harness, "it is not signed by them"));
+    harness.get_by_label("Close").click_accesskit();
+    harness.run();
 
     // Ann's own cancellation trashes it, its alarms with it.
     let cancel = dir.path().join("cancel.oldbrain");
@@ -653,10 +671,7 @@ fn decline_and_block_before_show_blocks_the_stranger() -> TestResult {
     // Another of hers shows nothing.
     drop_file(&mut harness, &file);
     assert!(!harness.state().previewing());
-    assert_eq!(
-        harness.state().notice(),
-        Some("Refused: this file comes from a person you blocked.")
-    );
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
     Ok(())
 }
 

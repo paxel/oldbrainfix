@@ -108,6 +108,24 @@ mod tests {
                 de.file_recording_unsupported(),
             ),
             (en.file_recording_fix(), de.file_recording_fix()),
+            (en.calendar_file_not_saved(), de.calendar_file_not_saved()),
+            (
+                en.calendar_file_not_saved_title(),
+                de.calendar_file_not_saved_title(),
+            ),
+            (
+                en.calendar_file_not_saved_cause(),
+                de.calendar_file_not_saved_cause(),
+            ),
+            (
+                en.calendar_file_not_saved_fix(),
+                de.calendar_file_not_saved_fix(),
+            ),
+            (en.changes_not_saved(), de.changes_not_saved()),
+            (en.changes_not_saved_title(), de.changes_not_saved_title()),
+            (en.changes_not_saved_cause(), de.changes_not_saved_cause()),
+            (en.changes_not_saved_fix(), de.changes_not_saved_fix()),
+            (en.changes_nothing_new(), de.changes_nothing_new()),
         ] {
             assert_ne!(en, de);
         }
@@ -118,6 +136,11 @@ mod tests {
             "A recording from a file cannot be transcribed."
         );
         assert_ne!(en.file_recording_failed(2), de.file_recording_failed(2));
+        // The count only picks the grammar: no value in an announcement.
+        assert_eq!(
+            en.file_recording_failed(3),
+            "Recordings from files cannot be transcribed."
+        );
         assert_ne!(
             en.person_filter_remove("Ben"),
             de.person_filter_remove("Ben")

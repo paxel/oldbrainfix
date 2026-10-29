@@ -45,6 +45,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 - On the desktop, an Area lists only its Notes without a Topic, as on the phone; a search in the Area still finds the Notes of its Topics.
 - On the desktop, the Agenda shows the whole week, as on the phone: after tomorrow come the five following days, each under its weekday and date, an empty day as "Nothing planned".
 - On the desktop, the Note editor shows a photo's Photo Text under the photo, as on the phone, not only after the photo is removed.
+- On the desktop, a Sent Item that cannot be taken is announced at the top only as not taken, without the error text, and a click on the announcement opens why, what to do and the full text with Close and Report.
 
 ---
 

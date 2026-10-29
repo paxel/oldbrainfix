@@ -915,35 +915,44 @@ fn bundle_section(
 /// sync's are. A bundle offering an Area (#108) is held as the offer and
 /// said to wait on the Agenda.
 pub fn import_bundle_text(t: &L10n, store: &Store, path: &Path) -> Result<String, String> {
-    import_bundle_result(t, store, path).map(|result| bundle_result_text(t, &result))
+    import_bundle_result(store, path)
+        .map(|result| bundle_result_text(t, &result))
+        .map_err(|e| bundle_error_text(t, e))
 }
 
 /// Imports the bundle at `path` into `store`, Conflicts it brought
-/// announced as an automatic sync's are; what went wrong in words.
-pub fn import_bundle_result(t: &L10n, store: &Store, path: &Path) -> Result<BundleResult, String> {
-    match import_bundle(store, path) {
-        Ok(result) => {
-            if !result.conflicts.is_empty() {
-                drop(store.set_conflicts_arrived(true));
-            }
-            Ok(result)
+/// announced as an automatic sync's are.
+pub fn import_bundle_result(store: &Store, path: &Path) -> Result<BundleResult, Error> {
+    let result = import_bundle(store, path)?;
+    if !result.conflicts.is_empty() {
+        drop(store.set_conflicts_arrived(true));
+    }
+    Ok(result)
+}
+
+/// What went wrong importing a bundle, in words; an Area offer refused
+/// says why and what to do.
+pub fn bundle_error_text(t: &L10n, error: Error) -> String {
+    match error {
+        Error::NotABundle => t.bundle_not_a_bundle().to_string(),
+        Error::BundleNeedsUpdate => t.bundle_needs_update().to_string(),
+        Error::Offer(e) => {
+            let (cause, fix) = offer_refusal(t, e);
+            format!("{cause} {fix}")
         }
-        Err(Error::NotABundle) => Err(t.bundle_not_a_bundle().to_string()),
-        Err(Error::BundleNeedsUpdate) => Err(t.bundle_needs_update().to_string()),
-        Err(Error::Offer(e)) => Err(offer_refusal(t, e).to_string()),
-        Err(Error::SyncPaused) => Err(t.sync_paused_error().to_string()),
-        Err(e) => Err(format!("{} ({e})", t.bundle_failed())),
+        Error::SyncPaused => t.sync_paused_error().to_string(),
+        e => format!("{} ({e})", t.bundle_failed()),
     }
 }
 
-/// What an Area offer refused as `error` is announced as (#108), each
-/// with its own cause and fix.
-pub fn offer_refusal(t: &L10n, error: OfferError) -> &'static str {
+/// Why an Area offer was refused as `error` says (#108), and what to
+/// do, as the phone's area offer dialog.
+pub fn offer_refusal(t: &L10n, error: OfferError) -> (&'static str, &'static str) {
     match error {
-        OfferError::NotAnOffer => t.not_an_area_offer(),
-        OfferError::NotForUs => t.area_offer_not_for_us(),
-        OfferError::FromBlocked => t.area_offer_from_blocked(),
-        OfferError::Refused => t.area_offer_refused(),
+        OfferError::NotAnOffer => (t.not_an_area_offer(), t.area_offer_ask_again_fix()),
+        OfferError::NotForUs => (t.area_offer_not_for_us(), t.area_offer_ask_again_fix()),
+        OfferError::FromBlocked => (t.area_offer_from_blocked(), t.blocked_fix()),
+        OfferError::Refused => (t.area_offer_refused(), t.area_offer_own_fix()),
     }
 }
 

@@ -44,6 +44,7 @@ Die deutschen Änderungsnotizen zu Old Brain Fix, Abschnitt für Abschnitt wie `
 - Auf dem Desktop zeigt ein Bereich nur seine Notizen ohne Thema, wie auf dem Telefon; eine Suche im Bereich findet weiter die Notizen seiner Themen.
 - Auf dem Desktop zeigt die Agenda die ganze Woche, wie auf dem Telefon: Nach morgen folgen die fünf nächsten Tage, jeder unter seinem Wochentag und Datum, ein leerer Tag mit „Nichts geplant“.
 - Auf dem Desktop zeigt der Notiz-Editor den erkannten Text eines Fotos unter dem Foto, wie auf dem Telefon, und nicht erst, nachdem das Foto entfernt wurde.
+- Auf dem Desktop meldet eine gesendete Notiz, die sich nicht übernehmen lässt, oben nur, dass sie nicht übernommen wurde, ohne den Fehlertext, und ein Klick auf die Meldung öffnet den Grund, was zu tun ist, und den vollständigen Text mit „Schließen“ und „Melden“.
 
 ## [0.1.1] - 2026-10-27
 
