@@ -2300,7 +2300,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupsIntro =>
-      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
+      'A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings, Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens it. This Device\'s settings stay out, except the playback speed. All your Devices share one passphrase and one recovery key, and each writes Backups of its own.';
 
   @override
   String get backupPassphrase => 'Passphrase';

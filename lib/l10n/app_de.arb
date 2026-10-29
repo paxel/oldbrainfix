@@ -605,7 +605,7 @@
   "backupsTitle": "Sicherungen",
   "backupsSettingsEntry": "Dieses Gerät sichern",
   "backupsSettingsDetail": "Verschlüsselte Dateien mit allem auf diesem Gerät, in einem Ordner deiner Wahl.",
-  "backupsIntro": "Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.",
+  "backupsIntro": "Eine Sicherung ist eine verschlüsselte Datei mit all deinen Bereichen, Notizen, Fotos, Sprachaufnahmen, Routinen und ihrem Verlauf. Nur deine Passphrase oder der Wiederherstellungsschlüssel auf dem Wiederherstellungsblatt öffnet sie. Die Einstellungen dieses Geräts bleiben draußen, außer der Wiedergabegeschwindigkeit. All deine Geräte teilen sich eine Passphrase und einen Wiederherstellungsschlüssel, und jedes schreibt eigene Sicherungen.",
   "backupPassphrase": "Passphrase",
   "backupPassphraseAgain": "Passphrase wiederholen",
   "backupPassphraseHint": "Mindestens 8 Zeichen. Ein kurzer Satz ist leicht zu merken.",
