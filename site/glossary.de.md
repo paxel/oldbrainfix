@@ -127,6 +127,10 @@ Zwei Geräte oder eine Person miteinander bekannt machen, persönlich oder per C
 **Geteilter Bereich** [Shared Area]:
 Ein Bereich, den andere Menschen mit abgleichen. Alles außerhalb bleibt privat.
 
+**Änderungs-Stupser** [Changes Nudge]:
+Der Hinweis, dass Menschen, die über Bündel abgleichen, Änderungen fehlen, etwa „Änderungen für Bob und Carol“. Er kommt 30 Minuten nach der ersten Änderung, die noch kein Bündel für sie trug, einer für alle, die warten, und kommt wieder wie der Stupser, bis an jede von ihnen ein Bündel ging. Ihn zu öffnen schickt jeder Person ihr Bündel.
+_Avoid_: Erinnerung (das ist etwas anderes), Abgleich-Erinnerung
+
 **Verwalter** [Manager]:
 Eine Person, die in einem geteilten Bereich alles darf.
 
@@ -165,6 +169,10 @@ _Avoid_: Zusammenstoß, Merge-Konflikt
 **Ausstehende Änderungen** [Pending Changes]:
 Änderungen, die du siehst, als wären sie behalten, die aber erst behalten werden, wenn du sie annimmst; lehnst du ab, bleibt nichts zurück. Was du in der Zwischenzeit bearbeitest, gewinnt beim Annehmen. Gilt für eine KI-Aufgabe, einen aus der Ferne angebotenen Bereich, die gesendete Notiz einer fremden Person bis „Zeigen“ und ein Bündel mit viel darin.
 _Avoid_: Entwurf, Zwischenstand, Vorschau (eine Vorschau zeigt, ohne etwas zu behalten)
+
+**KI-Aufgabe** [AI Task]:
+Eine Arbeit, die du über den KI-Port des Computers einem KI-Modell deiner Wahl gibst, etwa Tippfehler zu beheben oder alles über ein Thema zu entfernen. Alles, was sie ändert, ist eine ausstehende Änderung; sie werden zusammen geprüft, wenn du sagst, dass sie fertig ist, und als Ganzes angenommen oder abgelehnt. Eine nach der anderen; der Abgleich wartet so lange.
+_Avoid_: Agent, Assistent, Chat, KI-Modus
 
 ## Privatsphäre
 
