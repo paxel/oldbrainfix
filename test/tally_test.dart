@@ -153,7 +153,8 @@ void main() {
       expect(field.rule, TallyRule.max);
 
       // Shown back in imperial.
-      await tap(tester, find.text('Lifting'));
+      await tester.longPress(find.text('Lifting'));
+      await tester.pumpAndSettle();
       expect(find.text('lb · Target 100 lb'), findsOneWidget);
     });
 
@@ -163,7 +164,8 @@ void main() {
       final id = tallies.addField(note.id, name: 'Distance', unit: 'km');
       tallies.add(note.id, values: {id: 5000});
       await startAtNotes(tester);
-      await tap(tester, find.text('Running'));
+      await tester.longPress(find.text('Running'));
+      await tester.pumpAndSettle();
       expect(find.byType(TallySection), findsOneWidget);
       await tap(tester, key('tally-field-$id'));
       // Entries hold values: only distances are left.
@@ -255,7 +257,8 @@ void main() {
       now = now.add(const Duration(hours: 2));
       tallies.add(note.id, values: {id: 15});
       await startAtNotes(tester);
-      await tap(tester, find.text('Push-ups'));
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
 
       await reveal(tester, key('tally-entries'));
       expect(find.text('Push-ups 10 times\nmorning'), findsOneWidget);
@@ -281,7 +284,8 @@ void main() {
       final id = tallies.addField(note.id, name: 'Pages');
       final entry = tallies.add(note.id, values: {id: 12});
       await startAtNotes(tester);
-      await tap(tester, find.text('Pages'));
+      await tester.longPress(find.text('Pages'));
+      await tester.pumpAndSettle();
 
       await tap(tester, key('tally-entry-${entry.id}'));
       expect(find.byType(TallyEntryScreen), findsOneWidget);
@@ -422,7 +426,8 @@ void main() {
       expect(tallies.entries(note), hasLength(2));
 
       await startAtNotes(tester);
-      await tap(tester, find.text('Push-ups'));
+      await tester.longPress(find.text('Push-ups'));
+      await tester.pumpAndSettle();
       await reveal(tester, key('tally-whose'));
       expect(
         tester

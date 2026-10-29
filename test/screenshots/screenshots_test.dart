@@ -465,7 +465,8 @@ void main() {
         final t = await start(tester, _Seeded(texts));
         await tap(tester, find.byTooltip(t.browseTooltip));
         await tap(tester, find.text(t.starterHousehold));
-        await tap(tester, find.text(texts.boiler));
+        await tester.longPress(find.text(texts.boiler));
+        await tester.pumpAndSettle();
         expect(find.byType(NoteEditorScreen), findsOneWidget);
       });
 

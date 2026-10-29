@@ -14,7 +14,8 @@ import 'system_bars.dart';
 /// Every Note as a diary of cards, newest first, Unsorted ones included
 /// and those of closed locked Areas left out; reached from the top of
 /// the notes browser, and filtered to one person by "Their Notes" on
-/// their Profile. Swipe right goes back.
+/// their Profile. Swipe right goes back. Full or compact as last chosen
+/// for this list.
 class AllNotesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -34,7 +35,7 @@ class AllNotesScreen extends StatefulWidget {
 }
 
 class _AllNotesScreenState extends State<AllNotesScreen>
-    with ReloadsOnLogChange {
+    with ReloadsOnLogChange, FoldsNoteCards {
   late PersonFilter _people = widget.people;
   late List<PlacedNote> _shown = _load();
 
@@ -58,6 +59,10 @@ class _AllNotesScreenState extends State<AllNotesScreen>
 
   @override
   Store get log => widget.notes.store;
+
+  /// "Their Notes" on a Profile keeps its own choice.
+  @override
+  String get cardsKey => widget.people.isEveryone ? 'allNotes' : 'personNotes';
 
   @override
   void reloadLog() => _reload();
@@ -107,6 +112,7 @@ class _AllNotesScreenState extends State<AllNotesScreen>
               filter: _people,
               onChanged: _filter,
             ),
+            CompactNotesButton(compact: compact, onChanged: setCompact),
           ],
         ),
         body: ListView(
@@ -136,6 +142,9 @@ class _AllNotesScreenState extends State<AllNotesScreen>
                 // Every Area at once: no screen title names one.
                 showPlace: (_) => true,
                 onSchedule: _schedule,
+                compact: compact,
+                unfolded: unfolded,
+                onUnfold: unfold,
               ),
           ],
         ),

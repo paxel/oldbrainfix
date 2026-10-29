@@ -3419,4 +3419,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noteBeingCaptured => 'The Note being captured';
+
+  @override
+  String get showNotesCompact => 'Show Notes compact';
+
+  @override
+  String get showNotesFull => 'Show Notes in full';
+
+  @override
+  String get transcriptLabel => 'Transcript';
+
+  @override
+  String get photoTextLabel => 'Photo Text';
 }

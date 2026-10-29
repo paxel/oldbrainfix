@@ -40,9 +40,10 @@ fn harness(
     let mut app = App::new(store(scenario)?, locale);
     // These tests browse the Notes; the window opens on the Agenda.
     app.select(Selection::All);
-    // Tall enough for every Note of the `formats` scenario unscrolled.
+    // Tall enough for every Note of the `formats` scenario unscrolled,
+    // in full with its Sections.
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1500.0))
+        .with_size(egui::vec2(1280.0, 2400.0))
         .build_ui_state(
             |ui, app: &mut App| {
                 App::install(ui.ctx());
@@ -62,6 +63,36 @@ fn shows(harness: &Harness<'_, App>, label: &str) -> bool {
 /// The card of the Note with `text`.
 fn card<'a>(harness: &'a Harness<'_, App>, text: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by_role_and_label(Role::Button, text)
+}
+
+/// Edit on the card of the first Note whose text contains `text`, which
+/// opens the Note's editor on the right (#114).
+fn edit<'a>(harness: &'a Harness<'_, App>, text: &str) -> egui_kittest::Node<'a> {
+    let card = harness
+        .query_by_role_and_label(Role::Button, text)
+        .or_else(|| {
+            harness
+                .query_all_by(|n| {
+                    n.role() == Role::Button && n.label().is_some_and(|l| l.contains(text))
+                })
+                .next()
+        })
+        .unwrap_or_else(|| panic!("no card of {text:?}"))
+        .rect();
+    // "Edit", or "Bearbeiten" in German.
+    harness
+        .query_all_by(|n| {
+            n.role() == Role::Button && matches!(n.label().as_deref(), Some("Edit" | "Bearbeiten"))
+        })
+        .find(|n| card.contains_rect(n.rect()))
+        .unwrap_or_else(|| panic!("no Edit on the card of {text:?}"))
+}
+
+/// Whether a Note with `text` has a card of its own.
+fn has_card(harness: &Harness<'_, App>, text: &str) -> bool {
+    harness
+        .query_by_role_and_label(Role::Button, text)
+        .is_some()
 }
 
 #[test]
@@ -134,10 +165,10 @@ fn starter_names_show_in_the_apps_language() -> TestResult {
 #[test]
 fn a_selected_note_shows_right_with_its_sections_and_merged_notes() -> TestResult {
     let mut harness = harness("sections", "en")?;
-    // Merged Notes leave every list.
-    assert!(!shows(&harness, "Dentist on Tuesday"));
+    // Merged Notes leave every list: they show on their target's card.
+    assert!(!has_card(&harness, "Dentist on Tuesday"));
     let target = card(&harness, "Dentist number").rect();
-    card(&harness, "Dentist number").click();
+    edit(&harness, "Dentist number").click();
     harness.run();
     assert_eq!(
         harness.state().selected_note(),
@@ -150,14 +181,27 @@ fn a_selected_note_shows_right_with_its_sections_and_merged_notes() -> TestResul
         "Bring the old X-ray",
         "Called, all set",
     ] {
-        let node = harness.get_by_label(section);
+        let shown: Vec<egui::Rect> = harness
+            .query_all_by_label(section)
+            .map(|n| n.rect())
+            .collect();
         assert!(
-            node.rect().left() > target.right(),
+            shown.iter().any(|r| r.left() > target.right()),
             "{section} on the right"
         );
+        assert!(
+            shown.iter().any(|r| target.contains_rect(*r)),
+            "{section} on the card"
+        );
     }
-    // Oldest first.
-    let top = |label| harness.get_by_label(label).rect().top();
+    // Oldest first, on the right.
+    let top = |label| {
+        harness
+            .query_all_by_label(label)
+            .map(|n| n.rect())
+            .find(|r| r.left() > target.right())
+            .map_or(f32::NAN, |r| r.top())
+    };
     assert!(top("Dentist on Tuesday") < top("Called, all set"));
     assert!(shows(&harness, "Importance"));
     assert!(shows(&harness, "Normal"));
@@ -175,12 +219,12 @@ fn trashed_notes_show_only_in_the_trash() -> TestResult {
     assert!(shows(&harness, "The other"));
     // Past restoring, and the merged one goes with its target.
     assert!(!shows(&harness, "Long gone"));
-    assert!(!shows(&harness, "Into the bin with the other"));
+    assert!(!has_card(&harness, "Into the bin with the other"));
     assert!(!shows(&harness, "Not so old after all"));
     // The row on the left and the heading in the middle, then the
     // Note's state on the right.
     assert_eq!(harness.query_all_by_label("Trash").count(), 2);
-    card(&harness, "Old shopping list").click();
+    edit(&harness, "Old shopping list").click();
     harness.run();
     assert_eq!(harness.query_all_by_label("Trash").count(), 3);
     Ok(())
@@ -344,7 +388,7 @@ fn a_typed_thought_is_captured_with_the_nudge_picked() -> TestResult {
 #[test]
 fn a_notes_text_is_fixed_in_place() -> TestResult {
     let mut harness = harness("notes", "en")?;
-    card(&harness, "Needs more sauce").click();
+    edit(&harness, "Needs more sauce").click();
     harness.run();
     let id = find(harness.state(), "Needs more sauce")?.id;
     holding(&harness, "Needs more sauce").click();
@@ -366,18 +410,18 @@ fn a_notes_text_is_fixed_in_place() -> TestResult {
     harness.run();
     retype(&mut harness, "Sauce, lots");
     harness.run();
-    card(&harness, "Buy more sauce").click();
+    edit(&harness, "Buy more sauce").click();
     harness.run();
     assert_eq!(text(&harness)?, "Sauce, lots");
     let before = harness.state().store().all_entries()?.len();
-    card(&harness, "Sauce, lots").click();
+    edit(&harness, "Sauce, lots").click();
     harness.run();
     holding(&harness, "Sauce, lots").click();
     harness.run();
     harness.key_press_modifiers(Modifiers::COMMAND, Key::A);
     harness.key_press(Key::Backspace);
     harness.run();
-    card(&harness, "Buy more sauce").click();
+    edit(&harness, "Buy more sauce").click();
     harness.run();
     assert_eq!(text(&harness)?, "Sauce, lots");
     assert_eq!(harness.state().store().all_entries()?.len(), before);
@@ -390,11 +434,7 @@ fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> Test
         "This text was written with a newer version of Old Brain Fix. Update the app to change it.";
     let mut harness = harness("formats", "en")?;
     assert!(!shows(&harness, NEWER));
-    harness
-        .query_all_by_label_contains("# Heading")
-        .next()
-        .ok_or("the card")?
-        .click();
+    edit(&harness, "# Heading").click();
     harness.run();
     let id = harness
         .state()
@@ -429,7 +469,7 @@ fn a_text_in_an_unknown_format_shows_as_it_is_and_is_never_overwritten() -> Test
     assert_eq!(sections.len(), 1);
     assert_eq!(stored(&harness)?, before);
     // Written before the format was recorded, it reads as plain.
-    card(&harness, r#"{"format":"plain"}"#).click();
+    edit(&harness, r#"{"format":"plain"}"#).click();
     harness.run();
     assert_eq!(stored(&harness)?, before);
     // A plain Note says nothing of it.
@@ -444,7 +484,7 @@ fn a_text_in_a_later_structure_shows_as_it_is_and_version_1_is_plain() -> TestRe
         "This text was written with a newer version of Old Brain Fix. Update the app to change it.";
     let mut harness = harness("formats", "en")?;
     // Version 2, a known format and a key more: its text, read-only.
-    card(&harness, "Version two").click();
+    edit(&harness, "Version two").click();
     harness.run();
     let id = harness
         .state()
@@ -464,15 +504,11 @@ fn a_text_in_a_later_structure_shows_as_it_is_and_version_1_is_plain() -> TestRe
     harness.run();
     assert_eq!(harness.state().store().current(&id, "text")?, before);
     // Version 1 in a format not known here: read-only too.
-    harness
-        .query_all_by_label_contains("# Version one")
-        .next()
-        .ok_or("the card")?
-        .click();
+    edit(&harness, "# Version one").click();
     harness.run();
     assert!(shows(&harness, NEWER));
     // Version 1 written out, in a known format, is editable.
-    card(&harness, "Version one written out").click();
+    edit(&harness, "Version one written out").click();
     harness.run();
     assert!(!shows(&harness, NEWER));
     holding(&harness, "Version one written out");
@@ -482,11 +518,7 @@ fn a_text_in_a_later_structure_shows_as_it_is_and_version_1_is_plain() -> TestRe
 #[test]
 fn a_note_in_an_unknown_format_is_merged_with_its_text_as_it_is() -> TestResult {
     let mut harness = harness("formats", "en")?;
-    harness
-        .query_all_by_label_contains("# Heading")
-        .next()
-        .ok_or("the card")?
-        .click();
+    edit(&harness, "# Heading").click();
     harness.run();
     let id = harness
         .state()
@@ -517,7 +549,7 @@ fn a_note_in_an_unknown_format_is_merged_with_its_text_as_it_is() -> TestResult 
 #[test]
 fn a_section_in_an_unknown_format_says_so() -> TestResult {
     let mut harness = harness("formats", "en")?;
-    card(&harness, "Plain host").click();
+    edit(&harness, "Plain host").click();
     harness.run();
     let newer = harness
         .query_all_by_label(
@@ -536,7 +568,7 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
     let mut harness = harness("places", "en")?;
     harness.get_by_label("Kitchen").click();
     harness.run();
-    card(&harness, "Descale the kettle").click();
+    edit(&harness, "Descale the kettle").click();
     harness.run();
     let kettle = find(harness.state(), "Descale the kettle")?.id;
     let note = |h: &Harness<'_, App>, id: &str| -> Result<Note, Box<dyn std::error::Error>> {
@@ -606,7 +638,7 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
 #[test]
 fn a_note_is_filed_from_its_editor_or_by_dragging_its_card() -> TestResult {
     let mut harness = harness("places", "en")?;
-    card(&harness, "Still Unsorted").click();
+    edit(&harness, "Still Unsorted").click();
     harness.run();
     let id = find(harness.state(), "Still Unsorted")?.id;
     harness.get_by_label("File into…").click();
@@ -822,7 +854,7 @@ fn back_and_forward_keys_walk_the_areas_and_topics() -> TestResult {
 #[test]
 fn the_editor_speaks_german() -> TestResult {
     let mut harness = harness("places", "de")?;
-    card(&harness, "Still Unsorted").click();
+    edit(&harness, "Still Unsorted").click();
     harness.run();
     for label in [
         "Ablegen in …",
@@ -841,7 +873,7 @@ fn the_editor_speaks_german() -> TestResult {
 fn what_is_typed_is_kept_as_the_window_closes() -> TestResult {
     let mut harness = harness("places", "en")?;
     let now = harness.state().store().now();
-    card(&harness, "Still Unsorted").click();
+    edit(&harness, "Still Unsorted").click();
     harness.run();
     holding(&harness, "Still Unsorted").click();
     harness.run();

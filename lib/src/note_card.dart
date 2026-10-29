@@ -97,9 +97,12 @@ typedef MediaRemoval = ({
 });
 
 /// What a card's ⋮ menu offers beyond filing, scheduling and merging:
-/// the actions the Note editor has. An entry is left out when its
-/// callback is null.
+/// opening the Note editor, and the actions it has. An entry is left out
+/// when its callback is null.
 class NoteActions {
+  /// Opens the Note's editor, as a long press on the card does.
+  final VoidCallback? onEdit;
+
   /// Sets the Note's Importance, picked in the menu.
   final ValueChanged<Importance>? onImportance;
 
@@ -131,6 +134,7 @@ class NoteActions {
   final VoidCallback? onDelete;
 
   const NoteActions({
+    this.onEdit,
     this.onImportance,
     this.onSend,
     this.calendar,
@@ -147,16 +151,22 @@ class NoteActions {
 /// the other person who wrote it, picture and name (none on the user's
 /// own, ADR 0017); its capture time with the Named Place or coordinates
 /// it was captured at and an icon when there is more Capture Context;
-/// with [showPlace] where it is filed; a separator; its text, thumbnails
-/// of its first [shownPhotos] photos, a play button per voice recording
-/// with the start of its Transcript under it, and the start of each
-/// Transcript and Photo Text whose recording or photo was removed; a
+/// with [showPlace] where it is filed; a separator; its first line,
+/// thumbnails of its first [shownPhotos] photos, a play button per voice
+/// recording with the start of its Transcript under it, and the start of
+/// each Transcript and Photo Text whose recording or photo was removed; a
 /// separator; and
 /// its action row, icons only: file it, spawn a Routine, Reminder, Frog or
 /// Session from it, merge it, and ⋮ for the rest with words. Its Area's colour runs
 /// down the left edge and its icon leads the place line. An important
 /// Note gets an accent marker and a stronger emboss, an unimportant one
 /// is dimmed (UI laws, "Cards").
+///
+/// [full] shows the whole Note instead (#114): its Capture Context line
+/// by line, its text, every photo at full width with its Photo Text under
+/// it and every recording with its Transcript, both labelled and dimmed,
+/// and then each of its [sections], oldest first, the same way under its
+/// own Capture Context.
 class NoteCard extends StatelessWidget {
   final Note note;
 
@@ -189,8 +199,20 @@ class NoteCard extends StatelessWidget {
   /// The ⋮ menu's actions; no ⋮ when null.
   final NoteActions? actions;
 
-  /// Opens the Note's editor.
+  /// Whether the card shows the whole Note with its Sections, rather
+  /// than its first line.
+  final bool full;
+
+  /// Reads the Note's Sections, oldest first, for [full]; once per Note
+  /// read, never while building.
+  final List<Section> Function()? sections;
+
+  /// What a tap on the card does: unfold a compact Note in a list, pick
+  /// it in "merge into…"; nothing when null.
   final VoidCallback? onTap;
+
+  /// Opens the Note's editor on a long press; nothing when null.
+  final VoidCallback? onEdit;
 
   /// Shown where the action row goes, e.g. the trash's restore.
   final Widget? footer;
@@ -200,6 +222,10 @@ class NoteCard extends StatelessWidget {
 
   /// How many photo thumbnails a card shows; the rest are counted.
   static const shownPhotos = 3;
+
+  /// How tall a photo on a full card may get, so one of extreme
+  /// proportions cannot stretch the card.
+  static const photoHeight = 480.0;
 
   const NoteCard({
     super.key,
@@ -213,7 +239,10 @@ class NoteCard extends StatelessWidget {
     this.onMerge,
     this.onSchedule,
     this.actions,
+    this.full = false,
+    this.sections,
     this.onTap,
+    this.onEdit,
     this.footer,
   });
 
@@ -249,38 +278,41 @@ class NoteCard extends StatelessWidget {
           _AuthorLine(noteId: note.id, author: author),
           const SizedBox(height: 4),
         ],
-        Row(
-          children: [
-            Text(when.format(note.captured.toLocal()), style: text.bodySmall),
-            if (whereCaptured(note.context) case final where?) ...[
-              const SizedBox(width: 8),
-              Icon(
-                Icons.place_outlined,
-                size: 14,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 2),
-              Flexible(
-                child: Text(
-                  where,
-                  style: text.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+        if (full)
+          CaptureContextLines(capture: note.context, when: when)
+        else
+          Row(
+            children: [
+              Text(when.format(note.captured.toLocal()), style: text.bodySmall),
+              if (whereCaptured(note.context) case final where?) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.place_outlined,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
                 ),
-              ),
+                const SizedBox(width: 2),
+                Flexible(
+                  child: Text(
+                    where,
+                    style: text.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+              // The editor shows the rest.
+              if (note.context.hasMore) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.more_horiz,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                  semanticLabel: t.moreCaptureContext,
+                ),
+              ],
             ],
-            // The editor shows the rest.
-            if (note.context.hasMore) ...[
-              const SizedBox(width: 4),
-              Icon(
-                Icons.more_horiz,
-                size: 16,
-                color: scheme.onSurfaceVariant,
-                semanticLabel: t.moreCaptureContext,
-              ),
-            ],
-          ],
-        ),
+          ),
         if (place != null) ...[
           const SizedBox(height: 4),
           Row(
@@ -306,6 +338,7 @@ class NoteCard extends StatelessWidget {
             type: MaterialType.transparency,
             child: InkWell(
               onTap: onTap,
+              onLongPress: onEdit,
               child: Container(
                 decoration: colour == null
                     ? null
@@ -331,65 +364,77 @@ class NoteCard extends StatelessWidget {
                       ],
                     ),
                     const Divider(height: 24),
-                    // A photo Note may have no words.
-                    if (note.text.isNotEmpty)
-                      Text(note.text, style: text.bodyLarge),
-                    if (note.photos.isNotEmpty) ...[
-                      if (note.text.isNotEmpty) const SizedBox(height: 8),
-                      // Not a sideways list: swipes on a card belong to
-                      // the browser.
-                      Row(
-                        children: [
-                          for (final hash in note.photos.take(shownPhotos)) ...[
-                            NotePhoto(
-                              key: ValueKey(hash),
-                              hash: hash,
-                              size: 64,
-                            ),
-                            const SizedBox(width: 8),
+                    if (full)
+                      _FullNote(note: note, when: when, sections: sections)
+                    else ...[
+                      // A photo Note may have no words.
+                      if (note.text.isNotEmpty)
+                        Text(
+                          note.text.trim().split('\n').first,
+                          key: const ValueKey('note-first-line'),
+                          style: text.bodyLarge,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      if (note.photos.isNotEmpty) ...[
+                        if (note.text.isNotEmpty) const SizedBox(height: 8),
+                        // Not a sideways list: swipes on a card belong to
+                        // the browser.
+                        Row(
+                          children: [
+                            for (final hash in note.photos.take(
+                              shownPhotos,
+                            )) ...[
+                              NotePhoto(
+                                key: ValueKey(hash),
+                                hash: hash,
+                                size: 64,
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            if (note.photos.length > shownPhotos)
+                              Text(
+                                t.morePhotos(note.photos.length - shownPhotos),
+                                style: text.labelLarge,
+                              ),
                           ],
-                          if (note.photos.length > shownPhotos)
-                            Text(
-                              t.morePhotos(note.photos.length - shownPhotos),
-                              style: text.labelLarge,
-                            ),
-                        ],
-                      ),
-                    ],
-                    if (note.recordings.isNotEmpty) ...[
-                      if (note.text.isNotEmpty || note.photos.isNotEmpty)
-                        const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          for (final hash in note.recordings)
-                            RecordingButton(key: ValueKey(hash), hash: hash),
-                        ],
-                      ),
-                      for (final hash in note.recordings)
+                        ),
+                      ],
+                      if (note.recordings.isNotEmpty) ...[
+                        if (note.text.isNotEmpty || note.photos.isNotEmpty)
+                          const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final hash in note.recordings)
+                              RecordingButton(key: ValueKey(hash), hash: hash),
+                          ],
+                        ),
+                        for (final hash in note.recordings)
+                          TranscriptText(
+                            key: ValueKey('transcript:$hash'),
+                            noteId: note.id,
+                            hash: hash,
+                            transcript: note.transcripts[hash],
+                          ),
+                      ],
+                      // Removed, the file shows no more; its text stays.
+                      for (final hash in note.removedRecordings)
                         TranscriptText(
                           key: ValueKey('transcript:$hash'),
                           noteId: note.id,
                           hash: hash,
                           transcript: note.transcripts[hash],
                         ),
+                      for (final hash in note.removedPhotos)
+                        PhotoText(
+                          key: ValueKey('ocr:$hash'),
+                          noteId: note.id,
+                          hash: hash,
+                          photoText: note.photoTexts[hash],
+                          compact: true,
+                        ),
                     ],
-                    // Removed, the file shows no more; its text stays.
-                    for (final hash in note.removedRecordings)
-                      TranscriptText(
-                        key: ValueKey('transcript:$hash'),
-                        noteId: note.id,
-                        hash: hash,
-                        transcript: note.transcripts[hash],
-                      ),
-                    for (final hash in note.removedPhotos)
-                      PhotoText(
-                        key: ValueKey('ocr:$hash'),
-                        noteId: note.id,
-                        hash: hash,
-                        photoText: note.photoTexts[hash],
-                        compact: true,
-                      ),
                     if (acts || footer != null) const Divider(height: 24),
                     if (acts)
                       NoteActionRow(
@@ -485,7 +530,7 @@ class NoteActionRow extends StatelessWidget {
 }
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
-/// leads with the Note's Importance as radio buttons, the one it has
+/// leads with Edit, then the Note's Importance as radio buttons, the one it has
 /// marked, then sending, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", removing a photo or recording while its
 /// text stays, one entry each with the start of that text under it, and
@@ -526,6 +571,10 @@ class _MoreButton extends StatelessWidget {
           ),
         );
         return [
+          if (actions.onEdit case final edit?) ...[
+            item('note-edit', Icons.edit_outlined, t.edit, edit),
+            const PopupMenuDivider(),
+          ],
           if (actions.onImportance case final set?) ...[
             // The heading the choices continue: "Importance" "Important".
             PopupMenuItem(enabled: false, child: Text(t.importance)),
@@ -717,6 +766,237 @@ class _AuthorLineState extends State<_AuthorLine> {
                 child: line,
               ),
             ),
+    );
+  }
+}
+
+/// The Capture Context of a Note or Section, one line per thing known:
+/// the time; where it was, the Named Place with its coordinates or the
+/// coordinates alone; the app it was shared in from; the calendar events
+/// running; the Bluetooth devices connected.
+class CaptureContextLines extends StatelessWidget {
+  final CaptureContext capture;
+  final DateFormat when;
+
+  const CaptureContextLines({
+    super.key,
+    required this.capture,
+    required this.when,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final text = Theme.of(context).textTheme;
+    final location = capture.location;
+    final named = capture.namedPlace;
+    final lines = [
+      (Icons.schedule, when.format(capture.captured.toLocal())),
+      if (location != null)
+        (
+          Icons.place_outlined,
+          named == null
+              ? coordinatesText(location)
+              : '${named.name} (${coordinatesText(location)})',
+        ),
+      if (capture.sourceApp case final app?)
+        (Icons.apps, t.contextSourceApp(app.name)),
+      if (capture.calendarEvents.isNotEmpty)
+        (
+          Icons.event_outlined,
+          t.contextDuring(capture.calendarEvents.join(', ')),
+        ),
+      if (capture.bluetoothDevices.isNotEmpty)
+        (
+          Icons.bluetooth,
+          t.contextBluetooth(capture.bluetoothDevices.join(', ')),
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (i, (icon, line)) in lines.indexed) ...[
+          if (i > 0) const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(icon, size: 20, color: muted),
+              const SizedBox(width: 8),
+              Flexible(child: Text(line, style: text.bodyMedium)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// The whole of a Note on a full card: its text, photos and recordings,
+/// then each Section under a separator and its own Capture Context. The
+/// Sections are read when the Note is, not while building.
+class _FullNote extends StatefulWidget {
+  final Note note;
+  final DateFormat when;
+  final List<Section> Function()? sections;
+
+  const _FullNote({required this.note, required this.when, this.sections});
+
+  @override
+  State<_FullNote> createState() => _FullNoteState();
+}
+
+class _FullNoteState extends State<_FullNote> {
+  List<Section> _sections = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _read();
+  }
+
+  @override
+  void didUpdateWidget(_FullNote old) {
+    super.didUpdateWidget(old);
+    // Read again only when the Note was.
+    if (old.note != widget.note ||
+        (old.sections == null) != (widget.sections == null)) {
+      _read();
+    }
+  }
+
+  void _read() => _sections = widget.sections?.call() ?? const [];
+
+  @override
+  Widget build(BuildContext context) {
+    final note = widget.note;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Whole(
+          id: note.id,
+          text: note.text,
+          photos: note.photos,
+          photoTexts: note.photoTexts,
+          removedPhotos: note.removedPhotos,
+          recordings: note.recordings,
+          transcripts: note.transcripts,
+          removedRecordings: note.removedRecordings,
+        ),
+        for (final section in _sections)
+          Column(
+            key: ValueKey('section:${section.id}'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(height: 24),
+              CaptureContextLines(capture: section.context, when: widget.when),
+              const SizedBox(height: 8),
+              _Whole(
+                id: section.id,
+                text: section.text,
+                photos: section.photos,
+                photoTexts: section.photoTexts,
+                removedPhotos: section.removedPhotos,
+                recordings: section.recordings,
+                transcripts: section.transcripts,
+                removedRecordings: section.removedRecordings,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// The text, photos and recordings of a Note or Section [id] in full:
+/// each photo at full width, no taller than [NoteCard.photoHeight],
+/// opening full screen on a tap, with its Photo Text under it; each
+/// recording's play button with its Transcript; then the texts of the
+/// photos and recordings removed while their texts stay.
+class _Whole extends StatelessWidget {
+  final String id;
+  final String text;
+  final List<String> photos;
+  final Map<String, String> photoTexts;
+  final List<String> removedPhotos;
+  final List<String> recordings;
+  final Map<String, String> transcripts;
+  final List<String> removedRecordings;
+
+  const _Whole({
+    required this.id,
+    required this.text,
+    required this.photos,
+    required this.photoTexts,
+    required this.removedPhotos,
+    required this.recordings,
+    required this.transcripts,
+    required this.removedRecordings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyLarge;
+    final parts = <Widget>[
+      // A photo Note may have no words.
+      if (text.isNotEmpty) Text(text, style: style),
+      for (final hash in photos)
+        Column(
+          key: ValueKey(hash),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            NotePhoto(
+              hash: hash,
+              maxHeight: NoteCard.photoHeight,
+              onTap: () => viewPhoto(context, hash),
+            ),
+            PhotoText(
+              noteId: id,
+              hash: hash,
+              photoText: photoTexts[hash],
+              labelled: true,
+            ),
+          ],
+        ),
+      // Removed, the file shows no more; its text stays.
+      for (final hash in removedPhotos)
+        PhotoText(
+          key: ValueKey('ocr:$hash'),
+          noteId: id,
+          hash: hash,
+          photoText: photoTexts[hash],
+          labelled: true,
+        ),
+      for (final hash in recordings)
+        Column(
+          key: ValueKey(hash),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RecordingButton(hash: hash),
+            TranscriptText(
+              noteId: id,
+              hash: hash,
+              transcript: transcripts[hash],
+              labelled: true,
+            ),
+          ],
+        ),
+      for (final hash in removedRecordings)
+        TranscriptText(
+          key: ValueKey('transcript:$hash'),
+          noteId: id,
+          hash: hash,
+          transcript: transcripts[hash],
+          labelled: true,
+        ),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (i, part) in parts.indexed) ...[
+          if (i > 0) const SizedBox(height: 8),
+          part,
+        ],
+      ],
     );
   }
 }

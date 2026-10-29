@@ -40,7 +40,8 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, find.byTooltip('Search and browse'));
     await tap(tester, find.byTooltip('All Notes'));
-    await tap(tester, find.text(cardText));
+    await tester.longPress(find.text(cardText));
+    await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 

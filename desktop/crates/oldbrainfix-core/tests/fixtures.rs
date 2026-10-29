@@ -265,9 +265,23 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         }
     }
     let mut sections = serde_json::Map::new();
-    for note in all.iter().chain(trashed.iter()) {
-        let list: Vec<Value> = notes.sections(&note.id)?.iter().map(section_json).collect();
-        sections.insert(note.id.clone(), json!(list));
+    let listed: Vec<String> = all
+        .iter()
+        .chain(trashed.iter())
+        .map(|n| n.id.clone())
+        .collect();
+    // The one-pass read of a list gives what each Note's own read does.
+    let read = notes.sections_of(&listed)?;
+    for id in &listed {
+        let list: Vec<Value> = notes.sections(id)?.iter().map(section_json).collect();
+        let at_once: Vec<Value> = read
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(section_json)
+            .collect();
+        assert_eq!(at_once, list, "sections_of {id}");
+        sections.insert(id.clone(), json!(list));
     }
     let ids = |list: &[Note]| list.iter().map(|n| n.id.clone()).collect::<Vec<_>>();
     let mut searched = serde_json::Map::new();

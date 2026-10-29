@@ -68,7 +68,8 @@ void main() {
   Future<void> openEditor(WidgetTester tester, String text) async {
     await tap(tester, find.byIcon(Icons.search));
     await tap(tester, find.byTooltip('All Notes'));
-    await tap(tester, find.text(text));
+    await tester.longPress(find.text(text));
+    await tester.pumpAndSettle();
   }
 
   final moreIcon = find.byIcon(Icons.more_horiz);

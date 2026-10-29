@@ -5533,6 +5533,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The Note being captured'**
   String get noteBeingCaptured;
+
+  /// Bar button of a Note list that shows each Note by its first line only.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Notes compact'**
+  String get showNotesCompact;
+
+  /// Bar button of a Note list that shows each Note whole, with its Sections.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Notes in full'**
+  String get showNotesFull;
+
+  /// Small label above a Transcript on a Note card.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get transcriptLabel;
+
+  /// Small label above a Photo Text on a Note card.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Text'**
+  String get photoTextLabel;
 }
 
 class _AppLocalizationsDelegate

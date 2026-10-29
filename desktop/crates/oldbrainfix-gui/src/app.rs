@@ -254,6 +254,12 @@ struct View {
     /// change, by id.
     text_changeable: HashSet<String>,
     notes: Vec<Placed>,
+    /// The Sections of each Note listed, oldest first, read in one pass
+    /// for the full cards (#114).
+    sections: BTreeMap<String, Vec<Section>>,
+    /// Whether the list shows its Notes compact, by their first line,
+    /// as this Device keeps it for that list (#114).
+    compact: bool,
     /// The selected Note with its Sections.
     detail: Option<(Placed, Vec<Section>)>,
     /// Whether the Note being captured may spawn where it goes (#113).
@@ -518,7 +524,14 @@ struct Deleting {
 #[derive(Debug, Clone, PartialEq)]
 enum Action {
     Select(Selection),
+    /// Opens the Note's editor on the right: a double-click on its card
+    /// or Edit (#114).
     SelectNote(String),
+    /// Shows the compact card of this Note in full, in place (#114).
+    Unfold(String),
+    /// Switches the list shown to compact cards or full ones and keeps
+    /// the choice for that list on this Device (#114).
+    Compact(bool),
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
@@ -771,6 +784,10 @@ pub struct App {
     error: Option<String>,
     /// How far the Notes list is scrolled, for the parallax.
     scrolled: f32,
+    /// The Notes a click unfolded on the compact list shown, and which
+    /// list that is; they fold again once another list shows (#114).
+    unfolded: HashSet<String>,
+    unfolded_of: Option<String>,
     trail: Trail,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
@@ -1033,6 +1050,8 @@ impl App {
             view: View::default(),
             error: None,
             scrolled: 0.0,
+            unfolded: HashSet::new(),
+            unfolded_of: None,
             trail: Trail::default(),
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
@@ -2136,6 +2155,12 @@ impl App {
         if let Ok(quiet) = DeviceSettings::new(&self.store).quiet_hours() {
             self.quiet_text = (quiet.start.to_string(), quiet.end.to_string());
         }
+        // What a click unfolded stays while its list shows.
+        let cards = self.cards_key();
+        if cards != self.unfolded_of {
+            self.unfolded.clear();
+            self.unfolded_of = cards;
+        }
         let shown = self.view.detail.as_ref().map(|(p, _)| &p.note);
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
             self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
@@ -2143,6 +2168,17 @@ impl App {
             self.amend.clear();
         }
         self.kick();
+    }
+
+    /// Which Note list shows, by the phone's names (#114).
+    fn cards_key(&self) -> Option<String> {
+        let area = matches!(&self.selection, Selection::Place(id) if self.view.area(id).is_some());
+        cards_key(&self.selection, &self.people, area)
+    }
+
+    /// Whether the Note list shown shows its Notes compact (#114).
+    pub fn compact(&self) -> bool {
+        self.view.compact
     }
 
     /// How many Conflicts an automatic sync brought that are still open
@@ -2282,6 +2318,20 @@ impl App {
         for note in shown {
             placed.push(place(note)?);
         }
+        // Once per read for every card, never per frame.
+        let listed: Vec<String> = placed.iter().map(|p| p.note.id.clone()).collect();
+        let sections = if listed.is_empty() {
+            BTreeMap::new()
+        } else {
+            notes.sections_of(&listed)?
+        };
+        let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
+        let compact = match cards_key(&self.selection, &self.people, is_area) {
+            Some(key) => {
+                self.store.local_setting(&compact_setting(&key))?.as_deref() == Some("true")
+            }
+            None => false,
+        };
         let note_routines = match &detail {
             Some((p, _)) if !p.note.is_trashed() => routines.of_note(&p.note.id)?,
             _ => Vec::new(),
@@ -2488,6 +2538,8 @@ impl App {
             remakeable,
             text_changeable,
             notes: placed,
+            sections,
+            compact,
             detail,
             capture_spawns: capture_choices::may_spawn(
                 &self.store,
@@ -2684,6 +2736,21 @@ impl App {
             }
             Action::Search => {}
             Action::FilterPeople(people) => self.people = people,
+            Action::Unfold(id) => {
+                self.unfolded.insert(id);
+            }
+            Action::Compact(on) => {
+                if let Some(key) = self.cards_key() {
+                    // Nothing kept means full, the default.
+                    let setting = compact_setting(&key);
+                    if on {
+                        self.store.set_local_setting(&setting, "true")?;
+                    } else {
+                        self.store.remove_local_setting(&setting)?;
+                    }
+                }
+                self.unfolded.clear();
+            }
             Action::Speech(asked) => {
                 if let Some(speech) = &self.speech {
                     match asked {
@@ -4435,6 +4502,10 @@ impl App {
             {
                 actions.push(Action::NewTopic(id.clone()));
             }
+            // Every Note list but the trash has its full/compact switch.
+            if self.cards_key().is_some() && compact_button(ui, tones, &self.t, self.view.compact) {
+                actions.push(Action::Compact(!self.view.compact));
+            }
             if self.selection != Selection::Trash {
                 self.person_filter_menu(ui, actions);
             }
@@ -4504,7 +4575,8 @@ impl App {
                 ui.add_space(4.0);
                 let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
                 for placed in &self.view.notes {
-                    let selected = self.selected_note.as_deref() == Some(placed.note.id.as_str());
+                    let id = &placed.note.id;
+                    let selected = self.selected_note.as_deref() == Some(id.as_str());
                     // A Note in the trash is restored, not filed.
                     let draggable = !placed.note.is_trashed();
                     let media = CardMedia {
@@ -4513,14 +4585,34 @@ impl App {
                         store: &self.store,
                         transcribing: transcribing.as_deref(),
                     };
-                    let (card, author) =
-                        note_card(ui, &self.t, tones, placed, selected, draggable, media);
-                    if let (Some(author), Some(profile)) = (author, &placed.author)
+                    let look = CardLook {
+                        full: !self.view.compact || self.unfolded.contains(id),
+                        sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
+                    };
+                    let clicks = note_card(
+                        ui,
+                        &self.t,
+                        tones,
+                        placed,
+                        (selected, draggable),
+                        look,
+                        media,
+                    );
+                    // A click unfolds a compact Note and does nothing to a
+                    // full one; a double-click or Edit opens the editor
+                    // (UI laws, "Desktop").
+                    if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
                         && author.clicked()
                     {
                         actions.push(Action::OpenPerson(profile.id.clone()));
-                    } else if card.clicked() {
-                        actions.push(Action::SelectNote(placed.note.id.clone()));
+                    } else if clicks.edit.clicked()
+                        // A click soon after two more counts as well.
+                        || clicks.card.double_clicked()
+                        || clicks.card.triple_clicked()
+                    {
+                        actions.push(Action::SelectNote(id.clone()));
+                    } else if clicks.card.clicked() && !look.full {
+                        actions.push(Action::Unfold(id.clone()));
                     }
                 }
                 ui.add_space(8.0);
@@ -6445,6 +6537,27 @@ const BLOCKED_OPEN: &str = "peopleBlockedOpen";
 /// the phone names it.
 const FROGS_DONE_OPEN: &str = "frogsDoneOpen";
 
+/// The setting of this Device that keeps the Note list `key` compact
+/// (#114), the phone's; none while it shows in full, the default.
+fn compact_setting(key: &str) -> String {
+    format!("compactNotes:{key}")
+}
+
+/// Which Note list `selection` shows, by the phone's names, each keeping
+/// its own full/compact choice (#114): all Notes, or a person's while
+/// `people` keeps only some, Unsorted, an Area (`area`) or a Topic. A
+/// search inside one follows its choice; the trash has none.
+fn cards_key(selection: &Selection, people: &PersonFilter, area: bool) -> Option<String> {
+    Some(match selection {
+        Selection::All if people.is_everyone() => "allNotes".to_string(),
+        Selection::All => "personNotes".to_string(),
+        Selection::Unsorted => "unsorted".to_string(),
+        Selection::Place(id) if area => format!("area:{id}"),
+        Selection::Place(id) => format!("topic:{id}"),
+        _ => return None,
+    })
+}
+
 /// A person in People: their picture and name, either opening their
 /// Profile.
 fn people_row(
@@ -7983,11 +8096,6 @@ fn editor_media(
     }
 }
 
-/// A Note as a card (UI laws, "Cards"): its text, when it was captured
-/// and where it is filed, its Area's colour down the left edge and icon
-/// before the place. Important cards carry the accent marker and a
-/// stronger emboss; unimportant ones are dimmed. A `draggable` card can
-/// be dropped onto an Area or Topic.
 /// What a card needs to show its photos and recordings.
 struct CardMedia<'a> {
     photos: &'a mut PhotoCache,
@@ -7997,24 +8105,141 @@ struct CardMedia<'a> {
     transcribing: Option<&'a str>,
 }
 
+/// How a card shows its Note (#114): `full`, the whole Note with its
+/// `sections`, or compact, by its first line.
+#[derive(Debug, Clone, Copy)]
+struct CardLook<'a> {
+    full: bool,
+    sections: &'a [Section],
+}
+
+/// What can be clicked on a card: the card, the author's picture on
+/// another person's Note, and Edit.
+struct CardClicks {
+    card: egui::Response,
+    author: Option<egui::Response>,
+    edit: egui::Response,
+}
+
+/// The bar button of a Note list's full/compact switch (#114): it says
+/// what clicking it does and shows as selected while the list is
+/// `compact`; whether it was clicked.
+fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
+    let (icon, label) = if compact {
+        (icons::NOTES_COMPACT, t.show_notes_full())
+    } else {
+        (icons::NOTES_FULL, t.show_notes_compact())
+    };
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, compact, label));
+    let fill = if compact {
+        tones.accent.gamma_multiply(0.3)
+    } else if resp.hovered() {
+        ui.visuals().widgets.hovered.weak_bg_fill
+    } else {
+        Color32::TRANSPARENT
+    };
+    if fill.a() > 0 {
+        ui.painter().rect_filled(rect, 6.0, fill);
+    }
+    let text = ui.visuals().text_color();
+    icons::paint(ui.painter(), rect.shrink(2.0), icon, text);
+    resp.on_hover_text(label).clicked()
+}
+
+/// The text of a Note or Section and its photos and voice recordings,
+/// each as `(shown, removed, texts)`.
+struct Part<'a> {
+    text: &'a str,
+    photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
+    recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
+}
+
+impl<'a> Part<'a> {
+    fn of_note(note: &'a Note) -> Part<'a> {
+        Part {
+            text: &note.text,
+            photos: (&note.photos, &note.removed_photos, &note.photo_texts),
+            recordings: (
+                &note.recordings,
+                &note.removed_recordings,
+                &note.transcripts,
+            ),
+        }
+    }
+
+    fn of_section(section: &'a Section) -> Part<'a> {
+        Part {
+            text: &section.text,
+            photos: (
+                &section.photos,
+                &section.removed_photos,
+                &section.photo_texts,
+            ),
+            recordings: (
+                &section.recordings,
+                &section.removed_recordings,
+                &section.transcripts,
+            ),
+        }
+    }
+}
+
+/// The text, photos and recordings of a Note or Section in full on a
+/// card (#114), with their Transcripts and Photo Texts.
+fn whole(ui: &mut Ui, t: &L10n, part: Part, (cache, store, transcribing): ShownMedia) {
+    if !part.text.is_empty() {
+        let text = ui.visuals().text_color();
+        ui.label(RichText::new(part.text).size(16.0).color(text));
+    }
+    media_view::whole_media(
+        ui,
+        t,
+        (cache, store),
+        part.photos,
+        part.recordings,
+        transcribing,
+    );
+}
+
+/// The photo cache, the store the photos are read from and the
+/// recording being transcribed, for [`whole`].
+type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
+
+/// A Note as a card (UI laws, "Cards"): when it was captured, with Edit,
+/// and where it is filed, its Area's colour down the left edge and icon
+/// before the place; then, as `look` says, the whole Note with every
+/// Section oldest first, each under its own date, or its first line with
+/// its media. Important cards carry the accent marker and a stronger
+/// emboss; unimportant ones are dimmed. A `draggable` card can be
+/// dropped onto an Area or Topic; a `selected` one is outlined while its
+/// editor shows.
 fn note_card(
     ui: &mut Ui,
     t: &L10n,
     tones: Tones,
     placed: &Placed,
-    selected: bool,
-    draggable: bool,
+    (selected, draggable): (bool, bool),
+    look: CardLook,
     media: CardMedia,
-) -> (egui::Response, Option<egui::Response>) {
+) -> CardClicks {
     let note = &placed.note;
     let important = note.importance == Importance::Important;
+    let unimportant = note.importance == Importance::Unimportant;
     let colour = placed
         .area
         .as_ref()
         .and_then(|a| area_colour(a.colour.as_deref()));
     let mut author_rect = None;
+    let mut edit_rect = egui::Rect::NOTHING;
+    let CardMedia {
+        photos,
+        pictures,
+        store,
+        transcribing,
+    } = media;
     let inner = ui.scope(|ui| {
-        if note.importance == Importance::Unimportant {
+        if unimportant {
             ui.multiply_opacity(theme::UNIMPORTANT_OPACITY);
         }
         let text = ui.visuals().text_color();
@@ -8024,29 +8249,6 @@ fn note_card(
                 // Room for the marker on the right.
                 ui.set_max_width(ui.available_width() - 36.0);
             }
-            // A photo Note may have no words.
-            if !note.text.is_empty() {
-                ui.label(RichText::new(&note.text).size(16.0).color(text));
-            }
-            if !note.photos.is_empty() {
-                media_view::thumbnails(ui, t, media.photos, media.store, &note.photos, 64.0, 3);
-            }
-            media_view::recordings(
-                ui,
-                t,
-                &note.recordings,
-                &note.transcripts,
-                (None, media.transcribing, 1.0),
-                false,
-                &|_| Offers::default(),
-            );
-            media_view::removed_texts(
-                ui,
-                t,
-                (&note.removed_photos, &note.photo_texts),
-                (&note.removed_recordings, &note.transcripts),
-                &|_, _| Offers::default(),
-            );
             // Another person's Note shows their picture (ADR 0017); the
             // user's own none.
             ui.horizontal(|ui| {
@@ -8054,7 +8256,7 @@ fn note_card(
                     let name = profile_view::display_name(t, &author.name);
                     let picture = profile_view::person_picture(
                         ui,
-                        media.pictures,
+                        pictures,
                         author,
                         20.0,
                         &t.author_picture(name),
@@ -8062,6 +8264,11 @@ fn note_card(
                     author_rect = Some(picture.rect);
                 }
                 ui.label(RichText::new(when(t, note.captured)).small().color(weak));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    edit_rect = ui
+                        .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
+                        .0;
+                });
             });
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.
@@ -8082,6 +8289,44 @@ fn note_card(
                     ui.label(RichText::new(place).size(13.0).color(text));
                 });
             }
+            ui.separator();
+            if look.full {
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 8.0;
+                    let part = Part::of_note(note);
+                    whole(ui, t, part, (&mut *photos, store, transcribing));
+                    for section in look.sections {
+                        ui.separator();
+                        ui.label(RichText::new(when(t, section.captured)).small().color(weak));
+                        let part = Part::of_section(section);
+                        whole(ui, t, part, (&mut *photos, store, transcribing));
+                    }
+                });
+                return;
+            }
+            // A photo Note may have no words.
+            if let Some(first) = note.text.trim().lines().next() {
+                ui.add(egui::Label::new(RichText::new(first).size(16.0).color(text)).truncate());
+            }
+            if !note.photos.is_empty() {
+                media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
+            }
+            media_view::recordings(
+                ui,
+                t,
+                &note.recordings,
+                &note.transcripts,
+                (None, transcribing, 1.0),
+                false,
+                &|_| Offers::default(),
+            );
+            media_view::removed_texts(
+                ui,
+                t,
+                (&note.removed_photos, &note.photo_texts),
+                (&note.removed_recordings, &note.transcripts),
+                &|_, _| Offers::default(),
+            );
         });
         let rect = card.rect;
         if important {
@@ -8112,8 +8357,8 @@ fn note_card(
     if draggable {
         resp.dnd_set_drag_payload(DraggedNote(note.id.clone()));
     }
-    // The author's picture lies over the card and opens their Profile
-    // (#52): registered after the card, so it takes the click.
+    // The author's picture and Edit lie over the card: registered after
+    // it, so they take the click.
     let author = author_rect
         .zip(placed.author.as_ref())
         .map(|(rect, author)| {
@@ -8124,7 +8369,28 @@ fn note_card(
                 .on_hover_cursor(egui::CursorIcon::PointingHand)
                 .on_hover_text(label)
         });
-    (resp.on_hover_cursor(egui::CursorIcon::PointingHand), author)
+    let edit = ui.interact(edit_rect, Id::new(("edit", &note.id)), Sense::click());
+    edit.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.edit()));
+    if ui.is_rect_visible(edit_rect) {
+        let dim = |c: Color32| {
+            if unimportant {
+                c.gamma_multiply(theme::UNIMPORTANT_OPACITY)
+            } else {
+                c
+            }
+        };
+        if edit.hovered() {
+            let fill = dim(ui.visuals().widgets.hovered.weak_bg_fill);
+            ui.painter().rect_filled(edit_rect, 6.0, fill);
+        }
+        let fg = dim(ui.visuals().text_color());
+        icons::paint(ui.painter(), edit_rect.shrink(2.0), icons::EDIT, fg);
+    }
+    CardClicks {
+        card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
+        author,
+        edit: edit.on_hover_text(t.edit()),
+    }
 }
 
 #[cfg(test)]

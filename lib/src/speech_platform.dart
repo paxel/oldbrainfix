@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
 import 'l10n.dart';
+import 'ocr_platform.dart' show GeneratedTextLabel;
 import 'place_names.dart';
 
 /// The speech models Transcripts can be made with (ADR 0007):
@@ -583,12 +584,15 @@ class SpeechScope extends InheritedWidget {
 /// shown under its play button: [transcript] as read with the Note, and
 /// whatever the [Transcriber] writes while it shows. While the recording
 /// is being transcribed it says so; with no Transcript it shows nothing.
-/// A card shows the first few lines when [compact] is set.
+/// A card shows the first few lines when [compact] is set; [labelled],
+/// on a full card, shows it whole and dimmed under the word "Transcript",
+/// so it does not read as typed text.
 class TranscriptText extends StatefulWidget {
   final String noteId;
   final String hash;
   final String? transcript;
   final bool compact;
+  final bool labelled;
 
   const TranscriptText({
     super.key,
@@ -596,6 +600,7 @@ class TranscriptText extends StatefulWidget {
     required this.hash,
     required this.transcript,
     this.compact = true,
+    this.labelled = false,
   });
 
   @override
@@ -653,23 +658,32 @@ class _TranscriptTextState extends State<TranscriptText> {
     );
     final text = _text;
     if (text == null && !_transcribing) return const SizedBox.shrink();
+    final labelled = widget.labelled;
+    final compact = widget.compact && !labelled;
+    // Transcribed again, the Transcript before gives way meanwhile.
+    final Widget shown = switch (text) {
+      _ when _transcribing => Text(t.transcribing, style: quiet),
+      null => Text(t.transcribing, style: quiet),
+      '' => Text(t.noWordsHeard, style: quiet),
+      _ => Text(
+        text,
+        maxLines: compact ? 3 : null,
+        overflow: compact ? TextOverflow.ellipsis : null,
+        style: labelled
+            ? theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              )
+            : compact
+            ? theme.textTheme.bodyMedium
+            : theme.textTheme.bodyLarge,
+      ),
+    };
     return Padding(
       // Apart from the play button; nothing at all while there is no text.
-      padding: EdgeInsets.only(top: widget.compact ? 4 : 8),
-      // Transcribed again, the Transcript before gives way meanwhile.
-      child: switch (text) {
-        _ when _transcribing => Text(t.transcribing, style: quiet),
-        null => Text(t.transcribing, style: quiet),
-        '' => Text(t.noWordsHeard, style: quiet),
-        _ => Text(
-          text,
-          maxLines: widget.compact ? 3 : null,
-          overflow: widget.compact ? TextOverflow.ellipsis : null,
-          style: widget.compact
-              ? theme.textTheme.bodyMedium
-              : theme.textTheme.bodyLarge,
-        ),
-      },
+      padding: EdgeInsets.only(top: compact ? 4 : 8),
+      child: labelled
+          ? GeneratedTextLabel(label: t.transcriptLabel, child: shown)
+          : shown,
     );
   }
 }

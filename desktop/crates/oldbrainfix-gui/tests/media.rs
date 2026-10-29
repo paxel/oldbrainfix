@@ -183,6 +183,16 @@ fn shows<S>(harness: &Harness<'_, S>, label: &str) -> bool {
     harness.query_all_by_label(label).next().is_some()
 }
 
+/// Where `label` shows furthest right: in the editor, when the card in
+/// the middle shows it too (#114).
+fn rightmost<S>(harness: &Harness<'_, S>, label: &str) -> egui::Rect {
+    harness
+        .query_all_by_label(label)
+        .map(|n| n.rect())
+        .max_by(|a, b| a.left().total_cmp(&b.left()))
+        .unwrap_or_else(|| panic!("no {label:?}"))
+}
+
 #[test]
 fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> TestResult {
     let store = empty_store()?;
@@ -767,11 +777,11 @@ fn removing_a_photo_asks_once_and_keeps_its_photo_text() -> TestResult {
     harness.run();
     let photo = "0b6a0c7fce2f928971ccdff4431e34871dabb53e11455a29afc2fd5bed4d2e90";
     // The editor shows the Photo Text under its photo, above its button
-    // (#97); the card shows the photo alone.
+    // (#97); the full card shows it under the photo too (#114).
     let spare = "Spare key under the pot";
-    assert_eq!(harness.query_all_by_label(spare).count(), 1);
+    assert_eq!(harness.query_all_by_label(spare).count(), 2);
     let button = harness.get_by_label("Remove photo, keep text").rect();
-    assert!(harness.get_by_label(spare).rect().bottom() <= button.top());
+    assert!(rightmost(&harness, spare).bottom() <= button.top());
     // Cancel keeps it.
     harness.get_by_label("Remove photo, keep text").click();
     harness.run();
@@ -965,8 +975,8 @@ fn replace_and_append_take_a_photo_text_over_into_the_notes_text() -> TestResult
         "Remove photo, keep text",
     ];
     for pair in order.windows(2) {
-        let above = harness.get_by_label(pair[0]).rect();
-        let below = harness.get_by_label(pair[1]).rect();
+        let above = rightmost(&harness, pair[0]);
+        let below = rightmost(&harness, pair[1]);
         assert!(above.bottom() <= below.top(), "{pair:?}");
     }
     let text = |store: &Store| -> Result<String, Box<dyn std::error::Error>> {

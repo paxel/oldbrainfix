@@ -39,7 +39,8 @@ class AreasScreen extends StatefulWidget {
   State<AreasScreen> createState() => _AreasScreenState();
 }
 
-class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
+class _AreasScreenState extends State<AreasScreen>
+    with ReloadsOnLogChange, FoldsNoteCards {
   final _query = TextEditingController();
   List<Area> _areas = const [];
 
@@ -106,6 +107,10 @@ class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
 
   @override
   Store get log => widget.places.store;
+
+  /// The hits of the search over every Area.
+  @override
+  String get cardsKey => 'search';
 
   @override
   void reloadLog() => _reload();
@@ -315,12 +320,14 @@ class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
           title: Text(t.areasTitle),
           actions: [
             // Only the search's hits are Notes on this level.
-            if (searching)
+            if (searching) ...[
               PersonFilterButton(
                 store: widget.places.store,
                 filter: _filter,
                 onChanged: _filtered,
               ),
+              CompactNotesButton(compact: compact, onChanged: setCompact),
+            ],
             IconButton(
               tooltip: t.allNotesTitle,
               onPressed: _openAllNotes,
@@ -364,6 +371,9 @@ class _AreasScreenState extends State<AreasScreen> with ReloadsOnLogChange {
                         _reload,
                         // Hits from every Area.
                         (_) => true,
+                        compact: compact,
+                        unfolded: unfolded,
+                        onUnfold: unfold,
                       )
                     : _areaRows(t),
               ),
@@ -407,7 +417,8 @@ class AreaScreen extends StatefulWidget {
   State<AreaScreen> createState() => _AreaScreenState();
 }
 
-class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
+class _AreaScreenState extends State<AreaScreen>
+    with ReloadsOnLogChange, FoldsNoteCards {
   final _query = TextEditingController();
   Area? _area;
   List<Topic> _topics = const [];
@@ -483,6 +494,10 @@ class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
 
   @override
   Store get log => widget.places.store;
+
+  /// The Area's Notes and the hits of a search in it.
+  @override
+  String get cardsKey => 'area:${widget.areaId}';
 
   @override
   void reloadLog() => _reload();
@@ -652,6 +667,9 @@ class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
         // The Area's own Notes, under its title.
         showPlace: (_) => false,
         onSchedule: _schedule,
+        compact: compact,
+        unfolded: unfolded,
+        onUnfold: unfold,
       ),
     ];
   }
@@ -686,6 +704,7 @@ class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
                 _load();
               }),
             ),
+            CompactNotesButton(compact: compact, onChanged: setCompact),
           ],
         ),
         body: Column(
@@ -718,6 +737,9 @@ class _AreaScreenState extends State<AreaScreen> with ReloadsOnLogChange {
                         _reload,
                         // A hit in one of the Topics names it.
                         (placed) => placed.note.place != widget.areaId,
+                        compact: compact,
+                        unfolded: unfolded,
+                        onUnfold: unfold,
                       )
                     : _browsing(t, area),
               ),
@@ -756,7 +778,8 @@ class TopicScreen extends StatefulWidget {
   State<TopicScreen> createState() => _TopicScreenState();
 }
 
-class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
+class _TopicScreenState extends State<TopicScreen>
+    with ReloadsOnLogChange, FoldsNoteCards {
   final _query = TextEditingController();
   late Topic? _topic;
   late List<PlacedNote> _diary;
@@ -815,6 +838,10 @@ class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
 
   @override
   Store get log => widget.places.store;
+
+  /// The Topic's Notes and the hits of a search in it.
+  @override
+  String get cardsKey => 'topic:${widget.topicId}';
 
   @override
   void reloadLog() => _reload();
@@ -880,6 +907,7 @@ class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
                 _load();
               }),
             ),
+            CompactNotesButton(compact: compact, onChanged: setCompact),
           ],
         ),
         body: Column(
@@ -912,6 +940,9 @@ class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
                         _reload,
                         // Every hit is in the Topic of the title.
                         (_) => false,
+                        compact: compact,
+                        unfolded: unfolded,
+                        onUnfold: unfold,
                       )
                     : _diary.isEmpty
                     ? [
@@ -931,6 +962,9 @@ class _TopicScreenState extends State<TopicScreen> with ReloadsOnLogChange {
                         onChanged: _reload,
                         showPlace: (_) => false,
                         onSchedule: _schedule,
+                        compact: compact,
+                        unfolded: unfolded,
+                        onUnfold: unfold,
                       ),
               ),
             ),
@@ -981,8 +1015,11 @@ List<Widget> _hitCards(
   void Function(Note note, Spawn spawn) onSchedule,
   Notes notes,
   VoidCallback onChanged,
-  bool Function(PlacedNote placed) showPlace,
-) => hits.isEmpty
+  bool Function(PlacedNote placed) showPlace, {
+  required bool compact,
+  required Set<String> unfolded,
+  required void Function(Note note) onUnfold,
+}) => hits.isEmpty
     ? [BrowserEmpty(text: context.t.nothingFound)]
     : diaryCards(
         context,
@@ -994,6 +1031,9 @@ List<Widget> _hitCards(
         onChanged: onChanged,
         showPlace: showPlace,
         onSchedule: onSchedule,
+        compact: compact,
+        unfolded: unfolded,
+        onUnfold: onUnfold,
       );
 
 /// Opens "file into…" for [note] and files it; true when it moved.

@@ -47,6 +47,12 @@ pub const ARROW_DOWN: char = '\u{e097}';
 pub const PICK_DONE: char = '\u{e15a}';
 pub const PICK_OPEN: char = '\u{e504}';
 pub const SWAP: char = '\u{e625}';
+/// `edit`, as Edit in a Note card's ⋮ on the phone.
+pub const EDIT: char = '\u{e21a}';
+/// `view_agenda_outlined` and `view_headline`, as the phone's Note lists
+/// show their full/compact switch while full and while compact (#114).
+pub const NOTES_FULL: char = '\u{f48f}';
+pub const NOTES_COMPACT: char = '\u{e6b3}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

@@ -31,12 +31,14 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 ## Gestures
 
-- **Tap is the primary action.** On a list row or card it opens the
-  thing; on a checkbox it checks. A tap on a row or card never opens a
-  menu.
+- **Tap is the primary action.** On a list row it opens the thing; on a
+  checkbox it checks. A tap on a Note card unfolds it in place while it
+  is compact and does nothing while it is full; in "merge into…" it
+  picks the Note. A tap on a row or card never opens a menu.
 - **Long-press is the secondary action**: a menu, or the editor when
-  there is only one thing to do. A long-press never changes data by
-  itself.
+  there is only one thing to do. A long-press on a Note card opens its
+  editor, as Edit in its ⋮ does; nothing else opens it from a card. A
+  long-press never changes data by itself.
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
 - **A horizontal swipe only navigates** (see Navigation); it never
@@ -137,9 +139,22 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - A Note is drawn as a card with a soft embossed look, visibly above the
   background.
-- A card shows date, time and, when known, the Named Place or location,
-  plus a Capture Context icon when there is more to see. Tapping the card
-  opens the full editor, which shows everything about the Note.
+- **A Note is read on its card; the editor is the last step.** A full
+  card shows the whole Note: every Section oldest first, the original
+  and then each Amend and Merge, each under its date and Capture
+  Context, with all its photos, recordings, Transcripts and Photo Texts.
+  A Transcript or Photo Text shows whole under its recording or photo,
+  dimmed and labelled "Transcript" or "Photo Text", so it never reads as
+  typed text.
+- A photo on a full card fills the card's width in its own proportions,
+  its height capped, and is decoded no larger than it shows, so an
+  extreme picture (12 × 34,000 px) cannot break the card; a tap opens it
+  full screen with zoom.
+- A compact card shows date, time and, when known, the Named Place or
+  location, plus a Capture Context icon when there is more to see, the
+  Note's first line, its media and the action row.
+- The editor opens only through a long press on the card or Edit in its
+  ⋮.
 - Another person's Note shows their Profile picture, or its
   placeholder, on its card; one's own Notes show none. Tapping another
   person's picture, anywhere it shows, opens their Profile.
@@ -195,6 +210,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A part of a page that is rarely needed folds; the fold is remembered
   per Device in a setting of that Device, closed by default when there
   is already a choice.
+- **Every Note list has a full/compact switch** on its bar: each Area,
+  each Topic, Unsorted (with the Nudge screen), the search results and a
+  person's Notes. It is an on/off toggle of the view, not a choice of
+  value: one button that says what tapping it does. Full is the
+  default; each list remembers its own choice in a setting of this
+  Device. A search inside an Area or Topic follows that list's switch.
 - Rows show what the user needs to act, not the stored encoding: dates
   in the device format, values translated, storage keys never.
 
@@ -232,6 +253,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - The desktop window is multi-pane: Areas and Topics on the left, Notes
   in the middle, the selected Note's editor on the right, the Agenda as
   a panel or view.
+- In the Note lists a click unfolds a compact Note; a double-click or
+  Edit opens the editor.
 - Keys replace swipes: one for back, one for forward. They are Alt+Left
   and Alt+Right, and the mouse's back and forward buttons; the keys
   rest while text is being typed.

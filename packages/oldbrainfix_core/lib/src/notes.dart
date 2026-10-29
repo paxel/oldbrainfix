@@ -784,24 +784,7 @@ class Notes {
     final owners = {noteId, ...merged};
     final sections = [
       for (final id in merged)
-        if (byId(id) case final note?)
-          Section(
-            id: id,
-            noteId: noteId,
-            text: note.text,
-            textFormat: note.textFormat,
-            textVersion: note.textVersion,
-            textEditable: note.textEditable,
-            context: note.context,
-            photos: note.photos,
-            recordings: note.recordings,
-            transcripts: note.transcripts,
-            photoTexts: note.photoTexts,
-            removedPhotos: note.removedPhotos,
-            removedRecordings: note.removedRecordings,
-            removedTranscripts: note.removedTranscripts,
-            removedPhotoTexts: note.removedPhotoTexts,
-          ),
+        if (byId(id) case final note?) _merged(note, noteId),
       for (final id in store.entitiesOfType(SectionKeys.typeSection))
         if (owners.contains(store.current(id, SectionKeys.note)))
           ?_section(id, noteId: noteId),
@@ -809,6 +792,59 @@ class Notes {
     sections.sort((a, b) => a.context.captured.compareTo(b.context.captured));
     return sections;
   }
+
+  /// The Sections of each Note of [noteIds], exactly as [sections] gives
+  /// them, read in one pass over the Notes and Sections: for a list that
+  /// shows many Notes in full (#114). Every id asked for is a key, one
+  /// that is not a Note with the Sections that name it, if any.
+  Map<String, List<Section>> sectionsOf(Iterable<String> noteIds) {
+    final of = {for (final id in noteIds) id: <Section>[]};
+    // Where each Note merged into one of them shows: its Amends show
+    // there as well as under itself.
+    final into = <String, String>{};
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      final end = _mergedInto(id);
+      if (end == null) continue;
+      if (of[end] case final list?) {
+        into[id] = end;
+        if (byId(id) case final note?) list.add(_merged(note, end));
+      }
+    }
+    for (final id in store.entitiesOfType(SectionKeys.typeSection)) {
+      final owner = store.current(id, SectionKeys.note);
+      if (owner == null) continue;
+      for (final noteId in [owner, ?into[owner]]) {
+        final list = of[noteId];
+        if (list == null) continue;
+        if (_section(id, noteId: noteId) case final section?) {
+          list.add(section);
+        }
+      }
+    }
+    for (final list in of.values) {
+      list.sort((a, b) => a.context.captured.compareTo(b.context.captured));
+    }
+    return of;
+  }
+
+  /// The Note [note], merged into [noteId], as a Section of it.
+  static Section _merged(Note note, String noteId) => Section(
+    id: note.id,
+    noteId: noteId,
+    text: note.text,
+    textFormat: note.textFormat,
+    textVersion: note.textVersion,
+    textEditable: note.textEditable,
+    context: note.context,
+    photos: note.photos,
+    recordings: note.recordings,
+    transcripts: note.transcripts,
+    photoTexts: note.photoTexts,
+    removedPhotos: note.removedPhotos,
+    removedRecordings: note.removedRecordings,
+    removedTranscripts: note.removedTranscripts,
+    removedPhotoTexts: note.removedPhotoTexts,
+  );
 
   /// Records where the Note or Section [id] was captured. The position
   /// arrives after Capture, so it is attached later and never holds the

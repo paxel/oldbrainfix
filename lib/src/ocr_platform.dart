@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'l10n.dart';
+
 /// The platform seam for Photo Texts: ocrs with its models bundled in
 /// the app (android/ocr, android/…/Ocr.kt), so it works offline and
 /// needs nothing fetched. Widget tests hand in a fake.
@@ -213,16 +215,48 @@ class PhotoReaderScope extends InheritedWidget {
       reader != oldWidget.reader;
 }
 
+/// A Transcript or Photo Text under its [label], both dimmed, so it does
+/// not read as typed text.
+class GeneratedTextLabel extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const GeneratedTextLabel({
+    super.key,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
 /// The Photo Text of the photo [hash] of the Note [noteId], shown under
 /// the photo: [photoText] as read with the Note, and whatever the
 /// [PhotoReader] writes while it shows. A photo without text, or not
 /// read yet, shows nothing. [compact], on a card, shows the first three
-/// lines.
+/// lines; [labelled], on a full card, shows it whole under the word
+/// "Photo Text", so it does not read as typed text.
 class PhotoText extends StatefulWidget {
   final String noteId;
   final String hash;
   final String? photoText;
   final bool compact;
+  final bool labelled;
 
   const PhotoText({
     super.key,
@@ -230,6 +264,7 @@ class PhotoText extends StatefulWidget {
     required this.hash,
     required this.photoText,
     this.compact = false,
+    this.labelled = false,
   });
 
   @override
@@ -273,16 +308,19 @@ class _PhotoTextState extends State<PhotoText> {
     final text = _text;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final shown = Text(
+      text,
+      maxLines: widget.compact ? 3 : null,
+      overflow: widget.compact ? TextOverflow.ellipsis : null,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text(
-        text,
-        maxLines: widget.compact ? 3 : null,
-        overflow: widget.compact ? TextOverflow.ellipsis : null,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
+      child: widget.labelled
+          ? GeneratedTextLabel(label: context.t.photoTextLabel, child: shown)
+          : shown,
     );
   }
 }

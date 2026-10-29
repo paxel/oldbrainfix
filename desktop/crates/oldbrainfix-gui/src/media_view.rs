@@ -11,7 +11,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
-use egui::{ColorImage, RichText, TextureHandle, TextureOptions, Ui};
+use egui::{
+    ColorImage, RichText, Sense, TextureHandle, TextureOptions, Ui, WidgetInfo, WidgetType,
+};
 use oldbrainfix_core::Store;
 use oldbrainfix_core::settings::PLAYBACK_SPEEDS;
 use oldbrainfix_whisper::model::{Outcome, WhisperModel};
@@ -19,20 +21,41 @@ use oldbrainfix_whisper::model::{Outcome, WhisperModel};
 use crate::app::icon_button;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::media::{pixels, speed_number};
+use crate::media::{dimensions, pixels, speed_number};
 use crate::speech::{SpeechModel, Status};
 
 /// The long edge photos are shown at, at most.
 const SHOWN_EDGE: u32 = 1024;
 
+/// How tall a photo on a full card may get, so one of extreme
+/// proportions cannot stretch the card (#114), as on the phone.
+pub const CARD_PHOTO_HEIGHT: f32 = 480.0;
+
+/// How low the place of a very wide photo on a full card may get.
+const CARD_PHOTO_MIN_HEIGHT: f32 = 48.0;
+
 /// Photos decoded for showing, by hash, once each; `None` for one whose
-/// bytes are not on this computer (yet) or cannot be read.
+/// bytes are not on this computer (yet) or cannot be read. Their own
+/// sizes in pixels too, read from their headers, once each.
 #[derive(Default)]
 pub struct PhotoCache {
     shown: HashMap<String, Option<TextureHandle>>,
+    sizes: HashMap<String, Option<[u32; 2]>>,
 }
 
 impl PhotoCache {
+    /// The width and height in pixels of the photo `hash`, read without
+    /// decoding it; `None` while its bytes are not here, looked for again
+    /// then, or when they cannot be read.
+    pub fn size(&mut self, store: &Store, hash: &str) -> Option<[u32; 2]> {
+        if let Some(size) = self.sizes.get(hash) {
+            return *size;
+        }
+        let size = dimensions(&store.photo(hash)?);
+        self.sizes.insert(hash.to_string(), size);
+        size
+    }
+
     /// The photo `hash` to show, decoded on first sight.
     pub fn get(&mut self, ui: &Ui, store: &Store, hash: &str) -> Option<TextureHandle> {
         let found = self.shown.entry(hash.to_string()).or_insert_with(|| {
@@ -89,6 +112,112 @@ pub fn thumbnails(
             ui.label(RichText::new(t.more_photos(more)).color(weak));
         }
     });
+}
+
+/// The photo `hash` on a full card (#114): as wide as the card in its
+/// own proportions, no taller than [`CARD_PHOTO_HEIGHT`], decoded once it
+/// first comes into sight and then no larger than [`SHOWN_EDGE`] either
+/// way, so a photo of 12 × 34,000 pixels cannot break the card or fill
+/// the graphics memory; one not here shows as such.
+pub fn card_photo(ui: &mut Ui, t: &L10n, (cache, store): (&mut PhotoCache, &Store), hash: &str) {
+    let weak = ui.visuals().weak_text_color();
+    let Some([width, height]) = cache.size(store, hash) else {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::PHOTO, 18.0, weak);
+            ui.label(RichText::new(t.photo_missing()).color(weak));
+        });
+        return;
+    };
+    let room = ui.available_width();
+    let ratio = height as f32 / width as f32;
+    let shown = if room * ratio > CARD_PHOTO_HEIGHT {
+        egui::vec2(CARD_PHOTO_HEIGHT / ratio, CARD_PHOTO_HEIGHT)
+    } else {
+        egui::vec2(room, room * ratio)
+    };
+    let place = egui::vec2(room, shown.y.max(CARD_PHOTO_MIN_HEIGHT));
+    let (rect, resp) = ui.allocate_exact_size(place, Sense::hover());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, t.photo()));
+    // Out of sight it is not decoded yet; its place is known already.
+    if ui.is_rect_visible(rect)
+        && let Some(texture) = cache.get(ui, store, hash)
+    {
+        egui::Image::new(&texture)
+            .corner_radius(6.0)
+            .paint_at(ui, egui::Rect::from_center_size(rect.center(), shown));
+    }
+}
+
+/// A Transcript or Photo Text `said` whole on a full card, dimmed under
+/// its small `label`, so it never reads as typed text (#114).
+fn labelled(ui: &mut Ui, label: &str, said: RichText) {
+    let weak = ui.visuals().weak_text_color();
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 2.0;
+        ui.label(RichText::new(label).small().color(weak));
+        ui.label(said.color(weak));
+    });
+}
+
+/// The photos and voice recordings of a Note or Section in full on a
+/// card (#114), each `(shown, removed, texts)`: each photo with its Photo
+/// Text under it, each recording with its Transcript, "Transcribing…"
+/// while the one `transcribing` is being made or "No words heard." for
+/// an empty one, then the texts of those removed while their texts stay
+/// (ADR 0020); every text whole, dimmed and labelled.
+pub fn whole_media(
+    ui: &mut Ui,
+    t: &L10n,
+    (cache, store): (&mut PhotoCache, &Store),
+    (photos, removed_photos, photo_texts): (&[String], &[String], &BTreeMap<String, String>),
+    (recordings, removed_recordings, transcripts): (
+        &[String],
+        &[String],
+        &BTreeMap<String, String>,
+    ),
+    transcribing: Option<&str>,
+) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let said = |texts: &BTreeMap<String, String>, hash: &String| {
+        texts
+            .get(hash)
+            .filter(|s| !s.trim().is_empty())
+            .map(RichText::new)
+    };
+    for hash in photos {
+        card_photo(ui, t, (&mut *cache, store), hash);
+        if let Some(said) = said(photo_texts, hash) {
+            labelled(ui, t.photo_text_label(), said);
+        }
+    }
+    for hash in removed_photos {
+        if let Some(said) = said(photo_texts, hash) {
+            labelled(ui, t.photo_text_label(), said);
+        }
+    }
+    for hash in recordings {
+        ui.horizontal(|ui| {
+            icons::show(ui, icons::MIC, 16.0, weak);
+            ui.label(RichText::new(t.voice_recording()).color(text));
+        });
+        let line = match transcripts.get(hash) {
+            Some(said) if said.is_empty() => Some(RichText::new(t.no_words_heard()).italics()),
+            Some(said) => Some(RichText::new(said)),
+            None if transcribing == Some(hash.as_str()) => {
+                Some(RichText::new(t.transcribing()).italics())
+            }
+            None => None,
+        };
+        if let Some(line) = line {
+            labelled(ui, t.transcript_label(), line);
+        }
+    }
+    for hash in removed_recordings {
+        if let Some(said) = said(transcripts, hash) {
+            labelled(ui, t.transcript_label(), said);
+        }
+    }
 }
 
 /// What the editor offers under a photo or voice recording and its

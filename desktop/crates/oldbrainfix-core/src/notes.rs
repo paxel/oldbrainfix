@@ -5,7 +5,7 @@
 //! write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -864,23 +864,7 @@ impl<'a> Notes<'a> {
         let mut sections = Vec::new();
         for id in &merged {
             if let Some(note) = self.by_id(id)? {
-                sections.push(Section {
-                    id: id.clone(),
-                    note_id: note_id.to_string(),
-                    text: note.text,
-                    text_format: note.text_format,
-                    text_version: note.text_version,
-                    text_editable: note.text_editable,
-                    captured: note.captured,
-                    photos: note.photos,
-                    recordings: note.recordings,
-                    transcripts: note.transcripts,
-                    photo_texts: note.photo_texts,
-                    removed_photos: note.removed_photos,
-                    removed_recordings: note.removed_recordings,
-                    removed_transcripts: note.removed_transcripts,
-                    removed_photo_texts: note.removed_photo_texts,
-                });
+                sections.push(Self::merged_section(note, note_id));
             }
         }
         for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
@@ -895,6 +879,78 @@ impl<'a> Notes<'a> {
         }
         sections.sort_by_key(|s| s.captured);
         Ok(sections)
+    }
+
+    /// The Sections of each Note of `note_ids`, exactly as
+    /// [`Notes::sections`] gives them, read in one pass over the Notes and
+    /// Sections: for a list that shows many Notes in full (#114). Every id
+    /// asked for is a key, one that is not a Note with the Sections that
+    /// name it, if any.
+    pub fn sections_of(&self, note_ids: &[String]) -> Result<BTreeMap<String, Vec<Section>>> {
+        let mut of: BTreeMap<String, Vec<Section>> =
+            note_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+        // Where each Note merged into one of them shows: its Amends show
+        // there as well as under itself.
+        let mut into: HashMap<String, String> = HashMap::new();
+        for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
+            let Some(end) = self.merged_into(&id)? else {
+                continue;
+            };
+            if !of.contains_key(&end) || into.contains_key(&id) {
+                continue;
+            }
+            let note = self.by_id(&id)?;
+            if let (Some(note), Some(list)) = (note, of.get_mut(&end)) {
+                list.push(Self::merged_section(note, &end));
+            }
+            into.insert(id, end);
+        }
+        for id in self.store.entities_of_type(keys::TYPE_SECTION)? {
+            let Some(owner) = self.store.current(&id, keys::NOTE)? else {
+                continue;
+            };
+            let under: Vec<&str> = [Some(owner.as_str()), into.get(&owner).map(String::as_str)]
+                .into_iter()
+                .flatten()
+                .filter(|note_id| of.contains_key(*note_id))
+                .collect();
+            if under.is_empty() {
+                continue;
+            }
+            let fields = self.store.current_fields(&id)?;
+            for note_id in under {
+                if let Some(section) = Self::section(&id, note_id, &fields)?
+                    && let Some(list) = of.get_mut(note_id)
+                {
+                    list.push(section);
+                }
+            }
+        }
+        for list in of.values_mut() {
+            list.sort_by_key(|s| s.captured);
+        }
+        Ok(of)
+    }
+
+    /// The Note `note`, merged into `note_id`, as a Section of it.
+    fn merged_section(note: Note, note_id: &str) -> Section {
+        Section {
+            id: note.id,
+            note_id: note_id.to_string(),
+            text: note.text,
+            text_format: note.text_format,
+            text_version: note.text_version,
+            text_editable: note.text_editable,
+            captured: note.captured,
+            photos: note.photos,
+            recordings: note.recordings,
+            transcripts: note.transcripts,
+            photo_texts: note.photo_texts,
+            removed_photos: note.removed_photos,
+            removed_recordings: note.removed_recordings,
+            removed_transcripts: note.removed_transcripts,
+            removed_photo_texts: note.removed_photo_texts,
+        }
     }
 
     /// The Section `id` from its `fields`, shown under `note_id`.
@@ -1067,6 +1123,70 @@ mod tests {
             store.current(&b.id, keys::NUDGE)?.as_deref(),
             Some("2026-01-01T10:10:06.000Z")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_sections_of_many_notes_read_at_once_are_those_of_each() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let plain = notes.capture("plain", None, None)?;
+        let amended = notes.capture("amended", None, None)?;
+        notes.amend(&amended.id, "amend")?;
+        // A chain a → b → c, with Amends on a and b, read for all three.
+        let a = notes.capture("a", None, None)?;
+        notes.amend(&a.id, "a amend")?;
+        let b = notes.capture("b", None, None)?;
+        notes.amend(&b.id, "b amend")?;
+        let c = notes.capture("c", None, None)?;
+        notes.merge(&a.id, &b.id)?;
+        notes.merge(&b.id, &c.id)?;
+        // Two Notes merged into each other, and a Merge into a Note gone.
+        let x = notes.capture("x", None, None)?;
+        let y = notes.capture("y", None, None)?;
+        notes.amend(&y.id, "y amend")?;
+        store.append(&x.id, keys::MERGED, Some(&y.id), None)?;
+        store.append(&y.id, keys::MERGED, Some(&x.id), None)?;
+        let lost = notes.capture("lost", None, None)?;
+        store.append(&lost.id, keys::MERGED, Some("note:never-synced"), None)?;
+        notes.amend(&lost.id, "lost amend")?;
+        // A Section whose Note never arrived.
+        let orphan = "section:orphan";
+        store.append(orphan, keys::TYPE, Some(keys::TYPE_SECTION), None)?;
+        store.append(orphan, keys::NOTE, Some("note:never-synced"), None)?;
+        store.append(orphan, keys::TEXT, Some("orphan"), None)?;
+        let at = dart_iso(store.now());
+        store.append(orphan, keys::CAPTURED, Some(&at), None)?;
+
+        let mut ids: Vec<String> = [&plain, &amended, &a, &b, &c, &x, &y, &lost]
+            .iter()
+            .map(|n| n.id.clone())
+            .collect();
+        ids.push("note:never-synced".into());
+        ids.push("note:unknown".into());
+        let read = notes.sections_of(&ids)?;
+        assert_eq!(read.len(), ids.len());
+        for id in &ids {
+            assert_eq!(read.get(id), Some(&notes.sections(id)?), "{id}");
+            let alone = notes.sections_of(std::slice::from_ref(id))?;
+            assert_eq!(alone.get(id), read.get(id), "{id}");
+        }
+        let texts = |id: &str| -> Vec<String> {
+            read.get(id)
+                .map(|list| list.iter().map(|s| s.text.clone()).collect())
+                .unwrap_or_default()
+        };
+        assert_eq!(texts(&b.id), ["b amend"]);
+        assert_eq!(texts(&c.id), ["a", "a amend", "b", "b amend"]);
+        assert!(
+            read.get(&c.id)
+                .into_iter()
+                .flatten()
+                .all(|s| s.note_id == c.id)
+        );
+        assert_eq!(texts("note:never-synced"), ["orphan"]);
+        assert_eq!(read.get("note:unknown"), Some(&Vec::new()));
+        assert!(notes.sections_of(&[])?.is_empty());
         Ok(())
     }
 

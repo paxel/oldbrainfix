@@ -410,6 +410,69 @@ void main() {
       expect(store.entitiesOfType(SectionKeys.typeSection), isEmpty);
     });
 
+    test('the Sections of many Notes read at once are those of each', () {
+      final plain = notes.capture('plain');
+      tick();
+      final amended = notes.capture('amended');
+      tick();
+      notes.amend(amended.id, 'amend');
+      // A chain a → b → c, with Amends on a and b, read for all three.
+      final a = notes.capture('a');
+      tick();
+      notes.amend(a.id, 'a amend');
+      tick();
+      final b = notes.capture('b');
+      tick();
+      notes.amend(b.id, 'b amend');
+      tick();
+      final c = notes.capture('c');
+      notes.merge(a.id, b.id);
+      notes.merge(b.id, c.id);
+      // Two Notes merged into each other, and a Merge into a Note gone.
+      final x = notes.capture('x');
+      final y = notes.capture('y');
+      notes.amend(y.id, 'y amend');
+      store.append(x.id, NoteKeys.merged, y.id);
+      store.append(y.id, NoteKeys.merged, x.id);
+      final lost = notes.capture('lost');
+      store.append(lost.id, NoteKeys.merged, 'note:never-synced');
+      tick();
+      notes.amend(lost.id, 'lost amend');
+      // A Section whose Note never arrived.
+      store.append('section:orphan', SectionKeys.type, SectionKeys.typeSection);
+      store.append('section:orphan', SectionKeys.note, 'note:never-synced');
+      store.append('section:orphan', SectionKeys.text, 'orphan');
+      store.append(
+        'section:orphan',
+        SectionKeys.captured,
+        now.toIso8601String(),
+      );
+
+      String shown(Section s) => [
+        s.id,
+        s.noteId,
+        s.text,
+        s.context.captured.toIso8601String(),
+      ].join('|');
+      final ids = [
+        for (final note in [plain, amended, a, b, c, x, y, lost]) note.id,
+        'note:never-synced',
+        'note:unknown',
+      ];
+      final read = notes.sectionsOf(ids);
+      expect(read.keys, unorderedEquals(ids));
+      for (final id in ids) {
+        expect(read[id]?.map(shown), notes.sections(id).map(shown), reason: id);
+        expect(notes.sectionsOf([id])[id]?.map(shown), read[id]?.map(shown));
+      }
+      expect(read[b.id]?.map((s) => s.text), ['b amend']);
+      expect(read[c.id]?.map((s) => s.text), ['a', 'a amend', 'b', 'b amend']);
+      expect(read[c.id]?.map((s) => s.noteId), everyElement(c.id));
+      expect(read['note:never-synced']?.map((s) => s.text), ['orphan']);
+      expect(read['note:unknown'], isEmpty);
+      expect(notes.sectionsOf(const []), isEmpty);
+    });
+
     test('a merge is in the log and survives a reopen', () {
       final dir = Directory.systemTemp.createTempSync('obf');
       addTearDown(() => dir.deleteSync(recursive: true));

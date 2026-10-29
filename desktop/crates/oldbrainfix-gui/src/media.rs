@@ -646,6 +646,17 @@ fn keep(image: DynamicImage) -> Vec<u8> {
     out
 }
 
+/// The width and height of the photo `bytes`, read from its header
+/// without decoding it; `None` when it cannot be read or has no pixels.
+pub fn dimensions(bytes: &[u8]) -> Option<[u32; 2]> {
+    let (width, height) = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()?;
+    (width > 0 && height > 0).then_some([width, height])
+}
+
 /// The photo `jpeg` as pixels to show, at most `edge` on the long side;
 /// `None` when it cannot be read.
 pub fn pixels(jpeg: &[u8], edge: u32) -> Option<RgbaImage> {

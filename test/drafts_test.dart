@@ -49,7 +49,8 @@ void main() {
     ) async {
       final note = notes.capture('milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('milk'));
+      await tester.longPress(find.text('milk'));
+      await tester.pumpAndSettle();
       tick();
       await tester.enterText(find.byType(TextField), 'oat milk');
       await tester.pump(const Duration(milliseconds: 500));
@@ -78,7 +79,8 @@ void main() {
       ));
       tick(const Duration(hours: 1));
       await startAtNotes(tester);
-      await tap(tester, find.text('milk'));
+      await tester.longPress(find.text('milk'));
+      await tester.pumpAndSettle();
       expect(field(tester), 'oat milk');
       expect(notes.byId(note.id)?.text, 'milk');
 
@@ -100,7 +102,8 @@ void main() {
       // Fixed later, e.g. on another Device.
       notes.edit(note.id, 'soy milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('soy milk'));
+      await tester.longPress(find.text('soy milk'));
+      await tester.pumpAndSettle();
       expect(field(tester), 'soy milk');
       expect(await drafts.read(note.id), isNull);
     });
@@ -110,7 +113,8 @@ void main() {
     ) async {
       final note = notes.capture('milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('milk'));
+      await tester.longPress(find.text('milk'));
+      await tester.pumpAndSettle();
       tick();
       await tester.enterText(find.byType(TextField), 'oat milk');
       await tester.pump(NoteEditorScreen.draftPause);

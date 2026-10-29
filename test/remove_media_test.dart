@@ -77,6 +77,9 @@ void main() {
       find.descendant(of: find.byType(NoteEditorScreen), matching: finder);
 
   group('the card\'s ⋮', () {
+    // The compact card, which shows no Photo Text beside its photo (#114).
+    setUp(() => store.setLocalSetting('compactNotes:unsorted', 'true'));
+
     testWidgets('offers only photos and recordings with a text', (
       tester,
     ) async {
@@ -129,7 +132,8 @@ void main() {
       expect(inCard(find.byType(NotePhoto)), findsOneWidget);
       expect(inCard(find.text('Room 12')), findsOneWidget);
 
-      await tap(tester, inCard(find.text('doctor')));
+      await tester.longPress(inCard(find.text('doctor')));
+      await tester.pumpAndSettle();
       expect(inEditor(find.byType(NotePhoto)), findsOneWidget);
       await reveal(tester, inEditor(find.text('Room 12')));
       expect(inEditor(find.text('Room 12')), findsOneWidget);

@@ -58,7 +58,8 @@ void main() {
   Future<void> openNote(WidgetTester tester, String text) async {
     await tap(tester, find.byTooltip('Search and browse'));
     await tap(tester, find.byTooltip('All Notes'));
-    await tap(tester, find.text(text));
+    await tester.longPress(find.text(text));
+    await tester.pumpAndSettle();
   }
 
   /// From the notes browser, back to the Agenda.
@@ -114,7 +115,8 @@ void main() {
       routines.spawn(dentist.id, daily([at(8)]));
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('dentist'));
+      await tester.longPress(find.text('dentist'));
+      await tester.pumpAndSettle();
       await tap(tester, find.byTooltip('Move to trash'));
       expect(
         find.text('Delete with its 2 Routines and Reminders'),
@@ -322,7 +324,8 @@ void main() {
     await start(tester);
     await tap(tester, find.byTooltip('Suchen und stöbern'));
     await tap(tester, find.byTooltip('Alle Notizen'));
-    await tap(tester, find.text('Tabletten'));
+    await tester.longPress(find.text('Tabletten'));
+    await tester.pumpAndSettle();
     await tap(tester, find.byTooltip('In den Papierkorb'));
     await tap(
       tester,

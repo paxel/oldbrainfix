@@ -82,11 +82,12 @@ void main() {
     for (final step in [
       find.byTooltip('Search and browse'),
       find.byTooltip('All Notes'),
-      find.text(note.text),
     ]) {
       await tester.tap(step);
       await tester.pumpAndSettle();
     }
+    await tester.longPress(find.text(note.text));
+    await tester.pumpAndSettle();
     expect(find.byType(NoteEditorScreen), findsOneWidget);
   }
 

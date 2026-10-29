@@ -29,11 +29,16 @@ class NudgeScreen extends StatefulWidget {
   State<NudgeScreen> createState() => _NudgeScreenState();
 }
 
-class _NudgeScreenState extends State<NudgeScreen> with ReloadsOnLogChange {
+class _NudgeScreenState extends State<NudgeScreen>
+    with ReloadsOnLogChange, FoldsNoteCards {
   late List<Note> _unsorted = widget.notes.unsorted();
 
   @override
   Store get log => widget.notes.store;
+
+  /// The same Unsorted Notes as the list of all of them.
+  @override
+  String get cardsKey => 'unsorted';
 
   @override
   void reloadLog() => _reload();
@@ -45,6 +50,9 @@ class _NudgeScreenState extends State<NudgeScreen> with ReloadsOnLogChange {
 
   Future<void> _all() async {
     await openUnsorted(context, widget.notes, widget.places);
+    if (!mounted) return;
+    // The list of all of them shares the full/compact switch.
+    setState(readCompact);
     _reload();
   }
 
@@ -53,7 +61,10 @@ class _NudgeScreenState extends State<NudgeScreen> with ReloadsOnLogChange {
     final t = context.t;
     final more = _unsorted.length - nudgeCards;
     return Scaffold(
-      appBar: AppBar(title: Text(t.nudgeScreenTitle)),
+      appBar: AppBar(
+        title: Text(t.nudgeScreenTitle),
+        actions: [CompactNotesButton(compact: compact, onChanged: setCompact)],
+      ),
       body: ListView(
         padding: clearOfSystemBars(
           context,
@@ -69,6 +80,9 @@ class _NudgeScreenState extends State<NudgeScreen> with ReloadsOnLogChange {
               widget.places,
               _unsorted.take(nudgeCards),
               _reload,
+              compact: compact,
+              unfolded: unfolded,
+              onUnfold: unfold,
             ),
           if (more > 0)
             Padding(
@@ -113,12 +127,15 @@ class UnsortedScreen extends StatefulWidget {
 }
 
 class _UnsortedScreenState extends State<UnsortedScreen>
-    with ReloadsOnLogChange {
+    with ReloadsOnLogChange, FoldsNoteCards {
   PersonFilter _filter = PersonFilter.everyone;
   late List<Note> _unsorted = _load();
 
   @override
   Store get log => widget.notes.store;
+
+  @override
+  String get cardsKey => 'unsorted';
 
   @override
   void reloadLog() => _reload();
@@ -149,6 +166,7 @@ class _UnsortedScreenState extends State<UnsortedScreen>
             filter: _filter,
             onChanged: _filtered,
           ),
+          CompactNotesButton(compact: compact, onChanged: setCompact),
         ],
       ),
       body: ListView(
@@ -173,6 +191,9 @@ class _UnsortedScreenState extends State<UnsortedScreen>
               widget.places,
               _unsorted,
               _reload,
+              compact: compact,
+              unfolded: unfolded,
+              onUnfold: unfold,
             ),
         ],
       ),
@@ -180,15 +201,19 @@ class _UnsortedScreenState extends State<UnsortedScreen>
   }
 }
 
-/// [unsorted] as cards that open their Note and offer to file, merge or
-/// schedule it; [changed] runs once the user is back from any of them.
+/// [unsorted] as cards, full unless [compact], that open their Note and
+/// offer to file, merge or schedule it; [changed] runs once the user is
+/// back from any of them.
 List<Widget> _sortingCards(
   BuildContext context,
   Notes notes,
   Places places,
   Iterable<Note> unsorted,
-  VoidCallback changed,
-) {
+  VoidCallback changed, {
+  required bool compact,
+  required Set<String> unfolded,
+  required void Function(Note note) onUnfold,
+}) {
   Future<void> then(Future<Object?> step) async {
     await step;
     changed();
@@ -206,5 +231,8 @@ List<Widget> _sortingCards(
     showPlace: (_) => false,
     onSchedule: (note, spawn) =>
         then(spawnFromNote(context, notes, places, note, spawn: spawn)),
+    compact: compact,
+    unfolded: unfolded,
+    onUnfold: onUnfold,
   );
 }

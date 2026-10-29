@@ -336,7 +336,8 @@ void main() {
       expect(reminder.schedule.on(today), [Occurrence(today, at(10))]);
       expect(agendaRows(tester), ['10:00 call the plumber']);
       expect(find.text('Unsorted'), findsNothing, reason: 'nor on its card');
-      await tap(tester, find.text('call the plumber').first);
+      await tester.longPress(find.text('call the plumber').first);
+      await tester.pumpAndSettle();
       expect(find.text('Not filed'), findsOneWidget);
     });
 
@@ -376,7 +377,8 @@ void main() {
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
-      await tap(tester, find.text('dentist'));
+      await tester.longPress(find.text('dentist'));
+      await tester.pumpAndSettle();
 
       await tap(tester, find.text('Reminder'));
       await tap(tester, find.text('Save'));
@@ -557,7 +559,8 @@ void main() {
       expect(routine.schedule.rule?.format(), 'FREQ=MONTHLY;BYDAY=1MO,-1FR');
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
-      await tap(tester, find.text('pills'));
+      await tester.longPress(find.text('pills'));
+      await tester.pumpAndSettle();
       await tap(tester, find.text('Rule: FREQ=MONTHLY;BYDAY=1MO,-1FR · 08:00'));
       // A rule the simple editor cannot show opens in the advanced mode.
       expect(find.text('FREQ=MONTHLY;BYDAY=1MO,-1FR'), findsOneWidget);
@@ -582,7 +585,8 @@ void main() {
 
       await tap(tester, find.byTooltip('Search and browse'));
       await tap(tester, find.byTooltip('All Notes'));
-      await tap(tester, find.text('pills'));
+      await tester.longPress(find.text('pills'));
+      await tester.pumpAndSettle();
       await tap(tester, find.text('Every month on the last Friday · 08:00'));
       // In the simple editor, as it was built.
       expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsNothing);

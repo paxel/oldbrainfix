@@ -276,27 +276,32 @@ void main() {
       expect(cards(tester), hasLength(5));
     });
 
-    testWidgets('a card opens its Note; a Note sorted meanwhile leaves', (
-      tester,
-    ) async {
-      captureMany(3);
-      await start(tester);
-      alarms.tapNudge();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('nudgeMore')), findsNothing);
+    testWidgets(
+      'a long press opens a card\'s Note; a Note sorted meanwhile leaves',
+      (tester) async {
+        captureMany(3);
+        await start(tester);
+        alarms.tapNudge();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('nudgeMore')), findsNothing);
 
-      await tap(tester, find.text('note 2'));
-      expect(find.byType(NoteEditorScreen), findsOneWidget);
-      // Filed while the editor is open.
-      final area = Places(store).addArea('Household');
-      notes.file(notes.all().firstWhere((n) => n.text == 'note 2').id, area.id);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(cards(tester), ['note 1', 'note 3']);
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-      expect(find.text('2 Unsorted'), findsOneWidget);
-    });
+        await tester.longPress(find.text('note 2'));
+        await tester.pumpAndSettle();
+        expect(find.byType(NoteEditorScreen), findsOneWidget);
+        // Filed while the editor is open.
+        final area = Places(store).addArea('Household');
+        notes.file(
+          notes.all().firstWhere((n) => n.text == 'note 2').id,
+          area.id,
+        );
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(cards(tester), ['note 1', 'note 3']);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('2 Unsorted'), findsOneWidget);
+      },
+    );
 
     testWidgets('opened over the Unsorted list: Notes filed there are gone '
         'from the list once it shows again', (tester) async {

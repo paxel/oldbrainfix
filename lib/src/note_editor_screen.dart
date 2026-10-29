@@ -228,15 +228,17 @@ List<MediaRemoval> mediaRemovals(
   ];
 }
 
-/// The ⋮ menu of [placed]'s card: what the Note editor offers beyond
-/// filing, scheduling and merging, as far as this Device may (ADR 0013).
+/// The ⋮ menu of [placed]'s card: [onEdit] opening the editor, and what
+/// the Note editor offers beyond filing, scheduling and merging, as far
+/// as this Device may (ADR 0013).
 /// [changed] runs after each step that may have changed the Note.
 NoteActions noteActions(
   BuildContext context,
   Notes notes,
   PlacedNote placed,
-  VoidCallback changed,
-) {
+  VoidCallback changed, {
+  VoidCallback? onEdit,
+}) {
   final id = placed.note.id;
   void then(Future<Object?> step) => unawaited(
     step.then((_) {
@@ -244,6 +246,7 @@ NoteActions noteActions(
     }),
   );
   return NoteActions(
+    onEdit: onEdit,
     onImportance: placed.changes
         ? (picked) {
             notes.setImportance(id, picked);
@@ -1117,67 +1120,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// The Capture Context of a Note or Section, one line per thing known:
-/// the time; where it was, the Named Place with its coordinates or the
-/// coordinates alone; the app it was shared in from; the calendar events
-/// running; the Bluetooth devices connected.
-class CaptureContextLines extends StatelessWidget {
-  final CaptureContext capture;
-  final DateFormat when;
-
-  const CaptureContextLines({
-    super.key,
-    required this.capture,
-    required this.when,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.t;
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    final text = Theme.of(context).textTheme;
-    final location = capture.location;
-    final named = capture.namedPlace;
-    final lines = [
-      (Icons.schedule, when.format(capture.captured.toLocal())),
-      if (location != null)
-        (
-          Icons.place_outlined,
-          named == null
-              ? coordinatesText(location)
-              : '${named.name} (${coordinatesText(location)})',
-        ),
-      if (capture.sourceApp case final app?)
-        (Icons.apps, t.contextSourceApp(app.name)),
-      if (capture.calendarEvents.isNotEmpty)
-        (
-          Icons.event_outlined,
-          t.contextDuring(capture.calendarEvents.join(', ')),
-        ),
-      if (capture.bluetoothDevices.isNotEmpty)
-        (
-          Icons.bluetooth,
-          t.contextBluetooth(capture.bluetoothDevices.join(', ')),
-        ),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (i, (icon, line)) in lines.indexed) ...[
-          if (i > 0) const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(icon, size: 20, color: muted),
-              const SizedBox(width: 8),
-              Flexible(child: Text(line, style: text.bodyMedium)),
-            ],
-          ),
-        ],
-      ],
     );
   }
 }

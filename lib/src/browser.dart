@@ -46,6 +46,76 @@ mixin ReloadsOnLogChange<T extends StatefulWidget> on State<T> {
   }
 }
 
+/// A Note list's full/compact switch (#114): full unless switched to
+/// compact, remembered per list in a setting of this Device, and the
+/// Notes a tap unfolded while compact, for as long as the page shows.
+mixin FoldsNoteCards<T extends StatefulWidget> on State<T> {
+  /// The log whose Device settings keep the choice.
+  Store get log;
+
+  /// Which list this is, e.g. `area:<id>`; each keeps its own choice.
+  String get cardsKey;
+
+  /// Whether the cards show compact, by their first line.
+  bool compact = false;
+
+  /// The Notes shown in full while [compact].
+  Set<String> unfolded = const {};
+
+  String get _setting => 'compactNotes:$cardsKey';
+
+  @override
+  void initState() {
+    super.initState();
+    readCompact();
+  }
+
+  /// Reads the choice again, as another page showing the same list may
+  /// have changed it.
+  void readCompact() => compact = log.localSetting(_setting) == 'true';
+
+  /// Switches the list to compact or full and remembers it; what was
+  /// unfolded folds again.
+  void setCompact(bool on) {
+    setState(() {
+      compact = on;
+      unfolded = const {};
+    });
+    // Nothing kept means full, the default.
+    on
+        ? log.setLocalSetting(_setting, 'true')
+        : log.removeLocalSetting(_setting);
+  }
+
+  /// Shows [note] in full, in place.
+  void unfold(Note note) => setState(() => unfolded = {...unfolded, note.id});
+}
+
+/// The bar button of a Note list's full/compact switch: it says what
+/// tapping it does and shows as selected while the list is compact.
+class CompactNotesButton extends StatelessWidget {
+  final bool compact;
+  final ValueChanged<bool> onChanged;
+
+  const CompactNotesButton({
+    super.key = const ValueKey('compactNotes'),
+    required this.compact,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return IconButton(
+      tooltip: compact ? t.showNotesFull : t.showNotesCompact,
+      isSelected: compact,
+      onPressed: () => onChanged(!compact),
+      icon: const Icon(Icons.view_agenda_outlined),
+      selectedIcon: const Icon(Icons.view_headline),
+    );
+  }
+}
+
 /// Where swipe left leads in the notes browser: the last selected Area
 /// and Topic (UI laws, "Navigation"). Lives as long as the app, so the
 /// way back in survives leaving the browser.
@@ -504,8 +574,10 @@ class BrowserSearchField extends StatelessWidget {
 
 /// Notes as a diary of cards, each with "file into…", "merge into…",
 /// with [onSchedule] Routine, Reminder, Frog or Session, and ⋮ for the
-/// rest the Note editor offers, as far as this Device may; tapping a
-/// card opens it.
+/// rest the Note editor offers, as far as this Device may. Each shows in
+/// full unless [compact]; a tap on a compact one runs [onUnfold], and
+/// the Notes in [unfolded] show in full. A long press or Edit in ⋮ opens
+/// the editor (#114).
 /// [onChanged] runs after a step of ⋮ that may have changed a Note.
 /// [showPlace] says which cards name where they are filed: those the
 /// screen does not name already.
@@ -519,9 +591,20 @@ List<Widget> diaryCards(
   required VoidCallback onChanged,
   required bool Function(PlacedNote placed) showPlace,
   void Function(Note note, Spawn spawn)? onSchedule,
+  bool compact = false,
+  Set<String> unfolded = const {},
+  void Function(Note note)? onUnfold,
 }) {
   final when = DateFormat.yMd(Localizations.localeOf(context).toString())
       .add_Hm();
+  // The Sections of every listed Note, read in one pass when the first
+  // full card reads its own, not while building and not once per card.
+  Map<String, List<Section>>? read;
+  List<Section> sectionsOf(Note note) =>
+      (read ??= notes.sectionsOf([
+        for (final placed in shown) placed.note.id,
+      ]))[note.id] ??
+      const [];
   return [
     for (final placed in shown)
       if (placed case (
@@ -546,8 +629,20 @@ List<Widget> diaryCards(
           onSchedule: onSchedule == null || !schedules
               ? null
               : (spawn) => onSchedule(note, spawn),
-          actions: noteActions(context, notes, placed, onChanged),
-          onTap: () => onOpen(note),
+          actions: noteActions(
+            context,
+            notes,
+            placed,
+            onChanged,
+            onEdit: () => onOpen(note),
+          ),
+          full: !compact || unfolded.contains(note.id),
+          sections: () => sectionsOf(note),
+          // A full Note has nothing to unfold (#114).
+          onTap: !compact || unfolded.contains(note.id) || onUnfold == null
+              ? null
+              : () => onUnfold(note),
+          onEdit: () => onOpen(note),
         ),
   ];
 }

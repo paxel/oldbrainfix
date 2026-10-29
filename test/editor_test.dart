@@ -43,6 +43,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Opens the editor of the card [finder] shows, by a long press.
+  Future<void> edit(WidgetTester tester, Finder finder) async {
+    await tester.longPress(finder);
+    await tester.pumpAndSettle();
+  }
+
   /// Starts the app and opens every Note's card from the browser.
   Future<void> startAtNotes(WidgetTester tester) async {
     await start(tester);
@@ -66,7 +72,7 @@ void main() {
       );
 
   group('editor', () {
-    testWidgets('tapping a card shows everything about the Note', (
+    testWidgets('a long press on a card shows everything about the Note', (
       tester,
     ) async {
       final kitchen = places.addTopic(home.id, 'Kitchen');
@@ -75,7 +81,7 @@ void main() {
       notes.amend(note.id, 'Update: sauce bought');
       await startAtNotes(tester);
 
-      await tap(tester, find.text('nees mor sauce'));
+      await edit(tester, find.text('nees mor sauce'));
       expect(find.byType(NoteEditorScreen), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller?.text,
@@ -94,7 +100,7 @@ void main() {
     ) async {
       final note = notes.capture('nees mor sauce');
       await startAtNotes(tester);
-      await tap(tester, find.text('nees mor sauce'));
+      await edit(tester, find.text('nees mor sauce'));
 
       tick();
       await tester.enterText(find.byType(TextField), 'need more sauce');
@@ -116,7 +122,7 @@ void main() {
     testWidgets('a blanked text keeps the old one', (tester) async {
       final note = notes.capture('milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('milk'));
+      await edit(tester, find.text('milk'));
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -126,7 +132,7 @@ void main() {
     testWidgets('Add to Note appends a dated Section', (tester) async {
       final note = notes.capture('nees mor sauce');
       await startAtNotes(tester);
-      await tap(tester, find.text('nees mor sauce'));
+      await edit(tester, find.text('nees mor sauce'));
 
       tick(const Duration(hours: 3));
       await reveal(tester, find.text('Add to Note'));
@@ -157,11 +163,11 @@ void main() {
       expect(dimming(tester, 'pills'), isEmpty);
       expect(find.byIcon(Icons.label_important), findsNothing);
 
-      await tap(tester, find.text('pills'));
+      await edit(tester, find.text('pills'));
       await tap(tester, find.text('Important'));
       await tester.pageBack();
       await tester.pumpAndSettle();
-      await tap(tester, find.text('socks'));
+      await edit(tester, find.text('socks'));
       await tap(tester, find.text('Unimportant'));
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -187,7 +193,7 @@ void main() {
     testWidgets('the editor has no bottom bar', (tester) async {
       notes.capture('milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('milk'));
+      await edit(tester, find.text('milk'));
       final scaffold = tester.widget<Scaffold>(
         find.descendant(
           of: find.byType(NoteEditorScreen),
@@ -212,7 +218,7 @@ void main() {
       final note = notes.capture('nees mor sauce', place: home.id);
       notes.capture('milk');
       await startAtNotes(tester);
-      await tap(tester, find.text('nees mor sauce'));
+      await edit(tester, find.text('nees mor sauce'));
       await tap(tester, find.byTooltip('Move to trash'));
       await tap(tester, find.text('Delete'));
 
@@ -314,7 +320,7 @@ void main() {
     await start(tester);
     await tap(tester, find.byTooltip('Suchen und stöbern'));
     await tap(tester, find.byTooltip('Alle Notizen'));
-    await tap(tester, find.text('Soße kaufen'));
+    await edit(tester, find.text('Soße kaufen'));
     await tap(tester, find.text('Unwichtig'));
     await reveal(tester, find.text('Zur Notiz hinzufügen'));
     expect(find.text('Zur Notiz hinzufügen'), findsOneWidget);

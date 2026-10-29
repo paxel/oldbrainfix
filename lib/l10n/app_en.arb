@@ -1807,5 +1807,13 @@
   "captureChoiceTally": "Tally: {field}",
   "@captureChoiceTally": {"description": "On a capture screen: the first field of the Tally the Note becomes.", "placeholders": {"field": {"type": "String"}}},
   "noteBeingCaptured": "The Note being captured",
-  "@noteBeingCaptured": {"description": "In the Routine editor opened from a capture screen, for a Note without text yet."}
+  "@noteBeingCaptured": {"description": "In the Routine editor opened from a capture screen, for a Note without text yet."},
+  "showNotesCompact": "Show Notes compact",
+  "@showNotesCompact": {"description": "Bar button of a Note list that shows each Note by its first line only."},
+  "showNotesFull": "Show Notes in full",
+  "@showNotesFull": {"description": "Bar button of a Note list that shows each Note whole, with its Sections."},
+  "transcriptLabel": "Transcript",
+  "@transcriptLabel": {"description": "Small label above a Transcript on a Note card."},
+  "photoTextLabel": "Photo Text",
+  "@photoTextLabel": {"description": "Small label above a Photo Text on a Note card."}
 }

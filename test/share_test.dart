@@ -159,7 +159,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Buy milk'), findsOneWidget);
     expect(find.byTooltip('File into…'), findsNothing);
-    await tester.tap(find.text('Buy milk'));
+    await tester.longPress(find.text('Buy milk'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Move to trash'), findsNothing);
     expect(find.byTooltip('Merge into…'), findsNothing);

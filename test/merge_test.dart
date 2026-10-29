@@ -63,7 +63,8 @@ void main() {
     tick();
     final merged = notes.capture('nees mor sauce');
     await startAtNotes(tester);
-    await tap(tester, find.text('nees mor sauce'));
+    await tester.longPress(find.text('nees mor sauce'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'need more sauce');
     await tap(tester, find.byTooltip('Merge into…'));
 
@@ -75,7 +76,8 @@ void main() {
     expect(find.byType(NoteEditorScreen), findsNothing);
     expect(cards(), ['sauce']);
     expect(notes.byId(merged.id)?.mergedInto, target.id);
-    await tap(tester, find.text('sauce'));
+    await tester.longPress(find.text('sauce'));
+    await tester.pumpAndSettle();
     await reveal(tester, find.text('need more sauce'));
     expect(find.text('need more sauce'), findsOneWidget);
     expect(find.text(shown(DateTime.utc(2026, 10, 24, 9))), findsOneWidget);

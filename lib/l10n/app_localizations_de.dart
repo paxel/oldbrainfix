@@ -3453,4 +3453,16 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noteBeingCaptured => 'Die Notiz, die gerade erfasst wird';
+
+  @override
+  String get showNotesCompact => 'Notizen kompakt zeigen';
+
+  @override
+  String get showNotesFull => 'Notizen vollständig zeigen';
+
+  @override
+  String get transcriptLabel => 'Transkript';
+
+  @override
+  String get photoTextLabel => 'Fototext';
 }

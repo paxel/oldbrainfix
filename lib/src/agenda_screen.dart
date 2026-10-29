@@ -172,6 +172,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   String? _capturedId;
   PlacedNote? _captured;
 
+  /// The captured Note when a tap unfolded its compact card (#114).
+  String? _unfoldedId;
+
   /// Where shares come from; set with the first dependencies.
   PhotoPlatform? _photos;
   StreamSubscription<void>? _shares;
@@ -785,8 +788,19 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 onSchedule: captured.schedules
                     ? (spawn) => _schedule(captured.note, spawn)
                     : null,
-                actions: noteActions(context, widget.notes, captured, _reload),
-                onTap: () => _open(captured.note),
+                actions: noteActions(
+                  context,
+                  widget.notes,
+                  captured,
+                  _reload,
+                  onEdit: () => _open(captured.note),
+                ),
+                full: _unfoldedId == captured.note.id,
+                sections: () => widget.notes.sections(captured.note.id),
+                onTap: _unfoldedId == captured.note.id
+                    ? null
+                    : () => setState(() => _unfoldedId = captured.note.id),
+                onEdit: () => _open(captured.note),
               ),
             ],
             _Heading(t.agendaToday),

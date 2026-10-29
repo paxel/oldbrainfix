@@ -182,7 +182,8 @@ void main() {
       await start(tester);
       await tap(tester, find.byIcon(Icons.search));
       await tap(tester, find.byTooltip('All Notes'));
-      await tap(tester, find.text('nees mor sauce'));
+      await tester.longPress(find.text('nees mor sauce'));
+      await tester.pumpAndSettle();
       expect(find.text('Home (48.1372, 11.5761)'), findsOneWidget);
 
       await reveal(tester, find.text('Add to Note'));

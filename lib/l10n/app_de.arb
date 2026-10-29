@@ -914,5 +914,9 @@
   "captureChoiceReminder": "Erinnerung: {schedule}",
   "captureChoiceSession": "Einheit: {schedule}",
   "captureChoiceTally": "Strichliste: {field}",
-  "noteBeingCaptured": "Die Notiz, die gerade erfasst wird"
+  "noteBeingCaptured": "Die Notiz, die gerade erfasst wird",
+  "showNotesCompact": "Notizen kompakt zeigen",
+  "showNotesFull": "Notizen vollständig zeigen",
+  "transcriptLabel": "Transkript",
+  "photoTextLabel": "Fototext"
 }
