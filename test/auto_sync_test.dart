@@ -17,6 +17,7 @@ import 'package:oldbrainfix/src/sync_platform.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
 
@@ -525,7 +526,8 @@ void main() {
     }
 
     const found =
-        '1 thing was changed on both Devices. Tap to pick which version stays.';
+        'Something was changed on both Devices. Tap to pick which version '
+        'stays.';
 
     testWidgets('Conflicts a sync brought are announced at the top and lead '
         'to them', (tester) async {
@@ -546,10 +548,18 @@ void main() {
       failure = SyncFailure.updateThere;
       await start(tester);
       expect(joined, hasLength(1));
-      const needed =
-          'Old Brain Fix on Desk needs an update to sync with this Device.';
-      expect(announcements.visible, needed);
-      announcements.dismiss();
+      // Which Device behind the tap.
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'An update is needed to sync.',
+        title: 'Update needed',
+        cause:
+            'Old Brain Fix on Desk needs an update to sync with this Device.',
+        fix:
+            'Install the latest Old Brain Fix on the Device named, then sync '
+            'again.',
+      );
       // The periodic work asks again.
       sync.want();
       await tester.pumpAndSettle();

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'auto_sync.dart';
@@ -260,21 +261,13 @@ class _HostScreenState extends State<HostScreen> {
             ),
           )
         : (t.hostSyncDone, t.syncCameIn(session.name, session.applied.length));
-    announcements?.announce(
-      done,
-      onTap: () => unawaited(_showBrought(navigator.context, done, brought)),
+    announceDoneWith(announcements, navigator, done, brought);
+    announceRefusedWith(
+      t,
+      announcements,
+      navigator,
+      session.report.refusedCount,
     );
-    final refused = session.report.refusedCount;
-    if (refused > 0) {
-      announceFailure(
-        context,
-        t.hostRefused(refused),
-        title: t.hostRefusedTitle,
-        cause: t.syncRefused(refused),
-        fix: t.hostRefusedFix,
-        details: 'refused: $refused',
-      );
-    }
     final conflicts = visibleConflicts(
       store,
       LockScope.of(context),
@@ -460,19 +453,22 @@ class QrPainter extends CustomPainter {
   bool shouldRepaint(QrPainter oldDelegate) => oldDelegate.modules != modules;
 }
 
-/// What a session in person brought, behind the tap on its announcement
-/// [title]: [brought], and Close.
-Future<void> _showBrought(BuildContext context, String title, String brought) =>
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(brought),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.t.close),
-          ),
-        ],
-      ),
-    );
+/// Announces that [refused] changes were refused, when there were any;
+/// how many and why behind the tap.
+void announceRefusedWith(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+  int refused,
+) {
+  if (refused <= 0) return;
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.hostRefused(refused),
+    title: t.hostRefusedTitle,
+    cause: t.syncRefused(refused),
+    fix: t.hostRefusedFix,
+    details: 'refused: $refused',
+  );
+}

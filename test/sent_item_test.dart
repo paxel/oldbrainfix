@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
 import 'fake_profile.dart' show halvesPng;
@@ -246,7 +247,14 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('send-note')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, 'No app here can take the file.');
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Note was not sent.',
+        title: 'Note not sent',
+        cause: 'No app here can take the file.',
+        fix: 'Install a messenger or a mail app, then send it again.',
+      );
     });
   });
 
@@ -400,14 +408,28 @@ void main() {
       await app(tester);
       files.open(fileFrom(note, to: sentItemRecipients(ann).single));
       await tester.pumpAndSettle();
-      expect(announcements.visible, 'This file is encrypted for someone else.');
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The file was not taken.',
+        title: 'File not taken',
+        cause: 'This file is encrypted for someone else.',
+        fix: 'Ask the sender to send it again.',
+      );
 
-      announcements.dismiss();
       final damaged = '${dir.path}/damaged';
       File(damaged).writeAsStringSync('{"format":1,"item":"x","sig":"y"}');
       files.open(damaged);
       await tester.pumpAndSettle();
-      expect(announcements.visible, contains('cannot be read'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The file was not taken.',
+        cause:
+            'This file cannot be read: it is damaged, or not signed by the '
+            'key it names.',
+        fix: 'Ask the sender to send it again.',
+      );
       expect(find.byType(SentItemScreen), findsNothing);
     });
 
@@ -517,7 +539,15 @@ void main() {
       await app(tester);
       files.open(fileOf(forged));
       await tester.pumpAndSettle();
-      expect(announcements.visible, startsWith('Refused:'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The file was not taken.',
+        cause:
+            'Refused: this file would change a Note someone sent you, but it '
+            'is not signed by them.',
+        fix: 'Ask the sender to send it again.',
+      );
       expect(find.byType(SentItemScreen), findsNothing);
       expect(Notes(phone).all().single.isTrashed, isFalse);
     });

@@ -1,26 +1,41 @@
 import 'package:flutter/material.dart';
 
 import 'announcements.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 
-/// Fetches the speech model with [fetch] and announces at the top when
-/// it broke off or was not the pinned one.
+/// Fetches the speech model with [fetch] and announces a failure at the
+/// top when it broke off or was not the pinned one, why behind the tap.
 Future<void> fetchSpeechModel(
   BuildContext context,
   Future<ModelOutcome> Function() fetch,
 ) async {
   final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
   final t = context.t;
   final outcome = await fetch();
-  final text = switch (outcome) {
-    ModelOutcome.failed => t.speechModelFailed,
-    ModelOutcome.mismatch => t.speechModelMismatch,
+  final why = switch (outcome) {
+    ModelOutcome.failed => (t.speechModelFailedCause, t.speechModelFailedFix),
+    ModelOutcome.mismatch => (
+      t.speechModelMismatchCause,
+      t.speechModelMismatchFix,
+    ),
     ModelOutcome.installed || ModelOutcome.cancelled => null,
   };
-  if (text != null) announcements?.announce(text);
+  if (why == null) return;
+  final (cause, fix) = why;
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.speechModelNotKept,
+    title: t.speechModelNotKeptTitle,
+    cause: cause,
+    fix: fix,
+    details: 'speech model: ${outcome.name}',
+  );
 }
 
 /// The speech model for Transcripts: what it is for and where it comes

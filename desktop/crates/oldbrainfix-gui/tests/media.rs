@@ -282,10 +282,18 @@ fn without_a_microphone_the_top_says_so_and_nothing_is_kept() -> TestResult {
     harness.run();
     assert_eq!(devices.borrow().starts, 1);
     assert_eq!(
-        harness.state().error(),
+        harness.state().notice(),
         Some("Voice Notes need the microphone.")
     );
     assert!(Notes::new(&store).all()?.is_empty());
+    // The click opens what to do, with Close and Report.
+    harness
+        .get_by_label("Voice Notes need the microphone.")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().notice(), None);
+    assert!(shows(&harness, "Not done"));
+    assert!(shows(&harness, "Report"));
     Ok(())
 }
 
@@ -297,7 +305,7 @@ fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
     harness.get_by_label("Paste a picture").click();
     harness.run();
     assert_eq!(
-        harness.state().error(),
+        harness.state().notice(),
         Some("There is no picture on the clipboard.")
     );
     let photo = media::photo_from_file(&png(40, 30)).ok_or("a photo")?;

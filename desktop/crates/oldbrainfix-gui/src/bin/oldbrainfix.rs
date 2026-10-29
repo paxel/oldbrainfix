@@ -398,7 +398,7 @@ fn run() -> Result<i32, String> {
     if let Some(start) = &autostart {
         let on = DeviceSettings::new(&store).autostart_on().unwrap_or(true);
         if let Err(e) = start.set(on) {
-            eprintln!("oldbrainfix: {}", t.autostart_failed(&e));
+            eprintln!("oldbrainfix: {} ({e})", t.autostart_failed());
         }
     }
 

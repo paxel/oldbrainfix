@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/context_platform.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_context.dart';
 import 'fake_location.dart';
 import 'fake_photos.dart';
@@ -298,7 +299,15 @@ void main() {
       await tap(tester, find.text('Allow'));
       expect(store.calendarContextOn, isFalse);
       expect(isOn(tester, calendarSwitch), isFalse);
-      expect(announcements.visible, contains('may not read your calendar'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'This part of the Capture Context was not switched on.',
+        title: 'Not switched on',
+        cause: 'Old Brain Fix may not read your calendar.',
+        fix:
+            'You can allow it in the system settings, then turn this on again.',
+      );
     });
 
     testWidgets('switches off again; a taken-back permission shows off', (

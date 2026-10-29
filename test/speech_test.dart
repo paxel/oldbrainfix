@@ -27,6 +27,30 @@ final second = Uint8List.fromList([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 2]);
 const wrongHash =
     '0000000000000000000000000000000000000000000000000000000000000000';
 
+/// What a speech model not kept is announced as.
+const notKept = 'The speech model was not kept.';
+
+/// Why and what to do when the download broke off.
+const brokeOff =
+    'The download did not finish. Nothing was kept; try again later.';
+
+/// Why and what to do when the model is not a pinned one.
+const notPinned =
+    'That is not the expected speech model. Download one of the models '
+    'listed, or pick the file of one of them.';
+
+/// Taps the speech model announced as not kept and expects its failure
+/// dialog to say [why], with Report; closes it.
+Future<void> expectNotKept(WidgetTester tester, String why) async {
+  await tester.tap(find.text(notKept));
+  await tester.pumpAndSettle();
+  expect(find.text('Speech model not kept'), findsOneWidget);
+  expect(find.text(why), findsOneWidget);
+  expect(find.text('Report'), findsOneWidget);
+  await tester.tap(find.text('Close'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late Store store;
   late Notes notes;
@@ -180,10 +204,7 @@ void main() {
       speech.bring(wrongHash);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('That is not the expected speech model, so it was not kept.'),
-        findsOneWidget,
-      );
+      await expectNotKept(tester, notPinned);
       expect(speech.installed, isNull);
       expect(speech.side, isNull);
       // Once at the start, once for the wrong model.
@@ -200,13 +221,7 @@ void main() {
       speech.bring(null);
       await tester.pumpAndSettle();
 
-      expect(
-        find.text(
-          'The download did not finish, and nothing was kept. '
-          'Try again later.',
-        ),
-        findsOneWidget,
-      );
+      await expectNotKept(tester, brokeOff);
       expect(speech.installed, isNull);
       expect(missing, findsOneWidget);
     });
@@ -222,7 +237,7 @@ void main() {
 
       expect(speech.cancels, 1);
       expect(speech.installed, isNull);
-      expect(find.textContaining('did not finish'), findsNothing);
+      expect(find.text(notKept), findsNothing);
       expect(missing, findsOneWidget);
     });
 
@@ -250,7 +265,7 @@ void main() {
       speech.bring(wrongHash);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('not the expected'), findsOneWidget);
+      await expectNotKept(tester, notPinned);
       expect(speech.installed, isNull);
     });
 
@@ -261,7 +276,7 @@ void main() {
       speech.bring(null);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('did not finish'), findsNothing);
+      expect(find.text(notKept), findsNothing);
       expect(pick, findsOneWidget);
     });
 
@@ -358,7 +373,7 @@ void main() {
       speech.bring(null);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('did not finish'), findsOneWidget);
+      await expectNotKept(tester, brokeOff);
       expect(speech.installed, WhisperModel.base.sha256);
       expect(ready, findsOneWidget);
       expect(chosen(tester, base), isTrue);
@@ -387,7 +402,7 @@ void main() {
       speech.bring(WhisperModel.base.sha256);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('not the expected'), findsOneWidget);
+      await expectNotKept(tester, notPinned);
       expect(speech.installed, isNull);
       expect(missing, findsOneWidget);
     });
@@ -507,13 +522,7 @@ void main() {
 
       speech.bring(null);
       await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'The download did not finish, and nothing was kept. '
-          'Try again later.',
-        ),
-        findsOneWidget,
-      );
+      await expectNotKept(tester, brokeOff);
     });
 
     testWidgets('says so beside the button on mobile data', (tester) async {

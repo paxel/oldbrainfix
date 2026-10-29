@@ -62,6 +62,7 @@ use egui::{
 };
 use oldbrainfix_core::ai_port::AiPort;
 use oldbrainfix_core::backup;
+use oldbrainfix_core::bundle::BundleResult;
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::offers::{self, HeldAreaOffer, OfferError, Transport};
 use oldbrainfix_core::profile::ProfileChoice;
@@ -110,7 +111,7 @@ use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
-    Joiner, SyncAction, SyncHost, bundle_error_text, bundle_result_text, device_name,
+    JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
 };
 use crate::tally_view::{
@@ -469,6 +470,12 @@ enum Dialog {
         fix: String,
         details: String,
     },
+    /// What a job announced at the top as finished brought (UI laws,
+    /// "Announcements"): its `details` under `title`, with Close.
+    Done {
+        title: String,
+        details: String,
+    },
     /// "Which one is you?" (ADR 0017): two Profiles of the user's own
     /// Devices, both changed by the user, met.
     WhichProfile,
@@ -765,8 +772,12 @@ enum Action {
     /// Shows why reading a photo (`true`) or transcribing a recording
     /// again brought no text.
     ShowAgainFailed(bool),
-    /// Shows the failure behind the notice at the top.
-    ShowNoticeFailure,
+    /// Shows the dialog behind the notice at the top.
+    ShowNoticeDialog,
+    /// Shows what went wrong, announced at the top.
+    ShowError,
+    /// Shows which Device needs an update, announced at the top.
+    ShowUpdate,
     /// Something asked of the Backups card on the Profile page.
     Backup(BackupAction),
     /// Something asked of the own Profile on the Profile page.
@@ -815,7 +826,8 @@ pub struct App {
     selection: Selection,
     selected_note: Option<String>,
     view: View,
-    /// What went wrong reading or writing the log, shown at the top.
+    /// What went wrong reading or writing the log, in full: announced at
+    /// the top without it, its click opening it with the cause and fix.
     error: Option<String>,
     /// How far the Notes list is scrolled, for the parallax.
     scrolled: f32,
@@ -919,13 +931,15 @@ pub struct App {
     /// What a bundle saved or imported did, announced at the top until
     /// clicked away.
     notice: Option<String>,
-    /// The failure dialog behind the notice it was announced with (UI
-    /// laws, "Announcements"): the click on that notice opens it; a
-    /// later notice says something else and leaves it closed.
-    notice_failure: Option<(String, Dialog)>,
+    /// The dialog behind the notice it was announced with (UI laws,
+    /// "Announcements"), a failure's or what a finished job brought: the
+    /// click on that notice opens it; a later notice says something else
+    /// and leaves it closed.
+    notice_dialog: Option<(String, Dialog)>,
     /// Syncs that need an update of the app here or on another Device,
-    /// each announced once until clicked away (ADR 0019).
-    updates: std::collections::VecDeque<String>,
+    /// each announced once, which Device behind the click (ADR 0019):
+    /// what needs the update and the full text.
+    updates: std::collections::VecDeque<(String, String)>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
     /// The own Profile card copied, and another person's being pasted
@@ -1159,7 +1173,7 @@ impl App {
             }),
             handed: None,
             notice: None,
-            notice_failure: None,
+            notice_dialog: None,
             updates: std::collections::VecDeque::new(),
             profile_view: ProfileView::default(),
             card_form: CardForm::default(),
@@ -1315,10 +1329,15 @@ impl App {
                 if path.extension().is_none_or(|e| e != "pdf") {
                     path.set_extension("pdf");
                 }
-                self.notice = Some(match std::fs::write(&path, pdf) {
-                    Ok(()) => t.backup_sheet_saved().to_string(),
-                    Err(e) => format!("{} ({e})", t.backup_sheet_failed()),
-                });
+                match std::fs::write(&path, pdf) {
+                    Ok(()) => self.notice = Some(t.backup_sheet_saved().to_string()),
+                    Err(e) => self.announce_failure(
+                        t.backup_sheet_not_out(),
+                        t.backup_sheet_not_out_title(),
+                        (t.backup_sheet_failed_cause(), t.nothing_lost_fix()),
+                        format!("recovery sheet: {e}"),
+                    ),
+                }
             }
             BackupAction::PickFolder => {
                 if let Some(path) = (self.folder_picker)(t.backup_folder_pick_title()) {
@@ -1328,12 +1347,17 @@ impl App {
                 }
             }
             BackupAction::Weekly(on) => self.store.set_backups_weekly(on)?,
-            BackupAction::Now => {
-                self.notice = Some(match backups::now(&self.store) {
-                    Ok(_) => t.backup_done().to_string(),
-                    Err(e) => format!("{} ({e})", t.backup_failed()),
-                });
-            }
+            BackupAction::Now => match backups::now(&self.store) {
+                // Shown as the last Backup on the card: no announcement
+                // (UI laws).
+                Ok(_) => {}
+                Err(e) => self.announce_failure(
+                    t.backup_not_written(),
+                    t.backup_not_written_title(),
+                    (t.backup_failed_cause(), t.backup_failed_fix()),
+                    format!("backup: {e}"),
+                ),
+            },
         }
         Ok(())
     }
@@ -1372,7 +1396,12 @@ impl App {
                             }
                             self.notice = None;
                         }
-                        _ => self.notice = Some(t.restore_not_a_backup().to_string()),
+                        _ => self.announce_failure(
+                            t.restore_not_done(),
+                            t.restore_not_done_title(),
+                            (t.restore_not_a_backup(), t.restore_pick_fix()),
+                            "backup: no Backup header in the file picked".into(),
+                        ),
                     }
                 }
             }
@@ -1382,8 +1411,20 @@ impl App {
                 };
                 let key = match backup_view::unlock(&t, welcome) {
                     Ok(key) => key,
-                    Err(text) => {
-                        self.notice = Some(text);
+                    // Said red under the field.
+                    Err(backup_view::Unlocked::NotAKey) => {
+                        if let Some(welcome) = &mut self.welcome {
+                            welcome.code_invalid = true;
+                        }
+                        return Ok(());
+                    }
+                    Err(backup_view::Unlocked::Failed(cause, fix, details)) => {
+                        self.announce_failure(
+                            t.restore_not_done(),
+                            t.restore_not_done_title(),
+                            (cause, fix),
+                            details,
+                        );
                         return Ok(());
                     }
                 };
@@ -1393,7 +1434,10 @@ impl App {
                 match backup::restore(&self.store, path, &key) {
                     Ok(restored) => {
                         self.welcomed()?;
-                        self.notice = Some(t.restore_done(restored.entries as i64));
+                        self.announce_done(
+                            t.restore_done_short(),
+                            t.restore_done(restored.entries as i64),
+                        );
                         // The playback speed came with it; one that cannot
                         // be read leaves the speed as it was.
                         if let Ok(speed) = DeviceSettings::new(&self.store).playback_speed() {
@@ -1403,7 +1447,15 @@ impl App {
                             }
                         }
                     }
-                    Err(e) => self.notice = Some(backup_view::restore_failure(&t, &e)),
+                    Err(e) => {
+                        let (cause, fix) = backup_view::restore_failure(&t, &e);
+                        self.announce_failure(
+                            t.restore_not_done(),
+                            t.restore_not_done_title(),
+                            (cause, fix),
+                            format!("restore: {e}"),
+                        );
+                    }
                 }
             }
         }
@@ -1506,7 +1558,7 @@ impl App {
         details: String,
     ) {
         self.notice = Some(said.to_string());
-        self.notice_failure = Some((
+        self.notice_dialog = Some((
             said.to_string(),
             Dialog::Failure {
                 title: title.to_string(),
@@ -1515,6 +1567,64 @@ impl App {
                 details,
             },
         ));
+    }
+
+    /// Announces at the top that a job finished, in `said`, which
+    /// carries no values; its click opens `details` under `said`, with
+    /// Close.
+    fn announce_done(&mut self, said: &str, details: String) {
+        self.notice = Some(said.to_string());
+        self.notice_dialog = Some((
+            said.to_string(),
+            Dialog::Done {
+                title: said.to_string(),
+                details,
+            },
+        ));
+    }
+
+    /// Announces that what was asked was refused for the reason `said`
+    /// gives, a sentence without values; the click opens it with what to
+    /// do and `details`.
+    fn announce_refusal(&mut self, said: &str, details: &str) {
+        let t = self.t;
+        self.announce_failure(
+            said,
+            t.action_failed_title(),
+            (said, t.action_failed_fix()),
+            details.to_string(),
+        );
+    }
+
+    /// Announces that the Profile picture was not set, as one that cannot
+    /// be read is not; the click opens why and what to do.
+    fn announce_picture_unreadable(&mut self) {
+        let t = self.t;
+        self.announce_failure(
+            t.profile_picture_not_set(),
+            t.profile_picture_not_set_title(),
+            (t.profile_picture_unreadable(), t.profile_picture_fix()),
+            "profile picture: it cannot be read".into(),
+        );
+    }
+
+    /// Announces that joining a typed code failed, as `failure` says: the
+    /// cause, the fix and the full text (UI laws, "Announcements").
+    fn announce_join_failed(&mut self, failure: JoinFailure) {
+        let t = self.t;
+        match failure {
+            JoinFailure::Paused => self.notice = Some(t.sync_paused_error().to_string()),
+            JoinFailure::Failed {
+                cause,
+                fix,
+                details,
+            } => self.announce_failure(
+                t.sync_not_done(),
+                t.sync_not_done_title(),
+                (cause, fix),
+                details,
+            ),
+        }
     }
 
     /// Announces that a Sent Item was not taken, refused as `error`
@@ -1553,10 +1663,9 @@ impl App {
         );
     }
 
-    /// The failure dialog behind the notice shown, if it was announced
-    /// with one.
-    fn failure_behind_notice(&self) -> Option<&Dialog> {
-        match (&self.notice, &self.notice_failure) {
+    /// The dialog behind the notice shown, if it was announced with one.
+    fn dialog_behind_notice(&self) -> Option<&Dialog> {
+        match (&self.notice, &self.notice_dialog) {
             (Some(notice), Some((said, dialog))) if notice == said => Some(dialog),
             _ => None,
         }
@@ -1574,14 +1683,9 @@ impl App {
             Some(id) => self.store.held_by(id)?,
             None => Default::default(),
         };
-        let name = device
-            .as_ref()
-            .and_then(|id| self.store.paired_device(id).ok().flatten())
-            .map(|d| d.name)
-            .filter(|n| !n.is_empty())
-            .unwrap_or_else(|| self.t.unnamed_device().to_string());
+        let t = self.t;
         if self.store.entries_since(&since)?.is_empty() {
-            self.notice = Some(self.t.bundle_nothing_new(&name));
+            self.notice = Some(t.bundle_nothing_to_send().to_string());
             return Ok(());
         }
         let day = (self.wall)(self.store.now()).date();
@@ -1593,13 +1697,19 @@ impl App {
         if path.extension().is_none_or(|e| e != bundle::EXTENSION) {
             path.set_extension(bundle::EXTENSION);
         }
-        self.notice = Some(
-            match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
-                Ok(Some((entries, _))) => self.t.bundle_saved(entries as i64),
-                Ok(None) => self.t.bundle_nothing_new(&name),
-                Err(e) => ai_view::failed_text(&self.t, self.t.bundle_failed(), &e),
-            },
-        );
+        match bundle::write_bundle_now(&self.store, &path, device.as_deref()) {
+            Ok(Some(_)) => self.notice = Some(t.bundle_saved().to_string()),
+            Ok(None) => self.notice = Some(t.bundle_nothing_to_send().to_string()),
+            Err(oldbrainfix_core::Error::SyncPaused) => {
+                self.notice = Some(t.sync_paused_error().to_string());
+            }
+            Err(e) => self.announce_failure(
+                t.bundle_not_saved(),
+                t.bundle_not_saved_title(),
+                (t.bundle_not_written_cause(), t.nothing_lost_fix()),
+                format!("bundle: {e}"),
+            ),
+        }
         Ok(())
     }
 
@@ -1751,10 +1861,16 @@ impl App {
         }
         let to = picked.and_then(|i| recipients.get(i));
         let bytes = self.store.send_note(&note, to, cancel)?;
-        self.notice = Some(match std::fs::write(&path, bytes) {
-            Ok(()) => self.t.sent_saved().to_string(),
-            Err(e) => format!("{} ({e})", self.t.send_failed()),
-        });
+        let t = self.t;
+        match std::fs::write(&path, bytes) {
+            Ok(()) => self.notice = Some(t.sent_saved().to_string()),
+            Err(e) => self.announce_failure(
+                t.sent_item_not_sent(),
+                t.sent_item_not_sent_title(),
+                (t.sent_item_not_written_cause(), t.nothing_lost_fix()),
+                format!("sent item: {e}"),
+            ),
+        }
         Ok(())
     }
 
@@ -2027,15 +2143,54 @@ impl App {
                         blocking: None,
                     });
                 }
-                None => self.notice = Some(bundle_result_text(&self.t, &result)),
+                None => self.announce_imported(&result),
             },
             Err(oldbrainfix_core::Error::Offer(e)) => self.announce_offer_not_taken(e),
-            Err(e) => self.notice = Some(bundle_error_text(&self.t, e)),
+            Err(oldbrainfix_core::Error::SyncPaused) => {
+                self.notice = Some(self.t.sync_paused_error().to_string());
+            }
+            Err(e) => {
+                let t = self.t;
+                self.announce_failure(
+                    t.bundle_not_imported(),
+                    t.bundle_not_imported_title(),
+                    bundle_import_why(&t, &e),
+                    format!("bundle: {e}"),
+                );
+            }
         }
         self.refresh();
         // The alerts plan again: a Done in the bundle closes its alarm.
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
+        }
+    }
+
+    /// Announces what the bundle import `result` brought (UI laws,
+    /// "Announcements"): that it came in, how much behind the click; that
+    /// changes were refused, why behind the click; or that nothing could
+    /// be read, as from a Device not paired with this one.
+    fn announce_imported(&mut self, result: &BundleResult) {
+        let t = self.t;
+        if result.needs_pairing() {
+            self.announce_failure(
+                t.bundle_not_imported(),
+                t.bundle_not_imported_title(),
+                (t.bundle_pair_first_cause(), t.bundle_pair_first_fix()),
+                "bundle: from a Device not paired with this one".into(),
+            );
+            return;
+        }
+        let refused = result.report.refused_count() as i64;
+        if refused > 0 {
+            self.announce_failure(
+                &t.host_refused(refused),
+                t.host_refused_title(),
+                (&t.sync_refused(refused), t.host_refused_fix()),
+                bundle_result_text(&t, result),
+            );
+        } else {
+            self.announce_done(t.bundle_imported(), bundle_result_text(&t, result));
         }
     }
 
@@ -2362,7 +2517,8 @@ impl App {
         // What the hosts and the folder found that needs an update.
         for (source, update) in self.store.take_update_notices().unwrap_or_default() {
             let text = update_notice_text(&self.t, &self.store, &source, update);
-            self.updates.push_back(text);
+            let details = format!("update needed: {update:?} ({source})");
+            self.updates.push_back((text, details));
         }
         // "Which one is you?" opens once it comes up, and goes once it was
         // answered here or on another Device.
@@ -2842,8 +2998,13 @@ impl App {
         }
 
         self.refresh();
-        if let Err(e) = done {
-            self.error = Some(ai_view::error_text(&self.t, &e));
+        match done {
+            Ok(()) => {}
+            // Waiting, not failed: said with what to do.
+            Err(oldbrainfix_core::Error::SyncPaused) => {
+                self.notice = Some(self.t.sync_paused_error().to_string());
+            }
+            Err(e) => self.error = Some(e.to_string()),
         }
         if let Some(wake) = &self.wake {
             drop(wake.send(Event::Wake));
@@ -2913,9 +3074,9 @@ impl App {
                 self.playing = None;
                 let started = self.recorder.as_mut().is_some_and(|r| r.start());
                 if !started {
-                    return Err(oldbrainfix_core::Error::Invalid(
-                        self.t.microphone_missing().into(),
-                    ));
+                    let t = self.t;
+                    self.announce_refusal(t.microphone_missing(), "record: no microphone");
+                    return Ok(());
                 }
             }
             Action::Play(hash) => {
@@ -2941,9 +3102,12 @@ impl App {
             Action::PastePhoto => {
                 let photo = self.clipboard.as_mut().and_then(|c| c.photo());
                 let Some(photo) = photo else {
-                    return Err(oldbrainfix_core::Error::Invalid(
-                        self.t.paste_no_picture().into(),
-                    ));
+                    let t = self.t;
+                    self.announce_refusal(
+                        t.paste_no_picture(),
+                        "paste: no picture on the clipboard",
+                    );
+                    return Ok(());
                 };
                 self.capture_note(Notes::default_nudge(), &[photo], &[])?;
             }
@@ -3024,9 +3188,9 @@ impl App {
                 // A card dragged by a Member that is not theirs, or into
                 // an Area this Device was taken out of, stays (ADR 0013).
                 if !self.store.may_change(&note)? || !self.store.may_write_in(&place)? {
-                    return Err(oldbrainfix_core::Error::Invalid(
-                        self.t.only_managers().into(),
-                    ));
+                    let t = self.t;
+                    self.announce_refusal(t.only_managers(), "file: not a Manager of the Area");
+                    return Ok(());
                 }
                 notes.file(&note, &place)?;
             }
@@ -3613,12 +3777,34 @@ impl App {
             }
             // Never over another dialog: the notice waits until it is
             // closed.
-            Action::ShowNoticeFailure if self.dialog.is_none() => {
-                self.dialog = self.failure_behind_notice().cloned();
+            Action::ShowNoticeDialog if self.dialog.is_none() => {
+                self.dialog = self.dialog_behind_notice().cloned();
                 self.notice = None;
-                self.notice_failure = None;
+                self.notice_dialog = None;
             }
-            Action::ShowNoticeFailure => {}
+            Action::ShowError if self.dialog.is_none() => {
+                if let Some(details) = self.error.take() {
+                    let t = self.t;
+                    self.dialog = Some(Dialog::Failure {
+                        title: t.action_failed_title().into(),
+                        cause: t.action_failed_cause().into(),
+                        fix: t.action_failed_fix().into(),
+                        details,
+                    });
+                }
+            }
+            Action::ShowUpdate if self.dialog.is_none() => {
+                if let Some((cause, details)) = self.updates.pop_front() {
+                    let t = self.t;
+                    self.dialog = Some(Dialog::Failure {
+                        title: t.update_needed_title().into(),
+                        cause,
+                        fix: t.update_fix().into(),
+                        details,
+                    });
+                }
+            }
+            Action::ShowNoticeDialog | Action::ShowError | Action::ShowUpdate => {}
             Action::ShowAgainFailed(photo) => {
                 self.again_failed = None;
                 let t = self.t;
@@ -3961,9 +4147,13 @@ impl App {
                 if let Some(autostart) = &self.autostart
                     && let Err(e) = autostart.set(on)
                 {
-                    return Err(oldbrainfix_core::Error::Invalid(
-                        self.t.autostart_failed(&e),
-                    ));
+                    let t = self.t;
+                    self.announce_failure(
+                        t.autostart_failed(),
+                        t.autostart_failed_title(),
+                        (t.autostart_failed_cause(), t.autostart_failed_fix()),
+                        format!("autostart: {e}"),
+                    );
                 }
             }
             Setting::Renag(minutes) => settings.set_renag_interval(Duration::minutes(minutes))?,
@@ -4103,10 +4293,17 @@ impl App {
         if actions.contains(&Action::Back) {
             asked.push(WelcomeAction::Back);
         }
-        // What the earlier part of the frame decided about a join.
-        let actions = actions
-            .into_iter()
-            .filter(|a| matches!(a, Action::Welcome(_)));
+        // What the earlier part of the frame decided about a join, and
+        // a click on the announcement at the top.
+        let actions = actions.into_iter().filter(|a| {
+            matches!(
+                a,
+                Action::Welcome(_)
+                    | Action::ShowNoticeDialog
+                    | Action::ShowError
+                    | Action::ShowUpdate
+            )
+        });
         let (joining, hosted) = (self.sync.joining(), self.sync.synced());
         let sync = &mut self.sync;
         if let Some(welcome) = &mut self.welcome {
@@ -4162,9 +4359,18 @@ impl App {
                         });
                 });
         }
+        // What the announcement at the top opened shows over it too.
+        let mut closed = Vec::new();
+        if matches!(
+            self.dialog,
+            Some(Dialog::Failure { .. } | Dialog::Done { .. })
+        ) {
+            self.dialog(ui.ctx(), tones, &mut closed);
+        }
         let all: Vec<Action> = actions
             .chain(synced)
             .chain(asked.into_iter().map(Action::Welcome))
+            .chain(closed)
             .collect();
         for action in all {
             self.apply(action);
@@ -4232,7 +4438,9 @@ impl App {
                     if self.sync.synced() {
                         actions.push(Action::Welcome(WelcomeAction::Synced));
                     } else {
-                        self.notice = self.sync.take_code_error();
+                        if let Some(failure) = self.sync.take_join_failure() {
+                            self.announce_join_failed(failure);
+                        }
                         actions.push(Action::Welcome(WelcomeAction::Back));
                     }
                     ui.ctx().request_repaint();
@@ -4249,6 +4457,17 @@ impl App {
                     .ctx()
                     .request_repaint_after(std::time::Duration::from_millis(100)),
             }
+        }
+        // Hosting that could not start, or a session that choked, is
+        // announced once, its full text behind the click.
+        if let Some((started, details)) = self.sync.take_error() {
+            let t = self.t;
+            let why = if started {
+                (t.sync_host_failed_cause(), t.sync_host_failed_fix())
+            } else {
+                (t.sync_broke_off_cause(), t.nothing_lost_fix())
+            };
+            self.announce_failure(t.sync_not_done(), t.sync_not_done_title(), why, details);
         }
         // A speech model came: what waited is transcribed now.
         let ready = self.speech.as_ref().is_none_or(|s| s.current().is_some());
@@ -4342,12 +4561,18 @@ impl App {
             tones.mark,
             self.scrolled * background::PARALLAX,
         );
-        if let Some(error) = self.error.clone() {
-            // Announcements go to the top (UI laws).
+        if self.error.is_some() {
+            // Announcements go to the top (UI laws), without the error's
+            // text: the click shows it, with the cause and the fix.
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
-                    ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
+                    let colour = ui.visuals().error_fg_color;
+                    let text = RichText::new(self.t.action_failed()).color(colour);
+                    let label = egui::Label::new(text).sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowError);
+                    }
                 });
         } else if !self.untranscribable.is_empty() {
             // Recordings from files kept but not transcribable; the click
@@ -4384,9 +4609,9 @@ impl App {
                     }
                 });
         } else if let Some(notice) = self.notice.clone() {
-            // What a bundle did, until clicked away; a failure's click
-            // opens why.
-            let failed = self.failure_behind_notice().is_some();
+            // What a job did, until clicked away; the click opens the
+            // details, a failure's why.
+            let behind = self.dialog_behind_notice().is_some();
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
@@ -4394,27 +4619,28 @@ impl App {
                     let label = egui::Label::new(RichText::new(notice).color(colour))
                         .sense(egui::Sense::click());
                     let mut response = ui.add(label);
-                    if !failed {
+                    if !behind {
                         response = response.on_hover_text(self.t.close());
                     }
                     if response.clicked() {
-                        if failed {
-                            actions.push(Action::ShowNoticeFailure);
+                        if behind {
+                            actions.push(Action::ShowNoticeDialog);
                         } else {
                             self.notice = None;
                         }
                     }
                 });
-        } else if let Some(update) = self.updates.front().cloned() {
-            // A sync that needs an update, until clicked away.
+        } else if !self.updates.is_empty() {
+            // A sync that needs an update, until clicked; the click shows
+            // which Device.
             egui::Panel::top("announcement")
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let label = egui::Label::new(RichText::new(update).color(colour))
-                        .sense(egui::Sense::click());
-                    if ui.add(label).on_hover_text(self.t.close()).clicked() {
-                        self.updates.pop_front();
+                    let text = RichText::new(self.t.update_needed()).color(colour);
+                    let label = egui::Label::new(text).sense(egui::Sense::click());
+                    if ui.add(label).clicked() {
+                        actions.push(Action::ShowUpdate);
                     }
                 });
         } else if self.arrived > 0 && self.selection != Selection::Sync {
@@ -5659,7 +5885,22 @@ impl App {
                         cause,
                         fix,
                         details,
-                    } => failure_form(ui, &t, heading, (cause, fix), details, actions),
+                    } => {
+                        if failure_form(ui, &t, heading, (cause, fix), details) {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
+                    Dialog::Done {
+                        title: heading,
+                        details,
+                    } => {
+                        title(ui, heading);
+                        let text = ui.visuals().text_color();
+                        ui.label(RichText::new(details.as_str()).color(text));
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
                     Dialog::ProfileQr { link } => {
                         ui.set_width(500.0);
                         profile_view::qr_page(ui, &t, link);
@@ -6175,7 +6416,7 @@ impl App {
                     .and_then(Square::new);
                 match square {
                     Some(square) => self.person_square = Some(square),
-                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                    None => self.announce_picture_unreadable(),
                 }
             }
             PersonAction::UseSquare
@@ -6234,7 +6475,7 @@ impl App {
         }
         match square.make() {
             Some(picture) => self.store.set_override_picture(id, Some(&picture))?,
-            None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+            None => self.announce_picture_unreadable(),
         }
         Ok(())
     }
@@ -6266,7 +6507,7 @@ impl App {
                     .and_then(Square::new);
                 match square {
                     Some(square) => self.profile_view.square = Some(square),
-                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                    None => self.announce_picture_unreadable(),
                 }
             }
             ProfileAction::UseSquare => {
@@ -6278,7 +6519,7 @@ impl App {
                         own.set_picture(Some(picture))?;
                     }
                     Some(_) => {}
-                    None => self.notice = Some(self.t.profile_picture_unreadable().to_string()),
+                    None => self.announce_picture_unreadable(),
                 }
             }
             ProfileAction::CancelSquare => self.profile_view.square = None,
@@ -6748,15 +6989,16 @@ const REPORT_MAIL: &str = "taum@tuta.io";
 /// What a failure announced at the top was (UI laws, "Announcements"):
 /// `heading`, the cause and the fix in one sentence each, the full
 /// `details` to select and copy, Close, and Report, which opens a mail
-/// with the details to the developer that the user still sends.
-fn failure_form(
+/// with the details to the developer that the user still sends. Whether
+/// it was closed.
+pub(crate) fn failure_form(
     ui: &mut Ui,
     t: &L10n,
     heading: &str,
     (cause, fix): (&str, &str),
     details: &str,
-    actions: &mut Vec<Action>,
-) {
+) -> bool {
+    let mut closed = false;
     title(ui, heading);
     let text = ui.visuals().text_color();
     ui.label(RichText::new(format!("{cause} {fix}")).color(text));
@@ -6772,14 +7014,15 @@ fn failure_form(
         });
     ui.horizontal(|ui| {
         if ui.button(RichText::new(t.close()).color(text)).clicked() {
-            actions.push(Action::CloseDialog);
+            closed = true;
         }
         if ui.button(RichText::new(t.report()).color(text)).clicked() {
             ui.ctx()
                 .open_url(egui::OpenUrl::new_tab(report_url(details)));
-            actions.push(Action::CloseDialog);
+            closed = true;
         }
     });
+    closed
 }
 
 /// A `mailto:` link to [`REPORT_MAIL`] carrying `details` and this

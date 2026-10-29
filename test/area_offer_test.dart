@@ -518,7 +518,7 @@ void main() {
     ben.noteHeldBy(ann.deviceId, ann.versionVector());
     await tester.tap(find.text('Send changes to Ann'));
     await tester.pumpAndSettle();
-    expect(announcements.visible, 'Nothing new to send to Ann.');
+    expect(announcements.visible, 'There is nothing new to send.');
     expect(files.shared, hasLength(1));
   });
 }

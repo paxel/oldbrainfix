@@ -125,13 +125,21 @@ void main() {
       expect(switchedOn(tester), isFalse);
       expect(store.mirrorCalendar, isNull);
       expect(mirror.events, isEmpty);
+      await tap(
+        tester,
+        find.text(
+          'The Routines and Reminders were not written into the calendar.',
+        ),
+      );
+      expect(find.text('Not written into the calendar'), findsOneWidget);
       expect(
         find.text(
-          'Old Brain Fix may not write to your calendar. '
-          'You can allow it in the system settings.',
+          'Old Brain Fix may not write to your calendar. You can allow it in '
+          'the system settings, then turn this on again.',
         ),
         findsOneWidget,
       );
+      expect(find.text('Report'), findsOneWidget);
     });
 
     testWidgets('"Not now" asks nothing', (tester) async {
@@ -151,10 +159,20 @@ void main() {
       await openSettings(tester);
       await tap(tester, mirrorSwitch);
       expect(switchedOn(tester), isFalse);
+      await tap(
+        tester,
+        find.text(
+          'The Routines and Reminders were not written into the calendar.',
+        ),
+      );
       expect(
-        find.text('There is no calendar on this device to write into.'),
+        find.text(
+          'There is no calendar on this device to write into. Add a calendar '
+          "account in the phone's settings, then turn this on again.",
+        ),
         findsOneWidget,
       );
+      expect(find.text('Report'), findsOneWidget);
     });
 
     testWidgets('the only calendar is taken without asking which', (
@@ -312,10 +330,20 @@ void main() {
       expect(mirror.requests, 1);
       expect(switchedOn(tester), isTrue);
       expect(mirror.mirroredIn('1'), hasLength(1));
+      await tap(
+        tester,
+        find.text('The events were not removed from the calendar.'),
+      );
+      expect(find.text('Events not removed'), findsOneWidget);
       expect(
-        find.textContaining('The events could not be removed'),
+        find.text(
+          'Old Brain Fix could not remove the events it wrote from the '
+          'calendar. Allow Old Brain Fix to use your calendar in the system '
+          'settings, then turn this off again.',
+        ),
         findsOneWidget,
       );
+      expect(find.text('Report'), findsOneWidget);
     });
   });
 }

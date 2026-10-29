@@ -22,6 +22,7 @@ import 'capture_requests.dart';
 import 'capture_screen.dart';
 import 'context_platform.dart';
 import 'drafts.dart';
+import 'failure_dialog.dart';
 import 'first_start_screen.dart';
 import 'folder_platform.dart';
 import 'host_screen.dart';
@@ -568,13 +569,18 @@ class _HomeState extends State<_Home> {
 
   /// An automatic sync, now or in the background, or the shared folder
   /// needs an update of the app here or on another Device: announced at
-  /// the top, once (ADR 0019).
+  /// the top, once (ADR 0019), which Device behind the tap.
   void _updatesNeeded() {
     if (!mounted) return;
-    final announcements = AnnouncementsScope.of(context);
+    final t = context.t;
     for (final (source, where) in widget.autoSync.takeUpdates()) {
-      announcements?.announce(
-        updateNoticeText(context.t, widget.store, source, where),
+      announceFailure(
+        context,
+        t.updateNeeded,
+        title: t.updateNeededTitle,
+        cause: updateNoticeText(t, widget.store, source, where),
+        fix: t.updateFix,
+        details: 'update needed: ${where.name}',
       );
     }
   }
@@ -602,7 +608,7 @@ class _HomeState extends State<_Home> {
     if (count == 0) return;
     final navigator = Navigator.of(context);
     AnnouncementsScope.of(context)?.announce(
-      context.t.syncConflicts(count),
+      context.t.hostConflicts(count),
       onTap: () => unawaited(
         navigator.push(
           MaterialPageRoute<void>(
@@ -799,6 +805,7 @@ class _HomeState extends State<_Home> {
           bundles: widget.bundles,
           t: context.t,
           announcements: AnnouncementsScope.of(context),
+          navigator: Navigator.of(context, rootNavigator: true),
           person: person,
           onSent: widget.alarms.replan,
         );

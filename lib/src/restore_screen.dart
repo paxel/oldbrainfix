@@ -6,9 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'announcements.dart';
 import 'backup_screen.dart';
 import 'bundle_platform.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'pairing_platform.dart';
 import 'photo_platform.dart';
@@ -45,7 +45,8 @@ String? newestBackupIn(String dir) {
 /// First start, before the Starter Set (ADR 0016): a Backup file picked
 /// and opened with the passphrase, or with the recovery key typed or
 /// scanned from the Recovery Sheet, goes into the empty log. Pops with
-/// what was restored; why nothing was is announced at the top.
+/// what was restored, announced at the top with what to set again behind
+/// the tap; that nothing was is announced too, why behind the tap.
 ///
 /// With [found], the Backup Android's Auto Backup brought back from the
 /// user's Google account (ADR 0010) is open at once, asking for the
@@ -74,6 +75,10 @@ class RestoreScreen extends StatefulWidget {
 class _RestoreScreenState extends State<RestoreScreen> {
   final _passphrase = TextEditingController();
   final _code = TextEditingController();
+
+  /// Whether the key typed is no recovery key; said under the field
+  /// until it changes.
+  var _codeInvalid = false;
   String? _path;
   BackupHeader? _header;
   var _busy = false;
@@ -95,7 +100,19 @@ class _RestoreScreenState extends State<RestoreScreen> {
     super.dispose();
   }
 
-  void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
+  /// Announces that the Backup was not restored; the tap opens [cause],
+  /// [fix] and [details].
+  void _notRestored(String cause, String fix, String details) {
+    final t = context.t;
+    announceFailure(
+      context,
+      t.restoreNotDone,
+      title: t.restoreNotDoneTitle,
+      cause: cause,
+      fix: fix,
+      details: details,
+    );
+  }
 
   /// Removes the copy of the file picked; the Backup that came back with
   /// the app stays.
@@ -125,7 +142,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
       } on FileSystemException {
         // Gone already.
       }
-      _announce(t.restoreNotABackup);
+      _notRestored(
+        t.restoreNotABackup,
+        t.restorePickFix,
+        'backup: no Backup header in the file picked',
+      );
     }
   }
 
@@ -139,10 +160,20 @@ class _RestoreScreenState extends State<RestoreScreen> {
     final code = await pairing.readQr(photo);
     if (!mounted) return;
     if (code == null || decodeRecoveryCode(code) == null) {
-      _announce(t.restoreNoCode);
+      announceFailure(
+        context,
+        t.codeNotRead,
+        title: t.codeNotReadTitle,
+        cause: t.restoreNoCode,
+        fix: t.restoreNoCodeFix,
+        details: 'recovery key: none in the photo',
+      );
       return;
     }
-    setState(() => _code.text = code);
+    setState(() {
+      _codeInvalid = false;
+      _code.text = code;
+    });
   }
 
   Future<void> _restore() async {
@@ -152,11 +183,15 @@ class _RestoreScreenState extends State<RestoreScreen> {
     if (header == null || path == null) return;
     final code = _code.text.trim();
     if (code.isNotEmpty && decodeRecoveryCode(code) == null) {
-      _announce(t.restoreInvalidCode);
+      setState(() => _codeInvalid = true);
       return;
     }
-    setState(() => _busy = true);
-    String? failure;
+    setState(() {
+      _codeInvalid = false;
+      _busy = true;
+    });
+    // Why nothing was restored, what to do, and the full text.
+    (String, String, String)? failure;
     RestoreResult? result;
     try {
       final key = await unlockBackup(
@@ -166,27 +201,35 @@ class _RestoreScreenState extends State<RestoreScreen> {
         derive: widget.derive,
       );
       if (key == null) {
-        failure = t.restoreWrong;
+        failure = (
+          t.restoreWrong,
+          t.restoreWrongFix,
+          'backup: the passphrase or recovery key does not open it',
+        );
       } else {
         result = await restoreBackup(widget.store, path, key);
       }
     } on BackupException catch (e) {
-      failure = switch (e.problem) {
-        BackupProblem.notABackup => t.restoreNotABackup,
-        BackupProblem.wrongSecret => t.restoreWrong,
-        BackupProblem.damaged => t.restoreDamaged,
-        BackupProblem.notEmpty => t.restoreNotEmpty,
+      final (cause, fix) = switch (e.problem) {
+        BackupProblem.notABackup => (t.restoreNotABackup, t.restorePickFix),
+        BackupProblem.wrongSecret => (t.restoreWrong, t.restoreWrongFix),
+        BackupProblem.damaged => (t.restoreDamagedCause, t.restoreDamagedFix),
+        BackupProblem.notEmpty => (t.restoreNotEmpty, t.restoreNotEmptyFix),
       };
-    } on Object {
-      failure = t.restoreFailed;
+      failure = (cause, fix, '$e');
+    } on Object catch (e) {
+      failure = (t.restoreFailedCause, t.restoreFailedFix, '$e');
     }
     if (!mounted) return;
     setState(() => _busy = false);
     if (failure != null || result == null) {
-      _announce(failure ?? t.restoreFailed);
+      final (cause, fix, details) =
+          failure ??
+          (t.restoreFailedCause, t.restoreFailedFix, 'backup: no result');
+      _notRestored(cause, fix, details);
       return;
     }
-    _announce(t.restoreDone(result.entries));
+    announceDone(context, t.restoreDoneShort, t.restoreDone(result.entries));
     Navigator.of(context).pop(result);
   }
 
@@ -235,7 +278,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
         decoration: InputDecoration(
           labelText: t.restoreCodeLabel,
           border: const OutlineInputBorder(),
+          errorText: _codeInvalid ? t.restoreInvalidCode : null,
         ),
+        onChanged: (_) {
+          if (_codeInvalid) setState(() => _codeInvalid = false);
+        },
         onSubmitted: (_) => _restore(),
       ),
       const SizedBox(height: 16),

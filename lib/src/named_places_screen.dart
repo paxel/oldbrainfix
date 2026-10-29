@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
 import 'browser.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'location.dart';
 import 'look.dart';
@@ -37,11 +38,26 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
   Future<void> _add() async {
     final location = LocationScope.of(context);
     final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
     final t = context.t;
+    void notNamed(String cause, String fix, String details) =>
+        announceFailureWith(
+          announcements,
+          navigator,
+          t.namedPlaceNotAdded,
+          title: t.namedPlaceNotAddedTitle,
+          cause: cause,
+          fix: fix,
+          details: details,
+        );
     if (!await location.granted()) {
       if (!mounted) return;
       if (!await explainAndAskLocation(context, location)) {
-        announcements?.announce(t.locationNotAllowed);
+        notNamed(
+          t.locationNotAllowed,
+          t.locationAllowFix,
+          'named place: location not allowed',
+        );
         return;
       }
     }
@@ -50,7 +66,11 @@ class _NamedPlacesScreenState extends State<NamedPlacesScreen> {
     if (!mounted) return;
     setState(() => _locating = false);
     if (here == null) {
-      announcements?.announce(t.locationUnknown);
+      notNamed(
+        t.locationUnknown,
+        t.locationUnknownFix,
+        'named place: no position',
+      );
       return;
     }
     final picked = await showDialog<_Picked>(

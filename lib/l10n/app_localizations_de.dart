@@ -330,11 +330,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get locationNotAllowed =>
-      'Old Brain Fix darf deinen Standort nicht verwenden und weiß daher nicht, wo du bist. Du kannst ihn in den Systemeinstellungen erlauben.';
+      'Old Brain Fix darf deinen Standort nicht verwenden und weiß daher nicht, wo du bist.';
 
   @override
   String get locationUnknown =>
-      'Konnte nicht herausfinden, wo du bist. Ist der Standort eingeschaltet?';
+      'Das Telefon konnte nicht herausfinden, wo du bist.';
 
   @override
   String get namedPlacesTitle => 'Benannte Orte';
@@ -992,12 +992,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
 
   @override
-  String get calendarNotAllowed =>
-      'Old Brain Fix darf deinen Kalender nicht lesen. Du kannst es in den Systemeinstellungen erlauben.';
-
-  @override
   String get bluetoothNotAllowed =>
-      'Old Brain Fix darf deine Bluetooth-Geräte nicht sehen. Du kannst es in den Systemeinstellungen erlauben.';
+      'Old Brain Fix darf deine Bluetooth-Geräte nicht sehen.';
 
   @override
   String contextSourceApp(String app) {
@@ -1345,7 +1341,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calendarMirrorNotAllowed =>
-      'Old Brain Fix darf nicht in deinen Kalender schreiben. Du kannst es in den Systemeinstellungen erlauben.';
+      'Old Brain Fix darf nicht in deinen Kalender schreiben.';
 
   @override
   String get calendarMirrorNoCalendar =>
@@ -1353,7 +1349,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calendarMirrorNotRemoved =>
-      'Die Termine konnten nicht aus dem Kalender entfernt werden. Erlaube Old Brain Fix den Kalender und schalte es noch einmal aus.';
+      'Old Brain Fix konnte die Termine, die es geschrieben hat, nicht aus dem Kalender entfernen.';
 
   @override
   String get agendaCalendarSwitch =>
@@ -1736,8 +1732,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Das ist kein Kopplungscode. Vergleiche ihn mit dem Bildschirm des anderen Geräts.';
 
   @override
-  String get syncNoCode =>
-      'Auf dem Foto ist kein Code zu finden. Versuch es etwas näher oder tippe den Code ein.';
+  String get syncNoCode => 'Auf dem Foto wurde kein Kopplungscode gefunden.';
 
   @override
   String syncCameIn(String name, int count) {
@@ -1858,18 +1853,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get conflictsNone => 'Keine Konflikte. Alle Geräte sind sich einig.';
-
-  @override
-  String syncConflicts(int count) {
-    String _temp0 = intl.Intl.pluralLogic(
-      count,
-      locale: localeName,
-      other:
-          '$count Sachen wurden auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassungen bleiben.',
-      one: '1 Sache wurde auf beiden Geräten geändert. Tippe, um zu wählen, welche Fassung bleibt.',
-    );
-    return '$_temp0';
-  }
 
   @override
   String get conflictNoteText => 'Text einer Notiz';
@@ -2452,7 +2435,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get restoreNoCode =>
-      'Kein Wiederherstellungsschlüssel im Foto gefunden. Versuch es etwas näher noch einmal oder tippe ihn ein.';
+      'Auf dem Foto wurde kein Wiederherstellungsschlüssel gefunden.';
 
   @override
   String get restoreInvalidCode =>
@@ -3734,4 +3717,296 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get agendaCalendarAddFix =>
       'Richte in den Einstellungen des Telefons ein Kalenderkonto ein und schalte das dann wieder ein.';
+
+  @override
+  String get nothingLostFix => 'Nichts ging verloren; versuch es noch einmal.';
+
+  @override
+  String get codeNotRead => 'Das Foto konnte nicht gelesen werden.';
+
+  @override
+  String get codeNotReadTitle => 'Kein Code gefunden';
+
+  @override
+  String get syncNoCodeFix =>
+      'Versuch es etwas näher noch einmal oder tippe den Code ein.';
+
+  @override
+  String get restoreNoCodeFix =>
+      'Versuch es etwas näher noch einmal oder tippe den Schlüssel ein.';
+
+  @override
+  String get syncNotDone => 'Die Synchronisierung ist nicht zustande gekommen.';
+
+  @override
+  String get syncNotDoneTitle => 'Synchronisierung fehlgeschlagen';
+
+  @override
+  String get syncNotPrivateCause =>
+      'Dieser Code zeigt aus deinem Heimnetz hinaus.';
+
+  @override
+  String get syncNotPrivateFix =>
+      'Nur Geräte im selben Netz können sich synchronisieren: verbinde beide mit demselben WLAN und versuch es dann noch einmal.';
+
+  @override
+  String get syncUnreachableCause => 'Das andere Gerät hat nicht geantwortet.';
+
+  @override
+  String get syncUnreachableFix =>
+      'Sieh nach, ob es den Code noch zeigt und beide im selben WLAN sind, und versuch es dann noch einmal.';
+
+  @override
+  String get syncWrongHostFix =>
+      'Scanne den Code, den das andere Gerät jetzt zeigt, oder tippe ihn ein.';
+
+  @override
+  String get syncWrongPinCause => 'Die PIN passt nicht.';
+
+  @override
+  String get syncWrongPinFix => 'Tippe den Code noch einmal ein.';
+
+  @override
+  String get syncLockedCause => 'Es gab zu viele falsche Versuche.';
+
+  @override
+  String get syncLockedFix =>
+      'Lass auf dem anderen Gerät einen neuen Code zeigen und versuch es dann noch einmal.';
+
+  @override
+  String get syncDeclinedFix =>
+      'Versuch es noch einmal und sag auf dem anderen Gerät Ja, wenn es fragt.';
+
+  @override
+  String get syncBrokeOffCause =>
+      'Die Verbindung brach ab, bevor die Synchronisierung fertig war.';
+
+  @override
+  String get updateFix =>
+      'Installiere auf dem genannten Gerät das neueste Old Brain Fix und synchronisiere dann noch einmal.';
+
+  @override
+  String get updateNeeded => 'Zum Synchronisieren ist ein Update nötig.';
+
+  @override
+  String get updateNeededTitle => 'Update nötig';
+
+  @override
+  String get bundleNothingToSend => 'Es gibt nichts Neues zu senden.';
+
+  @override
+  String get bundleNotSent => 'Das Paket wurde nicht gesendet.';
+
+  @override
+  String get bundleNotSentTitle => 'Paket nicht gesendet';
+
+  @override
+  String get bundleNotWrittenCause =>
+      'Die Paketdatei konnte nicht geschrieben werden.';
+
+  @override
+  String get bundleNoAppFix =>
+      'Installiere einen Messenger oder eine Mail-App oder wähle einen geteilten Ordner und sende es dann noch einmal.';
+
+  @override
+  String get bundleNotImported => 'Das Paket wurde nicht importiert.';
+
+  @override
+  String get bundleNotImportedTitle => 'Paket nicht importiert';
+
+  @override
+  String get bundleAskAgainFix =>
+      'Lass dir das Paket noch einmal senden oder importiere eine andere Datei.';
+
+  @override
+  String get bundleNeedsUpdateCause =>
+      'Dieses Paket kommt von einem neueren Old Brain Fix.';
+
+  @override
+  String get bundleUpdateFix =>
+      'Aktualisiere Old Brain Fix auf diesem Gerät und importiere es dann noch einmal.';
+
+  @override
+  String get bundleNotReadCause =>
+      'Das Paket konnte nicht bis zum Ende gelesen werden.';
+
+  @override
+  String get bundleImportAgainFix =>
+      'Davon wurde nichts behalten; importiere es noch einmal.';
+
+  @override
+  String get bundlePairFirstCause =>
+      'Dieses Paket kommt von einem Gerät, mit dem dieses nicht gekoppelt ist, deshalb lässt sich nichts darin lesen.';
+
+  @override
+  String get bundlePairFirstFix =>
+      'Kopple die beiden Geräte zuerst und importiere es dann noch einmal.';
+
+  @override
+  String get bundleImported => 'Paket importiert.';
+
+  @override
+  String get sentItemNotSent => 'Die Notiz wurde nicht gesendet.';
+
+  @override
+  String get sentItemNotSentTitle => 'Notiz nicht gesendet';
+
+  @override
+  String get sentItemNotWrittenCause =>
+      'Die Datei für die Notiz konnte nicht geschrieben werden.';
+
+  @override
+  String get sendNoAppFix =>
+      'Installiere einen Messenger oder eine Mail-App und sende sie dann noch einmal.';
+
+  @override
+  String get calendarMirrorNotOn =>
+      'Die Routinen und Erinnerungen wurden nicht in den Kalender geschrieben.';
+
+  @override
+  String get calendarMirrorNotOnTitle => 'Nicht in den Kalender geschrieben';
+
+  @override
+  String get calendarMirrorChooseAgainFix =>
+      'Erlaube Old Brain Fix in den Systemeinstellungen den Kalender und wähle den Kalender dann noch einmal.';
+
+  @override
+  String get calendarMirrorNotOff =>
+      'Die Termine wurden nicht aus dem Kalender entfernt.';
+
+  @override
+  String get calendarMirrorNotOffTitle => 'Termine nicht entfernt';
+
+  @override
+  String get calendarMirrorOffAgainFix =>
+      'Erlaube Old Brain Fix in den Systemeinstellungen den Kalender und schalte das dann noch einmal aus.';
+
+  @override
+  String get contextNotOn =>
+      'Dieser Teil des Erfassungskontexts wurde nicht eingeschaltet.';
+
+  @override
+  String get contextNotOnTitle => 'Nicht eingeschaltet';
+
+  @override
+  String get calendarEventNotAdded =>
+      'Der Termin wurde nicht in den Kalender eingetragen.';
+
+  @override
+  String get calendarEventNotAddedTitle => 'Termin nicht eingetragen';
+
+  @override
+  String get noCalendarAppFix =>
+      'Installiere eine Kalender-App und versuch es dann noch einmal.';
+
+  @override
+  String get backupSheetNotOut =>
+      'Das Wiederherstellungsblatt wurde weder gedruckt noch geteilt.';
+
+  @override
+  String get backupSheetNotOutTitle =>
+      'Wiederherstellungsblatt nicht übergeben';
+
+  @override
+  String get backupSheetFailedCause =>
+      'Die Datei für das Wiederherstellungsblatt konnte nicht geschrieben werden.';
+
+  @override
+  String get backupSheetNoAppFix =>
+      'Installiere eine App, die PDF-Dateien druckt oder öffnet, und versuch es dann noch einmal.';
+
+  @override
+  String get backupNotWritten => 'Die Sicherung wurde nicht geschrieben.';
+
+  @override
+  String get backupNotWrittenTitle => 'Sicherung nicht geschrieben';
+
+  @override
+  String get backupFailedCause =>
+      'Die Sicherung konnte nicht in ihren Ordner geschrieben werden.';
+
+  @override
+  String get backupFailedFix =>
+      'Sieh nach, ob es den Ordner noch gibt, oder wähl ihn noch einmal und sichere dann noch einmal.';
+
+  @override
+  String get restoreNotDone => 'Die Sicherung wurde nicht wiederhergestellt.';
+
+  @override
+  String get restoreNotDoneTitle => 'Sicherung nicht wiederhergestellt';
+
+  @override
+  String get restorePickFix => 'Wähl die Sicherungsdatei noch einmal.';
+
+  @override
+  String get restoreWrongFix =>
+      'Tippe die Passphrase noch einmal ein oder nimm den Wiederherstellungsschlüssel vom Wiederherstellungsblatt.';
+
+  @override
+  String get restoreDamagedCause =>
+      'Die Sicherung ist beschädigt oder unvollständig.';
+
+  @override
+  String get restoreDamagedFix =>
+      'Nichts wurde wiederhergestellt; versuch eine ältere Sicherung.';
+
+  @override
+  String get restoreNotEmptyFix =>
+      'Eine Sicherung kommt nur auf ein Gerät, auf dem es noch keine Notizen gibt.';
+
+  @override
+  String get restoreFailedCause =>
+      'Die Sicherung konnte nicht bis zum Ende gelesen werden.';
+
+  @override
+  String get restoreFailedFix =>
+      'Nichts wurde geändert; versuch es noch einmal.';
+
+  @override
+  String get restoreDoneShort => 'Sicherung wiederhergestellt.';
+
+  @override
+  String get namedPlaceNotAdded => 'Der Ort wurde nicht benannt.';
+
+  @override
+  String get namedPlaceNotAddedTitle => 'Ort nicht benannt';
+
+  @override
+  String get locationAllowFix =>
+      'Du kannst es in den Systemeinstellungen erlauben und es dann noch einmal versuchen.';
+
+  @override
+  String get locationUnknownFix =>
+      'Schalte den Standort ein und versuch es dann noch einmal.';
+
+  @override
+  String get profilePictureNotSet => 'Das Bild wurde nicht übernommen.';
+
+  @override
+  String get profilePictureNotSetTitle => 'Bild nicht übernommen';
+
+  @override
+  String get profilePictureFix =>
+      'Wähl ein anderes Bild oder mach ein neues Foto.';
+
+  @override
+  String get speechModelNotKept => 'Das Sprachmodell wurde nicht behalten.';
+
+  @override
+  String get speechModelNotKeptTitle => 'Sprachmodell nicht behalten';
+
+  @override
+  String get speechModelFailedCause => 'Der Download wurde nicht fertig.';
+
+  @override
+  String get speechModelFailedFix =>
+      'Nichts wurde behalten; versuch es später noch einmal.';
+
+  @override
+  String get speechModelMismatchCause =>
+      'Das ist nicht das erwartete Sprachmodell.';
+
+  @override
+  String get speechModelMismatchFix =>
+      'Lade eines der aufgeführten Modelle herunter oder wähl die Datei eines davon.';
 }

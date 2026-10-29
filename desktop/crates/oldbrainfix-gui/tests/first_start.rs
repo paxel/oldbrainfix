@@ -266,8 +266,20 @@ fn a_failed_join_returns_to_the_choices_saying_why() -> TestResult {
     harness.step();
     harness.step();
     untouched(&harness)?;
-    // At the top, until clicked away.
-    assert!(shows(&harness, "The other Device said no to this one."));
+    // At the top only that it failed; the click opens why and what to do.
+    assert_eq!(
+        harness.state().notice(),
+        Some("The sync did not go through.")
+    );
+    assert!(!shows(&harness, "The other Device said no to this one."));
+    click(&mut harness, "The sync did not go through.");
+    assert!(shows(&harness, "Sync failed"));
+    assert!(shows(
+        &harness,
+        "The other Device said no to this one. Try again, and say yes on the other Device when it asks."
+    ));
+    assert!(shows(&harness, "sync: Declined"));
+    assert!(harness.query_by_label("Report").is_some());
     Ok(())
 }
 

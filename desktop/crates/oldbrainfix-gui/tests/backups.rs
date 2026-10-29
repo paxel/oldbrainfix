@@ -132,7 +132,8 @@ fn backups_are_set_up_the_sheet_saved_and_a_folder_gets_one_at_once() -> TestRes
             .extension()
             .is_some_and(|e| e == EXTENSION)
     );
-    assert!(shows(&harness, "Backup written."));
+    // Shown as the last Backup: no announcement.
+    assert!(!shows(&harness, "Backup written."));
     assert!(shows(&harness, "Last Backup:"));
     assert!(harness.state().store().backups_scheduled()?);
 
@@ -257,13 +258,43 @@ fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
 
     type_into(&mut harness, "Passphrase", "wrong horse");
     click(&mut harness, "Restore");
-    assert!(shows(&harness, "does not open the Backup"));
+    // Only that it was not restored; the click opens why and what to do.
+    assert_eq!(
+        harness.state().notice(),
+        Some("The Backup was not restored.")
+    );
+    assert!(!shows(&harness, "does not open the Backup"));
     assert!(harness.state().welcoming());
+    click(&mut harness, "The Backup was not restored.");
+    assert!(shows(&harness, "Backup not restored"));
+    assert!(shows(
+        &harness,
+        "This passphrase or recovery key does not open the Backup. Type the passphrase again, or use the recovery key on the Recovery Sheet."
+    ));
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
 
     type_over(&mut harness, Role::PasswordInput, 0, "correct horse");
     click(&mut harness, "Restore");
     assert!(!harness.state().welcoming());
+    // Only that it is restored; the click shows how much and what to set
+    // again.
+    assert_eq!(harness.state().notice(), Some("Backup restored."));
+    assert!(!shows(&harness, "Restored: "));
+    click(&mut harness, "Backup restored.");
     assert!(shows(&harness, "Restored: "));
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
     let store = harness.state().store();
     let texts: Vec<String> = Notes::new(store)
         .all()?

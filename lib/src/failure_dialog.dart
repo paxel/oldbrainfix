@@ -117,3 +117,41 @@ void announceFailureWith(
     ),
   );
 }
+
+/// Announces at the top that a job finished, in [text], which carries
+/// no values; its tap opens [details] under [text], and Close. The
+/// navigator is taken now, so the tap still works once the page it came
+/// from has closed.
+void announceDone(BuildContext context, String text, String details) =>
+    announceDoneWith(
+      AnnouncementsScope.of(context),
+      Navigator.of(context, rootNavigator: true),
+      text,
+      details,
+    );
+
+/// [announceDone] with the [announcements] and the [navigator] taken
+/// before an await.
+void announceDoneWith(
+  Announcements? announcements,
+  NavigatorState navigator,
+  String text,
+  String details,
+) => announcements?.announce(
+  text,
+  onTap: () => unawaited(
+    showDialog<void>(
+      context: navigator.context,
+      builder: (context) => AlertDialog(
+        title: Text(text),
+        content: Text(details),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.t.close),
+          ),
+        ],
+      ),
+    ),
+  ),
+);

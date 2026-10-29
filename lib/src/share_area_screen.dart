@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'announcements.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'failure_dialog.dart';
@@ -61,6 +60,10 @@ class ShareAreaScreen extends StatefulWidget {
 
 class _ShareAreaScreenState extends State<ShareAreaScreen> {
   final _code = TextEditingController();
+
+  /// Whether the code typed is no pair code; said under the field until
+  /// it changes.
+  var _codeInvalid = false;
   var _role = AreaRole.member;
   var _busy = false;
   late String _areaId = widget.areaId;
@@ -84,8 +87,6 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     _code.dispose();
     super.dispose();
   }
-
-  void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
 
   /// Announces that sharing from afar failed; the tap opens [cause],
   /// [fix] and [details].
@@ -136,7 +137,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     final code = await pairing.readQr(photo);
     if (!mounted) return;
     if (code == null || decodePairCode(code) == null) {
-      _announce(context.t.syncNoCode);
+      announceCodeNotRead(context);
       return;
     }
     _code.text = code;
@@ -161,12 +162,15 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     final t = context.t;
     final info = decodePairCode(_code.text);
     if (info == null) {
-      _announce(t.syncInvalidCode);
+      setState(() => _codeInvalid = true);
       return;
     }
     final pairing = PairingScope.of(context);
     final area = _area;
-    setState(() => _busy = true);
+    setState(() {
+      _codeInvalid = false;
+      _busy = true;
+    });
     ProfileChoice? confirmed;
     try {
       final store = widget.store;
@@ -186,14 +190,20 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
       );
       if (!mounted) return;
       final who = profileDisplayName(t, confirmed?.profile.name ?? '');
-      _announce(t.shareDone(area == null ? '' : areaName(t, area), who));
+      announceDone(
+        context,
+        t.hostShareDone,
+        t.shareDone(area == null ? '' : areaName(t, area), who),
+      );
       Navigator.of(context).pop(true);
-    } on SyncException catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
-      _announce(syncFailureText(t, e.failure));
-    } on Object {
-      if (!mounted) return;
-      _announce(t.syncFailFailed);
+      announceSyncFailed(
+        context,
+        e,
+        text: t.shareAfarFailed,
+        title: t.shareAfarFailedTitle,
+      );
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -347,7 +357,11 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
             decoration: InputDecoration(
               labelText: t.syncCodeLabel,
               border: const OutlineInputBorder(),
+              errorText: _codeInvalid ? t.syncInvalidCode : null,
             ),
+            onChanged: (_) {
+              if (_codeInvalid) setState(() => _codeInvalid = false);
+            },
             onSubmitted: (_) => _invite(),
           ),
           const SizedBox(height: 8),

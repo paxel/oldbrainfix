@@ -221,8 +221,15 @@ fn a_file_that_is_no_picture_is_refused() -> TestResult {
     app.select(Selection::Profile);
     let mut harness = window(app);
     click(&mut harness, "Choose a picture");
-    assert!(shows(&harness, "This picture cannot be read."));
+    // Only that it was not set; the click opens why and what to do.
+    assert_eq!(harness.state().notice(), Some("The picture was not set."));
     assert!(!shows(&harness, "Choose the square"));
+    click(&mut harness, "The picture was not set.");
+    assert!(shows(&harness, "Picture not set"));
+    assert!(shows(
+        &harness,
+        "This picture cannot be read. Pick another picture, or take a new photo."
+    ));
     Ok(())
 }
 

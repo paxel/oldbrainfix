@@ -10,6 +10,7 @@ import 'package:oldbrainfix/src/l10n.dart';
 import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_alarms.dart';
 import 'fake_profile.dart';
@@ -161,7 +162,15 @@ void main() {
     files.shares = false;
     await tester.tap(find.text('Send changes to Ann'));
     await tester.pumpAndSettle();
-    expect(announcements.visible, 'No app here can take the bundle.');
+    await expectFailureAnnounced(
+      tester,
+      announcements,
+      'The bundle was not sent.',
+      cause: 'No app here can take the bundle.',
+      fix:
+          'Install a messenger or a mail app, or choose a shared folder, '
+          'then send it again.',
+    );
     expect(ben.waitingForChanges().keys, [idOf(ann)]);
 
     files

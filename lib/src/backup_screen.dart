@@ -8,9 +8,9 @@ import 'package:intl/intl.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../l10n/app_localizations.dart';
-import 'announcements.dart';
 import 'auto_sync.dart';
 import 'bundle_platform.dart';
+import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
@@ -114,7 +114,20 @@ class _BackupScreenState extends State<BackupScreen> {
     super.dispose();
   }
 
-  void _announce(String text) => AnnouncementsScope.of(context)?.announce(text);
+  /// Announces that the Recovery Sheet was not printed or shared: that
+  /// no app took it when [noApp], else that its file could not be
+  /// written; why behind the tap, [details] as the full text.
+  void _sheetFailed(String details, {bool noApp = false}) {
+    final t = context.t;
+    announceFailure(
+      context,
+      t.backupSheetNotOut,
+      title: t.backupSheetNotOutTitle,
+      cause: noApp ? t.backupSheetNoApp : t.backupSheetFailedCause,
+      fix: noApp ? t.backupSheetNoAppFix : t.nothingLostFix,
+      details: details,
+    );
+  }
 
   Future<void> _nameFolder() async {
     final folder = _store.backupFolder;
@@ -212,7 +225,7 @@ class _BackupScreenState extends State<BackupScreen> {
       final path = await bundles.exportPath(recoverySheetName);
       if (!mounted) return;
       if (path == null) {
-        _announce(t.backupSheetFailed);
+        _sheetFailed('recovery sheet: no path to write the file to');
         return;
       }
       File(path).writeAsBytesSync(
@@ -230,9 +243,11 @@ class _BackupScreenState extends State<BackupScreen> {
           : await bundles.share(path, type: 'application/pdf') !=
                 ShareOutcome.noApp;
       if (!mounted) return;
-      if (!handed) _announce(t.backupSheetNoApp);
-    } on FileSystemException {
-      if (mounted) _announce(t.backupSheetFailed);
+      if (!handed) {
+        _sheetFailed('recovery sheet: no app took the file', noApp: true);
+      }
+    } on FileSystemException catch (e) {
+      if (mounted) _sheetFailed('$e');
     } finally {
       if (mounted) setState(() => _sheetBusy = false);
     }
@@ -272,10 +287,19 @@ class _BackupScreenState extends State<BackupScreen> {
         work,
         autoBackup: auto == null ? null : LocalBackupFolder(auto),
       );
-      if (mounted) _announce(t.backupDone);
-    } on Object {
+      // Shown as the last Backup below: no announcement (UI laws).
+    } on Object catch (e) {
       // Kept as the status below as well.
-      if (mounted) _announce(t.backupFailed);
+      if (mounted) {
+        announceFailure(
+          context,
+          t.backupNotWritten,
+          title: t.backupNotWrittenTitle,
+          cause: t.backupFailedCause,
+          fix: t.backupFailedFix,
+          details: '$e',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

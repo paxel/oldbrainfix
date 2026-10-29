@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_photos.dart';
 import 'reveal.dart';
 
@@ -434,6 +435,12 @@ void main() {
       'Ben',
       'Ann',
     ]);
-    expect(announcements.visible, 'Garden is now shared with Ann.');
+    // Only that it finished; with whom behind the tap.
+    await expectDoneAnnounced(
+      tester,
+      announcements,
+      'Sharing finished.',
+      'Garden is now shared with Ann.',
+    );
   });
 }

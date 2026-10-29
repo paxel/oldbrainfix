@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'alarm_sync.dart';
-import 'announcements.dart';
 import 'backup_screen.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'person_screen.dart';
 import 'photo_platform.dart';
@@ -377,8 +377,15 @@ class _ProfileCropScreenState extends State<ProfileCropScreen> {
   }
 
   void _unreadable() {
-    AnnouncementsScope.of(context)
-        ?.announce(context.t.profilePictureUnreadable);
+    final t = context.t;
+    announceFailure(
+      context,
+      t.profilePictureNotSet,
+      title: t.profilePictureNotSetTitle,
+      cause: t.profilePictureUnreadable,
+      fix: t.profilePictureFix,
+      details: 'profile picture: its size cannot be read',
+    );
     Navigator.of(context).pop();
   }
 

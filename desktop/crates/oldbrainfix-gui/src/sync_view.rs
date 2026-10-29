@@ -89,8 +89,9 @@ pub struct SyncHost {
     asking: Option<(Request, JoinAsk, Option<ProfileChoice>)>,
     /// The pictures of the people asking.
     pictures: Pictures,
-    /// Why hosting could not start, or what a session choked on.
-    error: Option<String>,
+    /// Why hosting could not start (`true`), or what a session choked
+    /// on, in full, until the window takes it to announce.
+    error: Option<(bool, String)>,
     no_network: bool,
     /// The last session: with whom and how many changes came in.
     last: Option<(String, usize)>,
@@ -115,6 +116,9 @@ pub struct SyncHost {
     /// Why the typed code joined nothing: not a code, or the sync
     /// failed; red under the field.
     code_error: Option<String>,
+    /// Why the last join failed, for the first start to announce once it
+    /// is back at its choices.
+    join_failure: Option<JoinFailure>,
     /// The join running off the window's thread, until it answers.
     joining: Option<Receiver<oldbrainfix_core::Result<JoinResult>>>,
     /// How a typed code is joined; [`lan_sync`] when none.
@@ -140,7 +144,7 @@ impl SyncHost {
             .and_then(|identity| Host::start(&identity, &new_pin(), self.bind))
         {
             Ok(host) => self.host = Some(host),
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some((true, format!("host: {e}"))),
         }
     }
 
@@ -189,7 +193,7 @@ impl SyncHost {
     pub fn reload_conflicts(&mut self, store: &Store) {
         match store.conflicts() {
             Ok(conflicts) => self.conflicts = conflicts,
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some((false, format!("conflicts: {e}"))),
         }
     }
 
@@ -269,13 +273,13 @@ impl SyncHost {
                 // With the certificate it hosts with, so it can be joined
                 // back later.
                 if let Err(e) = store.remember_joiner(&session) {
-                    self.error = Some(e.to_string());
+                    self.error = Some((false, format!("remember joiner: {e}")));
                 }
                 self.took_in(store, session)
             }
             Err(e) => {
                 request.reply(Response::status(500));
-                self.error = Some(e.to_string());
+                self.error = Some((false, format!("serve: {e}")));
                 false
             }
         }
@@ -316,6 +320,7 @@ impl SyncHost {
             return;
         };
         self.code_error = None;
+        self.join_failure = None;
         let joiner = self.joiner.clone();
         let name = name.to_string();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -341,9 +346,16 @@ impl SyncHost {
         self.synced
     }
 
-    /// Takes why the typed code joined nothing, out of the field.
-    pub fn take_code_error(&mut self) -> Option<String> {
-        self.code_error.take()
+    /// Takes why the last join failed, out of the field as well.
+    pub fn take_join_failure(&mut self) -> Option<JoinFailure> {
+        self.code_error = None;
+        self.join_failure.take()
+    }
+
+    /// Takes why hosting could not start (`true`) or what a session
+    /// choked on, in full, to announce once.
+    pub fn take_error(&mut self) -> Option<(bool, String)> {
+        self.error.take()
     }
 
     /// Takes in the join's answer once there: `None` while it runs, else
@@ -368,7 +380,12 @@ impl SyncHost {
                 Some(self.took_in(store, joined.session))
             }
             Err(e) => {
-                self.code_error = Some(join_failure_text(t, &e).to_string());
+                let failure = join_failure(t, &e);
+                self.code_error = Some(match &failure {
+                    JoinFailure::Paused => t.sync_paused_error().to_string(),
+                    JoinFailure::Failed { cause, fix, .. } => format!("{cause} {fix}"),
+                });
+                self.join_failure = Some(failure);
                 Some(false)
             }
         }
@@ -395,9 +412,6 @@ impl SyncHost {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 12.0;
-                if let Some(message) = &self.error {
-                    ui.label(RichText::new(message).color(error));
-                }
                 if let (Some(choice), Some(invite)) =
                     (self.asking_profile().cloned(), self.inviting.clone())
                 {
@@ -614,12 +628,8 @@ impl SyncHost {
     /// a Device of one's own shows them: the question about a Device
     /// asking, this Device's code, and the field for the other's.
     pub fn pairing(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> Option<SyncAction> {
-        let error = ui.visuals().error_fg_color;
         let mut action = None;
         ui.spacing_mut().item_spacing.y = 12.0;
-        if let Some(message) = &self.error {
-            ui.label(RichText::new(message).color(error));
-        }
         if let Some(asked) = self.trust_card(ui, t, tones) {
             action = Some(asked);
         }
@@ -750,28 +760,48 @@ impl SyncHost {
     }
 }
 
-/// Why joining a typed code failed, in words: each [`SyncFailure`] as
-/// the phone says it, anything else as broken off.
-pub fn join_failure_text(t: &L10n, error: &Error) -> &'static str {
-    match error {
-        Error::Sync(failure) => sync_failure_text(t, *failure),
-        Error::SyncPaused => t.sync_paused_error(),
-        _ => t.sync_fail_failed(),
+/// Why joining a typed code failed.
+#[derive(Debug, Clone, PartialEq)]
+pub enum JoinFailure {
+    /// Refused while an AI Task waits: said as everywhere.
+    Paused,
+    /// Failed: why and what to do, one sentence each, and the full text.
+    Failed {
+        cause: &'static str,
+        fix: &'static str,
+        details: String,
+    },
+}
+
+/// Why joining a typed code failed as `error` says: each
+/// [`SyncFailure`] as the phone says it, anything else as broken off.
+pub fn join_failure(t: &L10n, error: &Error) -> JoinFailure {
+    let (failure, details) = match error {
+        Error::SyncPaused => return JoinFailure::Paused,
+        Error::Sync(failure) => (*failure, format!("sync: {failure:?}")),
+        e => (SyncFailure::Failed, format!("sync: {e}")),
+    };
+    let (cause, fix) = sync_failure_why(t, failure);
+    JoinFailure::Failed {
+        cause,
+        fix,
+        details,
     }
 }
 
-/// A [`SyncFailure`] in words, as the phone's `syncFailureText`.
-pub fn sync_failure_text(t: &L10n, failure: SyncFailure) -> &'static str {
+/// Why a sync did not happen and what to do, one sentence each, as the
+/// phone's `syncFailureWhy`.
+pub fn sync_failure_why(t: &L10n, failure: SyncFailure) -> (&'static str, &'static str) {
     match failure {
-        SyncFailure::NotPrivate => t.sync_fail_not_private(),
-        SyncFailure::Unreachable => t.sync_fail_unreachable(),
-        SyncFailure::WrongHost => t.sync_fail_wrong_host(),
-        SyncFailure::WrongPin => t.sync_fail_wrong_pin(),
-        SyncFailure::Locked => t.sync_fail_locked(),
-        SyncFailure::Declined => t.sync_fail_declined(),
-        SyncFailure::UpdateHere => t.sync_fail_update_here(),
-        SyncFailure::UpdateThere => t.sync_fail_update_there(),
-        SyncFailure::Failed => t.sync_fail_failed(),
+        SyncFailure::NotPrivate => (t.sync_not_private_cause(), t.sync_not_private_fix()),
+        SyncFailure::Unreachable => (t.sync_unreachable_cause(), t.sync_unreachable_fix()),
+        SyncFailure::WrongHost => (t.sync_fail_wrong_host(), t.sync_wrong_host_fix()),
+        SyncFailure::WrongPin => (t.sync_wrong_pin_cause(), t.sync_wrong_pin_fix()),
+        SyncFailure::Locked => (t.sync_locked_cause(), t.sync_locked_fix()),
+        SyncFailure::Declined => (t.sync_fail_declined(), t.sync_declined_fix()),
+        SyncFailure::UpdateHere => (t.sync_fail_update_here(), t.update_fix()),
+        SyncFailure::UpdateThere => (t.sync_fail_update_there(), t.update_fix()),
+        SyncFailure::Failed => (t.sync_broke_off_cause(), t.nothing_lost_fix()),
     }
 }
 
@@ -942,6 +972,16 @@ pub fn bundle_error_text(t: &L10n, error: Error) -> String {
         }
         Error::SyncPaused => t.sync_paused_error().to_string(),
         e => format!("{} ({e})", t.bundle_failed()),
+    }
+}
+
+/// Why a bundle brought nothing in as `error` says, and what to do, one
+/// sentence each, as the phone says them.
+pub fn bundle_import_why(t: &L10n, error: &Error) -> (&'static str, &'static str) {
+    match error {
+        Error::NotABundle => (t.bundle_not_a_bundle(), t.bundle_ask_again_fix()),
+        Error::BundleNeedsUpdate => (t.bundle_needs_update_cause(), t.bundle_update_fix()),
+        _ => (t.bundle_not_read_cause(), t.bundle_import_again_fix()),
     }
 }
 

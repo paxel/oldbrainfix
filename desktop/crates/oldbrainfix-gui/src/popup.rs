@@ -38,7 +38,7 @@ use egui::{
 };
 use oldbrainfix_core::{APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic};
 
-use crate::app::{local_wall, region_of};
+use crate::app::{failure_form, local_wall, region_of};
 use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
 use crate::cli::note_text;
 use crate::icons;
@@ -89,14 +89,37 @@ enum PageAsk {
     Tally(FormIntent),
 }
 
+/// A failure announced at the top of the popup: what it says, why, and
+/// the full text.
+struct Failure {
+    said: &'static str,
+    cause: &'static str,
+    details: String,
+}
+
+impl Failure {
+    /// What went wrong as `error` says, said without its text.
+    fn of(t: &L10n, error: &oldbrainfix_core::Error) -> Failure {
+        Failure {
+            said: t.action_failed(),
+            cause: t.action_failed_cause(),
+            details: error.to_string(),
+        }
+    }
+}
+
 pub struct CapturePopup {
     store: Arc<Store>,
     t: L10n,
     text: String,
     /// Whether the field is still to take the keyboard.
     focus: bool,
-    /// What went wrong saving, shown at the top; the text stays.
-    error: Option<String>,
+    /// What went wrong, announced at the top without values (UI laws,
+    /// "Announcements"); the text stays.
+    error: Option<Failure>,
+    /// Whether the dialog with the failure's cause, fix and full text
+    /// shows.
+    failure_open: bool,
     saved: Option<Box<dyn Fn()>>,
     recorder: Option<Box<dyn Recorder>>,
     /// The recordings that ended, held until the Note is saved.
@@ -122,6 +145,7 @@ impl CapturePopup {
             text: String::new(),
             focus: true,
             error: None,
+            failure_open: false,
             saved: None,
             recorder: None,
             recorded: Vec::new(),
@@ -178,9 +202,51 @@ impl CapturePopup {
         self.page.is_some()
     }
 
-    /// What went wrong saving, as announced at the top.
+    /// What went wrong, in full, behind the announcement at the top.
     pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+        self.error.as_ref().map(|f| f.details.as_str())
+    }
+
+    /// The announcement of what went wrong, at the top; its click opens
+    /// the failure's dialog.
+    fn failure_line(&mut self, ui: &mut Ui) {
+        let Some(failure) = &self.error else {
+            return;
+        };
+        let colour = ui.visuals().error_fg_color;
+        let label =
+            egui::Label::new(RichText::new(failure.said).color(colour)).sense(egui::Sense::click());
+        if ui.add(label).clicked() {
+            self.failure_open = true;
+        }
+    }
+
+    /// The failure's dialog, while it shows: the cause, the fix and the
+    /// full text, Close and Report. Closed, the failure is done with.
+    fn failure_dialog(&mut self, ctx: &egui::Context) {
+        let t = self.t;
+        let Some(failure) = &self.error else {
+            self.failure_open = false;
+            return;
+        };
+        if !self.failure_open {
+            return;
+        }
+        let mut closed = false;
+        let modal = egui::Modal::new(Id::new("popup failure")).show(ctx, |ui| {
+            ui.set_width(360.0);
+            closed = failure_form(
+                ui,
+                &t,
+                t.action_failed_title(),
+                (failure.cause, t.action_failed_fix()),
+                &failure.details,
+            );
+        });
+        if closed || modal.should_close() {
+            self.failure_open = false;
+            self.error = None;
+        }
     }
 
     /// Takes the keyboard again, as when the hotkey is pressed once more,
@@ -205,7 +271,7 @@ impl CapturePopup {
         });
         match read {
             Ok(areas) => self.areas = areas,
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
         // An Area or Topic deleted meanwhile is no place to go.
         if let Some(place) = &self.choices.place
@@ -219,7 +285,7 @@ impl CapturePopup {
     fn read_spawns(&mut self) {
         match capture_choices::may_spawn(&self.store, self.choices.place.as_deref()) {
             Ok(spawns) => self.spawns = spawns,
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
     }
 
@@ -262,7 +328,7 @@ impl CapturePopup {
                 Outcome::Closed
             }
             Err(e) => {
-                self.error = Some(e.to_string());
+                self.error = Some(Failure::of(&self.t, &e));
                 Outcome::Open
             }
         }
@@ -287,10 +353,12 @@ impl CapturePopup {
         let in_field = ui.memory(|m| m.has_focus(id));
         let typing = ui.ctx().text_edit_focused();
         let paged = self.page.is_some();
+        // The failure's dialog takes Esc for itself.
+        let failure_open = self.failure_open && self.error.is_some();
         let (enter, escape, closing, back) = ui.input_mut(|i| {
             (
                 in_field && i.consume_key(Modifiers::NONE, Key::Enter),
-                i.consume_key(Modifiers::NONE, Key::Escape),
+                !failure_open && i.consume_key(Modifiers::NONE, Key::Escape),
                 i.viewport().close_requested(),
                 // A page goes back as a level does (UI laws, "Desktop").
                 paged
@@ -305,6 +373,7 @@ impl CapturePopup {
             }
             return left;
         }
+        self.failure_dialog(ui.ctx());
         if paged {
             if escape || back {
                 self.close_page(ui.ctx());
@@ -334,10 +403,8 @@ impl CapturePopup {
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_size(ui.available_size());
-                if let Some(error) = &self.error {
-                    // Announcements go to the top (UI laws).
-                    ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
-                }
+                // Announcements go to the top (UI laws).
+                self.failure_line(ui);
                 if let Some(chip) = capture_choices::chips(ui, &t, &self.choices, place_chip) {
                     asked = Some(chip);
                 }
@@ -418,7 +485,11 @@ impl CapturePopup {
             if recorder.start() {
                 self.error = None;
             } else {
-                self.error = Some(t.microphone_missing().to_string());
+                self.error = Some(Failure {
+                    said: t.microphone_missing(),
+                    cause: t.microphone_missing(),
+                    details: "record: no microphone".into(),
+                });
             }
         }
         if let Some(asked) = asked {
@@ -443,7 +514,7 @@ impl CapturePopup {
                 ctx.send_viewport_cmd(ViewportCommand::InnerSize(PAGE_SIZE.into()));
             }
             Ok(None) => {}
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
         self.read_spawns();
     }
@@ -491,9 +562,7 @@ impl CapturePopup {
             .inner_margin(Margin::same(16))
             .show(ui, |ui| {
                 ui.set_min_size(ui.available_size());
-                if let Some(error) = &self.error {
-                    ui.label(RichText::new(error).color(ui.visuals().error_fg_color));
-                }
+                self.failure_line(ui);
                 asked = match &mut self.page {
                     Some(Page::Schedule(editor)) => {
                         editor.show(ui, &t, tones).map(PageAsk::Schedule)
@@ -508,7 +577,7 @@ impl CapturePopup {
         match self.page_asked(asked) {
             Ok(true) => self.close_page(ui.ctx()),
             Ok(false) => {}
-            Err(e) => self.error = Some(e.to_string()),
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
     }
 

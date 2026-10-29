@@ -6,6 +6,7 @@ import 'package:oldbrainfix/src/announcements.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_location.dart';
 import 'open_settings.dart';
 import 'reveal.dart';
@@ -279,7 +280,16 @@ void main() {
       expect(find.text('Remember where you were?'), findsOneWidget);
       await tap(tester, find.text('Allow'));
       expect(location.asked, 1);
-      expect(announcements.visible, contains('may not use your location'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The place was not named.',
+        title: 'Place not named',
+        cause:
+            'Old Brain Fix may not use your location, so it cannot tell where '
+            'you are.',
+        fix: 'You can allow it in the system settings, then try again.',
+      );
       expect(named.all(), isEmpty);
     });
 
@@ -288,7 +298,13 @@ void main() {
       await tester.tap(find.byTooltip('Name this place'));
       await tester.pump();
       await arrive(tester, null);
-      expect(announcements.visible, contains('Could not find out where'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The place was not named.',
+        cause: 'The phone could not find out where you are.',
+        fix: 'Turn location on, then try again.',
+      );
       expect(find.byType(AlertDialog), findsNothing);
     });
   });

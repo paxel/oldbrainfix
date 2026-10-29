@@ -18,7 +18,8 @@ import 'system_bars.dart';
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
 /// and offers it to the app the user picks. A Note sent before goes as
-/// an update, or as its cancellation.
+/// an update, or as its cancellation. Announces a failure when no file
+/// could be written or no app takes it, why behind the tap.
 Future<void> sendNoteFile(
   BuildContext context,
   Store store,
@@ -26,7 +27,17 @@ Future<void> sendNoteFile(
 ) async {
   final t = context.t;
   final announcements = AnnouncementsScope.of(context);
+  final navigator = Navigator.of(context, rootNavigator: true);
   final files = BundleScope.of(context);
+  void notSent(String cause, String fix, String details) => announceFailureWith(
+    announcements,
+    navigator,
+    t.sentItemNotSent,
+    title: t.sentItemNotSentTitle,
+    cause: cause,
+    fix: fix,
+    details: details,
+  );
   final picked = await showDialog<_Pick>(
     context: context,
     builder: (_) => SendNoteDialog(
@@ -37,14 +48,18 @@ Future<void> sendNoteFile(
   if (picked == null) return;
   final path = await files.exportPath(sentItemFileName(store.clock()));
   if (path == null) {
-    announcements?.announce(t.sendNoApp);
+    notSent(
+      t.sentItemNotWrittenCause,
+      t.nothingLostFix,
+      'sent item: no path to write the file to',
+    );
     return;
   }
   File(path).writeAsBytesSync(
     sendNote(store, noteId, to: picked.to, cancel: picked.cancel),
   );
   if (await files.share(path, type: sentItemMimeType) == ShareOutcome.noApp) {
-    announcements?.announce(t.sendNoApp);
+    notSent(t.sendNoApp, t.sendNoAppFix, 'sent item: no app took the file');
   }
 }
 
@@ -184,13 +199,9 @@ Future<int> openReceivedFile(
           ),
         );
     }
-  } on NotASentItem {
-    announcements?.announce(t.sentItemUnreadable);
-  } on SentItemNotForUs {
-    announcements?.announce(t.sentItemNotForUs);
-  } on SentItemNotFromSender {
-    announcements?.announce(t.sentItemNotFromSender);
-  } on SentItemFromBlocked catch (e) {
+  } on Exception catch (e) {
+    // Refused, why behind the tap; anything else is no refusal.
+    if (_refused(t, e) == null) rethrow;
     _announceRefused(t, announcements, navigator, e);
   }
   return 0;
@@ -329,19 +340,15 @@ class _SentItemScreenState extends State<SentItemScreen> {
         SentItemState.cancel => t.sentItemTrashed,
         _ => t.sentItemAccepted,
       });
-    } on SentItemNotFromSender {
-      announcements?.announce(t.sentItemNotFromSender);
-    } on SentItemFromBlocked catch (e) {
+    } on Exception catch (e) {
+      // Refused, why behind the tap; anything else is no refusal.
+      if (_refused(t, e) == null) rethrow;
       _announceRefused(
         t,
         announcements,
         Navigator.of(context, rootNavigator: true),
         e,
       );
-    } on NotASentItem {
-      announcements?.announce(t.sentItemUnreadable);
-    } on SentItemNotForUs {
-      announcements?.announce(t.sentItemNotForUs);
     } on StateError {
       // The held item went meanwhile: a block drops it too.
       if (store.isBlocked(opened.sender.id)) {

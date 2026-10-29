@@ -16,6 +16,7 @@ import 'package:oldbrainfix/src/restore_screen.dart';
 import 'package:oldbrainfix/src/voice_platform.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'bundle_test.dart' show FakeBundles;
 import 'fake_photos.dart';
 import 'fake_profile.dart';
@@ -235,7 +236,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(store.backupFolder, folder.path);
       expect(find.text('Backups go into Backups.'), findsOneWidget);
-      expect(announcements.visible, 'Backup written.');
+      // Shown below as the last Backup: no announcement.
+      expect(announcements.visible, isNull);
       final written = folder.listSync().whereType<File>().single;
       expect(written.path, endsWith('.$backupExtension'));
       expect(readBackupHeader(written.path)?.created, now);
@@ -251,8 +253,17 @@ void main() {
       announcements.dismiss();
       await tester.tap(find.byKey(const ValueKey('backup-now')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, startsWith('The Backup could not'));
       expect(find.textContaining('could not be written'), findsWidgets);
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not written.',
+        title: 'Backup not written',
+        cause: 'The Backup could not be written into its folder.',
+        fix:
+            'Check that the folder is still there, or choose it again, then '
+            'back up again.',
+      );
     });
 
     testWidgets('keeps the newest Backup for Google only once opted in', (
@@ -278,7 +289,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(store.autoBackupOn, isTrue);
       expect(folders.optedIn, isTrue);
-      expect(announcements.visible, 'Backup written.');
+      expect(announcements.visible, isNull);
       final kept = auto.listSync().whereType<File>().single;
       expect(readBackupHeader(kept.path)?.created, now);
       // No folder needed: nothing went there, and the weekly one is on.
@@ -375,13 +386,16 @@ void main() {
       bundles.picks = copy('${Directory.current.path}/pubspec.yaml');
       await tester.tap(find.byKey(const ValueKey('restore-pick')));
       await tester.pumpAndSettle();
-      expect(
-        announcements.visible,
-        'This file is not a Backup of Old Brain Fix.',
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not restored.',
+        title: 'Backup not restored',
+        cause: 'This file is not a Backup of Old Brain Fix.',
+        fix: 'Pick the Backup file again.',
       );
       expect(find.byKey(const ValueKey('restore')), findsNothing);
 
-      announcements.dismiss();
       bundles.picks = copy(path);
       await tester.tap(find.byKey(const ValueKey('restore-pick')));
       await tester.pumpAndSettle();
@@ -392,9 +406,14 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('restore')));
       await tester.pumpAndSettle();
-      expect(
-        announcements.visible,
-        'This passphrase or recovery key does not open the Backup.',
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not restored.',
+        cause: 'This passphrase or recovery key does not open the Backup.',
+        fix:
+            'Type the passphrase again, or use the recovery key on the '
+            'Recovery Sheet.',
       );
       expect(store.currentSeq(), 0);
 
@@ -442,18 +461,43 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('restore-scan')));
       await tester.pumpAndSettle();
-      expect(
-        announcements.visible,
-        startsWith('No recovery key found in the photo'),
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The photo could not be read.',
+        title: 'No code found',
+        cause: 'No recovery key was found in the photo.',
+        fix: 'Try again a little closer, or type the key.',
       );
-      announcements.dismiss();
+
+      // What is no key is said under the field; nothing is tried.
+      const invalid =
+          'That is not a recovery key. Check it against the Recovery Sheet.';
+      await tester.enterText(
+        find.byKey(const ValueKey('restore-code')),
+        'nonsense',
+      );
+      await tester.tap(find.byKey(const ValueKey('restore')));
+      await tester.pumpAndSettle();
+      expect(find.text(invalid), findsOneWidget);
+      expect(announcements.visible, isNull);
+      expect(store.currentSeq(), 0);
+
       pairing.code = code;
       await tester.tap(find.byKey(const ValueKey('restore-scan')));
       await tester.pumpAndSettle();
+      expect(find.text(invalid), findsNothing, reason: 'the scan took it');
       await tester.tap(find.byKey(const ValueKey('restore')));
       await tester.pumpAndSettle();
 
-      expect(announcements.visible, startsWith('Restored: '));
+      // That it was restored; how much and what to set again behind the
+      // tap.
+      await expectDoneAnnounced(
+        tester,
+        announcements,
+        'Backup restored.',
+        'Set alarms and locks again',
+      );
       expect(find.text('Welcome to Old Brain Fix'), findsNothing);
       expect(find.text('Pick your Areas'), findsNothing);
       expect(store.starterSetOffered, isTrue);
@@ -513,17 +557,14 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('restore')));
       await tester.pumpAndSettle();
-      expect(
-        announcements.visible,
-        'This passphrase or recovery key does not open the Backup.',
-      );
+      expect(announcements.visible, 'The Backup was not restored.');
       expect(File(found).existsSync(), isTrue);
 
       announcements.dismiss();
       await tester.enterText(find.byKey(const ValueKey('restore-code')), code);
       await tester.tap(find.byKey(const ValueKey('restore')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, startsWith('Restored: '));
+      expect(announcements.visible, 'Backup restored.');
       expect(Places(store).areas().single.name, 'Doctor');
       expect(File(found).existsSync(), isFalse);
       expect(store.autoBackupOn, isFalse);

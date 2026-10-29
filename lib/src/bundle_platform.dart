@@ -10,8 +10,9 @@ import 'announcements.dart';
 import 'app_lock.dart';
 import 'area_offer_screen.dart';
 import 'conflicts_screen.dart';
+import 'failure_dialog.dart';
+import 'host_screen.dart';
 import 'l10n.dart';
-import 'profile.dart';
 
 /// What became of a file offered to the app the user picks.
 enum ShareOutcome {
@@ -165,7 +166,8 @@ class BundleScope extends InheritedWidget {
 }
 
 /// Imports the bundle copy at [path] into [store], removes the copy and
-/// announces at the top what came in, or why nothing did. Returns how
+/// announces at the top that it came in, what came in behind the tap, or
+/// that nothing did, why behind the tap. Returns how
 /// many of the Conflicts it brought may be shown, for the caller to
 /// announce: behind the App Lock they wait for the unlock. A bundle that
 /// offers an Area from afar (#108) opens its preview instead; behind the
@@ -179,26 +181,30 @@ Future<int> importBundleFile(
   final announcements = AnnouncementsScope.of(context);
   final lock = LockScope.of(context);
   final navigator = Navigator.of(context);
+  // The root navigator outlives the page: an announcement may be tapped
+  // after leaving it.
+  final root = Navigator.of(context, rootNavigator: true);
   BundleResult? result;
-  String? failure;
+  // Why nothing came in, what to do, and the full text.
+  (String, String, String)? failure;
   Exception? offerRefused;
   try {
     result = await importBundle(store, path);
-  } on NotABundle {
-    failure = t.bundleNotABundle;
-  } on BundleNeedsUpdate {
-    failure = t.bundleNeedsUpdate;
+  } on NotABundle catch (e) {
+    failure = (t.bundleNotABundle, t.bundleAskAgainFix, '$e');
+  } on BundleNeedsUpdate catch (e) {
+    failure = (t.bundleNeedsUpdateCause, t.bundleUpdateFix, '$e');
   } on Exception catch (e) {
     // An Area offer refused says why behind the tap; whatever else broke
     // on the way leaves nothing half-taken.
     if (areaOfferRefusal(t, e) == null) {
-      failure = t.bundleFailed;
+      failure = (t.bundleNotReadCause, t.bundleImportAgainFix, '$e');
     } else {
       offerRefused = e;
     }
-  } on Object {
+  } on Object catch (e) {
     // Whatever else broke on the way: nothing half-taken stays.
-    failure = t.bundleFailed;
+    failure = (t.bundleNotReadCause, t.bundleImportAgainFix, '$e');
   } finally {
     try {
       File(path).deleteSync();
@@ -210,8 +216,24 @@ Future<int> importBundleFile(
     announceAreaOfferRefused(t, announcements, navigator, offerRefused);
     return 0;
   }
+  void notImported((String, String, String) why) {
+    final (cause, fix, details) = why;
+    announceFailureWith(
+      announcements,
+      root,
+      t.bundleNotImported,
+      title: t.bundleNotImportedTitle,
+      cause: cause,
+      fix: fix,
+      details: details,
+    );
+  }
+
   if (failure != null || result == null) {
-    announcements?.announce(failure ?? t.bundleFailed);
+    notImported(
+      failure ??
+          (t.bundleNotReadCause, t.bundleImportAgainFix, 'bundle: no result'),
+    );
     return 0;
   }
   if (result.offer case final offer?) {
@@ -227,13 +249,21 @@ Future<int> importBundleFile(
     return 0;
   }
   if (result.needsPairing) {
-    announcements?.announce(t.bundlePairFirst);
+    notImported((
+      t.bundlePairFirstCause,
+      t.bundlePairFirstFix,
+      'bundle: from a Device not paired with this one',
+    ));
     return 0;
   }
   // How much came in tells nothing of what: fine behind the lock too.
-  announcements?.announce(t.bundleCameIn(result.applied.length));
-  final refused = result.report.refusedCount;
-  if (refused > 0) announcements?.announce(t.syncRefused(refused));
+  announceDoneWith(
+    announcements,
+    root,
+    t.bundleImported,
+    t.bundleCameIn(result.applied.length),
+  );
+  announceRefusedWith(t, announcements, root, result.report.refusedCount);
   return visibleConflicts(store, lock, result.conflicts).length;
 }
 
@@ -257,21 +287,30 @@ String changesFileName(DateTime day, String person, String name) {
 /// was picked do the changes up to the log's mark, read before the
 /// bundle was written, count as sent (#109), and [onSent] is told: a
 /// share sheet left without an app keeps the Changes Nudge and says
-/// nothing. Nothing new, no app and a failure are announced at the top.
+/// nothing. Nothing new, no app and a failure are announced at the top,
+/// a failure's why behind the tap on [navigator].
 Future<ShareOutcome?> sendChanges({
   required Store store,
   required BundlePlatform bundles,
   required AppLocalizations t,
   required Announcements? announcements,
+  required NavigatorState navigator,
   required String person,
   VoidCallback? onSent,
 }) async {
   if (store.entriesForPerson(person).isEmpty) {
-    announcements?.announce(
-      t.bundleNothingNew(profileDisplayName(t, store.personShown(person).name)),
-    );
+    announcements?.announce(t.bundleNothingToSend);
     return null;
   }
+  void notSent(String details, {bool noApp = false}) =>
+      announceBundleNotSentWith(
+        t,
+        announcements,
+        navigator,
+        details,
+        noApp: noApp,
+      );
+
   try {
     final path = await bundles.exportPath(
       changesFileName(
@@ -281,7 +320,7 @@ Future<ShareOutcome?> sendChanges({
       ),
     );
     if (path == null) {
-      announcements?.announce(t.bundleFailed);
+      notSent('bundle: no path to write the file to');
       return null;
     }
     final seq = store.currentSeq();
@@ -292,13 +331,46 @@ Future<ShareOutcome?> sendChanges({
         store.noteChangesSent(person, seq);
         onSent?.call();
       case ShareOutcome.noApp:
-        announcements?.announce(t.bundleNoApp);
+        notSent('bundle: no app took the file', noApp: true);
       case ShareOutcome.dismissed:
         break;
     }
     return shared;
-  } on Object {
-    announcements?.announce(t.bundleFailed);
+  } on Object catch (e) {
+    notSent('$e');
     return null;
   }
 }
+
+/// Announces that a bundle was not sent: that no app took it when
+/// [noApp], else that its file could not be written; why and what to do
+/// behind the tap, [details] as the full text.
+void announceBundleNotSent(
+  BuildContext context,
+  String details, {
+  bool noApp = false,
+}) => announceBundleNotSentWith(
+  context.t,
+  AnnouncementsScope.of(context),
+  Navigator.of(context, rootNavigator: true),
+  details,
+  noApp: noApp,
+);
+
+/// [announceBundleNotSent] with the [announcements] and the [navigator]
+/// taken before an await.
+void announceBundleNotSentWith(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+  String details, {
+  bool noApp = false,
+}) => announceFailureWith(
+  announcements,
+  navigator,
+  t.bundleNotSent,
+  title: t.bundleNotSentTitle,
+  cause: noApp ? t.bundleNoApp : t.bundleNotWrittenCause,
+  fix: noApp ? t.bundleNoAppFix : t.nothingLostFix,
+  details: details,
+);

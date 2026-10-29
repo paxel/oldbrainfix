@@ -677,13 +677,13 @@ abstract class AppLocalizations {
   /// No description provided for @locationNotAllowed.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix may not use your location, so it cannot tell where you are. You can allow it in the system settings.'**
+  /// **'Old Brain Fix may not use your location, so it cannot tell where you are.'**
   String get locationNotAllowed;
 
   /// No description provided for @locationUnknown.
   ///
   /// In en, this message translates to:
-  /// **'Could not find out where you are. Is location turned on?'**
+  /// **'The phone could not find out where you are.'**
   String get locationUnknown;
 
   /// No description provided for @namedPlacesTitle.
@@ -1598,16 +1598,10 @@ abstract class AppLocalizations {
   /// **'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name stays in the Note on your own devices and is never sent anywhere else.'**
   String get bluetoothExplainBody;
 
-  /// No description provided for @calendarNotAllowed.
-  ///
-  /// In en, this message translates to:
-  /// **'Old Brain Fix may not read your calendar. You can allow it in the system settings.'**
-  String get calendarNotAllowed;
-
   /// No description provided for @bluetoothNotAllowed.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix may not see your Bluetooth devices. You can allow it in the system settings.'**
+  /// **'Old Brain Fix may not see your Bluetooth devices.'**
   String get bluetoothNotAllowed;
 
   /// No description provided for @contextSourceApp.
@@ -2165,7 +2159,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarMirrorNotAllowed.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix may not write to your calendar. You can allow it in the system settings.'**
+  /// **'Old Brain Fix may not write to your calendar.'**
   String get calendarMirrorNotAllowed;
 
   /// No description provided for @calendarMirrorNoCalendar.
@@ -2177,7 +2171,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarMirrorNotRemoved.
   ///
   /// In en, this message translates to:
-  /// **'The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.'**
+  /// **'Old Brain Fix could not remove the events it wrote from the calendar.'**
   String get calendarMirrorNotRemoved;
 
   /// No description provided for @agendaCalendarSwitch.
@@ -2831,7 +2825,7 @@ abstract class AppLocalizations {
   /// No description provided for @syncNoCode.
   ///
   /// In en, this message translates to:
-  /// **'No code found in the photo. Try again a little closer, or type the code.'**
+  /// **'No pair code was found in the photo.'**
   String get syncNoCode;
 
   /// No description provided for @syncCameIn.
@@ -2983,12 +2977,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No conflicts. Every Device agrees.'**
   String get conflictsNone;
-
-  /// No description provided for @syncConflicts.
-  ///
-  /// In en, this message translates to:
-  /// **'{count, plural, =1{1 thing was changed on both Devices. Tap to pick which version stays.} other{{count} things were changed on both Devices. Tap to pick which versions stay.}}'**
-  String syncConflicts(int count);
 
   /// No description provided for @conflictNoteText.
   ///
@@ -3899,7 +3887,7 @@ abstract class AppLocalizations {
   /// No description provided for @restoreNoCode.
   ///
   /// In en, this message translates to:
-  /// **'No recovery key found in the photo. Try again a little closer, or type it.'**
+  /// **'No recovery key was found in the photo.'**
   String get restoreNoCode;
 
   /// No description provided for @restoreInvalidCode.
@@ -5989,6 +5977,498 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add a calendar account in the phone\'s settings, then turn this on again.'**
   String get agendaCalendarAddFix;
+
+  /// A fix in a failure dialog when nothing was lost and trying again may work.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was lost; try again.'**
+  String get nothingLostFix;
+
+  /// Announced when no code was found in a photo taken to read one; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The photo could not be read.'**
+  String get codeNotRead;
+
+  /// Title of the dialog behind 'codeNotRead'.
+  ///
+  /// In en, this message translates to:
+  /// **'No code found'**
+  String get codeNotReadTitle;
+
+  /// The fix in the dialog behind 'codeNotRead' for a pair code.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again a little closer, or type the code.'**
+  String get syncNoCodeFix;
+
+  /// The fix in the dialog behind 'codeNotRead' for a recovery key.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again a little closer, or type the key.'**
+  String get restoreNoCodeFix;
+
+  /// Announced when a sync in person failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The sync did not go through.'**
+  String get syncNotDone;
+
+  /// Title of the dialog behind 'syncNotDone'.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed'**
+  String get syncNotDoneTitle;
+
+  /// Why a sync failed: the code names an address outside the local network.
+  ///
+  /// In en, this message translates to:
+  /// **'This code points outside your home network.'**
+  String get syncNotPrivateCause;
+
+  /// The fix for 'syncNotPrivateCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Only Devices on the same network can sync: connect both to the same Wi-Fi, then try again.'**
+  String get syncNotPrivateFix;
+
+  /// Why a sync failed: the other Device did not answer.
+  ///
+  /// In en, this message translates to:
+  /// **'The other Device did not answer.'**
+  String get syncUnreachableCause;
+
+  /// The fix for 'syncUnreachableCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that it still shows the code and that both are on the same Wi-Fi, then try again.'**
+  String get syncUnreachableFix;
+
+  /// The fix when the code belongs to another Device.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan or type the code the other Device shows now.'**
+  String get syncWrongHostFix;
+
+  /// Why a sync failed: the PIN in the code is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The PIN does not match.'**
+  String get syncWrongPinCause;
+
+  /// The fix for 'syncWrongPinCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the code again.'**
+  String get syncWrongPinFix;
+
+  /// Why a sync failed: too many wrong PINs.
+  ///
+  /// In en, this message translates to:
+  /// **'There were too many wrong tries.'**
+  String get syncLockedCause;
+
+  /// The fix for 'syncLockedCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Show a new code on the other Device, then try again.'**
+  String get syncLockedFix;
+
+  /// The fix when the other Device said no.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again, and say yes on the other Device when it asks.'**
+  String get syncDeclinedFix;
+
+  /// Why a sync failed: anything else on the way.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection broke off before the sync finished.'**
+  String get syncBrokeOffCause;
+
+  /// The fix when Old Brain Fix on one Device needs an update to sync.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on the Device named, then sync again.'**
+  String get updateFix;
+
+  /// Announced when an automatic sync needs an update of the app here or on another Device; the tap shows which.
+  ///
+  /// In en, this message translates to:
+  /// **'An update is needed to sync.'**
+  String get updateNeeded;
+
+  /// Title of the dialog behind 'updateNeeded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Update needed'**
+  String get updateNeededTitle;
+
+  /// Announced when a bundle would hold nothing new for whom it is meant.
+  ///
+  /// In en, this message translates to:
+  /// **'There is nothing new to send.'**
+  String get bundleNothingToSend;
+
+  /// Announced when a bundle could not be written or no app took it; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle was not sent.'**
+  String get bundleNotSent;
+
+  /// Title of the dialog behind 'bundleNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundle not sent'**
+  String get bundleNotSentTitle;
+
+  /// Why a bundle was not sent: its file could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle file could not be written.'**
+  String get bundleNotWrittenCause;
+
+  /// The fix when no app takes the bundle.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a messenger or a mail app, or choose a shared folder, then send it again.'**
+  String get bundleNoAppFix;
+
+  /// Announced when a bundle brought nothing in; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle was not imported.'**
+  String get bundleNotImported;
+
+  /// Title of the dialog behind 'bundleNotImported'.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundle not imported'**
+  String get bundleNotImportedTitle;
+
+  /// The fix when the file is no sync bundle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask for the bundle again, or import another file.'**
+  String get bundleAskAgainFix;
+
+  /// Why a bundle was not imported: it comes from a newer app.
+  ///
+  /// In en, this message translates to:
+  /// **'This bundle comes from a newer Old Brain Fix.'**
+  String get bundleNeedsUpdateCause;
+
+  /// The fix for 'bundleNeedsUpdateCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Old Brain Fix on this Device, then import it again.'**
+  String get bundleUpdateFix;
+
+  /// Why a bundle was not imported: anything else broke on the way.
+  ///
+  /// In en, this message translates to:
+  /// **'The bundle could not be read to the end.'**
+  String get bundleNotReadCause;
+
+  /// The fix for 'bundleNotReadCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing of it was kept; import it again.'**
+  String get bundleImportAgainFix;
+
+  /// Why a bundle was not imported: it is from an unpaired Device.
+  ///
+  /// In en, this message translates to:
+  /// **'This bundle is from a Device this one is not paired with, so nothing in it can be read.'**
+  String get bundlePairFirstCause;
+
+  /// The fix for 'bundlePairFirstCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pair the two Devices first, then import it again.'**
+  String get bundlePairFirstFix;
+
+  /// Announced when a bundle was imported; the tap shows how much came in.
+  ///
+  /// In en, this message translates to:
+  /// **'Bundle imported.'**
+  String get bundleImported;
+
+  /// Announced when a Sent Item could not be written or no app took it; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note was not sent.'**
+  String get sentItemNotSent;
+
+  /// Title of the dialog behind 'sentItemNotSent'.
+  ///
+  /// In en, this message translates to:
+  /// **'Note not sent'**
+  String get sentItemNotSentTitle;
+
+  /// Why a Sent Item was not sent: its file could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for the Note could not be written.'**
+  String get sentItemNotWrittenCause;
+
+  /// The fix when no app takes a Sent Item.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a messenger or a mail app, then send it again.'**
+  String get sendNoAppFix;
+
+  /// Announced when the calendar mirror could not be turned on or moved; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Routines and Reminders were not written into the calendar.'**
+  String get calendarMirrorNotOn;
+
+  /// Title of the dialog behind 'calendarMirrorNotOn'.
+  ///
+  /// In en, this message translates to:
+  /// **'Not written into the calendar'**
+  String get calendarMirrorNotOnTitle;
+
+  /// The fix when the events could not be removed from the calendar mirrored into before.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Old Brain Fix to use your calendar in the system settings, then choose the calendar again.'**
+  String get calendarMirrorChooseAgainFix;
+
+  /// Announced when the calendar mirror could not be turned off; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The events were not removed from the calendar.'**
+  String get calendarMirrorNotOff;
+
+  /// Title of the dialog behind 'calendarMirrorNotOff'.
+  ///
+  /// In en, this message translates to:
+  /// **'Events not removed'**
+  String get calendarMirrorNotOffTitle;
+
+  /// The fix for 'calendarMirrorNotOff'.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Old Brain Fix to use your calendar in the system settings, then turn this off again.'**
+  String get calendarMirrorOffAgainFix;
+
+  /// Announced when a part of the Capture Context could not be switched on; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'This part of the Capture Context was not switched on.'**
+  String get contextNotOn;
+
+  /// Title of the dialog behind 'contextNotOn'.
+  ///
+  /// In en, this message translates to:
+  /// **'Not switched on'**
+  String get contextNotOnTitle;
+
+  /// Announced when no calendar app took an event; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The event was not added to the calendar.'**
+  String get calendarEventNotAdded;
+
+  /// Title of the dialog behind 'calendarEventNotAdded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Event not added'**
+  String get calendarEventNotAddedTitle;
+
+  /// The fix when there is no calendar app.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a calendar app, then try again.'**
+  String get noCalendarAppFix;
+
+  /// Announced when the Recovery Sheet could not be made or no app took it; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Recovery Sheet was not printed or shared.'**
+  String get backupSheetNotOut;
+
+  /// Title of the dialog behind 'backupSheetNotOut'.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery Sheet not handed over'**
+  String get backupSheetNotOutTitle;
+
+  /// Why the Recovery Sheet did not go out: its file could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The file for the Recovery Sheet could not be written.'**
+  String get backupSheetFailedCause;
+
+  /// The fix when no app takes the Recovery Sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Install an app that prints or opens PDF files, then try again.'**
+  String get backupSheetNoAppFix;
+
+  /// Announced when writing a Backup failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup was not written.'**
+  String get backupNotWritten;
+
+  /// Title of the dialog behind 'backupNotWritten'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup not written'**
+  String get backupNotWrittenTitle;
+
+  /// Why a Backup was not written.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup could not be written into its folder.'**
+  String get backupFailedCause;
+
+  /// The fix for 'backupFailedCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the folder is still there, or choose it again, then back up again.'**
+  String get backupFailedFix;
+
+  /// Announced when restoring a Backup failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup was not restored.'**
+  String get restoreNotDone;
+
+  /// Title of the dialog behind 'restoreNotDone'.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup not restored'**
+  String get restoreNotDoneTitle;
+
+  /// The fix when the file picked is no Backup.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the Backup file again.'**
+  String get restorePickFix;
+
+  /// The fix when the passphrase or recovery key does not open the Backup.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the passphrase again, or use the recovery key on the Recovery Sheet.'**
+  String get restoreWrongFix;
+
+  /// Why a Backup was not restored: it is damaged.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup is damaged or incomplete.'**
+  String get restoreDamagedCause;
+
+  /// The fix for 'restoreDamagedCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was restored; try an older Backup.'**
+  String get restoreDamagedFix;
+
+  /// The fix when the Device holds Notes already.
+  ///
+  /// In en, this message translates to:
+  /// **'A Backup goes only onto a Device that holds no Notes yet.'**
+  String get restoreNotEmptyFix;
+
+  /// Why a Backup was not restored: anything else broke on the way.
+  ///
+  /// In en, this message translates to:
+  /// **'The Backup could not be read to the end.'**
+  String get restoreFailedCause;
+
+  /// The fix for 'restoreFailedCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was changed; try again.'**
+  String get restoreFailedFix;
+
+  /// Announced when a Backup was restored; the tap shows how much came back and what to set again.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup restored.'**
+  String get restoreDoneShort;
+
+  /// Announced when naming the current place failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The place was not named.'**
+  String get namedPlaceNotAdded;
+
+  /// Title of the dialog behind 'namedPlaceNotAdded'.
+  ///
+  /// In en, this message translates to:
+  /// **'Place not named'**
+  String get namedPlaceNotAddedTitle;
+
+  /// The fix when the location may not be used.
+  ///
+  /// In en, this message translates to:
+  /// **'You can allow it in the system settings, then try again.'**
+  String get locationAllowFix;
+
+  /// The fix when the position could not be found.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn location on, then try again.'**
+  String get locationUnknownFix;
+
+  /// Announced when a picture for the Profile cannot be read; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The picture was not set.'**
+  String get profilePictureNotSet;
+
+  /// Title of the dialog behind 'profilePictureNotSet'.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture not set'**
+  String get profilePictureNotSetTitle;
+
+  /// The fix when a Profile picture cannot be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick another picture, or take a new photo.'**
+  String get profilePictureFix;
+
+  /// Announced when downloading or picking the speech model failed; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The speech model was not kept.'**
+  String get speechModelNotKept;
+
+  /// Title of the dialog behind 'speechModelNotKept'.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech model not kept'**
+  String get speechModelNotKeptTitle;
+
+  /// Why the speech model was not kept: the download broke off.
+  ///
+  /// In en, this message translates to:
+  /// **'The download did not finish.'**
+  String get speechModelFailedCause;
+
+  /// The fix for 'speechModelFailedCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was kept; try again later.'**
+  String get speechModelFailedFix;
+
+  /// Why the speech model was not kept: it is not a pinned one.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not the expected speech model.'**
+  String get speechModelMismatchCause;
+
+  /// The fix for 'speechModelMismatchCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Download one of the models listed, or pick the file of one of them.'**
+  String get speechModelMismatchFix;
 }
 
 class _AppLocalizationsDelegate

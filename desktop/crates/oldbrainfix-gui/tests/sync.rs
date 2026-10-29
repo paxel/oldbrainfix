@@ -417,7 +417,7 @@ fn conflicts_an_automatic_sync_brought_are_announced_until_sync_shows() -> TestR
     harness.step();
     assert_eq!(harness.state().arrived_conflicts(), 1);
     harness
-        .query_all_by_label_contains("A sync found 1 thing changed on both Devices")
+        .query_all_by_label_contains("A sync found something changed on both Devices")
         .next()
         .ok_or("the announcement")?
         .click_accesskit();
@@ -627,7 +627,21 @@ fn a_bundle_is_imported_and_one_saved_in_the_sync_view() -> TestResult {
     harness.get_by_label("Import bundle…").click_accesskit();
     harness.step();
     harness.step();
+    // Only that it came in; the click shows how much.
+    assert_eq!(harness.state().notice(), Some("Bundle imported."));
+    assert!(!shows(&harness, "came in with the bundle"));
+    harness.get_by_label("Bundle imported.").click_accesskit();
+    harness.step();
+    harness.step();
     assert!(shows(&harness, "came in with the bundle"));
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(!shows(&harness, "came in with the bundle"));
     let desk = harness.state().store();
     assert_eq!(
         texts_of(desk)?,
@@ -637,7 +651,10 @@ fn a_bundle_is_imported_and_one_saved_in_the_sync_view() -> TestResult {
     harness.get_by_label("Save bundle…").click_accesskit();
     harness.step();
     harness.step();
-    assert!(shows(&harness, "Bundle saved with"));
+    assert_eq!(
+        harness.state().notice(),
+        Some("Bundle saved. Send it to the other Device and import it there.")
+    );
     let file = saved.with_extension("obfsync");
     assert!(file.is_file(), "the extension is added");
     import_bundle(&phone, &file)?;
@@ -680,25 +697,42 @@ fn a_bundle_dropped_onto_the_window_is_imported_and_strangers_told_to_pair() -> 
         }];
         harness.run();
     };
+    // The click on a failure opens why and what to do, then Close.
+    let why = |harness: &mut Harness<'_, App>, cause: &str| -> TestResult {
+        assert_eq!(
+            harness.state().notice(),
+            Some("The bundle was not imported.")
+        );
+        assert!(!shows(harness, cause));
+        harness
+            .get_by_label("The bundle was not imported.")
+            .click_accesskit();
+        harness.run();
+        assert_eq!(harness.state().notice(), None);
+        assert!(shows(harness, "Bundle not imported"));
+        assert!(shows(harness, cause));
+        harness
+            .get_all_by_label("Close")
+            .last()
+            .ok_or("Close")?
+            .click_accesskit();
+        harness.run();
+        assert!(!shows(harness, "Bundle not imported"));
+        Ok(())
+    };
     drop(&mut harness, &paired);
-    assert!(shows(&harness, "came in with the bundle"));
+    assert_eq!(harness.state().notice(), Some("Bundle imported."));
     assert_eq!(texts_of(harness.state().store())?, vec!["Dropped in"]);
     drop(&mut harness, &foreign);
-    assert!(shows(&harness, "Pair them first"));
+    why(&mut harness, "Pair the two Devices first")?;
     assert_eq!(texts_of(harness.state().store())?, vec!["Dropped in"]);
     drop(&mut harness, &junk);
-    assert!(shows(&harness, "no sync bundle this app can read"));
-    // A click puts the announcement away.
-    harness
-        .get_by_label_contains("no sync bundle")
-        .click_accesskit();
-    harness.run();
-    assert_eq!(harness.state().notice(), None);
+    why(&mut harness, "no sync bundle this app can read")?;
     Ok(())
 }
 
 #[test]
-fn a_device_that_needs_an_update_is_announced_until_clicked_away() -> TestResult {
+fn a_device_that_needs_an_update_is_announced_which_one_behind_the_click() -> TestResult {
     use oldbrainfix_core::sync::UpdateNeeded;
     let desk = store(1)?;
     desk.remember_device(&oldbrainfix_core::PairedDevice {
@@ -723,12 +757,30 @@ fn a_device_that_needs_an_update_is_announced_until_clicked_away() -> TestResult
         );
     harness.step();
     let text = "Old Brain Fix on Pixel needs an update to sync with this Device.";
-    assert!(shows(&harness, text));
+    // Only that an update is needed: the Device's name behind the click.
+    assert!(shows(&harness, "An update is needed to sync."));
+    assert!(!shows(&harness, text));
     assert!(
         harness.state().store().take_update_notices()?.is_empty(),
         "taken once"
     );
-    harness.get_by_label(text).click_accesskit();
+    harness
+        .get_by_label("An update is needed to sync.")
+        .click_accesskit();
+    harness.step();
+    harness.step();
+    assert!(!shows(&harness, "An update is needed to sync."));
+    assert!(shows(&harness, "Update needed"));
+    assert!(shows(&harness, text));
+    assert!(shows(
+        &harness,
+        "Install the latest Old Brain Fix on the Device named, then sync again."
+    ));
+    harness
+        .get_all_by_label("Close")
+        .last()
+        .ok_or("Close")?
+        .click_accesskit();
     harness.step();
     harness.step();
     assert!(!shows(&harness, text));
@@ -859,7 +911,10 @@ fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
             SyncFailure::WrongPin,
             "The PIN does not match. Type the code again.",
         ),
-        (SyncFailure::Locked, "Too many wrong tries. Show a new code"),
+        (
+            SyncFailure::Locked,
+            "There were too many wrong tries. Show a new code",
+        ),
         (
             SyncFailure::Declined,
             "The other Device said no to this one.",
@@ -874,7 +929,7 @@ fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
         ),
         (
             SyncFailure::Failed,
-            "Sync broke off. Nothing was lost; try again.",
+            "The connection broke off before the sync finished. Nothing was lost; try again.",
         ),
     ];
     // Whatever else broke is said as broken off.
@@ -886,7 +941,10 @@ fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
     type_code(&mut harness, &code);
     step_until(&mut harness, |app| !app.sync_host().joining())?;
     harness.step();
-    assert!(shows(&harness, "Sync broke off."));
+    assert!(shows(
+        &harness,
+        "The connection broke off before the sync finished."
+    ));
     for (failure, text) in said {
         harness
             .state_mut()

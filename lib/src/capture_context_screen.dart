@@ -3,6 +3,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'announcements.dart';
 import 'context_platform.dart';
+import 'failure_dialog.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'system_bars.dart';
@@ -69,16 +70,25 @@ class _ContextSwitchState extends State<ContextSwitch> {
   Future<void> _switch(bool on) async {
     final source = ContextScope.of(context);
     final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
     final t = context.t;
     final kind = widget.kind;
     if (on &&
         !await source.granted(kind) &&
         (!mounted || !await explainAndAskContext(context, source, kind))) {
       if (!mounted) return;
-      announcements?.announce(switch (kind) {
-        ContextKind.calendar => t.calendarNotAllowed,
-        ContextKind.bluetooth => t.bluetoothNotAllowed,
-      });
+      announceFailureWith(
+        announcements,
+        navigator,
+        t.contextNotOn,
+        title: t.contextNotOnTitle,
+        cause: switch (kind) {
+          ContextKind.calendar => t.agendaCalendarNotAllowedCause,
+          ContextKind.bluetooth => t.bluetoothNotAllowed,
+        },
+        fix: t.agendaCalendarAllowFix,
+        details: 'capture context: ${kind.name} not allowed',
+      );
       return;
     }
     if (!mounted) return;

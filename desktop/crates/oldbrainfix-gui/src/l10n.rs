@@ -126,11 +126,27 @@ mod tests {
             (en.changes_not_saved_cause(), de.changes_not_saved_cause()),
             (en.changes_not_saved_fix(), de.changes_not_saved_fix()),
             (en.changes_nothing_new(), de.changes_nothing_new()),
+            (en.action_failed(), de.action_failed()),
+            (en.action_failed_title(), de.action_failed_title()),
+            (en.action_failed_cause(), de.action_failed_cause()),
+            (en.action_failed_fix(), de.action_failed_fix()),
+            (en.autostart_failed(), de.autostart_failed()),
+            (en.autostart_failed_title(), de.autostart_failed_title()),
+            (en.autostart_failed_cause(), de.autostart_failed_cause()),
+            (en.autostart_failed_fix(), de.autostart_failed_fix()),
+            (en.bundle_not_saved(), de.bundle_not_saved()),
+            (en.bundle_not_saved_title(), de.bundle_not_saved_title()),
+            (en.bundle_saved(), de.bundle_saved()),
+            (en.sync_host_failed_cause(), de.sync_host_failed_cause()),
+            (en.sync_host_failed_fix(), de.sync_host_failed_fix()),
         ] {
             assert_ne!(en, de);
         }
         assert_ne!(en.sync_conflicts_below(2), de.sync_conflicts_below(2));
-        assert_ne!(en.bundle_saved(2), de.bundle_saved(2));
+        assert_ne!(en.sync_conflicts_arrived(2), de.sync_conflicts_arrived(2));
+        // The count only picks the grammar: no value in an announcement.
+        assert!(!en.sync_conflicts_arrived(3).contains('3'));
+        assert!(!de.sync_conflicts_arrived(3).contains('3'));
         assert_eq!(
             en.file_recording_failed(1),
             "A recording from a file cannot be transcribed."

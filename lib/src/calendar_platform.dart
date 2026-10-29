@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'failure_dialog.dart';
 import 'l10n.dart';
@@ -137,27 +138,37 @@ List<CalendarChoice> addChoices(
   ];
 }
 
-/// Opens the calendar app filled in with [event]; says so at the top
-/// when there is none.
+/// Opens the calendar app filled in with [event]; announces a failure
+/// when there is none, why behind the tap.
 Future<void> addToCalendar(BuildContext context, CalendarEvent event) async {
+  final t = context.t;
   final announcements = AnnouncementsScope.of(context);
-  final text = context.t.noCalendarApp;
+  final navigator = Navigator.of(context, rootNavigator: true);
   if (await CalendarScope.of(context).insert(event)) return;
-  announcements?.announce(text);
+  announceFailureWith(
+    announcements,
+    navigator,
+    t.calendarEventNotAdded,
+    title: t.calendarEventNotAddedTitle,
+    cause: t.noCalendarApp,
+    fix: t.noCalendarAppFix,
+    details: 'calendar event: no calendar app took it',
+  );
 }
 
-/// Offers [events] as one calendar file, made at the store's now; says
-/// so at the top when no app can take it.
+/// Offers [events] as one calendar file, made at the store's now;
+/// announces a failure when no app can take it, why behind the tap.
 Future<void> shareCalendarFile(
   BuildContext context,
   Store store,
   Iterable<CalendarEvent> events,
 ) async {
+  final t = context.t;
   final announcements = AnnouncementsScope.of(context);
-  final text = context.t.nothingTakesCalendarFile;
+  final navigator = Navigator.of(context, rootNavigator: true);
   final ics = writeIcs(events, stamp: store.clock());
   if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
-  announcements?.announce(text);
+  _announceFileNotShared(t, announcements, navigator);
 }
 
 /// Offers [list] as one calendar file, made at the store's now, each
@@ -177,16 +188,23 @@ Future<void> shareRoutinesFile(
     return note == null ? t.noteGone : noteText(t, note);
   }, stamp: routines.store.clock());
   if (await CalendarScope.of(context).share(calendarFileName, ics)) return;
-  announceFailureWith(
-    announcements,
-    navigator,
-    t.calendarFileNotShared,
-    title: t.calendarFileNotSharedTitle,
-    cause: t.nothingTakesCalendarFile,
-    fix: t.calendarFileFix,
-    details: 'calendar file: no app took it',
-  );
+  _announceFileNotShared(t, announcements, navigator);
 }
+
+/// Announces that no app took the calendar file, why behind the tap.
+void _announceFileNotShared(
+  AppLocalizations t,
+  Announcements? announcements,
+  NavigatorState navigator,
+) => announceFailureWith(
+  announcements,
+  navigator,
+  t.calendarFileNotShared,
+  title: t.calendarFileNotSharedTitle,
+  cause: t.nothingTakesCalendarFile,
+  fix: t.calendarFileFix,
+  details: 'calendar file: no app took it',
+);
 
 /// The calendar button of an app bar: does its only choice at once, or
 /// opens a menu of [choices] where the finger is. Nothing shows without

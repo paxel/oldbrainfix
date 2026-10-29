@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../l10n/app_localizations.dart';
 import 'announcements.dart';
 import 'appointments.dart';
 import 'calendar_mirror.dart';
@@ -111,20 +112,55 @@ class _MirrorSwitchState extends State<MirrorSwitch> {
     }
   }
 
+  /// Announces that the Routines and Reminders were not written into a
+  /// calendar; the tap opens [cause], [fix] and [details]. The
+  /// [announcements] and the [navigator] are taken before an await.
+  void _announceNotOn(
+    AppLocalizations t,
+    Announcements? announcements,
+    NavigatorState navigator,
+    String cause,
+    String fix,
+    String details,
+  ) {
+    announceFailureWith(
+      announcements,
+      navigator,
+      t.calendarMirrorNotOn,
+      title: t.calendarMirrorNotOnTitle,
+      cause: cause,
+      fix: fix,
+      details: details,
+    );
+  }
+
   /// Turns the mirror on, or moves it to another calendar.
   Future<void> _choose() => _hold(() async {
     final platform = widget.mirror.platform;
-    final announcements = AnnouncementsScope.of(context);
     final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    void notOn(String cause, String fix, String details) =>
+        _announceNotOn(t, announcements, navigator, cause, fix, details);
     if (!await platform.granted() &&
         (!mounted || !await explainAndAskMirror(context, platform))) {
-      if (mounted) announcements?.announce(t.calendarMirrorNotAllowed);
+      if (mounted) {
+        notOn(
+          t.calendarMirrorNotAllowed,
+          t.agendaCalendarAllowFix,
+          'calendar mirror: writing not allowed',
+        );
+      }
       return;
     }
     final calendars = await platform.calendars();
     if (!mounted) return;
     if (calendars.isEmpty) {
-      announcements?.announce(t.calendarMirrorNoCalendar);
+      notOn(
+        t.calendarMirrorNoCalendar,
+        t.agendaCalendarAddFix,
+        'calendar mirror: no calendar on this device',
+      );
       return;
     }
     final picked = calendars.length == 1
@@ -132,7 +168,11 @@ class _MirrorSwitchState extends State<MirrorSwitch> {
         : await _pick(calendars);
     if (picked == null || !mounted) return;
     if (!await widget.mirror.turnOn((id: picked.id, name: picked.name))) {
-      announcements?.announce(t.calendarMirrorNotRemoved);
+      notOn(
+        t.calendarMirrorNotRemoved,
+        t.calendarMirrorChooseAgainFix,
+        'calendar mirror: events not removed from the calendar before',
+      );
     }
   });
 
@@ -172,16 +212,24 @@ class _MirrorSwitchState extends State<MirrorSwitch> {
   Future<void> _turnOff() => _hold(() async {
     final mirror = widget.mirror;
     final platform = mirror.platform;
-    final announcements = AnnouncementsScope.of(context);
     final t = context.t;
+    final announcements = AnnouncementsScope.of(context);
+    final navigator = Navigator.of(context, rootNavigator: true);
     if (await mirror.turnOff()) return;
     if (!await platform.granted() &&
         await platform.request() &&
         await mirror.turnOff()) {
       return;
     }
-    if (!mounted) return;
-    announcements?.announce(t.calendarMirrorNotRemoved);
+    announceFailureWith(
+      announcements,
+      navigator,
+      t.calendarMirrorNotOff,
+      title: t.calendarMirrorNotOffTitle,
+      cause: t.calendarMirrorNotRemoved,
+      fix: t.calendarMirrorOffAgainFix,
+      details: 'calendar mirror: events not removed',
+    );
   });
 
   @override

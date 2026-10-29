@@ -13,6 +13,7 @@ import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
 import 'open_settings.dart';
@@ -139,8 +140,14 @@ void main() {
     final (info, name) = joined.single;
     expect((info.host, info.port, info.pin), ('192.168.1.23', 45231, '042817'));
     expect(name, 'Pixel');
-    expect(announcements.visible, startsWith('Synced with Desk: '));
-    expect(find.text(announcements.visible!), findsOneWidget);
+    // Only that it finished; with whom and what came in behind the tap.
+    expect(find.text('Sync finished.'), findsOneWidget);
+    await expectDoneAnnounced(
+      tester,
+      announcements,
+      'Sync finished.',
+      'Synced with Desk: ',
+    );
     expect([for (final n in Notes(phone).all()) n.text], ['From the desk']);
     await tester.scrollUntilVisible(
       find.text('Desk'),
@@ -245,18 +252,21 @@ void main() {
     });
   });
 
-  testWidgets('what is no code is said so and nothing is tried', (
-    tester,
-  ) async {
+  testWidgets('what is no code is said under the field and nothing is '
+      'tried', (tester) async {
+    const invalid =
+        "That is not a pair code. Check it against the other Device's screen.";
     await open(tester);
     await tester.enterText(find.byKey(const ValueKey('code')), 'hello');
     await tester.tap(find.byKey(const ValueKey('join')));
     await tester.pumpAndSettle();
     expect(joined, isEmpty);
-    expect(
-      announcements.visible,
-      "That is not a pair code. Check it against the other Device's screen.",
-    );
+    expect(announcements.visible, isNull);
+    expect(find.text(invalid), findsOneWidget);
+    // Typing again takes it away.
+    await tester.enterText(find.byKey(const ValueKey('code')), 'hello!');
+    await tester.pumpAndSettle();
+    expect(find.text(invalid), findsNothing);
   });
 
   testWidgets('a refused sync says why at the top', (tester) async {
@@ -265,9 +275,13 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('code')), code);
     await tester.tap(find.byKey(const ValueKey('join')));
     await tester.pumpAndSettle();
-    expect(
-      announcements.visible,
-      'The PIN does not match. Type the code again.',
+    await expectFailureAnnounced(
+      tester,
+      announcements,
+      'The sync did not go through.',
+      title: 'Sync failed',
+      cause: 'The PIN does not match.',
+      fix: 'Type the code again.',
     );
     expect(phone.allEntries(), isEmpty);
   });
@@ -278,9 +292,12 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('code')), code);
     await tester.tap(find.byKey(const ValueKey('join')));
     await tester.pumpAndSettle();
-    expect(
-      announcements.visible,
-      'Sync broke off. Nothing was lost; try again.',
+    await expectFailureAnnounced(
+      tester,
+      announcements,
+      'The sync did not go through.',
+      cause: 'The connection broke off before the sync finished.',
+      fix: 'Nothing was lost; try again.',
     );
     expect(find.byKey(const ValueKey('join')), findsOneWidget);
   });
@@ -295,7 +312,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(pairing.read, onePixelPng);
     expect(joined.single.$1.pin, '042817');
-    expect(announcements.visible, startsWith('Synced with Desk: '));
+    expect(announcements.visible, 'Sync finished.');
   });
 
   testWidgets('a photo without a code says so', (tester) async {
@@ -304,7 +321,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('scan')));
     await tester.pumpAndSettle();
     expect(joined, isEmpty);
-    expect(announcements.visible, startsWith('No code found in the photo.'));
+    await expectFailureAnnounced(
+      tester,
+      announcements,
+      'The photo could not be read.',
+      title: 'No code found',
+      cause: 'No pair code was found in the photo.',
+      fix: 'Try again a little closer, or type the code.',
+    );
   });
 
   Future<void> syncNow(WidgetTester tester) async {
@@ -323,11 +347,12 @@ void main() {
     Notes(desk).edit(note.id, 'Edited at the desk');
     announcements.dismiss();
     await syncNow(tester);
-    expect(announcements.visible, startsWith('Synced with Desk: '));
+    expect(announcements.visible, 'Sync finished.');
     announcements.dismiss();
     await tester.pumpAndSettle();
     const found =
-        '1 thing was changed on both Devices. Tap to pick which version stays.';
+        'Something was changed on both Devices. Tap to pick which version '
+        'stays.';
     expect(announcements.visible, found);
     expect(find.text('1 conflict to settle'), findsOneWidget);
 

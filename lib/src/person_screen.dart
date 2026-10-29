@@ -325,6 +325,7 @@ class _PersonScreenState extends State<PersonScreen> {
         bundles: BundleScope.of(context),
         t: context.t,
         announcements: AnnouncementsScope.of(context),
+        navigator: Navigator.of(context, rootNavigator: true),
         person: widget.id,
         onSent: widget.onChangesSent,
       );

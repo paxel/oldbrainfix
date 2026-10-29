@@ -12,6 +12,7 @@ import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/sync_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'announced.dart';
 import 'fake_alarms.dart';
 import 'fake_photos.dart';
 
@@ -176,7 +177,7 @@ void main() {
       phone.noteHeldBy(desk.deviceId, phone.versionVector());
       await tester.tap(find.byKey(const ValueKey('send-bundle')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, 'Nothing new to send to Desk.');
+      expect(announcements.visible, 'There is nothing new to send.');
       expect(bundles.shared, hasLength(1));
 
       // No app to take it.
@@ -185,7 +186,16 @@ void main() {
       announcements.dismiss();
       await tester.tap(find.byKey(const ValueKey('send-bundle')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, 'No app here can take the bundle.');
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The bundle was not sent.',
+        title: 'Bundle not sent',
+        cause: 'No app here can take the bundle.',
+        fix:
+            'Install a messenger or a mail app, or choose a shared folder, '
+            'then send it again.',
+      );
     });
 
     testWidgets('imports a picked bundle and says what came in', (
@@ -205,7 +215,12 @@ void main() {
       bundles.picks = copy(file);
       await tester.tap(find.byKey(const ValueKey('import-bundle')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, contains('came in with the bundle'));
+      await expectDoneAnnounced(
+        tester,
+        announcements,
+        'Bundle imported.',
+        'came in with the bundle.',
+      );
       expect(Notes(phone).all().map((n) => n.text), ['From the desk']);
       expect(File(bundles.picks!).existsSync(), isFalse, reason: 'the copy');
 
@@ -215,9 +230,13 @@ void main() {
       bundles.picks = junk;
       await tester.tap(find.byKey(const ValueKey('import-bundle')));
       await tester.pumpAndSettle();
-      expect(
-        announcements.visible,
-        'This file is no sync bundle this app can read.',
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The bundle was not imported.',
+        title: 'Bundle not imported',
+        cause: 'This file is no sync bundle this app can read.',
+        fix: 'Ask for the bundle again, or import another file.',
       );
     });
 
@@ -231,7 +250,15 @@ void main() {
       bundles.picks = copy(file);
       await tester.tap(find.byKey(const ValueKey('import-bundle')));
       await tester.pumpAndSettle();
-      expect(announcements.visible, contains('Pair them first'));
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The bundle was not imported.',
+        cause:
+            'This bundle is from a Device this one is not paired with, so '
+            'nothing in it can be read.',
+        fix: 'Pair the two Devices first, then import it again.',
+      );
       expect(Notes(phone).all(), isEmpty);
     });
   });
@@ -252,7 +279,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(announcements.visible, contains('came in with the bundle'));
+    expect(announcements.visible, 'Bundle imported.');
     expect(Notes(phone).all().map((n) => n.text), ['Opened at the start']);
 
     announcements.dismiss();
@@ -261,7 +288,7 @@ void main() {
     await writeBundle(desk, second);
     bundles.open(copy(second));
     await tester.pumpAndSettle();
-    expect(announcements.visible, contains('came in with the bundle'));
+    expect(announcements.visible, 'Bundle imported.');
     expect(Notes(phone).all().map((n) => n.text).toSet(), {
       'Opened at the start',
       'Opened later',
@@ -289,7 +316,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(announcements.visible, contains('came in with the bundle'));
+    expect(announcements.visible, 'Bundle imported.');
     announcements.dismiss();
     expect(announcements.visible, isNull, reason: 'not past the lock');
     expect(find.byType(ConflictsScreen), findsNothing);

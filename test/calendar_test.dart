@@ -154,10 +154,16 @@ void main() {
       await edit(tester, note.id);
       await tap(tester, calendarButton);
 
+      await tap(tester, find.text('The event was not added to the calendar.'));
+      expect(find.text('Event not added'), findsOneWidget);
       expect(
-        find.text('There is no calendar app to add it to.'),
+        find.text(
+          'There is no calendar app to add it to. Install a calendar app, '
+          'then try again.',
+        ),
         findsOneWidget,
       );
+      expect(find.text('Report'), findsOneWidget);
     });
 
     testWidgets('without a calendar platform no calendar button shows', (

@@ -4,8 +4,8 @@
 //! and the review of the AI Task, its changes grouped by kind, each with
 //! what the log holds and what the task wrote, accepted or rejected as a
 //! whole. While an AI Task is open or waits for its review, sync waits;
-//! [`error_text`] says so where a sync, a bundle, an Area offer or a
-//! Sent Item was refused for it.
+//! the window says so where a sync, a bundle, an Area offer or a Sent
+//! Item was refused for it.
 
 use egui::{Id, RichText, Ui};
 use oldbrainfix_core::ai_port::{bridged_client_config, claude_code_command, client_config};
@@ -13,7 +13,7 @@ use oldbrainfix_core::ai_task::{AiChangeKind, AiFieldChange, AiReviewItem};
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::routines::keys as routine_keys;
-use oldbrainfix_core::{Error, Importance, Notes, Places, Routines, Store, StoredText, parse_time};
+use oldbrainfix_core::{Importance, Notes, Places, Routines, Store, StoredText, parse_time};
 
 use crate::app::{clickable_card, embossed, row_title, when};
 use crate::l10n::L10n;
@@ -56,24 +56,6 @@ pub fn client_text(client: Client, url: &str, token: &str) -> String {
         Client::Config => client_config(url, token),
         Client::ClaudeCode => claude_code_command(url, token),
         Client::ClaudeDesktop => bridged_client_config(url, token),
-    }
-}
-
-/// `error` in the user's words: a sync refused while an AI Task waits
-/// says why and what to do, anything else as it reads.
-pub fn error_text(t: &L10n, error: &Error) -> String {
-    match error {
-        Error::SyncPaused => t.sync_paused_error().to_string(),
-        e => e.to_string(),
-    }
-}
-
-/// `failed` followed by what went wrong, as a bundle or a Sent Item that
-/// was not saved is announced; a refusal while an AI Task waits alone.
-pub fn failed_text(t: &L10n, failed: &str, error: &Error) -> String {
-    match error {
-        Error::SyncPaused => t.sync_paused_error().to_string(),
-        e => format!("{failed} ({e})"),
     }
 }
 

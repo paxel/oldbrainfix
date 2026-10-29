@@ -11,6 +11,7 @@ import 'auto_sync.dart';
 import 'bundle_platform.dart';
 import 'sent_item_screen.dart';
 import 'conflicts_screen.dart';
+import 'failure_dialog.dart';
 import 'folder_platform.dart';
 import 'host_screen.dart';
 import 'l10n.dart';
@@ -63,6 +64,10 @@ class SyncScreen extends StatefulWidget {
 
 class _SyncScreenState extends State<SyncScreen> {
   final _code = TextEditingController();
+
+  /// Whether the code typed is no pair code; said under the field until
+  /// it changes.
+  var _codeInvalid = false;
   var _busy = false;
   late var _paired = widget.store.pairedDevices();
   var _conflicts = 0;
@@ -212,7 +217,7 @@ class _SyncScreenState extends State<SyncScreen> {
     final code = await pairing.readQr(photo);
     if (!mounted) return;
     if (code == null || decodePairCode(code) == null) {
-      _announce(context.t.syncNoCode);
+      announceCodeNotRead(context);
       return;
     }
     _code.text = code;
@@ -223,19 +228,26 @@ class _SyncScreenState extends State<SyncScreen> {
     final t = context.t;
     final info = decodePairCode(_code.text);
     if (info == null) {
-      _announce(t.syncInvalidCode);
+      setState(() => _codeInvalid = true);
       return;
     }
     final pairing = PairingScope.of(context);
-    setState(() => _busy = true);
+    setState(() {
+      _codeInvalid = false;
+      _busy = true;
+    });
     var synced = false;
     try {
       final name = await pairing.deviceName();
       final result = await widget.join(widget.store, info, name: name);
       if (!mounted) return;
-      _announce(
+      // The root navigator outlives this screen: an announcement may be
+      // tapped after leaving it.
+      final navigator = Navigator.of(context, rootNavigator: true);
+      final announcements = AnnouncementsScope.of(context);
+      final brought = [
         t.syncCameIn(result.session.name, result.session.applied.length),
-      );
+      ];
       final shared = result.session.sharedArea == null
           ? null
           : Places(widget.store).areaById(result.session.sharedArea ?? '');
@@ -247,33 +259,42 @@ class _SyncScreenState extends State<SyncScreen> {
         final who = person == null
             ? result.session.name
             : profileDisplayName(t, widget.store.personShown(person).name);
-        _announce(t.sharedWithYou(who, areaName(t, shared)));
+        brought.add(t.sharedWithYou(who, areaName(t, shared)));
       }
-      final refused = result.session.report.refusedCount;
-      if (refused > 0) _announce(t.syncRefused(refused));
+      announceDoneWith(
+        announcements,
+        navigator,
+        t.hostSyncDone,
+        brought.join('\n'),
+      );
+      announceRefusedWith(
+        t,
+        announcements,
+        navigator,
+        result.session.report.refusedCount,
+      );
       final conflicts = visibleConflicts(
         widget.store,
         LockScope.of(context),
         result.session.conflicts,
       ).length;
       if (conflicts > 0) {
-        // The root navigator outlives this screen: the announcement may
-        // be tapped after leaving it.
-        final navigator = Navigator.of(context, rootNavigator: true);
         _announce(
-          t.syncConflicts(conflicts),
+          t.hostConflicts(conflicts),
           onTap: () => _openConflicts(navigator),
         );
       }
       _code.clear();
       synced = true;
-    } on SyncException catch (e) {
-      if (!mounted) return;
-      _announce(syncFailureText(t, e.failure));
-    } on Object {
+    } on Object catch (e) {
       // Whatever else broke on the way: nothing half-taken stays.
       if (!mounted) return;
-      _announce(t.syncFailFailed);
+      announceSyncFailed(
+        context,
+        e,
+        text: t.syncNotDone,
+        title: t.syncNotDoneTitle,
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -354,8 +375,7 @@ class _SyncScreenState extends State<SyncScreen> {
         ? store.entriesFor(device, since).isEmpty
         : store.entriesSince(since).isEmpty;
     if (nothing) {
-      final name = device == null ? null : store.pairedDevice(device)?.name;
-      _announce(t.bundleNothingNew(name ?? t.bundleEverything));
+      _announce(t.bundleNothingToSend);
       return;
     }
     setState(() => _bundleBusy = true);
@@ -365,16 +385,22 @@ class _SyncScreenState extends State<SyncScreen> {
       );
       if (!mounted) return;
       if (path == null) {
-        _announce(t.bundleFailed);
+        announceBundleNotSent(context, 'bundle: no path to write the file to');
         return;
       }
       await writeBundle(store, path, forDevice: device);
       final shared = await bundles.share(path);
       if (!mounted) return;
-      if (shared == ShareOutcome.noApp) _announce(t.bundleNoApp);
-    } on Object {
+      if (shared == ShareOutcome.noApp) {
+        announceBundleNotSent(
+          context,
+          'bundle: no app took the file',
+          noApp: true,
+        );
+      }
+    } on Object catch (e) {
       if (!mounted) return;
-      _announce(t.bundleFailed);
+      announceBundleNotSent(context, '$e');
     } finally {
       if (mounted) setState(() => _bundleBusy = false);
     }
@@ -396,7 +422,7 @@ class _SyncScreenState extends State<SyncScreen> {
       // tapped after leaving it.
       final navigator = Navigator.of(context, rootNavigator: true);
       _announce(
-        context.t.syncConflicts(conflicts),
+        context.t.hostConflicts(conflicts),
         onTap: () => _openConflicts(navigator),
       );
     }
@@ -493,7 +519,11 @@ class _SyncScreenState extends State<SyncScreen> {
             decoration: InputDecoration(
               labelText: t.syncCodeLabel,
               border: const OutlineInputBorder(),
+              errorText: _codeInvalid ? t.syncInvalidCode : null,
             ),
+            onChanged: (_) {
+              if (_codeInvalid) setState(() => _codeInvalid = false);
+            },
             onSubmitted: (_) => _sync(),
           ),
           const SizedBox(height: 8),
@@ -607,17 +637,60 @@ String updateNoticeText(
   };
 }
 
-/// Why a sync did not happen, in words.
-String syncFailureText(AppLocalizations t, SyncFailure failure) =>
+/// Why a sync did not happen and what to do, one sentence each; null
+/// for [SyncFailure.cancelled], which the user chose here.
+(String, String)? syncFailureWhy(AppLocalizations t, SyncFailure failure) =>
     switch (failure) {
-      SyncFailure.notPrivate => t.syncFailNotPrivate,
-      SyncFailure.unreachable => t.syncFailUnreachable,
-      SyncFailure.wrongHost => t.syncFailWrongHost,
-      SyncFailure.wrongPin => t.syncFailWrongPin,
-      SyncFailure.locked => t.syncFailLocked,
-      SyncFailure.declined => t.syncFailDeclined,
-      SyncFailure.cancelled => t.shareCancelled,
-      SyncFailure.updateHere => t.syncFailUpdateHere,
-      SyncFailure.updateThere => t.syncFailUpdateThere,
-      SyncFailure.failed => t.syncFailFailed,
+      SyncFailure.notPrivate => (t.syncNotPrivateCause, t.syncNotPrivateFix),
+      SyncFailure.unreachable => (t.syncUnreachableCause, t.syncUnreachableFix),
+      SyncFailure.wrongHost => (t.syncFailWrongHost, t.syncWrongHostFix),
+      SyncFailure.wrongPin => (t.syncWrongPinCause, t.syncWrongPinFix),
+      SyncFailure.locked => (t.syncLockedCause, t.syncLockedFix),
+      SyncFailure.declined => (t.syncFailDeclined, t.syncDeclinedFix),
+      SyncFailure.cancelled => null,
+      SyncFailure.updateHere => (t.syncFailUpdateHere, t.updateFix),
+      SyncFailure.updateThere => (t.syncFailUpdateThere, t.updateFix),
+      SyncFailure.failed => (t.syncBrokeOffCause, t.nothingLostFix),
     };
+
+/// Announces that a sync, or sharing an Area in person, did not go
+/// through, in [text]; why and what to do behind the tap, under [title],
+/// as [error] says. An invite the user did not confirm only says that
+/// nothing was shared.
+void announceSyncFailed(
+  BuildContext context,
+  Object error, {
+  required String text,
+  required String title,
+}) {
+  final t = context.t;
+  final failure = error is SyncException ? error.failure : SyncFailure.failed;
+  final why = syncFailureWhy(t, failure);
+  if (why == null) {
+    AnnouncementsScope.of(context)?.announce(t.shareCancelled);
+    return;
+  }
+  final (cause, fix) = why;
+  announceFailure(
+    context,
+    text,
+    title: title,
+    cause: cause,
+    fix: fix,
+    details: error is SyncException ? 'sync: ${failure.name}' : '$error',
+  );
+}
+
+/// Announces that no pair code was found in the photo taken; what to do
+/// behind the tap.
+void announceCodeNotRead(BuildContext context) {
+  final t = context.t;
+  announceFailure(
+    context,
+    t.codeNotRead,
+    title: t.codeNotReadTitle,
+    cause: t.syncNoCode,
+    fix: t.syncNoCodeFix,
+    details: 'pair code: none in the photo',
+  );
+}

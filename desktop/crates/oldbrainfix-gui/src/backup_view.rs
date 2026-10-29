@@ -251,6 +251,9 @@ pub struct Welcome {
     pub file: Option<(PathBuf, Header)>,
     pub passphrase: String,
     pub code: String,
+    /// Whether the key typed is no recovery key; said red under the
+    /// field until it changes.
+    pub code_invalid: bool,
 }
 
 impl Welcome {
@@ -317,13 +320,20 @@ pub fn welcome(
         &mut state.passphrase,
     );
     ui.label(RichText::new(t.restore_or()).color(weak));
-    ui.add(
+    let code = ui.add(
         TextEdit::singleline(&mut state.code)
             .id(Id::new("restore code"))
             .hint_text(t.restore_code_label())
             .text_color(text)
             .desired_width(f32::INFINITY),
     );
+    if code.changed() {
+        state.code_invalid = false;
+    }
+    if state.code_invalid {
+        let error = ui.visuals().error_fg_color;
+        ui.label(RichText::new(t.restore_invalid_code()).color(error));
+    }
     ui.horizontal(|ui| {
         if ui
             .button(RichText::new(t.restore_start()).color(text))
@@ -337,27 +347,40 @@ pub fn welcome(
     });
 }
 
-/// Why a restore took nothing in, in words.
-pub fn restore_failure(t: &L10n, error: &Error) -> String {
+/// Why a restore took nothing in, and what to do, one sentence each, as
+/// the phone says them.
+pub fn restore_failure(t: &L10n, error: &Error) -> (&'static str, &'static str) {
     match error {
-        Error::Backup(Problem::NotABackup) => t.restore_not_a_backup(),
-        Error::Backup(Problem::WrongSecret) => t.restore_wrong(),
-        Error::Backup(Problem::Damaged) => t.restore_damaged(),
-        Error::Backup(Problem::NotEmpty) => t.restore_not_empty(),
-        _ => t.restore_failed(),
+        Error::Backup(Problem::NotABackup) => (t.restore_not_a_backup(), t.restore_pick_fix()),
+        Error::Backup(Problem::WrongSecret) => (t.restore_wrong(), t.restore_wrong_fix()),
+        Error::Backup(Problem::Damaged) => (t.restore_damaged_cause(), t.restore_damaged_fix()),
+        Error::Backup(Problem::NotEmpty) => (t.restore_not_empty(), t.restore_not_empty_fix()),
+        _ => (t.restore_failed_cause(), t.restore_failed_fix()),
     }
-    .to_string()
+}
+
+/// Why what was typed opens no Backup.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Unlocked {
+    /// The key typed is no recovery key: said under its field.
+    NotAKey,
+    /// Nothing opens it: why, what to do, and the full text.
+    Failed(&'static str, &'static str, String),
 }
 
 /// The backup key that opens `welcome`'s file with what was typed: the
 /// recovery key when one was, else the passphrase.
-pub fn unlock(t: &L10n, welcome: &Welcome) -> Result<[u8; backup::KEY_BYTES], String> {
+pub fn unlock(t: &L10n, welcome: &Welcome) -> Result<[u8; backup::KEY_BYTES], Unlocked> {
     let Some((_, header)) = &welcome.file else {
-        return Err(t.restore_not_a_backup().to_string());
+        return Err(Unlocked::Failed(
+            t.restore_not_a_backup(),
+            t.restore_pick_fix(),
+            "backup: no file picked".into(),
+        ));
     };
     let code = welcome.code.trim();
     if !code.is_empty() && recovery::decode_code(code).is_none() {
-        return Err(t.restore_invalid_code().to_string());
+        return Err(Unlocked::NotAKey);
     }
     let opened = if code.is_empty() {
         backup::unlock(header, Some(&welcome.passphrase), None)
@@ -366,7 +389,14 @@ pub fn unlock(t: &L10n, welcome: &Welcome) -> Result<[u8; backup::KEY_BYTES], St
     };
     match opened {
         Ok(Some(key)) => Ok(key),
-        Ok(None) => Err(t.restore_wrong().to_string()),
-        Err(e) => Err(restore_failure(t, &e)),
+        Ok(None) => Err(Unlocked::Failed(
+            t.restore_wrong(),
+            t.restore_wrong_fix(),
+            "backup: the passphrase or recovery key does not open it".into(),
+        )),
+        Err(e) => {
+            let (cause, fix) = restore_failure(t, &e);
+            Err(Unlocked::Failed(cause, fix, format!("restore: {e}")))
+        }
     }
 }
