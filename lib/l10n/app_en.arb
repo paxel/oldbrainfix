@@ -823,6 +823,56 @@
   "calendarMirrorNotAllowed": "Old Brain Fix may not write to your calendar. You can allow it in the system settings.",
   "calendarMirrorNoCalendar": "There is no calendar on this device to write into.",
   "calendarMirrorNotRemoved": "The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.",
+  "agendaCalendarSwitch": "Show my calendar's appointments on the Agenda",
+  "agendaCalendarDetail": "The appointments of the calendars you pick show beside your Routines and Reminders. Nothing is copied.",
+  "agendaCalendarNonePicked": "No calendar picked yet. Tap to pick calendars.",
+  "agendaCalendarShows": "From {calendars}. Tap to pick other calendars.",
+  "@agendaCalendarShows": {
+    "placeholders": {
+      "calendars": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaCalendarExplainTitle": "Show your appointments?",
+  "agendaCalendarExplainBody": "Old Brain Fix can show the appointments of the calendars you pick on the Agenda. It reads them whenever the Agenda shows, keeps no copy and sends nothing anywhere.",
+  "agendaCalendarNoCalendar": "There is no calendar on this device to read from.",
+  "agendaCalendarsTitle": "Calendars on the Agenda",
+  "agendaCalendarsHint": "The Agenda shows the appointments of the calendars picked here.",
+  "appointmentFromCalendar": "From the calendar “{calendar}”",
+  "@appointmentFromCalendar": {
+    "placeholders": {
+      "calendar": {
+        "type": "String"
+      }
+    }
+  },
+  "appointmentCopy": "Copy into a Note",
+  "appointmentNoTitle": "Appointment without a title",
+  "appointmentSince": "from {time}",
+  "@appointmentSince": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "appointmentUntil": "until {time}",
+  "@appointmentUntil": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "appointmentPlace": "Place: {place}",
+  "@appointmentPlace": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
   "settingsTitle": "Settings",
   "settingsIntro": "These settings belong to this phone and are never synced.",
   "settingsLook": "Look",

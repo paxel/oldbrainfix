@@ -378,6 +378,15 @@ class MainActivity : FlutterActivity() {
                     "mirrorRequest" -> requestMirror(result)
                     "zone" -> result.success(TimeZone.getDefault().id)
                     "calendars" -> inBackground(result) { CalendarMirror.calendars(this) }
+                    "readCalendars" -> inBackground(result) { Appointments.calendars(this) }
+                    "appointments" -> inBackground(result) {
+                        Appointments.between(
+                            this,
+                            from = (args["from"] as Number).toLong(),
+                            until = (args["until"] as Number).toLong(),
+                            calendarIds = (args["calendars"] as List<*>).map { it as String },
+                        )
+                    }
                     "marked" -> inBackground(result) {
                         CalendarMirror.marked(this, (args["calendar"] as String).toLong())
                     }

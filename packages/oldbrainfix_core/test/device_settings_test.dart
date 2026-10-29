@@ -59,6 +59,23 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the Agenda shows no calendar until switched on and picked', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.agendaCalendarOn, isFalse);
+    expect(store.agendaCalendars, isEmpty);
+    store
+      ..agendaCalendarOn = true
+      ..agendaCalendars = {'7', '3'};
+    expect(store.agendaCalendarOn, isTrue);
+    expect(store.agendaCalendars, {'3', '7'});
+    store.agendaCalendarOn = false;
+    expect(store.agendaCalendars, {'3', '7'}, reason: 'kept while off');
+    store.setLocalSetting('agendaCalendars', 'not json');
+    expect(store.agendaCalendars, isEmpty);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the alarm setup is offered until this Device has walked it', () {
     final store = Store.inMemory();
     addTearDown(store.close);

@@ -112,9 +112,12 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Order: the Missed Summary card, then the "x Unsorted" banner, then
   the "x Sent Items waiting" line while a stranger's Sent Item waits for
   "Show", then the "x shared Areas waiting" line while an offered Area
-  waits for Accept or Decline, then today's all-day Occurrences, then today's timed
-  Occurrences by time, then the "Eat a frog" section while today's pick
-  holds a Frog (never above what is due).
+  waits for Accept or Decline, then today's all-day Occurrences, then the
+  all-day appointments of the calendars picked, then today's timed
+  Occurrences and timed appointments together by time (an Occurrence
+  before an appointment at the same time), then the "Eat a frog" section
+  while today's pick holds a Frog (never above what is due). Every later
+  day orders its rows the same way.
 - After a visible gap comes tomorrow, in dimmer colours, then the five
   days after it, each under its weekday and date, dimmed alike. Every
   day shows, an empty one with "Nothing planned". The later days'
@@ -124,13 +127,22 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   Routines and Reminders lists every one alphabetically by name, also
   those beyond the week, and a tap opens its editor; its bar's Export
   writes one calendar file of all of them. Calendar opens the Calendar
-  page: "Read from your calendar" (the appointment running at Capture)
-  and "Write to your calendar" (the calendar mirror); Settings has a row
+  page: "Read from your calendar" (the appointment running at Capture,
+  and the switch that shows the calendar's appointments on the Agenda,
+  whose calendars are picked on a page of checkboxes, none at first) and
+  "Write to your calendar" (the calendar mirror); Settings has a row
   leading to the same page. Nothing on the Agenda selects rows to share.
 - **Every Occurrence row has ⋮**, which opens the same menu as a long
   press: History for a Routine, and Share, which hands the Routine as
   its whole series with its end, or the Reminder, to another app as a
   calendar file. A Masked row asks for its Area to open first.
+- **A calendar appointment's row is read only**: no checkbox, the
+  calendar's colour down its side, the calendar icon and the calendar's
+  name. A tap unfolds its place and description and folds them again;
+  ⋮ or a long press opens "Copy into a Note", which makes a new Unsorted
+  Note of its title, time, place and description and shows its card on
+  top. The calendar mirror's own entries never show as appointments.
+  Nothing of an appointment is kept or synced.
 - The Missed Summary stays until the user taps "seen"; opening the app
   never clears it.
 - **Checked off today, there all day.** An Occurrence checked off today

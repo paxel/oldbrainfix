@@ -1356,6 +1356,67 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Termine konnten nicht aus dem Kalender entfernt werden. Erlaube Old Brain Fix den Kalender und schalte es noch einmal aus.';
 
   @override
+  String get agendaCalendarSwitch =>
+      'Termine meines Kalenders in der Agenda zeigen';
+
+  @override
+  String get agendaCalendarDetail =>
+      'Die Termine der Kalender, die du auswählst, stehen neben deinen Routinen und Erinnerungen. Nichts wird kopiert.';
+
+  @override
+  String get agendaCalendarNonePicked =>
+      'Noch kein Kalender ausgewählt. Tippen, um Kalender auszuwählen.';
+
+  @override
+  String agendaCalendarShows(String calendars) {
+    return 'Aus $calendars. Tippen, um andere Kalender auszuwählen.';
+  }
+
+  @override
+  String get agendaCalendarExplainTitle => 'Deine Termine zeigen?';
+
+  @override
+  String get agendaCalendarExplainBody =>
+      'Old Brain Fix kann die Termine der Kalender, die du auswählst, in der Agenda zeigen. Es liest sie, wann immer die Agenda sie zeigt, behält keine Kopie und schickt nichts weiter.';
+
+  @override
+  String get agendaCalendarNoCalendar =>
+      'Auf diesem Gerät gibt es keinen Kalender zum Lesen.';
+
+  @override
+  String get agendaCalendarsTitle => 'Kalender in der Agenda';
+
+  @override
+  String get agendaCalendarsHint =>
+      'Die Agenda zeigt die Termine der hier ausgewählten Kalender.';
+
+  @override
+  String appointmentFromCalendar(String calendar) {
+    return 'Aus dem Kalender „$calendar“';
+  }
+
+  @override
+  String get appointmentCopy => 'In eine Notiz kopieren';
+
+  @override
+  String get appointmentNoTitle => 'Termin ohne Titel';
+
+  @override
+  String appointmentSince(String time) {
+    return 'ab $time';
+  }
+
+  @override
+  String appointmentUntil(String time) {
+    return 'bis $time';
+  }
+
+  @override
+  String appointmentPlace(String place) {
+    return 'Ort: $place';
+  }
+
+  @override
   String get settingsTitle => 'Einstellungen';
 
   @override

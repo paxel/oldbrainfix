@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 
 import 'alarm_sync.dart';
 import 'app_lock.dart';
+import 'appointments.dart';
 import 'area_look.dart';
 import 'area_offer_screen.dart';
 import 'areas_screen.dart';
@@ -62,6 +63,10 @@ typedef _ShownPicks = ({
 /// What the menu of an Occurrence's row does.
 enum _RowChoice { history, share }
 
+/// One row of a day on the Agenda: an Occurrence, or a part of a
+/// calendar appointment.
+typedef _DayEntry = ({_PlacedRow? row, AppointmentPiece? piece});
+
 /// A Frog of the "Eat a frog" section with its Note and Area, and
 /// whether it shows Masked.
 typedef _ShownFrog = ({PlacedFrog placed, bool masked});
@@ -105,6 +110,13 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// and has "Another one" until it has an entry. Once each has one, the
 /// box stays checked. On later days the row says how many it picks. A
 /// Masked row lists none, and a pick from a Masked Area shows masked.
+///
+/// Where switched on, every day also shows the appointments of the
+/// calendars picked on the Calendar page (#116), read as the Agenda
+/// loads, on resume and on a new day, and never kept: the all-day ones
+/// after the all-day Occurrences, the timed ones among the timed
+/// Occurrences by time. They are read only, marked with their calendar,
+/// and "Copy into a Note" makes a Note of one.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -154,11 +166,22 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final AppLifecycleListener _lifecycle;
   Timer? _timer;
   MissedSummary _missed = const MissedSummary(routines: [], nextChange: null);
-  List<_PlacedRow> _today = const [];
-  List<_PlacedRow> _tomorrow = const [];
+  List<_DayEntry> _today = const [];
+  List<_DayEntry> _tomorrow = const [];
 
   /// The days after tomorrow, each with its rows.
-  List<({Day day, List<_PlacedRow> rows})> _later = const [];
+  List<({Day day, List<_DayEntry> rows})> _later = const [];
+
+  /// The appointments of the calendars picked to show here, as read
+  /// last, with those calendars by id; none while that is off (#116).
+  List<Appointment> _appointments = const [];
+  Map<String, ReadCalendar> _readCalendars = const {};
+
+  /// Counts the calendar reads, so only the latest one's answer shows.
+  var _calendarReads = 0;
+
+  /// The appointment rows a tap unfolded, by [AppointmentPiece.key].
+  final _unfoldedAppointments = <String>{};
   var _unsorted = 0;
 
   /// Today's Occurrences of Sessions with their picks, by Session id and
@@ -197,6 +220,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
   void initState() {
     super.initState();
     _load();
+    unawaited(_readCalendar());
     _lifecycle = AppLifecycleListener(
       // Back from the background, the last capture is old news. A
       // dialog or the notification shade only makes the app inactive.
@@ -205,6 +229,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       // for meanwhile.
       onResume: () {
         _reload();
+        unawaited(_readCalendar());
         unawaited(_openWaiting());
       },
     );
@@ -249,7 +274,80 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final missed = _missed.nextChange?.difference(now);
     if (missed != null && missed < wait) wait = missed;
     wait += const Duration(seconds: 1);
-    _timer = Timer(wait.isNegative ? Duration.zero : wait, _reload);
+    _timer = Timer(wait.isNegative ? Duration.zero : wait, () {
+      _reload();
+      unawaited(_readCalendar());
+    });
+  }
+
+  /// Reads the appointments of the calendars picked to show here, over
+  /// the Agenda's days and a day either side, off the UI thread on the
+  /// platform's side; shows them once they arrive. Nothing is kept.
+  Future<void> _readCalendar() async {
+    final store = widget.notes.store;
+    final source = AppointmentScope.of(context);
+    final read = ++_calendarReads;
+    final picked = store.agendaCalendarOn
+        ? store.agendaCalendars
+        : const <String>{};
+    var appointments = const <Appointment>[];
+    var calendars = const <ReadCalendar>[];
+    if (source.available && picked.isNotEmpty && await source.granted()) {
+      final today = Day.today(store.clock(), deviceWallClock);
+      final from = DateTime(today.year, today.month, today.day - 1);
+      final until = DateTime(
+        today.year,
+        today.month,
+        today.day + AgendaScreen.days + 1,
+      );
+      calendars = await source.calendars();
+      appointments =
+          await source.appointments(from.toUtc(), until.toUtc(), picked) ??
+          const [];
+    }
+    if (!mounted || read != _calendarReads) return;
+    _appointments = [
+      for (final appointment in appointments)
+        if (picked.contains(appointment.calendarId)) appointment,
+    ];
+    _readCalendars = {for (final calendar in calendars) calendar.id: calendar};
+    _reload();
+  }
+
+  /// The rows of [day]: its all-day Occurrences [rows] and all-day
+  /// appointments, then the timed ones of both by time, an Occurrence
+  /// before an appointment at the same time.
+  List<_DayEntry> _entries(Day day, List<_PlacedRow> rows) {
+    final pieces = appointmentsOn(day, _appointments, deviceWallClock);
+    final timedRows = [
+      for (final placed in rows)
+        if (!placed.row.occurrence.allDay) placed,
+    ];
+    final timedPieces = [
+      for (final piece in pieces)
+        if (!piece.allDay) piece,
+    ];
+    final timed = <_DayEntry>[];
+    var r = 0;
+    var p = 0;
+    while (r < timedRows.length || p < timedPieces.length) {
+      final rowAt = r < timedRows.length
+          ? timedRows[r].row.occurrence.time
+          : null;
+      final pieceAt = p < timedPieces.length ? timedPieces[p].at : null;
+      if (rowAt != null && (pieceAt == null || rowAt.compareTo(pieceAt) <= 0)) {
+        timed.add((row: timedRows[r++], piece: null));
+      } else {
+        timed.add((row: null, piece: timedPieces[p++]));
+      }
+    }
+    return [
+      for (final placed in rows)
+        if (placed.row.occurrence.allDay) (row: placed, piece: null),
+      for (final piece in pieces)
+        if (piece.allDay) (row: null, piece: piece),
+      ...timed,
+    ];
   }
 
   void _load() {
@@ -261,11 +359,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
     };
     _system = deviceUnitSystem(widget.notes.store);
     final agenda = _routines.agenda(deviceWallClock, days: AgendaScreen.days);
-    _today = [for (final row in agenda.todayRows) _place(row)];
-    _tomorrow = [for (final row in agenda.tomorrowRows) _place(row)];
+    _today = _entries(agenda.today, [
+      for (final row in agenda.todayRows) _place(row),
+    ]);
+    _tomorrow = _entries(agenda.tomorrow, [
+      for (final row in agenda.tomorrowRows) _place(row),
+    ]);
     _later = [
       for (final (i, rows) in agenda.laterRows.indexed)
-        (day: agenda.later(i), rows: [for (final row in rows) _place(row)]),
+        (
+          day: agenda.later(i),
+          rows: _entries(agenda.later(i), [
+            for (final row in rows) _place(row),
+          ]),
+        ),
     ];
     // Writes today's pick when it is new; the reload that follows
     // writes nothing.
@@ -510,6 +617,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
     if (!mounted) return;
     _reload();
+    // Settings lead to the Calendar page too.
+    unawaited(_readCalendar());
   }
 
   Future<void> _openAllRoutines() async {
@@ -522,6 +631,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
     await openCalendarPage(context, widget.notes.store);
     if (!mounted) return;
     _reload();
+    unawaited(_readCalendar());
   }
 
   Future<void> _newRoutine() async {
@@ -682,6 +792,74 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
+  /// An appointment's row: read only, marked with its calendar's icon,
+  /// colour and name; a tap unfolds its place and description, and its ⋮
+  /// or a long press offers "Copy into a Note".
+  Widget _appointmentRow(
+    AppLocalizations t,
+    String locale,
+    AppointmentPiece piece,
+  ) {
+    final unfolded = _unfoldedAppointments.contains(piece.key);
+    return _AppointmentRow(
+      key: ValueKey('appointment-${piece.key}'),
+      piece: piece,
+      calendar: _readCalendars[piece.appointment.calendarId],
+      time: pieceTime(t, locale, piece),
+      unfolded: unfolded,
+      onTap: () => setState(
+        () => unfolded
+            ? _unfoldedAppointments.remove(piece.key)
+            : _unfoldedAppointments.add(piece.key),
+      ),
+      onMenu: (at) => _showAppointmentMenu(piece.appointment, at),
+    );
+  }
+
+  Future<void> _showAppointmentMenu(Appointment appointment, Offset at) async {
+    final t = context.t;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final copy = await showMenu<bool>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem(
+          key: const ValueKey('appointment-copy'),
+          value: true,
+          child: Row(
+            children: [
+              const Icon(Icons.note_add_outlined),
+              const SizedBox(width: 12),
+              Flexible(child: Text(t.appointmentCopy)),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (copy != true || !mounted) return;
+    _copyAppointment(appointment);
+  }
+
+  /// Makes a new Note of [appointment]'s details, Unsorted and nudged as
+  /// a Note captured without a choice; its card shows on top with its
+  /// enrich options. The appointment stays as it is.
+  void _copyAppointment(Appointment appointment) {
+    final t = context.t;
+    final locale = Localizations.localeOf(context).toString();
+    final note = widget.notes.capture(
+      appointmentNoteText(t, locale, appointment, deviceWallClock),
+      nudgeIn: Notes.defaultNudge,
+    );
+    _capturedId = note.id;
+    _unfoldedId = null;
+    _reload();
+  }
+
   void _toggleFrog(Frog frog) {
     if (frog.isDone) {
       _frogs.unmarkDone(frog.id);
@@ -746,8 +924,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final captured = _captured;
-    List<Widget> rows(List<_PlacedRow> rows) => [
-      for (final placed in rows) _occurrenceRow(t, locale, placed),
+    List<Widget> rows(List<_DayEntry> entries) => [
+      for (final entry in entries)
+        if (entry.piece case final piece?)
+          _appointmentRow(t, locale, piece)
+        else if (entry.row case final placed?)
+          _occurrenceRow(t, locale, placed),
     ];
     // Swipe left opens the notes browser, as the magnifier does.
     return BrowserSwipes(
@@ -1237,6 +1419,129 @@ class _OccurrenceRow extends StatelessWidget {
                             },
                           ),
                         ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A calendar appointment's part on one day as an embossed row, read
+/// only: its calendar's colour down the side and its icon, its time, its
+/// title, its calendar's name, and ⋮; no box, as nothing here checks it
+/// off. A tap unfolds its place and description, or folds them again; a
+/// long press opens [onMenu] where the finger is, and ⋮ opens it at the
+/// button.
+class _AppointmentRow extends StatelessWidget {
+  final AppointmentPiece piece;
+
+  /// Its calendar, when the calendar told it.
+  final ReadCalendar? calendar;
+  final String time;
+  final bool unfolded;
+  final VoidCallback onTap;
+  final void Function(Offset at) onMenu;
+
+  const _AppointmentRow({
+    super.key,
+    required this.piece,
+    required this.calendar,
+    required this.time,
+    required this.unfolded,
+    required this.onTap,
+    required this.onMenu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final appointment = piece.appointment;
+    final calendar = this.calendar;
+    final colour = calendar == null
+        ? scheme.onSurfaceVariant
+        : calendarColour(calendar.colour);
+    final location = appointment.location.trim();
+    final description = appointment.description.trim();
+    final dim = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Embossed(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          // The row's ink shows on the card, not under it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: GestureDetector(
+              onLongPressStart: (details) => onMenu(details.globalPosition),
+              child: InkWell(
+                onTap: onTap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(left: BorderSide(color: colour, width: 6)),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_note_outlined,
+                        color: colour,
+                        semanticLabel: t.appointmentFromCalendar(
+                          calendar?.name ?? '',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(time, style: text.labelLarge),
+                              Text(
+                                appointmentTitle(t, appointment),
+                                maxLines: unfolded ? null : 2,
+                                overflow: unfolded
+                                    ? null
+                                    : TextOverflow.ellipsis,
+                                style: text.bodyLarge,
+                              ),
+                              if (calendar != null)
+                                Text(calendar.name, style: text.labelSmall),
+                              if (unfolded && location.isNotEmpty)
+                                Text(t.appointmentPlace(location), style: dim),
+                              if (unfolded && description.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(description, style: dim),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // The same menu as the long press, at the button.
+                      Builder(
+                        builder: (button) => IconButton(
+                          key: ValueKey('appointment-menu-${piece.key}'),
+                          tooltip: t.more,
+                          icon: const Icon(Icons.more_vert),
+                          onPressed: () {
+                            final box = button.findRenderObject() as RenderBox?;
+                            if (box == null) return;
+                            onMenu(
+                              box.localToGlobal(
+                                box.size.bottomLeft(Offset.zero),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),

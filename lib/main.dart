@@ -12,6 +12,7 @@ import 'src/alarm_platform.dart';
 import 'src/alarm_sync.dart';
 import 'src/announcements.dart';
 import 'src/app.dart';
+import 'src/appointments.dart';
 import 'src/auto_sync.dart';
 import 'src/bundle_platform.dart';
 import 'src/calendar_mirror.dart';
@@ -93,6 +94,7 @@ Future<void> _openAndRun(Directory dir) async {
       ocr: const AndroidOcr(),
       calendar: const AndroidCalendar(),
       mirror: const AndroidMirror(),
+      appointments: const AndroidAppointments(),
       lock: const AndroidBiometrics(),
       pairing: const AndroidPairing(),
       sync: AndroidSync(),

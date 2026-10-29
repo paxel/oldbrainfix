@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'nudges.dart';
 import 'schedule.dart';
 import 'store.dart';
@@ -23,6 +25,8 @@ extension DeviceSettings on Store {
   static const _nudgeRepeatMinutes = 'nudgeRepeatMinutes';
   static const _calendarContext = 'calendarContext';
   static const _bluetoothContext = 'bluetoothContext';
+  static const _agendaCalendar = 'agendaCalendar';
+  static const _agendaCalendars = 'agendaCalendars';
   static const _streaksOff = 'streaksOff';
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
@@ -144,6 +148,30 @@ extension DeviceSettings on Store {
   bool get calendarContextOn => localSetting(_calendarContext) == 'true';
 
   set calendarContextOn(bool on) => setLocalSetting(_calendarContext, '$on');
+
+  /// Whether this Device's Agenda shows the appointments of the
+  /// calendars picked in [agendaCalendars]; off until switched on.
+  bool get agendaCalendarOn => localSetting(_agendaCalendar) == 'true';
+
+  set agendaCalendarOn(bool on) => setLocalSetting(_agendaCalendar, '$on');
+
+  /// The ids of this Device's calendars whose appointments the Agenda
+  /// shows; none until the user picks some. Kept while the switch is
+  /// off, so turning it on again brings them back.
+  Set<String> get agendaCalendars {
+    try {
+      if (jsonDecode(localSetting(_agendaCalendars) ?? '[]')
+          case final List<Object?> ids) {
+        return {...ids.whereType<String>()};
+      }
+    } on FormatException {
+      // A broken setting picks none.
+    }
+    return {};
+  }
+
+  set agendaCalendars(Set<String> ids) =>
+      setLocalSetting(_agendaCalendars, jsonEncode([...ids]..sort()));
 
   /// Whether Notes captured on this Device record the connected
   /// Bluetooth devices; off until the user switches it on.

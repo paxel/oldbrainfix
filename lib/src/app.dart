@@ -10,6 +10,7 @@ import 'alarm_platform.dart';
 import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
+import 'appointments.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
 import 'bundle_platform.dart';
@@ -100,6 +101,10 @@ class OldBrainFixApp extends StatefulWidget {
   /// How long the calendar mirror waits after a change for more to come.
   final Duration mirrorDelay;
 
+  /// The Device's calendars whose appointments the Agenda shows; none
+  /// when not given.
+  final AppointmentSource appointments;
+
   /// Biometrics and the screen lock for the App Lock and the Area Locks;
   /// none when not given, and the PIN unlocks.
   final LockPlatform lock;
@@ -153,6 +158,7 @@ class OldBrainFixApp extends StatefulWidget {
     this.calendar = const NoCalendar(),
     this.mirror = const NoMirror(),
     this.mirrorDelay = CalendarMirror.defaultDelay,
+    this.appointments = const NoAppointments(),
     this.lock = const NoBiometrics(),
     this.pairing = const NoPairing(),
     this.sync = const NoSync(),
@@ -287,23 +293,27 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                         calendar: widget.calendar,
                         child: CalendarMirrorScope(
                           mirror: _mirror,
-                          child: DraftsScope(
-                            drafts: _drafts,
-                            child: LockScope(
-                              lock: _lock,
-                              child: PairingScope(
-                                pairing: widget.pairing,
-                                child: AutoSyncScope(
-                                  sync: _autoSync,
-                                  child: FolderScope(
-                                    folders: widget.folders,
-                                    child: BundleScope(
-                                      bundles: widget.bundles,
-                                      child: PersonScope(
-                                        store: widget.store,
-                                        platform: widget.profile,
-                                        onChangesSent: _alarms.replan,
-                                        child: child ?? const SizedBox.shrink(),
+                          child: AppointmentScope(
+                            source: widget.appointments,
+                            child: DraftsScope(
+                              drafts: _drafts,
+                              child: LockScope(
+                                lock: _lock,
+                                child: PairingScope(
+                                  pairing: widget.pairing,
+                                  child: AutoSyncScope(
+                                    sync: _autoSync,
+                                    child: FolderScope(
+                                      folders: widget.folders,
+                                      child: BundleScope(
+                                        bundles: widget.bundles,
+                                        child: PersonScope(
+                                          store: widget.store,
+                                          platform: widget.profile,
+                                          onChangesSent: _alarms.replan,
+                                          child:
+                                              child ?? const SizedBox.shrink(),
+                                        ),
                                       ),
                                     ),
                                   ),

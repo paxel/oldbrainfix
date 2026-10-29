@@ -2180,6 +2180,96 @@ abstract class AppLocalizations {
   /// **'The events could not be removed from the calendar. Allow Old Brain Fix to use your calendar and turn this off again.'**
   String get calendarMirrorNotRemoved;
 
+  /// No description provided for @agendaCalendarSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my calendar\'s appointments on the Agenda'**
+  String get agendaCalendarSwitch;
+
+  /// No description provided for @agendaCalendarDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The appointments of the calendars you pick show beside your Routines and Reminders. Nothing is copied.'**
+  String get agendaCalendarDetail;
+
+  /// No description provided for @agendaCalendarNonePicked.
+  ///
+  /// In en, this message translates to:
+  /// **'No calendar picked yet. Tap to pick calendars.'**
+  String get agendaCalendarNonePicked;
+
+  /// No description provided for @agendaCalendarShows.
+  ///
+  /// In en, this message translates to:
+  /// **'From {calendars}. Tap to pick other calendars.'**
+  String agendaCalendarShows(String calendars);
+
+  /// No description provided for @agendaCalendarExplainTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show your appointments?'**
+  String get agendaCalendarExplainTitle;
+
+  /// No description provided for @agendaCalendarExplainBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Old Brain Fix can show the appointments of the calendars you pick on the Agenda. It reads them whenever the Agenda shows, keeps no copy and sends nothing anywhere.'**
+  String get agendaCalendarExplainBody;
+
+  /// No description provided for @agendaCalendarNoCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no calendar on this device to read from.'**
+  String get agendaCalendarNoCalendar;
+
+  /// No description provided for @agendaCalendarsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendars on the Agenda'**
+  String get agendaCalendarsTitle;
+
+  /// No description provided for @agendaCalendarsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The Agenda shows the appointments of the calendars picked here.'**
+  String get agendaCalendarsHint;
+
+  /// No description provided for @appointmentFromCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'From the calendar “{calendar}”'**
+  String appointmentFromCalendar(String calendar);
+
+  /// No description provided for @appointmentCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy into a Note'**
+  String get appointmentCopy;
+
+  /// No description provided for @appointmentNoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Appointment without a title'**
+  String get appointmentNoTitle;
+
+  /// No description provided for @appointmentSince.
+  ///
+  /// In en, this message translates to:
+  /// **'from {time}'**
+  String appointmentSince(String time);
+
+  /// No description provided for @appointmentUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'until {time}'**
+  String appointmentUntil(String time);
+
+  /// No description provided for @appointmentPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Place: {place}'**
+  String appointmentPlace(String place);
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:
