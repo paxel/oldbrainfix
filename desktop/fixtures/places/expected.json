@@ -109,6 +109,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:57.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": "topic:starter-kitchen",
       "importance": "normal",
       "trashed": null,
@@ -131,6 +139,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:01:02.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": "area:starter-household",
       "importance": "normal",
       "trashed": null,
@@ -153,6 +169,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:01:07.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -175,6 +199,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:01:12.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": "area:starter-car",
       "importance": "normal",
       "trashed": null,
@@ -197,6 +229,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:01:17.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "important",
       "trashed": null,
@@ -219,6 +259,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:01:23.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,

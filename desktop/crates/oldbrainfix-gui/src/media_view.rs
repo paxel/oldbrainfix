@@ -34,16 +34,52 @@ pub const CARD_PHOTO_HEIGHT: f32 = 480.0;
 /// How low the place of a very wide photo on a full card may get.
 const CARD_PHOTO_MIN_HEIGHT: f32 = 48.0;
 
+/// The most pixels a photo is decoded at either way full screen, as the
+/// phone's `NotePhoto.largest`: a 12-megapixel photo keeps its detail for
+/// the zoom, and no photo outgrows what a graphics texture holds.
+pub const LARGEST_EDGE: u32 = 4096;
+
+/// How far the full-screen photo zooms in, at least, beyond fitting the
+/// window, as on the phone.
+const MOST_ZOOM: f32 = 6.0;
+
 /// Photos decoded for showing, by hash, once each; `None` for one whose
 /// bytes are not on this computer (yet) or cannot be read. Their own
-/// sizes in pixels too, read from their headers, once each.
+/// sizes in pixels too, read from their headers, once each, and the one
+/// photo last shown full screen, decoded larger.
 #[derive(Default)]
 pub struct PhotoCache {
     shown: HashMap<String, Option<TextureHandle>>,
     sizes: HashMap<String, Option<[u32; 2]>>,
+    large: Option<(String, Option<TextureHandle>)>,
 }
 
 impl PhotoCache {
+    /// The photo `hash` to show full screen, decoded on first sight no
+    /// larger than [`LARGEST_EDGE`] either way, nor than the graphics
+    /// card takes; only the last one is kept, as it holds the most
+    /// memory.
+    pub fn large(&mut self, ui: &Ui, store: &Store, hash: &str) -> Option<TextureHandle> {
+        if let Some((held, texture)) = &self.large
+            && held == hash
+        {
+            return texture.clone();
+        }
+        // One not here yet is looked for again; one that cannot be read
+        // is not decoded again.
+        let bytes = store.photo(hash)?;
+        let most = ui.ctx().input(|i| i.max_texture_side);
+        let edge = u32::try_from(most).map_or(LARGEST_EDGE, |most| most.min(LARGEST_EDGE));
+        let texture = pixels(&bytes, edge).map(|image| {
+            let size = [image.width() as usize, image.height() as usize];
+            let image = ColorImage::from_rgba_unmultiplied(size, image.as_raw());
+            ui.ctx()
+                .load_texture(format!("photo-large:{hash}"), image, TextureOptions::LINEAR)
+        });
+        self.large = Some((hash.to_string(), texture.clone()));
+        texture
+    }
+
     /// The width and height in pixels of the photo `hash`, read without
     /// decoding it; `None` while its bytes are not here, looked for again
     /// then, or when they cannot be read.
@@ -118,15 +154,21 @@ pub fn thumbnails(
 /// own proportions, no taller than [`CARD_PHOTO_HEIGHT`], decoded once it
 /// first comes into sight and then no larger than [`SHOWN_EDGE`] either
 /// way, so a photo of 12 × 34,000 pixels cannot break the card or fill
-/// the graphics memory; one not here shows as such.
-pub fn card_photo(ui: &mut Ui, t: &L10n, (cache, store): (&mut PhotoCache, &Store), hash: &str) {
+/// the graphics memory; one not here shows as such. Where it lies while
+/// it is here, for the card to take its click above its own.
+pub fn card_photo(
+    ui: &mut Ui,
+    t: &L10n,
+    (cache, store): (&mut PhotoCache, &Store),
+    hash: &str,
+) -> Option<egui::Rect> {
     let weak = ui.visuals().weak_text_color();
     let Some([width, height]) = cache.size(store, hash) else {
         ui.horizontal(|ui| {
             icons::show(ui, icons::PHOTO, 18.0, weak);
             ui.label(RichText::new(t.photo_missing()).color(weak));
         });
-        return;
+        return None;
     };
     let room = ui.available_width();
     let ratio = height as f32 / width as f32;
@@ -136,8 +178,7 @@ pub fn card_photo(ui: &mut Ui, t: &L10n, (cache, store): (&mut PhotoCache, &Stor
         egui::vec2(room, room * ratio)
     };
     let place = egui::vec2(room, shown.y.max(CARD_PHOTO_MIN_HEIGHT));
-    let (rect, resp) = ui.allocate_exact_size(place, Sense::hover());
-    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, t.photo()));
+    let (rect, _) = ui.allocate_exact_size(place, Sense::hover());
     // Out of sight it is not decoded yet; its place is known already.
     if ui.is_rect_visible(rect)
         && let Some(texture) = cache.get(ui, store, hash)
@@ -146,6 +187,120 @@ pub fn card_photo(ui: &mut Ui, t: &L10n, (cache, store): (&mut PhotoCache, &Stor
             .corner_radius(6.0)
             .paint_at(ui, egui::Rect::from_center_size(rect.center(), shown));
     }
+    Some(rect)
+}
+
+/// The click on a photo of a full card lying at `rect`, registered after
+/// the card so it opens the photo full screen instead of folding or
+/// selecting the card.
+pub fn photo_click(ui: &mut Ui, t: &L10n, rect: egui::Rect, id: egui::Id) -> egui::Response {
+    let resp = ui.interact(rect, id, Sense::click());
+    resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, t.photo()));
+    resp.on_hover_cursor(egui::CursorIcon::ZoomIn)
+}
+
+/// The photo shown full screen (#114), how far it is zoomed in, 1 fitting
+/// the window, and how far it is moved from the middle.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Viewer {
+    pub hash: String,
+    pub zoom: f32,
+    pub offset: egui::Vec2,
+}
+
+impl Viewer {
+    /// The photo `hash` fitting the window.
+    pub fn new(hash: String) -> Viewer {
+        Viewer {
+            hash,
+            zoom: 1.0,
+            offset: egui::Vec2::ZERO,
+        }
+    }
+}
+
+/// The photo of `viewer` over the whole window, on dark, with a close
+/// button: the wheel or a pinch zooms it in around the pointer, from
+/// fitting the window up to [`MOST_ZOOM`] times or until its short side
+/// fills the window, and a drag moves it. Decoded once, no larger than
+/// [`LARGEST_EDGE`] either way, so one of 12 × 34,000 pixels shows too.
+/// Whether it is to close: Esc or the close button.
+pub fn photo_viewer(
+    ctx: &egui::Context,
+    t: &L10n,
+    (cache, store): (&mut PhotoCache, &Store),
+    viewer: &mut Viewer,
+) -> bool {
+    let modal = egui::Modal::new(egui::Id::new("photo viewer"))
+        .frame(egui::Frame::NONE)
+        .backdrop_color(egui::Color32::from_black_alpha(235))
+        .show(ctx, |ui| {
+            let screen = ui.ctx().content_rect();
+            let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click_and_drag());
+            resp.widget_info(|| WidgetInfo::labeled(WidgetType::Image, true, t.photo()));
+            let texture = cache.large(ui, store, &viewer.hash);
+            // Its own proportions, not those it was decoded at.
+            let size = cache
+                .size(store, &viewer.hash)
+                .map(|[w, h]| egui::vec2(w as f32, h as f32))
+                .or_else(|| texture.as_ref().map(TextureHandle::size_vec2))
+                .filter(|s| s.x > 0.0 && s.y > 0.0);
+            let Some(size) = size else {
+                let weak = ui.visuals().weak_text_color();
+                ui.put(
+                    egui::Rect::from_center_size(rect.center(), egui::vec2(240.0, 24.0)),
+                    egui::Label::new(RichText::new(t.photo_missing()).color(weak)),
+                );
+                return close_button(ui, t, rect);
+            };
+            let fit = (rect.width() / size.x).min(rect.height() / size.y);
+            let fill = (rect.width() / size.x).max(rect.height() / size.y);
+            let most = (fill / fit).max(MOST_ZOOM);
+            if resp.hovered() {
+                let (pinch, wheel, pointer) = ui.input(|i| {
+                    (
+                        i.zoom_delta(),
+                        i.smooth_scroll_delta.y,
+                        i.pointer.hover_pos(),
+                    )
+                });
+                let factor = pinch * (wheel / 200.0).exp();
+                if factor != 1.0 {
+                    let zoom = (viewer.zoom * factor).clamp(1.0, most);
+                    // What is under the pointer stays there.
+                    let at = pointer.unwrap_or(rect.center()) - rect.center();
+                    viewer.offset = at - (at - viewer.offset) * (zoom / viewer.zoom);
+                    viewer.zoom = zoom;
+                }
+            }
+            viewer.offset += resp.drag_delta();
+            let shown = size * fit * viewer.zoom;
+            // Never further than its edges.
+            let slack = ((shown - rect.size()) / 2.0).max(egui::Vec2::ZERO);
+            viewer.offset = viewer.offset.clamp(-slack, slack);
+            if let Some(texture) = texture {
+                let at = egui::Rect::from_center_size(rect.center() + viewer.offset, shown);
+                egui::Image::new(&texture).paint_at(ui, at);
+            }
+            close_button(ui, t, rect)
+        });
+    modal.inner || modal.should_close()
+}
+
+/// The full-screen photo's close button in the top right corner of
+/// `rect`; whether it was clicked.
+fn close_button(ui: &mut Ui, t: &L10n, rect: egui::Rect) -> bool {
+    let at = egui::Rect::from_min_size(
+        egui::pos2(rect.right() - 48.0, rect.top() + 16.0),
+        egui::vec2(32.0, 32.0),
+    );
+    let (fill, fg) = (egui::Color32::from_black_alpha(160), egui::Color32::WHITE);
+    ui.painter().rect_filled(at, 16.0, fill);
+    let mut clicked = false;
+    ui.scope_builder(egui::UiBuilder::new().max_rect(at.shrink(4.0)), |ui| {
+        clicked = icon_button(ui, icons::CLOSE, t.close(), fg).clicked();
+    });
+    clicked
 }
 
 /// A Transcript or Photo Text `said` whole on a full card, dimmed under
@@ -164,7 +319,8 @@ fn labelled(ui: &mut Ui, label: &str, said: RichText) {
 /// Text under it, each recording with its Transcript, "Transcribing…"
 /// while the one `transcribing` is being made or "No words heard." for
 /// an empty one, then the texts of those removed while their texts stay
-/// (ADR 0020); every text whole, dimmed and labelled.
+/// (ADR 0020); every text whole, dimmed and labelled. Each photo shown
+/// comes back with where it lies.
 pub fn whole_media(
     ui: &mut Ui,
     t: &L10n,
@@ -176,9 +332,10 @@ pub fn whole_media(
         &BTreeMap<String, String>,
     ),
     transcribing: Option<&str>,
-) {
+) -> Vec<(String, egui::Rect)> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
+    let mut shown = Vec::new();
     let said = |texts: &BTreeMap<String, String>, hash: &String| {
         texts
             .get(hash)
@@ -186,7 +343,9 @@ pub fn whole_media(
             .map(RichText::new)
     };
     for hash in photos {
-        card_photo(ui, t, (&mut *cache, store), hash);
+        if let Some(rect) = card_photo(ui, t, (&mut *cache, store), hash) {
+            shown.push((hash.clone(), rect));
+        }
         if let Some(said) = said(photo_texts, hash) {
             labelled(ui, t.photo_text_label(), said);
         }
@@ -218,6 +377,7 @@ pub fn whole_media(
             labelled(ui, t.transcript_label(), said);
         }
     }
+    shown
 }
 
 /// What the editor offers under a photo or voice recording and its
@@ -300,6 +460,8 @@ fn generated_buttons(
 /// What was asked of a photo.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Photo {
+    /// Showing it full screen.
+    View(String),
     /// Removing it and keeping its Photo Text (ADR 0020).
     Remove(String),
     /// Something of its Photo Text.
@@ -310,7 +472,7 @@ pub enum Photo {
 /// each with its Photo Text from `photo_texts` under it, as the phone's
 /// editor shows it, the buttons it `offers` for that text, and the
 /// button that removes the photo and keeps its Photo Text (ADR 0020).
-/// What was clicked comes back.
+/// A click on a photo shows it full screen. What was clicked comes back.
 pub fn photos(
     ui: &mut Ui,
     t: &L10n,
@@ -328,12 +490,16 @@ pub fn photos(
             Some(texture) => {
                 let size = texture.size_vec2();
                 let width = ui.available_width().min(size.x);
-                ui.add(
+                let photo = ui.add(
                     egui::Image::new(&texture)
                         .fit_to_exact_size(egui::vec2(width, size.y * width / size.x.max(1.0)))
                         .corner_radius(6.0)
-                        .alt_text(t.photo()),
+                        .alt_text(t.photo())
+                        .sense(Sense::click()),
                 );
+                if photo.on_hover_cursor(egui::CursorIcon::ZoomIn).clicked() {
+                    clicked = Some(Photo::View(hash.clone()));
+                }
             }
             None => {
                 ui.horizontal(|ui| {

@@ -111,23 +111,32 @@ final _scenarios = <Scenario>[
     about:
         'Amends; a chain of Merges where the merged Note had an Amend of '
         'its own; two Notes merged into each other, kept under the lower '
-        'id; a Merge into a Note this Device does not hold.',
+        'id; a Merge into a Note this Device does not hold. Capture '
+        'Contexts on the Notes and Amends: locations in a Named Place, in '
+        'the smaller of two, in none and in one deleted, source apps, '
+        'calendar events and Bluetooth devices, and garbled values of '
+        'each.',
     build: (store) {
       final notes = Notes(store);
       final a = notes.capture('Dentist on Tuesday');
-      notes.amend(a.id, 'Moved to Wednesday');
+      final moved = notes.amend(a.id, 'Moved to Wednesday');
       final b = notes.capture('Ask about the crown');
       notes.amend(b.id, 'Bring the old X-ray');
       final c = notes.capture('Dentist number');
       notes.merge(b.id, a.id);
       notes.merge(a.id, c.id);
-      notes.amend(c.id, 'Called, all set');
+      final called = notes.amend(c.id, 'Called, all set');
       final x = notes.capture('Loop one');
       final y = notes.capture('Loop two');
       store.append(y.id, NoteKeys.merged, x.id);
       store.append(x.id, NoteKeys.merged, y.id);
       final z = notes.capture('Merged into a stranger');
       store.append(z.id, NoteKeys.merged, 'note:elsewhere');
+      _captureContexts(
+        store,
+        [a.id, moved.id, b.id, c.id, called.id],
+        [x.id, y.id, z.id],
+      );
     },
   ),
   (
@@ -1058,6 +1067,61 @@ const _queries = [
   '4711',
 ];
 
+/// Capture Contexts for the `sections` scenario: on the Dentist Notes,
+/// their Amends and the Note merged in ([dentist]: the Note, its Amend,
+/// the Note merged into it, the target, the target's Amend), and on the
+/// loop and the stranger Note ([others]). Home holds the Kitchen, a
+/// Named Place without a readable radius is skipped and a deleted one
+/// no longer counts. Garbled values read as nothing.
+void _captureContexts(Store store, List<String> dentist, List<String> others) {
+  final notes = Notes(store);
+  final places = NamedPlaces(store);
+  final [a, moved, b, c, called] = dentist;
+  final [x, y, z] = others;
+  places.add('Home', Coordinates(52.52, 13.405), radius: 300);
+  places.add('Kitchen', Coordinates(52.521, 13.405), radius: 30);
+  final gone = places.add('Garden', Coordinates(52.5, 13.4), radius: 50);
+  places.delete(gone.id);
+  store.append('namedplace:wide', NamedPlaceKeys.type, 'namedPlace');
+  store.append('namedplace:wide', NamedPlaceKeys.name, 'Everywhere');
+  store.append('namedplace:wide', NamedPlaceKeys.centre, '52.52,13.405');
+  store.append('namedplace:wide', NamedPlaceKeys.radius, 'wide');
+  // In the Kitchen, inside Home: the smaller one.
+  notes.locate(a, Coordinates(52.521, 13.405));
+  notes.attachContext(
+    a,
+    calendarEvents: ['Standup', 'Lunch'],
+    bluetoothDevices: ['Car kit'],
+  );
+  // About a kilometre north of Home: in no Named Place.
+  notes.locate(moved, Coordinates(52.53, 13.405));
+  notes.attachContext(moved, bluetoothDevices: ['Ear buds']);
+  // At Home, written with spaces around the numbers.
+  store.append(b, NoteKeys.location, ' 52.52 , 13.405 ');
+  store.append(b, NoteKeys.sourcePackage, 'com.whatsapp');
+  store.append(b, NoteKeys.sourceLabel, 'WhatsApp');
+  store.append(b, NoteKeys.calendar, '["Dentist",3,null,"","Dentist"]');
+  store.append(c, NoteKeys.location, 'somewhere');
+  store.append(c, NoteKeys.calendar, 'not json');
+  store.append(c, NoteKeys.bluetooth, '{"name":"Car kit"}');
+  store.append(c, NoteKeys.sourcePackage, '');
+  store.append(c, NoteKeys.sourceLabel, 'Ghost');
+  store.append(called, SectionKeys.location, '91,0');
+  store.append(called, NoteKeys.sourceLabel, 'Label alone');
+  store.append(called, SectionKeys.bluetooth, '"Car kit"');
+  store.append(x, NoteKeys.location, '52.52,13.405,0');
+  store.append(x, NoteKeys.sourcePackage, 'org.example.notes');
+  store.append(x, NoteKeys.calendar, '[]');
+  // The Kitchen's centre, with a sign.
+  store.append(y, NoteKeys.location, '+52.521,13.405e0');
+  store.append(y, NoteKeys.calendar, '["Late"]');
+  store.append(y, NoteKeys.calendar, null);
+  // Where the deleted Garden was: in none.
+  notes.locate(z, Coordinates(52.5, 13.4));
+  store.append(z, NoteKeys.sourcePackage, 'com.example.mail');
+  store.append(z, NoteKeys.sourceLabel, '  ');
+}
+
 /// A text in a format this version does not know, as a later version
 /// would store it.
 const _future =
@@ -1087,6 +1151,7 @@ Map<String, Object?> _note(Note note) => {
   'textVersion': note.textVersion,
   'textEditable': note.textEditable,
   'captured': note.captured.toUtc().toIso8601String(),
+  'context': _context(note.context),
   'place': note.place,
   'importance': note.importance.name,
   'trashed': note.trashed?.toUtc().toIso8601String(),
@@ -1103,6 +1168,35 @@ Map<String, Object?> _note(Note note) => {
   'wordless': note.wordless.name,
 };
 
+/// [context] beyond its capture time, which [_note] and [_section]
+/// write as `captured`: coordinates as numbers, never formatted.
+Map<String, Object?> _context(CaptureContext context) => {
+  'location': switch (context.location) {
+    final at? => [at.latitude, at.longitude],
+    null => null,
+  },
+  'namedPlace': switch (context.namedPlace) {
+    final place? => {
+      'id': place.id,
+      'name': place.name,
+      'centre': [place.centre.latitude, place.centre.longitude],
+      'radius': place.radius,
+    },
+    null => null,
+  },
+  'sourceApp': switch (context.sourceApp) {
+    final app? => {
+      'package': app.package,
+      'label': app.label,
+      'name': app.name,
+    },
+    null => null,
+  },
+  'calendarEvents': context.calendarEvents,
+  'bluetoothDevices': context.bluetoothDevices,
+  'hasMore': context.hasMore,
+};
+
 Map<String, Object?> _section(Section section) => {
   'id': section.id,
   'noteId': section.noteId,
@@ -1111,6 +1205,7 @@ Map<String, Object?> _section(Section section) => {
   'textVersion': section.textVersion,
   'textEditable': section.textEditable,
   'captured': section.context.captured.toUtc().toIso8601String(),
+  'context': _context(section.context),
   'photos': section.photos,
   'recordings': section.recordings,
   'transcripts': section.transcripts,

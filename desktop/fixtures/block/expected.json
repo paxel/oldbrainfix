@@ -86,6 +86,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:13.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -221,6 +229,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:13.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -353,6 +369,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:13.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -490,6 +514,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:13.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -512,6 +544,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:26.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -538,6 +578,14 @@
           "textVersion": 1,
           "textEditable": true,
           "captured": "2026-01-01T10:00:52.000Z",
+          "context": {
+            "location": null,
+            "namedPlace": null,
+            "sourceApp": null,
+            "calendarEvents": [],
+            "bluetoothDevices": [],
+            "hasMore": false
+          },
           "place": "area:00000000000000000000000000000003",
           "importance": "normal",
           "trashed": null,
@@ -580,6 +628,14 @@
             "textVersion": 1,
             "textEditable": true,
             "captured": "2026-01-01T10:00:37.000Z",
+            "context": {
+              "location": null,
+              "namedPlace": null,
+              "sourceApp": null,
+              "calendarEvents": [],
+              "bluetoothDevices": [],
+              "hasMore": false
+            },
             "photos": [],
             "recordings": [],
             "transcripts": {},

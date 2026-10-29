@@ -278,14 +278,14 @@ where
 
 /// `text` without the whitespace Dart's `trim` takes off: Unicode's
 /// White_Space and the byte order mark.
-fn dart_trim(text: &str) -> &str {
+pub(crate) fn dart_trim(text: &str) -> &str {
     text.trim_matches(is_space)
 }
 
 /// `text` in lower case character by character, one character for one,
 /// as Dart's `toLowerCase` does it: with no regard for a word's end, and
 /// a dotted capital I becomes a plain i.
-fn lower(text: &str) -> String {
+pub(crate) fn lower(text: &str) -> String {
     text.chars()
         .flat_map(|c| match c {
             '\u{130}' => 'i'.to_lowercase(),

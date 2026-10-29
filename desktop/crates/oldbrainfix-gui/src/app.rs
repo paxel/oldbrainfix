@@ -68,10 +68,11 @@ use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CardTaken, ClockTime, Day,
-    DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite, MissedSummary, Note, Notes,
-    NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
-    Routines, Search, Section, Sessions, Store, Tallies, Topic, UnitSystem, bundle,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
+    ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday, Importance, Invite,
+    MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person, PersonFilter, Places,
+    Profile, QuietHours, Routine, Routines, Search, Section, Sessions, Store, Tallies, Topic,
+    UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -93,7 +94,9 @@ use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
     photo_from_file,
 };
-use crate::media_view::{self, Generated, Offers, Photo, PhotoCache, Recording, Speech, Voice};
+use crate::media_view::{
+    self, Generated, Offers, Photo, PhotoCache, Recording, Speech, Viewer, Voice,
+};
 use crate::names::{area_name, offered_area_name, topic_name};
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
@@ -532,6 +535,10 @@ enum Action {
     /// Switches the list shown to compact cards or full ones and keeps
     /// the choice for that list on this Device (#114).
     Compact(bool),
+    /// Shows this photo full screen, to zoom and move (#114).
+    ViewPhoto(String),
+    /// Closes the photo shown full screen.
+    ClosePhoto,
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
@@ -788,6 +795,8 @@ pub struct App {
     /// list that is; they fold again once another list shows (#114).
     unfolded: HashSet<String>,
     unfolded_of: Option<String>,
+    /// The photo shown full screen over the window, while one is (#114).
+    viewer: Option<Viewer>,
     trail: Trail,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
@@ -1052,6 +1061,7 @@ impl App {
             scrolled: 0.0,
             unfolded: HashSet::new(),
             unfolded_of: None,
+            viewer: None,
             trail: Trail::default(),
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
@@ -2181,6 +2191,12 @@ impl App {
         self.view.compact
     }
 
+    /// The photo shown full screen, by hash, and how far it is zoomed in,
+    /// 1 fitting the window (#114).
+    pub fn viewed_photo(&self) -> Option<(&str, f32)> {
+        self.viewer.as_ref().map(|v| (v.hash.as_str(), v.zoom))
+    }
+
     /// How many Conflicts an automatic sync brought that are still open
     /// and not announced; none once they are settled elsewhere.
     fn conflicts_arrived(&self) -> usize {
@@ -2736,6 +2752,8 @@ impl App {
             }
             Action::Search => {}
             Action::FilterPeople(people) => self.people = people,
+            Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
+            Action::ClosePhoto => self.viewer = None,
             Action::Unfold(id) => {
                 self.unfolded.insert(id);
             }
@@ -4039,7 +4057,17 @@ impl App {
         if !files.is_empty() {
             actions.push(Action::Files(files));
         }
-        if self.dialog.is_none() {
+        if self.viewer.is_some() {
+            // Back closes the photo shown full screen, and goes nowhere
+            // else.
+            let back = ui.input_mut(|i| {
+                i.pointer.button_pressed(PointerButton::Extra1)
+                    | i.consume_key(Modifiers::ALT, Key::ArrowLeft)
+            });
+            if back {
+                actions.push(Action::ClosePhoto);
+            }
+        } else if self.dialog.is_none() {
             let typing = ui.ctx().text_edit_focused();
             ui.input_mut(|i| {
                 let back = i.pointer.button_pressed(PointerButton::Extra1)
@@ -4183,6 +4211,12 @@ impl App {
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| self.notes_pane(ui, tones, &mut actions));
         self.dialog(ui.ctx(), tones, &mut actions);
+        // The photo full screen, over everything else.
+        if let Some(viewer) = &mut self.viewer
+            && media_view::photo_viewer(ui.ctx(), &self.t, (&mut self.photos, &self.store), viewer)
+        {
+            actions.push(Action::ClosePhoto);
+        }
         self.dragged(ui.ctx(), tones);
         for action in actions {
             self.apply(action);
@@ -4601,7 +4635,9 @@ impl App {
                     // A click unfolds a compact Note and does nothing to a
                     // full one; a double-click or Edit opens the editor
                     // (UI laws, "Desktop").
-                    if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
+                    if let Some(hash) = clicks.photo {
+                        actions.push(Action::ViewPhoto(hash));
+                    } else if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
                         && author.clicked()
                     {
                         actions.push(Action::OpenPerson(profile.id.clone()));
@@ -4858,7 +4894,7 @@ impl App {
                 });
                 embossed(ui, tones, false, None, |ui| {
                     ui.label(RichText::new(t.captured_heading()).strong().color(text));
-                    ui.label(RichText::new(when(&t, note.captured)).color(text));
+                    capture_context(ui, &t, note.captured, &note.context);
                     ui.horizontal(|ui| {
                         let colour = placed
                             .area
@@ -4923,11 +4959,7 @@ impl App {
                             (playing, transcribing, can_play, speed),
                             actions,
                         );
-                        ui.label(
-                            RichText::new(when(&t, section.captured))
-                                .small()
-                                .color(weak),
-                        );
+                        capture_context(ui, &t, section.captured, &section.context);
                     });
                 }
                 if trashed {
@@ -7895,6 +7927,78 @@ pub fn when(t: &L10n, at: DateTime<Utc>) -> String {
     }
 }
 
+/// A point as the phone shows it, `<latitude>, <longitude>` to four
+/// decimals.
+fn coordinates_text(at: Coordinates) -> String {
+    format!("{:.4}, {:.4}", at.latitude(), at.longitude())
+}
+
+/// Where `context` was captured as a compact card shows it, the
+/// phone's `whereCaptured`: its Named Place, else its coordinates;
+/// `None` while unknown.
+fn where_captured(context: &CaptureContext) -> Option<String> {
+    match (&context.named_place, context.location) {
+        (Some(place), _) => Some(place.name.clone()),
+        (None, Some(at)) => Some(coordinates_text(at)),
+        (None, None) => None,
+    }
+}
+
+/// What a Capture Context says beyond the time, line by line with each
+/// line's icon, as the phone's `CaptureContextLines`: where, with its
+/// Named Place, the app it was shared in from, the calendar events
+/// running and the Bluetooth devices connected.
+fn context_lines(t: &L10n, context: &CaptureContext) -> Vec<(char, String)> {
+    let mut lines = Vec::new();
+    if let Some(at) = context.location {
+        let at = coordinates_text(at);
+        lines.push((
+            icons::CONTEXT_WHERE,
+            match &context.named_place {
+                Some(place) => format!("{} ({at})", place.name),
+                None => at,
+            },
+        ));
+    }
+    if let Some(app) = &context.source_app {
+        lines.push((icons::CONTEXT_APP, t.context_source_app(app.name())));
+    }
+    if !context.calendar_events.is_empty() {
+        let events = context.calendar_events.join(", ");
+        lines.push((icons::CONTEXT_CALENDAR, t.context_during(&events)));
+    }
+    if !context.bluetooth_devices.is_empty() {
+        let devices = context.bluetooth_devices.join(", ");
+        lines.push((icons::CONTEXT_BLUETOOTH, t.context_bluetooth(&devices)));
+    }
+    lines
+}
+
+/// One line of a Capture Context: its icon, dimmed, and what it says,
+/// wrapped where it is long.
+fn context_line(ui: &mut Ui, icon: char, line: &str) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.horizontal_top(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        icons::show(ui, icon, 16.0, weak);
+        ui.add(egui::Label::new(RichText::new(line).size(13.0).color(text)).wrap());
+    });
+}
+
+/// The whole Capture Context of a Note or Section `captured` then, line
+/// by line, as the phone's `CaptureContextLines`: when, then
+/// [`context_lines`].
+fn capture_context(ui: &mut Ui, t: &L10n, captured: DateTime<Utc>, context: &CaptureContext) {
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 4.0;
+        context_line(ui, icons::CONTEXT_WHEN, &when(t, captured));
+        for (icon, line) in context_lines(t, context) {
+            context_line(ui, icon, &line);
+        }
+    });
+}
+
 /// Where a Note is filed, `Area / Topic`; `None` while it is in no
 /// place.
 fn place_line(t: &L10n, placed: &Placed) -> Option<String> {
@@ -8065,6 +8169,7 @@ fn editor_media(
     };
     let photo_offers = |hash: &str| offering.offers(id, hash, true);
     match media_view::photos(ui, t, (cache, store), photos, photo_texts, &photo_offers) {
+        Some(Photo::View(hash)) => actions.push(Action::ViewPhoto(hash)),
         Some(Photo::Remove(hash)) => actions.push(ask(hash, true)),
         Some(Photo::Text(asked)) => actions.push(text(asked, true)),
         None => {}
@@ -8114,11 +8219,13 @@ struct CardLook<'a> {
 }
 
 /// What can be clicked on a card: the card, the author's picture on
-/// another person's Note, and Edit.
+/// another person's Note, Edit, and the photo of a full card clicked, by
+/// hash.
 struct CardClicks {
     card: egui::Response,
     author: Option<egui::Response>,
     edit: egui::Response,
+    photo: Option<String>,
 }
 
 /// The bar button of a Note list's full/compact switch (#114): it says
@@ -8186,8 +8293,14 @@ impl<'a> Part<'a> {
 }
 
 /// The text, photos and recordings of a Note or Section in full on a
-/// card (#114), with their Transcripts and Photo Texts.
-fn whole(ui: &mut Ui, t: &L10n, part: Part, (cache, store, transcribing): ShownMedia) {
+/// card (#114), with their Transcripts and Photo Texts; the photos shown
+/// with where they lie.
+fn whole(
+    ui: &mut Ui,
+    t: &L10n,
+    part: Part,
+    (cache, store, transcribing): ShownMedia,
+) -> Vec<(String, egui::Rect)> {
     if !part.text.is_empty() {
         let text = ui.visuals().text_color();
         ui.label(RichText::new(part.text).size(16.0).color(text));
@@ -8199,7 +8312,7 @@ fn whole(ui: &mut Ui, t: &L10n, part: Part, (cache, store, transcribing): ShownM
         part.photos,
         part.recordings,
         transcribing,
-    );
+    )
 }
 
 /// The photo cache, the store the photos are read from and the
@@ -8208,12 +8321,13 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 
 /// A Note as a card (UI laws, "Cards"): when it was captured, with Edit,
 /// and where it is filed, its Area's colour down the left edge and icon
-/// before the place; then, as `look` says, the whole Note with every
-/// Section oldest first, each under its own date, or its first line with
-/// its media. Important cards carry the accent marker and a stronger
-/// emboss; unimportant ones are dimmed. A `draggable` card can be
-/// dropped onto an Area or Topic; a `selected` one is outlined while its
-/// editor shows.
+/// before the place; then, as `look` says, the whole Note under its
+/// Capture Context with every Section oldest first, each under its own,
+/// its photos opening full screen on a click; or, compact, where it was
+/// captured, its first line and its media. Important cards carry the
+/// accent marker and a stronger emboss; unimportant ones are dimmed. A
+/// `draggable` card can be dropped onto an Area or Topic; a `selected`
+/// one is outlined while its editor shows.
 fn note_card(
     ui: &mut Ui,
     t: &L10n,
@@ -8232,6 +8346,8 @@ fn note_card(
         .and_then(|a| area_colour(a.colour.as_deref()));
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
+    // The photos shown in full, where they lie.
+    let mut shown = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -8263,13 +8379,38 @@ fn note_card(
                     );
                     author_rect = Some(picture.rect);
                 }
-                ui.label(RichText::new(when(t, note.captured)).small().color(weak));
+                if look.full {
+                    context_line(ui, icons::CONTEXT_WHEN, &when(t, note.captured));
+                } else {
+                    ui.label(RichText::new(when(t, note.captured)).small().color(weak));
+                    // Where, and that the editor shows more (UI laws,
+                    // "Cards"); room is left for Edit.
+                    let room = (ui.available_width() - 56.0).max(0.0);
+                    if let Some(at) = where_captured(&note.context) {
+                        icons::show(ui, icons::CONTEXT_WHERE, 14.0, weak);
+                        ui.allocate_ui(egui::vec2(room, 20.0), |ui| {
+                            let at = RichText::new(at).small().color(weak);
+                            ui.add(egui::Label::new(at).truncate());
+                        });
+                    }
+                    if note.context.has_more() {
+                        icons::show(ui, icons::MORE, 16.0, weak);
+                    }
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     edit_rect = ui
                         .allocate_exact_size(egui::vec2(24.0, 24.0), Sense::hover())
                         .0;
                 });
             });
+            if look.full {
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    for (icon, line) in context_lines(t, &note.context) {
+                        context_line(ui, icon, &line);
+                    }
+                });
+            }
             // A Note that spawned a Routine is not Unsorted, though not
             // filed.
             let place = match place_line(t, placed) {
@@ -8294,12 +8435,12 @@ fn note_card(
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
                     let part = Part::of_note(note);
-                    whole(ui, t, part, (&mut *photos, store, transcribing));
+                    shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
                     for section in look.sections {
                         ui.separator();
-                        ui.label(RichText::new(when(t, section.captured)).small().color(weak));
+                        capture_context(ui, t, section.captured, &section.context);
                         let part = Part::of_section(section);
-                        whole(ui, t, part, (&mut *photos, store, transcribing));
+                        shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
                     }
                 });
                 return;
@@ -8386,10 +8527,19 @@ fn note_card(
         let fg = dim(ui.visuals().text_color());
         icons::paint(ui.painter(), edit_rect.shrink(2.0), icons::EDIT, fg);
     }
+    // A click on a photo opens it full screen (UI laws, "Cards").
+    let mut photo = None;
+    for (i, (hash, rect)) in shown.into_iter().enumerate() {
+        let id = Id::new(("photo", &note.id, i));
+        if media_view::photo_click(ui, t, rect, id).clicked() {
+            photo = Some(hash);
+        }
+    }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
         edit: edit.on_hover_text(t.edit()),
+        photo,
     }
 }
 

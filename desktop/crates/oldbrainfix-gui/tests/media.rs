@@ -831,6 +831,11 @@ fn removing_a_recording_of_a_merged_note_keeps_its_transcript() -> TestResult {
     let mut harness = window(store.clone(), &devices);
     harness.state_mut().select_note(DENTIST);
     harness.run();
+    // The Capture Context above takes room: it lies at the bottom.
+    harness
+        .get_by_label("Remove recording, keep text")
+        .scroll_to_me();
+    harness.run();
     harness.get_by_label("Remove recording, keep text").click();
     harness.run();
     assert!(shows(

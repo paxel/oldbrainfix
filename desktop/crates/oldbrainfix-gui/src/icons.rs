@@ -53,6 +53,16 @@ pub const EDIT: char = '\u{e21a}';
 /// show their full/compact switch while full and while compact (#114).
 pub const NOTES_FULL: char = '\u{f48f}';
 pub const NOTES_COMPACT: char = '\u{e6b3}';
+/// `schedule`, `place_outlined`, `apps`, `event_outlined` and
+/// `bluetooth`, as the phone's `CaptureContextLines` mark when, where, the
+/// app shared from, the calendar events and the Bluetooth devices; and
+/// `more_horiz`, as a compact card says there is more to see.
+pub const CONTEXT_WHEN: char = '\u{e556}';
+pub const CONTEXT_WHERE: char = '\u{f2ac}';
+pub const CONTEXT_APP: char = '\u{e08f}';
+pub const CONTEXT_CALENDAR: char = '\u{f02f}';
+pub const CONTEXT_BLUETOOTH: char = '\u{e0e4}';
+pub const MORE: char = '\u{e402}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

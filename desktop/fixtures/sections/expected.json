@@ -1,5 +1,5 @@
 {
-  "now": "2026-01-02T10:00:44.000Z",
+  "now": "2026-01-02T10:01:27.000Z",
   "device": "65b60673d6ed884bf01c2c222d82ada0",
   "areas": [],
   "notes": [
@@ -10,6 +10,30 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": [
+          52.521,
+          13.405
+        ],
+        "namedPlace": {
+          "id": "namedplace:0000000000000000000000000000000b",
+          "name": "Kitchen",
+          "centre": [
+            52.521,
+            13.405
+          ],
+          "radius": 30.0
+        },
+        "sourceApp": null,
+        "calendarEvents": [
+          "Standup",
+          "Lunch"
+        ],
+        "bluetoothDevices": [
+          "Car kit"
+        ],
+        "hasMore": true
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -32,6 +56,33 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:10.000Z",
+      "context": {
+        "location": [
+          52.52,
+          13.405
+        ],
+        "namedPlace": {
+          "id": "namedplace:0000000000000000000000000000000a",
+          "name": "Home",
+          "centre": [
+            52.52,
+            13.405
+          ],
+          "radius": 300.0
+        },
+        "sourceApp": {
+          "package": "com.whatsapp",
+          "label": "WhatsApp",
+          "name": "WhatsApp"
+        },
+        "calendarEvents": [
+          "Dentist",
+          "",
+          "Dentist"
+        ],
+        "bluetoothDevices": [],
+        "hasMore": true
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -54,6 +105,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:19.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -76,6 +135,18 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:30.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": {
+          "package": "org.example.notes",
+          "label": null,
+          "name": "org.example.notes"
+        },
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": true
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -98,6 +169,25 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:34.000Z",
+      "context": {
+        "location": [
+          52.521,
+          13.405
+        ],
+        "namedPlace": {
+          "id": "namedplace:0000000000000000000000000000000b",
+          "name": "Kitchen",
+          "centre": [
+            52.521,
+            13.405
+          ],
+          "radius": 30.0
+        },
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -120,6 +210,21 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:40.000Z",
+      "context": {
+        "location": [
+          52.5,
+          13.4
+        ],
+        "namedPlace": null,
+        "sourceApp": {
+          "package": "com.example.mail",
+          "label": "  ",
+          "name": "com.example.mail"
+        },
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": true
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -159,6 +264,25 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:34.000Z",
+        "context": {
+          "location": [
+            52.521,
+            13.405
+          ],
+          "namedPlace": {
+            "id": "namedplace:0000000000000000000000000000000b",
+            "name": "Kitchen",
+            "centre": [
+              52.521,
+              13.405
+            ],
+            "radius": 30.0
+          },
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},
@@ -178,6 +302,30 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
+        "context": {
+          "location": [
+            52.521,
+            13.405
+          ],
+          "namedPlace": {
+            "id": "namedplace:0000000000000000000000000000000b",
+            "name": "Kitchen",
+            "centre": [
+              52.521,
+              13.405
+            ],
+            "radius": 30.0
+          },
+          "sourceApp": null,
+          "calendarEvents": [
+            "Standup",
+            "Lunch"
+          ],
+          "bluetoothDevices": [
+            "Car kit"
+          ],
+          "hasMore": true
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},
@@ -195,6 +343,19 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
+        "context": {
+          "location": [
+            52.53,
+            13.405
+          ],
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [
+            "Ear buds"
+          ],
+          "hasMore": true
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},
@@ -212,6 +373,33 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:10.000Z",
+        "context": {
+          "location": [
+            52.52,
+            13.405
+          ],
+          "namedPlace": {
+            "id": "namedplace:0000000000000000000000000000000a",
+            "name": "Home",
+            "centre": [
+              52.52,
+              13.405
+            ],
+            "radius": 300.0
+          },
+          "sourceApp": {
+            "package": "com.whatsapp",
+            "label": "WhatsApp",
+            "name": "WhatsApp"
+          },
+          "calendarEvents": [
+            "Dentist",
+            "",
+            "Dentist"
+          ],
+          "bluetoothDevices": [],
+          "hasMore": true
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},
@@ -229,6 +417,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:14.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},
@@ -246,6 +442,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:25.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},

@@ -40,6 +40,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:18.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -64,6 +72,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:23.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": "topic:starter-meetings",
       "importance": "normal",
       "trashed": null,
@@ -88,6 +104,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:34.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -137,6 +161,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:39.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "photos": [],
         "recordings": [],
         "transcripts": {},

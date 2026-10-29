@@ -10,6 +10,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "important",
       "trashed": null,
@@ -32,6 +40,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:06.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -54,6 +70,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:11.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "unimportant",
       "trashed": null,
@@ -76,6 +100,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:18.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -98,6 +130,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:23.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,
@@ -120,6 +160,14 @@
       "textVersion": 1,
       "textEditable": true,
       "captured": "2026-01-01T10:00:29.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
       "place": null,
       "importance": "normal",
       "trashed": null,

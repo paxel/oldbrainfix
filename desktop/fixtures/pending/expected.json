@@ -44,6 +44,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": "area:00000000000000000000000000000003",
         "importance": "normal",
         "trashed": null,
@@ -66,6 +74,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -88,6 +104,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:19.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -110,6 +134,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-02T09:03:00.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -213,6 +245,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": "area:00000000000000000000000000000003",
         "importance": "normal",
         "trashed": null,
@@ -235,6 +275,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -257,6 +305,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:19.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -279,6 +335,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-02T09:03:00.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -410,6 +474,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:01.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": "area:00000000000000000000000000000003",
         "importance": "normal",
         "trashed": null,
@@ -432,6 +504,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:05.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -454,6 +534,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-01T10:00:19.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,
@@ -476,6 +564,14 @@
         "textVersion": 1,
         "textEditable": true,
         "captured": "2026-01-02T09:03:00.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
         "place": null,
         "importance": "normal",
         "trashed": null,

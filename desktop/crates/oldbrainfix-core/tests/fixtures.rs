@@ -12,6 +12,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
+use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::nudges::QuietHours;
 use oldbrainfix_core::places::keys as place_keys;
@@ -20,10 +21,11 @@ use oldbrainfix_core::schedule::Frequency;
 use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
-    AgendaRow, Alarms, Blob, ClockTime, Conflict, Day, Frog, Frogs, Importance, Note, Notes,
-    NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine, Routines,
-    STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, SigningKey, SimpleRepeat, Store,
-    Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    AgendaRow, Alarms, Blob, CaptureContext, ClockTime, Conflict, Day, Frog, Frogs, Importance,
+    Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Recurrence, RepeatKind, Routine,
+    Routines, STARTER_SET, Schedule, Search, Section, SessionRule, Sessions, SigningKey,
+    SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry,
+    dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -137,6 +139,7 @@ fn note_json(note: &Note) -> Value {
         "textVersion": note.text_version,
         "textEditable": note.text_editable,
         "captured": dart_iso(note.captured),
+        "context": context_json(&note.context),
         "place": note.place,
         "importance": note.importance.name(),
         "trashed": note.trashed.map(dart_iso),
@@ -154,6 +157,27 @@ fn note_json(note: &Note) -> Value {
     })
 }
 
+/// A Capture Context in the shape of the generator's `_context`.
+fn context_json(context: &CaptureContext) -> Value {
+    json!({
+        "location": context.location.map(|at| json!([at.latitude(), at.longitude()])),
+        "namedPlace": context.named_place.as_ref().map(|place| json!({
+            "id": place.id,
+            "name": place.name,
+            "centre": [place.centre.latitude(), place.centre.longitude()],
+            "radius": place.radius,
+        })),
+        "sourceApp": context.source_app.as_ref().map(|app| json!({
+            "package": app.package,
+            "label": app.label,
+            "name": app.name(),
+        })),
+        "calendarEvents": context.calendar_events,
+        "bluetoothDevices": context.bluetooth_devices,
+        "hasMore": context.has_more(),
+    })
+}
+
 fn section_json(section: &Section) -> Value {
     json!({
         "id": section.id,
@@ -163,6 +187,7 @@ fn section_json(section: &Section) -> Value {
         "textVersion": section.text_version,
         "textEditable": section.text_editable,
         "captured": dart_iso(section.captured),
+        "context": context_json(&section.context),
         "photos": section.photos,
         "recordings": section.recordings,
         "transcripts": section.transcripts,
@@ -580,19 +605,125 @@ fn write_notes(store: &Store) -> Built {
 fn write_sections(store: &Store) -> Built {
     let notes = Notes::new(store);
     let a = notes.capture("Dentist on Tuesday", None, None)?;
-    notes.amend(&a.id, "Moved to Wednesday")?;
+    let moved = notes.amend(&a.id, "Moved to Wednesday")?;
     let b = notes.capture("Ask about the crown", None, None)?;
     notes.amend(&b.id, "Bring the old X-ray")?;
     let c = notes.capture("Dentist number", None, None)?;
     notes.merge(&b.id, &a.id)?;
     notes.merge(&a.id, &c.id)?;
-    notes.amend(&c.id, "Called, all set")?;
+    let called = notes.amend(&c.id, "Called, all set")?;
     let x = notes.capture("Loop one", None, None)?;
     let y = notes.capture("Loop two", None, None)?;
     store.append(&y.id, note_keys::MERGED, Some(&x.id), None)?;
     store.append(&x.id, note_keys::MERGED, Some(&y.id), None)?;
     let z = notes.capture("Merged into a stranger", None, None)?;
     store.append(&z.id, note_keys::MERGED, Some("note:elsewhere"), None)?;
+    // The generator's `_captureContexts`: what its Named Places, `locate`
+    // and `attachContext` write, and the raw values after them.
+    let named =
+        |name: &str, centre: &str, radius: &str| -> Result<String, Box<dyn std::error::Error>> {
+            let id = format!("namedplace:{}", store.new_id()?);
+            place_entries(store, &id, name, centre, radius)?;
+            Ok(id)
+        };
+    named("Home", "52.52,13.405", "300.0")?;
+    named("Kitchen", "52.521,13.405", "30.0")?;
+    let gone = named("Garden", "52.5,13.4", "50.0")?;
+    store.append(&gone, named_place_keys::TYPE, None, None)?;
+    place_entries(
+        store,
+        "namedplace:wide",
+        "Everywhere",
+        "52.52,13.405",
+        "wide",
+    )?;
+    let put = |id: &str, values: &[(&str, Option<&str>)]| -> Built {
+        for (field, value) in values {
+            store.append(id, field, *value, None)?;
+        }
+        Ok(())
+    };
+    use note_keys::{BLUETOOTH, CALENDAR, LOCATION, SOURCE_LABEL, SOURCE_PACKAGE};
+    put(
+        &a.id,
+        &[
+            (LOCATION, Some("52.521,13.405")),
+            (CALENDAR, Some(r#"["Standup","Lunch"]"#)),
+            (BLUETOOTH, Some(r#"["Car kit"]"#)),
+        ],
+    )?;
+    put(
+        &moved.id,
+        &[
+            (LOCATION, Some("52.53,13.405")),
+            (BLUETOOTH, Some(r#"["Ear buds"]"#)),
+        ],
+    )?;
+    put(
+        &b.id,
+        &[
+            (LOCATION, Some(" 52.52 , 13.405 ")),
+            (SOURCE_PACKAGE, Some("com.whatsapp")),
+            (SOURCE_LABEL, Some("WhatsApp")),
+            (CALENDAR, Some(r#"["Dentist",3,null,"","Dentist"]"#)),
+        ],
+    )?;
+    put(
+        &c.id,
+        &[
+            (LOCATION, Some("somewhere")),
+            (CALENDAR, Some("not json")),
+            (BLUETOOTH, Some(r#"{"name":"Car kit"}"#)),
+            (SOURCE_PACKAGE, Some("")),
+            (SOURCE_LABEL, Some("Ghost")),
+        ],
+    )?;
+    put(
+        &called.id,
+        &[
+            (LOCATION, Some("91,0")),
+            (SOURCE_LABEL, Some("Label alone")),
+            (BLUETOOTH, Some(r#""Car kit""#)),
+        ],
+    )?;
+    put(
+        &x.id,
+        &[
+            (LOCATION, Some("52.52,13.405,0")),
+            (SOURCE_PACKAGE, Some("org.example.notes")),
+            (CALENDAR, Some("[]")),
+        ],
+    )?;
+    put(
+        &y.id,
+        &[
+            (LOCATION, Some("+52.521,13.405e0")),
+            (CALENDAR, Some(r#"["Late"]"#)),
+            (CALENDAR, None),
+        ],
+    )?;
+    put(
+        &z.id,
+        &[
+            (LOCATION, Some("52.5,13.4")),
+            (SOURCE_PACKAGE, Some("com.example.mail")),
+            (SOURCE_LABEL, Some("  ")),
+        ],
+    )?;
+    Ok(())
+}
+
+/// The entries of a Named Place, as the Dart core's `NamedPlaces.add`
+/// writes them.
+fn place_entries(store: &Store, id: &str, name: &str, centre: &str, radius: &str) -> Built {
+    use named_place_keys::{CENTRE, NAME, RADIUS, TYPE, TYPE_NAMED_PLACE};
+    store.batch(|| {
+        store.append(id, TYPE, Some(TYPE_NAMED_PLACE), None)?;
+        store.append(id, NAME, Some(name), None)?;
+        store.append(id, CENTRE, Some(centre), None)?;
+        store.append(id, RADIUS, Some(radius), None)?;
+        Ok(())
+    })?;
     Ok(())
 }
 

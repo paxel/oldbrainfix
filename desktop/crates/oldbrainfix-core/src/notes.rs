@@ -1,8 +1,8 @@
 //! Notes and their Sections as the Dart core's `Notes` reads and writes
 //! them: the text, the capture time, the Importance, where a Note is
 //! filed, whether it is in the trash, what was merged into it, and its
-//! photos and voice recordings with their Photo Texts and Transcripts. Every
-//! write appends the same entries, in the same order and read from the
+//! photos and voice recordings with their Photo Texts and Transcripts,
+//! and the Capture Context of Notes and Sections. Every write appends the same entries, in the same order and read from the
 //! clock as often, as the Dart core's, so both logs come out alike.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -10,9 +10,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use chrono::{DateTime, Duration, Utc};
 
 use crate::entry::{dart_iso, parse_time};
+use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
 use crate::store::{Fields, Store};
 use crate::text_format::StoredText;
+use crate::transcript_prompts::dart_trim;
 use crate::{Error, Result};
 
 /// Field keys of a Note.
@@ -55,6 +57,20 @@ pub mod keys {
     /// text was found; absent means not read (yet); null means removed
     /// while the photo stays (ADR 0025).
     pub const OCR_PREFIX: &str = "ocr:";
+    /// Where a Note or Section was captured, `<latitude>,<longitude>`;
+    /// absent while unknown.
+    pub const LOCATION: &str = "location";
+    /// The app something was shared in from, its package and its label;
+    /// absent for anything not shared in, or when the platform did not
+    /// say.
+    pub const SOURCE_PACKAGE: &str = "sourcePackage";
+    pub const SOURCE_LABEL: &str = "sourceLabel";
+    /// The titles of the calendar events running at Capture, as a JSON
+    /// list; absent while unknown or off.
+    pub const CALENDAR: &str = "calendar";
+    /// The names of the Bluetooth devices connected at Capture, as a JSON
+    /// list; absent while unknown or off.
+    pub const BLUETOOTH: &str = "bluetooth";
 
     pub fn photo(hash: &str) -> String {
         format!("{PHOTO_PREFIX}{hash}")
@@ -126,6 +142,59 @@ impl Wordless {
     }
 }
 
+/// The app something was shared in from (CONTEXT.md, Capture Context).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceApp {
+    /// Its Android package, such as `com.whatsapp`.
+    pub package: String,
+    /// Its name as the Device showed it at capture time, or `None` when
+    /// the Device could not tell.
+    pub label: Option<String>,
+}
+
+impl SourceApp {
+    /// What to show: the label, else the package.
+    pub fn name(&self) -> &str {
+        match self.label.as_deref().map(dart_trim) {
+            Some(label) if !label.is_empty() => label,
+            _ => &self.package,
+        }
+    }
+}
+
+/// What was true when a Note or Section was captured (CONTEXT.md),
+/// beyond the time, which is its `captured`: where it was, the app it
+/// was shared in from, the calendar events running and the Bluetooth
+/// devices connected. Notes and Sections keep it under the same keys.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CaptureContext {
+    /// Where it was captured, or `None` when that is unknown: denied,
+    /// unavailable, not arrived yet, or not readable.
+    pub location: Option<Coordinates>,
+    /// The Named Place `location` lies in, resolved when read, so a
+    /// renamed, deleted or new Named Place shows on Notes captured before.
+    pub named_place: Option<NamedPlace>,
+    /// The app it was shared in from, or `None` when it was not shared in
+    /// or the platform did not say.
+    pub source_app: Option<SourceApp>,
+    /// The titles of the calendar events running at capture; empty when
+    /// none, unknown or off.
+    pub calendar_events: Vec<String>,
+    /// The names of the Bluetooth devices connected at capture; empty
+    /// when none, unknown or off.
+    pub bluetooth_devices: Vec<String>,
+}
+
+impl CaptureContext {
+    /// Whether there is more than the time and place a card shows (UI
+    /// laws, "Cards").
+    pub fn has_more(&self) -> bool {
+        self.source_app.is_some()
+            || !self.calendar_events.is_empty()
+            || !self.bluetooth_devices.is_empty()
+    }
+}
+
 /// A Note as the screens want it (CONTEXT.md).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Note {
@@ -142,6 +211,8 @@ pub struct Note {
     /// does not know, which it shows as its source text (ADR 0018).
     pub text_editable: bool,
     pub captured: DateTime<Utc>,
+    /// Where it was captured and what else was true then.
+    pub context: CaptureContext,
     /// The Area or Topic the Note is filed in, or `None` when it has
     /// none or that place is gone.
     pub place: Option<String>,
@@ -233,6 +304,9 @@ pub struct Section {
     pub text_version: i64,
     pub text_editable: bool,
     pub captured: DateTime<Utc>,
+    /// Where it was captured and what else was true then; a merged
+    /// Note's own.
+    pub context: CaptureContext,
     /// A merged Note's photos and recordings travel with it, with their
     /// Photo Texts and Transcripts; an Amend has none.
     pub photos: Vec<String>,
@@ -657,7 +731,7 @@ impl<'a> Notes<'a> {
             Ok(())
         })?;
         let fields = self.store.current_fields(&id)?;
-        Self::section(&id, note_id, &fields)?
+        self.section(&id, note_id, &fields)?
             .ok_or_else(|| Error::Invalid("the new Section is gone".into()))
     }
 
@@ -770,6 +844,7 @@ impl<'a> Notes<'a> {
             text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
+            context: self.context(&fields)?,
             place,
             importance: Importance::from_name(fields.get(keys::IMPORTANCE)),
             trashed: fields.get(keys::TRASHED).map(parse_time).transpose()?,
@@ -874,7 +949,7 @@ impl<'a> Notes<'a> {
                 .is_some_and(|o| o == note_id || merged.iter().any(|m| m == o));
             if owned {
                 let fields = self.store.current_fields(&id)?;
-                sections.extend(Self::section(&id, note_id, &fields)?);
+                sections.extend(self.section(&id, note_id, &fields)?);
             }
         }
         sections.sort_by_key(|s| s.captured);
@@ -919,7 +994,7 @@ impl<'a> Notes<'a> {
             }
             let fields = self.store.current_fields(&id)?;
             for note_id in under {
-                if let Some(section) = Self::section(&id, note_id, &fields)?
+                if let Some(section) = self.section(&id, note_id, &fields)?
                     && let Some(list) = of.get_mut(note_id)
                 {
                     list.push(section);
@@ -942,6 +1017,7 @@ impl<'a> Notes<'a> {
             text_version: note.text_version,
             text_editable: note.text_editable,
             captured: note.captured,
+            context: note.context,
             photos: note.photos,
             recordings: note.recordings,
             transcripts: note.transcripts,
@@ -954,7 +1030,7 @@ impl<'a> Notes<'a> {
     }
 
     /// The Section `id` from its `fields`, shown under `note_id`.
-    fn section(id: &str, note_id: &str, fields: &Fields) -> Result<Option<Section>> {
+    fn section(&self, id: &str, note_id: &str, fields: &Fields) -> Result<Option<Section>> {
         if fields.get(keys::TYPE) != Some(keys::TYPE_SECTION) {
             return Ok(None);
         }
@@ -970,6 +1046,7 @@ impl<'a> Notes<'a> {
             text_version: text.version,
             text_editable: text.editable,
             captured: parse_time(captured)?,
+            context: self.context(fields)?,
             photos: Vec::new(),
             recordings: Vec::new(),
             transcripts: BTreeMap::new(),
@@ -979,6 +1056,30 @@ impl<'a> Notes<'a> {
             removed_transcripts: Vec::new(),
             removed_photo_texts: Vec::new(),
         }))
+    }
+
+    /// The Capture Context in the `fields` of a Note or Section, with the
+    /// Named Place its location lies in.
+    fn context(&self, fields: &Fields) -> Result<CaptureContext> {
+        let location = Coordinates::decode(fields.get(keys::LOCATION));
+        let named_place = match location {
+            Some(at) => NamedPlaces::new(self.store).at(at)?,
+            None => None,
+        };
+        let source_app = match fields.get(keys::SOURCE_PACKAGE) {
+            Some(package) if !package.is_empty() => Some(SourceApp {
+                package: package.to_string(),
+                label: fields.get(keys::SOURCE_LABEL).map(str::to_string),
+            }),
+            _ => None,
+        };
+        Ok(CaptureContext {
+            location,
+            named_place,
+            source_app,
+            calendar_events: names(fields.get(keys::CALENDAR)),
+            bluetooth_devices: names(fields.get(keys::BLUETOOTH)),
+        })
     }
 
     /// The Note `id` ends up in at the end of its Merge chain, or `None`
@@ -1041,6 +1142,21 @@ fn removed_text(fields: &Fields, field: &str) -> bool {
 /// nothing was found.
 fn has_text(text: Option<&String>) -> bool {
     text.is_some_and(|t| !t.trim().is_empty())
+}
+
+/// A stored JSON list of names, its strings in their order; empty when
+/// absent or unreadable.
+fn names(json: Option<&str>) -> Vec<String> {
+    match json.map(serde_json::from_str::<serde_json::Value>) {
+        Some(Ok(serde_json::Value::Array(items))) => items
+            .into_iter()
+            .filter_map(|item| match item {
+                serde_json::Value::String(name) => Some(name),
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 /// The texts under `prefix`, by the hash they belong to.
@@ -1726,6 +1842,153 @@ mod tests {
         )?;
         let note = Notes::new(&store).by_id("note:a")?;
         assert!(note.is_some_and(|n| n.is_unsorted() && n.text.is_empty()));
+        Ok(())
+    }
+
+    #[test]
+    fn names_read_only_the_strings_of_a_json_list() {
+        let read = |json: Option<&str>| names(json);
+        assert_eq!(read(None), Vec::<String>::new());
+        assert_eq!(read(Some(r#"["Standup","Lunch"]"#)), ["Standup", "Lunch"]);
+        // As the Dart core's `whereType<String>`: in their order, empty
+        // and repeated ones kept.
+        assert_eq!(
+            read(Some(r#" ["Dentist",3,null,"",["x"],{"a":"b"},"Dentist"] "#)),
+            ["Dentist", "", "Dentist"]
+        );
+        for garbled in [
+            "",
+            "not json",
+            r#""Car kit""#,
+            r#"{"name":"Car kit"}"#,
+            "[]",
+            r#"["a",]"#,
+            "[\"a\"] x",
+        ] {
+            assert_eq!(read(Some(garbled)), Vec::<String>::new(), "{garbled:?}");
+        }
+    }
+
+    #[test]
+    fn a_source_app_is_named_by_its_label_else_its_package() {
+        let app = |label: Option<&str>| SourceApp {
+            package: "com.whatsapp".into(),
+            label: label.map(str::to_string),
+        };
+        assert_eq!(app(Some("WhatsApp")).name(), "WhatsApp");
+        assert_eq!(app(Some(" WhatsApp\u{a0}")).name(), "WhatsApp");
+        for blank in [None, Some(""), Some("  "), Some("\u{feff}\n")] {
+            assert_eq!(app(blank).name(), "com.whatsapp", "{blank:?}");
+        }
+    }
+
+    /// Writes `values` on `id`, as another version or Device might have.
+    fn put(store: &Store, id: &str, values: &[(&str, Option<&str>)]) -> Result<()> {
+        for (field, value) in values {
+            store.append(id, field, *value, None)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn notes_and_sections_read_their_capture_context() -> Result<()> {
+        use crate::named_places::keys as place_keys;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        for (id, name, centre, radius) in [
+            ("namedplace:home", "Home", "52.52,13.405", "300.0"),
+            ("namedplace:kitchen", "Kitchen", "52.521,13.405", "30.0"),
+        ] {
+            put(
+                &store,
+                id,
+                &[
+                    (place_keys::TYPE, Some(place_keys::TYPE_NAMED_PLACE)),
+                    (place_keys::NAME, Some(name)),
+                    (place_keys::CENTRE, Some(centre)),
+                    (place_keys::RADIUS, Some(radius)),
+                ],
+            )?;
+        }
+        let shared = notes.capture("Shared in", None, None)?;
+        assert_eq!(shared.context, CaptureContext::default());
+        assert!(!shared.context.has_more());
+        put(
+            &store,
+            &shared.id,
+            &[
+                (keys::LOCATION, Some("52.521,13.405")),
+                (keys::SOURCE_PACKAGE, Some("com.whatsapp")),
+                (keys::CALENDAR, Some(r#"["Standup"]"#)),
+                (keys::BLUETOOTH, Some(r#"["Car kit"]"#)),
+            ],
+        )?;
+        let context = note(&store, &shared.id)?.context;
+        assert_eq!(context.location, Coordinates::new(52.521, 13.405));
+        // The smaller of the two holding it.
+        assert_eq!(
+            context.named_place.map(|p| p.id).as_deref(),
+            Some("namedplace:kitchen")
+        );
+        let app = context.source_app.ok_or(Error::Invalid("no app".into()))?;
+        assert_eq!((app.package.as_str(), app.label), ("com.whatsapp", None));
+        assert_eq!(context.calendar_events, ["Standup"]);
+        assert_eq!(context.bluetooth_devices, ["Car kit"]);
+        // An Amend keeps its own, under the same keys; garbled values
+        // read as nothing, and an empty package as no app.
+        let host = notes.capture("Host", None, None)?;
+        let amend = notes.amend(&host.id, "Later")?;
+        put(
+            &store,
+            &amend.id,
+            &[
+                (keys::LOCATION, Some(" 52.52 , 13.405 ")),
+                (keys::SOURCE_PACKAGE, Some("")),
+                (keys::SOURCE_LABEL, Some("Ghost")),
+                (keys::CALENDAR, Some("not json")),
+                (keys::BLUETOOTH, Some(r#"["Ear buds"]"#)),
+            ],
+        )?;
+        put(&store, &host.id, &[(keys::LOCATION, Some("91,0"))])?;
+        notes.merge(&shared.id, &host.id)?;
+        let host_context = note(&store, &host.id)?.context;
+        assert_eq!(host_context.location, None);
+        assert_eq!(host_context.named_place, None);
+        let sections = notes.sections(&host.id)?;
+        let at_once = notes.sections_of(std::slice::from_ref(&host.id))?;
+        assert_eq!(at_once.get(&host.id), Some(&sections));
+        let by_id = |id: &str| sections.iter().find(|s| s.id == id).map(|s| &s.context);
+        // The merged Note brings its own.
+        assert_eq!(by_id(&shared.id), Some(&note(&store, &shared.id)?.context));
+        let amended = by_id(&amend.id).cloned().unwrap_or_default();
+        assert_eq!(
+            amended.named_place.as_ref().map(|p| p.name.as_str()),
+            Some("Home")
+        );
+        assert_eq!(amended.source_app, None);
+        assert!(amended.calendar_events.is_empty());
+        assert_eq!(amended.bluetooth_devices, ["Ear buds"]);
+        assert!(amended.has_more());
+        // A Named Place renamed or deleted shows on what was captured
+        // before.
+        put(&store, "namedplace:kitchen", &[(place_keys::TYPE, None)])?;
+        let moved = note(&store, &shared.id)?.context.named_place;
+        assert_eq!(moved.map(|p| p.name).as_deref(), Some("Home"));
+        put(
+            &store,
+            "namedplace:home",
+            &[(place_keys::NAME, Some("Flat"))],
+        )?;
+        let renamed = note(&store, &shared.id)?.context.named_place;
+        assert_eq!(renamed.map(|p| p.name).as_deref(), Some("Flat"));
+        // A cleared field reads as unknown again.
+        put(
+            &store,
+            &shared.id,
+            &[(keys::CALENDAR, None), (keys::LOCATION, None)],
+        )?;
+        let cleared = note(&store, &shared.id)?.context;
+        assert!(cleared.calendar_events.is_empty() && cleared.location.is_none());
         Ok(())
     }
 }
