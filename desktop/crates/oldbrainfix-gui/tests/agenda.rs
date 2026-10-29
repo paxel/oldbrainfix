@@ -105,6 +105,16 @@ fn left<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node
     harness.get_by_role_and_label(Role::Button, label)
 }
 
+/// Edit on the card of the Note `text`, which opens its editor on the
+/// right; a single click only unfolds a compact Note (#114).
+fn edit<'a>(harness: &'a Harness<'_, App>, text: &str) -> egui_kittest::Node<'a> {
+    let card = harness.get_by_role_and_label(Role::Button, text).rect();
+    harness
+        .query_all_by(|n| n.role() == Role::Button && n.label().as_deref() == Some("Edit"))
+        .find(|n| card.contains_rect(n.rect()))
+        .unwrap_or_else(|| panic!("no Edit on the card of {text:?}"))
+}
+
 /// The radio button `label`.
 fn radio<'a>(harness: &'a Harness<'_, App>, label: &'a str) -> egui_kittest::Node<'a> {
     harness.get_by_role_and_label(Role::RadioButton, label)
@@ -285,9 +295,7 @@ fn a_routine_spawned_from_a_note_takes_several_times_its_renag_and_escalation() 
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
-    harness
-        .get_by_role_and_label(Role::Button, "Another thought")
-        .click();
+    edit(&harness, "Another thought").click();
     harness.run();
     harness.get_by_label("Routine").click();
     harness.run();
@@ -405,9 +413,7 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
-    harness
-        .get_by_role_and_label(Role::Button, "Walk the dog")
-        .click();
+    edit(&harness, "Walk the dog").click();
     harness.run();
     harness.get_by_label("Move to trash").click();
     harness.run();
@@ -428,9 +434,7 @@ fn deleting_a_note_asks_about_its_routines_and_a_routine_goes_to_the_trash() -> 
     // Restored, the Note brings its Routine back.
     left(&harness, "Trash").click();
     harness.run();
-    harness
-        .get_by_role_and_label(Role::Button, "Walk the dog")
-        .click();
+    edit(&harness, "Walk the dog").click();
     harness.run();
     harness.get_by_label("Restore").click();
     harness.run();
@@ -479,9 +483,7 @@ fn deleting_a_note_with_routines_from_the_editor_asks_and_cancel_keeps_it() -> T
     let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
     harness.get_by_label("All Notes").click();
     harness.run();
-    harness
-        .get_by_role_and_label(Role::Button, "Walk the dog")
-        .click();
+    edit(&harness, "Walk the dog").click();
     harness.run();
     let walk = find_note(harness.state(), "Walk the dog")?;
     let trashed = |h: &Harness<'_, App>| -> Result<bool, Box<dyn std::error::Error>> {
