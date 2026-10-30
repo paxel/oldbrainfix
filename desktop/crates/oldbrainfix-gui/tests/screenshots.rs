@@ -25,6 +25,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{
     ClockTime, Day, Importance, Notes, Places, Routines, Schedule, SigningKey, Store, parse_time,
 };
@@ -62,6 +63,9 @@ struct Texts {
     snack: &'static str,
     bins: &'static str,
     garage: &'static str,
+    /// The capture field's hint, and a thought typed into it.
+    hint: &'static str,
+    capture: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -82,6 +86,8 @@ const EN: Texts = Texts {
     snack: "Snack: an apple and a handful of nuts",
     bins: "Put the bins out",
     garage: "Call the garage about the winter tyres",
+    hint: "What's on your mind?",
+    capture: "Ask Dana if she still needs the ladder",
 };
 
 const DE: Texts = Texts {
@@ -102,6 +108,8 @@ const DE: Texts = Texts {
     snack: "Snack: ein Apfel und eine Handvoll Nüsse",
     bins: "Mülltonnen rausstellen",
     garage: "Werkstatt wegen der Winterreifen anrufen",
+    hint: "Was geht dir durch den Kopf?",
+    capture: "Dana fragen, ob sie die Leiter noch braucht",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -338,6 +346,16 @@ fn guide_frames() -> TestResult {
                 |screen: &str| format!("site/assets/frames/desktop/{language}/{name}/{screen}.png");
             let mut harness = window(texts, language, theme)?;
             problems.extend(match_frame(&mut harness, &frame("agenda"))?);
+            // A thought typed into the Agenda's capture field: the action
+            // row and the Nudge times show.
+            let mut harness = window(texts, language, theme)?;
+            harness
+                .get_by(|n| n.placeholder() == Some(texts.hint))
+                .click();
+            harness.run();
+            harness.get_by(|n| n.is_focused()).type_text(texts.capture);
+            harness.run();
+            problems.extend(match_frame(&mut harness, &frame("capture"))?);
         }
     }
     assert!(

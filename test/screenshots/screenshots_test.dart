@@ -24,11 +24,16 @@ import 'package:oldbrainfix/l10n/app_localizations.dart';
 import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
+import 'package:oldbrainfix/src/bundle_platform.dart';
+import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
+import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
 import '../fake_photos.dart';
 import '../fake_voice.dart';
@@ -413,14 +418,16 @@ Future<void> _loadFonts() async {
   await emoji.load();
 }
 
-/// Shows the app on [seeded] in [language] at [dpr], inside [boundary].
+/// Shows the app on [store] in [language] at [dpr], inside [boundary];
+/// with [bundles], a Backup can be picked on the first start.
 Future<AppLocalizations> _start(
   WidgetTester tester,
   GlobalKey boundary,
   String language,
-  _Seeded seeded,
+  Store store,
   double dpr, {
   FakeAlarms? alarms,
+  BundlePlatform bundles = const NoBundles(),
 }) async {
   tester.view
     ..physicalSize = _frame / _dpr * dpr
@@ -428,15 +435,16 @@ Future<AppLocalizations> _start(
   tester.platformDispatcher.localesTestValue = [Locale(language)];
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-  addTearDown(seeded.store.close);
+  addTearDown(store.close);
   await tester.pumpWidget(
     RepaintBoundary(
       key: boundary,
       child: OldBrainFixApp(
-        store: seeded.store,
+        store: store,
         alarms: alarms ?? FakeAlarms(),
         voice: FakeVoice(),
         photos: FakePhotos(),
+        bundles: bundles,
       ),
     ),
   );
@@ -593,7 +601,14 @@ void main() {
         WidgetTester tester,
         _Seeded seeded, {
         FakeAlarms? alarms,
-      }) => _start(tester, boundary, language, seeded, _dpr, alarms: alarms);
+      }) => _start(
+        tester,
+        boundary,
+        language,
+        seeded.store,
+        _dpr,
+        alarms: alarms,
+      );
 
       Future<void> tap(WidgetTester tester, Finder finder) =>
           _tap(tester, finder);
@@ -699,7 +714,18 @@ void main() {
           _Seeded seed() => _Seeded(texts)..store.themeChoice = choice;
 
           Future<AppLocalizations> start(WidgetTester tester, _Seeded seeded) =>
-              _start(tester, boundary, language, seeded, _guideDpr);
+              _start(tester, boundary, language, seeded.store, _guideDpr);
+
+          /// The first start of a Device that holds nothing yet, in this
+          /// frame's theme, a Backup file pickable.
+          Future<AppLocalizations> firstStart(WidgetTester tester) => _start(
+            tester,
+            boundary,
+            language,
+            Store.inMemory(clock: () => _now)..themeChoice = choice,
+            _guideDpr,
+            bundles: FakeBundles(Directory('build')),
+          );
 
           /// The guide frame [name]: [body] brings the app to its screen.
           void frame(String name, Future<void> Function(WidgetTester) body) {
@@ -716,6 +742,35 @@ void main() {
           frame('agenda', (tester) async {
             await start(tester, seed());
             expect(find.byType(AgendaScreen), findsOneWidget);
+          });
+
+          frame('first-start', (tester) async {
+            await firstStart(tester);
+            expect(find.byType(FirstStartScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('restore-offer')), findsOneWidget);
+          });
+
+          frame('starter-set', (tester) async {
+            await firstStart(tester);
+            await _tap(tester, find.byKey(const ValueKey('first-new')));
+            expect(find.byType(StarterSetScreen), findsOneWidget);
+          });
+
+          frame('capture-fan', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.byIcon(Icons.add));
+            for (final way in ['text', 'voice', 'photo', 'gallery', 'paste']) {
+              expect(fanEntry(way), findsOneWidget);
+            }
+          });
+
+          frame('capture', (tester) async {
+            await start(tester, seed());
+            await openTextCapture(tester);
+            await tester.enterText(find.byType(TextField), texts.captureText);
+            await tester.pumpAndSettle();
+            expect(find.byType(CaptureScreen), findsOneWidget);
+            expect(find.byType(NudgeButtons), findsOneWidget);
           });
         }
       }
