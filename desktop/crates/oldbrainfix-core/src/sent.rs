@@ -32,6 +32,7 @@ use crate::routines::keys as routine_keys;
 use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
 use crate::store::{ACCEPTED_PENDING_PREFIX, Fields, Store};
+use crate::text_boxes::{self, ShownBox};
 use crate::text_format::{self, StoredText};
 use crate::{Error, Notes, Result, Routine, Routines, Schedule, Tallies};
 
@@ -396,6 +397,21 @@ fn sent_lines(json: &Value, shopping: bool) -> Option<Vec<SentLine>> {
 
 /// The format a text of `json` says it is in: plain when it says none,
 /// `None` when it is no text.
+/// `text` as a Sent Item carries it: each of its `boxes` in the glyph of
+/// its current state, its id kept, so the receiver starts from the
+/// sender's states and the same boxes take the later ones (ADR 0035); a
+/// text that is not `editable` here as it is.
+fn baked(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
+    if !editable {
+        return text.to_string();
+    }
+    let ticks = boxes
+        .iter()
+        .filter_map(|b| Some((b.id.clone(), b.last.clone()?)))
+        .collect();
+    text_boxes::baked(text, &ticks)
+}
+
 fn text_format_of(json: &Value) -> Option<String> {
     match json.get("format") {
         None => Some(text_format::PLAIN.to_string()),
@@ -605,7 +621,7 @@ impl Store {
             cancel,
             from: self.own_key_record()?,
             profile,
-            text: note.text,
+            text: baked(&note.text, note.text_editable, &note.boxes),
             text_format: note.text_format,
             text_version: note.text_version,
             sections: notes
@@ -613,7 +629,7 @@ impl Store {
                 .into_iter()
                 .filter(|s| !s.text.trim().is_empty())
                 .map(|s| SentSection {
-                    text: s.text,
+                    text: baked(&s.text, s.text_editable, &s.boxes),
                     captured: s.captured,
                     format: s.text_format,
                     version: s.text_version,

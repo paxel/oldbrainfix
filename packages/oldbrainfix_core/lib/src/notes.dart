@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'boxes.dart';
 import 'named_places.dart';
 import 'places.dart';
 import 'shared_areas.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'text_boxes.dart';
 import 'text_format.dart';
 
 /// Field keys of a Note.
@@ -275,6 +277,10 @@ class Note {
   /// photo stays, as for [removedTranscripts].
   final List<String> removedPhotoTexts;
 
+  /// The boxes of [text] as they show now, in the order they come
+  /// (ADR 0035); none in a text this version may not change.
+  final List<ShownBox> boxes;
+
   const Note({
     required this.id,
     required this.text,
@@ -296,13 +302,20 @@ class Note {
     this.removedRecordings = const [],
     this.removedTranscripts = const [],
     this.removedPhotoTexts = const [],
+    this.boxes = const [],
   });
 
   /// When the Note was captured.
   DateTime get captured => context.captured;
 
-  /// [text] as it reads without its marks, for search and previews.
-  String get visibleText => TextFormats.visible(textFormat, text);
+  /// [text] as it shows: each box in the glyph of its current state,
+  /// without its id; what [boxes] count their offsets in, and what is
+  /// copied, shared and saved (ADR 0035). [text] as it is in a format
+  /// not known here.
+  String get shownText => _shownText(text, textEditable, boxes);
+
+  /// [shownText] as it reads without its marks, for search and previews.
+  String get visibleText => TextFormats.visible(textFormat, shownText);
 
   bool get isTrashed => trashed != null;
 
@@ -370,6 +383,9 @@ class Section {
   final List<String> removedTranscripts;
   final List<String> removedPhotoTexts;
 
+  /// The boxes of [text] as they show now, as for [Note.boxes].
+  final List<ShownBox> boxes;
+
   const Section({
     required this.id,
     required this.noteId,
@@ -386,10 +402,23 @@ class Section {
     this.removedRecordings = const [],
     this.removedTranscripts = const [],
     this.removedPhotoTexts = const [],
+    this.boxes = const [],
   });
 
-  /// [text] as it reads without its marks, as for [Note.visibleText].
-  String get visibleText => TextFormats.visible(textFormat, text);
+  /// [text] as it shows, as for [Note.shownText].
+  String get shownText => _shownText(text, textEditable, boxes);
+
+  /// [shownText] as it reads without its marks, as for
+  /// [Note.visibleText].
+  String get visibleText => TextFormats.visible(textFormat, shownText);
+}
+
+/// [text] with each of [boxes] in the glyph of its state and no ids,
+/// when [editable]; else as it is.
+String _shownText(String text, bool editable, List<ShownBox> boxes) {
+  if (!editable) return text;
+  if (boxes.isEmpty) return TextBoxes.strip(text);
+  return TextBoxes.shown(text, {for (final b in boxes) b.id: ?b.last}).text;
 }
 
 /// How a diary of cards is ordered.
@@ -468,7 +497,7 @@ class Notes {
       store.append(
         id,
         NoteKeys.text,
-        StoredText.of(format, text).encode(),
+        StoredText.of(format, _boxed(text, format)).encode(),
         date: now,
       );
       if (place != null) store.append(id, NoteKeys.place, place, date: now);
@@ -734,7 +763,7 @@ class Notes {
     store.append(
       noteId,
       NoteKeys.text,
-      StoredText.of(written, _text(text)).encode(),
+      StoredText.of(written, _boxed(_text(text), written)).encode(),
     );
   }
 
@@ -760,7 +789,7 @@ class Notes {
   /// of the Note [noteId] (ADR 0025): it becomes the text, or with
   /// [append] goes on a line of its own after it. Into a formatted text
   /// it goes as plain text, escaped so that it reads as itself. Gives
-  /// the text written.
+  /// the text written, its boxes with their ids (ADR 0035).
   String takeOver(String noteId, String generated, {required bool append}) {
     final note = byId(noteId);
     if (note == null) {
@@ -772,7 +801,8 @@ class Notes {
         ? taken
         : '${text.trimRight()}\n$taken';
     edit(noteId, joined);
-    return _text(joined);
+    // As written: its glyphs boxes with their ids.
+    return byId(noteId)?.text ?? _text(joined);
   }
 
   /// When the text of the Note [noteId] was last set, by capture or edit;
@@ -808,7 +838,7 @@ class Notes {
       store.append(
         id,
         SectionKeys.text,
-        StoredText.of(format, trimmed).encode(),
+        StoredText.of(format, _boxed(trimmed, format)).encode(),
         date: now,
       );
     });
@@ -906,6 +936,7 @@ class Notes {
     removedRecordings: note.removedRecordings,
     removedTranscripts: note.removedTranscripts,
     removedPhotoTexts: note.removedPhotoTexts,
+    boxes: note.boxes,
   );
 
   /// Records where the Note or Section [id] was captured. The position
@@ -1082,7 +1113,21 @@ class Notes {
         for (final hash in photos)
           if (_removedText(fields, NoteKeys.ocr(hash))) hash,
       ],
+      boxes: _boxes(id, text, fields),
     );
+  }
+
+  /// The boxes of the stored [text] of [id] with the ticks that count
+  /// (ADR 0035); none in a text this version may not change.
+  List<ShownBox> _boxes(
+    String id,
+    StoredText text,
+    Map<String, String?> fields,
+  ) {
+    if (!text.editable) return const [];
+    final ticked = fields.keys.any((k) => k.startsWith(BoxKeys.prefix));
+    final ticks = ticked ? Boxes(store).ticks(id) : const <String, BoxTick>{};
+    return TextBoxes.shown(text.text, ticks).boxes;
   }
 
   /// The hashes of the fields under [prefix] whose value is [value], in
@@ -1182,7 +1227,17 @@ class Notes {
       textVersion: text.version,
       textEditable: text.editable,
       context: _context(captured, fields),
+      boxes: _boxes(id, text, fields),
     );
+  }
+
+  /// The Section [id] as it shows under its Note: an Amend, or a Note
+  /// merged into another; null when there is none.
+  Section? section(String id) {
+    if (!id.startsWith('note:')) return _section(id);
+    final note = byId(id);
+    final into = note?.mergedInto;
+    return note == null || into == null ? null : _merged(note, into);
   }
 
   /// The Capture Context from the stored capture time and the [fields]
@@ -1223,6 +1278,11 @@ class Notes {
       throw ArgumentError.value(format, 'format', 'not a format known here');
     }
   }
+
+  /// [text] in [format] as it is saved: every bare ☐, ✅ and ❌ a box
+  /// with an id of its own (ADR 0035).
+  static String _boxed(String text, String format) =>
+      TextBoxes.convert(text, format: format, newId: Store.newId);
 
   static String _text(String text) {
     final trimmed = text.trim();

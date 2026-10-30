@@ -32,7 +32,8 @@ final _blockedInstant = RegExp(
 /// only what carries no text, picture or sound and keeps the Shared Areas
 /// whole. That is a check-off or its undoing (`done@…` on a Routine,
 /// `done` on a Frog, `checked` on a Checklist's Line, `check@…` on a
-/// Routine for one of its Lines), a grant (`role:…` on an Area), and a
+/// Routine for one of its Lines, a tick `box@…` of a box in the text of
+/// a Note or a Section), a grant (`role:…` on an Area), and a
 /// Note's `$type`
 /// and filing, which say where the Routines, Frogs and Sections others
 /// hung on it lie; the Note
@@ -68,6 +69,11 @@ bool keptFromBlocked(Entry e) {
   if (kind == FrogKeys.typeFrog && e.field == FrogKeys.done ||
       kind == ChecklistKeys.typeLine && e.field == ChecklistKeys.checked) {
     return value == null || _blockedInstant.hasMatch(value);
+  }
+  if ((kind == 'note' || kind == 'section') &&
+      e.field.startsWith(BoxKeys.prefix)) {
+    return TextBoxes.isId(e.field.substring(BoxKeys.prefix.length)) &&
+        BoxState.named(value) != null;
   }
   if (kind == 'area' && e.field.startsWith(ShareKeys.rolePrefix)) {
     final device = e.field.substring(ShareKeys.rolePrefix.length);

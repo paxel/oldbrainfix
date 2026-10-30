@@ -216,6 +216,59 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'boxes',
+    about:
+        'Boxes in texts (ADR 0035): a capture whose glyphs become boxes, '
+        'mid-word and with a selector, one joined into another emoji left '
+        'as it is; ticks, one ticked back, one dated back, and ticks of '
+        'another shape; an edit that takes a ticked box out, adds one and '
+        'copies one, whose copy gets an id of its own; a formatted Note '
+        'whose code and link address keep their glyphs and whose table '
+        'cell is ticked; an Amend and a Note merged in, each ticked; a '
+        'Transcript\'s words taken over.',
+    build: (store) {
+      final notes = Notes(store);
+      final boxes = Boxes(store);
+      final trip = notes.capture(
+        'Trip a☐passport\n✅\uFE0F tickets ❌ visa ✅\u200D🔥',
+      );
+      final [passport, tickets, visa] = trip.boxes;
+      boxes.tick(trip.id, passport.id, BoxState.done);
+      boxes.tick(trip.id, tickets.id, BoxState.failed);
+      boxes.tick(trip.id, tickets.id, BoxState.done);
+      boxes.tick(trip.id, visa.id, BoxState.done);
+      store.append(
+        trip.id,
+        BoxKeys.tick(visa.id),
+        'open',
+        date: DateTime.utc(2025, 12, 31),
+      );
+      store.append(trip.id, 'box@', 'done');
+      store.append(trip.id, '${BoxKeys.tick(visa.id)}x', 'failed');
+      store.append(trip.id, BoxKeys.tick(passport.id), 'Done');
+      final text = notes.byId(trip.id)!.text;
+      notes.edit(
+        trip.id,
+        '${text.substring(0, visa.sourceStart)}\n☐ charger '
+        '${text.substring(passport.sourceStart, passport.sourceEnd)}',
+      );
+      final copy = notes.byId(trip.id)!.boxes.last;
+      boxes.tick(trip.id, copy.id, BoxState.failed);
+      final list = notes.capture(
+        '- ☐ a `☐` [☐ b](https://x.org/☐)\n\n| ☐ c | d |\n| --- | --- |',
+        format: TextFormats.markdown,
+      );
+      boxes.tick(list.id, list.boxes.last.id, BoxState.done);
+      final insurance = notes.amend(trip.id, '☐ insurance');
+      boxes.tick(insurance.id, insurance.boxes.single.id, BoxState.failed);
+      final shoes = notes.capture('☐ shoes');
+      boxes.tick(shoes.id, shoes.boxes.single.id, BoxState.done);
+      notes.merge(shoes.id, trip.id);
+      boxes.tick(shoes.id, shoes.boxes.single.id, BoxState.open);
+      notes.takeOver(trip.id, '❌ from a photo', append: true);
+    },
+  ),
+  (
     name: 'places',
     about:
         'The whole Starter Set planted, one starter Area renamed; an Area '
@@ -5795,6 +5848,153 @@ Map<String, Object?> _textMarksOf(String text) {
   };
 }
 
+/// Boxes in texts (ADR 0035): for each text the boxes found, each text
+/// as saved, plain and formatted, with ids from the counted entity ids,
+/// the boxes found in the plain one, as it shows and as a Sent Item
+/// carries it with every second box ticked on, without ids, and as it
+/// reads; offsets counted in code points, so that the cores' UTF-16 and
+/// UTF-8 offsets compare.
+Map<String, Object?> _textBoxes() {
+  String id(String id) => TextBoxes.encodeId(id);
+  final tags = String.fromCharCodes([0xE0061, 0xE0062, 0xE0063]);
+  final cancel = String.fromCharCode(0xE007F);
+  final texts = [
+    '',
+    'No boxes here',
+    'a☐b ✅c❌',
+    '☐ Buy milk\n✅ v2 supported at customer\n❌ v1',
+    '✅\uFE0F with selector ❌\uFE0E text style ☐\uFE0F\uFE0F two',
+    '✅\u200D🔥 joined ✅\uFE0F\u200D🔥 joined too ❌\u200D',
+    '☑ a ☒ b ✔ c ✓ d ❎ e',
+    'x☐${id('a7k2')} y✅${id('a7k2')} ✅\uFE0E${id('zz00')} ❌${id('0000')}',
+    '☐$tags$cancel short ☐${tags}d no cancel ☐$tags\u{E0041}$cancel '
+        'capital ${id('a7k2')} alone',
+    '`☐` [☐ b](https://x.org/☐) **✅** ~~❌~~',
+    '| ☐ c | d |\n| --- | --- |\n| ✅ | `❌` |\n\n> ☐ quoted',
+    '😀☐🧠✅\r\n❌\r☐',
+    'Ünïcode ☐ Straße ✅ 👩‍👧 ❌',
+  ];
+  return {
+    'cases': [for (final text in texts) _textBoxesOf(text)],
+  };
+}
+
+/// What [_textBoxes] holds for the text [text].
+Map<String, Object?> _textBoxesOf(String text) {
+  String Function() counted() {
+    var n = 0;
+    return () => (++n).toRadixString(16).padLeft(32, '0');
+  }
+
+  int points(String s, int at) => s.substring(0, at).runes.length;
+  final plain = TextBoxes.convert(text, newId: counted());
+  final markdown = TextBoxes.convert(
+    text,
+    format: TextFormats.markdown,
+    newId: counted(),
+  );
+  final found = TextBoxes.find(plain);
+  final ticks = {
+    for (final (i, b) in found.indexed)
+      if (i.isOdd)
+        b.id: BoxTick(
+          state: BoxState.values[(b.state.index + 1) % BoxState.values.length],
+          at: DateTime.utc(2026, 1, 1),
+          device: 'd',
+          own: true,
+        ),
+  };
+  final shown = TextBoxes.shown(plain, ticks);
+  return {
+    'text': text,
+    'plain': plain,
+    'markdown': markdown,
+    'found': [
+      for (final b in TextBoxes.find(text))
+        {
+          'id': b.id,
+          'state': b.state.name,
+          'start': points(text, b.start),
+          'idStart': points(text, b.idStart),
+          'end': points(text, b.end),
+        },
+    ],
+    'shown': shown.text,
+    'boxes': [
+      for (final b in shown.boxes)
+        {
+          'id': b.id,
+          'state': b.state.name,
+          'starting': b.state == b.starting ? null : b.starting.name,
+          'start': points(shown.text, b.start),
+          'end': points(shown.text, b.end),
+          'sourceStart': points(plain, b.sourceStart),
+          'idStart': points(plain, b.idStart),
+          'sourceEnd': points(plain, b.sourceEnd),
+        },
+    ],
+    'baked': TextBoxes.baked(plain, ticks),
+    'strip': TextBoxes.strip(text),
+    'visible': TextFormats.visible(TextFormats.markdown, markdown),
+  };
+}
+
+/// The boxes of every Note of [store] and of each of its Sections
+/// (ADR 0035): the text as stored, as it shows and reads, and each box
+/// with its offsets in code points, its latest tick and its history.
+Map<String, Object?> _boxesOf(Store store) {
+  final notes = Notes(store);
+  final boxes = Boxes(store);
+  int points(String s, int at) => s.substring(0, at).runes.length;
+  Map<String, Object?> tick(BoxTick t) => {
+    'at': t.at.toUtc().toIso8601String(),
+    'device': t.device,
+    'own': t.own,
+    'state': t.state.name,
+  };
+  Map<String, Object?> text(
+    String id,
+    String source,
+    String shown,
+    String visible,
+    List<ShownBox> list,
+  ) => {
+    'id': id,
+    'text': source,
+    'shown': shown,
+    'visible': visible,
+    'boxes': [
+      for (final b in list)
+        {
+          'id': b.id,
+          'state': b.state.name,
+          'starting': b.starting.name,
+          'start': points(shown, b.start),
+          'end': points(shown, b.end),
+          'sourceStart': points(source, b.sourceStart),
+          'idStart': points(source, b.idStart),
+          'sourceEnd': points(source, b.sourceEnd),
+          'last': switch (b.last) {
+            final t? => tick(t),
+            null => null,
+          },
+          'history': [for (final t in boxes.history(id, b.id)) tick(t)],
+        },
+    ],
+  };
+  final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
+  return {
+    'notes': [
+      for (final id in ids)
+        if (notes.byId(id) case final n?) ...[
+          text(n.id, n.text, n.shownText, n.visibleText, n.boxes),
+          for (final s in notes.sections(id))
+            text(s.id, s.text, s.shownText, s.visibleText, s.boxes),
+        ],
+    ],
+  };
+}
+
 /// Tags in texts (ADR 0032): for each text the tags found, each as
 /// written, as searched and where it lies, counted in code points, so
 /// that the cores' UTF-16 and UTF-8 offsets compare.
@@ -6876,6 +7076,14 @@ Future<void> main(List<String> args) async {
     'start of every line, one past the last among them, and the line of '
     'every offset, counted in code points; with variation selectors, '
     'astral characters and line breaks of every kind.\n'
+    '- `text_boxes.json`: boxes in texts: for each text the boxes found, '
+    'the text as saved, plain and formatted, with ids from counted entity '
+    'ids, as it shows and as a Sent Item carries it with every second box '
+    'ticked on, without ids, and as it reads, offsets counted in code '
+    'points; glyphs mid-word, with variation selectors, joined into '
+    'another emoji, other boxes and ticks, ids twice, ids of another '
+    'shape and alone, in inline code, a link and a table, and astral '
+    'characters and line breaks of every kind.\n'
     '- `text_tags.json`: tags in texts: for each text the tags found, each '
     'as written, as searched and where it lies, counted in code points; in '
     'many scripts, after spaces of any kind, punctuation, emoji and status '
@@ -7067,6 +7275,10 @@ Future<void> main(List<String> args) async {
     '${_json.convert(_textMarks())}\n',
   );
   _write(
+    File('${root.path}/text_boxes.json'),
+    '${_json.convert(_textBoxes())}\n',
+  );
+  _write(
     File('${root.path}/text_tags.json'),
     '${_json.convert(_textTags())}\n',
   );
@@ -7143,6 +7355,14 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/checklists.json'),
           '${_json.convert(_checklists(store))}\n',
+        );
+      }
+      if (noteIds.any(
+        (id) => Notes(store).byId(id)?.boxes.isNotEmpty ?? false,
+      )) {
+        _write(
+          File('${out.path}/boxes.json'),
+          '${_json.convert(_boxesOf(store))}\n',
         );
       }
       if (scenario.name == 'markers') {

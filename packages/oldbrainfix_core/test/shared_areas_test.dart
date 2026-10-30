@@ -433,9 +433,51 @@ void main() {
       }
       exchange(ben, ann);
       for (final store in [ann, ben]) {
-        expect(Notes(store).byId(h.note)!.text, 'Buy milk\n☐ oat');
-        expect(Notes(store).byId(own.id)!.text, 'Bread\n✅ rye');
+        expect(Notes(store).byId(h.note)!.shownText, 'Buy milk\n☐ oat');
+        expect(Notes(store).byId(own.id)!.shownText, 'Bread\n✅ rye');
       }
+    });
+
+    test('a tick another person\'s Device wrote on a Note in no Shared '
+        'Area counts for nothing (ADR 0035)', () {
+      final h = household(AreaRole.member);
+      Notes(ann).edit(h.secret, '☐ pills');
+      final id = Notes(ann).byId(h.secret)!.boxes.single.id;
+      // As a modified app would.
+      final forged = ben.append(h.secret, BoxKeys.tick(id), 'done');
+      ann.applyEntries([forged], verifiedDevice: ben.deviceId);
+      expect(ann.allEntries().map((e) => e.id), contains(forged.id));
+      expect(Notes(ann).byId(h.secret)!.shownText, '☐ pills');
+      expect(Boxes(ann).history(h.secret, id), isEmpty);
+    });
+
+    test('a Member ticks the boxes of any Note and Section, while their '
+        'texts stay the author\'s (ADR 0035)', () {
+      final h = household(AreaRole.member);
+      Notes(ann).edit(h.note, 'Buy milk\n☐ oat');
+      final eggs = Notes(ann).amend(h.note, '☐ ask about eggs');
+      exchange(ben, ann);
+      final box = Notes(ben).byId(h.note)!.boxes.single;
+      final inSection = Notes(ben).section(eggs.id)!.boxes.single;
+      expect(ben.mayChange(h.note), isFalse);
+      expect(Boxes(ben).mayTick(h.note), isTrue);
+      expect(Boxes(ben).mayTick(eggs.id), isTrue);
+      Boxes(ben).tick(h.note, box.id, BoxState.done);
+      Boxes(ben).tick(eggs.id, inSection.id, BoxState.failed);
+      exchange(ben, ann);
+      for (final store in [ann, ben]) {
+        final note = Notes(store).byId(h.note)!;
+        expect(note.shownText, 'Buy milk\n✅ oat');
+        expect(note.boxes.single.starting, BoxState.open);
+        expect(note.boxes.single.last?.device, ben.deviceId);
+        expect(Notes(store).section(eggs.id)!.shownText, '❌ ask about eggs');
+        expect(Boxes(store).history(eggs.id, inSection.id).length, 1);
+      }
+      final tick = Notes(ann).byId(h.note)!.boxes.single.last!;
+      expect(tick.own, isFalse);
+      expect(ann.tickedBy(h.note, tick)?.name, 'Ben');
+      expect(Notes(ben).byId(h.note)!.boxes.single.last!.own, isTrue);
+      expect(ben.tickedBy(h.note, tick), isNull);
     });
 
     test('a Manager does everything, and Managers change roles', () {

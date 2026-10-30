@@ -17,6 +17,7 @@ import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
 import 'tallies.dart';
+import 'text_boxes.dart';
 import 'text_format.dart';
 
 /// Sent Items (CONTEXT.md, ADR 0009, 0015): one Note with its Routines
@@ -561,14 +562,14 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
     cancel: cancel,
     from: store.ownKeyRecord,
     profile: profile,
-    text: note.text,
+    text: _baked(note.text, note.textEditable, note.boxes),
     textFormat: note.textFormat,
     textVersion: note.textVersion,
     sections: [
       for (final s in notes.sections(noteId))
         if (s.text.trim().isNotEmpty)
           SentSection(
-            s.text,
+            _baked(s.text, s.textEditable, s.boxes),
             s.context.captured,
             format: s.textFormat,
             version: s.textVersion,
@@ -1308,6 +1309,14 @@ _Held? _held(Store store, SentItem item) {
   }
   return (SentItemState.update, _changes(store, held.note, item, trashed));
 }
+
+/// [text] as a Sent Item carries it: each of its [boxes] in the glyph
+/// of its current state, its id kept, so the receiver starts from the
+/// sender's states and the same boxes take the later ones (ADR 0035); a
+/// text that is not [editable] here as it is.
+String _baked(String text, bool editable, List<ShownBox> boxes) => editable
+    ? TextBoxes.baked(text, {for (final b in boxes) b.id: ?b.last})
+    : text;
 
 /// What the update [item] changes on the Note [noteId]: its text when the
 /// sender changed theirs, the Sections not here yet (by when they were

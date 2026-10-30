@@ -96,6 +96,29 @@ void main() {
       },
     );
 
+    test('keeps her ticks of boxes, on a Note and on a Section, as her '
+        'check-offs (ADR 0035)', () {
+      final area = household();
+      final milk = Notes(ann).capture('☐ Milk', place: area);
+      final eggs = Notes(ann).amend(milk.id, '☐ Eggs');
+      exchange(carol, ann);
+      final box = Notes(carol).byId(milk.id)!.boxes.single.id;
+      final inSection = Notes(carol).section(eggs.id)!.boxes.single.id;
+      Boxes(carol).tick(milk.id, box, BoxState.done);
+      Boxes(carol).tick(eggs.id, inSection, BoxState.failed);
+      exchange(carol, ann);
+
+      expect(ann.blockPerson(idOf(carol)), isEmpty);
+
+      final note = Notes(ann).byId(milk.id)!;
+      expect(note.shownText, '✅ Milk');
+      expect(note.boxes.single.last?.device, carol.deviceId);
+      // Without her name or picture.
+      expect(ann.tickedBy(milk.id, note.boxes.single.last!), isNull);
+      expect(Notes(ann).section(eggs.id)!.shownText, '❌ Eggs');
+      expect(by(ann, carol).every(keptFromBlocked), isTrue);
+    });
+
     test('a sync relaying her Note through a third Device stores none of '
         'it, nor asks for her photo', () {
       final area = household();
@@ -348,6 +371,9 @@ void main() {
         entry('note:ab12', r'$type', 'note'),
         entry('note:ab12', 'place', 'topic:ab12'),
         entry('note:ab12', 'place', null),
+        entry('note:ab12', 'box@a7k2', 'done'),
+        entry('note:ab12', 'box@0000', 'open'),
+        entry('section:ab12', 'box@zz99', 'failed'),
       ]) {
         expect(keptFromBlocked(e), isTrue, reason: '$e');
       }
@@ -400,6 +426,17 @@ void main() {
         entry('area:ab12', 'name', 'Rude'),
         entry('note:ab12', r'$type', 'Rude'),
         entry('note:ab12', 'place', 'area:Rude words'),
+        entry('note:ab12', 'box@a7k2', 'Rude words'),
+        entry('note:ab12', 'box@a7k2', 'Done'),
+        entry('note:ab12', 'box@a7k2', null),
+        entry('note:ab12', 'box@A7K2', 'done'),
+        entry('note:ab12', 'box@a7k', 'done'),
+        entry('note:ab12', 'box@a7k22', 'done'),
+        entry('note:ab12', 'box@', 'done'),
+        entry('note:ab12', 'box@a7-2', 'done'),
+        entry('routine:ab12', 'box@a7k2', 'done'),
+        entry('line:ab12', 'box@a7k2', 'done'),
+        entry('note:Rude words', 'box@a7k2', 'done'),
         entry('note:ab12', 'place', null, ctx: ''),
         Entry(
           seq: 0,

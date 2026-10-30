@@ -9,10 +9,12 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, Duration, Utc};
 
+use crate::boxes::{self, Boxes};
 use crate::entry::{dart_iso, parse_time};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
 use crate::store::{Fields, Store};
+use crate::text_boxes::{self, ShownBox};
 use crate::text_format::{self, StoredText};
 use crate::transcript_prompts::dart_trim;
 use crate::{Error, Result};
@@ -250,12 +252,24 @@ pub struct Note {
     /// The hashes of its photos whose Photo Text was removed while the
     /// photo stays, as for `removed_transcripts`.
     pub removed_photo_texts: Vec<String>,
+    /// The boxes of `text` as they show now, in the order they come (ADR
+    /// 0035); none in a text this version may not change.
+    pub boxes: Vec<ShownBox>,
 }
 
 impl Note {
-    /// `text` as it reads without its marks, for search and previews.
+    /// `text` as it shows: each box in the glyph of its current state,
+    /// without its id; what `boxes` count their offsets in, and what is
+    /// copied, shared and saved (ADR 0035). `text` as it is in a format
+    /// not known here.
+    pub fn shown_text(&self) -> String {
+        shown_text(&self.text, self.text_editable, &self.boxes)
+    }
+
+    /// [`Note::shown_text`] as it reads without its marks, for search and
+    /// previews.
     pub fn visible_text(&self) -> String {
-        text_format::visible(&self.text_format, &self.text)
+        text_format::visible(&self.text_format, &self.shown_text())
     }
 
     pub fn is_trashed(&self) -> bool {
@@ -327,6 +341,8 @@ pub struct Section {
     /// [`Note::removed_photo_texts`].
     pub removed_transcripts: Vec<String>,
     pub removed_photo_texts: Vec<String>,
+    /// The boxes of `text` as they show now, as for [`Note::boxes`].
+    pub boxes: Vec<ShownBox>,
 }
 
 /// An error unless `format` is a format this version writes.
@@ -339,11 +355,32 @@ fn require_format(format: &str) -> Result<()> {
 }
 
 impl Section {
-    /// `text` as it reads without its marks, as for
+    /// `text` as it shows, as for [`Note::shown_text`].
+    pub fn shown_text(&self) -> String {
+        shown_text(&self.text, self.text_editable, &self.boxes)
+    }
+
+    /// [`Section::shown_text`] as it reads without its marks, as for
     /// [`Note::visible_text`].
     pub fn visible_text(&self) -> String {
-        text_format::visible(&self.text_format, &self.text)
+        text_format::visible(&self.text_format, &self.shown_text())
     }
+}
+
+/// `text` with each of `boxes` in the glyph of its state and no ids,
+/// when `editable`; else as it is.
+fn shown_text(text: &str, editable: bool, boxes: &[ShownBox]) -> String {
+    if !editable {
+        return text.to_string();
+    }
+    if boxes.is_empty() {
+        return text_boxes::strip(text);
+    }
+    let ticks = boxes
+        .iter()
+        .filter_map(|b| Some((b.id.clone(), b.last.clone()?)))
+        .collect();
+    text_boxes::shown(text, &ticks).text
 }
 
 /// A Note's photos or recordings, their texts and those removed.
@@ -464,7 +501,8 @@ impl<'a> Notes<'a> {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
             s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            let text = StoredText::of(format, text, text_format::VERSION).encode();
+            let text = StoredText::of(format, &Self::boxed(s, text, format)?, text_format::VERSION)
+                .encode();
             s.append(&id, keys::TEXT, Some(&text), at)?;
             if let Some(place) = place {
                 s.append(&id, keys::PLACE, Some(place), at)?;
@@ -787,7 +825,8 @@ impl<'a> Notes<'a> {
         } else {
             format.unwrap_or(&note.text_format)
         };
-        let text = StoredText::of(written, Self::text(text)?, text_format::VERSION).encode();
+        let boxed = Self::boxed(self.store, Self::text(text)?, written)?;
+        let text = StoredText::of(written, &boxed, text_format::VERSION).encode();
         self.store
             .append(note_id, keys::TEXT, Some(&text), None)
             .map(drop)
@@ -815,7 +854,7 @@ impl<'a> Notes<'a> {
     /// of the Note `note_id` (ADR 0025): it becomes the text, or with
     /// `append` goes on a line of its own after it. Into a formatted text
     /// it goes as plain text, escaped so that it reads as itself. Gives
-    /// the text written.
+    /// the text written, its boxes with their ids (ADR 0035).
     pub fn take_over(&self, note_id: &str, generated: &str, append: bool) -> Result<String> {
         let Some(note) = self.by_id(note_id)? else {
             return Err(Error::Invalid(format!("not a Note: {note_id}")));
@@ -827,7 +866,11 @@ impl<'a> Notes<'a> {
             format!("{}\n{}", note.text.trim_end(), taken)
         };
         self.edit(note_id, &joined)?;
-        Ok(Self::text(&joined)?.to_string())
+        // As written: its glyphs boxes with their ids.
+        match self.by_id(note_id)? {
+            Some(note) => Ok(note.text),
+            None => Ok(Self::text(&joined)?.to_string()),
+        }
     }
 
     /// Amends the Note `note_id` with a new Section holding `text`,
@@ -846,12 +889,18 @@ impl<'a> Notes<'a> {
                 "no role in the Shared Area of {note_id}"
             )));
         }
-        let text = StoredText::of(format, Self::text(text)?, text_format::VERSION).encode();
+        let trimmed = Self::text(text)?;
         let id = format!("section:{}", self.store.new_id()?);
         let now = self.store.now();
         let at = Some(now);
         self.store.batch(|| {
             let s = self.store;
+            let text = StoredText::of(
+                format,
+                &Self::boxed(s, trimmed, format)?,
+                text_format::VERSION,
+            )
+            .encode();
             s.append(&id, keys::TYPE, Some(keys::TYPE_SECTION), at)?;
             s.append(&id, keys::NOTE, Some(note_id), at)?;
             s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
@@ -936,6 +985,12 @@ impl<'a> Notes<'a> {
     }
 
     /// `text` trimmed; an error when nothing is left.
+    /// `text` in `format` as it is saved: every bare ☐, ✅ and ❌ a box
+    /// with an id of its own (ADR 0035).
+    fn boxed(store: &Store, text: &str, format: &str) -> Result<String> {
+        text_boxes::convert(text, format, || store.new_id())
+    }
+
     fn text(text: &str) -> Result<&str> {
         let trimmed = text.trim();
         if trimmed.is_empty() {
@@ -980,6 +1035,7 @@ impl<'a> Notes<'a> {
         };
         let removed_transcripts = removed_texts(&recordings, keys::transcript);
         let removed_photo_texts = removed_texts(&photos, keys::ocr);
+        let boxes = self.boxes(id, &text, &fields)?;
         Ok(Some(Note {
             id: id.to_string(),
             text: text.text,
@@ -1003,7 +1059,42 @@ impl<'a> Notes<'a> {
             photo_texts,
             removed_transcripts,
             removed_photo_texts,
+            boxes,
         }))
+    }
+
+    /// The boxes of the stored `text` of `id` with the ticks that count
+    /// (ADR 0035); none in a text this version may not change.
+    fn boxes(&self, id: &str, text: &StoredText, fields: &Fields) -> Result<Vec<ShownBox>> {
+        if !text.editable {
+            return Ok(Vec::new());
+        }
+        let ticked = fields.iter().any(|(k, _)| k.starts_with(boxes::PREFIX));
+        let ticks = if ticked {
+            Boxes::new(self.store).ticks(id)?
+        } else {
+            BTreeMap::new()
+        };
+        Ok(text_boxes::shown(&text.text, &ticks).boxes)
+    }
+
+    /// The Section `id` as it shows under its Note: an Amend, or a Note
+    /// merged into another; `None` when there is none.
+    pub fn section_by_id(&self, id: &str) -> Result<Option<Section>> {
+        if !id.starts_with("note:") {
+            let fields = self.store.current_fields(id)?;
+            let Some(note_id) = fields.get(keys::NOTE).map(str::to_string) else {
+                return Ok(None);
+            };
+            return self.section(id, &note_id, &fields);
+        }
+        Ok(match self.by_id(id)? {
+            Some(note) => note
+                .merged_into
+                .clone()
+                .map(|into| Self::merged_section(note, &into)),
+            None => None,
+        })
     }
 
     /// Every Note neither in the trash nor merged, newest capture first.
@@ -1169,6 +1260,7 @@ impl<'a> Notes<'a> {
             removed_recordings: note.removed_recordings,
             removed_transcripts: note.removed_transcripts,
             removed_photo_texts: note.removed_photo_texts,
+            boxes: note.boxes,
         }
     }
 
@@ -1181,6 +1273,7 @@ impl<'a> Notes<'a> {
             return Ok(None);
         };
         let text = StoredText::read(fields.get(keys::TEXT));
+        let boxes = self.boxes(id, &text, fields)?;
         Ok(Some(Section {
             id: id.to_string(),
             note_id: note_id.to_string(),
@@ -1198,6 +1291,7 @@ impl<'a> Notes<'a> {
             removed_recordings: Vec::new(),
             removed_transcripts: Vec::new(),
             removed_photo_texts: Vec::new(),
+            boxes,
         }))
     }
 

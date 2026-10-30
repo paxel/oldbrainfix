@@ -61,9 +61,9 @@ _Avoid_: Werkzeugleiste, Symbolleiste
 Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Vollbild geöffnet, um ihre Zellen zu bearbeiten und Reihen und Spalten einzufügen, zu verschieben und zu löschen.
 _Avoid_: Tabellenkalkulation, Raster
 
-**Statuszeichen** [Status mark]:
-Ein ☐ (offen), ✅ (abgehakt) oder ❌ (gescheitert) als erstes Zeichen einer Zeile im Text einer Notiz oder eines Abschnitts, nach beliebigen Leerzeichen, Tabs und dem Aufzählungszeichen eines Listenpunkts, oder am Anfang einer Zelle einer Tabelle; ein Tippen oder Klicken auf eines im Text einer Notiz bietet die beiden anderen Zustände an, die eines Abschnitts werden gezeigt, lassen sich aber nicht ändern. Es ist ein Zeichen des Textes, und daneben wird nichts gespeichert, darum ändern es in einem geteilten Bereich nur der Verfasser der Notiz und die Verwalter.
-_Avoid_: Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
+**Statuskästchen** [Box]:
+Ein ☐ (offen), ✅ (erledigt) oder ❌ (gescheitert) irgendwo im Text einer Notiz oder eines Abschnitts, auch mitten in einem Wort und in einer Zelle einer Tabelle, aber nicht in Code im Text; es wird beim Speichern des Textes zu einem Statuskästchen mit einer eigenen Kennung, die unsichtbar im Text steht, und das Zeichen, mit dem es geschrieben wurde, ist der Zustand, mit dem es beginnt. Ein Tippen oder Klicken darauf bietet die beiden anderen Zustände an. Jede Änderung seines Zustands wird neben dem Text gespeichert, die neueste gilt, darum lassen sich auch die Statuskästchen eines Abschnitts ändern, während sein Text bleibt, wie er ist, und in einem geteilten Bereich ändert jeder mit einer Rolle dort jedes Statuskästchen, während das Hinzufügen, Verschieben und Löschen von Statuskästchen eine Änderung des Textes bleibt. Kopien, Weitergaben und gesendete Notizen zeigen jedes Statuskästchen in seinem jetzigen Zustand. Transkripte und Fototexte enthalten keine Statuskästchen.
+_Avoid_: Statuszeichen (der frühere Name), Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
 
 **#Wort** [Tag]:
 Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
@@ -192,7 +192,7 @@ _Avoid_: Erinnerung (das ist etwas anderes), Abgleich-Erinnerung
 Eine Person, die in einem geteilten Bereich alles darf.
 
 **Mitglied** [Member]:
-Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen, Fälligkeiten und Frösche abhaken und Zeilen jeder Checkliste und Einkaufsliste hinzufügen und abhaken darf, aber keine Routinen, Erinnerungen, Frösche, Notizen anderer oder die Zeilen ihrer Checklisten und Einkaufslisten ändern.
+Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen, Fälligkeiten und Frösche abhaken, Zeilen jeder Checkliste und Einkaufsliste hinzufügen und abhaken und den Zustand jedes Statuskästchens ändern darf, aber keine Routinen, Erinnerungen, Frösche, Notizen anderer oder die Zeilen ihrer Checklisten und Einkaufslisten ändern.
 _Avoid_: Gast, Betrachter
 
 **Gesendete Notiz** [Sent Item]:

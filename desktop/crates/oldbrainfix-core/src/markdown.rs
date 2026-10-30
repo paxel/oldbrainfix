@@ -569,6 +569,9 @@ pub fn tags(text: &str) -> Vec<FoundTag> {
         .collect()
 }
 
+/// Deprecated: replaced by the boxes of [`crate::text_boxes`] (ADR
+/// 0035); kept only until the apps have switched over.
+///
 /// Every status mark of `text`, top line first and left to right: those
 /// [`text_marks::find`] finds on a line that is no table's, and one at
 /// the start of a cell of a table's row.
@@ -608,6 +611,9 @@ pub fn marks(text: &str) -> Vec<Mark> {
     marks
 }
 
+/// Deprecated: replaced by the boxes of [`crate::text_boxes`] (ADR
+/// 0035); kept only until the apps have switched over.
+///
 /// `text` with the status mark [`marks`] finds on the line `line`, in the
 /// cell in `column` of a table's row or, `column` `None`, at the line's
 /// start, changed to `to`, everything else as it was. `None` when there

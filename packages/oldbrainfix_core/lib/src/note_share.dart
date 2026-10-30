@@ -36,7 +36,7 @@ class NoteShare {
     final parts = [
       _Part(
         null,
-        note.text,
+        note.shownText,
         note.textFormat,
         _generated(
           note.photos,
@@ -50,7 +50,7 @@ class NoteShare {
       for (final s in sections)
         _Part(
           date(s.context.captured),
-          s.text,
+          s.shownText,
           s.textFormat,
           _generated(
             s.photos,

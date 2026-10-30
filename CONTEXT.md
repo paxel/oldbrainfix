@@ -63,9 +63,9 @@ _Avoid_: toolbar, formatting toolbar
 Rows and columns in a Formatted text, written as a GitHub Markdown table: a header row, the first column as headings when it is marked so, and cells of one line of formatting each. It is opened full screen to edit its cells and to put in, move and delete rows and columns. German: Tabelle.
 _Avoid_: spreadsheet, grid
 
-**Status mark**:
-A ☐ (open), ✅ (checked) or ❌ (failed) as the first character of a line of a Note's or Section's text, after any spaces, tabs and one list item's bullet, or at the start of a Table's cell; a tap or click on one in a Note's text offers the other two states, while those of a Section show but cannot be changed. It is a character of the text and nothing is stored beside it, so in a Shared Area only the Note's author and the Managers change it. German: Statuszeichen.
-_Avoid_: checkbox, tick (a Line of a Checklist has the checkbox)
+**Box**:
+A ☐ (open), ✅ (done) or ❌ (failed) anywhere in a Note's or Section's text, in the middle of a word and in a Table's cell too, but not in inline code; it becomes a Box, with an id of its own kept invisibly in the text, when the text is saved, and the glyph it was written with is the state it starts in. A tap or click on one offers the other two states. Each change of its state is kept beside the text, the latest one winning, so the Boxes of a Section can be changed too while its text stays as it is, and in a Shared Area anyone with a role there changes any Box, while adding, moving and deleting Boxes stays an edit of the text. Copies, shares and Sent Items show each Box in its state now. Transcripts and Photo Texts hold no Boxes. German: Statuskästchen.
+_Avoid_: status mark (its earlier name), checkbox (a Line of a Checklist has the checkbox)
 
 **Tag**:
 A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag and there is no list of Tags; it is no Topic and no part of the Capture Context. German: #Wort.
@@ -194,7 +194,7 @@ _Avoid_: reminder (that is a different thing), sync reminder
 A person who may do everything in a Shared Area.
 
 **Member**:
-A person in a Shared Area who may add and amend Notes, check off Occurrences and Frogs, and add and check Lines of any Checklist or Shopping List, but not change Routines, Reminders, Frogs, other people's Notes or the Lines of their Checklists and Shopping Lists.
+A person in a Shared Area who may add and amend Notes, check off Occurrences and Frogs, add and check Lines of any Checklist or Shopping List, and change the state of any Box, but not change Routines, Reminders, Frogs, other people's Notes or the Lines of their Checklists and Shopping Lists.
 _Avoid_: guest, viewer
 
 **Sent Item**:

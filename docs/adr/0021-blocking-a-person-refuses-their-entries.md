@@ -74,3 +74,7 @@ Amended by ADR 0027 (#101): a blocked person's check-off of a Frog is kept like 
 ## Sessions (ADR 0029)
 
 Amended by ADR 0029 (#104): a blocked person's picks of a Session and the marks of their entries for them are no check-offs; they are refused and deleted like the rest of their writing.
+
+## Boxes (ADR 0035)
+
+Amended by ADR 0035: a blocked person's tick of a Box is kept like a check-off, in its exact shape: `box@<id>` on a Note or a Section, the id four digits or small letters, the value `open`, `done` or `failed`. It shows without their name or picture.

@@ -595,6 +595,21 @@ extension People on Store {
     return null;
   }
 
+  /// The person who wrote [tick] on a box in the text of [entity], as
+  /// their Profile shows, as for [authorOf]: through the key of its
+  /// Device, in a Shared Area the person its grant names. Null for the
+  /// user's own ([BoxTick.own]), for a writer not known, and for a
+  /// blocked person, whose ticks stay without their name or picture
+  /// (ADR 0021).
+  Profile? tickedBy(String entity, BoxTick tick) {
+    if (tick.own) return null;
+    if (_deviceWriter(tick.device, entity) case _Theirs(:final author)) {
+      if (blockedIds.contains(resolvePerson(author.id))) return null;
+      return _withOverride(author);
+    }
+    return null;
+  }
+
   /// Whether the person filter of the browser keeps the Note or Section
   /// [entity] (#53): with [filter]'s `me`, the user's own, written on any
   /// of their Devices or under any of their Profile's ids; with its
@@ -645,6 +660,13 @@ extension People on Store {
       }
     }
     if (device == null) return const _Unknown();
+    return _deviceWriter(device, entity);
+  }
+
+  /// Who the Device [device] writes for in the place of [entity]: the
+  /// user, another person as their Profile shows without the Override,
+  /// or nobody known.
+  _Writer _deviceWriter(String device, String entity) {
     if (device == deviceId || isOwnDevice(device)) return const _Own();
     final keyBytes = pinnedKey(device)?.record.publicKey;
     final key = keyBytes == null ? null : base64.encode(keyBytes);

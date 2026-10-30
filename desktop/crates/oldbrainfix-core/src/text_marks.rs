@@ -1,3 +1,7 @@
+//! Deprecated: replaced by the boxes of [`crate::text_boxes`] (ADR 0035,
+//! which supersedes ADR 0031); kept only until the apps have switched
+//! over, then removed.
+//!
 //! Status marks in user text (ADR 0031), as the Dart core's
 //! `text_marks.dart` finds and changes them: a ☐, ✅ or ❌ that begins a
 //! line of a Note's or a Section's text shows that line open, checked or

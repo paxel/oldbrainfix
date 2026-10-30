@@ -487,6 +487,9 @@ abstract final class Markdown {
     ];
   }
 
+  /// Deprecated: replaced by the boxes of `text_boxes.dart` (ADR 0035);
+  /// kept only until the apps have switched over.
+  ///
   /// Every status mark of [text], top line first and left to right: those
   /// `TextMarks.find` finds on a line that is no table's, and one at the
   /// start of a cell of a table's row.
@@ -526,6 +529,9 @@ abstract final class Markdown {
     return marks;
   }
 
+  /// Deprecated: replaced by the boxes of `text_boxes.dart` (ADR 0035);
+  /// kept only until the apps have switched over.
+  ///
   /// [text] with the status mark [marks] finds on the line [line], in the
   /// cell in [column] of a table's row or, [column] null, at the line's
   /// start, changed to [to], everything else as it was. Null when there

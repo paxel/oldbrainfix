@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'area_keys.dart';
+import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
 import 'frogs.dart';
@@ -342,6 +343,8 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
                 e.field.startsWith(NoteKeys.ocrPrefix))) {
           return true;
         }
+        // Anyone ticks the boxes of any text (ADR 0035).
+        if (e.field.startsWith(BoxKeys.prefix)) return true;
         final owner = ownerIn(area, list);
         return owner != null && owner == areas[area]?.personOf(e.device);
       },
@@ -354,6 +357,7 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         id.startsWith('section:') || id.startsWith(TallyKeys.entryPrefix);
     final frog = id.startsWith(FrogKeys.prefix);
     final line = id.startsWith(ChecklistKeys.linePrefix);
+    final box = id.startsWith('section:');
     if (!section && !frog && !line && !id.startsWith('routine:')) continue;
     final list = byEntity[id] ?? const <Entry>[];
     String? note;
@@ -372,8 +376,10 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         AreaAccess.none => false,
         AreaAccess.member =>
           section
-              ? ownerIn(area, list) == areas[area]?.personOf(e.device) &&
-                    ownerIn(area, list) != null
+              // Anyone ticks the boxes of a Section's text (ADR 0035).
+              ? box && e.field.startsWith(BoxKeys.prefix) ||
+                    ownerIn(area, list) == areas[area]?.personOf(e.device) &&
+                        ownerIn(area, list) != null
               // A Member checks any Line and adds their own; the rest
               // is for the author of the Line or of its Note (ADR 0030).
               : line

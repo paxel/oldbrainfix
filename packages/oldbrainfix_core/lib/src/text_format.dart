@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'markdown.dart';
+import 'text_boxes.dart';
 
 /// The formats of user text (ADR 0018): the text of a Note or a Section
 /// is stored with the format it is in. This version knows [plain] and
@@ -21,10 +22,14 @@ abstract final class TextFormats {
   /// holds `format` and `text` and nothing else.
   static const version = 1;
 
-  /// [text] in [format] as it reads without its marks, for search and
-  /// previews; a text in any other format as it is.
-  static String visible(String format, String text) =>
-      format == markdown ? Markdown.plain(text) : text;
+  /// [text] in [format] as it reads without its marks and without the
+  /// ids of its boxes (ADR 0035), for search and previews; a text in any
+  /// other format as it is.
+  static String visible(String format, String text) => switch (format) {
+    markdown => Markdown.plain(TextBoxes.strip(text)),
+    plain => TextBoxes.strip(text),
+    _ => text,
+  };
 
   /// The plain text [text] as it is written into a text in [format] to
   /// read as itself, such as a Transcript put into a Note's text.

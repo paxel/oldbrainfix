@@ -1,0 +1,498 @@
+{
+  "cases": [
+    {
+      "text": "",
+      "plain": "",
+      "markdown": "",
+      "found": [],
+      "shown": "",
+      "boxes": [],
+      "baked": "",
+      "strip": "",
+      "visible": ""
+    },
+    {
+      "text": "No boxes here",
+      "plain": "No boxes here",
+      "markdown": "No boxes here",
+      "found": [],
+      "shown": "No boxes here",
+      "boxes": [],
+      "baked": "No boxes here",
+      "strip": "No boxes here",
+      "visible": "No boxes here"
+    },
+    {
+      "text": "a☐b ✅c❌",
+      "plain": "a☐󠀸󠁯󠁩󠀶󠁿b ✅󠁵󠁸󠁰󠀰󠁿c❌󠁰󠀰󠁶󠁫󠁿",
+      "markdown": "a☐󠀸󠁯󠁩󠀶󠁿b ✅󠁵󠁸󠁰󠀰󠁿c❌󠁰󠀰󠁶󠁫󠁿",
+      "found": [],
+      "shown": "a☐b ❌c❌",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 1,
+          "end": 2,
+          "sourceStart": 1,
+          "idStart": 2,
+          "sourceEnd": 7
+        },
+        {
+          "id": "uxp0",
+          "state": "failed",
+          "starting": "done",
+          "start": 4,
+          "end": 5,
+          "sourceStart": 9,
+          "idStart": 10,
+          "sourceEnd": 15
+        },
+        {
+          "id": "p0vk",
+          "state": "failed",
+          "starting": null,
+          "start": 6,
+          "end": 7,
+          "sourceStart": 16,
+          "idStart": 17,
+          "sourceEnd": 22
+        }
+      ],
+      "baked": "a☐󠀸󠁯󠁩󠀶󠁿b ❌󠁵󠁸󠁰󠀰󠁿c❌󠁰󠀰󠁶󠁫󠁿",
+      "strip": "a☐b ✅c❌",
+      "visible": "a☐b ✅c❌"
+    },
+    {
+      "text": "☐ Buy milk\n✅ v2 supported at customer\n❌ v1",
+      "plain": "☐󠀸󠁯󠁩󠀶󠁿 Buy milk\n✅󠁵󠁸󠁰󠀰󠁿 v2 supported at customer\n❌󠁰󠀰󠁶󠁫󠁿 v1",
+      "markdown": "☐󠀸󠁯󠁩󠀶󠁿 Buy milk\n✅󠁵󠁸󠁰󠀰󠁿 v2 supported at customer\n❌󠁰󠀰󠁶󠁫󠁿 v1",
+      "found": [],
+      "shown": "☐ Buy milk\n❌ v2 supported at customer\n❌ v1",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 1,
+          "sourceEnd": 6
+        },
+        {
+          "id": "uxp0",
+          "state": "failed",
+          "starting": "done",
+          "start": 11,
+          "end": 12,
+          "sourceStart": 16,
+          "idStart": 17,
+          "sourceEnd": 22
+        },
+        {
+          "id": "p0vk",
+          "state": "failed",
+          "starting": null,
+          "start": 38,
+          "end": 39,
+          "sourceStart": 48,
+          "idStart": 49,
+          "sourceEnd": 54
+        }
+      ],
+      "baked": "☐󠀸󠁯󠁩󠀶󠁿 Buy milk\n❌󠁵󠁸󠁰󠀰󠁿 v2 supported at customer\n❌󠁰󠀰󠁶󠁫󠁿 v1",
+      "strip": "☐ Buy milk\n✅ v2 supported at customer\n❌ v1",
+      "visible": "☐ Buy milk\n✅ v2 supported at customer\n❌ v1"
+    },
+    {
+      "text": "✅️ with selector ❌︎ text style ☐️️ two",
+      "plain": "✅️󠀸󠁯󠁩󠀶󠁿 with selector ❌︎󠁵󠁸󠁰󠀰󠁿 text style ☐️󠁰󠀰󠁶󠁫󠁿️ two",
+      "markdown": "✅️󠀸󠁯󠁩󠀶󠁿 with selector ❌︎󠁵󠁸󠁰󠀰󠁿 text style ☐️󠁰󠀰󠁶󠁫󠁿️ two",
+      "found": [],
+      "shown": "✅ with selector ☐ text style ☐️ two",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "done",
+          "starting": null,
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 2,
+          "sourceEnd": 7
+        },
+        {
+          "id": "uxp0",
+          "state": "open",
+          "starting": "failed",
+          "start": 16,
+          "end": 17,
+          "sourceStart": 22,
+          "idStart": 24,
+          "sourceEnd": 29
+        },
+        {
+          "id": "p0vk",
+          "state": "open",
+          "starting": null,
+          "start": 29,
+          "end": 30,
+          "sourceStart": 41,
+          "idStart": 43,
+          "sourceEnd": 48
+        }
+      ],
+      "baked": "✅󠀸󠁯󠁩󠀶󠁿 with selector ☐󠁵󠁸󠁰󠀰󠁿 text style ☐󠁰󠀰󠁶󠁫󠁿️ two",
+      "strip": "✅️ with selector ❌︎ text style ☐️️ two",
+      "visible": "✅ with selector ❌ text style ☐️ two"
+    },
+    {
+      "text": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "plain": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "markdown": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "found": [],
+      "shown": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "boxes": [],
+      "baked": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "strip": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍",
+      "visible": "✅‍🔥 joined ✅️‍🔥 joined too ❌‍"
+    },
+    {
+      "text": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "plain": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "markdown": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "found": [],
+      "shown": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "boxes": [],
+      "baked": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "strip": "☑ a ☒ b ✔ c ✓ d ❎ e",
+      "visible": "☑ a ☒ b ✔ c ✓ d ❎ e"
+    },
+    {
+      "text": "x☐󠁡󠀷󠁫󠀲󠁿 y✅󠁡󠀷󠁫󠀲󠁿 ✅︎󠁺󠁺󠀰󠀰󠁿 ❌󠀰󠀰󠀰󠀰󠁿",
+      "plain": "x☐󠁡󠀷󠁫󠀲󠁿 y✅󠀸󠁯󠁩󠀶󠁿 ✅︎󠁺󠁺󠀰󠀰󠁿 ❌󠀰󠀰󠀰󠀰󠁿",
+      "markdown": "x☐󠁡󠀷󠁫󠀲󠁿 y✅󠀸󠁯󠁩󠀶󠁿 ✅︎󠁺󠁺󠀰󠀰󠁿 ❌󠀰󠀰󠀰󠀰󠁿",
+      "found": [
+        {
+          "id": "a7k2",
+          "state": "open",
+          "start": 1,
+          "idStart": 2,
+          "end": 7
+        },
+        {
+          "id": "zz00",
+          "state": "done",
+          "start": 16,
+          "idStart": 18,
+          "end": 23
+        },
+        {
+          "id": "0000",
+          "state": "failed",
+          "start": 24,
+          "idStart": 25,
+          "end": 30
+        }
+      ],
+      "shown": "x☐ y❌ ✅ ☐",
+      "boxes": [
+        {
+          "id": "a7k2",
+          "state": "open",
+          "starting": null,
+          "start": 1,
+          "end": 2,
+          "sourceStart": 1,
+          "idStart": 2,
+          "sourceEnd": 7
+        },
+        {
+          "id": "8oi6",
+          "state": "failed",
+          "starting": "done",
+          "start": 4,
+          "end": 5,
+          "sourceStart": 9,
+          "idStart": 10,
+          "sourceEnd": 15
+        },
+        {
+          "id": "zz00",
+          "state": "done",
+          "starting": null,
+          "start": 6,
+          "end": 7,
+          "sourceStart": 16,
+          "idStart": 18,
+          "sourceEnd": 23
+        },
+        {
+          "id": "0000",
+          "state": "open",
+          "starting": "failed",
+          "start": 8,
+          "end": 9,
+          "sourceStart": 24,
+          "idStart": 25,
+          "sourceEnd": 30
+        }
+      ],
+      "baked": "x☐󠁡󠀷󠁫󠀲󠁿 y❌󠀸󠁯󠁩󠀶󠁿 ✅󠁺󠁺󠀰󠀰󠁿 ☐󠀰󠀰󠀰󠀰󠁿",
+      "strip": "x☐ y✅ ✅ ❌",
+      "visible": "x☐ y✅ ✅ ❌"
+    },
+    {
+      "text": "☐󠁡󠁢󠁣󠁿 short ☐󠁡󠁢󠁣d no cancel ☐󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "plain": "☐󠀸󠁯󠁩󠀶󠁿󠁡󠁢󠁣󠁿 short ☐󠁵󠁸󠁰󠀰󠁿󠁡󠁢󠁣d no cancel ☐󠁰󠀰󠁶󠁫󠁿󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "markdown": "☐󠀸󠁯󠁩󠀶󠁿󠁡󠁢󠁣󠁿 short ☐󠁵󠁸󠁰󠀰󠁿󠁡󠁢󠁣d no cancel ☐󠁰󠀰󠁶󠁫󠁿󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "found": [],
+      "shown": "☐󠁡󠁢󠁣󠁿 short ✅󠁡󠁢󠁣d no cancel ☐󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 1,
+          "sourceEnd": 6
+        },
+        {
+          "id": "uxp0",
+          "state": "done",
+          "starting": "open",
+          "start": 12,
+          "end": 13,
+          "sourceStart": 17,
+          "idStart": 18,
+          "sourceEnd": 23
+        },
+        {
+          "id": "p0vk",
+          "state": "open",
+          "starting": null,
+          "start": 28,
+          "end": 29,
+          "sourceStart": 38,
+          "idStart": 39,
+          "sourceEnd": 44
+        }
+      ],
+      "baked": "☐󠀸󠁯󠁩󠀶󠁿󠁡󠁢󠁣󠁿 short ✅󠁵󠁸󠁰󠀰󠁿󠁡󠁢󠁣d no cancel ☐󠁰󠀰󠁶󠁫󠁿󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "strip": "☐󠁡󠁢󠁣󠁿 short ☐󠁡󠁢󠁣d no cancel ☐󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone",
+      "visible": "☐󠁡󠁢󠁣󠁿 short ☐󠁡󠁢󠁣d no cancel ☐󠁡󠁢󠁣󠁁󠁿 capital 󠁡󠀷󠁫󠀲󠁿 alone"
+    },
+    {
+      "text": "`☐` [☐ b](https://x.org/☐) **✅** ~~❌~~",
+      "plain": "`☐󠀸󠁯󠁩󠀶󠁿` [☐󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐󠁰󠀰󠁶󠁫󠁿) **✅󠁩󠀲󠀰󠁪󠁿** ~~❌󠀹󠁦󠀵󠁦󠁿~~",
+      "markdown": "`☐` [☐󠀸󠁯󠁩󠀶󠁿 b](https://x.org/☐) **✅󠁵󠁸󠁰󠀰󠁿** ~~❌󠁰󠀰󠁶󠁫󠁿~~",
+      "found": [],
+      "shown": "`☐` [✅ b](https://x.org/☐) **❌** ~~❌~~",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 1,
+          "end": 2,
+          "sourceStart": 1,
+          "idStart": 2,
+          "sourceEnd": 7
+        },
+        {
+          "id": "uxp0",
+          "state": "done",
+          "starting": "open",
+          "start": 5,
+          "end": 6,
+          "sourceStart": 10,
+          "idStart": 11,
+          "sourceEnd": 16
+        },
+        {
+          "id": "p0vk",
+          "state": "open",
+          "starting": null,
+          "start": 24,
+          "end": 25,
+          "sourceStart": 34,
+          "idStart": 35,
+          "sourceEnd": 40
+        },
+        {
+          "id": "i20j",
+          "state": "failed",
+          "starting": "done",
+          "start": 29,
+          "end": 30,
+          "sourceStart": 44,
+          "idStart": 45,
+          "sourceEnd": 50
+        },
+        {
+          "id": "9f5f",
+          "state": "failed",
+          "starting": null,
+          "start": 35,
+          "end": 36,
+          "sourceStart": 55,
+          "idStart": 56,
+          "sourceEnd": 61
+        }
+      ],
+      "baked": "`☐󠀸󠁯󠁩󠀶󠁿` [✅󠁵󠁸󠁰󠀰󠁿 b](https://x.org/☐󠁰󠀰󠁶󠁫󠁿) **❌󠁩󠀲󠀰󠁪󠁿** ~~❌󠀹󠁦󠀵󠁦󠁿~~",
+      "strip": "`☐` [☐ b](https://x.org/☐) **✅** ~~❌~~",
+      "visible": "☐ ☐ b ✅ ❌"
+    },
+    {
+      "text": "| ☐ c | d |\n| --- | --- |\n| ✅ | `❌` |\n\n> ☐ quoted",
+      "plain": "| ☐󠀸󠁯󠁩󠀶󠁿 c | d |\n| --- | --- |\n| ✅󠁵󠁸󠁰󠀰󠁿 | `❌󠁰󠀰󠁶󠁫󠁿` |\n\n> ☐󠁩󠀲󠀰󠁪󠁿 quoted",
+      "markdown": "| ☐󠀸󠁯󠁩󠀶󠁿 c | d |\n| --- | --- |\n| ✅󠁵󠁸󠁰󠀰󠁿 | `❌` |\n\n> ☐󠁰󠀰󠁶󠁫󠁿 quoted",
+      "found": [],
+      "shown": "| ☐ c | d |\n| --- | --- |\n| ❌ | `❌` |\n\n> ✅ quoted",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 2,
+          "end": 3,
+          "sourceStart": 2,
+          "idStart": 3,
+          "sourceEnd": 8
+        },
+        {
+          "id": "uxp0",
+          "state": "failed",
+          "starting": "done",
+          "start": 28,
+          "end": 29,
+          "sourceStart": 33,
+          "idStart": 34,
+          "sourceEnd": 39
+        },
+        {
+          "id": "p0vk",
+          "state": "failed",
+          "starting": null,
+          "start": 33,
+          "end": 34,
+          "sourceStart": 43,
+          "idStart": 44,
+          "sourceEnd": 49
+        },
+        {
+          "id": "i20j",
+          "state": "done",
+          "starting": "open",
+          "start": 41,
+          "end": 42,
+          "sourceStart": 56,
+          "idStart": 57,
+          "sourceEnd": 62
+        }
+      ],
+      "baked": "| ☐󠀸󠁯󠁩󠀶󠁿 c | d |\n| --- | --- |\n| ❌󠁵󠁸󠁰󠀰󠁿 | `❌󠁰󠀰󠁶󠁫󠁿` |\n\n> ✅󠁩󠀲󠀰󠁪󠁿 quoted",
+      "strip": "| ☐ c | d |\n| --- | --- |\n| ✅ | `❌` |\n\n> ☐ quoted",
+      "visible": "☐ c d\n✅ ❌\n\n☐ quoted"
+    },
+    {
+      "text": "😀☐🧠✅\r\n❌\r☐",
+      "plain": "😀☐󠀸󠁯󠁩󠀶󠁿🧠✅󠁵󠁸󠁰󠀰󠁿\r\n❌󠁰󠀰󠁶󠁫󠁿\r☐󠁩󠀲󠀰󠁪󠁿",
+      "markdown": "😀☐󠀸󠁯󠁩󠀶󠁿🧠✅󠁵󠁸󠁰󠀰󠁿\r\n❌󠁰󠀰󠁶󠁫󠁿\r☐󠁩󠀲󠀰󠁪󠁿",
+      "found": [],
+      "shown": "😀☐🧠❌\r\n❌\r✅",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 1,
+          "end": 2,
+          "sourceStart": 1,
+          "idStart": 2,
+          "sourceEnd": 7
+        },
+        {
+          "id": "uxp0",
+          "state": "failed",
+          "starting": "done",
+          "start": 3,
+          "end": 4,
+          "sourceStart": 8,
+          "idStart": 9,
+          "sourceEnd": 14
+        },
+        {
+          "id": "p0vk",
+          "state": "failed",
+          "starting": null,
+          "start": 6,
+          "end": 7,
+          "sourceStart": 16,
+          "idStart": 17,
+          "sourceEnd": 22
+        },
+        {
+          "id": "i20j",
+          "state": "done",
+          "starting": "open",
+          "start": 8,
+          "end": 9,
+          "sourceStart": 23,
+          "idStart": 24,
+          "sourceEnd": 29
+        }
+      ],
+      "baked": "😀☐󠀸󠁯󠁩󠀶󠁿🧠❌󠁵󠁸󠁰󠀰󠁿\r\n❌󠁰󠀰󠁶󠁫󠁿\r✅󠁩󠀲󠀰󠁪󠁿",
+      "strip": "😀☐🧠✅\r\n❌\r☐",
+      "visible": "😀☐🧠✅\r\n❌\r☐"
+    },
+    {
+      "text": "Ünïcode ☐ Straße ✅ 👩‍👧 ❌",
+      "plain": "Ünïcode ☐󠀸󠁯󠁩󠀶󠁿 Straße ✅󠁵󠁸󠁰󠀰󠁿 👩‍👧 ❌󠁰󠀰󠁶󠁫󠁿",
+      "markdown": "Ünïcode ☐󠀸󠁯󠁩󠀶󠁿 Straße ✅󠁵󠁸󠁰󠀰󠁿 👩‍👧 ❌󠁰󠀰󠁶󠁫󠁿",
+      "found": [],
+      "shown": "Ünïcode ☐ Straße ❌ 👩‍👧 ❌",
+      "boxes": [
+        {
+          "id": "8oi6",
+          "state": "open",
+          "starting": null,
+          "start": 8,
+          "end": 9,
+          "sourceStart": 8,
+          "idStart": 9,
+          "sourceEnd": 14
+        },
+        {
+          "id": "uxp0",
+          "state": "failed",
+          "starting": "done",
+          "start": 17,
+          "end": 18,
+          "sourceStart": 22,
+          "idStart": 23,
+          "sourceEnd": 28
+        },
+        {
+          "id": "p0vk",
+          "state": "failed",
+          "starting": null,
+          "start": 23,
+          "end": 24,
+          "sourceStart": 33,
+          "idStart": 34,
+          "sourceEnd": 39
+        }
+      ],
+      "baked": "Ünïcode ☐󠀸󠁯󠁩󠀶󠁿 Straße ❌󠁵󠁸󠁰󠀰󠁿 👩‍👧 ❌󠁰󠀰󠁶󠁫󠁿",
+      "strip": "Ünïcode ☐ Straße ✅ 👩‍👧 ❌",
+      "visible": "Ünïcode ☐ Straße ✅ 👩‍👧 ❌"
+    }
+  ]
+}

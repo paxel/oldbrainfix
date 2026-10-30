@@ -1,5 +1,7 @@
 # Status marks are characters of the text, found at the start of a line
 
+Superseded by ADR 0035: the marks never shipped and are replaced by Boxes, which carry an id in the text and are ticked beside it.
+
 For status marks in documentation, such as "v2 supported at customer" with a tick in front (#125), a ☐, ✅ or ❌ at the start of a line of a Note's or a Section's text can be tapped or clicked to change it: Check, Fail and Open, the current state left out. Both cores find and change the marks the same way (`text_marks.dart`, `text_marks.rs`).
 
 ## The marks are the text

@@ -9,6 +9,7 @@ import 'package:meta/meta.dart';
 import 'area_keys.dart';
 import 'area_offers.dart';
 import 'backup.dart';
+import 'boxes.dart';
 import 'checklists.dart';
 import 'entry.dart';
 import 'folder_sync.dart';
@@ -23,6 +24,7 @@ import 'shared_areas.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
+import 'text_boxes.dart';
 
 part 'blocks.dart';
 part 'overrides.dart';

@@ -38,7 +38,8 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 16] = [
+const SCENARIOS: [&str; 17] = [
+    "boxes",
     "checklist-routines",
     "checklists",
     "edits",
@@ -844,6 +845,219 @@ fn write_markdown(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `boxes` scenario (ADR 0035).
+fn write_boxes(store: &Store) -> Built {
+    use oldbrainfix_core::boxes::{Boxes, tick_field};
+    use oldbrainfix_core::text_boxes::BoxState;
+    use oldbrainfix_core::text_format::MARKDOWN;
+    let notes = Notes::new(store);
+    let boxes = Boxes::new(store);
+    let trip = notes.capture(
+        "Trip a☐passport\n✅\u{FE0F} tickets ❌ visa ✅\u{200D}🔥",
+        None,
+        None,
+    )?;
+    let [passport, tickets, visa] =
+        <[_; 3]>::try_from(trip.boxes.clone()).map_err(|_| "three boxes")?;
+    boxes.tick(&trip.id, &passport.id, BoxState::Done)?;
+    boxes.tick(&trip.id, &tickets.id, BoxState::Failed)?;
+    boxes.tick(&trip.id, &tickets.id, BoxState::Done)?;
+    boxes.tick(&trip.id, &visa.id, BoxState::Done)?;
+    store.append(
+        &trip.id,
+        &tick_field(&visa.id),
+        Some("open"),
+        Some(utc(2025, 12, 31, 0)?),
+    )?;
+    store.append(&trip.id, "box@", Some("done"), None)?;
+    store.append(
+        &trip.id,
+        &format!("{}x", tick_field(&visa.id)),
+        Some("failed"),
+        None,
+    )?;
+    store.append(&trip.id, &tick_field(&passport.id), Some("Done"), None)?;
+    let text = notes.by_id(&trip.id)?.ok_or("the trip")?.text;
+    notes.edit(
+        &trip.id,
+        &format!(
+            "{}\n☐ charger {}",
+            &text[..visa.source_start],
+            &text[passport.source_start..passport.source_end]
+        ),
+    )?;
+    let copy = notes
+        .by_id(&trip.id)?
+        .and_then(|n| n.boxes.last().map(|b| b.id.clone()))
+        .ok_or("the copy")?;
+    boxes.tick(&trip.id, &copy, BoxState::Failed)?;
+    let list = notes.capture_as(
+        "- ☐ a `☐` [☐ b](https://x.org/☐)\n\n| ☐ c | d |\n| --- | --- |",
+        MARKDOWN,
+        None,
+        None,
+    )?;
+    let cell = list.boxes.last().ok_or("a cell's box")?;
+    boxes.tick(&list.id, &cell.id, BoxState::Done)?;
+    let insurance = notes.amend(&trip.id, "☐ insurance")?;
+    boxes.tick(&insurance.id, &insurance.boxes[0].id, BoxState::Failed)?;
+    let shoes = notes.capture("☐ shoes", None, None)?;
+    boxes.tick(&shoes.id, &shoes.boxes[0].id, BoxState::Done)?;
+    notes.merge(&shoes.id, &trip.id)?;
+    boxes.tick(&shoes.id, &shoes.boxes[0].id, BoxState::Open)?;
+    notes.take_over(&trip.id, "❌ from a photo", true)?;
+    Ok(())
+}
+
+/// The code points of `text` before the byte offset `at`.
+fn points(text: &str, at: usize) -> usize {
+    text[..at].chars().count()
+}
+
+/// A tick in the shape of the generator's `_boxesOf`.
+fn tick_json(t: &oldbrainfix_core::text_boxes::BoxTick) -> Value {
+    json!({
+        "at": dart_iso(t.at),
+        "device": t.device,
+        "own": t.own,
+        "state": t.state.name(),
+    })
+}
+
+#[test]
+fn boxes_show_and_tick_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::boxes::Boxes;
+    use oldbrainfix_core::text_boxes::ShownBox;
+    let dir = fixtures().join("boxes");
+    let now = read_json(&dir.join("expected.json"))?["now"]
+        .as_str()
+        .ok_or("expected.json names now")?
+        .to_string();
+    let store = load("boxes", &now)?;
+    let notes = Notes::new(&store);
+    let boxes = Boxes::new(&store);
+    let text = |id: &str, source: &str, shown: &str, visible: &str, list: &[ShownBox]| {
+        let mut out = Vec::new();
+        for b in list {
+            out.push(json!({
+                "id": b.id,
+                "state": b.state.name(),
+                "starting": b.starting.name(),
+                "start": points(shown, b.start),
+                "end": points(shown, b.end),
+                "sourceStart": points(source, b.source_start),
+                "idStart": points(source, b.id_start),
+                "sourceEnd": points(source, b.source_end),
+                "last": b.last.as_ref().map(tick_json),
+                "history": boxes.history(id, &b.id)?.iter().map(tick_json).collect::<Vec<_>>(),
+            }));
+        }
+        Ok::<_, Box<dyn std::error::Error>>(json!({
+            "id": id,
+            "text": source,
+            "shown": shown,
+            "visible": visible,
+            "boxes": out,
+        }))
+    };
+    let mut ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
+    ids.sort();
+    let mut out = Vec::new();
+    for id in ids {
+        let Some(n) = notes.by_id(&id)? else {
+            continue;
+        };
+        out.push(text(
+            &n.id,
+            &n.text,
+            &n.shown_text(),
+            &n.visible_text(),
+            &n.boxes,
+        )?);
+        for s in notes.sections(&id)? {
+            out.push(text(
+                &s.id,
+                &s.text,
+                &s.shown_text(),
+                &s.visible_text(),
+                &s.boxes,
+            )?);
+        }
+    }
+    let expected = read_json(&dir.join("boxes.json"))?;
+    assert_eq!(json!({ "notes": out }), expected);
+    Ok(())
+}
+
+#[test]
+fn boxes_in_texts_are_found_made_and_shown_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::text_boxes::{self, BoxState, BoxTick};
+    use oldbrainfix_core::text_format::{self, MARKDOWN, PLAIN};
+    let fixture = read_json(&fixtures().join("text_boxes.json"))?;
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(!cases.is_empty());
+    let counted = || {
+        let mut n = 0u64;
+        move || {
+            n += 1;
+            Ok(format!("{n:032x}"))
+        }
+    };
+    let at = utc(2026, 1, 1, 0)?;
+    for case in cases {
+        let text = case["text"].as_str().ok_or("a text")?;
+        let plain = text_boxes::convert(text, PLAIN, counted())?;
+        let markdown = text_boxes::convert(text, MARKDOWN, counted())?;
+        let mut ticks = BTreeMap::new();
+        for (i, b) in text_boxes::find(&plain).into_iter().enumerate() {
+            if i % 2 == 1 {
+                let next = BoxState::ALL
+                    .iter()
+                    .position(|s| *s == b.state)
+                    .map_or(0, |p| (p + 1) % BoxState::ALL.len());
+                ticks.insert(
+                    b.id,
+                    BoxTick {
+                        state: BoxState::ALL[next],
+                        at,
+                        device: "d".into(),
+                        own: true,
+                    },
+                );
+            }
+        }
+        let shown = text_boxes::shown(&plain, &ticks);
+        let actual = json!({
+            "text": text,
+            "plain": plain,
+            "markdown": markdown,
+            "found": text_boxes::find(text).iter().map(|b| json!({
+                "id": b.id,
+                "state": b.state.name(),
+                "start": points(text, b.start),
+                "idStart": points(text, b.id_start),
+                "end": points(text, b.end),
+            })).collect::<Vec<_>>(),
+            "shown": shown.text,
+            "boxes": shown.boxes.iter().map(|b| json!({
+                "id": b.id,
+                "state": b.state.name(),
+                "starting": (b.state != b.starting).then(|| b.starting.name()),
+                "start": points(&shown.text, b.start),
+                "end": points(&shown.text, b.end),
+                "sourceStart": points(&plain, b.source_start),
+                "idStart": points(&plain, b.id_start),
+                "sourceEnd": points(&plain, b.source_end),
+            })).collect::<Vec<_>>(),
+            "baked": text_boxes::baked(&plain, &ticks),
+            "strip": text_boxes::strip(text),
+            "visible": text_format::visible(MARKDOWN, &markdown),
+        });
+        assert_eq!(&actual, case, "{text:?}");
+    }
+    Ok(())
+}
+
 // -------------------------------------------- values of a later version
 
 /// The generator's `markers` scenario (ADR 0034).
@@ -1393,7 +1607,8 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 16] = [
+    let writers: [(&str, Writer); 17] = [
+        ("boxes", write_boxes),
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),

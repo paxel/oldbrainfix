@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::boxes;
 use crate::checklists::keys as checklist_keys;
 use crate::entry::{Entry, WireEntry};
 use crate::frogs::keys as frog_keys;
@@ -21,6 +22,7 @@ use crate::schedule::Occurrence;
 use crate::shared::{AreaRole, Grant, JudgedLog, ROLE_PREFIX};
 use crate::store::Store;
 use crate::sync::{BLOB_KINDS, split_blob_ref};
+use crate::text_boxes::{self, BoxState};
 use crate::{Error, Result};
 
 /// The entity id's prefix, before the Profile id.
@@ -77,7 +79,7 @@ fn is_instant(text: &str) -> bool {
 /// picture or sound and keeps the Shared Areas whole. That is a
 /// check-off or its undoing (`done@…` on a Routine, `done` on a Frog,
 /// `checked` on a Checklist's Line, `check@…` on a Routine for one of its
-/// Lines), a
+/// Lines, a tick `box@…` of a box in the text of a Note or a Section), a
 /// grant (`role:…` on an Area), and a Note's `$type` and filing, which
 /// say where the Routines, Frogs and Sections others hung on it lie; the
 /// Note itself shows
@@ -140,6 +142,11 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
         || kind == checklist_keys::TYPE_LINE && field == checklist_keys::CHECKED
     {
         return value.is_none_or(is_instant);
+    }
+    if (kind == "note" || kind == "section")
+        && let Some(id) = field.strip_prefix(boxes::PREFIX)
+    {
+        return text_boxes::is_id(id) && BoxState::named(value).is_some();
     }
     if kind == "area"
         && let Some(device) = field.strip_prefix(ROLE_PREFIX)
@@ -614,6 +621,35 @@ mod tests {
             .keys()
             .cloned()
             .collect())
+    }
+
+    #[test]
+    fn blocking_keeps_her_ticks_of_boxes_on_a_note_and_on_a_section() -> TestResult {
+        use crate::boxes::Boxes;
+        use crate::text_boxes::BoxState;
+        let h = household()?;
+        let (ann, carol) = (&h.ann, &h.carol);
+        let milk = Notes::new(ann).capture("☐ Milk", Some(&h.area), None)?;
+        let eggs = Notes::new(ann).amend(&milk.id, "☐ Eggs")?;
+        exchange(carol, ann, true)?;
+        Boxes::new(carol).tick(&milk.id, &milk.boxes[0].id, BoxState::Done)?;
+        Boxes::new(carol).tick(&eggs.id, &eggs.boxes[0].id, BoxState::Failed)?;
+        exchange(carol, ann, true)?;
+
+        assert!(ann.block_person(&own_id(carol)?, false)?.is_empty());
+
+        let note = Notes::new(ann).by_id(&milk.id)?.ok_or("a Note")?;
+        assert_eq!(note.shown_text(), "✅ Milk");
+        let tick = note.boxes[0].last.clone().ok_or("a tick")?;
+        assert_eq!(tick.device, carol.device_id()?);
+        // Without her name or picture.
+        assert_eq!(ann.ticked_by(&milk.id, &tick)?, None);
+        let section = Notes::new(ann)
+            .section_by_id(&eggs.id)?
+            .ok_or("a Section")?;
+        assert_eq!(section.shown_text(), "❌ Eggs");
+        assert!(by(ann, carol)?.iter().all(kept_from_blocked));
+        Ok(())
     }
 
     #[test]
@@ -1178,6 +1214,9 @@ mod tests {
             entry("note:ab12", "$type", Some("note")),
             entry("note:ab12", "place", Some("topic:ab12")),
             entry("note:ab12", "place", None),
+            entry("note:ab12", "box@a7k2", Some("done")),
+            entry("note:ab12", "box@0000", Some("open")),
+            entry("section:ab12", "box@zz99", Some("failed")),
         ] {
             assert!(kept_from_blocked(&e), "{e:?}");
         }
@@ -1247,6 +1286,17 @@ mod tests {
             entry("area:ab12", "name", Some("Rude")),
             entry("note:ab12", "$type", Some("Rude")),
             entry("note:ab12", "place", Some("area:Rude words")),
+            entry("note:ab12", "box@a7k2", Some("Rude words")),
+            entry("note:ab12", "box@a7k2", Some("Done")),
+            entry("note:ab12", "box@a7k2", None),
+            entry("note:ab12", "box@A7K2", Some("done")),
+            entry("note:ab12", "box@a7k", Some("done")),
+            entry("note:ab12", "box@a7k22", Some("done")),
+            entry("note:ab12", "box@", Some("done")),
+            entry("note:ab12", "box@a7-2", Some("done")),
+            entry("routine:ab12", "box@a7k2", Some("done")),
+            entry("line:ab12", "box@a7k2", Some("done")),
+            entry("note:Rude words", "box@a7k2", Some("done")),
             with_ctx,
             long_author,
             extra,

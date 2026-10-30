@@ -6,6 +6,7 @@
 use serde_json::{Map, Value};
 
 use crate::markdown;
+use crate::text_boxes;
 
 /// Text as typed, without formatting.
 pub const PLAIN: &str = "plain";
@@ -22,13 +23,14 @@ pub const KNOWN: [&str; 2] = [PLAIN, MARKDOWN];
 /// holds `format` and `text` and nothing else.
 pub const VERSION: i64 = 1;
 
-/// `text` in `format` as it reads without its marks, for search and
-/// previews; a text in any other format as it is.
+/// `text` in `format` as it reads without its marks and without the ids
+/// of its boxes (ADR 0035), for search and previews; a text in any other
+/// format as it is.
 pub fn visible(format: &str, text: &str) -> String {
-    if format == MARKDOWN {
-        markdown::plain(text)
-    } else {
-        text.to_string()
+    match format {
+        MARKDOWN => markdown::plain(&text_boxes::strip(text)),
+        PLAIN => text_boxes::strip(text),
+        _ => text.to_string(),
     }
 }
 

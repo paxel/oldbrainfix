@@ -1,0 +1,278 @@
+{
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Trip a☐󠁵󠁸󠁰󠀰󠁿passport\n✅️󠁰󠀰󠁶󠁫󠁿 tickets \n☐󠀹󠁦󠀵󠁦󠁿 charger ☐󠁳󠁦󠁡󠁩󠁿\n❌󠁪󠀹󠀰󠁰󠁿 from a photo",
+      "shown": "Trip a✅passport\n✅ tickets \n☐ charger ❌\n❌ from a photo",
+      "visible": "Trip a✅passport\n✅ tickets \n☐ charger ❌\n❌ from a photo",
+      "boxes": [
+        {
+          "id": "uxp0",
+          "state": "done",
+          "starting": "open",
+          "start": 6,
+          "end": 7,
+          "sourceStart": 6,
+          "idStart": 7,
+          "sourceEnd": 12,
+          "last": {
+            "at": "2026-01-01T10:00:05.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "done"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:05.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "done"
+            }
+          ]
+        },
+        {
+          "id": "p0vk",
+          "state": "done",
+          "starting": "done",
+          "start": 16,
+          "end": 17,
+          "sourceStart": 21,
+          "idStart": 23,
+          "sourceEnd": 28,
+          "last": {
+            "at": "2026-01-01T10:00:07.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "done"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:06.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "failed"
+            },
+            {
+              "at": "2026-01-01T10:00:07.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "done"
+            }
+          ]
+        },
+        {
+          "id": "9f5f",
+          "state": "open",
+          "starting": "open",
+          "start": 27,
+          "end": 28,
+          "sourceStart": 38,
+          "idStart": 39,
+          "sourceEnd": 44,
+          "last": null,
+          "history": []
+        },
+        {
+          "id": "sfai",
+          "state": "failed",
+          "starting": "open",
+          "start": 37,
+          "end": 38,
+          "sourceStart": 53,
+          "idStart": 54,
+          "sourceEnd": 59,
+          "last": {
+            "at": "2026-01-01T10:00:14.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "failed"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:14.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "failed"
+            }
+          ]
+        },
+        {
+          "id": "j90p",
+          "state": "failed",
+          "starting": "failed",
+          "start": 39,
+          "end": 40,
+          "sourceStart": 60,
+          "idStart": 61,
+          "sourceEnd": 66,
+          "last": null,
+          "history": []
+        }
+      ]
+    },
+    {
+      "id": "section:0000000000000000000000000000000b",
+      "text": "☐󠁷󠀷󠀸󠁴󠁿 insurance",
+      "shown": "❌ insurance",
+      "visible": "❌ insurance",
+      "boxes": [
+        {
+          "id": "w78t",
+          "state": "failed",
+          "starting": "open",
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 1,
+          "sourceEnd": 6,
+          "last": {
+            "at": "2026-01-01T10:00:25.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "failed"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:25.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "failed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "☐󠀰󠁳󠀵󠁣󠁿 shoes",
+      "shown": "☐ shoes",
+      "visible": "☐ shoes",
+      "boxes": [
+        {
+          "id": "0s5c",
+          "state": "open",
+          "starting": "open",
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 1,
+          "sourceEnd": 6,
+          "last": {
+            "at": "2026-01-01T10:00:32.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "open"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:30.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "done"
+            },
+            {
+              "at": "2026-01-01T10:00:32.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "open"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note:00000000000000000000000000000007",
+      "text": "- ☐󠀲󠀹󠁫󠀲󠁿 a `☐` [☐󠀸󠁸󠁮󠁲󠁿 b](https://x.org/☐)\n\n| ☐󠁩󠀸󠀵󠁺󠁿 c | d |\n| --- | --- |",
+      "shown": "- ☐ a `☐` [☐ b](https://x.org/☐)\n\n| ✅ c | d |\n| --- | --- |",
+      "visible": "☐ a ☐ ☐ b\n\n✅ c d",
+      "boxes": [
+        {
+          "id": "29k2",
+          "state": "open",
+          "starting": "open",
+          "start": 2,
+          "end": 3,
+          "sourceStart": 2,
+          "idStart": 3,
+          "sourceEnd": 8,
+          "last": null,
+          "history": []
+        },
+        {
+          "id": "8xnr",
+          "state": "open",
+          "starting": "open",
+          "start": 11,
+          "end": 12,
+          "sourceStart": 16,
+          "idStart": 17,
+          "sourceEnd": 22,
+          "last": null,
+          "history": []
+        },
+        {
+          "id": "i85z",
+          "state": "done",
+          "starting": "open",
+          "start": 36,
+          "end": 37,
+          "sourceStart": 46,
+          "idStart": 47,
+          "sourceEnd": 52,
+          "last": {
+            "at": "2026-01-01T10:00:19.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "done"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:19.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "done"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "note:0000000000000000000000000000000d",
+      "text": "☐󠀰󠁳󠀵󠁣󠁿 shoes",
+      "shown": "☐ shoes",
+      "visible": "☐ shoes",
+      "boxes": [
+        {
+          "id": "0s5c",
+          "state": "open",
+          "starting": "open",
+          "start": 0,
+          "end": 1,
+          "sourceStart": 0,
+          "idStart": 1,
+          "sourceEnd": 6,
+          "last": {
+            "at": "2026-01-01T10:00:32.000Z",
+            "device": "65b60673d6ed884bf01c2c222d82ada0",
+            "own": true,
+            "state": "open"
+          },
+          "history": [
+            {
+              "at": "2026-01-01T10:00:30.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "done"
+            },
+            {
+              "at": "2026-01-01T10:00:32.000Z",
+              "device": "65b60673d6ed884bf01c2c222d82ada0",
+              "own": true,
+              "state": "open"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -37,9 +37,13 @@ pub fn note_share(
     sections: &[Section],
     date: impl Fn(DateTime<Utc>) -> String,
 ) -> NoteShare {
+    // Each box in the glyph of its current state, without its id (ADR
+    // 0035).
+    let note_text = note.shown_text();
+    let section_texts: Vec<String> = sections.iter().map(Section::shown_text).collect();
     let mut parts = vec![(
         None,
-        note.text.as_str(),
+        note_text.as_str(),
         note.text_format.as_str(),
         generated(
             &note.photos,
@@ -50,10 +54,10 @@ pub fn note_share(
             &note.transcripts,
         ),
     )];
-    for s in sections {
+    for (s, text) in sections.iter().zip(&section_texts) {
         parts.push((
             Some(date(s.captured)),
-            s.text.as_str(),
+            text.as_str(),
             s.text_format.as_str(),
             generated(
                 &s.photos,

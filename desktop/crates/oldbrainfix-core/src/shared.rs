@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde_json::{Value, json};
 
+use crate::boxes;
 use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
@@ -496,6 +497,10 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                 {
                     return true;
                 }
+                // Anyone ticks the boxes of any text (ADR 0035).
+                if e.field.starts_with(boxes::PREFIX) {
+                    return true;
+                }
                 let owner = judged.owner_in(area, list);
                 owner.is_some() && owner == judged.person_of(area, &e.device)
             },
@@ -508,6 +513,7 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
         let section = id.starts_with("section:") || id.starts_with(tally_keys::ENTRY_PREFIX);
         let frog = id.starts_with(frog_keys::PREFIX);
         let line = id.starts_with(checklist_keys::LINE_PREFIX);
+        let ticked = id.starts_with("section:");
         if !section && !frog && !line && !id.starts_with("routine:") {
             continue;
         }
@@ -528,8 +534,11 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                 AreaAccess::None => false,
                 AreaAccess::Member => {
                     if section {
+                        // Anyone ticks the boxes of a Section's text (ADR
+                        // 0035).
                         let owner = judged.owner_in(area, list);
-                        owner == judged.person_of(area, &e.device) && owner.is_some()
+                        ticked && e.field.starts_with(boxes::PREFIX)
+                            || owner == judged.person_of(area, &e.device) && owner.is_some()
                     } else if line {
                         // A Member checks any Line and adds their own; the
                         // rest is for the author of the Line or of its Note
@@ -1321,7 +1330,7 @@ mod tests {
             Notes::new(&ben).edit(id, &swapped)?;
         }
         let text = |id: &str| -> Result<Option<String>> {
-            Ok(Notes::new(&ben).by_id(id)?.map(|n| n.text))
+            Ok(Notes::new(&ben).by_id(id)?.map(|n| n.shown_text()))
         };
         assert_eq!(text(&milk.id)?, Some("Buy milk\n☐ oat".into()));
         assert_eq!(text(&own.id)?, Some("Bread\n✅ rye".into()));

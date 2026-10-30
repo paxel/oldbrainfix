@@ -29,6 +29,7 @@ use crate::profile::{
 };
 use crate::signing::device_id_from_key;
 use crate::store::Store;
+use crate::text_boxes::BoxTick;
 
 const PREFIX: &str = "person:";
 
@@ -746,6 +747,30 @@ impl Store {
         }
     }
 
+    /// The person who wrote `tick` on a box in the text of `entity`, as
+    /// their Profile shows, as the Dart core's `tickedBy` and as for
+    /// [`Store::author_of`]: through the key of its Device, in a Shared
+    /// Area the person its grant names. None for the user's own
+    /// (`tick.own`), for a writer not known, and for a blocked person,
+    /// whose ticks stay without their name or picture (ADR 0021).
+    pub fn ticked_by(&self, entity: &str, tick: &BoxTick) -> Result<Option<Profile>> {
+        if tick.own {
+            return Ok(None);
+        }
+        match self.device_writer(&tick.device, entity)? {
+            Writer::Theirs(author) => {
+                if self
+                    .blocked_ids()?
+                    .contains(&self.resolve_person(&author.id)?)
+                {
+                    return Ok(None);
+                }
+                Ok(Some(self.with_override(author)?))
+            }
+            Writer::Own | Writer::Unknown => Ok(None),
+        }
+    }
+
     /// Whether the person filter of the browser keeps the Note or
     /// Section `entity` (#53), as the Dart core's `wroteBy`: with
     /// `filter.me`, the user's own, written on any of their Devices or
@@ -823,11 +848,18 @@ impl Store {
         else {
             return Ok(Writer::Unknown);
         };
-        if device == self.device_id()? || self.is_own_device(&device)? {
+        self.device_writer(&device, entity)
+    }
+
+    /// Who the Device `device` writes for in the place of `entity`: the
+    /// user, another person as their Profile shows without the Override,
+    /// or nobody known.
+    fn device_writer(&self, device: &str, entity: &str) -> Result<Writer> {
+        if device == self.device_id()? || self.is_own_device(device)? {
             return Ok(Writer::Own);
         }
         let key = self
-            .pinned_key(&device)?
+            .pinned_key(device)?
             .map(|k| BASE64.encode(&k.record.public_key));
         if let Some(key) = &key
             && self.own_keys()?.bound.contains(key)
@@ -837,7 +869,7 @@ impl Store {
         let named = match self.area_of(entity)? {
             Some(area) => self
                 .grants_of(&area)?
-                .and_then(|g| g.person_of(&device).map(str::to_string)),
+                .and_then(|g| g.person_of(device).map(str::to_string)),
             None => None,
         };
         if let Some(named) = &named
