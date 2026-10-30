@@ -29,6 +29,7 @@ pub mod enrich;
 pub mod folder_sync;
 pub mod format_bar;
 pub mod frogs_view;
+pub mod history_view;
 pub mod hotkey;
 pub mod icons;
 pub mod instance;

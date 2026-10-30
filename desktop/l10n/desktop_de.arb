@@ -221,5 +221,7 @@
   "conflictsIntro": "Zwei Geräte haben dasselbe geändert, bevor sie sich synchronisiert haben. Klicke auf die Fassung, die bleibt; bis dahin wird die neuere gezeigt.",
   "sentItemHidden": "Was sie gesendet hat, bleibt verborgen, bis du auf „Zeigen“ klickst.",
   "captureFieldName": "Erfassen",
-  "noteTextFieldName": "Text der Notiz"
+  "noteTextFieldName": "Text der Notiz",
+  "showStreaksDevice": "Serien auf diesem Computer zeigen",
+  "snoozesHereDevice": "Verschobenes ist nur auf diesem Computer festgehalten, und nur für etwa den letzten Monat."
 }

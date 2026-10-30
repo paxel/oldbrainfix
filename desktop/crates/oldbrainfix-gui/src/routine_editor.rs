@@ -11,7 +11,8 @@
 //! writes it; leaving without saving drops the edit. Opened from a
 //! capture for the Note not written yet (#113), Save hands back what was
 //! set up instead ([`RoutineEditor::choice`]), as the phone's
-//! `chooseSchedule`.
+//! `chooseSchedule`. A saved Routine has History beside its heading, as
+//! in the phone's bar (Q400).
 
 use std::collections::BTreeSet;
 
@@ -53,6 +54,8 @@ pub enum Intent {
     Close,
     /// Show the Note it comes from.
     OpenNote(String),
+    /// Show the History of the Routine with this id.
+    History(String),
     /// Something asked of a Session's part.
     Session(SessionIntent),
 }
@@ -113,6 +116,9 @@ pub struct RoutineEditor {
     /// A Session's part, with the Session as it was opened; `None` for a
     /// new one.
     session: Option<(SessionDraft, Option<Session>)>,
+    /// Whether it has a History to open: a Routine saved, not a
+    /// Reminder, as it was opened.
+    history: bool,
 }
 
 impl RoutineEditor {
@@ -176,6 +182,7 @@ impl RoutineEditor {
             rule_error: None,
             next: Vec::new(),
             session: None,
+            history: false,
         };
         editor.update();
         editor
@@ -258,6 +265,7 @@ impl RoutineEditor {
             rule_error: None,
             next: Vec::new(),
             session: None,
+            history: !routine.is_reminder(),
         };
         match SimpleRepeat::of(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
@@ -496,7 +504,16 @@ impl RoutineEditor {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
-                ui.label(RichText::new(heading).size(18.0).strong().color(text));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(heading).size(18.0).strong().color(text));
+                    // As in the bar of the phone's editor.
+                    if let Some(id) = self.routine.as_ref().filter(|_| self.history) {
+                        ui.add_space((ui.available_width() - 28.0).max(0.0));
+                        if icon_button(ui, icons::HISTORY, t.history_title(), text).clicked() {
+                            intent = Some(Intent::History(id.clone()));
+                        }
+                    }
+                });
                 embossed(ui, tones, false, None, |ui| {
                     if !self.from_note {
                         ui.add(

@@ -98,6 +98,7 @@ use crate::enrich::Enricher;
 use crate::folder_sync;
 use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
+use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
@@ -168,6 +169,10 @@ pub enum Selection {
     /// Every Routine and Reminder by name, also those beyond the
     /// Agenda's week (#115), with Export; reached from the Agenda's bar.
     AllRoutines,
+    /// The History of the Routine with this id (Q400): its Streak, its
+    /// Adherence and its Log; reached from an Occurrence's menu and from
+    /// the Routine's editor.
+    History(String),
     /// Every Note neither in the trash nor merged.
     All,
     Unsorted,
@@ -392,6 +397,8 @@ struct View {
     /// Those whose schedule a newer version of the app saved, with the
     /// name and Area of their Note, which a click opens (ADR 0034).
     all_newer: Vec<all_routines_view::NewerRow>,
+    /// The Routine's History, while it shows.
+    history: Option<HistoryShown>,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
@@ -446,11 +453,13 @@ struct UpdateNotice {
 }
 
 /// The last selected Area and Topic, where forward leads, as the phone's
-/// `BrowserTrail` keeps them.
+/// `BrowserTrail` keeps them; and where back leads from a History.
 #[derive(Debug, Clone, Default)]
 struct Trail {
     area: Option<String>,
     topic: Option<String>,
+    /// What a Routine's History was opened from, where back leads.
+    history: Option<Selection>,
 }
 
 /// A dialog over the window.
@@ -1009,6 +1018,8 @@ enum Setting {
     Units(Option<UnitSystem>),
     /// How the Agenda shows Shopping Lists today (#123).
     ShoppingAgenda(ShoppingAgenda),
+    /// Whether a Routine's History shows its Streak (Q400).
+    Streaks(bool),
 }
 
 /// The wall clock the window shows days on.
@@ -2873,6 +2884,13 @@ impl App {
             self.selection = Selection::All;
             read = self.read();
         }
+        // A Routine gone meanwhile has no History to show.
+        if let (Ok(view), Selection::History(_)) = (&read, &self.selection)
+            && view.history.is_none()
+        {
+            self.selection = self.trail.history.take().unwrap_or(Selection::Agenda);
+            read = self.read();
+        }
         match read {
             Ok(view) => {
                 self.view = view;
@@ -2941,6 +2959,23 @@ impl App {
     }
 
     /// Which Note list shows, by the phone's names (#114).
+    /// The History of the Routine `id` as its page shows it, at the
+    /// store's now; `None` when there is no such Routine.
+    fn history_shown(&self, id: &str) -> oldbrainfix_core::Result<Option<HistoryShown>> {
+        let routines = Routines::new(&self.store);
+        let Some(routine) = routines.by_id(id)? else {
+            return Ok(None);
+        };
+        let note = routines.note(&routine)?;
+        let week_start = history_view::week_start(&self.t);
+        Ok(Some(HistoryShown {
+            title: all_routines_view::routine_name(&self.t, note.as_ref()),
+            schedule: schedule_text(&self.t, &routine.schedule),
+            history: routines.history(&routine, &*self.wall, week_start)?,
+            streaks: DeviceSettings::new(&self.store).streaks_on()?,
+        }))
+    }
+
     fn cards_key(&self) -> Option<String> {
         let area = matches!(&self.selection, Selection::Place(id) if self.view.area(id).is_some());
         cards_key(&self.selection, &self.people, area)
@@ -3025,7 +3060,8 @@ impl App {
             | Selection::AreaOffersWaiting
             | Selection::AiReview
             | Selection::Frogs
-            | Selection::AllRoutines => Vec::new(),
+            | Selection::AllRoutines
+            | Selection::History(_) => Vec::new(),
             Selection::All => self
                 .store
                 .notes_by(search.notes(&self.query, None)?, &self.people)?,
@@ -3458,6 +3494,10 @@ impl App {
                 }
             }
         }
+        let history = match &self.selection {
+            Selection::History(id) => self.history_shown(id)?,
+            _ => None,
+        };
         let (frogs_open, frogs_done) = if self.selection == Selection::Frogs {
             (shown_frogs(frogs.open()?)?, shown_frogs(frogs.done()?)?)
         } else {
@@ -3519,6 +3559,7 @@ impl App {
             frogs_open,
             all_routines,
             all_newer,
+            history,
             frogs_done,
             frogs_done_open: self.store.local_setting(FROGS_DONE_OPEN)?.as_deref() == Some("true"),
             agenda,
@@ -3602,6 +3643,12 @@ impl App {
                 if selection != self.selection {
                     self.query.clear();
                     self.people = PersonFilter::default();
+                }
+                // Back from a History leads where it was opened from.
+                if matches!(selection, Selection::History(_))
+                    && !matches!(self.selection, Selection::History(_))
+                {
+                    self.trail.history = Some(self.selection.clone());
                 }
                 if let Selection::Place(id) = &selection {
                     if let Some(topic) = self.view.topic(id) {
@@ -4053,6 +4100,7 @@ impl App {
                     self.editor = None;
                     self.selected_note = Some(id);
                 }
+                Intent::History(id) => return self.act(Action::Select(Selection::History(id))),
             },
             Action::DeleteRoutine => {
                 self.dialog = None;
@@ -5302,6 +5350,7 @@ impl App {
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::ShoppingAgenda(way) => settings.set_shopping_agenda(way)?,
+            Setting::Streaks(on) => settings.set_streaks_on(on)?,
         }
         Ok(())
     }
@@ -5382,6 +5431,7 @@ impl App {
             Selection::Settings | Selection::Sync => Some(Selection::Profile),
             Selection::AiReview => Some(Selection::Settings),
             Selection::Frogs | Selection::AllRoutines => Some(Selection::Agenda),
+            Selection::History(_) => Some(self.trail.history.clone().unwrap_or(Selection::Agenda)),
             Selection::About => Some(Selection::Settings),
             Selection::Licences => Some(Selection::About),
             Selection::Place(id) => Some(match self.view.topic(id) {
@@ -6060,6 +6110,7 @@ impl App {
             Selection::AiReview => self.t.ai_review_title().to_string(),
             Selection::Frogs => self.t.frogs_title().to_string(),
             Selection::AllRoutines => self.t.all_routines_title().to_string(),
+            Selection::History(_) => self.t.history_title().to_string(),
             Selection::All => self.t.all_notes_title().to_string(),
             Selection::Unsorted => self.t.unsorted().to_string(),
             Selection::Trash => self.t.trash_title().to_string(),
@@ -6257,6 +6308,10 @@ impl App {
                     AllRoutinesAction::OpenNote(id) => Action::SelectNote(id),
                     AllRoutinesAction::Export => Action::ExportRoutines,
                 }));
+                return;
+            }
+            Selection::History(_) => {
+                history_view::page(ui, &self.t, tones, self.view.history.as_ref(), &*self.wall);
                 return;
             }
             Selection::Sync => {
@@ -8488,6 +8543,7 @@ impl App {
             .shopping_agenda()
             .unwrap_or(ShoppingAgenda::STANDARD);
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
+        let streaks = settings.streaks_on().unwrap_or(true);
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -8662,6 +8718,17 @@ impl App {
                     if radio_column(ui, &mut chosen, options) && chosen != shopping_way {
                         actions.push(Action::Setting(Setting::ShoppingAgenda(chosen)));
                     }
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(RichText::new(t.settings_history()).strong().color(text));
+                    let mut on = streaks;
+                    if ui
+                        .checkbox(&mut on, RichText::new(t.show_streaks_device()).color(text))
+                        .changed()
+                    {
+                        actions.push(Action::Setting(Setting::Streaks(on)));
+                    }
+                    ui.label(RichText::new(t.show_streaks_detail()).small().color(weak));
                 });
             });
     }
@@ -10325,11 +10392,13 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                 actions.push(Action::OpenRoutine(routine.id.clone()));
             }
             // The same menu from a right-click and from ⋮.
-            let mut share = false;
-            open.context_menu(|ui| share |= occurrence_menu(ui, t));
+            let history = !routine.is_reminder();
+            let mut picked = None;
+            open.context_menu(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let more = icon_button(ui, icons::MORE_VERT, &t.occurrence_menu(&title), weak);
-                egui::Popup::menu(&more).show(|ui| share |= occurrence_menu(ui, t));
+                egui::Popup::menu(&more)
+                    .show(|ui| picked = picked.or(occurrence_menu(ui, t, history)));
                 if let Some(icon) = row
                     .area
                     .as_ref()
@@ -10341,8 +10410,14 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                     icons::show(ui, icons::REMINDER, 18.0, weak);
                 }
             });
-            if share {
-                actions.push(Action::ShareRoutine(routine.id.clone()));
+            match picked {
+                Some(OccurrencePick::History) => {
+                    actions.push(Action::Select(Selection::History(routine.id.clone())));
+                }
+                Some(OccurrencePick::Share) => {
+                    actions.push(Action::ShareRoutine(routine.id.clone()));
+                }
+                None => {}
             }
         });
         // The picks go under the title, outside its click.
@@ -10442,19 +10517,36 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
     });
 }
 
-/// An Occurrence's menu, from a right-click on it or its ⋮: Share, which
-/// saves its Routine as the whole series with its end, or its Reminder,
-/// as a calendar file. The desktop has no Routine history, which the
-/// phone's menu leads to too. Whether Share was clicked.
-fn occurrence_menu(ui: &mut Ui, t: &L10n) -> bool {
+/// What was picked in an Occurrence's menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OccurrencePick {
+    History,
+    Share,
+}
+
+/// An Occurrence's menu, from a right-click on it or its ⋮, as the
+/// phone's: History for a Routine (`history`), and Share, which saves
+/// its Routine as the whole series with its end, or its Reminder, as a
+/// calendar file. What was picked.
+fn occurrence_menu(ui: &mut Ui, t: &L10n, history: bool) -> Option<OccurrencePick> {
     let text = ui.visuals().text_color();
-    let share = ui.button(RichText::new(t.share()).color(text)).clicked();
+    let mut picked = None;
+    if history
+        && ui
+            .button(RichText::new(t.history_title()).color(text))
+            .clicked()
+    {
+        picked = Some(OccurrencePick::History);
+    }
+    if ui.button(RichText::new(t.share()).color(text)).clicked() {
+        picked = Some(OccurrencePick::Share);
+    }
     // A pick closes the menu, also one by keyboard or screen reader,
     // which no pointer click closes.
-    if share {
+    if picked.is_some() {
         ui.close();
     }
-    share
+    picked
 }
 
 /// How many Missed Occurrences of one Routine show to check off.

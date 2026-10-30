@@ -68,6 +68,14 @@ pub const MORE: char = '\u{e402}';
 /// `file_upload_outlined`, as that page's Export.
 pub const ALL_ROUTINES: char = '\u{e2b8}';
 pub const MORE_VERT: char = '\u{e404}';
+/// `check_circle`, `cancel` and `timelapse`, as the phone's Routine
+/// History marks what was Done, Missed, and a day partly both; it marks
+/// what is still due with `radio_button_unchecked` ([`PICK_OPEN`]), what
+/// is still to come with `schedule` ([`CONTEXT_WHEN`]) and a day with
+/// nothing due with `remove` ([`REMOVE`]).
+pub const STATUS_DONE: char = '\u{e159}';
+pub const STATUS_MISSED: char = '\u{e139}';
+pub const DAY_PARTLY: char = '\u{e660}';
 pub const EXPORT: char = '\u{f05d}';
 /// `shopping_cart_outlined`, as the phone marks a Shopping List's row on
 /// the Agenda (#123).
