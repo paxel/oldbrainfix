@@ -1,0 +1,212 @@
+<!-- page: title="Routines, Reminders and the Agenda" track="guide" order=3 summary="Setting up Routines and Reminders, Re-nag and Escalation, what is Missed, and the Agenda's week with the appointments of your calendar." -->
+<p class="lede">
+  A Routine is something to be done on a repeating schedule; a Reminder is a Routine that happens
+  only once. Both come from a Note, ring at their time and ring again until they are Done. The
+  Agenda shows what is due today and on the six days after it.
+</p>
+
+<h2>Making a Routine or Reminder</h2>
+<ul>
+  <li><strong>From a Note</strong>: the alarm clock on the Note's card, "Routine, Reminder, Frog or Session", offers <strong>Routine</strong> and <strong>Reminder</strong>; the capture screen offers the same before the Note is saved (see <a href="capture-and-sort.html">Capture and sort</a>). The editor shows the Note on top under "From the Note"; a tap on it opens the Note.</li>
+  <li><strong>Without a Note</strong>: "New Routine or Reminder" in the Agenda's bar opens the editor with the field "What is to be done?". The text typed there becomes the Routine's Note.</li>
+</ul>
+<p>
+  A new Routine starts every day at 08:00, a new Reminder once at the next full hour.
+  <strong>Save</strong> in the top bar writes it; leaving the editor without Save drops the change.
+  Once saved, the bar also holds the calendar button where the phone has a calendar app,
+  <strong>History</strong> for a Routine, and
+  <strong>Delete</strong>, which asks once; a deleted Routine stays in the Trash for 30 days, and its
+  Note stays. In a Shared Area only a Manager changes Routines and Reminders; anyone else sees the
+  editor with "Only a Manager of this Area can change this."
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/routine-editor.png" alt="The editor of a daily Routine, with its Note on top and the choice of schedule" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/routine-editor.png" alt="The editor of a daily Routine, with its Note on top and the choice of schedule" width="648" height="1152" loading="lazy">
+  <figcaption>The Routine editor on the phone.</figcaption>
+</figure>
+
+<h2>The schedule</h2>
+<p>
+  The schedule is set in one of two modes, <strong>Simple</strong> and <strong>Advanced</strong>. The
+  simple mode offers:
+</p>
+<ul>
+  <li><strong>Once</strong>: a Reminder.</li>
+  <li><strong>Every …</strong>: a number, changed with − and +, of days, weeks, months or years.</li>
+  <li><strong>Weekdays</strong>: one button per weekday; any number of them can be picked.</li>
+  <li><strong>Monthly on a day</strong>: every so many months, on a day of the month from 1 to 31. Months without that day are skipped.</li>
+  <li><strong>Monthly on a weekday</strong>: every so many months, on the first, second, third, fourth or last of a weekday, such as the last Friday.</li>
+</ul>
+<p>
+  <strong>Starts</strong> (<strong>On</strong> for Once) picks the first day. Everything but Once has
+  <strong>Ends</strong>: <strong>Never</strong>, <strong>On a day</strong> with its last day, or
+  <strong>After a number of times</strong>, where each time of day counts separately.
+</p>
+<p>
+  The advanced mode takes the repeat rule as an RRULE, the format calendars use, such as
+  <code>FREQ=MONTHLY;BYDAY=1MO</code> for the first Monday of every month; left empty, it happens
+  once. A schedule the simple mode cannot show opens in the advanced mode.
+</p>
+<p>
+  Under <strong>Times of day</strong>, <strong>Add a time</strong> adds a time; each time has a button
+  that removes it. Without a time it is all day. A Reminder has at most one time. Under
+  <strong>Next</strong> the next three Occurrences show while the schedule is edited, or "This never
+  comes up." Checking an Occurrence off early or late never moves the schedule.
+</p>
+
+<h2>Re-nag and Escalation</h2>
+<p>
+  The folded section <strong>Re-nag</strong> says how often an ignored alarm rings again, such as
+  "Rings again every 10 min until Done". It rings again at that interval until it is Done or snoozed,
+  or until the next Occurrence is due; then it counts as Missed. A Reminder stops at midnight. The
+  choices are <strong>Default</strong> and 5, 10, 15, 30 or 60 minutes. The default is set in
+  Settings under "Alarms", "Default on this phone", 10 min unless changed.
+</p>
+<p>
+  The folded section <strong>Escalation</strong> is off at first ("Off: it only Re-nags"). With the
+  switch "Escalate to a full-screen alarm" on, an Occurrence ignored for a number of Re-nags (3 when
+  first turned on; 1, 2, 3, 5 or 10) becomes a full-screen alarm with sound, also over the lock
+  screen. It shows the Note's first line and the time, a big <strong>Done</strong>, and "Remind me
+  again in …" with <strong>10 min</strong>, <strong>30 min</strong> and <strong>1 h</strong>; Back
+  does not close it. It rings for up to 5 minutes, then Re-nags again until it is Done or snoozed.
+</p>
+
+<h2>When it rings</h2>
+<p>
+  An Occurrence shows as a notification with <strong>Done</strong> and <strong>Snooze</strong>; Snooze
+  turns the same notification into 10 min, 30 min and 1 h. Both work without opening the app, also
+  on the lock screen. The Quiet Hours hold back only Nudges; Routines and Reminders ring on time.
+</p>
+<p>
+  The sound is chosen in Settings under "Alarms", <strong>Alarm sound</strong>: Old Brain Fix's own
+  chime at first; a tap opens the phone's sound picker to choose another sound of the phone or the
+  chime again. "Set up alarms" there leads to the permissions alarms need to ring on time. While one
+  is missing, a red line on top of the Agenda says so, and a tap on it leads to the setup.
+</p>
+<p>
+  After the phone was off, alarms that fell into that time do not ring late: one Catch-up
+  Notification, "Missed while the phone was off", says how many were Missed.
+</p>
+
+<h2>Missed and the Missed Summary</h2>
+<p>
+  An Occurrence is Missed when it was never Done: a Routine's when its next Occurrence starts, a
+  Reminder's at midnight. The Missed Summary sits on top of the Agenda, headed "Missed": each Routine
+  with how often it was Missed, such as "Water the plants · 3 times", up to three of its Missed
+  Occurrences, each with a box to check it off late, and "and 2 more" for the rest. The card stays
+  until <strong>Seen</strong> is tapped; opening the app never clears it.
+</p>
+
+<h2>History</h2>
+<p>
+  A Routine's <strong>History</strong> opens from its editor's bar or from the menu of its row on the
+  Agenda. It shows the <strong>Streak</strong>, now and longest, with the last 7 days as dots; the
+  <strong>Adherence</strong> this week, this month and over the last 30 days, such as "18 of 20
+  Done"; and the log of every Occurrence, the latest first: Done with its time, early or late,
+  Missed, due and not Done yet, or still to come, with the snoozes this phone recorded over about
+  the last month. Settings can turn the Streaks off with "Show Streaks on this phone"; the Adherence
+  shows either way. A Reminder has no History.
+</p>
+
+<h2>The Agenda</h2>
+<p>
+  The Agenda is the start screen. From the top it shows:
+</p>
+<ol>
+  <li>the Missed Summary, while there is something Missed;</li>
+  <li>"x Unsorted", which opens the Unsorted Notes;</li>
+  <li>"x Sent Items waiting" and "x shared Areas waiting", while there are any;</li>
+  <li>under "Today": the all-day Occurrences, then the calendar's all-day appointments, then the Shopping Lists as Settings choose (see <a href="lists-tallies-sessions-frogs.html">Lists, Tallies, Sessions and Frogs</a>), then the timed Occurrences and appointments together by time, an Occurrence before an appointment at the same time;</li>
+  <li>the section "Eat a frog", while there is an open Frog or one was eaten today;</li>
+  <li>after a gap, tomorrow and the five days after it, dimmed, each under its weekday and date. A day with nothing due says "Nothing planned".</li>
+</ol>
+<p>
+  Each row of an Occurrence holds the box to check it off, its time, its Note's text, its Area's
+  colour and icon, and ⋮. A tap on the row opens the editor. The Occurrences of the coming days can
+  be checked off today already. An Occurrence checked off today stays on the Agenda for the day,
+  struck through as Done; its box unchecks it. Checking off opens nothing. At midnight the Agenda
+  moves on to the new day.
+</p>
+<p>
+  ⋮ on a row, or a long press, opens a menu with <strong>History</strong> for a Routine and, where
+  the phone has a calendar app, <strong>Share</strong>. An Occurrence from a locked Area set to Masked shows as "Private Routine"
+  with its time and can still be checked off; opening it asks for its Area to be opened first.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/agenda.png" alt="The Agenda with today's Routines and Reminders, the Frogs and the dimmed days after" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/agenda.png" alt="The Agenda with today's Routines and Reminders, the Frogs and the dimmed days after" width="648" height="1152" loading="lazy">
+  <figcaption>The Agenda on the phone.</figcaption>
+</figure>
+
+<p>
+  The Agenda's bar holds, in this order: <strong>All Routines and Reminders</strong>,
+  <strong>Calendar</strong> (where the phone has a calendar), <strong>New Routine or
+  Reminder</strong>, and the Profile picture, which leads to the Profile page and Settings.
+</p>
+
+<h3>Sharing one Routine or Reminder</h3>
+<p>
+  <strong>Share</strong> in a row's menu hands the Routine as its whole series, with its end, or the
+  Reminder, to another app as a calendar file. In the editor, the calendar button of a saved one
+  offers "Add to calendar" for each of its events, one per time of day, which opens the calendar app
+  filled in, and <strong>Share as calendar file</strong>.
+</p>
+
+<h2>All Routines and Reminders</h2>
+<p>
+  This page lists every Routine and Reminder alphabetically by name, also those beyond the Agenda's
+  week. Each card shows whether it is a Routine or a Reminder, its name, its schedule and its Area's
+  colour and icon; a tap opens its editor. <strong>Export</strong> in the bar hands one calendar file
+  of all of them to the app you choose. Those of a closed locked Area stay out of the list and of the
+  file. One whose schedule a newer version of the app saved follows at the end, saying so; a tap
+  opens its Note.
+</p>
+
+<h2>The Calendar page</h2>
+<p>
+  The Calendar page opens from the Agenda's bar and from Settings, under "Calendar". It shows only
+  where the phone has a calendar, and has two sections.
+</p>
+<h3>Read from your calendar</h3>
+<ul>
+  <li><strong>Note the running appointment</strong>: a Note captured during an appointment carries it in its Capture Context, such as "During: Dentist".</li>
+  <li><strong>Show my calendar's appointments on the Agenda</strong>: turned on, it explains what it does, asks for access to the calendar and opens "Calendars on the Agenda" with a checkbox per calendar, none ticked at first. Afterwards it names the calendars picked; a tap picks others. Turning it off keeps the calendars picked for the next time.</li>
+</ul>
+<h3>Write to your calendar</h3>
+<p>
+  <strong>Write Routines and Reminders into a calendar</strong>: turned on, it explains, asks for
+  access and lets you pick the calendar. The Routines and Reminders then appear in that calendar and
+  follow every change. Old Brain Fix only changes or removes the events it wrote itself; turning the
+  switch off removes them. Wherever that calendar syncs to, they show up too.
+</p>
+
+<h3>Appointments on the Agenda</h3>
+<p>
+  The appointments of the calendars picked show on every day of the Agenda: the all-day ones after
+  the all-day Occurrences, the timed ones among the timed Occurrences. An appointment's row is read
+  only: it has no box, the calendar's colour runs down its side, and it shows the calendar icon and
+  "From the calendar" with the calendar's name. A tap unfolds its place and description and folds
+  them again. ⋮ or a long press offers <strong>Copy into a Note</strong>, which makes a new Unsorted
+  Note of its title, time, place and description and shows its card on top of the Agenda. The
+  events Old Brain Fix wrote into a calendar never show as appointments. The appointments are read
+  whenever the Agenda shows them; nothing of them is kept or synced.
+</p>
+
+<h2>On the desktop</h2>
+<ul>
+  <li>The Agenda shows in the same order, with the capture field on top. Its bar holds All Routines and Reminders, New Routine or Reminder and the Profile picture; the desktop has no Calendar page and shows no calendar appointments.</li>
+  <li>A click on an Occurrence's text opens its editor in the right pane; a right-click or ⋮ opens <strong>Share</strong>, which saves the calendar file where you choose. <strong>Export</strong> on All Routines and Reminders saves one file the same way. The desktop has no History.</li>
+  <li>The simple mode of the schedule offers Once, Every … and Weekdays. Monthly schedules and ends are written in the advanced mode as an RRULE, and a schedule with them opens there.</li>
+  <li>Alarms come as notifications while the app runs, also from the tray. On Linux they offer Done, 10 min, 30 min, 1 h and "Open Old Brain Fix"; on Windows and macOS they show without buttons. The Re-nag default is "Default on this computer".</li>
+  <li>Escalation turns the notification urgent, with the system's alarm sound; there is no full-screen alarm.</li>
+  <li>The <strong>Alarm sound</strong> is Old Brain Fix's own chime or a sound file ("Choose a sound file…", "Use the own chime"). The app plays it itself, so the notifications stay silent.</li>
+  <li>What became Missed while the app was not running is told in one notification, "Missed while Old Brain Fix was not running".</li>
+</ul>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/agenda.png" alt="The Agenda in the desktop app" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/agenda.png" alt="The Agenda in the desktop app" width="1280" height="800" loading="lazy">
+  <figcaption>The Agenda in the desktop app.</figcaption>
+</figure>

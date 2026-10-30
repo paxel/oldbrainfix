@@ -29,6 +29,7 @@ import 'package:oldbrainfix/src/capture_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
+import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -79,6 +80,11 @@ typedef _Texts = ({
   String captureText,
   String home,
   List<String> frogs,
+  String packing,
+  String groceries,
+  String reading,
+  String pagesRead,
+  String pages,
 });
 
 const _en = (
@@ -111,6 +117,17 @@ const _en = (
     'Clear out the shelf in the cellar',
     'Cancel the old gym membership',
   ],
+  packing:
+      'Packing for the weekend at the lake\n'
+      '✓ Toothbrush\n'
+      'Phone charger\n'
+      'Hiking gear\n'
+      '  ✓ Boots\n'
+      '  Rain jacket',
+  groceries: 'Weekly shopping\nMilk\nBread\nCoffee\nApples\nWashing-up liquid',
+  reading: 'Reading before bed',
+  pagesRead: 'Pages read',
+  pages: 'pages',
 );
 
 const _de = (
@@ -143,6 +160,17 @@ const _de = (
     'Das Regal im Keller ausmisten',
     'Den alten Fitnessstudio-Vertrag kündigen',
   ],
+  packing:
+      'Packen fürs Wochenende am See\n'
+      '✓ Zahnbürste\n'
+      'Ladekabel fürs Handy\n'
+      'Wandersachen\n'
+      '  ✓ Wanderschuhe\n'
+      '  Regenjacke',
+  groceries: 'Wocheneinkauf\nMilch\nBrot\nKaffee\nÄpfel\nSpülmittel',
+  reading: 'Lesen vor dem Schlafen',
+  pagesRead: 'Gelesene Seiten',
+  pages: 'Seiten',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -153,13 +181,16 @@ class _Seeded {
 
   _Seeded._(this.store, this.snack);
 
-  factory _Seeded(_Texts x) {
+  /// With [lists], the Household also holds a Checklist, a Shopping List
+  /// and a Tally with its entries, for the guide's frames of them.
+  factory _Seeded(_Texts x, {bool lists = false}) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
     final store = Store.inMemory(clock: () => clock)
       ..starterSetOffered = true
       ..alarmSetupDone = true;
     final snack = _seed(store, x, (at) => clock = at);
+    if (lists) _seedLists(store, x, (at) => clock = at);
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
     Alarms(store).markSeen();
@@ -354,6 +385,53 @@ class _Seeded {
     capture(DateTime(2026, 10, 26, 19, 4), x.unsorted[1]);
     capture(DateTime(2026, 10, 27, 8, 31), x.unsorted[2]);
     return snack;
+  }
+
+  /// A Tally of the pages read in the evenings, a packing Checklist and
+  /// the weekly Shopping List, all in the Household, after [_seed].
+  static void _seedLists(
+    Store store,
+    _Texts x,
+    void Function(DateTime) setClock,
+  ) {
+    final places = Places(store);
+    final notes = Notes(store);
+    final household = places.areas().firstWhere(
+      (a) => a.starter == 'household',
+    );
+
+    // Pages read most evenings since 13 October, 30 a day the target.
+    setClock(DateTime(2026, 10, 13, 22, 5));
+    final reading = notes.capture(x.reading, place: household.id);
+    final tallies = Tallies(store);
+    final pages = tallies.addField(
+      reading.id,
+      name: x.pagesRead,
+      unit: x.pages,
+      target: 30,
+    );
+    const read = [24, 31, 0, 18, 40, 35, 12, 0, 30, 27, 22, 45, 33, 16];
+    for (final (i, count) in read.indexed) {
+      if (count == 0) continue;
+      final at = DateTime(2026, 10, 13 + i, 22, 15);
+      setClock(at);
+      tallies.add(reading.id, values: {pages: count.toDouble()});
+    }
+
+    // The packing list, two Lines checked already.
+    setClock(DateTime(2026, 10, 25, 19, 40));
+    final packing = notes.capture(x.packing, place: household.id);
+    Checklists(store).make(packing.id);
+
+    // The weekly shopping, two Lines bought on Saturday.
+    setClock(DateTime(2026, 10, 24, 9, 30));
+    final groceries = notes.capture(x.groceries, place: household.id);
+    final shopping = ShoppingLists(store)..make(groceries.id);
+    setClock(DateTime(2026, 10, 24, 11, 5));
+    final lines = shopping.byNote(groceries.id, deviceWallClock)!.lines;
+    for (final line in [lines[1], lines[3]]) {
+      shopping.check(line.id, deviceWallClock);
+    }
   }
 }
 
@@ -771,6 +849,67 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.byType(CaptureScreen), findsOneWidget);
             expect(find.byType(NudgeButtons), findsOneWidget);
+          });
+
+          frame('routine-editor', (tester) async {
+            await start(tester, seed());
+            await _tap(tester, find.text(texts.snack).first);
+            expect(find.byType(RoutineEditorScreen), findsOneWidget);
+          });
+
+          /// The Household with its Checklist, Shopping List and Tally.
+          Future<void> household(WidgetTester tester) async {
+            final t = await start(
+              tester,
+              _Seeded(texts, lists: true)..store.themeChoice = choice,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+          }
+
+          /// The Household's list of Notes, scrolling down.
+          final notesList = find.byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          );
+
+          frame('lists', (tester) async {
+            await household(tester);
+            // The lower part of the Checklist above the Shopping List,
+            // its struck Lines at the end.
+            final groceries = find.text(texts.groceries.split('\n').first);
+            await tester.scrollUntilVisible(
+              groceries,
+              300,
+              scrollable: notesList.first,
+            );
+            Scrollable.ensureVisible(tester.element(groceries), alignment: 0.3);
+            await tester.pumpAndSettle();
+            expect(groceries, findsOneWidget);
+          });
+
+          frame('tally', (tester) async {
+            await household(tester);
+            final reading = find.text(texts.reading);
+            await tester.scrollUntilVisible(
+              reading,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            await tester.longPress(reading);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            // The length of a bar and the chart of the pages read, with the
+            // target as a line.
+            expect(
+              find.text('${texts.pagesRead} (${texts.pages})'),
+              findsOneWidget,
+            );
+            Scrollable.ensureVisible(
+              tester.element(find.byKey(const ValueKey('tally-period'))),
+              alignment: 0.12,
+            );
+            await tester.pumpAndSettle();
           });
         }
       }
