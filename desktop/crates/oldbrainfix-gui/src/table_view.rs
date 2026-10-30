@@ -688,8 +688,8 @@ impl TableView {
         let accent = ui.visuals().hyperlink_color;
         let fill = ui.visuals().text_edit_bg_color();
         ui.painter().rect_filled(rect, 0.0, fill);
-        if std::mem::take(&mut editing.focus) {
-            let end = editing.typed.len();
+        let end = editing.typed.len();
+        if editing.focus {
             format_bar::select(ui, id, &editing.typed, (end, end));
         }
         let text = ui.visuals().text_color();
@@ -710,6 +710,19 @@ impl TableView {
             egui::Stroke::new(2.0, accent),
             egui::StrokeKind::Inside,
         );
+        // The field takes the keyboard the moment editing starts. egui
+        // drops that focus again while the field is new under the click
+        // that started it, or in the view's first, unseen frame; it is
+        // asked again after the field until it holds it.
+        if editing.focus {
+            if response.has_focus() {
+                editing.focus = false;
+            } else {
+                format_bar::select(ui, id, &editing.typed, (end, end));
+                ui.ctx().request_repaint();
+            }
+            return;
+        }
         if response.lost_focus()
             && let Some(text) = self.commit()
         {
@@ -825,8 +838,12 @@ fn menu(
             }
         }
     };
+    // The right-click's menu has its own id: on a click the context menu
+    // closes its popup, which would otherwise be this one just opened.
     Popup::menu(resp).show(&mut entries);
-    resp.context_menu(&mut entries);
+    Popup::context_menu(resp)
+        .id(Popup::default_response_id(resp).with("context"))
+        .show(&mut entries);
     picked
 }
 
