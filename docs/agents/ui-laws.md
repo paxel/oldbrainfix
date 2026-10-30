@@ -327,3 +327,11 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - Keys replace swipes: one for back, one for forward. They are Alt+Left
   and Alt+Right, and the mouse's back and forward buttons; the keys
   rest while text is being typed.
+
+## User guide
+
+- **A ticket that changes a screen also updates its guide page and
+  frames**: the page's text under `site/en/guide/` and `site/de/guide/`,
+  and the frames, written anew by `tool/guide-frames.sh` and committed
+  with the change. CI fails while a committed frame no longer matches
+  its screen.

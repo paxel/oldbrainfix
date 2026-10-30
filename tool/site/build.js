@@ -25,7 +25,10 @@ export const LANGS = [
 ];
 
 /** The sections of the navigation, labelled per language. */
-export const TRACKS = [{ id: "reference", label: { en: "Reference", de: "Nachschlagen" } }];
+export const TRACKS = [
+  { id: "guide", label: { en: "Guide", de: "Anleitung" } },
+  { id: "reference", label: { en: "Reference", de: "Nachschlagen" } },
+];
 
 /** The chrome's words per language; the pages carry their own. */
 export const UI = {

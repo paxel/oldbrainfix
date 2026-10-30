@@ -312,7 +312,7 @@ jobs:
         working-directory: desktop
         env:
           SCREENSHOTS_DIR: ${{ github.workspace }}/screenshots
-        run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored
+        run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored render_the_screenshots
       - uses: actions/upload-artifact@v6
         with:
           name: screenshots

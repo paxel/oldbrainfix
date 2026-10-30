@@ -30,7 +30,7 @@ every release.
 Generator: `test/screenshots/screenshots_test.dart`, skipped in normal runs.
 
 ```sh
-flutter test test/screenshots --run-skipped --concurrency=1
+flutter test test/screenshots --run-skipped --concurrency=1 --plain-name 'store screenshots'
 ```
 
 It writes phone frames, 1080 × 1920, per locale to

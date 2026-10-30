@@ -28,14 +28,27 @@ jobs:
           flutter test
       - name: No untranslated strings
         run: test "$(tr -d '[:space:]' < build/untranslated.json)" = "{}"
+      # The user guide's frames are committed (#134): each is drawn again
+      # from the seeded data and compared, with a little slack for
+      # rasterising; a changed screen fails until tool/guide-frames.sh has
+      # written its frames anew.
+      - name: The guide's phone frames match their screens
+        run: flutter test test/screenshots/screenshots_test.dart --run-skipped --concurrency=1 --plain-name 'guide frames'
+      - name: The changed phone frames, for a look
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: guide-frames-phone
+          path: build/guide-frames
+          if-no-files-found: ignore
 
   desktop:
     name: Desktop (Rust)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: System libraries (ALSA for the microphone, cmake for whisper.cpp)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake g++
+      - name: System libraries (ALSA for the microphone, cmake for whisper.cpp, lavapipe for the guide's frames)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake g++ mesa-vulkan-drivers libvulkan1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -66,6 +79,18 @@ jobs:
           cargo fmt --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
+      # The desktop half of the guide's frames (#134), drawn by the software
+      # Vulkan as on any machine without a GPU.
+      - name: The guide's desktop frames match their screens
+        working-directory: desktop
+        run: cargo test -p oldbrainfix-gui --test screenshots --locked -- --ignored guide_frames
+      - name: The changed desktop frames, for a look
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: guide-frames-desktop
+          path: build/guide-frames
+          if-no-files-found: ignore
 
   # The Flatpak (#45): the files Flathub gets are current and pass its
   # linters, and the manifest builds from source for both arches.

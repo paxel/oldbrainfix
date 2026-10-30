@@ -1186,6 +1186,30 @@ h3:hover .anchor,
   width: auto;
 }
 
+/* A guide frame comes in light and dark (#134): the one of the site's
+   theme shows, the other is not loaded. */
+.frame .shot-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .frame .shot-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .frame .shot-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .frame .shot-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]) .frame .shot-dark {
+    display: block;
+  }
+}
+
 .frame figcaption {
   color: var(--muted);
   font-size: 0.85rem;

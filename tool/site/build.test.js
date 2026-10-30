@@ -204,6 +204,35 @@ test("the repository's own site builds and links, generated pages included", () 
   assert.ok(fs.readFileSync(path.join(out, "de", "reference", "whats-new.html"), "utf8").includes(anchor));
 });
 
+test("the Guide track is in both languages' navigation and on both home pages", () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "oldbrainfix-site-dist-"));
+  buildSite({ outDir: out, base: "/oldbrainfix/", generated: generatedPages() });
+  for (const [lang, label] of [["en", "Guide"], ["de", "Anleitung"]]) {
+    const home = fs.readFileSync(path.join(out, lang, "index.html"), "utf8");
+    assert.match(home, new RegExp(`<section class="nav-track" aria-label="${label}"><p class="eyebrow">${label}</p><ul><li><a href="\\.\\./${lang}/guide/index\\.html">`));
+    assert.match(home, /<a class="card" href="guide\/index\.html">/);
+    const guide = fs.readFileSync(path.join(out, lang, "guide", "index.html"), "utf8");
+    assert.match(guide, new RegExp(`<p class="eyebrow track-eyebrow">${label}</p>`));
+  }
+});
+
+test("every guide frame comes in English and German, light and dark", () => {
+  const frames = path.join(REPO_ROOT, "site", "assets", "frames");
+  for (const device of fs.readdirSync(frames)) {
+    const names = (lang, theme) => {
+      const dir = path.join(frames, device, lang, theme);
+      return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".png")).sort() : [];
+    };
+    const all = new Set(["en", "de"].flatMap((l) => ["light", "dark"].flatMap((t) => names(l, t))));
+    assert.ok(all.size > 0, `${device}: no frames`);
+    for (const lang of ["en", "de"]) {
+      for (const theme of ["light", "dark"]) {
+        assert.deepEqual(names(lang, theme), [...all].sort(), `${device}/${lang}/${theme}`);
+      }
+    }
+  }
+});
+
 test("the glossary is read from CONTEXT.md, and a term without its German entry fails", () => {
   const entries = parseGlossary("## Language\n\n### Capturing\n\n**Note**:\nA thought.\n_Avoid_: memo\n\n**Bereich** [Area]:\nA shelf.\n");
   assert.deepEqual(entries.map((e) => [e.term, e.english, e.avoid]), [["Note", "Note", "memo"], ["Bereich", "Area", ""]]);

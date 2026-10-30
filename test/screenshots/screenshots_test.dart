@@ -2,7 +2,17 @@
 // screens per locale, 1080 × 1920, into the fastlane metadata that Play
 // and F-Droid read. Skipped in normal runs; written with
 //
-//   flutter test test/screenshots --run-skipped --concurrency=1
+//   flutter test test/screenshots --run-skipped --concurrency=1 \
+//     --plain-name 'store screenshots'
+//
+// The user guide's phone frames (#134) come from the same seeded data:
+// each screen in English and German, light and dark, 648 × 1152, under
+// site/assets/frames/phone/<language>/<theme>/. They are committed; a run
+// compares each frame with the committed one and fails when they differ,
+// and UPDATE_FRAMES=1 writes them instead (tool/guide-frames.sh):
+//
+//   flutter test test/screenshots --run-skipped --concurrency=1 \
+//     --plain-name 'guide frames'
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -28,6 +38,18 @@ import '../open_capture.dart';
 /// 432 × 768 logical pixels, which 2.5 scales to exactly 1080 × 1920.
 const _frame = Size(1080, 1920);
 const _dpr = 2.5;
+
+/// The guide's frames: the same 432 × 768 screen at 1.5, 648 × 1152,
+/// enough for a page and light in the repository.
+const _guideDpr = 1.5;
+
+/// How far a guide frame may drift from the committed one before it
+/// counts as changed: a pixel differs when a channel is more than
+/// [_channelSlack] off, and a frame fails with more than [_pixelSlack]
+/// differing pixels. The slack absorbs the edges another engine version
+/// rasterises a shade differently; a changed word or button exceeds it.
+const _channelSlack = 24;
+const _pixelSlack = 200;
 
 /// Tuesday, 27 October 2026, 09:40 on the test machine's clock: the same
 /// Agenda, Streak and Adherence on every run.
@@ -391,6 +413,169 @@ Future<void> _loadFonts() async {
   await emoji.load();
 }
 
+/// Shows the app on [seeded] in [language] at [dpr], inside [boundary].
+Future<AppLocalizations> _start(
+  WidgetTester tester,
+  GlobalKey boundary,
+  String language,
+  _Seeded seeded,
+  double dpr, {
+  FakeAlarms? alarms,
+}) async {
+  tester.view
+    ..physicalSize = _frame / _dpr * dpr
+    ..devicePixelRatio = dpr;
+  tester.platformDispatcher.localesTestValue = [Locale(language)];
+  addTearDown(tester.view.reset);
+  addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+  addTearDown(seeded.store.close);
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: boundary,
+      child: OldBrainFixApp(
+        store: seeded.store,
+        alarms: alarms ?? FakeAlarms(),
+        voice: FakeVoice(),
+        photos: FakePhotos(),
+      ),
+    ),
+  );
+  // The brain in the Agenda's title, decoded before the frame.
+  final context = tester.element(find.byType(Navigator));
+  await tester.runAsync(
+    () => precacheImage(const AssetImage('assets/brain.png'), context),
+  );
+  await tester.pumpAndSettle();
+  return AppLocalizations.of(context);
+}
+
+Future<void> _tap(WidgetTester tester, Finder finder) async {
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+/// What [boundary] shows now at [dpr]: as PNG and as raw RGBA.
+Future<({int width, int height, Uint8List png, Uint8List rgba})> _capture(
+  WidgetTester tester,
+  GlobalKey boundary,
+  double dpr,
+) async {
+  await tester.pumpAndSettle();
+  final render =
+      boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  final shot = await tester.runAsync(() async {
+    final image = await render.toImage(pixelRatio: dpr);
+    try {
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      final rgba = await image.toByteData();
+      return (
+        width: image.width,
+        height: image.height,
+        png: png!.buffer.asUint8List(),
+        rgba: rgba!.buffer.asUint8List(),
+      );
+    } finally {
+      image.dispose();
+    }
+  });
+  return shot!;
+}
+
+/// The raw RGBA of the PNG [bytes], with its size.
+Future<({int width, int height, Uint8List rgba})> _decode(
+  WidgetTester tester,
+  Uint8List bytes,
+) async {
+  final decoded = await tester.runAsync(() async {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final image = (await codec.getNextFrame()).image;
+    try {
+      final rgba = await image.toByteData();
+      return (
+        width: image.width,
+        height: image.height,
+        rgba: rgba!.buffer.asUint8List(),
+      );
+    } finally {
+      image.dispose();
+      codec.dispose();
+    }
+  });
+  return decoded!;
+}
+
+/// Compares what [boundary] shows with the committed guide frame at
+/// [path], or writes it there with UPDATE_FRAMES=1. A changed frame fails
+/// and is written to build/guide-frames/ for a look.
+Future<void> _matchFrame(
+  WidgetTester tester,
+  GlobalKey boundary,
+  String path,
+) async {
+  final shot = await _capture(tester, boundary, _guideDpr);
+  final file = File(path);
+  if (Platform.environment['UPDATE_FRAMES'] == '1') {
+    file.parent.createSync(recursive: true);
+    file.writeAsBytesSync(shot.png);
+    return;
+  }
+  String? problem;
+  if (!file.existsSync()) {
+    problem = 'no committed frame';
+  } else {
+    final old = await _decode(tester, file.readAsBytesSync());
+    if ((old.width, old.height) != (shot.width, shot.height)) {
+      problem =
+          'size ${shot.width} × ${shot.height}, '
+          'committed ${old.width} × ${old.height}';
+    } else {
+      var differing = 0;
+      for (var i = 0; i < shot.rgba.length; i += 4) {
+        for (var c = 0; c < 4; c++) {
+          if ((shot.rgba[i + c] - old.rgba[i + c]).abs() > _channelSlack) {
+            differing++;
+            break;
+          }
+        }
+      }
+      if (differing > _pixelSlack) problem = '$differing pixels differ';
+    }
+  }
+  if (problem != null) {
+    final fresh = File('build/guide-frames/${file.path}')
+      ..parent.createSync(recursive: true)
+      ..writeAsBytesSync(shot.png);
+    fail(
+      '$path no longer matches its screen ($problem); the new frame is '
+      '${fresh.path}. Regenerate with tool/guide-frames.sh.',
+    );
+  }
+}
+
+/// Runs [body] as test [name] with real shadows and counted ids: the
+/// embossed cards are flat otherwise, and the own Profile's placeholder
+/// colour, made from its id, is the same on every run. Restored before
+/// the test ends, which checks it.
+void _shot(String name, Future<void> Function(WidgetTester) body) {
+  testWidgets(name, (tester) async {
+    debugDisableShadows = false;
+    EditableText.debugDeterministicCursor = true;
+    // Bare screens: no debug banner in the corner.
+    WidgetsApp.debugAllowBannerOverride = false;
+    final random = Store.idMaker;
+    var ids = 0;
+    Store.idMaker = () => 'shot${++ids}';
+    try {
+      await body(tester);
+    } finally {
+      debugDisableShadows = true;
+      EditableText.debugDeterministicCursor = false;
+      WidgetsApp.debugAllowBannerOverride = true;
+      Store.idMaker = random;
+    }
+  });
+}
+
 void main() {
   group('store screenshots', skip: 'writes PNGs; run with --run-skipped', () {
     setUpAll(_loadFonts);
@@ -404,86 +589,27 @@ void main() {
       );
       final boundary = GlobalKey();
 
-      /// Shows the app on [seeded] as a phone in [language] would.
       Future<AppLocalizations> start(
         WidgetTester tester,
         _Seeded seeded, {
         FakeAlarms? alarms,
-      }) async {
-        tester.view
-          ..physicalSize = _frame
-          ..devicePixelRatio = _dpr;
-        tester.platformDispatcher.localesTestValue = [Locale(language)];
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
-        addTearDown(seeded.store.close);
-        await tester.pumpWidget(
-          RepaintBoundary(
-            key: boundary,
-            child: OldBrainFixApp(
-              store: seeded.store,
-              alarms: alarms ?? FakeAlarms(),
-              voice: FakeVoice(),
-              photos: FakePhotos(),
-            ),
-          ),
-        );
-        // The brain in the Agenda's title, decoded before the frame.
-        final context = tester.element(find.byType(Navigator));
-        await tester.runAsync(
-          () => precacheImage(const AssetImage('assets/brain.png'), context),
-        );
-        await tester.pumpAndSettle();
-        return AppLocalizations.of(context);
-      }
+      }) => _start(tester, boundary, language, seeded, _dpr, alarms: alarms);
 
-      Future<void> tap(WidgetTester tester, Finder finder) async {
-        await tester.tap(finder);
-        await tester.pumpAndSettle();
-      }
+      Future<void> tap(WidgetTester tester, Finder finder) =>
+          _tap(tester, finder);
 
       /// Writes what the app shows now as [name].
       Future<void> shoot(WidgetTester tester, String name) async {
-        await tester.pumpAndSettle();
-        final render =
-            boundary.currentContext!.findRenderObject()!
-                as RenderRepaintBoundary;
-        final png = await tester.runAsync(() async {
-          final image = await render.toImage(pixelRatio: _dpr);
-          try {
-            expect((image.width, image.height), (1080, 1920));
-            final data = await image.toByteData(format: ui.ImageByteFormat.png);
-            return data!.buffer.asUint8List();
-          } finally {
-            image.dispose();
-          }
-        });
+        final shot = await _capture(tester, boundary, _dpr);
+        expect((shot.width, shot.height), (1080, 1920));
         out.createSync(recursive: true);
-        File('${out.path}/$name').writeAsBytesSync(png!);
+        File('${out.path}/$name').writeAsBytesSync(shot.png);
       }
 
-      /// Runs [body] with real shadows: the embossed cards are flat
-      /// otherwise. Restored before the test ends, which checks it.
       void frame(String name, Future<void> Function(WidgetTester) body) {
-        testWidgets('$locale $name', (tester) async {
-          debugDisableShadows = false;
-          EditableText.debugDeterministicCursor = true;
-          // Bare screens: no debug banner in the corner.
-          WidgetsApp.debugAllowBannerOverride = false;
-          // Counted ids: the own Profile's placeholder colour, made from
-          // its id, is the same on every run.
-          final random = Store.idMaker;
-          var ids = 0;
-          Store.idMaker = () => 'shot${++ids}';
-          try {
-            await body(tester);
-            await shoot(tester, name);
-          } finally {
-            debugDisableShadows = true;
-            EditableText.debugDeterministicCursor = false;
-            WidgetsApp.debugAllowBannerOverride = true;
-            Store.idMaker = random;
-          }
+        _shot('$locale $name', (tester) async {
+          await body(tester);
+          await shoot(tester, name);
         });
       }
 
@@ -555,4 +681,44 @@ void main() {
       });
     }
   });
+
+  group(
+    'guide frames',
+    skip: 'compares the frames; run with --run-skipped',
+    () {
+      setUpAll(_loadFonts);
+
+      for (final (language, texts) in [('en', _en), ('de', _de)]) {
+        for (final (theme, choice) in [
+          ('light', ThemeChoice.light),
+          ('dark', ThemeChoice.dark),
+        ]) {
+          final boundary = GlobalKey();
+
+          /// The seeded store in this frame's theme.
+          _Seeded seed() => _Seeded(texts)..store.themeChoice = choice;
+
+          Future<AppLocalizations> start(WidgetTester tester, _Seeded seeded) =>
+              _start(tester, boundary, language, seeded, _guideDpr);
+
+          /// The guide frame [name]: [body] brings the app to its screen.
+          void frame(String name, Future<void> Function(WidgetTester) body) {
+            _shot('$language $theme $name', (tester) async {
+              await body(tester);
+              await _matchFrame(
+                tester,
+                boundary,
+                'site/assets/frames/phone/$language/$theme/$name.png',
+              );
+            });
+          }
+
+          frame('agenda', (tester) async {
+            await start(tester, seed());
+            expect(find.byType(AgendaScreen), findsOneWidget);
+          });
+        }
+      }
+    },
+  );
 }
