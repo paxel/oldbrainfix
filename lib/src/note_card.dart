@@ -113,6 +113,9 @@ class NoteActions {
   /// Sends the Note to a person as a Sent Item.
   final VoidCallback? onSend;
 
+  /// Hands the Note's text, photos and recordings to another app.
+  final VoidCallback? onShare;
+
   /// The calendar choices, read as the menu opens; only shown with a
   /// calendar.
   final NoteCalendar Function()? calendar;
@@ -151,6 +154,7 @@ class NoteActions {
     this.onEdit,
     this.onImportance,
     this.onSend,
+    this.onShare,
     this.calendar,
     this.onAmend,
     this.removals,
@@ -707,6 +711,8 @@ class _MoreButton extends StatelessWidget {
           ],
           if (actions.onSend case final send?)
             item('note-send', Icons.send_outlined, t.sendToPerson, send),
+          if (actions.onShare case final share?)
+            item('note-share', Icons.share_outlined, t.shareToApp, share),
           if (calendar != null && calendar.add.isNotEmpty)
             item(
               'note-calendar',

@@ -253,6 +253,177 @@ abstract final class Markdown {
     return out.toString();
   }
 
+  /// [text] as HTML, for an app that shows formatted text another app
+  /// hands it (#129), the same in both cores. Lines in a row of
+  /// paragraph lines are one `<p>`, of quote lines one `<blockquote>`,
+  /// with `<br>` between them; a line of only spaces and tabs ends either
+  /// and shows nothing. Headings are `<h1>` and `<h2>`. Items in a row
+  /// are one `<ul>` or `<ol>`, `start` its first number unless that is
+  /// 1, those one level in a list inside the item above them; another
+  /// kind of item starts a list of its own. A table is a `<table>`, its
+  /// header row in `<thead>` with `<th>` cells, the first cell of each
+  /// other row a `<th>` too when its first column holds headings, a
+  /// column's alignment as `align`. Bold is `<strong>`, italic `<em>`,
+  /// strike-through `<del>`, code `<code>`; a link is an `<a>` only when
+  /// [mayOpen] allows its destination, else its label alone. Every
+  /// character of the text is escaped, so nothing in it is markup;
+  /// status marks and tags are text. A line break follows each part at
+  /// the top.
+  static String html(String text) {
+    final out = StringBuffer();
+    // The paragraph or quote open, and the kinds of the lists open, the
+    // outer one first, each with an item open.
+    String? open;
+    final lists = <MarkdownBlockKind>[];
+    void closeLists(int keep) {
+      while (lists.length > keep) {
+        final kind = lists.removeLast();
+        out.write(
+          kind == MarkdownBlockKind.numbered ? '</li></ol>' : '</li></ul>',
+        );
+        if (lists.isEmpty) out.write('\n');
+      }
+    }
+
+    void close() {
+      if (open != null) out.write('</$open>\n');
+      open = null;
+      closeLists(0);
+    }
+
+    void openAs(String tag) {
+      if (open == tag) {
+        out.write('<br>');
+      } else {
+        close();
+        out.write('<$tag>');
+        open = tag;
+      }
+    }
+
+    for (final block in parse(text)) {
+      switch (block.kind) {
+        case MarkdownBlockKind.table:
+          final table = block.table;
+          if (table == null || block.line != table.firstLine) continue;
+          close();
+          _htmlTable(out, table);
+        case MarkdownBlockKind.paragraph:
+          if (_skipBlank(text, block.start, block.end) == block.end) {
+            close();
+            continue;
+          }
+          openAs('p');
+          _htmlSpans(out, block.spans);
+        case MarkdownBlockKind.quote:
+          openAs('blockquote');
+          _htmlSpans(out, block.spans);
+        case MarkdownBlockKind.heading1 || MarkdownBlockKind.heading2:
+          close();
+          final tag = block.kind == MarkdownBlockKind.heading1 ? 'h1' : 'h2';
+          out.write('<$tag>');
+          _htmlSpans(out, block.spans);
+          out.write('</$tag>\n');
+        case MarkdownBlockKind.bullet || MarkdownBlockKind.numbered:
+          if (open != null) close();
+          // One level in only inside an item.
+          final level = block.level < lists.length ? block.level : lists.length;
+          closeLists(level + 1);
+          if (lists.length == level + 1 && lists[level] == block.kind) {
+            out.write('</li><li>');
+          } else {
+            closeLists(level);
+            out.write(switch (block.kind) {
+              MarkdownBlockKind.numbered when block.number != 1 =>
+                '<ol start="${block.number}"><li>',
+              MarkdownBlockKind.numbered => '<ol><li>',
+              _ => '<ul><li>',
+            });
+            lists.add(block.kind);
+          }
+          _htmlSpans(out, block.spans);
+      }
+    }
+    close();
+    return out.toString();
+  }
+
+  static void _htmlTable(StringBuffer out, MarkdownTable table) {
+    void row(MarkdownTableRow row, bool header) {
+      out.write('<tr>');
+      for (final (c, cell) in row.cells.indexed) {
+        final tag = header || (c == 0 && table.headingColumn) ? 'th' : 'td';
+        final align = c < table.aligns.length
+            ? table.aligns[c]
+            : MarkdownAlign.none;
+        out.write(
+          align == MarkdownAlign.none
+              ? '<$tag>'
+              : '<$tag align="${align.name}">',
+        );
+        _htmlSpans(out, cell.spans);
+        out.write('</$tag>');
+      }
+      out.write('</tr>');
+    }
+
+    out.write('<table><thead>');
+    row(table.rows.first, true);
+    out.write('</thead>');
+    if (table.rows.length > 1) {
+      out.write('<tbody>');
+      for (final r in table.rows.skip(1)) {
+        row(r, false);
+      }
+      out.write('</tbody>');
+    }
+    out.write('</table>\n');
+  }
+
+  static void _htmlSpans(StringBuffer out, List<MarkdownSpan> spans) {
+    for (final s in spans) {
+      switch (s.kind) {
+        case MarkdownSpanKind.text:
+          out.write(_htmlEscape(s.text));
+        case MarkdownSpanKind.code:
+          out.write('<code>${_htmlEscape(s.text)}</code>');
+        case MarkdownSpanKind.link when mayOpen(s.url):
+          out.write('<a href="${_htmlEscape(s.url)}">');
+          _htmlSpans(out, s.children);
+          out.write('</a>');
+        case MarkdownSpanKind.link:
+          _htmlSpans(out, s.children);
+        case MarkdownSpanKind.bold ||
+            MarkdownSpanKind.italic ||
+            MarkdownSpanKind.strike:
+          final tag = switch (s.kind) {
+            MarkdownSpanKind.bold => 'strong',
+            MarkdownSpanKind.italic => 'em',
+            _ => 'del',
+          };
+          out.write('<$tag>');
+          _htmlSpans(out, s.children);
+          out.write('</$tag>');
+      }
+    }
+  }
+
+  /// [text] with `&`, `<`, `>`, `"` and `'` written as HTML references.
+  static String _htmlEscape(String text) {
+    final out = StringBuffer();
+    for (final c in text.codeUnits) {
+      out.write(switch (c) {
+        0x26 => '&amp;',
+        0x3C => '&lt;',
+        0x3E => '&gt;',
+        0x22 => '&quot;',
+        0x27 => '&#39;',
+        _ => String.fromCharCode(c),
+      });
+    }
+    return out.toString();
+  }
+
   /// Whether [text] uses any format: a line other than a paragraph line,
   /// or bold, italic, strike-through, code or a link. An escaped
   /// character is none.

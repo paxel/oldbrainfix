@@ -340,6 +340,19 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         assert_eq!(at_once, list, "sections_of {id}");
         sections.insert(id.clone(), json!(list));
     }
+    let mut shares = serde_json::Map::new();
+    for note in all.iter().chain(trashed.iter()) {
+        let share = oldbrainfix_core::share::note_share(note, &notes.sections(&note.id)?, dart_iso);
+        shares.insert(
+            note.id.clone(),
+            json!({
+                "html": share.html,
+                "photos": share.photos,
+                "recordings": share.recordings,
+                "text": share.text,
+            }),
+        );
+    }
     let ids = |list: &[Note]| list.iter().map(|n| n.id.clone()).collect::<Vec<_>>();
     let mut searched = serde_json::Map::new();
     for query in QUERIES {
@@ -358,6 +371,7 @@ fn read(store: &Store) -> Result<Value, Box<dyn std::error::Error>> {
         "untranscribed": blobs_json(&notes.untranscribed()?),
         "unreadPhotos": blobs_json(&notes.unread_photos()?),
         "removable": removable,
+        "shares": shares,
         "search": searched,
         "searchWithin": within,
         "conflicts": conflicts_json(&store.conflicts()?),
@@ -4586,6 +4600,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         let ours = json!({
             "blocks": blocks,
             "escaped": markdown::escape(text),
+            "html": markdown::html(text),
             "marks": marks,
             "plain": markdown::plain(text),
             "shortcuts": shortcuts,

@@ -145,6 +145,32 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000015": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought"
+    },
+    "note:00000000000000000000000000000013": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Odd kind\nOne"
+    },
+    "note:0000000000000000000000000000000c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Hardware"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Groceries"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000015",

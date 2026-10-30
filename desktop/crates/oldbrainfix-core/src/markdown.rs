@@ -297,6 +297,206 @@ pub fn plain(text: &str) -> String {
     out
 }
 
+/// `text` as HTML, for an app that shows formatted text another app
+/// hands it (#129), the same in both cores. Lines in a row of paragraph
+/// lines are one `<p>`, of quote lines one `<blockquote>`, with `<br>`
+/// between them; a line of only spaces and tabs ends either and shows
+/// nothing. Headings are `<h1>` and `<h2>`. Items in a row are one `<ul>`
+/// or `<ol>`, `start` its first number unless that is 1, those one level
+/// in a list inside the item above them; another kind of item starts a
+/// list of its own. A table is a `<table>`, its header row in `<thead>`
+/// with `<th>` cells, the first cell of each other row a `<th>` too when
+/// its first column holds headings, a column's alignment as `align`.
+/// Bold is `<strong>`, italic `<em>`, strike-through `<del>`, code
+/// `<code>`; a link is an `<a>` only when [`may_open`] allows its
+/// destination, else its label alone. Every character of the text is
+/// escaped, so nothing in it is markup; status marks and tags are text. A
+/// line break follows each part at the top.
+pub fn html(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut html = Html::default();
+    for block in parse(text) {
+        match block.kind {
+            BlockKind::Table => {
+                let Some(table) = &block.table else { continue };
+                if block.line != table.first_line {
+                    continue;
+                }
+                html.close();
+                html_table(&mut html.out, table);
+            }
+            BlockKind::Paragraph => {
+                if skip_blank(bytes, block.start, block.end) == block.end {
+                    html.close();
+                    continue;
+                }
+                html.open_as("p");
+                html_spans(&mut html.out, &block.spans);
+            }
+            BlockKind::Quote => {
+                html.open_as("blockquote");
+                html_spans(&mut html.out, &block.spans);
+            }
+            BlockKind::Heading1 | BlockKind::Heading2 => {
+                html.close();
+                let tag = if block.kind == BlockKind::Heading1 {
+                    "h1"
+                } else {
+                    "h2"
+                };
+                html.out.push_str(&format!("<{tag}>"));
+                html_spans(&mut html.out, &block.spans);
+                html.out.push_str(&format!("</{tag}>\n"));
+            }
+            BlockKind::Bullet | BlockKind::Numbered => {
+                if html.open.is_some() {
+                    html.close();
+                }
+                // One level in only inside an item.
+                let level = block.level.min(html.lists.len());
+                html.close_lists(level + 1);
+                if html.lists.len() == level + 1 && html.lists[level] == block.kind {
+                    html.out.push_str("</li><li>");
+                } else {
+                    html.close_lists(level);
+                    match block.kind {
+                        BlockKind::Numbered if block.number != 1 => {
+                            html.out
+                                .push_str(&format!("<ol start=\"{}\"><li>", block.number));
+                        }
+                        BlockKind::Numbered => html.out.push_str("<ol><li>"),
+                        _ => html.out.push_str("<ul><li>"),
+                    }
+                    html.lists.push(block.kind);
+                }
+                html_spans(&mut html.out, &block.spans);
+            }
+        }
+    }
+    html.close();
+    html.out
+}
+
+/// What [`html`] has written and has open: the paragraph or quote, and
+/// the kinds of the lists, the outer one first, each with an item open.
+#[derive(Default)]
+struct Html {
+    out: String,
+    open: Option<&'static str>,
+    lists: Vec<BlockKind>,
+}
+
+impl Html {
+    fn close_lists(&mut self, keep: usize) {
+        while self.lists.len() > keep {
+            let kind = self.lists.pop();
+            self.out.push_str(if kind == Some(BlockKind::Numbered) {
+                "</li></ol>"
+            } else {
+                "</li></ul>"
+            });
+            if self.lists.is_empty() {
+                self.out.push('\n');
+            }
+        }
+    }
+
+    fn close(&mut self) {
+        if let Some(tag) = self.open.take() {
+            self.out.push_str(&format!("</{tag}>\n"));
+        }
+        self.close_lists(0);
+    }
+
+    fn open_as(&mut self, tag: &'static str) {
+        if self.open == Some(tag) {
+            self.out.push_str("<br>");
+        } else {
+            self.close();
+            self.out.push_str(&format!("<{tag}>"));
+            self.open = Some(tag);
+        }
+    }
+}
+
+fn html_table(out: &mut String, table: &Table) {
+    let row = |out: &mut String, row: &table::Row, header: bool| {
+        out.push_str("<tr>");
+        for (c, cell) in row.cells.iter().enumerate() {
+            let tag = if header || (c == 0 && table.heading_column) {
+                "th"
+            } else {
+                "td"
+            };
+            match table.aligns.get(c).copied().unwrap_or(table::Align::None) {
+                table::Align::None => out.push_str(&format!("<{tag}>")),
+                align => out.push_str(&format!("<{tag} align=\"{}\">", align.name())),
+            }
+            html_spans(out, &cell.spans);
+            out.push_str(&format!("</{tag}>"));
+        }
+        out.push_str("</tr>");
+    };
+    out.push_str("<table><thead>");
+    if let Some(header) = table.rows.first() {
+        row(&mut *out, header, true);
+    }
+    out.push_str("</thead>");
+    if table.rows.len() > 1 {
+        out.push_str("<tbody>");
+        for r in table.rows.iter().skip(1) {
+            row(&mut *out, r, false);
+        }
+        out.push_str("</tbody>");
+    }
+    out.push_str("</table>\n");
+}
+
+fn html_spans(out: &mut String, spans: &[Span]) {
+    for s in spans {
+        match s.kind {
+            SpanKind::Text => html_escape(out, &s.text),
+            SpanKind::Code => {
+                out.push_str("<code>");
+                html_escape(out, &s.text);
+                out.push_str("</code>");
+            }
+            SpanKind::Link if may_open(&s.url) => {
+                out.push_str("<a href=\"");
+                html_escape(out, &s.url);
+                out.push_str("\">");
+                html_spans(out, &s.children);
+                out.push_str("</a>");
+            }
+            SpanKind::Link => html_spans(out, &s.children),
+            SpanKind::Bold | SpanKind::Italic | SpanKind::Strike => {
+                let tag = match s.kind {
+                    SpanKind::Bold => "strong",
+                    SpanKind::Italic => "em",
+                    _ => "del",
+                };
+                out.push_str(&format!("<{tag}>"));
+                html_spans(out, &s.children);
+                out.push_str(&format!("</{tag}>"));
+            }
+        }
+    }
+}
+
+/// `text` with `&`, `<`, `>`, `"` and `'` written as HTML references.
+fn html_escape(out: &mut String, text: &str) {
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(c),
+        }
+    }
+}
+
 /// Whether `text` uses any format: a line other than a paragraph line,
 /// or bold, italic, strike-through, code or a link. An escaped character
 /// is none.
@@ -1610,5 +1810,27 @@ mod tests {
         ] {
             assert!(!may_open(url), "{url}");
         }
+    }
+
+    #[test]
+    fn html_groups_lines_escapes_and_links_only_what_may_open() {
+        assert_eq!(
+            html("one\ntwo\n\n  \nthree\n> a\n> **b**\n- a\n  - b\n  1. c\n- d\n\n3. f\n# H"),
+            "<p>one<br>two</p>\n<p>three</p>\n<blockquote>a<br><strong>b</strong></blockquote>\n\
+             <ul><li>a<ul><li>b</li></ul><ol><li>c</li></ol></li><li>d</li></ul>\n\
+             <ol start=\"3\"><li>f</li></ol>\n<h1>H</h1>\n"
+        );
+        assert_eq!(
+            html("<b>&</b> 'q' `<i>` [w](https://x.org/?a&b) [no](javascript:x)"),
+            "<p>&lt;b&gt;&amp;&lt;/b&gt; &#39;q&#39; <code>&lt;i&gt;</code> \
+             <a href=\"https://x.org/?a&amp;b\">w</a> no</p>\n"
+        );
+        assert_eq!(
+            html("<!-- first column headings -->\n| A | B |\n|:-:|--:|\n| x | **y** |"),
+            "<table><thead><tr><th align=\"center\">A</th><th align=\"right\">B</th></tr></thead>\
+             <tbody><tr><th align=\"center\">x</th><td align=\"right\"><strong>y</strong></td></tr>\
+             </tbody></table>\n"
+        );
+        assert_eq!(html(""), "");
     }
 }

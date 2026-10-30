@@ -213,6 +213,44 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000006": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Quote \" backslash \\ slash / newline \n tab \t bell \u0001 umlaut ü emoji 🧠"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Half a millisecond later"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "First text"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Maybe paint the shed"
+    },
+    "note:00000000000000000000000000000002": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Needs more sauce"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Buy more sauce"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000006",

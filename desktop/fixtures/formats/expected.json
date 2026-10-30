@@ -393,6 +393,62 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "{\"format\":\"plain\",\"text\":\"Odd version\",\"v\":\"1\"}"
+    },
+    "note:0000000000000000000000000000000a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": ""
+    },
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Version two"
+    },
+    "note:00000000000000000000000000000008": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "# Version one"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Version one written out"
+    },
+    "note:00000000000000000000000000000006": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "# Heading\n**bold** ü"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Plain host\n\n2026-01-01T10:00:12.000Z\n# Heading\n**bold** ü\n\n2026-01-01T10:00:17.000Z\n# Heading\n**bold** ü"
+    },
+    "note:00000000000000000000000000000002": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "{\"format\":\"plain\"}"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Plain oat milk"
+    }
+  },
   "search": {
     "": [
       "note:0000000000000000000000000000000b",

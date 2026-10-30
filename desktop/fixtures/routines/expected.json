@@ -402,6 +402,80 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000018": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Another thought"
+    },
+    "note:00000000000000000000000000000017": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought"
+    },
+    "note:00000000000000000000000000000011": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Walk the dog"
+    },
+    "note:0000000000000000000000000000000f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Stretch"
+    },
+    "note:0000000000000000000000000000000d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Old habit"
+    },
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Pay the rent"
+    },
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Night meds"
+    },
+    "note:00000000000000000000000000000006": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Dentist"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Water the plants"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Take the pills"
+    },
+    "note:00000000000000000000000000000015": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Car inspection"
+    },
+    "note:00000000000000000000000000000013": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Flyer for the fair"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000018",

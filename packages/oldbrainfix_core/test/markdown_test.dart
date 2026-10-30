@@ -943,4 +943,65 @@ void main() {
     expect(phone.conflicts(), isEmpty);
     expect(Notes(phone).byId(note.id)!.textFormat, TextFormats.markdown);
   });
+
+  group('html', () {
+    test('lines in a row are one paragraph or quote, a blank line ends it', () {
+      expect(
+        Markdown.html('one\ntwo\n\n  \nthree\n> a\n> **b**\nfour'),
+        '<p>one<br>two</p>\n<p>three</p>\n'
+        '<blockquote>a<br><strong>b</strong></blockquote>\n<p>four</p>\n',
+      );
+      expect(Markdown.html(''), '');
+      expect(
+        Markdown.html('# A\n## B *c*'),
+        '<h1>A</h1>\n<h2>B <em>c</em></h2>\n',
+      );
+    });
+
+    test('items in a row are one list, one level in inside the item above', () {
+      expect(
+        Markdown.html('- a\n  - b\n  1. c\n- d\n1. e\n\n3. f\n  - g'),
+        '<ul><li>a<ul><li>b</li></ul><ol><li>c</li></ol></li><li>d</li></ul>\n'
+        '<ol><li>e</li></ol>\n'
+        '<ol start="3"><li>f<ul><li>g</li></ul></li></ol>\n',
+      );
+    });
+
+    test('a table is a table, headings and alignment kept', () {
+      expect(
+        Markdown.html(
+          '<!-- first column headings -->\n| A | B |\n|:-:|--:|\n'
+          '| x | **y** |\n| z |',
+        ),
+        '<table><thead><tr><th align="center">A</th><th align="right">B</th>'
+        '</tr></thead><tbody><tr><th align="center">x</th>'
+        '<td align="right"><strong>y</strong></td></tr>'
+        '<tr><th align="center">z</th><td align="right"></td></tr>'
+        '</tbody></table>\n',
+      );
+    });
+
+    test('everything written is escaped, and only web and e-mail links are '
+        'links', () {
+      expect(
+        Markdown.html(
+          '<b>&</b> "q" \'s\' `<i>` ~~x~~ ☐ #tag '
+          '[web](https://x.org/?a=1&b="2") [no](javascript:alert(1)) '
+          '[mail](MAILTO:a@b.c)',
+        ),
+        '<p>&lt;b&gt;&amp;&lt;/b&gt; &quot;q&quot; &#39;s&#39; '
+        '<code>&lt;i&gt;</code> <del>x</del> ☐ #tag '
+        '<a href="https://x.org/?a=1&amp;b=&quot;2&quot;">web</a> no '
+        '<a href="MAILTO:a@b.c">mail</a></p>\n',
+      );
+    });
+
+    test('an escaped text reads as itself', () {
+      const text = '# not a heading\n- *no* list | 1. x';
+      expect(
+        Markdown.html(Markdown.escape(text)),
+        '<p># not a heading<br>- *no* list | 1. x</p>\n',
+      );
+    });
+  });
 }

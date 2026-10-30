@@ -343,6 +343,16 @@ class MainActivity : FlutterActivity() {
                         args["path"] as? String ?: "",
                         args["type"] as? String ?: "application/octet-stream",
                     )
+                    "shareText" -> shareWith(
+                        result,
+                        Bundles.textChooser(
+                            this@MainActivity,
+                            args["text"] as? String ?: "",
+                            args["html"] as? String,
+                            (args["paths"] as? List<*>).orEmpty().map { it as? String ?: "" },
+                            (args["types"] as? List<*>).orEmpty().map { it as? String ?: "" },
+                        ),
+                    )
                     "pick" -> pickBundle(result)
                     "take" -> result.success(Bundles.take())
                     "print" -> result.success(
@@ -486,8 +496,15 @@ class MainActivity : FlutterActivity() {
      * once the user is back: "taken" when an app was picked, "dismissed"
      * when the chooser was left, "none" when nothing can take it.
      */
-    private fun shareBundle(result: MethodChannel.Result, path: String, type: String) {
-        val chooser = Bundles.chooser(this, path, type) ?: return result.success("none")
+    private fun shareBundle(result: MethodChannel.Result, path: String, type: String) =
+        shareWith(result, Bundles.chooser(this, path, type))
+
+    /**
+     * Opens the share [chooser], answering as [shareBundle] does; "none"
+     * when there is no chooser.
+     */
+    private fun shareWith(result: MethodChannel.Result, chooser: Intent?) {
+        if (chooser == null) return result.success("none")
         try {
             startActivity(chooser)
         } catch (_: ActivityNotFoundException) {

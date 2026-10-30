@@ -126,6 +126,14 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000005": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000005"
@@ -271,6 +279,14 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000005": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000005"
@@ -413,6 +429,14 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000005": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000005"
@@ -660,6 +684,28 @@
           "photo/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d",
           "ocr/384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
         ]
+      },
+      "shares": {
+        "note:0000000000000000000000000000000b": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Ruder words"
+        },
+        "note:00000000000000000000000000000007": {
+          "html": null,
+          "photos": [
+            "384778eca6013eb953717fdc0a8c890e8186ee2f064e0cb159cb50220836c24d"
+          ],
+          "recordings": [],
+          "text": "Rude words"
+        },
+        "note:00000000000000000000000000000005": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk\n\n2026-01-01T10:00:37.000Z\nRude too"
+        }
       },
       "search": {
         "": [

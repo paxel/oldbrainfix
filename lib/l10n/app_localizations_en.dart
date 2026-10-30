@@ -2078,9 +2078,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairedPerson => 'Another person\'s Device';
 
   @override
-  String get sendNote => 'Send this Note';
-
-  @override
   String get sendTitle => 'Send this Note';
 
   @override
@@ -3932,6 +3929,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sendNoAppFix =>
       'Install a messenger or a mail app, then send it again.';
+
+  @override
+  String get shareToApp => 'Share to an app';
+
+  @override
+  String get noteNotShared => 'The Note was not shared.';
+
+  @override
+  String get noteNotSharedTitle => 'Note not shared';
+
+  @override
+  String get shareNoApp => 'No app here can take the Note.';
+
+  @override
+  String get shareNoAppFix =>
+      'Install a messenger or a mail app, then share it again.';
+
+  @override
+  String get shareNotWrittenCause =>
+      'The photos and recordings of the Note could not be written for sharing.';
+
+  @override
+  String get shareNothingCause =>
+      'The Note\'s photos and recordings are not on this Device yet.';
+
+  @override
+  String get shareNothingFix =>
+      'Sync with your other Devices, then share it again.';
 
   @override
   String get calendarMirrorNotOn =>

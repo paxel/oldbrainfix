@@ -2095,9 +2095,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get pairedPerson => 'Gerät einer anderen Person';
 
   @override
-  String get sendNote => 'Diese Notiz senden';
-
-  @override
   String get sendTitle => 'Diese Notiz senden';
 
   @override
@@ -3978,6 +3975,34 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get sendNoAppFix =>
       'Installiere einen Messenger oder eine Mail-App und sende sie dann noch einmal.';
+
+  @override
+  String get shareToApp => 'Mit einer App teilen';
+
+  @override
+  String get noteNotShared => 'Die Notiz wurde nicht geteilt.';
+
+  @override
+  String get noteNotSharedTitle => 'Notiz nicht geteilt';
+
+  @override
+  String get shareNoApp => 'Keine App hier kann die Notiz annehmen.';
+
+  @override
+  String get shareNoAppFix =>
+      'Installiere einen Messenger oder eine Mail-App und teile sie dann noch einmal.';
+
+  @override
+  String get shareNotWrittenCause =>
+      'Die Fotos und Aufnahmen der Notiz konnten zum Teilen nicht geschrieben werden.';
+
+  @override
+  String get shareNothingCause =>
+      'Die Fotos und Aufnahmen der Notiz sind noch nicht auf diesem Gerät.';
+
+  @override
+  String get shareNothingFix =>
+      'Synchronisiere mit deinen anderen Geräten und teile sie dann noch einmal.';
 
   @override
   String get calendarMirrorNotOn =>

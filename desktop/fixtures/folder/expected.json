@@ -303,6 +303,48 @@
       }
     ],
     "removable": {},
+    "shares": {
+      "note:0000000000000000000000000000000c": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Pills"
+      },
+      "note:0000000000000000000000000000000b": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Unsorted thought"
+      },
+      "note:0000000000000000000000000000000a": {
+        "html": null,
+        "photos": [],
+        "recordings": [
+          "1ea0b82fcff189743ed6ce83a48c90e6804df158c4d6f34e6eecaf556a3173bc"
+        ],
+        "text": "Needs more sauce"
+      },
+      "note:00000000000000000000000000000008": {
+        "html": null,
+        "photos": [
+          "86d482994bce129d1dab379710b39dccaa38b6e80b15cc5af2651a255559188b"
+        ],
+        "recordings": [],
+        "text": "Blood test on Friday\n\n2026-01-01T10:00:25.000Z\nFasting from midnight"
+      },
+      "note:00000000000000000000000000000004": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call mum"
+      },
+      "note:00000000000000000000000000000003": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Buy milk"
+      }
+    },
     "search": {
       "": [
         "note:0000000000000000000000000000000c",

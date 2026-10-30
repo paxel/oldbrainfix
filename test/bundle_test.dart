@@ -50,6 +50,25 @@ class FakeBundles implements BundlePlatform {
     return dismisses ? ShareOutcome.dismissed : ShareOutcome.taken;
   }
 
+  /// What was handed along as text (#129), with its files' bytes as
+  /// they were when handed.
+  final texts = <({String text, String? html, List<SharedFile> files})>[];
+  final fileBytes = <String, List<int>>{};
+
+  @override
+  Future<ShareOutcome> shareText(
+    String text, {
+    String? html,
+    List<SharedFile> files = const [],
+  }) async {
+    texts.add((text: text, html: html, files: files));
+    for (final f in files) {
+      fileBytes[f.path] = File(f.path).readAsBytesSync();
+    }
+    if (!shares) return ShareOutcome.noApp;
+    return dismisses ? ShareOutcome.dismissed : ShareOutcome.taken;
+  }
+
   @override
   Future<String?> pick() async => picks;
 

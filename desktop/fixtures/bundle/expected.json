@@ -221,6 +221,42 @@
       }
     ],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000007": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Unsorted thought"
+      },
+      "note:00000000000000000000000000000006": {
+        "html": null,
+        "photos": [],
+        "recordings": [
+          "52f0f855e3f6ef7cfd85ef214bcf3b80db8af56da1f0cc1811655661c1aeb442"
+        ],
+        "text": "Hum this"
+      },
+      "note:00000000000000000000000000000005": {
+        "html": null,
+        "photos": [
+          "c40c7db61b1eb6c0e7415902a7574a8e7315f8633c5125e60084addd3c2d21fc"
+        ],
+        "recordings": [],
+        "text": "Blood test on Friday"
+      },
+      "note:00000000000000000000000000000003": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call mum"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Buy milk"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000007",

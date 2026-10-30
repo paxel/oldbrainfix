@@ -14,6 +14,7 @@
         }
       ],
       "escaped": "",
+      "html": "",
       "marks": [],
       "plain": "",
       "shortcuts": [],
@@ -53,6 +54,7 @@
         }
       ],
       "escaped": "plain words, nothing more",
+      "html": "<p>plain words, nothing more</p>\n",
       "marks": [],
       "plain": "plain words, nothing more",
       "shortcuts": [],
@@ -378,6 +380,7 @@
         }
       ],
       "escaped": "\\*\\*bold\\*\\* \\*it\\* \\_it\\_ \\_\\_bold\\_\\_ \\~\\~gone\\~\\~ \\`co de\\` \\[site](https://x.org)",
+      "html": "<p><strong>bold</strong> <em>it</em> <em>it</em> <strong>bold</strong> <del>gone</del> <code>co de</code> <a href=\"https://x.org\">site</a></p>\n",
       "marks": [],
       "plain": "bold it it bold gone co de site",
       "shortcuts": [
@@ -907,6 +910,7 @@
         }
       ],
       "escaped": "\\*\\*\\*both\\*\\*\\* \\*\\*a \\*b\\* c\\*\\* \\*a \\*\\*b\\*\\* c\\* a\\*\\*b\\*\\*c 2\\*3\\*4 2 \\* 3 \\* 4",
+      "html": "<p><em><strong>both</strong></em> <strong>a <em>b</em> c</strong> <em>a <strong>b</strong> c</em> a<strong>b</strong>c 2<em>3</em>4 2 * 3 * 4</p>\n",
       "marks": [],
       "plain": "both a b c a b c abc 234 2 * 3 * 4",
       "shortcuts": [
@@ -1249,6 +1253,7 @@
         }
       ],
       "escaped": "snake_case_name \\_x_y\\_ \\_\\_x\\_\\_y \\*\\*unclosed \\*a \\*\\*b ~x~ \\~\\~\\~x\\~\\~\\~ \\~\\~a\\~\\~b",
+      "html": "<p>snake_case_name <em>x_y</em> __x__y **unclosed *a **b ~x~ ~~~x~~~ <del>a</del>b</p>\n",
       "marks": [],
       "plain": "snake_case_name x_y __x__y **unclosed *a **b ~x~ ~~~x~~~ ab",
       "shortcuts": [
@@ -1728,6 +1733,7 @@
         }
       ],
       "escaped": "\\*(x)\\* \\*\\*\"q\"\\*\\* \\_(a)\\_ a\\_(b)\\_ \\*\\*\\*\\*x\\*\\*\\*\\* \\*a\\*b\\* \\*\\*a\\*",
+      "html": "<p><em>(x)</em> <strong>&quot;q&quot;</strong> <em>(a)</em> a_(b)_ <strong><strong>x</strong></strong> <em>a</em>b* *<em>a</em></p>\n",
       "marks": [],
       "plain": "(x) \"q\" (a) a_(b)_ x ab* *a",
       "shortcuts": [
@@ -2133,6 +2139,7 @@
         }
       ],
       "escaped": "\\\\\\*not\\\\\\* \\\\\\ \\\\\\_ \\a \\\\# a\\ \\`\\`a\\`b\\`\\` \\` x \\` \\`  \\` \\`open \\`\\`x\\` ",
+      "html": "<p>*not* \\ _ \\a # a\\ <code>a`b</code> <code>x</code> <code>  </code> <code>open ``x</code> </p>\n",
       "marks": [],
       "plain": "*not* \\ _ \\a # a\\ a`b x    open ``x ",
       "shortcuts": [
@@ -2606,6 +2613,7 @@
         }
       ],
       "escaped": "\\[\\*\\*a\\*\\* \\`b\\`](u) \\[a \\[b](c)](d) !\\[img](u) \\\\!\\[no](u) \\[x](a(b)c) \\[x](a b) \\[x]( <u> ) \\[x](u \"t\") \\[x]() \\[x] (u) \\[x]",
+      "html": "<p><strong>a</strong> <code>b</code> a [b](c) ![img](u) !no x [x](a b) x [x](u &quot;t&quot;) x [x] (u) [x]</p>\n",
       "marks": [],
       "plain": "a b a [b](c) ![img](u) !no x [x](a b) x [x](u \"t\") x [x] (u) [x]",
       "shortcuts": [
@@ -3211,6 +3219,7 @@
         }
       ],
       "escaped": "\\# One\n\\## Two\n### Three\n#NoSpace\n   \\# three spaces\n    # four\n\\#\n\\##",
+      "html": "<h1>One</h1>\n<h2>Two</h2>\n<p>### Three<br>#NoSpace</p>\n<h1>three spaces</h1>\n<p>    # four</p>\n<h1></h1>\n<h2></h2>\n",
       "marks": [],
       "plain": "One\nTwo\n### Three\n#NoSpace\nthree spaces\n    # four\n\n",
       "shortcuts": [
@@ -3635,6 +3644,7 @@
         }
       ],
       "escaped": "\\> said\n\\>tight\n   \\> far\n    > code\n\\> \\*\\*b\\*\\* \\`c\\`",
+      "html": "<blockquote>said<br>tight<br>far</blockquote>\n<p>    &gt; code</p>\n<blockquote><strong>b</strong> <code>c</code></blockquote>\n",
       "marks": [],
       "plain": "said\ntight\nfar\n    > code\nb c",
       "shortcuts": [
@@ -4027,6 +4037,7 @@
         }
       ],
       "escaped": "\\- a\n\\* b\n\\+ c\n  \\- d\n\t\\- e\n -f\n\\-\n\\- \n---\n\\* \\* \\*",
+      "html": "<ul><li>a</li><li>b</li><li>c<ul><li>d</li><li>e</li></ul></li></ul>\n<p> -f</p>\n<ul><li></li><li></li></ul>\n<p>---</p>\n<ul><li>* *</li></ul>\n",
       "marks": [],
       "plain": "a\nb\nc\nd\ne\n -f\n\n\n---\n* *",
       "shortcuts": [
@@ -4447,6 +4458,7 @@
         }
       ],
       "escaped": "1\\. one\n1\\. two\n   1\\. sub\n   \\- mixed\n3\\. three\n\n5\\. five\n0\\. zero\n123456789\\. nine\n1234567890. ten\n1.x\n2\\.",
+      "html": "<ol><li>one</li><li>two<ol><li>sub</li></ol><ul><li>mixed</li></ul></li><li>three</li></ol>\n<ol start=\"5\"><li>five</li><li>zero</li><li>nine</li></ol>\n<p>1234567890. ten<br>1.x</p>\n<ol start=\"2\"><li></li></ol>\n",
       "marks": [],
       "plain": "one\ntwo\nsub\nmixed\nthree\n\nfive\nzero\nnine\n1234567890. ten\n1.x\n",
       "shortcuts": [
@@ -4963,6 +4975,7 @@
         }
       ],
       "escaped": "a\r\nb\rc\n\n\r\n",
+      "html": "<p>a<br>b<br>c</p>\n",
       "marks": [],
       "plain": "a\r\nb\rc\n\n\r\n",
       "shortcuts": [],
@@ -5176,6 +5189,7 @@
         }
       ],
       "escaped": "🧠 \\*\\*ü\\*\\* \\`日記\\` \\[𝔸](https://x.org/𝔸) \\~\\~Straße\\~\\~ é\\*x\\*",
+      "html": "<p>🧠 <strong>ü</strong> <code>日記</code> <a href=\"https://x.org/𝔸\">𝔸</a> <del>Straße</del> é<em>x</em></p>\n",
       "marks": [],
       "plain": "🧠 ü 日記 𝔸 Straße éx",
       "shortcuts": [
@@ -5515,6 +5529,7 @@
         }
       ],
       "escaped": "\\- ☐ milk\n\\* ✅ \\*\\*eggs\\*\\*\n1\\. ❌ \\`x\\`\n\\> ☐ q",
+      "html": "<ul><li>☐ milk</li><li>✅ <strong>eggs</strong></li></ul>\n<ol><li>❌ <code>x</code></li></ol>\n<blockquote>☐ q</blockquote>\n",
       "marks": [
         {
           "column": null,
@@ -5864,6 +5879,7 @@
         }
       ],
       "escaped": "#tag \\`#code\\` \\[#label](https://x.org/#anchor) \\*\\*#bold\\*\\* #a_b\n\\# Heading #h\n\\`#a\\` #b \\`#c\\`",
+      "html": "<p>#tag <code>#code</code> <a href=\"https://x.org/#anchor\">#label</a> <strong>#bold</strong> #a_b</p>\n<h1>Heading #h</h1>\n<p><code>#a</code> #b <code>#c</code></p>\n",
       "marks": [],
       "plain": "#tag #code #label #bold #a_b\nHeading #h\n#a #b #c",
       "shortcuts": [
@@ -6387,6 +6403,7 @@
         }
       ],
       "escaped": "\\| a \\| b \\|\n\\|---\\|---\\|\n\\`\\`\\`\ncode\n\\`\\`\\`\n<b>x</b> &amp; <https://x.org>",
+      "html": "<table><thead><tr><th>a</th><th>b</th></tr></thead></table>\n<p>```<br>code<br>```<br>&lt;b&gt;x&lt;/b&gt; &amp;amp; &lt;https://x.org&gt;</p>\n",
       "marks": [],
       "plain": "a b\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>",
       "shortcuts": [],
@@ -6830,6 +6847,7 @@
         }
       ],
       "escaped": " \\*x\\*  　\\*\\*y\\*\\*　 \t\\*z\\*\t",
+      "html": "<p> <em>x</em>  　<strong>y</strong>　 \t<em>z</em>\t</p>\n",
       "marks": [],
       "plain": " x  　y　 \tz\t",
       "shortcuts": [
@@ -7190,6 +7208,7 @@
         }
       ],
       "escaped": "Shop\n\\| Item \\| \\*\\*Qty\\*\\* \\| Note \\|\n\\|:-----\\|----:\\|:-:\\|\n\\| milk \\| 2 \\|\n\\| eggs \\| 6 \\| free range \\| beyond \\|\nbread \\| 1 \\| \\`a\\\\\\|b\\` \\\\\\| c\n\nafter",
+      "html": "<p>Shop</p>\n<table><thead><tr><th align=\"left\">Item</th><th align=\"right\"><strong>Qty</strong></th><th align=\"center\">Note</th></tr></thead><tbody><tr><td align=\"left\">milk</td><td align=\"right\">2</td><td align=\"center\"></td></tr><tr><td align=\"left\">eggs</td><td align=\"right\">6</td><td align=\"center\">free range</td></tr><tr><td align=\"left\">bread</td><td align=\"right\">1</td><td align=\"center\"><code>a|b</code> | c</td></tr></tbody></table>\n<p>after</p>\n",
       "marks": [],
       "plain": "Shop\nItem Qty Note\nmilk 2\neggs 6 free range\nbread 1 a|b | c\n\nafter",
       "shortcuts": [
@@ -8142,6 +8161,7 @@
         }
       ],
       "escaped": "a \\\\\\| b \\| c\n-\\|-\na \\\\\\\\\\| b \\| c\\\\\\|",
+      "html": "<table><thead><tr><th>a | b</th><th>c</th></tr></thead><tbody><tr><td>a \\| b</td><td>c|</td></tr></tbody></table>\n",
       "marks": [],
       "plain": "a | b c\na \\| b c|",
       "shortcuts": [],
@@ -8555,6 +8575,7 @@
         }
       ],
       "escaped": "a\r\n\\|-\r\nb\r\n\r\n\\|x\\|\n\\|---\\|\n\\|\\|\n\\|",
+      "html": "<table><thead><tr><th>a</th></tr></thead><tbody><tr><td>b</td></tr></tbody></table>\n<table><thead><tr><th>x</th></tr></thead><tbody><tr><td></td></tr></tbody></table>\n<p>|</p>\n",
       "marks": [],
       "plain": "a\r\nb\r\n\r\nx\n\n|",
       "shortcuts": [],
@@ -8936,6 +8957,7 @@
         }
       ],
       "escaped": "<!-- first column headings -->\n\\| ☐ milk \\| ✅️ 2 \\| a ❌ \\|\n\\|-\\|-\\|-\\|\n❌ c \\| d\n☐‍ x \\|\n\\# ☐ end",
+      "html": "<table><thead><tr><th>☐ milk</th><th>✅️ 2</th><th>a ❌</th></tr></thead><tbody><tr><th>❌ c</th><td>d</td><td></td></tr><tr><th>☐‍ x</th><td></td><td></td></tr></tbody></table>\n<h1>☐ end</h1>\n",
       "marks": [
         {
           "column": 0,
@@ -9697,6 +9719,7 @@
         }
       ],
       "escaped": "a \\| b\n\\|---\\|\na \\| b\n\\- \\| -\n\\# a \\| b\n--\\|--\na\n---\na \\| b\n\\|--\\|:x:\\|",
+      "html": "<p>a | b<br>|---|<br>a | b</p>\n<ul><li>| -</li></ul>\n<h1>a | b</h1>\n<p>--|--<br>a<br>---<br>a | b<br>|--|:x:|</p>\n",
       "marks": [],
       "plain": "a | b\n|---|\na | b\n| -\na | b\n--|--\na\n---\na | b\n|--|:x:|",
       "shortcuts": [
@@ -10292,6 +10315,7 @@
         }
       ],
       "escaped": "a \\| b\n-\\|-\nc\n\\`\\`\\`\ne \\| f\n-\\|-\n---\ng \\| h\n-\\|-\n    x \\| y\ni \\| j\n-\\|-\n<!-- x -->\nk \\| l\n-\\|-\n\\* \\* \\*",
+      "html": "<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>c</td><td></td></tr></tbody></table>\n<p>```</p>\n<table><thead><tr><th>e</th><th>f</th></tr></thead></table>\n<p>---</p>\n<table><thead><tr><th>g</th><th>h</th></tr></thead></table>\n<p>    x | y</p>\n<table><thead><tr><th>i</th><th>j</th></tr></thead></table>\n<p>&lt;!-- x --&gt;</p>\n<table><thead><tr><th>k</th><th>l</th></tr></thead></table>\n<ul><li>* *</li></ul>\n",
       "marks": [],
       "plain": "a b\nc\n```\ne f\n---\ng h\n    x | y\ni j\n<!-- x -->\nk l\n* *",
       "shortcuts": [
@@ -11107,6 +11131,7 @@
         }
       ],
       "escaped": "x\n  <!-- first column headings --> \na\\|b\n-\\|-\n\n<!-- first column headings -->\nno table",
+      "html": "<p>x</p>\n<table><thead><tr><th>a</th><th>b</th></tr></thead></table>\n<p>&lt;!-- first column headings --&gt;<br>no table</p>\n",
       "marks": [],
       "plain": "x\na b\n\n<!-- first column headings -->\nno table",
       "shortcuts": [],
@@ -11711,6 +11736,7 @@
         }
       ],
       "escaped": "🧠 \\| ü\n:-:\\|-\n日記 \\| \\[𝔸](https://x.org/𝔸) #tag \\`#code\\`\n\\*\\*b\\*\\* \\| \\*i\\* \\~\\~s\\~\\~",
+      "html": "<table><thead><tr><th align=\"center\">🧠</th><th>ü</th></tr></thead><tbody><tr><td align=\"center\">日記</td><td><a href=\"https://x.org/𝔸\">𝔸</a> #tag <code>#code</code></td></tr><tr><td align=\"center\"><strong>b</strong></td><td><em>i</em> <del>s</del></td></tr></tbody></table>\n",
       "marks": [],
       "plain": "🧠 ü\n日記 𝔸 #tag #code\nb i s",
       "shortcuts": [
@@ -12237,6 +12263,968 @@
         [
           68,
           68
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 2,
+          "end": 3,
+          "kind": "bullet",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 3,
+              "contentStart": 2,
+              "end": 3,
+              "kind": "text",
+              "start": 2,
+              "text": "a",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 8,
+          "end": 9,
+          "kind": "bullet",
+          "level": 1,
+          "line": 1,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 9,
+              "contentStart": 8,
+              "end": 9,
+              "kind": "text",
+              "start": 8,
+              "text": "b",
+              "url": ""
+            }
+          ],
+          "start": 4
+        },
+        {
+          "contentStart": 15,
+          "end": 16,
+          "kind": "numbered",
+          "level": 1,
+          "line": 2,
+          "number": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 16,
+              "contentStart": 15,
+              "end": 16,
+              "kind": "text",
+              "start": 15,
+              "text": "c",
+              "url": ""
+            }
+          ],
+          "start": 10
+        },
+        {
+          "contentStart": 19,
+          "end": 20,
+          "kind": "bullet",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 20,
+              "contentStart": 19,
+              "end": 20,
+              "kind": "text",
+              "start": 19,
+              "text": "d",
+              "url": ""
+            }
+          ],
+          "start": 17
+        },
+        {
+          "contentStart": 24,
+          "end": 25,
+          "kind": "numbered",
+          "level": 0,
+          "line": 4,
+          "number": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 25,
+              "contentStart": 24,
+              "end": 25,
+              "kind": "text",
+              "start": 24,
+              "text": "e",
+              "url": ""
+            }
+          ],
+          "start": 21
+        },
+        {
+          "contentStart": 26,
+          "end": 26,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "spans": [],
+          "start": 26
+        },
+        {
+          "contentStart": 30,
+          "end": 31,
+          "kind": "numbered",
+          "level": 0,
+          "line": 6,
+          "number": 3,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 31,
+              "contentStart": 30,
+              "end": 31,
+              "kind": "text",
+              "start": 30,
+              "text": "f",
+              "url": ""
+            }
+          ],
+          "start": 27
+        },
+        {
+          "contentStart": 36,
+          "end": 37,
+          "kind": "bullet",
+          "level": 1,
+          "line": 7,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 37,
+              "contentStart": 36,
+              "end": 37,
+              "kind": "text",
+              "start": 36,
+              "text": "g",
+              "url": ""
+            }
+          ],
+          "start": 32
+        },
+        {
+          "contentStart": 40,
+          "end": 41,
+          "kind": "quote",
+          "level": 0,
+          "line": 8,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 41,
+              "contentStart": 40,
+              "end": 41,
+              "kind": "text",
+              "start": 40,
+              "text": "q",
+              "url": ""
+            }
+          ],
+          "start": 38
+        },
+        {
+          "contentStart": 43,
+          "end": 43,
+          "kind": "quote",
+          "level": 0,
+          "line": 9,
+          "number": 0,
+          "spans": [],
+          "start": 42
+        },
+        {
+          "contentStart": 46,
+          "end": 47,
+          "kind": "quote",
+          "level": 0,
+          "line": 10,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 47,
+              "contentStart": 46,
+              "end": 47,
+              "kind": "text",
+              "start": 46,
+              "text": "r",
+              "url": ""
+            }
+          ],
+          "start": 44
+        },
+        {
+          "contentStart": 48,
+          "end": 49,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 11,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 49,
+              "contentStart": 48,
+              "end": 49,
+              "kind": "text",
+              "start": 48,
+              "text": "x",
+              "url": ""
+            }
+          ],
+          "start": 48
+        },
+        {
+          "contentStart": 50,
+          "end": 51,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 12,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 51,
+              "contentStart": 50,
+              "end": 51,
+              "kind": "text",
+              "start": 50,
+              "text": "y",
+              "url": ""
+            }
+          ],
+          "start": 50
+        },
+        {
+          "contentStart": 52,
+          "end": 54,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 13,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 54,
+              "contentStart": 52,
+              "end": 54,
+              "kind": "text",
+              "start": 52,
+              "text": "  ",
+              "url": ""
+            }
+          ],
+          "start": 52
+        },
+        {
+          "contentStart": 58,
+          "end": 59,
+          "kind": "heading2",
+          "level": 0,
+          "line": 14,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 59,
+              "contentStart": 58,
+              "end": 59,
+              "kind": "text",
+              "start": 58,
+              "text": "z",
+              "url": ""
+            }
+          ],
+          "start": 55
+        },
+        {
+          "contentStart": 60,
+          "end": 133,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 15,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 71,
+              "contentStart": 60,
+              "end": 71,
+              "kind": "text",
+              "start": 60,
+              "text": "<i>'&\"</i> ",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 73,
+                  "contentStart": 72,
+                  "end": 73,
+                  "kind": "text",
+                  "start": 72,
+                  "text": "j",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 73,
+              "contentStart": 72,
+              "end": 88,
+              "kind": "link",
+              "start": 71,
+              "text": "",
+              "url": "javascript:x"
+            },
+            {
+              "children": [],
+              "contentEnd": 89,
+              "contentStart": 88,
+              "end": 89,
+              "kind": "text",
+              "start": 88,
+              "text": " ",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 91,
+                  "contentStart": 90,
+                  "end": 91,
+                  "kind": "text",
+                  "start": 90,
+                  "text": "m",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 91,
+              "contentStart": 90,
+              "end": 106,
+              "kind": "link",
+              "start": 89,
+              "text": "",
+              "url": "MAILTO:a@b.c"
+            },
+            {
+              "children": [],
+              "contentEnd": 107,
+              "contentStart": 106,
+              "end": 107,
+              "kind": "text",
+              "start": 106,
+              "text": " ",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 109,
+                  "contentStart": 108,
+                  "end": 109,
+                  "kind": "text",
+                  "start": 108,
+                  "text": "w",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 109,
+              "contentStart": 108,
+              "end": 133,
+              "kind": "link",
+              "start": 107,
+              "text": "",
+              "url": "http://x.org/?a=1&b=2"
+            }
+          ],
+          "start": 60
+        }
+      ],
+      "escaped": "\\- a\n  \\- b\n  1\\. c\n\\- d\n1\\. e\n\n3\\. f\n  \\- g\n\\> q\n\\>\n\\> r\nx\ny\n  \n\\## z\n<i>'&\"</i> \\[j](javascript:x) \\[m](MAILTO:a@b.c) \\[w](http://x.org/?a=1&b=2)",
+      "html": "<ul><li>a<ul><li>b</li></ul><ol><li>c</li></ol></li><li>d</li></ul>\n<ol><li>e</li></ol>\n<ol start=\"3\"><li>f<ul><li>g</li></ul></li></ol>\n<blockquote>q<br><br>r</blockquote>\n<p>x<br>y</p>\n<h2>z</h2>\n<p>&lt;i&gt;&#39;&amp;&quot;&lt;/i&gt; j <a href=\"MAILTO:a@b.c\">m</a> <a href=\"http://x.org/?a=1&amp;b=2\">w</a></p>\n",
+      "marks": [],
+      "plain": "a\nb\nc\nd\ne\n\nf\ng\nq\n\nr\nx\ny\n  \nz\n<i>'&\"</i> j m w",
+      "shortcuts": [
+        2,
+        8,
+        15,
+        19,
+        24,
+        30,
+        36,
+        40,
+        46,
+        58,
+        88,
+        106,
+        133
+      ],
+      "tags": [],
+      "tables": [],
+      "text": "- a\n  - b\n  1. c\n- d\n1. e\n\n3. f\n  - g\n> q\n>\n> r\nx\ny\n  \n## z\n<i>'&\"</i> [j](javascript:x) [m](MAILTO:a@b.c) [w](http://x.org/?a=1&b=2)",
+      "uses": true,
+      "words": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          8,
+          9
+        ],
+        [
+          10,
+          10
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          14,
+          14
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          17,
+          17
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          19,
+          20
+        ],
+        [
+          19,
+          20
+        ],
+        [
+          21,
+          22
+        ],
+        [
+          21,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          25
+        ],
+        [
+          24,
+          25
+        ],
+        [
+          26,
+          26
+        ],
+        [
+          27,
+          28
+        ],
+        [
+          27,
+          28
+        ],
+        [
+          29,
+          29
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          34
+        ],
+        [
+          35,
+          35
+        ],
+        [
+          36,
+          37
+        ],
+        [
+          36,
+          37
+        ],
+        [
+          38,
+          38
+        ],
+        [
+          39,
+          39
+        ],
+        [
+          40,
+          41
+        ],
+        [
+          40,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          45,
+          45
+        ],
+        [
+          46,
+          47
+        ],
+        [
+          46,
+          47
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          50,
+          51
+        ],
+        [
+          50,
+          51
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          53,
+          53
+        ],
+        [
+          54,
+          54
+        ],
+        [
+          55,
+          55
+        ],
+        [
+          56,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          59
+        ],
+        [
+          58,
+          59
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          61,
+          62
+        ],
+        [
+          61,
+          62
+        ],
+        [
+          63,
+          63
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          65,
+          65
+        ],
+        [
+          66,
+          66
+        ],
+        [
+          67,
+          67
+        ],
+        [
+          68,
+          69
+        ],
+        [
+          68,
+          69
+        ],
+        [
+          70,
+          70
+        ],
+        [
+          71,
+          71
+        ],
+        [
+          72,
+          73
+        ],
+        [
+          72,
+          73
+        ],
+        [
+          74,
+          74
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          75,
+          85
+        ],
+        [
+          86,
+          87
+        ],
+        [
+          86,
+          87
+        ],
+        [
+          88,
+          88
+        ],
+        [
+          89,
+          89
+        ],
+        [
+          90,
+          91
+        ],
+        [
+          90,
+          91
+        ],
+        [
+          92,
+          92
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          93,
+          99
+        ],
+        [
+          100,
+          101
+        ],
+        [
+          100,
+          101
+        ],
+        [
+          102,
+          103
+        ],
+        [
+          102,
+          103
+        ],
+        [
+          104,
+          105
+        ],
+        [
+          104,
+          105
+        ],
+        [
+          106,
+          106
+        ],
+        [
+          107,
+          107
+        ],
+        [
+          108,
+          109
+        ],
+        [
+          108,
+          109
+        ],
+        [
+          110,
+          110
+        ],
+        [
+          111,
+          115
+        ],
+        [
+          111,
+          115
+        ],
+        [
+          111,
+          115
+        ],
+        [
+          111,
+          115
+        ],
+        [
+          111,
+          115
+        ],
+        [
+          116,
+          116
+        ],
+        [
+          117,
+          117
+        ],
+        [
+          118,
+          119
+        ],
+        [
+          118,
+          119
+        ],
+        [
+          120,
+          123
+        ],
+        [
+          120,
+          123
+        ],
+        [
+          120,
+          123
+        ],
+        [
+          120,
+          123
+        ],
+        [
+          124,
+          124
+        ],
+        [
+          125,
+          126
+        ],
+        [
+          125,
+          126
+        ],
+        [
+          127,
+          128
+        ],
+        [
+          127,
+          128
+        ],
+        [
+          129,
+          130
+        ],
+        [
+          129,
+          130
+        ],
+        [
+          131,
+          132
+        ],
+        [
+          131,
+          132
+        ],
+        [
+          133,
+          133
         ]
       ]
     }

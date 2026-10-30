@@ -89,6 +89,57 @@ object Bundles {
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         send.clipData = ClipData.newRawUri("", uri)
+        return chooserFor(context, send)
+    }
+
+    /**
+     * The share chooser for a Note's [text] (#129), with [html] beside it
+     * when there is one, and the files at [paths] as [types], telling
+     * [ShareChosenReceiver] which app is picked; null when one of them is
+     * no such file to share.
+     */
+    fun textChooser(
+        context: Context,
+        text: String,
+        html: String?,
+        paths: List<String>,
+        types: List<String>,
+    ): Intent? {
+        val dir = FileShare.dir(context)
+        val files = paths.map(::File)
+        if (paths.any { !inside(dir, it) } || files.any { !it.isFile }) return null
+        val uris = files.map { FileProvider.getUriForFile(context, "${context.packageName}.photos", it) }
+        val send = Intent(if (uris.size > 1) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND)
+            .setType(typeOf(types))
+        if (text.isNotEmpty()) send.putExtra(Intent.EXTRA_TEXT, text)
+        // Android asks for the text beside its HTML.
+        if (html != null && text.isNotEmpty()) send.putExtra(Intent.EXTRA_HTML_TEXT, html)
+        if (uris.size == 1) send.putExtra(Intent.EXTRA_STREAM, uris[0])
+        if (uris.size > 1) send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        if (uris.isNotEmpty()) {
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            send.clipData = ClipData.newRawUri("", uris[0]).apply {
+                for (uri in uris.drop(1)) addItem(ClipData.Item(uri))
+            }
+        }
+        return chooserFor(context, send)
+    }
+
+    /**
+     * What a share of files of [types] goes as: text alone, the one type
+     * they all have, the kind they share, or anything.
+     */
+    fun typeOf(types: List<String>): String {
+        val kinds = types.map { it.substringBefore('/') }.distinct()
+        return when {
+            types.isEmpty() -> "text/plain"
+            types.distinct().size == 1 -> types[0]
+            kinds.size == 1 -> "${kinds[0]}/*"
+            else -> "*/*"
+        }
+    }
+
+    private fun chooserFor(context: Context, send: Intent): Intent {
         // Mutable, so the chooser can put in the app picked; explicit, so
         // only this app's receiver hears it.
         val picked = PendingIntent.getBroadcast(

@@ -23,6 +23,7 @@ import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
+import 'share_note.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
@@ -264,6 +265,7 @@ NoteActions noteActions(
           }
         : null,
     onSend: () => unawaited(sendNoteFile(context, notes.store, id)),
+    onShare: () => unawaited(shareNoteToApp(context, notes, id)),
     calendar: () => noteCalendar(context, Routines(notes.store), placed.note),
     onAmend: placed.amends
         ? () => then(
@@ -939,7 +941,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           actions: [
             IconButton(
               key: const ValueKey('send-note-file'),
-              tooltip: t.sendNote,
+              tooltip: t.sendToPerson,
               onPressed: () {
                 _saveText();
                 unawaited(
@@ -947,6 +949,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 );
               },
               icon: const Icon(Icons.send_outlined),
+            ),
+            IconButton(
+              key: const ValueKey('share-note'),
+              tooltip: t.shareToApp,
+              onPressed: () {
+                _saveText();
+                unawaited(shareNoteToApp(context, widget.notes, widget.noteId));
+              },
+              icon: const Icon(Icons.share_outlined),
             ),
             CalendarButton(choices: _calendarChoices),
             if (changes) ...[

@@ -71,6 +71,7 @@ use oldbrainfix_core::routines::routines_by_name;
 use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
+use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
     Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
@@ -113,6 +114,7 @@ use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
+use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
@@ -793,8 +795,14 @@ enum Action {
     /// Saves a bundle for each person the Changes Nudge covers, one
     /// after another, as its click asked (#109).
     SendWaitingChanges,
-    /// Asks whom the selected Note is sent to.
-    StartSend,
+    /// Asks whom the Note is sent to.
+    StartSend(String),
+    /// Puts the Note's text on the clipboard, with HTML beside formatted
+    /// text (#129).
+    CopyAsText(String),
+    /// Saves the Note as a Markdown file with its photos and recordings
+    /// beside it, where the user says (#129).
+    SaveAsMarkdown(String),
     /// Saves the Note of the send dialog as a Sent Item.
     SendNote,
     /// Accepts the Sent Item previewed, or declines it.
@@ -1058,6 +1066,8 @@ pub struct App {
     item_saver: FileSaver,
     /// Asks where to save a calendar file, of one Routine or of all.
     calendar_saver: FileSaver,
+    /// Asks where to save a Note as Markdown (#129).
+    markdown_saver: FileSaver,
     /// Files handed over from outside the window, to open.
     handed: Option<Arc<std::sync::Mutex<Vec<std::path::PathBuf>>>>,
     /// What a bundle saved or imported did, announced at the top until
@@ -1211,6 +1221,9 @@ fn item_dialog(title: &str) -> rfd::FileDialog {
         .add_filter(oldbrainfix_core::APP_NAME, &[sent::EXTENSION])
 }
 
+/// What a Note saved as Markdown ends in (#129).
+const MARKDOWN_EXTENSION: &str = "md";
+
 /// The save dialog's filter for a calendar file.
 fn calendar_dialog(title: &str) -> rfd::FileDialog {
     rfd::FileDialog::new()
@@ -1308,6 +1321,13 @@ impl App {
             item_saver: Box::new(|title, name| item_dialog(title).set_file_name(name).save_file()),
             calendar_saver: Box::new(|title, name| {
                 calendar_dialog(title).set_file_name(name).save_file()
+            }),
+            markdown_saver: Box::new(|title, name| {
+                rfd::FileDialog::new()
+                    .set_title(title)
+                    .add_filter("Markdown", &[MARKDOWN_EXTENSION])
+                    .set_file_name(name)
+                    .save_file()
             }),
             handed: None,
             notice: None,
@@ -1619,6 +1639,95 @@ impl App {
     /// Hands in the dialog asking where to save a calendar file.
     pub fn set_calendar_saver(&mut self, saver: FileSaver) {
         self.calendar_saver = saver;
+    }
+
+    /// Hands in the dialog asking where to save a Note as Markdown.
+    pub fn set_markdown_saver(&mut self, saver: FileSaver) {
+        self.markdown_saver = saver;
+    }
+
+    /// What the Note `id` hands to another app (#129), its Sections'
+    /// dates as the cards show them; `None` when it is gone.
+    fn note_share(&self, id: &str) -> oldbrainfix_core::Result<Option<NoteShare>> {
+        let notes = Notes::new(&self.store);
+        let Some(note) = notes.by_id(id)? else {
+            return Ok(None);
+        };
+        let t = self.t;
+        let sections = notes.sections(id)?;
+        Ok(Some(share::note_share(&note, &sections, |at| when(&t, at))))
+    }
+
+    /// Puts the Note `id`'s text on the clipboard, with its HTML when it
+    /// is formatted; through the window's clipboard, as plain text, when
+    /// the system's cannot be reached. Copied says nothing (UI laws); a
+    /// Note without words is announced.
+    fn copy_as_text(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        let Some(share) = self.note_share(id)? else {
+            return Ok(());
+        };
+        let t = self.t;
+        if share.text.is_empty() {
+            self.announce_failure(
+                t.note_not_shared(),
+                t.note_not_shared_title(),
+                (t.copy_nothing_cause(), t.copy_nothing_fix()),
+                "copy: no words".to_string(),
+            );
+            return Ok(());
+        }
+        let put = self
+            .clipboard
+            .as_mut()
+            .is_some_and(|c| c.put_text(&share.text, share.html.as_deref()));
+        if !put {
+            self.copy = Some(share.text);
+        }
+        Ok(())
+    }
+
+    /// Saves the Note `id` as a Markdown file where the user says, with
+    /// its photos and recordings beside it (#129). Saved says nothing (UI
+    /// laws); a failure, or nothing of the Note here, is announced, the
+    /// latter before the dialog.
+    fn save_as_markdown(&mut self, id: &str) -> oldbrainfix_core::Result<()> {
+        let Some(share) = self.note_share(id)? else {
+            return Ok(());
+        };
+        let t = self.t;
+        let nothing = |app: &mut App| {
+            app.announce_failure(
+                t.note_not_shared(),
+                t.note_not_shared_title(),
+                (t.share_nothing_cause(), t.share_nothing_fix()),
+                "markdown: no words and no photo or recording here".to_string(),
+            );
+        };
+        // Said before the dialog, so no place is picked for nothing.
+        if !share_note::has_anything(&share, &Notes::new(&self.store)) {
+            nothing(self);
+            return Ok(());
+        }
+        let title = row_title(&t, Notes::new(&self.store).by_id(id)?.as_ref());
+        let Some(mut path) =
+            (self.markdown_saver)(t.save_markdown_title(), &share_note::file_name(&title))
+        else {
+            return Ok(());
+        };
+        if path.extension().is_none_or(|e| e != MARKDOWN_EXTENSION) {
+            path.set_extension(MARKDOWN_EXTENSION);
+        }
+        match share_note::save_markdown(&path, &share, &Notes::new(&self.store)) {
+            Ok(true) => {}
+            Ok(false) => nothing(self),
+            Err(e) => self.announce_failure(
+                t.note_not_shared(),
+                t.note_not_shared_title(),
+                (t.share_not_written_cause(), t.nothing_lost_fix()),
+                format!("markdown: {e}"),
+            ),
+        }
+        Ok(())
     }
 
     /// Saves `list` as one calendar file where the user says, made at the
@@ -3823,13 +3932,13 @@ impl App {
             Action::Person(asked) => self.person_action(asked)?,
             Action::Welcome(asked) => self.welcome_action(asked)?,
             Action::Ai(asked) => self.ai_action(asked)?,
-            Action::StartSend => {
+            Action::StartSend(id) => {
                 self.save_text()?;
                 let recipients = self.store.sent_item_recipients()?;
                 let picked = (!recipients.is_empty()).then_some(0);
-                let update = self.store.was_sent(&selected)?;
+                let update = self.store.was_sent(&id)?;
                 self.dialog = Some(Dialog::Send {
-                    note: selected,
+                    note: id,
                     recipients,
                     picked,
                     update,
@@ -3837,6 +3946,14 @@ impl App {
                 });
             }
             Action::SendNote => self.send_note()?,
+            Action::CopyAsText(id) => {
+                self.save_text()?;
+                self.copy_as_text(&id)?;
+            }
+            Action::SaveAsMarkdown(id) => {
+                self.save_text()?;
+                self.save_as_markdown(&id)?;
+            }
             Action::AcceptSent => match self.dialog.take() {
                 Some(Dialog::HeldSentItem { held, .. }) => self.accept_held(&held.id, false)?,
                 Some(Dialog::SentItem {
@@ -6627,13 +6744,28 @@ impl App {
                         }
                     });
                 });
-                if ui
-                    .button(RichText::new(t.send_button()).color(text))
-                    .on_hover_text(t.send_note())
-                    .clicked()
-                {
-                    actions.push(Action::StartSend);
-                }
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .button(RichText::new(t.send_button()).color(text))
+                        .on_hover_text(t.send_to_person())
+                        .clicked()
+                    {
+                        actions.push(Action::StartSend(note.id.clone()));
+                    }
+                    // To another app (#129).
+                    if ui
+                        .button(RichText::new(t.copy_as_text()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::CopyAsText(note.id.clone()));
+                    }
+                    if ui
+                        .button(RichText::new(t.save_as_markdown()).color(text))
+                        .clicked()
+                    {
+                        actions.push(Action::SaveAsMarkdown(note.id.clone()));
+                    }
+                });
                 if !may.changes {
                     return;
                 }
@@ -10559,6 +10691,25 @@ fn note_card(
         }
         if let Some(asked) = menu.and_then(|m| shopping_view::card_menu_entry(ui, t, m)) {
             picked = Some(Action::Shopping(asked));
+        }
+        // To a person as a Sent Item, or to another app (#129).
+        if ui
+            .button(RichText::new(t.send_to_person()).color(text))
+            .clicked()
+        {
+            picked = Some(Action::StartSend(note.id.clone()));
+        }
+        if ui
+            .button(RichText::new(t.copy_as_text()).color(text))
+            .clicked()
+        {
+            picked = Some(Action::CopyAsText(note.id.clone()));
+        }
+        if ui
+            .button(RichText::new(t.save_as_markdown()).color(text))
+            .clicked()
+        {
+            picked = Some(Action::SaveAsMarkdown(note.id.clone()));
         }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.

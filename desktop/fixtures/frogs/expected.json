@@ -209,6 +209,44 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought"
+    },
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Paint the shed"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Sort out the old DVDs"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Wash the windows"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Clean out the cupboard"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Fix the gate"
+    }
+  },
   "search": {
     "": [
       "note:0000000000000000000000000000000b",

@@ -3338,12 +3338,6 @@ abstract class AppLocalizations {
   /// **'Another person\'s Device'**
   String get pairedPerson;
 
-  /// No description provided for @sendNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Send this Note'**
-  String get sendNote;
-
   /// No description provided for @sendTitle.
   ///
   /// In en, this message translates to:
@@ -6409,6 +6403,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Install a messenger or a mail app, then send it again.'**
   String get sendNoAppFix;
+
+  /// The entry in a Note's ⋮ menu and the editor's bar that hands the Note's text, photos and recordings to another app on the share sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Share to an app'**
+  String get shareToApp;
+
+  /// Announced when a Note could not be handed to another app; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note was not shared.'**
+  String get noteNotShared;
+
+  /// Title of the dialog behind 'noteNotShared'.
+  ///
+  /// In en, this message translates to:
+  /// **'Note not shared'**
+  String get noteNotSharedTitle;
+
+  /// Why a Note was not shared: no app takes text and files.
+  ///
+  /// In en, this message translates to:
+  /// **'No app here can take the Note.'**
+  String get shareNoApp;
+
+  /// The fix for 'shareNoApp'.
+  ///
+  /// In en, this message translates to:
+  /// **'Install a messenger or a mail app, then share it again.'**
+  String get shareNoAppFix;
+
+  /// Why a Note was not shared: its files could not be written.
+  ///
+  /// In en, this message translates to:
+  /// **'The photos and recordings of the Note could not be written for sharing.'**
+  String get shareNotWrittenCause;
+
+  /// Why a Note without words was not shared: none of its photos and recordings has arrived from another Device yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note\'s photos and recordings are not on this Device yet.'**
+  String get shareNothingCause;
+
+  /// The fix for 'shareNothingCause'.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with your other Devices, then share it again.'**
+  String get shareNothingFix;
 
   /// Announced when the calendar mirror could not be turned on or moved; the tap shows why and what to do.
   ///

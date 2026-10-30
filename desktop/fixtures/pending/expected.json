@@ -184,6 +184,32 @@
     "untranscribed": [],
     "unreadPhotos": [],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000802": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Eggs"
+      },
+      "note:00000000000000000000000000000005": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call Bob back"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Brown bread"
+      },
+      "note:00000000000000000000000000000001": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Milk, two litres"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000802",
@@ -387,6 +413,32 @@
     "untranscribed": [],
     "unreadPhotos": [],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000802": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Eggs"
+      },
+      "note:00000000000000000000000000000005": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call Bob back"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Brown bread"
+      },
+      "note:00000000000000000000000000000001": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Milk, two litres"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000802",
@@ -618,6 +670,32 @@
     "untranscribed": [],
     "unreadPhotos": [],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000802": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Eggs"
+      },
+      "note:00000000000000000000000000000005": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call Bob back"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Brown bread"
+      },
+      "note:00000000000000000000000000000001": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Milk, two litres"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000802",

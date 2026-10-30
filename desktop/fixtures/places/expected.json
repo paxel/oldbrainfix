@@ -331,6 +331,44 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000008": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Still Unsorted"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Where did this go?"
+    },
+    "note:00000000000000000000000000000006": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "New tyres"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Parents evening"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Sort the cellar"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Descale the kettle"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000008",

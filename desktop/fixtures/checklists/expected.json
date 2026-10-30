@@ -112,6 +112,26 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought\nwith a second line"
+    },
+    "note:0000000000000000000000000000000d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Shop"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Packing"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000016",

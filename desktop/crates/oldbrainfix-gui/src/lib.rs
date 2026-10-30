@@ -47,6 +47,7 @@ pub mod routine_editor;
 pub mod schedule_text;
 pub mod session_editor;
 pub mod session_view;
+pub mod share_note;
 pub mod shopping_view;
 pub mod speech;
 pub mod sync_view;

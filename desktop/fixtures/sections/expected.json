@@ -464,6 +464,26 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000009": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Merged into a stranger"
+    },
+    "note:00000000000000000000000000000007": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Loop one\n\n2026-01-01T10:00:34.000Z\nLoop two"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Dentist number\n\n2026-01-01T10:00:01.000Z\nDentist on Tuesday\n\n2026-01-01T10:00:05.000Z\nMoved to Wednesday\n\n2026-01-01T10:00:10.000Z\nAsk about the crown\n\n2026-01-01T10:00:14.000Z\nBring the old X-ray\n\n2026-01-01T10:00:25.000Z\nCalled, all set"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000009",

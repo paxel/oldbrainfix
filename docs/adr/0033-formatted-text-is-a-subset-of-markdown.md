@@ -58,6 +58,10 @@ A link's destination is written by whoever wrote the text, who may be another pe
 
 Transcripts and Photo Texts stay plain (ADR 0018). Replacing a formatted Note's text with one, or appending one, writes it escaped (`Markdown.escape`, `Notes.takeOver`), so it reads as itself: a `\` before a line's mark, every `*`, `` ` `` and `[`, a `~` next to another, a `_` not between two characters that are neither space nor punctuation, and a `\` before ASCII punctuation. A tag keeps its `_`.
 
+## HTML
+
+A Note handed to another app (#129) carries its Markdown as text and, beside it, HTML for apps that show formatted text (`Markdown.html`, the same bytes from both cores). It is drawn from the parts above and nothing else: a row of paragraph lines is one `<p>` and a row of quote lines one `<blockquote>`, with `<br>` between the lines; a line of only spaces and tabs ends either; headings are `<h1>` and `<h2>`; a row of items is one `<ul>` or `<ol>` (`start` when it does not begin at 1) with those one level in as a list inside the item above; a table is a `<table>` with its header row in `<thead>`, its heading column as `<th>` and its alignment as `align`; bold, italic, strike-through and code are `<strong>`, `<em>`, `<del>` and `<code>`. Every character of the text is escaped, so nothing a person wrote becomes markup, and a link is an `<a>` only when `Markdown.mayOpen` allows it, else its label alone. A plain text or a Transcript beside a formatted one goes into the HTML escaped (`Markdown.escape`), so it reads as itself.
+
 ## Considered Options
 
 - A Markdown library in each core (rejected: two libraries never read the same text into the same parts, and the cards of both apps must agree).

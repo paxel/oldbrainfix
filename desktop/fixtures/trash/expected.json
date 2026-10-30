@@ -199,6 +199,26 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000002": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Not so old after all"
+    },
+    "note:00000000000000000000000000000005": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "The other\n\n2026-01-01T10:00:19.000Z\nInto the bin with the other"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Old shopping list"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000002"

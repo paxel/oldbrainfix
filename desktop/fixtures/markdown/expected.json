@@ -238,6 +238,44 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:0000000000000000000000000000000a": {
+      "html": "<table><thead><tr><th align=\"left\">Item</th><th align=\"right\">Qty</th></tr></thead><tbody><tr><td align=\"left\"><strong>Milk</strong></td><td align=\"right\">3 | 4</td></tr></tbody></table>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "| Item | Qty |\n| :-- | --: |\n| **Milk** | 3 \\| 4 |"
+    },
+    "note:00000000000000000000000000000006": {
+      "html": "<p><strong>Packing</strong></p>\n<ul><li>socks<ul><li>wool</li></ul></li></ul>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "**Packing**\n- socks\n  - wool"
+    },
+    "note:00000000000000000000000000000004": {
+      "html": "<ul><li>eggs</li><li><del>bread</del></li></ul>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "- eggs\n- ~~bread~~"
+    },
+    "note:00000000000000000000000000000003": {
+      "html": "<p>Call <strong>mum</strong> later</p>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "Call **mum** later"
+    },
+    "note:00000000000000000000000000000002": {
+      "html": "<h1>Shopping</h1>\n<ul><li><strong>oat milk</strong> <code>#code</code> #real</li></ul>\n<p>2*3 [x] _y_</p>\n<p>2026-01-01T10:00:21.000Z</p>\n<blockquote><del>old</del> <em>new</em></blockquote>\n",
+      "photos": [],
+      "recordings": [],
+      "text": "# Shopping\n- **oat milk** `#code` #real\n2\\*3 \\[x] \\_y\\_\n\n2026-01-01T10:00:21.000Z\n> ~~old~~ *new*"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Plain stars ** stay"
+    }
+  },
   "search": {
     "": [
       "note:0000000000000000000000000000000a",

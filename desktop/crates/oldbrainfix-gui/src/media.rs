@@ -86,6 +86,13 @@ pub trait Clipboard {
     /// The picture on the clipboard, as a photo to keep; `None` when
     /// there is none.
     fn photo(&mut self) -> Option<Vec<u8>>;
+
+    /// Puts `text` on the clipboard, with `html` beside it for apps that
+    /// take formatted text (#129); whether it is there. A clipboard that
+    /// cannot leaves it to the window's own, which takes plain text.
+    fn put_text(&mut self, _text: &str, _html: Option<&str>) -> bool {
+        false
+    }
 }
 
 /// `samples` of one channel at [`SAMPLE_RATE`], from -1 to 1, as a WAV
@@ -531,13 +538,37 @@ impl<S: rodio::Source> rodio::Source for Stretch<S> {
     }
 }
 
-/// The system's clipboard, through arboard. Device-only.
+/// The system's clipboard, through arboard. Device-only. It is kept
+/// once opened: on X11 what this app put there lasts only while it is.
+/// Without X11 on Wayland it does not open, and text goes through the
+/// window's clipboard, without HTML.
 #[derive(Default)]
-pub struct SystemClipboard;
+pub struct SystemClipboard {
+    open: Option<arboard::Clipboard>,
+}
+
+impl SystemClipboard {
+    fn open(&mut self) -> Option<&mut arboard::Clipboard> {
+        if self.open.is_none() {
+            self.open = arboard::Clipboard::new().ok();
+        }
+        self.open.as_mut()
+    }
+}
 
 impl Clipboard for SystemClipboard {
+    fn put_text(&mut self, text: &str, html: Option<&str>) -> bool {
+        let Some(clipboard) = self.open() else {
+            return false;
+        };
+        match html {
+            Some(html) => clipboard.set_html(html, Some(text)).is_ok(),
+            None => clipboard.set_text(text).is_ok(),
+        }
+    }
+
     fn photo(&mut self) -> Option<Vec<u8>> {
-        let image = arboard::Clipboard::new().ok()?.get_image().ok()?;
+        let image = self.open()?.get_image().ok()?;
         let rgba = RgbaImage::from_raw(
             u32::try_from(image.width).ok()?,
             u32::try_from(image.height).ok()?,
@@ -604,6 +635,40 @@ fn is_sound(name: &str, bytes: &[u8]) -> bool {
         // has the same sync but no layer.
         || (byte(0) == 0xFF && byte(1) & 0xE0 == 0xE0 && byte(1) & 0x06 != 0)
         || tag(4) == b"ftyp"
+}
+
+/// The file extension of the photo `bytes`: PNG, GIF or WebP by their
+/// signatures, else JPEG, as the phone names a shared photo (#129).
+pub fn photo_extension(bytes: &[u8]) -> &'static str {
+    let tag = |at: usize| bytes.get(at..at + 4).unwrap_or_default();
+    match tag(0) {
+        b"\x89PNG" => "png",
+        b"GIF8" => "gif",
+        b"RIFF" if tag(8) == b"WEBP" => "webp",
+        _ => "jpg",
+    }
+}
+
+/// The file extension of the recording `bytes`, as the phone names a
+/// shared recording (#129): WAV as the desktop records, Ogg as a
+/// messenger's voice message is, MP3, else the phone's own AAC in
+/// MPEG-4.
+pub fn recording_extension(bytes: &[u8]) -> &'static str {
+    let tag = |at: usize| bytes.get(at..at + 4).unwrap_or_default();
+    let byte = |at: usize| bytes.get(at).copied().unwrap_or(0);
+    if tag(0) == b"RIFF" && tag(8) == b"WAVE" {
+        "wav"
+    } else if tag(0) == b"OggS" {
+        "ogg"
+    } else if bytes.starts_with(b"ID3")
+        // An MPEG audio frame's sync bits, with a layer set: ADTS AAC
+        // has the same sync but no layer.
+        || (byte(0) == 0xFF && byte(1) & 0xE0 == 0xE0 && byte(1) & 0x06 != 0)
+    {
+        "mp3"
+    } else {
+        "m4a"
+    }
 }
 
 /// The picture file `bytes` (JPEG, PNG or WebP) as a photo to keep,
@@ -878,6 +943,21 @@ mod tests {
         // Neither a picture nor a sound file: left alone.
         assert_eq!(from_file("notes.txt", b"plain text"), None);
         assert_eq!(from_file("empty.ogg", b""), None);
+    }
+
+    #[test]
+    fn shared_photos_and_recordings_are_named_as_the_phone_names_them() {
+        assert_eq!(photo_extension(b"\x89PNG\r\n"), "png");
+        assert_eq!(photo_extension(b"GIF89a"), "gif");
+        assert_eq!(photo_extension(b"RIFF\0\0\0\0WEBPVP8 "), "webp");
+        assert_eq!(photo_extension(&[0xFF, 0xD8, 0xFF]), "jpg");
+        assert_eq!(photo_extension(b""), "jpg");
+        assert_eq!(recording_extension(&wav(&[0.0])), "wav");
+        assert_eq!(recording_extension(b"OggS\0"), "ogg");
+        assert_eq!(recording_extension(b"ID3\x04\0\0\0"), "mp3");
+        assert_eq!(recording_extension(&[0xFF, 0xFB, 0x90, 0]), "mp3");
+        assert_eq!(recording_extension(&[0xFF, 0xF1, 0x50, 0x80]), "m4a");
+        assert_eq!(recording_extension(b"\0\0\0\x20ftypM4A "), "m4a");
     }
 
     #[test]

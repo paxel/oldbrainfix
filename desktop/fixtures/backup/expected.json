@@ -223,6 +223,24 @@
       }
     ],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000004": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Pills"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [
+          "bda8f56e957a41b23c58ed8a6a501e94988c9641324d323893cc12cf663baef5"
+        ],
+        "recordings": [
+          "3babb7c90981a09e02f53c650d9dba7629c56b7c1947cfa010d3571cf0a5ce3e"
+        ],
+        "text": "Buy milk\n\n2026-01-01T10:00:11.000Z\nOat milk, \"the green one\""
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000004",

@@ -289,6 +289,32 @@
     "untranscribed": [],
     "unreadPhotos": [],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000007": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Packing"
+      },
+      "note:00000000000000000000000000000005": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Pills"
+      },
+      "note:00000000000000000000000000000002": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Call mum tonight"
+      },
+      "note:00000000000000000000000000000001": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Buy oat milk"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000007",

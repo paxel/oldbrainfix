@@ -26,6 +26,7 @@ export 'src/lan_host.dart';
 export 'src/locks.dart';
 export 'src/markdown.dart';
 export 'src/named_places.dart';
+export 'src/note_share.dart';
 export 'src/notes.dart';
 export 'src/nudges.dart';
 export 'src/pair_code.dart';

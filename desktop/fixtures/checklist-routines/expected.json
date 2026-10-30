@@ -208,6 +208,44 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:0000000000000000000000000000001c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought"
+    },
+    "note:0000000000000000000000000000001a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Walk the dog"
+    },
+    "note:00000000000000000000000000000017": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Empty"
+    },
+    "note:0000000000000000000000000000000f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Tidy"
+    },
+    "note:0000000000000000000000000000000a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Passport"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Gym bag"
+    }
+  },
   "search": {
     "": [
       "note:0000000000000000000000000000001c",

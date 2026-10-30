@@ -157,6 +157,22 @@
       }
     ],
     "removable": {},
+    "shares": {
+      "note:00000000000000000000000000000007": {
+        "html": null,
+        "photos": [],
+        "recordings": [],
+        "text": "Ben private"
+      },
+      "note:00000000000000000000000000000004": {
+        "html": null,
+        "photos": [
+          "bda8f56e957a41b23c58ed8a6a501e94988c9641324d323893cc12cf663baef5"
+        ],
+        "recordings": [],
+        "text": "Buy milk"
+      }
+    },
     "search": {
       "": [
         "note:00000000000000000000000000000007",

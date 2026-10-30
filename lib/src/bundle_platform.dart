@@ -26,6 +26,10 @@ enum ShareOutcome {
   noApp,
 }
 
+/// A file handed to another app beside a text: where [exportPath]
+/// wrote it, and its MIME type.
+typedef SharedFile = ({String path, String type});
+
 /// The platform seam for bundle files (android/…/Bundles.kt): where a
 /// bundle is written before it is shared, handing it to the app the user
 /// picks, picking one to import, and the bundles other apps opened with
@@ -44,6 +48,15 @@ abstract interface class BundlePlatform {
   /// to the app the user picks; answers once the user is back, with
   /// whether an app was picked.
   Future<ShareOutcome> share(String path, {String type = bundleMimeType});
+
+  /// Offers [text], with [html] beside it when there is one, and the
+  /// [files], each written where [exportPath] said, to the app the user
+  /// picks (#129); answers as [share] does.
+  Future<ShareOutcome> shareText(
+    String text, {
+    String? html,
+    List<SharedFile> files = const [],
+  });
 
   /// Opens the system's file picker; the copy of the file picked, or
   /// null when the user backed out.
@@ -75,6 +88,13 @@ class NoBundles implements BundlePlatform {
   Future<ShareOutcome> share(
     String path, {
     String type = bundleMimeType,
+  }) async => ShareOutcome.noApp;
+
+  @override
+  Future<ShareOutcome> shareText(
+    String text, {
+    String? html,
+    List<SharedFile> files = const [],
   }) async => ShareOutcome.noApp;
 
   @override
@@ -120,6 +140,22 @@ class AndroidBundles implements BundlePlatform {
         'dismissed' => ShareOutcome.dismissed,
         _ => ShareOutcome.noApp,
       };
+
+  @override
+  Future<ShareOutcome> shareText(
+    String text, {
+    String? html,
+    List<SharedFile> files = const [],
+  }) async => switch (await _ask<String>('shareText', {
+    'text': text,
+    'html': html,
+    'paths': [for (final f in files) f.path],
+    'types': [for (final f in files) f.type],
+  })) {
+    'taken' => ShareOutcome.taken,
+    'dismissed' => ShareOutcome.dismissed,
+    _ => ShareOutcome.noApp,
+  };
 
   @override
   Future<String?> pick() => _ask<String>('pick', null);

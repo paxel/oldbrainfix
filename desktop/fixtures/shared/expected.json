@@ -238,6 +238,26 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000004": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Fix the tap\n\n2026-01-01T10:00:32.000Z\nThe hot one"
+        },
+        "note:00000000000000000000000000000003": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Blood results"
+        },
+        "note:00000000000000000000000000000001": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000004",
@@ -377,6 +397,20 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000006": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Ben private"
+        },
+        "note:00000000000000000000000000000001": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000006",
@@ -697,6 +731,38 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000105": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Still private"
+        },
+        "note:00000000000000000000000000000103": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Ben buys rye bread"
+        },
+        "note:00000000000000000000000000000004": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Fix the tap\n\n2026-01-01T10:00:32.000Z\nThe hot one"
+        },
+        "note:00000000000000000000000000000003": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Blood results"
+        },
+        "note:00000000000000000000000000000001": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk\n\n2026-02-01T11:00:00.000Z\nOat milk please"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000105",
@@ -969,6 +1035,32 @@
       "untranscribed": [],
       "unreadPhotos": [],
       "removable": {},
+      "shares": {
+        "note:00000000000000000000000000000103": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Ben buys rye bread"
+        },
+        "note:00000000000000000000000000000006": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Ben private"
+        },
+        "note:00000000000000000000000000000004": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Fix the tap\n\n2026-01-01T10:00:32.000Z\nThe hot one"
+        },
+        "note:00000000000000000000000000000001": {
+          "html": null,
+          "photos": [],
+          "recordings": [],
+          "text": "Buy milk\n\n2026-02-01T11:00:00.000Z\nOat milk please"
+        }
+      },
       "search": {
         "": [
           "note:00000000000000000000000000000103",

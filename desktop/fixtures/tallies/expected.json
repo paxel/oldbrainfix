@@ -202,6 +202,32 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000016": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Unsorted thought"
+    },
+    "note:00000000000000000000000000000011": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Evenings\n\n2026-01-01T10:01:28.000Z\nReading"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Gym"
+    },
+    "note:00000000000000000000000000000013": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Steps"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000016",

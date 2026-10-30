@@ -198,6 +198,32 @@
     }
   ],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000003": {
+      "html": null,
+      "photos": [
+        "ec6f9f0e691fcbfd4c1143567ef396e2cad71100efbd8ec89752fea3d2fdbcec"
+      ],
+      "recordings": [],
+      "text": "Pills at eight"
+    },
+    "note:00000000000000000000000000000002": {
+      "html": null,
+      "photos": [
+        "7ee3b95c962c4e532bc59f2c831f1920a61e7f83dd213d8d38679b6ab44f9c66"
+      ],
+      "recordings": [],
+      "text": "Call the dentist\n\n2026-01-01T10:00:39.000Z\nTuesday works"
+    },
+    "note:00000000000000000000000000000001": {
+      "html": null,
+      "photos": [],
+      "recordings": [
+        "dc71e8a1145dc55a601110bac83fd735449595d88a85e07740dcd04a0102c8fd"
+      ],
+      "text": "Buy milk and eggs"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000003",

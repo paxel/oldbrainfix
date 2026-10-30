@@ -322,6 +322,62 @@
   "untranscribed": [],
   "unreadPhotos": [],
   "removable": {},
+  "shares": {
+    "note:00000000000000000000000000000012": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Sweep the floor"
+    },
+    "note:00000000000000000000000000000011": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Oil the saw"
+    },
+    "note:0000000000000000000000000000000d": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Pay the rent"
+    },
+    "note:0000000000000000000000000000000c": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Renew the passport"
+    },
+    "note:0000000000000000000000000000000b": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Water the plants"
+    },
+    "note:0000000000000000000000000000000a": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Call the plumber"
+    },
+    "note:0000000000000000000000000000000f": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Buy stamps"
+    },
+    "note:00000000000000000000000000000010": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Return the drill"
+    },
+    "note:0000000000000000000000000000000e": {
+      "html": null,
+      "photos": [],
+      "recordings": [],
+      "text": "Old flyer"
+    }
+  },
   "search": {
     "": [
       "note:00000000000000000000000000000012",

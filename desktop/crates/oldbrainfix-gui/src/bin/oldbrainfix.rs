@@ -238,7 +238,7 @@ impl Shell {
         app.set_hotkey(Some(hotkey));
         app.set_recorder(Box::new(MicRecorder::default()));
         app.set_player(Box::new(SpeakerPlayer::default()));
-        app.set_clipboard(Box::new(SystemClipboard));
+        app.set_clipboard(Box::new(SystemClipboard::default()));
         app.set_enrichers(
             Some(self.transcriber.clone()),
             Some(self.reader.clone()),

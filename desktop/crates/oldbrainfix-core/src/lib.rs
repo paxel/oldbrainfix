@@ -52,6 +52,7 @@ pub mod search;
 pub mod sent;
 pub mod sessions;
 pub mod settings;
+pub mod share;
 pub mod shared;
 pub mod shopping_lists;
 pub mod signing;
