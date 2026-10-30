@@ -28,3 +28,4 @@ CREATE TABLE moments (
         label TEXT,
         at    TEXT NOT NULL
       );
+PRAGMA user_version = 1;

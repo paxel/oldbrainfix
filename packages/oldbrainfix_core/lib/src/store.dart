@@ -15,6 +15,23 @@ import 'photos.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
 
+/// The version of the tables this version keeps the log in, recorded as
+/// the database's `user_version` (ADR 0034). 0, SQLite's own default, is
+/// a database from before the version was recorded: the same tables.
+const storeVersion = 1;
+
+/// A database a newer version of the app saved (ADR 0034): this version
+/// does not open it, and nothing in it changed.
+class StoreNeedsUpdate implements Exception {
+  /// The `user_version` it was saved with.
+  final int version;
+
+  const StoreNeedsUpdate(this.version);
+
+  @override
+  String toString() => 'StoreNeedsUpdate($version)';
+}
+
 /// The log: an append-only entry log over SQLite with a latest-wins
 /// projection (ADR 0002). All reads and writes are synchronous.
 ///
@@ -84,14 +101,21 @@ class Store {
     String path, {
     DateTime Function() clock = DateTime.now,
     SigningKey Function() newKey = SigningKey.generate,
-  }) => _init(
-    sqlite3.open(path),
-    clock,
-    newKey,
-    FileBlobs('${File(path).parent.path}/photos'),
-    FileBlobs('${File(path).parent.path}/audio'),
-    FilePendingFiles('${File(path).parent.path}/pending'),
-  );
+  }) {
+    final db = sqlite3.open(path);
+    // Before the directories beside it are made: a database of a newer
+    // version leaves everything as it was.
+    _savedVersion(db);
+    final dir = File(path).parent.path;
+    return _init(
+      db,
+      clock,
+      newKey,
+      FileBlobs('$dir/photos'),
+      FileBlobs('$dir/audio'),
+      FilePendingFiles('$dir/pending'),
+    );
+  }
 
   /// Opens a throwaway in-memory store (tests).
   factory Store.inMemory({
@@ -106,6 +130,18 @@ class Store {
     MemoryPendingFiles(),
   );
 
+  /// The version [db] was saved with; [StoreNeedsUpdate], with [db]
+  /// closed, for one of a newer version. Reads only, so such a database
+  /// stays as it was.
+  static int _savedVersion(Database db) {
+    final version = db.select('PRAGMA user_version').first.columnAt(0) as int;
+    if (version != 0 && version != storeVersion) {
+      db.close();
+      throw StoreNeedsUpdate(version);
+    }
+    return version;
+  }
+
   static Store _init(
     Database db,
     DateTime Function() clock,
@@ -116,8 +152,11 @@ class Store {
   ) {
     // The background sync may hold the file a moment while the app opens:
     // a write waits for it instead of failing.
+    db.execute('PRAGMA busy_timeout = 5000');
+    // Read before anything is written: a database of a newer version is
+    // left exactly as it was.
+    final version = _savedVersion(db);
     db.execute('''
-      PRAGMA busy_timeout = 5000;
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS entries (
         seq      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,18 +189,9 @@ class Store {
       CREATE INDEX IF NOT EXISTS idx_entries_entity_field
         ON entries (entity, field);
     ''');
-    // A log from before causal contexts were kept gains the column; its
-    // entries keep none.
-    final columns = db.select('PRAGMA table_info(entries)');
-    if (!columns.any((c) => c['name'] == 'ctx')) {
-      db.execute('ALTER TABLE entries ADD COLUMN ctx TEXT');
-    }
-    // And the entries kept as they came, of a later structure among them
-    // (ADR 0019); none in a log from before.
-    if (!columns.any((c) => c['name'] == 'raw')) {
-      db.execute('ALTER TABLE entries ADD COLUMN raw TEXT');
-      db.execute('ALTER TABLE entries ADD COLUMN v INTEGER');
-    }
+    // Today's tables: a database from before the version was recorded
+    // gets it. A later version adds its steps here, one per version.
+    if (version == 0) db.execute('PRAGMA user_version = $storeVersion');
     final store = Store._(db, clock, photos, audio, pending);
     if (store.localSetting('device') == null) {
       final key = newKey();

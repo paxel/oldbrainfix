@@ -3074,6 +3074,18 @@ abstract class AppLocalizations {
   /// **'Saved by a newer version of Old Brain Fix. Update the app to change it.'**
   String get newerVersionNeeded;
 
+  /// The only screen shown, on the phone and the desktop, when this Device's database was saved by a newer version of the app (ADR 0034): the app does not open it, offers no Capture and changes nothing; the desktop's command line prints it too.
+  ///
+  /// In en, this message translates to:
+  /// **'This Device\'s data was saved by a newer Old Brain Fix; install that version again.'**
+  String get storeNeedsUpdate;
+
+  /// Under storeNeedsUpdate on the screen shown in place of the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing on this Device was changed.'**
+  String get storeNeedsUpdateUnchanged;
+
   /// No description provided for @conflictOnThisDevice.
   ///
   /// In en, this message translates to:

@@ -6187,7 +6187,8 @@ void _write(File file, String text) {
   file.writeAsStringSync(text);
 }
 
-/// The store's schema, as SQLite keeps it, in a stable order.
+/// The store's schema, as SQLite keeps it, in a stable order, and the
+/// version it records (ADR 0034).
 String _schema(Directory work) {
   final path = '${work.path}/schema.db';
   Store.open(path, newKey: () => SigningKey.fromSeed(_seed)).close();
@@ -6196,7 +6197,8 @@ String _schema(Directory work) {
     final rows = db.select(
       "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name",
     );
-    return '${[for (final row in rows) '${row['sql']};'].join('\n')}\n';
+    final version = db.select('PRAGMA user_version').first.columnAt(0);
+    return '${[for (final row in rows) '${row['sql']};', 'PRAGMA user_version = $version;'].join('\n')}\n';
   } finally {
     db.close();
   }
@@ -6459,7 +6461,7 @@ Future<void> main(List<String> args) async {
     'the Dart core; the desktop core loads every `log.jsonl` and must read '
     'the same `expected.json`, which holds what each Note hands to '
     'another app among it. Do not edit by hand.\n\n'
-    '- `schema.sql`: the tables and indexes of the store.\n'
+    '- `schema.sql`: the tables and indexes of the store, and its version.\n'
     '- `signing.json`: entries signed by the writer key, with the bytes '
     'the signatures cover.\n'
     '- `question_marks.json`: the background\'s shapes and their scatter '

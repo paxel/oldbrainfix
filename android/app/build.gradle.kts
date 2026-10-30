@@ -211,4 +211,7 @@ dependencies {
     // grants (Storage Access Framework); AndroidX only.
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
+    // The JSON the unit tests read stored values with: android.jar's
+    // org.json is only a stub off the device.
+    testImplementation("org.json:json:20250517")
 }

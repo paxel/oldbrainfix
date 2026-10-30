@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -96,6 +97,80 @@ void main() {
     addTearDown(second.close);
     expect(second.deviceId, device);
     expect(second.current('note:a', 'text'), 'kept');
+  });
+
+  group('the database version', () {
+    late Directory dir;
+    late String path;
+
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('obf');
+      path = '${dir.path}/oldbrainfix.db';
+      final store = Store.open(path);
+      store.append('note:a', 'text', 'kept');
+      store.close();
+    });
+    tearDown(() => dir.deleteSync(recursive: true));
+
+    int version() {
+      final db = sqlite3.open(path);
+      try {
+        return db.select('PRAGMA user_version').first.columnAt(0) as int;
+      } finally {
+        db.close();
+      }
+    }
+
+    void setVersion(int version) {
+      final db = sqlite3.open(path);
+      db.execute('PRAGMA user_version = $version');
+      db.close();
+    }
+
+    /// Every file beside the database, with its bytes.
+    Map<String, List<int>> files() => {
+      for (final file in dir.listSync(recursive: true).whereType<File>())
+        file.path: file.readAsBytesSync(),
+    };
+
+    test('is recorded', () {
+      expect(version(), storeVersion);
+      expect(storeVersion, 1);
+    });
+
+    test('a database from before it was recorded keeps its log and gets '
+        'it', () {
+      setVersion(0);
+      final store = Store.open(path);
+      addTearDown(store.close);
+      expect(store.current('note:a', 'text'), 'kept');
+      expect(version(), 1);
+    });
+
+    test('a database a newer version saved is not opened, and nothing in '
+        'it or beside it changes', () {
+      // The directories beside it are made again only by an open that
+      // goes ahead.
+      Directory('${dir.path}/photos').deleteSync(recursive: true);
+      Directory('${dir.path}/audio').deleteSync(recursive: true);
+      for (final newer in [2, 1000, -1]) {
+        setVersion(newer);
+        final before = files();
+        expect(
+          () => Store.open(path),
+          throwsA(
+            isA<StoreNeedsUpdate>().having((e) => e.version, 'version', newer),
+          ),
+        );
+        expect(files(), before);
+        expect(Directory('${dir.path}/photos').existsSync(), isFalse);
+        expect(version(), newer);
+      }
+      setVersion(1);
+      final store = Store.open(path);
+      addTearDown(store.close);
+      expect(store.current('note:a', 'text'), 'kept');
+    });
   });
 
   test('listeners hear each append, a batch once, and settings never', () {

@@ -16,9 +16,17 @@ Only an absent version and exactly 1 are version 1: the string `1` in a field of
 
 **Override.** The Override carries `overrideVersion`; version 1 holds `overrideName` and `overridePicture`. It is read like them, from what one's own Devices wrote only (ADR 0017), so another person's Device cannot lock an Override by writing one. Of a later version, its name and picture show as far as they read, and giving another name or picture is refused; the same again changes nothing. Names stay plain strings (ADR 0018); the marker is a field of its own.
 
+## The database and Android's stored values
+
+**Database.** The SQLite file each app keeps the log in records the version of its tables as `user_version` (#132). This version's tables are version 1. SQLite gives every file 0 until something is written there, so 0 is a database from before the version was recorded, and those tables are the same as version 1: every release since 0.1.0 has had the `ctx`, `raw` and `v` columns, so the column probes that added them are gone. Opening such a file writes 1. Unlike a marker in the log, this number is written for version 1 too: no other Device reads it, nothing syncs it, and it is what lets each later version's step run once, a check of the version where the columns were probed before. A later version adds its step, which ends by writing its number.
+
+A file of any other version, a later one or a number no version writes, such as a negative one, is not opened. The store reads `user_version` first, before the journal mode, the tables, the Device key or the directories beside the file, and gives up with `StoreNeedsUpdate` (Dart) or `Error::StoreNeedsUpdate` (Rust), leaving every byte of the file and of everything beside it as it was. In place of the app the phone shows only "This Device's data was saved by a newer Old Brain Fix; install that version again." and "Nothing on this Device was changed.", before anything else and with no Capture; its background sync does nothing. On the desktop every start but the command line, the window's, the tray's and the capture popup's, shows the same in a window of its own and starts no tray, hotkey, alerts or sync; `oldbrainfix capture` and `oldbrainfix import` print the first sentence and end with an error. The data of a later version cannot be read here without losing what that version keeps, so installing it again is the only way on.
+
+**Android's stored values.** The alarm plan, its labels, the Nudge and the Changes Nudge, the Done and snoozes queued from notifications and the widget, and the Agenda widget's snapshot are JSON in SharedPreferences, written by this Device's app alone. Each object carries `v` by the rule of ADR 0019, as JSON markers here do: absent or the whole number 1 is version 1, and nothing writes it today; the plan and the queue are arrays, so each of their elements carries its own. Every read catches what does not read: a value that is missing, of another type than a text or a number, or not JSON reads as none, and so does one of a later version, so AlarmReceiver, RearmReceiver and the widget never crash over one. An alarm of the plan or a row of the snapshot that does not read is left out and the rest rings or shows; a label falls back to its name, a Nudge to none, the snapshot to none, with which the widget asks to open the app. The queue loses no tap: an action that does not read, of a kind this version does not apply or of a later version is not handed to the app, and its acknowledgement leaves it queued; a queue text that is no JSON array is kept aside as it was under `unread` before a new tap starts another (a queue of another type than a text is written over), and a new tap's number counts on past every one queued, whatever the stored counter says.
+
 ## Not covered here
 
-The keys and aliases a signed Profile lists stay as ADR 0017 has them: each counts only when a bound key's signature holds over `oldbrainfix:profile-key:<id>:<key>` or `oldbrainfix:profile-alias:<alias>:<to>`, which says the same whatever a later structure adds beside it. An entry of another shape is still left out and not passed on, since nothing here could check who made it. The database, the Android plans, pair codes, Sent Item, Backup, keys and Profiles files and local settings have gaps of their own (#60) and keep their behaviour.
+The keys and aliases a signed Profile lists stay as ADR 0017 has them: each counts only when a bound key's signature holds over `oldbrainfix:profile-key:<id>:<key>` or `oldbrainfix:profile-alias:<alias>:<to>`, which says the same whatever a later structure adds beside it. An entry of another shape is still left out and not passed on, since nothing here could check who made it. Pair codes, Sent Item, Backup, keys and Profiles files and local settings have gaps of their own (#60) and keep their behaviour.
 
 ## Considered Options
 
@@ -27,6 +35,9 @@ The keys and aliases a signed Profile lists stay as ADR 0017 has them: each coun
 - An unknown role read as Member (rejected: a later read-only role would gain writes on every older Device) or, as before, as no grant (rejected: it strips the person's access, and a Manager here could grant over it).
 - A marker inside the Override name (rejected: names are plain and may hold any character).
 - A Routine of a later version as a `Routine` without a schedule (rejected: every reader of a schedule in both cores and both apps would have to handle its absence; a type of its own keeps them as they are).
+- A database of a later version opened read-only, showing what this version can read of it (rejected: what this version reads of a later one's tables can be wrong, and the alarms and Captures that would follow from it could not be kept).
+- `user_version` 0 kept for version 1, as markers in the log keep it absent (rejected: every open would have to probe the columns again to tell a database from before 0.1.0 from today's).
+- The column probes kept for a database at 0 (rejected: no released version wrote one without the columns).
 
 ## Consequences
 
@@ -34,3 +45,5 @@ The keys and aliases a signed Profile lists stay as ADR 0017 has them: each coun
 - A times value with a part that is no `HH:MM`, which no version wrote, now makes the Routine one of a later version instead of losing that time.
 - A Sent Item whose Routine has such times is unreadable, as one with an unreadable rule already was.
 - Nothing changes for the user of this version alone: the note shows only once a later version writes one of these values.
+- The first open by this version writes `user_version` 1 into the database; the version before it neither reads nor minds it. A database of a build from before 0.1.0 that was never opened since no longer gains its missing columns.
+- `schema.sql` among the fixtures holds the version beside the tables, so both cores record the same one.

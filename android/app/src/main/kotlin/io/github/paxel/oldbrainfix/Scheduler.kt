@@ -19,6 +19,10 @@ import java.util.TimeZone
  * without hitting Android's limit on pending alarms. An ignored alarm
  * Re-nags from the same one pending alarm, and escalates to a
  * full-screen alarm from there.
+ *
+ * Each stored value is read through [Stored]: one that is missing or not
+ * readable, or an element of the plan that is, reads as none, so the
+ * receivers never crash over it, and one of a later version is not used.
  */
 object Scheduler {
     private const val PREFS = "oldbrainfix_alarms"
@@ -73,31 +77,38 @@ object Scheduler {
     }
 
     /** The texts the app handed over for notifications, by name. */
-    fun label(context: Context, name: String): String =
-        JSONObject(prefs(context).getString(KEY_LABELS, "{}") ?: "{}").optString(name, name)
+    fun label(context: Context, name: String): String = labelOf(Stored.text(prefs(context), KEY_LABELS), name)
+
+    /** The text [name] of the [labels] handed over; [name] itself without one. */
+    internal fun labelOf(labels: String?, name: String): String =
+        Stored.objectOf(labels) { it.opt(name) as? String } ?: name
 
     /** The plan with the taps not applied yet. */
-    private fun alarms(context: Context): List<Alarm> {
-        val plan = JSONArray(prefs(context).getString(KEY_PLAN, "[]") ?: "[]")
-        val alarms = (0 until plan.length()).map { alarm(plan.getJSONObject(it)) }
-        return AlarmPlan.effective(alarms, EventQueue.pending(context))
-    }
+    private fun alarms(context: Context): List<Alarm> =
+        AlarmPlan.effective(planOf(Stored.text(prefs(context), KEY_PLAN)), EventQueue.pending(context))
+
+    /** The alarms of the [plan] handed over that read, in order. */
+    internal fun planOf(plan: String?): List<Alarm> = Stored.listOf(plan) { alarm(it) }
 
     /** The Nudge with the snooze tapped and not applied yet; null while nothing is Unsorted. */
     private fun nudge(context: Context): Nudge? {
-        val json = prefs(context).getString(KEY_NUDGE, null) ?: return null
-        return NudgePlan.effective(nudge(JSONObject(json)), EventQueue.pending(context))
+        val nudge = nudgeOf(Stored.text(prefs(context), KEY_NUDGE)) ?: return null
+        return NudgePlan.effective(nudge, EventQueue.pending(context))
     }
+
+    /** The Nudge handed over as [text], or null. */
+    internal fun nudgeOf(text: String?): Nudge? = Stored.objectOf(text) { nudge(it) }
 
     /**
      * The Changes Nudge (#109) and its text for the lock screen; null
      * while nobody waits for changes. It has no snooze, so the Nudge's
      * snoozes queued meanwhile do not touch it.
      */
-    private fun changes(context: Context): Pair<Nudge, String>? {
-        val json = JSONObject(prefs(context).getString(KEY_CHANGES, null) ?: return null)
-        return nudge(json) to json.optString("public")
-    }
+    private fun changes(context: Context): Pair<Nudge, String>? = changesOf(Stored.text(prefs(context), KEY_CHANGES))
+
+    /** The Changes Nudge handed over as [text] and its text for the lock screen, or null. */
+    internal fun changesOf(text: String?): Pair<Nudge, String>? =
+        Stored.objectOf(text) { nudge(it) to it.optString("public") }
 
     /**
      * After the phone was off (or its clock jumped ahead): what became
@@ -109,8 +120,8 @@ object Scheduler {
         val missed = AlarmPlan.catchUp(
             alarms(context),
             TimeZone.getDefault(),
-            prefs.getLong(KEY_LAST_FIRED, 0),
-            prefs.getLong(KEY_LAST_ARMED, 0),
+            Stored.long(prefs, KEY_LAST_FIRED),
+            Stored.long(prefs, KEY_LAST_ARMED),
             System.currentTimeMillis(),
         )
         if (missed > 0) Notifications.showCatchUp(context, missed)
@@ -121,7 +132,7 @@ object Scheduler {
     fun arm(context: Context) {
         val manager = context.getSystemService(AlarmManager::class.java)
         val now = System.currentTimeMillis()
-        val lastFired = prefs(context).getLong(KEY_LAST_FIRED, 0)
+        val lastFired = Stored.long(prefs(context), KEY_LAST_FIRED)
         prefs(context).edit().putLong(KEY_LAST_ARMED, now).commit()
         val zone = TimeZone.getDefault()
         val next = listOfNotNull(
@@ -151,7 +162,7 @@ object Scheduler {
     fun fired(context: Context, armed: Long) {
         val now = System.currentTimeMillis()
         val zone = TimeZone.getDefault()
-        val lastFired = prefs(context).getLong(KEY_LAST_FIRED, 0)
+        val lastFired = Stored.long(prefs(context), KEY_LAST_FIRED)
         val due = AlarmPlan.due(alarms(context), zone, armed, lastFired, now)
         val ring = AlarmPlan.toRing(due, zone, now, Permissions.fullScreenAllowed(context))
         for (alarm in due) {

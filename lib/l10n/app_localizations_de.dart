@@ -1907,6 +1907,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Von einer neueren Version von Old Brain Fix gespeichert. Aktualisiere die App, um es zu ändern.';
 
   @override
+  String get storeNeedsUpdate =>
+      'Die Daten dieses Geräts wurden von einer neueren Version von Old Brain Fix gespeichert; installiere diese Version wieder.';
+
+  @override
+  String get storeNeedsUpdateUnchanged =>
+      'Auf diesem Gerät wurde nichts verändert.';
+
+  @override
   String conflictOnThisDevice(String when) {
     return 'Auf diesem Gerät, $when';
   }

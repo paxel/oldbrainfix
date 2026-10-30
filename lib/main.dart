@@ -30,6 +30,7 @@ import 'src/photo_platform.dart';
 import 'src/profile_platform.dart';
 import 'src/routine_editor_screen.dart';
 import 'src/speech_platform.dart';
+import 'src/store_needs_update_screen.dart';
 import 'src/sync_platform.dart';
 import 'src/voice_platform.dart';
 
@@ -74,10 +75,17 @@ Future<void> main() async {
 }
 
 /// Opens the store and starts the app. Separate from [main] because the
-/// crash screen's Restart runs it again.
+/// crash screen's Restart runs it again. A database a newer version saved
+/// is not opened: one screen says so, with nothing else to do.
 Future<void> _openAndRun(Directory dir) async {
   final work = await getTemporaryDirectory();
-  final store = Store.open('${dir.path}/oldbrainfix.db');
+  final Store store;
+  try {
+    store = Store.open('${dir.path}/oldbrainfix.db');
+  } on StoreNeedsUpdate {
+    runApp(const StoreNeedsUpdateApp());
+    return;
+  }
   _store = store;
   runApp(
     OldBrainFixApp(
@@ -111,14 +119,20 @@ Future<void> _openAndRun(Directory dir) async {
 /// while the app is closed (android/…/SyncWorker.kt): paired Devices,
 /// hosted for and joined, and the shared folder, the same store, the
 /// weekly Backup when it is due, the alarms armed with the texts in the
-/// Device's language, and the work told when it is over.
+/// Device's language, and the work told when it is over. A database a
+/// newer version saved is left alone: nothing syncs.
 @pragma('vm:entry-point')
 Future<void> backgroundSyncMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   final sync = AndroidSync();
   try {
     final dir = await getApplicationSupportDirectory();
-    final store = Store.open('${dir.path}/oldbrainfix.db');
+    final Store store;
+    try {
+      store = Store.open('${dir.path}/oldbrainfix.db');
+    } on StoreNeedsUpdate {
+      return;
+    }
     final alarms = AlarmSync(
       store: store,
       platform: AndroidAlarms(),

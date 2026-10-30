@@ -188,36 +188,8 @@ class AgendaWidget : AppWidgetProvider() {
         }
 
         /** The snapshot the app handed over last, or null before the first. */
-        private fun snapshot(context: Context): AgendaSnapshot? {
-            val text = prefs(context).getString(KEY_SNAPSHOT, null) ?: return null
-            return runCatching { parse(JSONObject(text)) }.getOrNull()
-        }
-
-        private fun parse(json: JSONObject): AgendaSnapshot {
-            val days = json.getJSONObject("days")
-            val labels = json.getJSONObject("labels")
-            return AgendaSnapshot(
-                days = days.keys().asSequence().associateWith { day ->
-                    val rows = days.getJSONArray(day)
-                    (0 until rows.length()).map {
-                        val row = rows.getJSONObject(it)
-                        WidgetRow(
-                            routine = row.getString("routine"),
-                            occurrence = row.getString("occurrence"),
-                            title = row.optString("title"),
-                            time = row.optString("time"),
-                            done = row.optBoolean("done"),
-                        )
-                    }
-                },
-                unsorted = json.optInt("unsorted"),
-                today = labels.optString("today"),
-                empty = labels.optString("empty"),
-                unsortedText = labels.optString("unsorted"),
-                more = labels.optString("more"),
-                done = labels.optString("done"),
-            )
-        }
+        private fun snapshot(context: Context): AgendaSnapshot? =
+            AgendaWidgetPlan.snapshotOf(Stored.text(prefs(context), KEY_SNAPSHOT))
 
         /** The inexact alarm that moves the widget on to the new day. */
         private fun midnight(context: Context): PendingIntent = PendingIntent.getBroadcast(

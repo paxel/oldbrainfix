@@ -1,5 +1,6 @@
 package io.github.paxel.oldbrainfix
 
+import org.json.JSONArray
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
@@ -50,6 +51,37 @@ object AgendaWidgetPlan {
 
     /** Rows shown when the launcher does not tell the widget's height. */
     const val DEFAULT_ROOM = 3
+
+    /**
+     * The snapshot the app handed over as [text] ([Stored]): null when
+     * there is none, it does not read or it is of a later version, which
+     * makes the widget ask to open the app. A row that does not read is
+     * left out.
+     */
+    fun snapshotOf(text: String?): AgendaSnapshot? = Stored.objectOf(text) { json ->
+        val days = json.getJSONObject("days")
+        val labels = json.getJSONObject("labels")
+        AgendaSnapshot(
+            days = days.keys().asSequence().associateWith { day ->
+                val rows = days.optJSONArray(day) ?: JSONArray()
+                Stored.elementsOf(rows) { row ->
+                    WidgetRow(
+                        routine = row.getString("routine"),
+                        occurrence = row.getString("occurrence"),
+                        title = row.optString("title"),
+                        time = row.optString("time"),
+                        done = row.optBoolean("done"),
+                    )
+                }
+            },
+            unsorted = json.optInt("unsorted"),
+            today = labels.optString("today"),
+            empty = labels.optString("empty"),
+            unsortedText = labels.optString("unsorted"),
+            more = labels.optString("more"),
+            done = labels.optString("done"),
+        )
+    }
 
     /** The day [now] shows on [zone]'s clock, `YYYY-MM-DD`. */
     fun dayKey(now: Long, zone: TimeZone): String {

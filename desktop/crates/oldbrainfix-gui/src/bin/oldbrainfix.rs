@@ -4,7 +4,9 @@
 //! window leaves the app running in the tray, where Open brings the
 //! window back; without a tray, closing it quits. `--tray` (the login
 //! start) starts without the window. A second start hands its wish to the
-//! running app and ends.
+//! running app and ends. A database a newer version saved opens nothing:
+//! a window of its own says so, whatever the start, and the command line
+//! prints it.
 //!
 //! The hotkey, the tray's Capture and `oldbrainfix capture` open the
 //! capture popup: over the window while it is open, else on its own.
@@ -30,7 +32,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
-use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Notes, SigningKey, Store};
+use oldbrainfix_core::{APP_ID, APP_NAME, DeviceSettings, Error, Notes, SigningKey, Store};
 use oldbrainfix_gui::alerts::{self, Alerts, Event};
 use oldbrainfix_gui::auto_sync;
 use oldbrainfix_gui::autostart::Autostart;
@@ -48,6 +50,7 @@ use oldbrainfix_gui::notify::DesktopNotifier;
 use oldbrainfix_gui::popup::{self, CapturePopup, Outcome};
 use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
+use oldbrainfix_gui::store_needs_update::StoreNeedsUpdateView;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
 use oldbrainfix_gui::tray::{self, Command};
 use oldbrainfix_gui::{App, instance, local_wall};
@@ -279,14 +282,55 @@ impl Shell {
     }
 }
 
+/// The window in place of the app's while this Device's database was
+/// saved by a newer version.
+struct Refusal(StoreNeedsUpdateView);
+
+impl eframe::App for Refusal {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        App::install(ui.ctx());
+        self.0.show(ui);
+    }
+}
+
 /// Opens the store in `dir`.
-fn open_store(dir: &Path) -> Result<Store, String> {
+fn open_store(dir: &Path) -> Result<Store, Error> {
     Store::open(
         &dir.join("oldbrainfix.db"),
         Box::new(chrono::Utc::now),
         SigningKey::generate,
     )
-    .map_err(|e| e.to_string())
+}
+
+/// What the command line says when the store does not open.
+fn not_opened(t: &L10n, e: Error) -> String {
+    match e {
+        Error::StoreNeedsUpdate(_) => t.store_needs_update().to_string(),
+        e => e.to_string(),
+    }
+}
+
+/// This Device's database was saved by a newer version: says so on the
+/// command line and in a window of its own, until it is closed, and
+/// starts nothing else, no tray, hotkey, alerts or sync; the exit code.
+fn refuse(locale: &'static str) -> Result<i32, String> {
+    let view = StoreNeedsUpdateView::new(locale);
+    eprintln!("oldbrainfix: {}", view.t().store_needs_update());
+    let viewport = egui::ViewportBuilder::default()
+        .with_title(view.t().app_title())
+        .with_app_id(APP_ID)
+        .with_inner_size([640.0, 360.0]);
+    let options = eframe::NativeOptions {
+        viewport,
+        ..Default::default()
+    };
+    eframe::run_native(
+        APP_NAME,
+        options,
+        Box::new(move |_| Ok(Box::new(Refusal(view)))),
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(cli::FAILED)
 }
 
 /// `oldbrainfix capture TEXT`: keeps `text` through the running app, or
@@ -297,7 +341,7 @@ fn capture_text(dir: &Path, socket: &Path, t: &L10n, text: &str) -> i32 {
         return cli::USAGE;
     }
     let kept = instance::hand_over_text(socket, text).unwrap_or_else(|| {
-        let store = open_store(dir)?;
+        let store = open_store(dir).map_err(|e| not_opened(t, e))?;
         popup::capture(&store, text, Notes::default_nudge())
             .map(drop)
             .map_err(|e| e.to_string())
@@ -318,7 +362,7 @@ fn import_file(dir: &Path, socket: &Path, t: &L10n, file: &str) -> i32 {
     // The running app has a working directory of its own.
     let path = std::path::absolute(file).unwrap_or_else(|_| file.into());
     let done = instance::hand_over_import(socket, &path).unwrap_or_else(|| {
-        let store = open_store(dir)?;
+        let store = open_store(dir).map_err(|e| not_opened(t, e))?;
         import_bundle_text(t, &store, &path)
     });
     match done {
@@ -384,7 +428,13 @@ fn run() -> Result<i32, String> {
     // The menu entry and icon the window's app id names, kept current.
     #[cfg(target_os = "linux")]
     std::thread::spawn(oldbrainfix_gui::launcher::register);
-    let store = Arc::new(open_store(&dir)?);
+    // A database of a newer version opens nothing: the window, the tray's
+    // start and the capture popup's all show why instead.
+    let store = match open_store(&dir) {
+        Ok(store) => Arc::new(store),
+        Err(Error::StoreNeedsUpdate(_)) => return refuse(locale),
+        Err(e) => return Err(e.to_string()),
+    };
     // The own Profile from the login's full name and account picture,
     // asking nothing; the window opens without it if that fails. On the
     // first start only once its view is answered (ADR 0017).

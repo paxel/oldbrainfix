@@ -36,6 +36,11 @@ pub enum Error {
     /// (ADR 0022, 0026): nothing goes out or comes in until it is decided.
     #[error("sync is paused until the pending changes are decided")]
     SyncPaused,
+    /// A database a newer version of the app saved, with the
+    /// `user_version` it holds, as the Dart core's `StoreNeedsUpdate`
+    /// (ADR 0034): it is not opened, and nothing in it changed.
+    #[error("a database of a newer version ({0})")]
+    StoreNeedsUpdate(i64),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

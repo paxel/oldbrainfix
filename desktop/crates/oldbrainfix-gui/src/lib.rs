@@ -8,8 +8,9 @@
 //! photos, Paste in the capture, the Transcripts and Photo Texts made of
 //! them, the LAN sync it hosts, for pairing in the Sync view and for paired Devices on their
 //! own, the shared folder it syncs through, the Backups it writes and
-//! restores, and the About view with every third-party component's
-//! licence.
+//! restores, the About view with every third-party component's
+//! licence, and the view in place of the window for a database of a
+//! newer version.
 
 pub mod about_view;
 pub mod ai_view;
@@ -51,6 +52,7 @@ pub mod session_view;
 pub mod share_note;
 pub mod shopping_view;
 pub mod speech;
+pub mod store_needs_update;
 pub mod sync_view;
 pub mod table_view;
 pub mod tally_view;

@@ -96,7 +96,7 @@ pub use shopping_lists::{
     Reappear, ShoppingAgenda, ShoppingAgendaList, ShoppingLine, ShoppingList, ShoppingLists,
 };
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
-pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, Store};
+pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, STORE_VERSION, Store};
 pub use sync::Moment;
 pub use tallies::{Tallies, Tally, TallyBucket, TallyEntry, TallyField, TallyPeriod};
 pub use tally_units::{TallyRule, UnitKind, UnitSystem};

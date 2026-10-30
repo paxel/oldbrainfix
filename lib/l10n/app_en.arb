@@ -1099,6 +1099,10 @@
   "@textNewerFormat": {"description": "Above a Note's or Section's text in the editor when the text is in a format this version of the app does not know; the text then shows as it is stored and cannot be changed."},
   "newerVersionNeeded": "Saved by a newer version of Old Brain Fix. Update the app to change it.",
   "@newerVersionNeeded": {"description": "In place of a value a newer version of the app saved in a form this version does not know (ADR 0034): a Routine's schedule in the list of all Routines and Reminders and under its Note, a person's role in a Shared Area, a Profile or the name and picture given to a person; the value is kept as it is and cannot be changed here."},
+  "storeNeedsUpdate": "This Device's data was saved by a newer Old Brain Fix; install that version again.",
+  "@storeNeedsUpdate": {"description": "The only screen shown, on the phone and the desktop, when this Device's database was saved by a newer version of the app (ADR 0034): the app does not open it, offers no Capture and changes nothing; the desktop's command line prints it too."},
+  "storeNeedsUpdateUnchanged": "Nothing on this Device was changed.",
+  "@storeNeedsUpdateUnchanged": {"description": "Under storeNeedsUpdate on the screen shown in place of the app."},
   "conflictOnThisDevice": "On this Device, {when}",
   "@conflictOnThisDevice": {
     "placeholders": {

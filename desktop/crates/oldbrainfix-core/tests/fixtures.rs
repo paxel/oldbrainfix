@@ -512,6 +512,9 @@ fn the_store_has_the_dart_core_tables() -> TestResult {
         ours.push_str(&row?);
         ours.push_str(";\n");
     }
+    // And the version both record (ADR 0034).
+    let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    ours.push_str(&format!("PRAGMA user_version = {version};\n"));
     let theirs = std::fs::read_to_string(fixtures().join("schema.sql"))?;
     let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
     assert_eq!(squash(&ours), squash(&theirs));

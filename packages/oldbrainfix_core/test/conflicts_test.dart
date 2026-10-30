@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
-import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 
 /// A clock shared by every store of a test, one second per read, so
@@ -472,40 +470,6 @@ void main() {
       expect(decodeContext('a:10 b:2'), {'a': 10, 'b': 2});
       expect(decodeContext(''), isEmpty);
       expect(decodeContext('junk :3 c:x'), isEmpty);
-    });
-
-    test('a store from before contexts gains the column', () {
-      final dir = Directory.systemTemp.createTempSync('oldbrainfix_ctx_');
-      addTearDown(() => dir.deleteSync(recursive: true));
-      final path = '${dir.path}/oldbrainfix.db';
-      final key = SigningKey.generate();
-      Store.open(path, newKey: () => key).close();
-      final db = sqlite3.open(path);
-      db.execute('DROP TABLE entries');
-      db.execute('''
-        CREATE TABLE entries (
-          seq      INTEGER PRIMARY KEY AUTOINCREMENT,
-          device   TEXT NOT NULL,
-          dseq     INTEGER NOT NULL,
-          entity   TEXT NOT NULL,
-          field    TEXT NOT NULL,
-          value    TEXT,
-          date     TEXT NOT NULL,
-          author   TEXT NOT NULL,
-          recorded TEXT NOT NULL,
-          sig      TEXT
-        )''');
-      db.execute(
-        "INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded) "
-        "VALUES ('d', 1, 'note:a', 'text', 'kept', '2026-01-01T00:00:00.000Z', '', '2026-01-01T00:00:00.000Z')",
-      );
-      db.close();
-      final store = Store.open(path, newKey: () => key);
-      addTearDown(store.close);
-      expect(store.current('note:a', 'text'), 'kept');
-      expect(store.history('note:a').single.ctx, isNull);
-      store.append('note:a', 'text', 'edited');
-      expect(store.history('note:a').last.ctx, 'd:1');
     });
   });
 }

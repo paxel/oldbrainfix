@@ -56,6 +56,22 @@ pub type IdMaker = Box<dyn Fn() -> Result<String> + Send + Sync>;
 /// `_applied`: those of a later structure are only held and passed on.
 const APPLIED: &str = "(v IS NULL OR v <= 1)";
 
+/// The version of the tables this version keeps the log in, recorded as
+/// the database's `user_version` (ADR 0034), as the Dart core's
+/// `storeVersion`. 0, SQLite's own default, is a database from before the
+/// version was recorded: the same tables.
+pub const STORE_VERSION: i64 = 1;
+
+/// The version `db` was saved with; [`Error::StoreNeedsUpdate`] for one
+/// of a newer version. Reads only, so such a database stays as it was.
+fn saved_version(db: &Connection) -> Result<i64> {
+    let version: i64 = db.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if version != 0 && version != STORE_VERSION {
+        return Err(Error::StoreNeedsUpdate(version));
+    }
+    Ok(version)
+}
+
 /// The tables, word for word as the Dart core creates them.
 const SCHEMA: &str = "
       CREATE TABLE IF NOT EXISTS entries (
@@ -257,18 +273,15 @@ impl Store {
         clock: Clock,
         new_key: impl FnOnce() -> Result<SigningKey>,
     ) -> Result<Store> {
+        let db = Connection::open(path)?;
+        // Before the directories beside it are made: a database of a
+        // newer version leaves everything as it was.
+        saved_version(&db)?;
         let dir = path.parent().unwrap_or(Path::new("."));
         let photos = Box::new(FileBlobs::new(dir.join("photos"))?);
         let audio = Box::new(FileBlobs::new(dir.join("audio"))?);
         let pending = Box::new(FilePendingFiles::new(dir.join("pending")));
-        Self::init(
-            Connection::open(path)?,
-            clock,
-            new_key,
-            photos,
-            audio,
-            pending,
-        )
+        Self::init(db, clock, new_key, photos, audio, pending)
     }
 
     /// Opens a throwaway in-memory store (tests).
@@ -294,36 +307,16 @@ impl Store {
         audio: Box<dyn Blobs>,
         pending_files: Box<dyn PendingFiles>,
     ) -> Result<Store> {
+        // Read before anything is written: a database of a newer version
+        // is left exactly as it was.
+        let version = saved_version(&db)?;
         // The pragma answers with the mode it took; memory stays memory.
         db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))?;
         db.execute_batch(SCHEMA)?;
-        // A log from before causal contexts were kept gains the column;
-        // its entries keep none.
-        let has_ctx = {
-            let mut stmt = db.prepare("PRAGMA table_info(entries)")?;
-            let names = stmt.query_map([], |r| r.get::<_, String>("name"))?;
-            names
-                .collect::<rusqlite::Result<Vec<_>>>()?
-                .iter()
-                .any(|n| n == "ctx")
-        };
-        if !has_ctx {
-            db.execute_batch("ALTER TABLE entries ADD COLUMN ctx TEXT")?;
-        }
-        // And the entries kept as they came, of a later structure among
-        // them (ADR 0019); none in a log from before.
-        let has_raw = {
-            let mut stmt = db.prepare("PRAGMA table_info(entries)")?;
-            let names = stmt.query_map([], |r| r.get::<_, String>("name"))?;
-            names
-                .collect::<rusqlite::Result<Vec<_>>>()?
-                .iter()
-                .any(|n| n == "raw")
-        };
-        if !has_raw {
-            db.execute_batch(
-                "ALTER TABLE entries ADD COLUMN raw TEXT; ALTER TABLE entries ADD COLUMN v INTEGER",
-            )?;
+        // Today's tables: a database from before the version was recorded
+        // gets it. A later version adds its steps here, one per version.
+        if version == 0 {
+            db.execute_batch(&format!("PRAGMA user_version = {STORE_VERSION}"))?;
         }
         let store = Store {
             db: ReentrantMutex::new(db),
@@ -1648,41 +1641,90 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn a_store_from_before_contexts_gains_the_column() -> Result<()> {
-        let dir = tempfile::tempdir()?;
-        let path = dir.path().join("oldbrainfix.db");
-        drop(Store::open(&path, ticking(), || {
-            Ok(SigningKey::from_seed([1; 32]))
-        })?);
-        {
-            let db = Connection::open(&path)?;
-            db.execute_batch(
-                "DROP TABLE entries;
-                 CREATE TABLE entries (
-                   seq      INTEGER PRIMARY KEY AUTOINCREMENT,
-                   device   TEXT NOT NULL,
-                   dseq     INTEGER NOT NULL,
-                   entity   TEXT NOT NULL,
-                   field    TEXT NOT NULL,
-                   value    TEXT,
-                   date     TEXT NOT NULL,
-                   author   TEXT NOT NULL,
-                   recorded TEXT NOT NULL,
-                   sig      TEXT
-                 );
-                 INSERT INTO entries (device, dseq, entity, field, value, date, author, recorded)
-                 VALUES ('d', 1, 'note:a', 'text', 'kept', '2026-01-01T00:00:00.000Z', '',
-                         '2026-01-01T00:00:00.000Z');",
-            )?;
+    /// A store with one Note in `dir`, closed again.
+    fn saved(dir: &Path) -> Result<std::path::PathBuf> {
+        let path = dir.join("oldbrainfix.db");
+        let store = Store::open(&path, ticking(), || Ok(SigningKey::from_seed([1; 32])))?;
+        store.append("note:a", "text", Some("kept"), None)?;
+        drop(store);
+        Ok(path)
+    }
+
+    fn version_of(path: &Path) -> Result<i64> {
+        Ok(Connection::open(path)?.query_row("PRAGMA user_version", [], |r| r.get(0))?)
+    }
+
+    fn set_version(path: &Path, version: i64) -> Result<()> {
+        Ok(Connection::open(path)?.execute_batch(&format!("PRAGMA user_version = {version}"))?)
+    }
+
+    /// Every file under `dir`, with its bytes.
+    fn files(dir: &Path) -> Result<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>> {
+        let mut found = std::collections::BTreeMap::new();
+        let mut dirs = vec![dir.to_path_buf()];
+        while let Some(next) = dirs.pop() {
+            for entry in std::fs::read_dir(next)? {
+                let path = entry?.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                } else {
+                    found.insert(path.clone(), std::fs::read(&path)?);
+                }
+            }
         }
+        Ok(found)
+    }
+
+    #[test]
+    fn the_database_version_is_recorded() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = saved(dir.path())?;
+        assert_eq!(version_of(&path)?, STORE_VERSION);
+        assert_eq!(STORE_VERSION, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_database_from_before_the_version_keeps_its_log_and_gets_it() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = saved(dir.path())?;
+        set_version(&path, 0)?;
         let store = Store::open(&path, ticking(), || {
             Err(Error::Invalid("no new key on reopen".into()))
         })?;
         assert_eq!(store.current("note:a", "text")?.as_deref(), Some("kept"));
-        assert_eq!(store.history("note:a")?[0].ctx, None);
-        let edit = store.append("note:a", "text", Some("edited"), None)?;
-        assert_eq!(edit.ctx.as_deref(), Some("d:1"));
+        drop(store);
+        assert_eq!(version_of(&path)?, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn a_database_a_newer_version_saved_is_not_opened_and_nothing_changes() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let path = saved(dir.path())?;
+        // The directories beside it are made again only by an open that
+        // goes ahead.
+        std::fs::remove_dir_all(dir.path().join("photos"))?;
+        std::fs::remove_dir_all(dir.path().join("audio"))?;
+        for newer in [2, 1000, -1] {
+            set_version(&path, newer)?;
+            let before = files(dir.path())?;
+            let opened = Store::open(&path, ticking(), || {
+                Err(Error::Invalid("no new key on reopen".into()))
+            });
+            assert!(
+                matches!(opened, Err(Error::StoreNeedsUpdate(v)) if v == newer),
+                "{newer}"
+            );
+            assert_eq!(files(dir.path())?, before, "{newer}");
+            assert!(!dir.path().join("photos").exists());
+            assert_eq!(version_of(&path)?, newer);
+        }
+        set_version(&path, 1)?;
+        let store = Store::open(&path, ticking(), || {
+            Err(Error::Invalid("no new key on reopen".into()))
+        })?;
+        assert_eq!(store.current("note:a", "text")?.as_deref(), Some("kept"));
         Ok(())
     }
 
