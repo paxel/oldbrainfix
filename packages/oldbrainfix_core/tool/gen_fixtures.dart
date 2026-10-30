@@ -17,7 +17,8 @@
 /// text read as Lines and the keys that place them, and with a Routine
 /// the Lines checked for each Occurrence (`checklists.json`); the
 /// Shopping List scenario its Lines at moments around the days they come
-/// back (`shopping.json`).
+/// back (`shopping.json`); the History scenario each Routine's history at
+/// held moments with this Device's settings (`history.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -1160,6 +1161,137 @@ final _scenarios = <Scenario>[
       });
     },
   ),
+  (
+    name: 'history',
+    about:
+        'Routine histories over days the clock moves on: a Routine twice a '
+        'day Done early, on time and late, once before it was made, at a '
+        'time no schedule has and under keys no app writes, Missed, '
+        'rescheduled to once a day until a set day while one Occurrence ran, '
+        'trashed and restored; a Session Done from its entries, one late; a '
+        'Checklist with a Routine for a number of days, Done from its Lines, '
+        'one never all checked and one with a Line unchecked again; a '
+        'Reminder checked off and unchecked again, so Missed, one Done late '
+        'and one on the hour the clock skips; '
+        'a Routine Done once and trashed before its next Occurrence was '
+        'Missed.',
+    build: (store) {
+      final notes = Notes(store);
+      final routines = Routines(store);
+      final lists = Checklists(store);
+      final tallies = Tallies(store);
+      final sessions = Sessions(store);
+      void jump(Duration by) => _tick = _tick.add(by);
+      Occurrence on(int day, [ClockTime? time]) =>
+          Occurrence(Day(2026, 1, day), time);
+      DateTime wall(int day, int hour, [int minute = 0]) =>
+          instantOf(Day(2026, 1, day), _at(hour, minute), _europe);
+      Schedule daily(List<ClockTime> times, [String rule = 'FREQ=DAILY']) =>
+          Schedule(
+            start: Day(2026, 1, 1),
+            times: times,
+            rule: Recurrence.parse(rule),
+          );
+      final pills = routines.create('Take the pills', daily([_at(8), _at(20)]));
+      final gym = notes.capture('Gym bag\nTowel\nShoes').id;
+      lists.make(gym);
+      final bag = routines
+          .spawn(gym, daily([_at(18)], 'FREQ=DAILY;COUNT=14'))
+          .id;
+      String line(String text) =>
+          lists.byNote(gym)!.lines.firstWhere((l) => l.text == text).id;
+      void check(String text, int day, {bool off = false}) {
+        final at = (routineId: bag, occurrence: on(day, _at(18)));
+        if (off) {
+          lists.uncheck(line(text), on: at);
+        } else {
+          lists.check(line(text), on: at);
+        }
+      }
+
+      final pushUps = notes.capture('Push-ups').id;
+      tallies.addField(pushUps, name: 'Push-ups', unit: 'times', target: 20);
+      final sport = sessions
+          .create(
+            'Sport',
+            daily([_at(7)], 'FREQ=DAILY;UNTIL=20260110'),
+            pool: [pushUps],
+            count: 1,
+            rule: SessionRule.rolling,
+          )
+          .id;
+      final bank = routines.create(
+        'Call the bank',
+        Schedule(start: Day(2026, 1, 3), times: [_at(10)]),
+      );
+      final passport = routines.create(
+        'Renew the passport',
+        Schedule(start: Day(2026, 1, 6)),
+      );
+      routines.create(
+        'Dentist',
+        Schedule(start: Day(2026, 3, 29), times: [_at(2, 30)]),
+      );
+      final plants = routines.create('Water the plants', daily([]));
+      routines.markDone(pills.id, on(1, _at(8)), at: wall(1, 8, 30));
+      routines.markDone(plants.id, on(1), at: wall(1, 9, 30));
+      // 21:00 on the 1st.
+      jump(const Duration(hours: 10));
+      routines.markDone(pills.id, on(1, _at(20)));
+      check('Towel', 1);
+      check('Shoes', 1);
+      // 08:00 on the 2nd.
+      jump(const Duration(hours: 11));
+      sessions.record(
+        sport,
+        on(2, _at(7)),
+        pushUps,
+        values: tallies.byNote(pushUps)!.targets,
+      );
+      routines.markDone(pills.id, on(2, _at(8)), at: wall(2, 7, 45));
+      jump(const Duration(hours: 3));
+      routines.trash(plants.id);
+      // 10:00 on the 3rd.
+      jump(const Duration(hours: 23));
+      routines.markDone(pills.id, on(2, _at(20)));
+      check('Towel', 2);
+      sessions.record(sport, on(3, _at(7)), pushUps, line: 'Slow');
+      // 10:00 on the 4th.
+      jump(const Duration(days: 1));
+      routines.markDone(pills.id, on(4, _at(8)));
+      // As another Device or a modified app would.
+      for (final key in ['2026-01-04T13:00', '2026-1-4', '2026-02-20T08:00']) {
+        store.append(
+          pills.id,
+          '${RoutineKeys.donePrefix}$key',
+          '2026-01-04T12:00:00.000Z',
+        );
+      }
+      check('Towel', 3);
+      check('Shoes', 3);
+      check('Shoes', 3, off: true);
+      // Noon on the 5th, while 08:00 is not Done yet.
+      jump(const Duration(days: 1, hours: 2));
+      routines.reschedule(
+        pills.id,
+        daily([_at(9)], 'FREQ=DAILY;UNTIL=20260125'),
+      );
+      jump(const Duration(days: 2));
+      routines.trash(pills.id);
+      jump(const Duration(days: 1));
+      routines.restore(pills.id);
+      // Noon on the 9th.
+      jump(const Duration(days: 1));
+      routines.markDone(pills.id, on(9, _at(9)));
+      routines.markDone(passport.id, on(6));
+      sessions.record(sport, on(8, _at(7)), pushUps, line: 'Late');
+      sessions.record(sport, on(9, _at(7)), pushUps, line: 'Again');
+      check('Towel', 8);
+      check('Shoes', 8);
+      routines.markDone(bank.id, on(3, _at(10)), at: wall(3, 9, 50));
+      routines.unmarkDone(bank.id, on(3, _at(10)));
+    },
+  ),
 ];
 
 /// Grant values as a Device of a later version may write them, for the
@@ -1340,6 +1472,163 @@ Map<String, Object?> _frogs(Store store) {
         section(frogs.today(_frogDay(days))),
     ],
   };
+}
+
+/// What the Routines of the `history` scenario come to: the schedules
+/// each had, each with what is Done, and at held moments with this
+/// Device's snoozes, Streaks setting and the day its weeks start on, the
+/// history of each. Leaves the clock held as it was.
+Map<String, Object?> _history(Store store) {
+  final routines = Routines(store);
+  final ids = store.entitiesOfType(RoutineKeys.typeRoutine)..sort();
+  String find(String text) => [
+    for (final id in ids)
+      if (routines.byId(id) case final r? when routines.note(r)?.text == text)
+        id,
+  ].single;
+  final pills = find('Take the pills');
+  final sport = find('Sport');
+  String? iso(DateTime? at) => at?.toUtc().toIso8601String();
+  Map<String, Object?> adherence(Adherence a) => {
+    'done': a.done,
+    'missed': a.missed,
+    'share': a.share,
+  };
+  Map<String, Object?> history(RoutineHistory h) => {
+    'today': '${h.today}',
+    'weekStart': h.weekStart,
+    'currentStreak': h.currentStreak,
+    'longestStreak': h.longestStreak,
+    'lastSevenDays': [
+      for (final d in h.lastSevenDays)
+        ['${d.day}', d.done, d.missed, d.open, d.empty],
+    ],
+    'thisWeek': adherence(h.thisWeek),
+    'thisMonth': adherence(h.thisMonth),
+    'last30Days': adherence(h.last30Days),
+    'january': adherence(h.adherence(Day(2026, 1, 1), Day(2026, 1, 31))),
+    'firstWeek': [
+      for (final e in h.between(Day(2026, 1, 1), Day(2026, 1, 7)))
+        e.occurrence.key,
+    ],
+    'entries': [
+      for (final e in h.entries)
+        {
+          'occurrence': e.occurrence.key,
+          'status': e.status.name,
+          'start': iso(e.start),
+          'missedAt': iso(e.missedAt),
+          'doneAt': iso(e.doneAt),
+          'snoozedUntil': iso(e.snoozedUntil),
+          'timing': e.timing?.name,
+        },
+    ],
+  };
+  final checks = <(DateTime, int, Map<String, String>)>[
+    // Friday afternoon after the last writes: snoozes of the Routine and
+    // the Session, garbled ones and one of a Routine not held.
+    (
+      DateTime.utc(2026, 1, 9, 13),
+      DateTime.monday,
+      {
+        'snoozes': jsonEncode({
+          '$pills@2026-01-09T09:00': DateTime.utc(
+            2026,
+            1,
+            9,
+            8,
+            20,
+          ).toIso8601String(),
+          '$pills@2026-01-03T08:00': DateTime.utc(
+            2026,
+            1,
+            3,
+            7,
+            30,
+          ).toIso8601String(),
+          '$sport@2026-01-06T07:00': DateTime.utc(
+            2026,
+            1,
+            6,
+            6,
+            40,
+          ).toIso8601String(),
+          '$sport@2026-01-09T07:00': 'soon',
+          '$sport@2026-01-05T07:00': 5,
+          'routine:none@2026-01-09T09:00': DateTime.utc(
+            2026,
+            1,
+            9,
+            8,
+            20,
+          ).toIso8601String(),
+        }),
+        'streaksOff': '',
+      },
+    ),
+    // Sunday evening, weeks starting on Sunday, Streaks off.
+    (
+      DateTime.utc(2026, 1, 11, 20),
+      DateTime.sunday,
+      {'snoozes': '{}', 'streaksOff': 'true'},
+    ),
+    // Sunday noon after the clock skipped 02:00 to 03:00.
+    (
+      DateTime.utc(2026, 3, 29, 12),
+      DateTime.monday,
+      {'snoozes': '{}', 'streaksOff': 'garbled'},
+    ),
+    // A new month, weeks starting on Thursday.
+    (
+      DateTime.utc(2026, 4, 1, 8),
+      DateTime.thursday,
+      {'snoozes': '', 'streaksOff': 'false'},
+    ),
+  ];
+  final held = _held;
+  try {
+    return {
+      'spans': {
+        for (final id in ids)
+          id: [
+            for (final s in scheduleSpans(store.history(id)))
+              {
+                'from': iso(s.from),
+                'until': iso(s.until),
+                'start': '${s.schedule.start}',
+                'times': [for (final t in s.schedule.times) '$t'],
+                'rule': s.schedule.rule?.format(),
+              },
+          ],
+      },
+      'routines': [
+        for (final id in ids)
+          if (routines.byId(id) case final routine?) _routine(routine),
+      ],
+      'checks': [
+        for (final (now, weekStart, local) in checks)
+          () {
+            _held = now;
+            local.forEach(store.setLocalSetting);
+            return {
+              'now': iso(now),
+              'weekStart': weekStart,
+              'local': local,
+              'streaksOn': store.streaksOn,
+              'histories': {
+                for (final id in ids)
+                  if (routines.byId(id) case final routine?)
+                    id: history(
+                      routines.history(routine, _europe, weekStart: weekStart),
+                    ),
+              },
+            };
+          }(),
+      ],
+    };
+  } finally {
+    _held = held;
+  }
 }
 
 /// What the Sessions of [store] come to: each Session with its pool,
@@ -7024,6 +7313,14 @@ Future<void> main(List<String> args) async {
     'Occurrences with their picks, their targets and the entries recorded '
     'for them, the day before, on and after the clock held, on the same '
     'clock.\n'
+    '- `history/history.json`: the schedules each Routine of the `history` '
+    'log had, each with what is Done, and at held moments with this '
+    'Device\'s snoozes, Streaks setting and the day weeks start on, the '
+    'history of each: every Occurrence asked for or Done with its status, '
+    'start, when it counts as Missed, when it was Done, early, on time or '
+    'late, and snoozed, the Streaks, the last seven days and the Adherence '
+    'of this week, this month, the last 30 days and January, on the same '
+    'clock.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
     'typed, what is no code and codes of a later version (ADR 0034).\n'
     '- `later_formats.json`: what files and values of a later version '
@@ -7375,6 +7672,13 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/shopping.json'),
           '${_json.convert(_shoppingLists(store))}\n',
+        );
+      }
+      // Last: its checks set this Device's settings.
+      if (scenario.name == 'history') {
+        _write(
+          File('${out.path}/history.json'),
+          '${_json.convert(_history(store))}\n',
         );
       }
       index.writeln('- `${scenario.name}`: ${scenario.about}');

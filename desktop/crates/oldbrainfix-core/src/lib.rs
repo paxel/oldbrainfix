@@ -2,7 +2,7 @@
 //! core's signed, append-only entry log (ADR 0002) and of what the
 //! screens read from it and write to it, Notes with their Sections, Areas
 //! and Topics, Routines and Reminders with the alarm plan, the Nudge,
-//! the Missed Summary and their calendar file, Frogs with today's pick, Tallies with their entries and charts, Checklists and Shopping Lists with their Lines, this Device's settings, and the question marks of
+//! the Missed Summary, their history and their calendar file, Frogs with today's pick, Tallies with their entries and charts, Checklists and Shopping Lists with their Lines, this Device's settings, and the question marks of
 //! the background; and of the photos and voice recordings kept beside
 //! the log, with their Photo Texts and Transcripts and the search over
 //! them; and the LAN sync between Devices with its pair codes, keys and
@@ -29,6 +29,7 @@ pub mod entry;
 pub mod error;
 pub mod folder;
 pub mod frogs;
+pub mod history;
 pub mod ics;
 pub mod join;
 pub mod keys;
@@ -75,6 +76,9 @@ pub use conflicts::{Conflict, ConflictVersion};
 pub use entry::{Entry, WireEntry, dart_iso, parse_time};
 pub use error::{Error, Result};
 pub use frogs::{Frog, Frogs, FrogsToday};
+pub use history::{
+    Adherence, DayTally, DoneTiming, HistoryEntry, OccurrenceStatus, RoutineHistory, ScheduleSpan,
+};
 pub use named_places::{Coordinates, NamedPlace, NamedPlaces};
 pub use notes::{Blob, CaptureContext, Importance, Note, Notes, Section, SourceApp, Wordless};
 pub use nudges::{PlannedChangesNudge, PlannedNudge, QuietHours};

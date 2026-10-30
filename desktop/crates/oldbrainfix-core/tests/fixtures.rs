@@ -4,7 +4,7 @@
 //! scenario again to the same log, byte for byte. Schedules, the alarm
 //! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
 //! of Tallies, the Lines of Checklists and Shopping Lists and the picks
-//! of Sessions must
+//! of Sessions and the histories of Routines must
 //! come to the same on the
 //! same European wall clock, Europe/Berlin here; the calendar files of
 //! Routines and Reminders must be the same bytes.
@@ -15,6 +15,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Duration, NaiveDateTime, TimeZone, Utc};
 use oldbrainfix_core::alarms::{WallMoment, instant_of};
+use oldbrainfix_core::history::{Adherence, DoneTiming, RoutineHistory, schedule_spans};
 use oldbrainfix_core::ics::routines_ics;
 use oldbrainfix_core::named_places::keys as named_place_keys;
 use oldbrainfix_core::notes::keys as note_keys;
@@ -38,13 +39,14 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 17] = [
+const SCENARIOS: [&str; 18] = [
     "boxes",
     "checklist-routines",
     "checklists",
     "edits",
     "formats",
     "frogs",
+    "history",
     "markdown",
     "markers",
     "media",
@@ -1607,13 +1609,14 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 17] = [
+    let writers: [(&str, Writer); 18] = [
         ("boxes", write_boxes),
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
+        ("history", write_history),
         ("markdown", write_markdown),
         ("markers", write_markers),
         ("media", write_media),
@@ -2087,9 +2090,16 @@ fn write_sessions(store: &Store) -> Built {
 
 #[test]
 fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
-    let expected = read_json(&fixtures().join("sessions").join("sessions.json"))?;
-    let read_at = read_json(&fixtures().join("sessions").join("expected.json"))?;
-    let store = load("sessions", read_at["now"].as_str().ok_or("now")?)?;
+    for scenario in ["history", "sessions"] {
+        sessions_come_to_what_the_dart_core_says(scenario)?;
+    }
+    Ok(())
+}
+
+fn sessions_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
+    let expected = read_json(&fixtures().join(scenario).join("sessions.json"))?;
+    let read_at = read_json(&fixtures().join(scenario).join("expected.json"))?;
+    let store = load(scenario, read_at["now"].as_str().ok_or("now")?)?;
     let sessions = Sessions::new(&store);
     let routines = Routines::new(&store);
     let mut every = Vec::new();
@@ -2110,7 +2120,7 @@ fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
             "choices": sessions.choices(s.id())?,
         }));
     }
-    assert_eq!(json!(every), expected["sessions"]);
+    assert_eq!(json!(every), expected["sessions"], "{scenario}");
     let mut ids = store.entities_of_type("routine")?;
     ids.sort();
     let mut all = Vec::new();
@@ -2155,8 +2165,256 @@ fn sessions_and_their_picks_come_to_what_the_dart_core_says() -> TestResult {
         }
         days.push(json!(shown));
     }
-    assert_eq!(json!(days), expected["today"]);
+    assert_eq!(json!(days), expected["today"], "{scenario}");
     assert_eq!(store.all_entries()?.len(), before, "today writes nothing");
+    Ok(())
+}
+
+// -------------------------------------------------------------- History
+
+/// The generator's `history` scenario.
+fn write_history(store: &Store) -> Built {
+    use oldbrainfix_core::routines::keys::DONE_PREFIX;
+    let notes = Notes::new(store);
+    let routines = Routines::new(store);
+    let lists = Checklists::new(store);
+    let tallies = Tallies::new(store);
+    let sessions = Sessions::new(store);
+    let on = |day: i64, time: Option<ClockTime>| Occurrence::new(Day::new(2026, 1, day), time);
+    let wall =
+        |day: i64, hour: u32, minute: u32| -> Result<DateTime<Utc>, Box<dyn std::error::Error>> {
+            Ok(instant_of(
+                Day::new(2026, 1, day),
+                at(hour, minute)?,
+                &berlin,
+            ))
+        };
+    let every_day =
+        |times: &[ClockTime], rule: &str| schedule(Day::new(2026, 1, 1), times, Some(rule));
+    let pills = routines
+        .create(
+            "Take the pills",
+            &every_day(&[at(8, 0)?, at(20, 0)?], "FREQ=DAILY")?,
+        )?
+        .id;
+    let gym = notes.capture("Gym bag\nTowel\nShoes", None, None)?.id;
+    lists.make(&gym)?;
+    let bag = routines
+        .spawn(&gym, &every_day(&[at(18, 0)?], "FREQ=DAILY;COUNT=14")?)?
+        .id;
+    let line = |text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(&gym)?.ok_or("a Checklist")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let check = |text: &str, day: i64, off: bool| -> Built {
+        let when = RoutineOccurrence {
+            routine_id: bag.clone(),
+            occurrence: on(day, Some(at(18, 0)?)),
+        };
+        if off {
+            lists.uncheck_for(&line(text)?, &when)?;
+        } else {
+            lists.check_for(&line(text)?, &when)?;
+        }
+        Ok(())
+    };
+    let push_ups = notes.capture("Push-ups", None, None)?.id;
+    tallies.add_field(&push_ups, "Push-ups", "times", Some(20.0), None)?;
+    let sport = sessions
+        .create(
+            "Sport",
+            &every_day(&[at(7, 0)?], "FREQ=DAILY;UNTIL=20260110")?,
+            std::slice::from_ref(&push_ups),
+            1,
+            SessionRule::Rolling,
+        )?
+        .id()
+        .to_string();
+    let bank = routines
+        .create(
+            "Call the bank",
+            &schedule(Day::new(2026, 1, 3), &[at(10, 0)?], None)?,
+        )?
+        .id;
+    let passport = routines
+        .create(
+            "Renew the passport",
+            &schedule(Day::new(2026, 1, 6), &[], None)?,
+        )?
+        .id;
+    routines.create(
+        "Dentist",
+        &schedule(Day::new(2026, 3, 29), &[at(2, 30)?], None)?,
+    )?;
+    let plants = routines
+        .create("Water the plants", &every_day(&[], "FREQ=DAILY")?)?
+        .id;
+    routines.mark_done(&pills, &on(1, Some(at(8, 0)?)), Some(wall(1, 8, 30)?))?;
+    routines.mark_done(&plants, &on(1, None), Some(wall(1, 9, 30)?))?;
+    // 21:00 on the 1st.
+    jump(Duration::hours(10));
+    routines.mark_done(&pills, &on(1, Some(at(20, 0)?)), None)?;
+    check("Towel", 1, false)?;
+    check("Shoes", 1, false)?;
+    // 08:00 on the 2nd.
+    jump(Duration::hours(11));
+    let targets = tallies.by_note(&push_ups)?.ok_or("a Tally")?.targets();
+    sessions.record(&sport, &on(2, Some(at(7, 0)?)), &push_ups, &targets, "")?;
+    routines.mark_done(&pills, &on(2, Some(at(8, 0)?)), Some(wall(2, 7, 45)?))?;
+    jump(Duration::hours(3));
+    routines.trash(&plants)?;
+    // 10:00 on the 3rd.
+    jump(Duration::hours(23));
+    routines.mark_done(&pills, &on(2, Some(at(20, 0)?)), None)?;
+    check("Towel", 2, false)?;
+    let none = BTreeMap::new();
+    sessions.record(&sport, &on(3, Some(at(7, 0)?)), &push_ups, &none, "Slow")?;
+    // 10:00 on the 4th.
+    jump(Duration::days(1));
+    routines.mark_done(&pills, &on(4, Some(at(8, 0)?)), None)?;
+    // As another Device or a modified app would.
+    for key in ["2026-01-04T13:00", "2026-1-4", "2026-02-20T08:00"] {
+        store.append(
+            &pills,
+            &format!("{DONE_PREFIX}{key}"),
+            Some("2026-01-04T12:00:00.000Z"),
+            None,
+        )?;
+    }
+    check("Towel", 3, false)?;
+    check("Shoes", 3, false)?;
+    check("Shoes", 3, true)?;
+    // Noon on the 5th, while 08:00 is not Done yet.
+    jump(Duration::days(1) + Duration::hours(2));
+    routines.reschedule(
+        &pills,
+        &every_day(&[at(9, 0)?], "FREQ=DAILY;UNTIL=20260125")?,
+    )?;
+    jump(Duration::days(2));
+    routines.trash(&pills)?;
+    jump(Duration::days(1));
+    routines.restore(&pills)?;
+    // Noon on the 9th.
+    jump(Duration::days(1));
+    routines.mark_done(&pills, &on(9, Some(at(9, 0)?)), None)?;
+    routines.mark_done(&passport, &on(6, None), None)?;
+    sessions.record(&sport, &on(8, Some(at(7, 0)?)), &push_ups, &none, "Late")?;
+    sessions.record(&sport, &on(9, Some(at(7, 0)?)), &push_ups, &none, "Again")?;
+    check("Towel", 8, false)?;
+    check("Shoes", 8, false)?;
+    let call = on(3, Some(at(10, 0)?));
+    routines.mark_done(&bank, &call, Some(wall(3, 9, 50)?))?;
+    routines.unmark_done(&bank, &call)?;
+    Ok(())
+}
+
+fn adherence_json(a: &Adherence) -> Value {
+    json!({"done": a.done, "missed": a.missed, "share": a.share()})
+}
+
+/// A history as the generator's `_history` lists it.
+fn history_json(h: &RoutineHistory) -> Value {
+    let days: Vec<Value> = h
+        .last_seven_days
+        .iter()
+        .map(|d| json!([d.day.to_string(), d.done, d.missed, d.open, d.is_empty()]))
+        .collect();
+    let first_week: Vec<String> = h
+        .between(Day::new(2026, 1, 1), Day::new(2026, 1, 7))
+        .iter()
+        .map(|e| e.occurrence.key())
+        .collect();
+    let entries: Vec<Value> = h
+        .entries
+        .iter()
+        .map(|e| {
+            json!({
+                "occurrence": e.occurrence.key(),
+                "status": e.status.name(),
+                "start": dart_iso(e.start),
+                "missedAt": dart_iso(e.missed_at),
+                "doneAt": iso(e.done_at),
+                "snoozedUntil": iso(e.snoozed_until),
+                "timing": e.timing().map(DoneTiming::name),
+            })
+        })
+        .collect();
+    json!({
+        "today": h.today.to_string(),
+        "weekStart": h.week_start,
+        "currentStreak": h.current_streak,
+        "longestStreak": h.longest_streak,
+        "lastSevenDays": days,
+        "thisWeek": adherence_json(&h.this_week),
+        "thisMonth": adherence_json(&h.this_month),
+        "last30Days": adherence_json(&h.last_30_days),
+        "january": adherence_json(&h.adherence(Day::new(2026, 1, 1), Day::new(2026, 1, 31))),
+        "firstWeek": first_week,
+        "entries": entries,
+    })
+}
+
+#[test]
+fn routine_histories_come_to_what_the_dart_core_says() -> TestResult {
+    let dir = fixtures().join("history");
+    let expected = read_json(&dir.join("history.json"))?;
+    let read_at = read_json(&dir.join("expected.json"))?;
+    let store = load("history", read_at["now"].as_str().ok_or("now")?)?;
+    let routines = Routines::new(&store);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut spans = serde_json::Map::new();
+    let mut every = Vec::new();
+    for id in &ids {
+        let of: Vec<Value> = schedule_spans(&store.history(id)?)
+            .iter()
+            .map(|s| {
+                json!({
+                    "from": dart_iso(s.from),
+                    "until": iso(s.until),
+                    "start": s.schedule.start.to_string(),
+                    "times": s.schedule.times.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                    "rule": s.schedule.rule.as_ref().map(Recurrence::format),
+                })
+            })
+            .collect();
+        spans.insert(id.clone(), json!(of));
+        if let Some(routine) = routines.by_id(id)? {
+            every.push(routine_json(&routine));
+        }
+    }
+    assert_eq!(Value::Object(spans), expected["spans"]);
+    assert_eq!(json!(every), expected["routines"]);
+    let checks = expected["checks"].as_array().ok_or("checks")?;
+    assert_eq!(checks.len(), 4);
+    for check in checks {
+        let now = check["now"].as_str().ok_or("now")?;
+        let store = load("history", now)?;
+        for (key, value) in check["local"].as_object().ok_or("local")? {
+            store.set_local_setting(key, value.as_str().ok_or("a setting")?)?;
+        }
+        let week_start = u32::try_from(check["weekStart"].as_u64().ok_or("weekStart")?)?;
+        let streaks = oldbrainfix_core::DeviceSettings::new(&store).streaks_on()?;
+        assert_eq!(json!(streaks), check["streaksOn"], "{now}");
+        let routines = Routines::new(&store);
+        let mut shown = 0;
+        for id in &ids {
+            let Some(routine) = routines.by_id(id)? else {
+                continue;
+            };
+            let history = routines.history(&routine, &berlin, week_start)?;
+            assert_eq!(history_json(&history), check["histories"][id], "{now} {id}");
+            shown += 1;
+        }
+        let held = check["histories"].as_object().ok_or("histories")?;
+        assert_eq!(shown, held.len(), "{now}");
+    }
     Ok(())
 }
 
@@ -2403,7 +2661,7 @@ const MARKDOWN_ROWS: [&str; 23] = [
 
 #[test]
 fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
-    for scenario in ["checklist-routines", "checklists"] {
+    for scenario in ["checklist-routines", "checklists", "history"] {
         checklists_come_to_what_the_dart_core_says(scenario)?;
     }
     Ok(())
@@ -2926,9 +3184,16 @@ fn units_json() -> Value {
 
 #[test]
 fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
-    let expected = read_json(&fixtures().join("tallies").join("tallies.json"))?;
-    let read_at = read_json(&fixtures().join("tallies").join("expected.json"))?;
-    let store = load("tallies", read_at["now"].as_str().ok_or("now")?)?;
+    for scenario in ["history", "tallies"] {
+        tallies_come_to_what_the_dart_core_says(scenario)?;
+    }
+    Ok(())
+}
+
+fn tallies_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
+    let expected = read_json(&fixtures().join(scenario).join("tallies.json"))?;
+    let read_at = read_json(&fixtures().join(scenario).join("expected.json"))?;
+    let store = load(scenario, read_at["now"].as_str().ok_or("now")?)?;
     let tallies = Tallies::new(&store);
     let mut note_ids = store.entities_of_type(note_keys::TYPE_NOTE)?;
     note_ids.sort();
@@ -2980,7 +3245,7 @@ fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
         }
         removed.insert(id.clone(), json!(gone));
     }
-    assert_eq!(Value::Object(every), expected["tallies"]);
+    assert_eq!(Value::Object(every), expected["tallies"], "{scenario}");
     let all: Vec<String> = tallies.all()?.into_iter().map(|t| t.note_id).collect();
     assert_eq!(json!(all), expected["all"]);
     assert_eq!(Value::Object(entries), expected["entries"]);
@@ -3017,7 +3282,7 @@ fn tallies_and_their_charts_come_to_what_the_dart_core_says() -> TestResult {
         }
         charts.insert(tally.note_id.clone(), Value::Object(by_field));
     }
-    assert_eq!(Value::Object(charts), expected["charts"]);
+    assert_eq!(Value::Object(charts), expected["charts"], "{scenario}");
     assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
     assert_eq!(units_json(), expected["units"]);
     Ok(())

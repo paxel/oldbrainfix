@@ -1,0 +1,4233 @@
+{
+  "spans": {
+    "routine:00000000000000000000000000000002": [
+      {
+        "from": "2026-01-01T10:00:09.000Z",
+        "until": "2026-01-05T11:02:25.000Z",
+        "start": "2026-01-01",
+        "times": [
+          "08:00",
+          "20:00"
+        ],
+        "rule": "FREQ=DAILY"
+      },
+      {
+        "from": "2026-01-05T11:02:26.000Z",
+        "until": "2026-01-07T11:02:28.000Z",
+        "start": "2026-01-01",
+        "times": [
+          "09:00"
+        ],
+        "rule": "FREQ=DAILY;UNTIL=20260125"
+      },
+      {
+        "from": "2026-01-08T11:02:29.000Z",
+        "until": null,
+        "start": "2026-01-01",
+        "times": [
+          "09:00"
+        ],
+        "rule": "FREQ=DAILY;UNTIL=20260125"
+      }
+    ],
+    "routine:00000000000000000000000000000007": [
+      {
+        "from": "2026-01-01T10:00:36.000Z",
+        "until": null,
+        "start": "2026-01-01",
+        "times": [
+          "18:00"
+        ],
+        "rule": "FREQ=DAILY;COUNT=14"
+      }
+    ],
+    "routine:0000000000000000000000000000000b": [
+      {
+        "from": "2026-01-01T10:00:55.000Z",
+        "until": null,
+        "start": "2026-01-01",
+        "times": [
+          "07:00"
+        ],
+        "rule": "FREQ=DAILY;UNTIL=20260110"
+      }
+    ],
+    "routine:0000000000000000000000000000000d": [
+      {
+        "from": "2026-01-01T10:01:09.000Z",
+        "until": null,
+        "start": "2026-01-03",
+        "times": [
+          "10:00"
+        ],
+        "rule": null
+      }
+    ],
+    "routine:0000000000000000000000000000000f": [
+      {
+        "from": "2026-01-01T10:01:20.000Z",
+        "until": null,
+        "start": "2026-01-06",
+        "times": [],
+        "rule": null
+      }
+    ],
+    "routine:00000000000000000000000000000011": [
+      {
+        "from": "2026-01-01T10:01:31.000Z",
+        "until": null,
+        "start": "2026-03-29",
+        "times": [
+          "02:30"
+        ],
+        "rule": null
+      }
+    ],
+    "routine:00000000000000000000000000000013": [
+      {
+        "from": "2026-01-01T10:01:42.000Z",
+        "until": "2026-01-02T10:02:02.000Z",
+        "start": "2026-01-01",
+        "times": [],
+        "rule": "FREQ=DAILY"
+      }
+    ]
+  },
+  "routines": [
+    {
+      "id": "routine:00000000000000000000000000000002",
+      "noteId": "note:00000000000000000000000000000001",
+      "start": "2026-01-01",
+      "times": [
+        "09:00"
+      ],
+      "rule": "FREQ=DAILY;UNTIL=20260125",
+      "done": {
+        "2026-01-01T08:00": "2026-01-01T07:30:00.000Z",
+        "2026-01-01T20:00": "2026-01-01T20:01:47.000Z",
+        "2026-01-02T08:00": "2026-01-02T06:45:00.000Z",
+        "2026-01-02T20:00": "2026-01-03T09:02:03.000Z",
+        "2026-01-04T08:00": "2026-01-04T09:02:14.000Z",
+        "2026-01-04T13:00": "2026-01-04T12:00:00.000Z",
+        "2026-01-09T09:00": "2026-01-09T11:02:30.000Z",
+        "2026-02-20T08:00": "2026-01-04T12:00:00.000Z",
+        "2026-1-4": "2026-01-04T12:00:00.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-08T11:02:29.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:00000000000000000000000000000007",
+      "noteId": "note:00000000000000000000000000000003",
+      "start": "2026-01-01",
+      "times": [
+        "18:00"
+      ],
+      "rule": "FREQ=DAILY;COUNT=14",
+      "done": {
+        "2026-01-01T18:00": "2026-01-01T20:01:52.000Z",
+        "2026-01-08T18:00": "2026-01-09T11:02:51.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:00:36.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000000b",
+      "noteId": "note:0000000000000000000000000000000a",
+      "start": "2026-01-01",
+      "times": [
+        "07:00"
+      ],
+      "rule": "FREQ=DAILY;UNTIL=20260110",
+      "done": {
+        "2026-01-02T07:00": "2026-01-02T07:01:53.000Z",
+        "2026-01-03T07:00": "2026-01-03T09:02:07.000Z",
+        "2026-01-08T07:00": "2026-01-09T11:02:34.000Z",
+        "2026-01-09T07:00": "2026-01-09T11:02:41.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:00:55.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000000d",
+      "noteId": "note:0000000000000000000000000000000c",
+      "start": "2026-01-03",
+      "times": [
+        "10:00"
+      ],
+      "rule": null,
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:09.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:0000000000000000000000000000000f",
+      "noteId": "note:0000000000000000000000000000000e",
+      "start": "2026-01-06",
+      "times": [],
+      "rule": null,
+      "done": {
+        "2026-01-06": "2026-01-09T11:02:32.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:20.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000011",
+      "noteId": "note:00000000000000000000000000000010",
+      "start": "2026-03-29",
+      "times": [
+        "02:30"
+      ],
+      "rule": null,
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:31.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000013",
+      "noteId": "note:00000000000000000000000000000012",
+      "start": "2026-01-01",
+      "times": [],
+      "rule": "FREQ=DAILY",
+      "done": {
+        "2026-01-01": "2026-01-01T08:30:00.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-02T10:02:02.000Z",
+      "trashed": "2026-01-02T10:02:01.000Z",
+      "trashedWith": null,
+      "reminder": false
+    }
+  ],
+  "checks": [
+    {
+      "now": "2026-01-09T13:00:00.000Z",
+      "weekStart": 1,
+      "local": {
+        "snoozes": "{\"routine:00000000000000000000000000000002@2026-01-09T09:00\":\"2026-01-09T08:20:00.000Z\",\"routine:00000000000000000000000000000002@2026-01-03T08:00\":\"2026-01-03T07:30:00.000Z\",\"routine:0000000000000000000000000000000b@2026-01-06T07:00\":\"2026-01-06T06:40:00.000Z\",\"routine:0000000000000000000000000000000b@2026-01-09T07:00\":\"soon\",\"routine:0000000000000000000000000000000b@2026-01-05T07:00\":5,\"routine:none@2026-01-09T09:00\":\"2026-01-09T08:20:00.000Z\"}",
+        "streaksOff": ""
+      },
+      "streaksOn": true,
+      "histories": {
+        "routine:00000000000000000000000000000002": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 4,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              2,
+              0,
+              false
+            ],
+            [
+              "2026-01-04",
+              2,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              1,
+              0,
+              0,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 1,
+            "missed": 1,
+            "share": 0.5
+          },
+          "thisMonth": {
+            "done": 7,
+            "missed": 4,
+            "share": 0.6363636363636364
+          },
+          "last30Days": {
+            "done": 7,
+            "missed": 4,
+            "share": 0.6363636363636364
+          },
+          "january": {
+            "done": 7,
+            "missed": 4,
+            "share": 0.6363636363636364
+          },
+          "firstWeek": [
+            "2026-01-01T08:00",
+            "2026-01-01T20:00",
+            "2026-01-02T08:00",
+            "2026-01-02T20:00",
+            "2026-01-03T08:00",
+            "2026-01-03T20:00",
+            "2026-01-04T08:00",
+            "2026-01-04T13:00",
+            "2026-01-04T20:00",
+            "2026-01-06T09:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T08:00",
+              "status": "done",
+              "start": "2026-01-01T07:00:00.000Z",
+              "missedAt": "2026-01-01T19:00:00.000Z",
+              "doneAt": "2026-01-01T07:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-01T20:00",
+              "status": "done",
+              "start": "2026-01-01T19:00:00.000Z",
+              "missedAt": "2026-01-02T07:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:47.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T08:00",
+              "status": "done",
+              "start": "2026-01-02T07:00:00.000Z",
+              "missedAt": "2026-01-02T19:00:00.000Z",
+              "doneAt": "2026-01-02T06:45:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            },
+            {
+              "occurrence": "2026-01-02T20:00",
+              "status": "done",
+              "start": "2026-01-02T19:00:00.000Z",
+              "missedAt": "2026-01-03T07:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:03.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-03T08:00",
+              "status": "missed",
+              "start": "2026-01-03T07:00:00.000Z",
+              "missedAt": "2026-01-03T19:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": "2026-01-03T07:30:00.000Z",
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T20:00",
+              "status": "missed",
+              "start": "2026-01-03T19:00:00.000Z",
+              "missedAt": "2026-01-04T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T08:00",
+              "status": "done",
+              "start": "2026-01-04T07:00:00.000Z",
+              "missedAt": "2026-01-04T19:00:00.000Z",
+              "doneAt": "2026-01-04T09:02:14.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T13:00",
+              "status": "done",
+              "start": "2026-01-04T12:00:00.000Z",
+              "missedAt": "2026-01-04T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T20:00",
+              "status": "missed",
+              "start": "2026-01-04T19:00:00.000Z",
+              "missedAt": "2026-01-05T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T09:00",
+              "status": "missed",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-07T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-09T09:00",
+              "status": "done",
+              "start": "2026-01-09T08:00:00.000Z",
+              "missedAt": "2026-01-10T08:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:30.000Z",
+              "snoozedUntil": "2026-01-09T08:20:00.000Z",
+              "timing": "onTime"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000007": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-04",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-05",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-08",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              1,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 1,
+            "missed": 3,
+            "share": 0.25
+          },
+          "thisMonth": {
+            "done": 2,
+            "missed": 6,
+            "share": 0.25
+          },
+          "last30Days": {
+            "done": 2,
+            "missed": 6,
+            "share": 0.25
+          },
+          "january": {
+            "done": 2,
+            "missed": 6,
+            "share": 0.25
+          },
+          "firstWeek": [
+            "2026-01-01T18:00",
+            "2026-01-02T18:00",
+            "2026-01-03T18:00",
+            "2026-01-04T18:00",
+            "2026-01-05T18:00",
+            "2026-01-06T18:00",
+            "2026-01-07T18:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T18:00",
+              "status": "done",
+              "start": "2026-01-01T17:00:00.000Z",
+              "missedAt": "2026-01-02T17:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:52.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T18:00",
+              "status": "missed",
+              "start": "2026-01-02T17:00:00.000Z",
+              "missedAt": "2026-01-03T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T18:00",
+              "status": "missed",
+              "start": "2026-01-03T17:00:00.000Z",
+              "missedAt": "2026-01-04T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T18:00",
+              "status": "missed",
+              "start": "2026-01-04T17:00:00.000Z",
+              "missedAt": "2026-01-05T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T18:00",
+              "status": "missed",
+              "start": "2026-01-05T17:00:00.000Z",
+              "missedAt": "2026-01-06T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T18:00",
+              "status": "missed",
+              "start": "2026-01-06T17:00:00.000Z",
+              "missedAt": "2026-01-07T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T18:00",
+              "status": "missed",
+              "start": "2026-01-07T17:00:00.000Z",
+              "missedAt": "2026-01-08T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T18:00",
+              "status": "done",
+              "start": "2026-01-08T17:00:00.000Z",
+              "missedAt": "2026-01-09T17:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:51.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-09T18:00",
+              "status": "coming",
+              "start": "2026-01-09T17:00:00.000Z",
+              "missedAt": "2026-01-10T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000b": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 2,
+          "longestStreak": 2,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-04",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-05",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-08",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-09",
+              1,
+              0,
+              0,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 2,
+            "missed": 3,
+            "share": 0.4
+          },
+          "thisMonth": {
+            "done": 4,
+            "missed": 4,
+            "share": 0.5
+          },
+          "last30Days": {
+            "done": 4,
+            "missed": 4,
+            "share": 0.5
+          },
+          "january": {
+            "done": 4,
+            "missed": 4,
+            "share": 0.5
+          },
+          "firstWeek": [
+            "2026-01-02T07:00",
+            "2026-01-03T07:00",
+            "2026-01-04T07:00",
+            "2026-01-05T07:00",
+            "2026-01-06T07:00",
+            "2026-01-07T07:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-02T07:00",
+              "status": "done",
+              "start": "2026-01-02T06:00:00.000Z",
+              "missedAt": "2026-01-03T06:00:00.000Z",
+              "doneAt": "2026-01-02T07:01:53.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-03T07:00",
+              "status": "done",
+              "start": "2026-01-03T06:00:00.000Z",
+              "missedAt": "2026-01-04T06:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:07.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T07:00",
+              "status": "missed",
+              "start": "2026-01-04T06:00:00.000Z",
+              "missedAt": "2026-01-05T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T07:00",
+              "status": "missed",
+              "start": "2026-01-05T06:00:00.000Z",
+              "missedAt": "2026-01-06T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T07:00",
+              "status": "missed",
+              "start": "2026-01-06T06:00:00.000Z",
+              "missedAt": "2026-01-07T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": "2026-01-06T06:40:00.000Z",
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T07:00",
+              "status": "missed",
+              "start": "2026-01-07T06:00:00.000Z",
+              "missedAt": "2026-01-08T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T07:00",
+              "status": "done",
+              "start": "2026-01-08T06:00:00.000Z",
+              "missedAt": "2026-01-09T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:34.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-09T07:00",
+              "status": "done",
+              "start": "2026-01-09T06:00:00.000Z",
+              "missedAt": "2026-01-10T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:41.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000d": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-04",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "january": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "firstWeek": [
+            "2026-01-03T10:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-03T10:00",
+              "status": "missed",
+              "start": "2026-01-03T09:00:00.000Z",
+              "missedAt": "2026-01-03T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000f": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-04",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "thisMonth": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "last30Days": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-06"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-06",
+              "status": "done",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-06T23:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:32.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000011": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-04",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "firstWeek": [],
+          "entries": []
+        },
+        "routine:00000000000000000000000000000013": {
+          "today": "2026-01-09",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-03",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-04",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "last30Days": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-01"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01",
+              "status": "done",
+              "start": "2026-01-01T08:00:00.000Z",
+              "missedAt": "2026-01-01T23:00:00.000Z",
+              "doneAt": "2026-01-01T08:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "now": "2026-01-11T20:00:00.000Z",
+      "weekStart": 7,
+      "local": {
+        "snoozes": "{}",
+        "streaksOff": "true"
+      },
+      "streaksOn": false,
+      "histories": {
+        "routine:00000000000000000000000000000002": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 0,
+          "longestStreak": 4,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-10",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              1,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 7,
+            "missed": 5,
+            "share": 0.5833333333333334
+          },
+          "last30Days": {
+            "done": 7,
+            "missed": 5,
+            "share": 0.5833333333333334
+          },
+          "january": {
+            "done": 7,
+            "missed": 5,
+            "share": 0.5833333333333334
+          },
+          "firstWeek": [
+            "2026-01-01T08:00",
+            "2026-01-01T20:00",
+            "2026-01-02T08:00",
+            "2026-01-02T20:00",
+            "2026-01-03T08:00",
+            "2026-01-03T20:00",
+            "2026-01-04T08:00",
+            "2026-01-04T13:00",
+            "2026-01-04T20:00",
+            "2026-01-06T09:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T08:00",
+              "status": "done",
+              "start": "2026-01-01T07:00:00.000Z",
+              "missedAt": "2026-01-01T19:00:00.000Z",
+              "doneAt": "2026-01-01T07:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-01T20:00",
+              "status": "done",
+              "start": "2026-01-01T19:00:00.000Z",
+              "missedAt": "2026-01-02T07:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:47.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T08:00",
+              "status": "done",
+              "start": "2026-01-02T07:00:00.000Z",
+              "missedAt": "2026-01-02T19:00:00.000Z",
+              "doneAt": "2026-01-02T06:45:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            },
+            {
+              "occurrence": "2026-01-02T20:00",
+              "status": "done",
+              "start": "2026-01-02T19:00:00.000Z",
+              "missedAt": "2026-01-03T07:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:03.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-03T08:00",
+              "status": "missed",
+              "start": "2026-01-03T07:00:00.000Z",
+              "missedAt": "2026-01-03T19:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T20:00",
+              "status": "missed",
+              "start": "2026-01-03T19:00:00.000Z",
+              "missedAt": "2026-01-04T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T08:00",
+              "status": "done",
+              "start": "2026-01-04T07:00:00.000Z",
+              "missedAt": "2026-01-04T19:00:00.000Z",
+              "doneAt": "2026-01-04T09:02:14.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T13:00",
+              "status": "done",
+              "start": "2026-01-04T12:00:00.000Z",
+              "missedAt": "2026-01-04T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T20:00",
+              "status": "missed",
+              "start": "2026-01-04T19:00:00.000Z",
+              "missedAt": "2026-01-05T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T09:00",
+              "status": "missed",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-07T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-09T09:00",
+              "status": "done",
+              "start": "2026-01-09T08:00:00.000Z",
+              "missedAt": "2026-01-10T08:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:30.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T09:00",
+              "status": "missed",
+              "start": "2026-01-10T08:00:00.000Z",
+              "missedAt": "2026-01-11T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T09:00",
+              "status": "open",
+              "start": "2026-01-11T08:00:00.000Z",
+              "missedAt": "2026-01-12T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000007": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 0,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-08",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-09",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-10",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              1,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 2,
+            "missed": 8,
+            "share": 0.2
+          },
+          "last30Days": {
+            "done": 2,
+            "missed": 8,
+            "share": 0.2
+          },
+          "january": {
+            "done": 2,
+            "missed": 8,
+            "share": 0.2
+          },
+          "firstWeek": [
+            "2026-01-01T18:00",
+            "2026-01-02T18:00",
+            "2026-01-03T18:00",
+            "2026-01-04T18:00",
+            "2026-01-05T18:00",
+            "2026-01-06T18:00",
+            "2026-01-07T18:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T18:00",
+              "status": "done",
+              "start": "2026-01-01T17:00:00.000Z",
+              "missedAt": "2026-01-02T17:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:52.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T18:00",
+              "status": "missed",
+              "start": "2026-01-02T17:00:00.000Z",
+              "missedAt": "2026-01-03T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T18:00",
+              "status": "missed",
+              "start": "2026-01-03T17:00:00.000Z",
+              "missedAt": "2026-01-04T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T18:00",
+              "status": "missed",
+              "start": "2026-01-04T17:00:00.000Z",
+              "missedAt": "2026-01-05T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T18:00",
+              "status": "missed",
+              "start": "2026-01-05T17:00:00.000Z",
+              "missedAt": "2026-01-06T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T18:00",
+              "status": "missed",
+              "start": "2026-01-06T17:00:00.000Z",
+              "missedAt": "2026-01-07T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T18:00",
+              "status": "missed",
+              "start": "2026-01-07T17:00:00.000Z",
+              "missedAt": "2026-01-08T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T18:00",
+              "status": "done",
+              "start": "2026-01-08T17:00:00.000Z",
+              "missedAt": "2026-01-09T17:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:51.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-09T18:00",
+              "status": "missed",
+              "start": "2026-01-09T17:00:00.000Z",
+              "missedAt": "2026-01-10T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-10T18:00",
+              "status": "missed",
+              "start": "2026-01-10T17:00:00.000Z",
+              "missedAt": "2026-01-11T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T18:00",
+              "status": "open",
+              "start": "2026-01-11T17:00:00.000Z",
+              "missedAt": "2026-01-12T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000b": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 0,
+          "longestStreak": 2,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-06",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-08",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-09",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-10",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 4,
+            "missed": 5,
+            "share": 0.4444444444444444
+          },
+          "last30Days": {
+            "done": 4,
+            "missed": 5,
+            "share": 0.4444444444444444
+          },
+          "january": {
+            "done": 4,
+            "missed": 5,
+            "share": 0.4444444444444444
+          },
+          "firstWeek": [
+            "2026-01-02T07:00",
+            "2026-01-03T07:00",
+            "2026-01-04T07:00",
+            "2026-01-05T07:00",
+            "2026-01-06T07:00",
+            "2026-01-07T07:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-02T07:00",
+              "status": "done",
+              "start": "2026-01-02T06:00:00.000Z",
+              "missedAt": "2026-01-03T06:00:00.000Z",
+              "doneAt": "2026-01-02T07:01:53.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-03T07:00",
+              "status": "done",
+              "start": "2026-01-03T06:00:00.000Z",
+              "missedAt": "2026-01-04T06:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:07.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T07:00",
+              "status": "missed",
+              "start": "2026-01-04T06:00:00.000Z",
+              "missedAt": "2026-01-05T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T07:00",
+              "status": "missed",
+              "start": "2026-01-05T06:00:00.000Z",
+              "missedAt": "2026-01-06T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T07:00",
+              "status": "missed",
+              "start": "2026-01-06T06:00:00.000Z",
+              "missedAt": "2026-01-07T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T07:00",
+              "status": "missed",
+              "start": "2026-01-07T06:00:00.000Z",
+              "missedAt": "2026-01-08T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T07:00",
+              "status": "done",
+              "start": "2026-01-08T06:00:00.000Z",
+              "missedAt": "2026-01-09T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:34.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-09T07:00",
+              "status": "done",
+              "start": "2026-01-09T06:00:00.000Z",
+              "missedAt": "2026-01-10T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:41.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T07:00",
+              "status": "missed",
+              "start": "2026-01-10T06:00:00.000Z",
+              "missedAt": "2026-01-10T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000d": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-10",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "january": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "firstWeek": [
+            "2026-01-03T10:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-03T10:00",
+              "status": "missed",
+              "start": "2026-01-03T09:00:00.000Z",
+              "missedAt": "2026-01-03T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000f": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              1,
+              0,
+              0,
+              false
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-10",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "last30Days": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-06"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-06",
+              "status": "done",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-06T23:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:32.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000011": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-10",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "firstWeek": [],
+          "entries": []
+        },
+        "routine:00000000000000000000000000000013": {
+          "today": "2026-01-11",
+          "weekStart": 7,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-01-05",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-06",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-07",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-08",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-09",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-10",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-01-11",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "last30Days": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-01"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01",
+              "status": "done",
+              "start": "2026-01-01T08:00:00.000Z",
+              "missedAt": "2026-01-01T23:00:00.000Z",
+              "doneAt": "2026-01-01T08:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "now": "2026-03-29T12:00:00.000Z",
+      "weekStart": 1,
+      "local": {
+        "snoozes": "{}",
+        "streaksOff": "garbled"
+      },
+      "streaksOn": true,
+      "histories": {
+        "routine:00000000000000000000000000000002": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 4,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 7,
+            "missed": 20,
+            "share": 0.25925925925925924
+          },
+          "firstWeek": [
+            "2026-01-01T08:00",
+            "2026-01-01T20:00",
+            "2026-01-02T08:00",
+            "2026-01-02T20:00",
+            "2026-01-03T08:00",
+            "2026-01-03T20:00",
+            "2026-01-04T08:00",
+            "2026-01-04T13:00",
+            "2026-01-04T20:00",
+            "2026-01-06T09:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T08:00",
+              "status": "done",
+              "start": "2026-01-01T07:00:00.000Z",
+              "missedAt": "2026-01-01T19:00:00.000Z",
+              "doneAt": "2026-01-01T07:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-01T20:00",
+              "status": "done",
+              "start": "2026-01-01T19:00:00.000Z",
+              "missedAt": "2026-01-02T07:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:47.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T08:00",
+              "status": "done",
+              "start": "2026-01-02T07:00:00.000Z",
+              "missedAt": "2026-01-02T19:00:00.000Z",
+              "doneAt": "2026-01-02T06:45:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            },
+            {
+              "occurrence": "2026-01-02T20:00",
+              "status": "done",
+              "start": "2026-01-02T19:00:00.000Z",
+              "missedAt": "2026-01-03T07:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:03.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-03T08:00",
+              "status": "missed",
+              "start": "2026-01-03T07:00:00.000Z",
+              "missedAt": "2026-01-03T19:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T20:00",
+              "status": "missed",
+              "start": "2026-01-03T19:00:00.000Z",
+              "missedAt": "2026-01-04T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T08:00",
+              "status": "done",
+              "start": "2026-01-04T07:00:00.000Z",
+              "missedAt": "2026-01-04T19:00:00.000Z",
+              "doneAt": "2026-01-04T09:02:14.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T13:00",
+              "status": "done",
+              "start": "2026-01-04T12:00:00.000Z",
+              "missedAt": "2026-01-04T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T20:00",
+              "status": "missed",
+              "start": "2026-01-04T19:00:00.000Z",
+              "missedAt": "2026-01-05T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T09:00",
+              "status": "missed",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-07T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-09T09:00",
+              "status": "done",
+              "start": "2026-01-09T08:00:00.000Z",
+              "missedAt": "2026-01-10T08:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:30.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T09:00",
+              "status": "missed",
+              "start": "2026-01-10T08:00:00.000Z",
+              "missedAt": "2026-01-11T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T09:00",
+              "status": "missed",
+              "start": "2026-01-11T08:00:00.000Z",
+              "missedAt": "2026-01-12T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-12T09:00",
+              "status": "missed",
+              "start": "2026-01-12T08:00:00.000Z",
+              "missedAt": "2026-01-13T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-13T09:00",
+              "status": "missed",
+              "start": "2026-01-13T08:00:00.000Z",
+              "missedAt": "2026-01-14T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-14T09:00",
+              "status": "missed",
+              "start": "2026-01-14T08:00:00.000Z",
+              "missedAt": "2026-01-15T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-15T09:00",
+              "status": "missed",
+              "start": "2026-01-15T08:00:00.000Z",
+              "missedAt": "2026-01-16T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-16T09:00",
+              "status": "missed",
+              "start": "2026-01-16T08:00:00.000Z",
+              "missedAt": "2026-01-17T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-17T09:00",
+              "status": "missed",
+              "start": "2026-01-17T08:00:00.000Z",
+              "missedAt": "2026-01-18T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-18T09:00",
+              "status": "missed",
+              "start": "2026-01-18T08:00:00.000Z",
+              "missedAt": "2026-01-19T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-19T09:00",
+              "status": "missed",
+              "start": "2026-01-19T08:00:00.000Z",
+              "missedAt": "2026-01-20T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-20T09:00",
+              "status": "missed",
+              "start": "2026-01-20T08:00:00.000Z",
+              "missedAt": "2026-01-21T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-21T09:00",
+              "status": "missed",
+              "start": "2026-01-21T08:00:00.000Z",
+              "missedAt": "2026-01-22T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-22T09:00",
+              "status": "missed",
+              "start": "2026-01-22T08:00:00.000Z",
+              "missedAt": "2026-01-23T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-23T09:00",
+              "status": "missed",
+              "start": "2026-01-23T08:00:00.000Z",
+              "missedAt": "2026-01-24T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-24T09:00",
+              "status": "missed",
+              "start": "2026-01-24T08:00:00.000Z",
+              "missedAt": "2026-01-25T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-25T09:00",
+              "status": "missed",
+              "start": "2026-01-25T08:00:00.000Z",
+              "missedAt": "2026-01-25T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-02-20T08:00",
+              "status": "done",
+              "start": "2026-02-20T07:00:00.000Z",
+              "missedAt": "2026-02-20T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000007": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 2,
+            "missed": 12,
+            "share": 0.14285714285714285
+          },
+          "firstWeek": [
+            "2026-01-01T18:00",
+            "2026-01-02T18:00",
+            "2026-01-03T18:00",
+            "2026-01-04T18:00",
+            "2026-01-05T18:00",
+            "2026-01-06T18:00",
+            "2026-01-07T18:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T18:00",
+              "status": "done",
+              "start": "2026-01-01T17:00:00.000Z",
+              "missedAt": "2026-01-02T17:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:52.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T18:00",
+              "status": "missed",
+              "start": "2026-01-02T17:00:00.000Z",
+              "missedAt": "2026-01-03T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T18:00",
+              "status": "missed",
+              "start": "2026-01-03T17:00:00.000Z",
+              "missedAt": "2026-01-04T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T18:00",
+              "status": "missed",
+              "start": "2026-01-04T17:00:00.000Z",
+              "missedAt": "2026-01-05T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T18:00",
+              "status": "missed",
+              "start": "2026-01-05T17:00:00.000Z",
+              "missedAt": "2026-01-06T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T18:00",
+              "status": "missed",
+              "start": "2026-01-06T17:00:00.000Z",
+              "missedAt": "2026-01-07T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T18:00",
+              "status": "missed",
+              "start": "2026-01-07T17:00:00.000Z",
+              "missedAt": "2026-01-08T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T18:00",
+              "status": "done",
+              "start": "2026-01-08T17:00:00.000Z",
+              "missedAt": "2026-01-09T17:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:51.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-09T18:00",
+              "status": "missed",
+              "start": "2026-01-09T17:00:00.000Z",
+              "missedAt": "2026-01-10T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-10T18:00",
+              "status": "missed",
+              "start": "2026-01-10T17:00:00.000Z",
+              "missedAt": "2026-01-11T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T18:00",
+              "status": "missed",
+              "start": "2026-01-11T17:00:00.000Z",
+              "missedAt": "2026-01-12T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-12T18:00",
+              "status": "missed",
+              "start": "2026-01-12T17:00:00.000Z",
+              "missedAt": "2026-01-13T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-13T18:00",
+              "status": "missed",
+              "start": "2026-01-13T17:00:00.000Z",
+              "missedAt": "2026-01-14T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-14T18:00",
+              "status": "missed",
+              "start": "2026-01-14T17:00:00.000Z",
+              "missedAt": "2026-01-14T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000b": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 2,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 4,
+            "missed": 5,
+            "share": 0.4444444444444444
+          },
+          "firstWeek": [
+            "2026-01-02T07:00",
+            "2026-01-03T07:00",
+            "2026-01-04T07:00",
+            "2026-01-05T07:00",
+            "2026-01-06T07:00",
+            "2026-01-07T07:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-02T07:00",
+              "status": "done",
+              "start": "2026-01-02T06:00:00.000Z",
+              "missedAt": "2026-01-03T06:00:00.000Z",
+              "doneAt": "2026-01-02T07:01:53.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-03T07:00",
+              "status": "done",
+              "start": "2026-01-03T06:00:00.000Z",
+              "missedAt": "2026-01-04T06:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:07.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T07:00",
+              "status": "missed",
+              "start": "2026-01-04T06:00:00.000Z",
+              "missedAt": "2026-01-05T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T07:00",
+              "status": "missed",
+              "start": "2026-01-05T06:00:00.000Z",
+              "missedAt": "2026-01-06T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T07:00",
+              "status": "missed",
+              "start": "2026-01-06T06:00:00.000Z",
+              "missedAt": "2026-01-07T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T07:00",
+              "status": "missed",
+              "start": "2026-01-07T06:00:00.000Z",
+              "missedAt": "2026-01-08T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T07:00",
+              "status": "done",
+              "start": "2026-01-08T06:00:00.000Z",
+              "missedAt": "2026-01-09T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:34.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-09T07:00",
+              "status": "done",
+              "start": "2026-01-09T06:00:00.000Z",
+              "missedAt": "2026-01-10T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:41.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T07:00",
+              "status": "missed",
+              "start": "2026-01-10T06:00:00.000Z",
+              "missedAt": "2026-01-10T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000d": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "firstWeek": [
+            "2026-01-03T10:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-03T10:00",
+              "status": "missed",
+              "start": "2026-01-03T09:00:00.000Z",
+              "missedAt": "2026-01-03T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000f": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-06"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-06",
+              "status": "done",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-06T23:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:32.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000011": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              1,
+              false
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "firstWeek": [],
+          "entries": [
+            {
+              "occurrence": "2026-03-29T02:30",
+              "status": "open",
+              "start": "2026-03-29T01:00:00.000Z",
+              "missedAt": "2026-03-29T22:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000013": {
+          "today": "2026-03-29",
+          "weekStart": 1,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-23",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-24",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-25",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-01"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01",
+              "status": "done",
+              "start": "2026-01-01T08:00:00.000Z",
+              "missedAt": "2026-01-01T23:00:00.000Z",
+              "doneAt": "2026-01-01T08:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "now": "2026-04-01T08:00:00.000Z",
+      "weekStart": 4,
+      "local": {
+        "snoozes": "",
+        "streaksOff": "false"
+      },
+      "streaksOn": true,
+      "histories": {
+        "routine:00000000000000000000000000000002": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 1,
+          "longestStreak": 4,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 7,
+            "missed": 20,
+            "share": 0.25925925925925924
+          },
+          "firstWeek": [
+            "2026-01-01T08:00",
+            "2026-01-01T20:00",
+            "2026-01-02T08:00",
+            "2026-01-02T20:00",
+            "2026-01-03T08:00",
+            "2026-01-03T20:00",
+            "2026-01-04T08:00",
+            "2026-01-04T13:00",
+            "2026-01-04T20:00",
+            "2026-01-06T09:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T08:00",
+              "status": "done",
+              "start": "2026-01-01T07:00:00.000Z",
+              "missedAt": "2026-01-01T19:00:00.000Z",
+              "doneAt": "2026-01-01T07:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-01T20:00",
+              "status": "done",
+              "start": "2026-01-01T19:00:00.000Z",
+              "missedAt": "2026-01-02T07:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:47.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T08:00",
+              "status": "done",
+              "start": "2026-01-02T07:00:00.000Z",
+              "missedAt": "2026-01-02T19:00:00.000Z",
+              "doneAt": "2026-01-02T06:45:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            },
+            {
+              "occurrence": "2026-01-02T20:00",
+              "status": "done",
+              "start": "2026-01-02T19:00:00.000Z",
+              "missedAt": "2026-01-03T07:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:03.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-03T08:00",
+              "status": "missed",
+              "start": "2026-01-03T07:00:00.000Z",
+              "missedAt": "2026-01-03T19:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T20:00",
+              "status": "missed",
+              "start": "2026-01-03T19:00:00.000Z",
+              "missedAt": "2026-01-04T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T08:00",
+              "status": "done",
+              "start": "2026-01-04T07:00:00.000Z",
+              "missedAt": "2026-01-04T19:00:00.000Z",
+              "doneAt": "2026-01-04T09:02:14.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T13:00",
+              "status": "done",
+              "start": "2026-01-04T12:00:00.000Z",
+              "missedAt": "2026-01-04T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T20:00",
+              "status": "missed",
+              "start": "2026-01-04T19:00:00.000Z",
+              "missedAt": "2026-01-05T07:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T09:00",
+              "status": "missed",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-07T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-09T09:00",
+              "status": "done",
+              "start": "2026-01-09T08:00:00.000Z",
+              "missedAt": "2026-01-10T08:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:30.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T09:00",
+              "status": "missed",
+              "start": "2026-01-10T08:00:00.000Z",
+              "missedAt": "2026-01-11T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T09:00",
+              "status": "missed",
+              "start": "2026-01-11T08:00:00.000Z",
+              "missedAt": "2026-01-12T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-12T09:00",
+              "status": "missed",
+              "start": "2026-01-12T08:00:00.000Z",
+              "missedAt": "2026-01-13T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-13T09:00",
+              "status": "missed",
+              "start": "2026-01-13T08:00:00.000Z",
+              "missedAt": "2026-01-14T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-14T09:00",
+              "status": "missed",
+              "start": "2026-01-14T08:00:00.000Z",
+              "missedAt": "2026-01-15T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-15T09:00",
+              "status": "missed",
+              "start": "2026-01-15T08:00:00.000Z",
+              "missedAt": "2026-01-16T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-16T09:00",
+              "status": "missed",
+              "start": "2026-01-16T08:00:00.000Z",
+              "missedAt": "2026-01-17T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-17T09:00",
+              "status": "missed",
+              "start": "2026-01-17T08:00:00.000Z",
+              "missedAt": "2026-01-18T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-18T09:00",
+              "status": "missed",
+              "start": "2026-01-18T08:00:00.000Z",
+              "missedAt": "2026-01-19T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-19T09:00",
+              "status": "missed",
+              "start": "2026-01-19T08:00:00.000Z",
+              "missedAt": "2026-01-20T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-20T09:00",
+              "status": "missed",
+              "start": "2026-01-20T08:00:00.000Z",
+              "missedAt": "2026-01-21T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-21T09:00",
+              "status": "missed",
+              "start": "2026-01-21T08:00:00.000Z",
+              "missedAt": "2026-01-22T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-22T09:00",
+              "status": "missed",
+              "start": "2026-01-22T08:00:00.000Z",
+              "missedAt": "2026-01-23T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-23T09:00",
+              "status": "missed",
+              "start": "2026-01-23T08:00:00.000Z",
+              "missedAt": "2026-01-24T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-24T09:00",
+              "status": "missed",
+              "start": "2026-01-24T08:00:00.000Z",
+              "missedAt": "2026-01-25T08:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-25T09:00",
+              "status": "missed",
+              "start": "2026-01-25T08:00:00.000Z",
+              "missedAt": "2026-01-25T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-02-20T08:00",
+              "status": "done",
+              "start": "2026-02-20T07:00:00.000Z",
+              "missedAt": "2026-02-20T23:00:00.000Z",
+              "doneAt": "2026-01-04T12:00:00.000Z",
+              "snoozedUntil": null,
+              "timing": "early"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000007": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 0,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 2,
+            "missed": 12,
+            "share": 0.14285714285714285
+          },
+          "firstWeek": [
+            "2026-01-01T18:00",
+            "2026-01-02T18:00",
+            "2026-01-03T18:00",
+            "2026-01-04T18:00",
+            "2026-01-05T18:00",
+            "2026-01-06T18:00",
+            "2026-01-07T18:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01T18:00",
+              "status": "done",
+              "start": "2026-01-01T17:00:00.000Z",
+              "missedAt": "2026-01-02T17:00:00.000Z",
+              "doneAt": "2026-01-01T20:01:52.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-02T18:00",
+              "status": "missed",
+              "start": "2026-01-02T17:00:00.000Z",
+              "missedAt": "2026-01-03T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-03T18:00",
+              "status": "missed",
+              "start": "2026-01-03T17:00:00.000Z",
+              "missedAt": "2026-01-04T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-04T18:00",
+              "status": "missed",
+              "start": "2026-01-04T17:00:00.000Z",
+              "missedAt": "2026-01-05T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T18:00",
+              "status": "missed",
+              "start": "2026-01-05T17:00:00.000Z",
+              "missedAt": "2026-01-06T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T18:00",
+              "status": "missed",
+              "start": "2026-01-06T17:00:00.000Z",
+              "missedAt": "2026-01-07T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T18:00",
+              "status": "missed",
+              "start": "2026-01-07T17:00:00.000Z",
+              "missedAt": "2026-01-08T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T18:00",
+              "status": "done",
+              "start": "2026-01-08T17:00:00.000Z",
+              "missedAt": "2026-01-09T17:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:51.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-09T18:00",
+              "status": "missed",
+              "start": "2026-01-09T17:00:00.000Z",
+              "missedAt": "2026-01-10T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-10T18:00",
+              "status": "missed",
+              "start": "2026-01-10T17:00:00.000Z",
+              "missedAt": "2026-01-11T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-11T18:00",
+              "status": "missed",
+              "start": "2026-01-11T17:00:00.000Z",
+              "missedAt": "2026-01-12T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-12T18:00",
+              "status": "missed",
+              "start": "2026-01-12T17:00:00.000Z",
+              "missedAt": "2026-01-13T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-13T18:00",
+              "status": "missed",
+              "start": "2026-01-13T17:00:00.000Z",
+              "missedAt": "2026-01-14T17:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-14T18:00",
+              "status": "missed",
+              "start": "2026-01-14T17:00:00.000Z",
+              "missedAt": "2026-01-14T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000b": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 0,
+          "longestStreak": 2,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 4,
+            "missed": 5,
+            "share": 0.4444444444444444
+          },
+          "firstWeek": [
+            "2026-01-02T07:00",
+            "2026-01-03T07:00",
+            "2026-01-04T07:00",
+            "2026-01-05T07:00",
+            "2026-01-06T07:00",
+            "2026-01-07T07:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-02T07:00",
+              "status": "done",
+              "start": "2026-01-02T06:00:00.000Z",
+              "missedAt": "2026-01-03T06:00:00.000Z",
+              "doneAt": "2026-01-02T07:01:53.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-03T07:00",
+              "status": "done",
+              "start": "2026-01-03T06:00:00.000Z",
+              "missedAt": "2026-01-04T06:00:00.000Z",
+              "doneAt": "2026-01-03T09:02:07.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-04T07:00",
+              "status": "missed",
+              "start": "2026-01-04T06:00:00.000Z",
+              "missedAt": "2026-01-05T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-05T07:00",
+              "status": "missed",
+              "start": "2026-01-05T06:00:00.000Z",
+              "missedAt": "2026-01-06T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-06T07:00",
+              "status": "missed",
+              "start": "2026-01-06T06:00:00.000Z",
+              "missedAt": "2026-01-07T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-07T07:00",
+              "status": "missed",
+              "start": "2026-01-07T06:00:00.000Z",
+              "missedAt": "2026-01-08T06:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            },
+            {
+              "occurrence": "2026-01-08T07:00",
+              "status": "done",
+              "start": "2026-01-08T06:00:00.000Z",
+              "missedAt": "2026-01-09T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:34.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            },
+            {
+              "occurrence": "2026-01-09T07:00",
+              "status": "done",
+              "start": "2026-01-09T06:00:00.000Z",
+              "missedAt": "2026-01-10T06:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:41.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            },
+            {
+              "occurrence": "2026-01-10T07:00",
+              "status": "missed",
+              "start": "2026-01-10T06:00:00.000Z",
+              "missedAt": "2026-01-10T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000d": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "firstWeek": [
+            "2026-01-03T10:00"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-03T10:00",
+              "status": "missed",
+              "start": "2026-01-03T09:00:00.000Z",
+              "missedAt": "2026-01-03T23:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:0000000000000000000000000000000f": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-06"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-06",
+              "status": "done",
+              "start": "2026-01-06T08:00:00.000Z",
+              "missedAt": "2026-01-06T23:00:00.000Z",
+              "doneAt": "2026-01-09T11:02:32.000Z",
+              "snoozedUntil": null,
+              "timing": "late"
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000011": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 0,
+          "longestStreak": 0,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              1,
+              0,
+              false
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 1,
+            "share": 0.0
+          },
+          "january": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "firstWeek": [],
+          "entries": [
+            {
+              "occurrence": "2026-03-29T02:30",
+              "status": "missed",
+              "start": "2026-03-29T01:00:00.000Z",
+              "missedAt": "2026-03-29T22:00:00.000Z",
+              "doneAt": null,
+              "snoozedUntil": null,
+              "timing": null
+            }
+          ]
+        },
+        "routine:00000000000000000000000000000013": {
+          "today": "2026-04-01",
+          "weekStart": 4,
+          "currentStreak": 1,
+          "longestStreak": 1,
+          "lastSevenDays": [
+            [
+              "2026-03-26",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-27",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-28",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-29",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-30",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-03-31",
+              0,
+              0,
+              0,
+              true
+            ],
+            [
+              "2026-04-01",
+              0,
+              0,
+              0,
+              true
+            ]
+          ],
+          "thisWeek": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "thisMonth": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "last30Days": {
+            "done": 0,
+            "missed": 0,
+            "share": null
+          },
+          "january": {
+            "done": 1,
+            "missed": 0,
+            "share": 1.0
+          },
+          "firstWeek": [
+            "2026-01-01"
+          ],
+          "entries": [
+            {
+              "occurrence": "2026-01-01",
+              "status": "done",
+              "start": "2026-01-01T08:00:00.000Z",
+              "missedAt": "2026-01-01T23:00:00.000Z",
+              "doneAt": "2026-01-01T08:30:00.000Z",
+              "snoozedUntil": null,
+              "timing": "onTime"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

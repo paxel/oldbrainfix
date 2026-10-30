@@ -1,0 +1,196 @@
+{
+  "sessions": [
+    {
+      "id": "routine:0000000000000000000000000000000b",
+      "noteId": "note:0000000000000000000000000000000a",
+      "pool": [
+        "note:00000000000000000000000000000008"
+      ],
+      "count": 1,
+      "counts": {},
+      "rule": "rolling",
+      "picksFrom": [
+        "note:00000000000000000000000000000008"
+      ],
+      "choices": [
+        "note:00000000000000000000000000000008"
+      ]
+    }
+  ],
+  "routines": [
+    {
+      "id": "routine:00000000000000000000000000000002",
+      "noteId": "note:00000000000000000000000000000001",
+      "start": "2026-01-01",
+      "times": [
+        "09:00"
+      ],
+      "rule": "FREQ=DAILY;UNTIL=20260125",
+      "done": {
+        "2026-01-01T08:00": "2026-01-01T07:30:00.000Z",
+        "2026-01-01T20:00": "2026-01-01T20:01:47.000Z",
+        "2026-01-02T08:00": "2026-01-02T06:45:00.000Z",
+        "2026-01-02T20:00": "2026-01-03T09:02:03.000Z",
+        "2026-01-04T08:00": "2026-01-04T09:02:14.000Z",
+        "2026-01-04T13:00": "2026-01-04T12:00:00.000Z",
+        "2026-01-09T09:00": "2026-01-09T11:02:30.000Z",
+        "2026-02-20T08:00": "2026-01-04T12:00:00.000Z",
+        "2026-1-4": "2026-01-04T12:00:00.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-08T11:02:29.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:00000000000000000000000000000007",
+      "noteId": "note:00000000000000000000000000000003",
+      "start": "2026-01-01",
+      "times": [
+        "18:00"
+      ],
+      "rule": "FREQ=DAILY;COUNT=14",
+      "done": {
+        "2026-01-01T18:00": "2026-01-01T20:01:52.000Z",
+        "2026-01-08T18:00": "2026-01-09T11:02:51.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:00:36.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000000b",
+      "noteId": "note:0000000000000000000000000000000a",
+      "start": "2026-01-01",
+      "times": [
+        "07:00"
+      ],
+      "rule": "FREQ=DAILY;UNTIL=20260110",
+      "done": {
+        "2026-01-02T07:00": "2026-01-02T07:01:53.000Z",
+        "2026-01-03T07:00": "2026-01-03T09:02:07.000Z",
+        "2026-01-08T07:00": "2026-01-09T11:02:34.000Z",
+        "2026-01-09T07:00": "2026-01-09T11:02:41.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:00:55.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": false
+    },
+    {
+      "id": "routine:0000000000000000000000000000000d",
+      "noteId": "note:0000000000000000000000000000000c",
+      "start": "2026-01-03",
+      "times": [
+        "10:00"
+      ],
+      "rule": null,
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:09.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:0000000000000000000000000000000f",
+      "noteId": "note:0000000000000000000000000000000e",
+      "start": "2026-01-06",
+      "times": [],
+      "rule": null,
+      "done": {
+        "2026-01-06": "2026-01-09T11:02:32.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:20.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000011",
+      "noteId": "note:00000000000000000000000000000010",
+      "start": "2026-03-29",
+      "times": [
+        "02:30"
+      ],
+      "rule": null,
+      "done": {},
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-01T10:01:31.000Z",
+      "trashed": null,
+      "trashedWith": null,
+      "reminder": true
+    },
+    {
+      "id": "routine:00000000000000000000000000000013",
+      "noteId": "note:00000000000000000000000000000012",
+      "start": "2026-01-01",
+      "times": [],
+      "rule": "FREQ=DAILY",
+      "done": {
+        "2026-01-01": "2026-01-01T08:30:00.000Z"
+      },
+      "renag": null,
+      "escalation": null,
+      "scheduledAt": "2026-01-02T10:02:02.000Z",
+      "trashed": "2026-01-02T10:02:01.000Z",
+      "trashedWith": null,
+      "reminder": false
+    }
+  ],
+  "today": [
+    [
+      {
+        "session": "routine:0000000000000000000000000000000b",
+        "occurrence": "2026-01-09T07:00",
+        "picks": [
+          {
+            "noteId": "note:00000000000000000000000000000008",
+            "text": "Push-ups",
+            "targets": {
+              "00000000000000000000000000000009": "20"
+            },
+            "entries": [
+              "tallyEntry:00000000000000000000000000000017"
+            ]
+          }
+        ],
+        "canSwap": false,
+        "complete": true
+      }
+    ],
+    [
+      {
+        "session": "routine:0000000000000000000000000000000b",
+        "occurrence": "2026-01-10T07:00",
+        "picks": [
+          {
+            "noteId": "note:00000000000000000000000000000008",
+            "text": "Push-ups",
+            "targets": {
+              "00000000000000000000000000000009": "20"
+            },
+            "entries": []
+          }
+        ],
+        "canSwap": false,
+        "complete": false
+      }
+    ],
+    [],
+    [],
+    [],
+    []
+  ]
+}

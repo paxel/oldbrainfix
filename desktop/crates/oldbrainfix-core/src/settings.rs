@@ -25,6 +25,7 @@ const PLAYBACK_SPEED: &str = "playbackSpeed";
 const ALARM_SOUND: &str = "alarmSound";
 const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
+const STREAKS_OFF: &str = "streaksOff";
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
@@ -172,6 +173,17 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(AUTOSTART_OFF, &(!on).to_string())
     }
 
+    /// Whether this Device shows Streaks; on unless switched off. Adherence
+    /// shows either way.
+    pub fn streaks_on(&self) -> Result<bool> {
+        Ok(self.store.local_setting(STREAKS_OFF)?.as_deref() != Some("true"))
+    }
+
+    pub fn set_streaks_on(&self, on: bool) -> Result<()> {
+        self.store
+            .set_local_setting(STREAKS_OFF, &(!on).to_string())
+    }
+
     /// When the desktop last showed what was due; `None` before the first
     /// time.
     pub fn last_fired(&self) -> Result<Option<DateTime<Utc>>> {
@@ -296,6 +308,7 @@ mod tests {
         assert!(settings.quiet_hours_on()?);
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
+        assert!(settings.streaks_on()?);
         assert_eq!(settings.capture_hotkey()?, DEFAULT_CAPTURE_HOTKEY);
         assert_eq!(settings.missed_seen()?, None);
         store.set_local_setting(RENAG_MINUTES, "0")?;
@@ -322,6 +335,7 @@ mod tests {
         settings.set_quiet_hours_on(false)?;
         settings.set_alerts_on(false)?;
         settings.set_autostart_on(false)?;
+        settings.set_streaks_on(false)?;
         assert_eq!(settings.renag_interval()?, Duration::minutes(5));
         assert_eq!(settings.nudge_repeat()?, Duration::minutes(30));
         assert_eq!(settings.quiet_hours()?, quiet);
@@ -332,6 +346,10 @@ mod tests {
         assert!(!settings.quiet_hours_on()?);
         assert!(!settings.alerts_on()?);
         assert!(!settings.autostart_on()?);
+        assert!(!settings.streaks_on()?);
+        assert_eq!(store.local_setting(STREAKS_OFF)?.as_deref(), Some("true"));
+        settings.set_streaks_on(true)?;
+        assert!(settings.streaks_on()?);
         settings.set_capture_hotkey("Super+Shift+K")?;
         assert_eq!(settings.capture_hotkey()?, "Super+Shift+K");
         let now = store.now();

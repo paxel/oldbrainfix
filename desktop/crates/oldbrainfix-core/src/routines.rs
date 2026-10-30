@@ -171,7 +171,7 @@ impl Agenda {
 
 /// Spawning, changing and checking off Routines and Reminders.
 pub struct Routines<'a> {
-    store: &'a Store,
+    pub(crate) store: &'a Store,
 }
 
 impl<'a> Routines<'a> {
