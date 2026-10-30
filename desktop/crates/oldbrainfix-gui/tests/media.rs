@@ -12,6 +12,7 @@ use std::time::{Duration as StdDuration, Instant};
 
 use chrono::Duration;
 use egui::Key;
+use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use oldbrainfix_core::{Notes, SigningKey, Store, WireEntry, dart_iso, parse_time};
@@ -316,6 +317,17 @@ fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
     harness.get_by_label("Paste").click();
     harness.run();
     assert_eq!(harness.state().error(), None);
+    // The picture waits on the field until the capture is saved.
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert!(shows(&harness, "Photo"));
+    harness
+        .get_by(|n| {
+            n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Parking spot")
+        })
+        .click();
+    harness.run();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
+    harness.run();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].text, "Parking spot");
@@ -349,6 +361,13 @@ fn pictures_dropped_onto_the_window_become_one_photo_note() -> TestResult {
             ..Default::default()
         },
     ];
+    harness.run();
+    // Both pictures wait on the empty field until the capture is saved.
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert_eq!(harness.query_all_by_label("Photo").count(), 2);
+    field(&harness, "What's on your mind?").click();
+    harness.run();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
     harness.run();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
