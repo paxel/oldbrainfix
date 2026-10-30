@@ -40,6 +40,7 @@ import 'session_view.dart';
 import 'setup_screen.dart';
 import 'system_bars.dart';
 import 'tally_view.dart';
+import 'text_marks_view.dart';
 
 /// An Agenda row with where its Note is filed and whether it shows
 /// Masked, read once per change; for a Session its Session, and today
@@ -657,15 +658,20 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   Future<void> _browse() => Navigator.of(context).push(_areasRoute());
 
-  /// The Areas list's page, for the magnifier and for swipe left to pull
-  /// in; coming back closes the Areas opened on the way.
-  BrowserRoute<void> _areasRoute() {
+  void _searchTag(BuildContext _, String query) =>
+      unawaited(Navigator.of(context).push(_areasRoute(query)));
+
+  /// The Areas list's page, for the magnifier, for swipe left to pull
+  /// in and searching for [query], a tag tapped (ADR 0032); coming back
+  /// closes the Areas opened on the way.
+  BrowserRoute<void> _areasRoute([String query = '']) {
     _capturedId = null;
     final route = BrowserRoute<void>(
       builder: (_) => AreasScreen(
         notes: widget.notes,
         places: widget.places,
         trail: widget.trail,
+        query: query,
       ),
     );
     route.popped.then((_) {
@@ -1122,208 +1128,212 @@ class _AgendaScreenState extends State<AgendaScreen> {
     return BrowserSwipes(
       forwardRoute: _areasRoute,
       back: false,
-      child: Scaffold(
-        appBar: AppBar(
-          // The band-aid brain of the feature graphic, title-high and
-          // silent: the title is still read as the app's name.
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/brain.png',
-                key: const ValueKey('brain'),
-                height: 28,
-                excludeFromSemantics: true,
+      child: TagSearchScope(
+        onSearch: _searchTag,
+        child: Scaffold(
+          appBar: AppBar(
+            // The band-aid brain of the feature graphic, title-high and
+            // silent: the title is still read as the app's name.
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/brain.png',
+                  key: const ValueKey('brain'),
+                  height: 28,
+                  excludeFromSemantics: true,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(t.appTitle, overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                key: const ValueKey('allRoutines'),
+                tooltip: t.allRoutinesTitle,
+                onPressed: _openAllRoutines,
+                icon: const Icon(Icons.format_list_bulleted),
               ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(t.appTitle, overflow: TextOverflow.ellipsis),
+              if (hasCalendarPage(context))
+                IconButton(
+                  key: const ValueKey('calendarPage'),
+                  tooltip: t.calendarPageTitle,
+                  onPressed: _openCalendar,
+                  icon: const Icon(Icons.event_outlined),
+                ),
+              IconButton(
+                tooltip: t.newRoutineTooltip,
+                onPressed: _newRoutine,
+                icon: const Icon(Icons.add_alarm),
+              ),
+              // The Profile picture, where the settings gear was: Settings,
+              // Sync and Backups are reached through the Profile page.
+              IconButton(
+                key: const ValueKey('profile'),
+                tooltip: t.profileTitle,
+                onPressed: _openProfile,
+                icon: OwnProfileAvatar(model: widget.profile),
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              key: const ValueKey('allRoutines'),
-              tooltip: t.allRoutinesTitle,
-              onPressed: _openAllRoutines,
-              icon: const Icon(Icons.format_list_bulleted),
+          body: ListView(
+            // Room under the last row for the floating buttons.
+            padding: clearOfSystemBars(
+              context,
+              const EdgeInsets.only(top: 8, bottom: 160),
             ),
-            if (hasCalendarPage(context))
-              IconButton(
-                key: const ValueKey('calendarPage'),
-                tooltip: t.calendarPageTitle,
-                onPressed: _openCalendar,
-                icon: const Icon(Icons.event_outlined),
-              ),
-            IconButton(
-              tooltip: t.newRoutineTooltip,
-              onPressed: _newRoutine,
-              icon: const Icon(Icons.add_alarm),
-            ),
-            // The Profile picture, where the settings gear was: Settings,
-            // Sync and Backups are reached through the Profile page.
-            IconButton(
-              key: const ValueKey('profile'),
-              tooltip: t.profileTitle,
-              onPressed: _openProfile,
-              icon: OwnProfileAvatar(model: widget.profile),
-            ),
-          ],
-        ),
-        body: ListView(
-          // Room under the last row for the floating buttons.
-          padding: clearOfSystemBars(
-            context,
-            const EdgeInsets.only(top: 8, bottom: 160),
-          ),
-          children: [
-            if (widget.alarms.missing.isNotEmpty) _AlarmsBanner(onTap: _setUp),
-            if (!_missed.isEmpty)
-              MissedSummaryCard(
-                summary: _missed,
-                masks: _locks.masks,
-                onCheck: _checkMissed,
-                onSeen: _seen,
-              ),
-            if (_unsorted > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('unsortedBanner'),
-                icon: Icons.move_to_inbox,
-                text: t.unsortedBanner(_unsorted),
-                onTap: _openUnsorted,
-              ),
-            if (_waiting > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('sentItemsWaiting'),
-                icon: Icons.mark_email_unread_outlined,
-                text: t.sentItemsWaiting(_waiting),
-                onTap: _openHeld,
-              ),
-            if (_offers > 0)
-              _CountBanner(
-                bannerKey: const ValueKey('areaOffersWaiting'),
-                icon: Icons.group_add_outlined,
-                text: t.areaOffersWaiting(_offers),
-                onTap: _openOffers,
-              ),
-            if (captured != null) ...[
-              _Heading(t.justCaptured),
-              NoteCard(
-                note: captured.note,
-                when: DateFormat.yMd(locale).add_Hm(),
-                area: captured.area,
-                topic: captured.topic,
-                showPlace: true,
-                onFile: () => _file(captured.note),
-                onMerge: () => _merge(captured.note),
-                // Only a Manager spawns in a Shared Area (ADR 0013).
-                onSchedule: captured.schedules
-                    ? (spawn) => _schedule(captured.note, spawn)
-                    : null,
-                actions: noteActions(
-                  context,
-                  widget.notes,
-                  captured,
-                  _reload,
+            children: [
+              if (widget.alarms.missing.isNotEmpty)
+                _AlarmsBanner(onTap: _setUp),
+              if (!_missed.isEmpty)
+                MissedSummaryCard(
+                  summary: _missed,
+                  masks: _locks.masks,
+                  onCheck: _checkMissed,
+                  onSeen: _seen,
+                ),
+              if (_unsorted > 0)
+                _CountBanner(
+                  bannerKey: const ValueKey('unsortedBanner'),
+                  icon: Icons.move_to_inbox,
+                  text: t.unsortedBanner(_unsorted),
+                  onTap: _openUnsorted,
+                ),
+              if (_waiting > 0)
+                _CountBanner(
+                  bannerKey: const ValueKey('sentItemsWaiting'),
+                  icon: Icons.mark_email_unread_outlined,
+                  text: t.sentItemsWaiting(_waiting),
+                  onTap: _openHeld,
+                ),
+              if (_offers > 0)
+                _CountBanner(
+                  bannerKey: const ValueKey('areaOffersWaiting'),
+                  icon: Icons.group_add_outlined,
+                  text: t.areaOffersWaiting(_offers),
+                  onTap: _openOffers,
+                ),
+              if (captured != null) ...[
+                _Heading(t.justCaptured),
+                NoteCard(
+                  note: captured.note,
+                  when: DateFormat.yMd(locale).add_Hm(),
+                  area: captured.area,
+                  topic: captured.topic,
+                  showPlace: true,
+                  onFile: () => _file(captured.note),
+                  onMerge: () => _merge(captured.note),
+                  // Only a Manager spawns in a Shared Area (ADR 0013).
+                  onSchedule: captured.schedules
+                      ? (spawn) => _schedule(captured.note, spawn)
+                      : null,
+                  actions: noteActions(
+                    context,
+                    widget.notes,
+                    captured,
+                    _reload,
+                    onEdit: () => _open(captured.note),
+                  ),
+                  full: _unfoldedId == captured.note.id,
+                  sections: () => widget.notes.sections(captured.note.id),
+                  checklist: (
+                    read: () =>
+                        Checklists(widget.notes.store)
+                            .shownNow(captured.note.id, deviceWallClock),
+                    lists: Checklists(widget.notes.store),
+                  ),
+                  shopping: (
+                    read: () =>
+                        ShoppingLists(widget.notes.store)
+                            .byNote(captured.note.id, deviceWallClock),
+                    lists: ShoppingLists(widget.notes.store),
+                  ),
+                  onMark: markEdit(widget.notes, captured, _reload),
+                  onTap: _unfoldedId == captured.note.id
+                      ? null
+                      : () => setState(() => _unfoldedId = captured.note.id),
                   onEdit: () => _open(captured.note),
                 ),
-                full: _unfoldedId == captured.note.id,
-                sections: () => widget.notes.sections(captured.note.id),
-                checklist: (
-                  read: () =>
-                      Checklists(widget.notes.store)
-                          .shownNow(captured.note.id, deviceWallClock),
-                  lists: Checklists(widget.notes.store),
-                ),
-                shopping: (
-                  read: () =>
-                      ShoppingLists(widget.notes.store)
-                          .byNote(captured.note.id, deviceWallClock),
-                  lists: ShoppingLists(widget.notes.store),
-                ),
-                onMark: markEdit(widget.notes, captured, _reload),
-                onTap: _unfoldedId == captured.note.id
-                    ? null
-                    : () => setState(() => _unfoldedId = captured.note.id),
-                onEdit: () => _open(captured.note),
-              ),
-            ],
-            _Heading(t.agendaToday),
-            if (_today.isEmpty)
-              BrowserEmpty(text: t.nothingToday)
-            else
-              ...rows(_today),
-            // Under what is due, never above it (#101).
-            if (_frogsToday case final frogs? when frogs.visible) ...[
-              _FrogsHeading(onTap: _openFrogs),
-              for (final (:placed, :masked) in _frogRows)
-                FrogRow(
-                  key: ValueKey('frog-${placed.frog.id}'),
-                  frog: placed.frog,
-                  // A Masked row tells nothing of its Area either.
-                  area: masked ? null : placed.area,
-                  title: masked ? t.maskedFrog : noteText(t, placed.note),
-                  onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
-                      ? () => _toggleFrog(placed.frog)
-                      : null,
-                  onTap: () => _openFrogNote(placed.note),
-                  onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
-                  onAnother: frogs.canSwap && !frogs.eaten
-                      ? () => _anotherFrog(placed.frog)
-                      : null,
-                ),
-            ],
-            // The visible gap between today and tomorrow.
-            const SizedBox(height: 32),
-            Opacity(
-              opacity: AgendaScreen.tomorrowOpacity,
-              child: Column(
-                children: [
-                  _Heading(t.agendaTomorrow),
-                  if (_tomorrow.isEmpty)
-                    BrowserEmpty(text: t.nothingTomorrow)
-                  else
-                    ...rows(_tomorrow),
-                ],
-              ),
-            ),
-            // The days after, each under its weekday and date; one with
-            // nothing due still shows.
-            for (final (:day, rows: later) in _later) ...[
-              const SizedBox(height: 16),
+              ],
+              _Heading(t.agendaToday),
+              if (_today.isEmpty)
+                BrowserEmpty(text: t.nothingToday)
+              else
+                ...rows(_today),
+              // Under what is due, never above it (#101).
+              if (_frogsToday case final frogs? when frogs.visible) ...[
+                _FrogsHeading(onTap: _openFrogs),
+                for (final (:placed, :masked) in _frogRows)
+                  FrogRow(
+                    key: ValueKey('frog-${placed.frog.id}'),
+                    frog: placed.frog,
+                    // A Masked row tells nothing of its Area either.
+                    area: masked ? null : placed.area,
+                    title: masked ? t.maskedFrog : noteText(t, placed.note),
+                    onToggle: widget.notes.store.mayCheckOff(placed.frog.id)
+                        ? () => _toggleFrog(placed.frog)
+                        : null,
+                    onTap: () => _openFrogNote(placed.note),
+                    onMenu: (at) => frogMenu(context, _frogs, placed.frog, at),
+                    onAnother: frogs.canSwap && !frogs.eaten
+                        ? () => _anotherFrog(placed.frog)
+                        : null,
+                  ),
+              ],
+              // The visible gap between today and tomorrow.
+              const SizedBox(height: 32),
               Opacity(
                 opacity: AgendaScreen.tomorrowOpacity,
                 child: Column(
                   children: [
-                    _Heading(t.agendaDay(day.wall)),
-                    if (later.isEmpty)
-                      _NothingPlanned(t.nothingPlanned)
+                    _Heading(t.agendaTomorrow),
+                    if (_tomorrow.isEmpty)
+                      BrowserEmpty(text: t.nothingTomorrow)
                     else
-                      ...rows(later),
+                      ...rows(_tomorrow),
                   ],
                 ),
               ),
+              // The days after, each under its weekday and date; one with
+              // nothing due still shows.
+              for (final (:day, rows: later) in _later) ...[
+                const SizedBox(height: 16),
+                Opacity(
+                  opacity: AgendaScreen.tomorrowOpacity,
+                  child: Column(
+                    children: [
+                      _Heading(t.agendaDay(day.wall)),
+                      if (later.isEmpty)
+                        _NothingPlanned(t.nothingPlanned)
+                      else
+                        ...rows(later),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-        floatingActionButton: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton.small(
-              heroTag: 'browse',
-              tooltip: t.browseTooltip,
-              onPressed: _browse,
-              child: const Icon(Icons.search),
-            ),
-            const SizedBox(height: 16),
-            FloatingActionButton(
-              key: _plus,
-              heroTag: 'capture',
-              tooltip: t.captureTooltip,
-              onPressed: _capture,
-              child: const Icon(Icons.add),
-            ),
-          ],
+          ),
+          floatingActionButton: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FloatingActionButton.small(
+                heroTag: 'browse',
+                tooltip: t.browseTooltip,
+                onPressed: _browse,
+                child: const Icon(Icons.search),
+              ),
+              const SizedBox(height: 16),
+              FloatingActionButton(
+                key: _plus,
+                heroTag: 'capture',
+                tooltip: t.captureTooltip,
+                onPressed: _capture,
+                child: const Icon(Icons.add),
+              ),
+            ],
+          ),
         ),
       ),
     );

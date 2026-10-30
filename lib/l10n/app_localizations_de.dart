@@ -4188,4 +4188,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get textMarkInsert => '☐ an den Anfang der Zeile setzen';
+
+  @override
+  String searchForTag(String tag) {
+    return 'Nach $tag suchen';
+  }
 }

@@ -5216,6 +5216,48 @@ Map<String, Object?> _textMarksOf(String text) {
   };
 }
 
+/// Tags in texts (ADR 0032): for each text the tags found, each as
+/// written, as searched and where it lies, counted in code points, so
+/// that the cores' UTF-16 and UTF-8 offsets compare.
+Map<String, Object?> _textTags() {
+  const texts = [
+    '',
+    '#',
+    '#Garten',
+    'water the beans #Garten',
+    '#Garten water the beans\nsee #urlaub2026 and #to_do',
+    '#Müll #Straße #ÄRGER #日記 #дача #𝔸x #İzmir #ΟΔΟΣ #ǅx',
+    '#garten. #garten, (#garten) "#garten"! #garten🌱 „#h“ *#i* 🌱#j',
+    '#a#b #c/d #e\'s',
+    '#to-do #Garten- und Balkonpflanzen #a-- #-a #- #--',
+    '#1 issue #126 #2024 #_ #1_2 #² #v2 #2024plan #3d #Ⅻ',
+    '# Heading\n## Part\n#\n##double ###three # ',
+    'C# F#m x#a 1#a _#a -#a https://example.org/#top page.html#anchor '
+        '\\#escaped &#x27;',
+    '\t#a\n#b\r\n#c\u00a0#d\u3000#e\r#f\u2028#g',
+    '#Mu\u0308ll #Müll é#x e\u0301#y',
+    '☐ #call mum\n✅#done\n- ❌ #later',
+    '🧠 #𝔸 👩‍👧 #Familie',
+  ];
+  return {
+    'cases': [
+      for (final text in texts)
+        {
+          'tags': [
+            for (final t in TextTags.find(text))
+              {
+                'end': text.substring(0, t.end).runes.length,
+                'start': text.substring(0, t.start).runes.length,
+                'tag': t.tag,
+                'written': text.substring(t.start, t.end),
+              },
+          ],
+          'text': text,
+        },
+    ],
+  };
+}
+
 /// The lead-ins Whisper gets: name lists as given, and three stores,
 /// each seen in English and German: one with the Starter Set, one with
 /// names too long to all fit, one with more names than are listed. Then
@@ -5815,6 +5857,12 @@ Future<void> main(List<String> args) async {
     'start of every line, one past the last among them, and the line of '
     'every offset, counted in code points; with variation selectors, '
     'astral characters and line breaks of every kind.\n'
+    '- `text_tags.json`: tags in texts: for each text the tags found, each '
+    'as written, as searched and where it lies, counted in code points; in '
+    'many scripts, after spaces of any kind, punctuation, emoji and status '
+    'marks, with a `-` inside and at the end, and those that are none: '
+    'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
+    '`\\` or `&`, as in "C#" and web addresses.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -5979,6 +6027,10 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/text_marks.json'),
     '${_json.convert(_textMarks())}\n',
+  );
+  _write(
+    File('${root.path}/text_tags.json'),
+    '${_json.convert(_textTags())}\n',
   );
   _sync(root);
   _conflictsFixture(root);

@@ -123,4 +123,31 @@ void main() {
       atHome.id,
     ]);
   });
+
+  test('a tag, as a tap on it searches, finds every Note holding it in '
+      'its text or a Section, in any case, and not the word alone', () {
+    final inText = capture('#garten water the beans');
+    final inSection = capture('Saturday');
+    final longer = capture('#Gartenarbeit: dig');
+    capture('Garten without a tag');
+    now = now.add(const Duration(minutes: 1));
+    notes.amend(inSection.id, 'then the #GARTEN');
+    final [tag] = TextTags.find('see #Garten');
+    expect(search.notes('#Garten').map((n) => n.id), [
+      longer.id,
+      inSection.id,
+      inText.id,
+    ]);
+    expect(search.notes(tag.tag).map((n) => n.id), [
+      longer.id,
+      inSection.id,
+      inText.id,
+    ]);
+    // Lowered letter by letter, as the tag is and the Rust core does.
+    final turkish = capture('#İzmir trip');
+    final greek = capture('#ΟΔΟΣ');
+    expect(search.notes('#izmir').map((n) => n.id), [turkish.id]);
+    expect(search.notes('#İZMİR').map((n) => n.id), [turkish.id]);
+    expect(search.notes('#οδοσ').map((n) => n.id), [greek.id]);
+  });
 }

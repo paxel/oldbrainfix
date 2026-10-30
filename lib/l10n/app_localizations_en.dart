@@ -4133,4 +4133,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get textMarkInsert => 'Put ☐ at the start of the line';
+
+  @override
+  String searchForTag(String tag) {
+    return 'Search for $tag';
+  }
 }

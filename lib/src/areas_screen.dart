@@ -18,21 +18,25 @@ import 'profile.dart';
 import 'routine_editor_screen.dart';
 import 'share_area_screen.dart';
 import 'system_bars.dart';
+import 'text_marks_view.dart';
 import 'trash_screen.dart';
 
 /// The notes browser's first level: a search field over every Note, and
 /// the Areas while it is empty, with "+" to add an Area. Tapping an Area
 /// opens its Topics; the app bar leads to all Notes and the trash.
+/// [query] starts the search, as a tap on a tag does (ADR 0032).
 class AreasScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
   final BrowserTrail trail;
+  final String query;
 
   const AreasScreen({
     super.key,
     required this.notes,
     required this.places,
     required this.trail,
+    this.query = '',
   });
 
   @override
@@ -41,7 +45,7 @@ class AreasScreen extends StatefulWidget {
 
 class _AreasScreenState extends State<AreasScreen>
     with ReloadsOnLogChange, FoldsNoteCards {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.query);
   List<Area> _areas = const [];
 
   /// What this Device may do in each Area, and who shares the shared
@@ -104,6 +108,12 @@ class _AreasScreenState extends State<AreasScreen>
   });
 
   void _reload() => setState(_load);
+
+  /// A tag tapped on a hit searches for it here.
+  void _searchTag(BuildContext _, String query) {
+    _query.text = query;
+    _reload();
+  }
 
   @override
   Store get log => widget.places.store;
@@ -315,75 +325,78 @@ class _AreasScreenState extends State<AreasScreen>
     return BrowserSwipes(
       forwardRoute: _forwardRoute,
       onForward: _forward,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(t.areasTitle),
-          actions: [
-            // Only the search's hits are Notes on this level.
-            if (searching) ...[
-              PersonFilterButton(
-                store: widget.places.store,
-                filter: _filter,
-                onChanged: _filtered,
-              ),
-              CompactNotesButton(compact: compact, onChanged: setCompact),
-            ],
-            IconButton(
-              tooltip: t.allNotesTitle,
-              onPressed: _openAllNotes,
-              icon: const Icon(Icons.notes),
-            ),
-            IconButton(
-              tooltip: t.trashTitle,
-              onPressed: _openTrash,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            BrowserSearchField(
-              controller: _query,
-              hint: t.searchAllHint,
-              onChanged: (_) => _reload(),
-            ),
-            if (searching)
-              PersonFilterChips(
-                store: widget.places.store,
-                filter: _filter,
-                onChanged: _filtered,
-              ),
-            Expanded(
-              child: ListView(
-                padding: clearOfSystemBars(
-                  context,
-                  const EdgeInsets.symmetric(vertical: 8),
+      child: TagSearchScope(
+        onSearch: _searchTag,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(t.areasTitle),
+            actions: [
+              // Only the search's hits are Notes on this level.
+              if (searching) ...[
+                PersonFilterButton(
+                  store: widget.places.store,
+                  filter: _filter,
+                  onChanged: _filtered,
                 ),
-                children: searching
-                    ? _hitCards(
-                        context,
-                        _hits,
-                        _file,
-                        _merge,
-                        _openNote,
-                        _schedule,
-                        widget.notes,
-                        _reload,
-                        // Hits from every Area.
-                        (_) => true,
-                        compact: compact,
-                        unfolded: unfolded,
-                        onUnfold: unfold,
-                      )
-                    : _areaRows(t),
+                CompactNotesButton(compact: compact, onChanged: setCompact),
+              ],
+              IconButton(
+                tooltip: t.allNotesTitle,
+                onPressed: _openAllNotes,
+                icon: const Icon(Icons.notes),
               ),
-            ),
-          ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          tooltip: t.newArea,
-          onPressed: _add,
-          child: const Icon(Icons.add),
+              IconButton(
+                tooltip: t.trashTitle,
+                onPressed: _openTrash,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+          body: Column(
+            children: [
+              BrowserSearchField(
+                controller: _query,
+                hint: t.searchAllHint,
+                onChanged: (_) => _reload(),
+              ),
+              if (searching)
+                PersonFilterChips(
+                  store: widget.places.store,
+                  filter: _filter,
+                  onChanged: _filtered,
+                ),
+              Expanded(
+                child: ListView(
+                  padding: clearOfSystemBars(
+                    context,
+                    const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                  children: searching
+                      ? _hitCards(
+                          context,
+                          _hits,
+                          _file,
+                          _merge,
+                          _openNote,
+                          _schedule,
+                          widget.notes,
+                          _reload,
+                          // Hits from every Area.
+                          (_) => true,
+                          compact: compact,
+                          unfolded: unfolded,
+                          onUnfold: unfold,
+                        )
+                      : _areaRows(t),
+                ),
+              ),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            tooltip: t.newArea,
+            onPressed: _add,
+            child: const Icon(Icons.add),
+          ),
         ),
       ),
     );

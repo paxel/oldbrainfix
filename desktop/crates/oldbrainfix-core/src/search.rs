@@ -37,12 +37,12 @@ impl<'a> Search<'a> {
             Some(place) => notes.inside(place)?,
             None => notes.all()?,
         };
-        let wanted = query.trim().to_lowercase();
+        let wanted = lower_case(query.trim());
         if wanted.is_empty() {
             return Ok(scope);
         }
         let sections = self.section_texts(&notes)?;
-        let holds = |text: &String| text.to_lowercase().contains(&wanted);
+        let holds = |text: &String| lower_case(text).contains(&wanted);
         Ok(scope
             .into_iter()
             .filter(|note| {
@@ -140,6 +140,16 @@ impl<'a> Search<'a> {
     }
 }
 
+/// `text` in lower case letter by letter, as the Dart core's
+/// `toLowerCase` lowers it: each character to the first of its lower
+/// case, so "İ" becomes "i" and a closing "Σ" "σ", where
+/// `str::to_lowercase` writes "i̇" and "ς".
+pub(crate) fn lower_case(text: &str) -> String {
+    text.chars()
+        .map(|c| c.to_lowercase().next().unwrap_or(c))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,6 +202,35 @@ mod tests {
                 .set_photo_text(&voice.id, &voice.recordings[0], "x")
                 .is_err()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_tag_finds_every_note_holding_it_in_any_case_not_the_word_alone() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let in_text = notes.capture("#garten water the beans", None, None)?;
+        let in_section = notes.capture("Saturday", None, None)?;
+        let longer = notes.capture("#Gartenarbeit: dig", None, None)?;
+        notes.capture("Garten without a tag", None, None)?;
+        notes.amend(&in_section.id, "then the #GARTEN")?;
+        let search = Search::new(&store);
+        let ids = |q: &str| -> Result<Vec<String>> {
+            Ok(search.notes(q, None)?.into_iter().map(|n| n.id).collect())
+        };
+        let expected = vec![longer.id, in_section.id, in_text.id];
+        assert_eq!(ids("#Garten")?, expected);
+        let tapped = crate::text_tags::find("see #Garten");
+        assert_eq!(tapped.len(), 1);
+        for tag in tapped {
+            assert_eq!(ids(&tag.tag)?, expected);
+        }
+        // Lowered letter by letter, as the tag is and the Dart core does.
+        let turkish = notes.capture("#İzmir trip", None, None)?;
+        let greek = notes.capture("#ΟΔΟΣ", None, None)?;
+        assert_eq!(ids("#izmir")?, vec![turkish.id.clone()]);
+        assert_eq!(ids("#İZMİR")?, vec![turkish.id]);
+        assert_eq!(ids("#οδοσ")?, vec![greek.id]);
         Ok(())
     }
 }

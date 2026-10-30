@@ -121,7 +121,7 @@ use crate::sync_view::{
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
 };
-use crate::text_marks_view::{self, MarkSpot};
+use crate::text_marks_view::{self, Spots};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -664,6 +664,8 @@ enum Action {
     ShowUntranscribable,
     /// The search over the Notes shown changed.
     Search,
+    /// Searches All Notes for this, a tag clicked as written (#126).
+    SearchFor(String),
     /// Shows only the Notes of these people (#53).
     FilterPeople(PersonFilter),
     Speech(Speech),
@@ -3366,6 +3368,16 @@ impl App {
                 }
             }
             Action::Search => {}
+            Action::SearchFor(query) => {
+                // All Notes' search, whatever list shows: the tag is
+                // found in every Note holding it (ADR 0032).
+                if self.selection != Selection::All {
+                    self.act(Action::Select(Selection::All))?;
+                } else {
+                    self.save_text()?;
+                }
+                self.query = query;
+            }
             Action::FilterPeople(people) => self.people = people,
             Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
             Action::ClosePhoto => self.viewer = None,
@@ -5671,6 +5683,8 @@ impl App {
                     }
                     if let Some(picked) = clicks.picked {
                         actions.push(picked);
+                    } else if let Some(tag) = clicks.tag {
+                        actions.push(Action::SearchFor(tag));
                     } else if let Some((line, to)) = clicks.mark {
                         let note = id.clone();
                         actions.push(Action::Mark { note, line, to });
@@ -5873,13 +5887,11 @@ impl App {
                             (Some(18.0), text),
                             false,
                         );
-                        text_marks_view::mark_clicks(
-                            ui,
-                            &t,
-                            Id::new(("text", &note.id)),
-                            &spots,
-                            false,
-                        );
+                        let of = Id::new(("text", &note.id));
+                        text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
+                        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
+                            actions.push(Action::SearchFor(tag));
+                        }
                         return;
                     }
                     let id = Id::new("note text");
@@ -5888,10 +5900,24 @@ impl App {
                     {
                         actions.push(Action::SaveText);
                     }
+                    // Its tags in the accent colour; a click on one places
+                    // the cursor, as anywhere in the field (#126).
+                    let accent = ui.visuals().hyperlink_color;
+                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                        let typed = typed.as_str();
+                        let mut job = text_marks_view::tag_job(
+                            typed,
+                            (0, typed.len()),
+                            FontId::proportional(18.0),
+                            (text, accent),
+                        );
+                        job.wrap.max_width = width;
+                        ui.fonts_mut(|f| f.layout_job(job))
+                    };
                     let output = TextEdit::multiline(edited)
                         .id(id)
-                        .text_color(text)
                         .font(FontId::proportional(18.0))
+                        .layouter(&mut layouter)
                         .desired_rows(1)
                         .desired_width(f32::INFINITY)
                         .frame(Frame::NONE)
@@ -6045,7 +6071,11 @@ impl App {
                             let spots =
                                 text_marks_view::marked_label(ui, &section.text, all, shown, false);
                             let of = Id::new(("text", &section.id));
-                            text_marks_view::mark_clicks(ui, &t, of, &spots, false);
+                            text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
+                            if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
+                            {
+                                actions.push(Action::SearchFor(tag));
+                            }
                         }
                         let media = Media {
                             id: &section.id,
@@ -8805,7 +8835,7 @@ fn merge_form(
         .max_height(320.0)
         .show(ui, |ui| {
             for (id, text) in shown {
-                if row(ui, tones, false, 0.0, None, text, false).clicked() {
+                if merge_row(ui, tones, text).clicked() {
                     actions.push(Action::Merge(id.clone()));
                 }
             }
@@ -9449,6 +9479,31 @@ fn row(
     resp
 }
 
+/// A Note the merge picks as a row, as [`row`] draws one, its tags in the
+/// accent colour: a click on one picks the Note, as anywhere on the row
+/// (#126).
+fn merge_row(ui: &mut Ui, tones: Tones, label: &str) -> egui::Response {
+    let height = 30.0;
+    let width = ui.available_width();
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, height), Sense::click());
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::SelectableLabel, true, false, label));
+    if ui.is_rect_visible(rect) {
+        if resp.hovered() {
+            ui.painter()
+                .rect_filled(rect, 8.0, tones.card.gamma_multiply(0.7));
+        }
+        let x = rect.left() + 8.0;
+        let colours = (ui.visuals().text_color(), ui.visuals().hyperlink_color);
+        let font = FontId::proportional(15.0);
+        let mut job = text_marks_view::tag_job(label, (0, label.len()), font, colours);
+        job.wrap.max_width = (rect.right() - x - 8.0).max(0.0);
+        let text = ui.painter().layout_job(job);
+        let y = rect.center().y - text.size().y / 2.0;
+        ui.painter().galley(egui::pos2(x, y), text, colours.0);
+    }
+    resp
+}
+
 /// Lays out `content` on a softly embossed card the width of `ui`;
 /// `band` runs an Area's colour down its left edge.
 pub(crate) fn embossed(
@@ -9622,6 +9677,8 @@ struct CardClicks {
     /// The line of the Note's text whose status mark was changed and to
     /// what (#125).
     mark: Option<(usize, TextMark)>,
+    /// The tag clicked, as written (#126).
+    tag: Option<String>,
     menu_opened: bool,
     picked: Option<Action>,
 }
@@ -9731,7 +9788,7 @@ fn whole(
     t: &L10n,
     part: Part,
     (cache, store, transcribing): ShownMedia,
-    marks: &mut Vec<MarkSpot>,
+    marks: &mut Spots,
 ) -> Vec<(String, egui::Rect)> {
     card_text(ui, part.text, marks);
     media_view::whole_media(
@@ -9745,8 +9802,8 @@ fn whole(
 }
 
 /// The whole text `text` of a Note or Section on a full card, where its
-/// status marks lie added to `marks` (#125).
-fn card_text(ui: &mut Ui, text: &str, marks: &mut Vec<MarkSpot>) {
+/// status marks (#125) and tags (#126) lie added to `marks`.
+fn card_text(ui: &mut Ui, text: &str, marks: &mut Spots) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
@@ -9797,11 +9854,12 @@ fn note_card(
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
     // The photos shown in full, where they lie, the checkboxes of its
-    // Lines and the status marks of its text and of its Sections'.
+    // Lines and the status marks and tags of its text and of its
+    // Sections'.
     let mut shown = Vec::new();
     let mut boxes = Vec::new();
-    let mut marks = Vec::new();
-    let mut section_marks: Vec<(&str, Vec<MarkSpot>)> = Vec::new();
+    let mut marks = Spots::default();
+    let mut section_marks: Vec<(&str, Spots)> = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -9921,7 +9979,7 @@ fn note_card(
                         ui.separator();
                         capture_context(ui, t, section.captured, &section.context);
                         let part = Part::of_section(section);
-                        let mut spots = Vec::new();
+                        let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);
                         shown.extend(whole(ui, t, part, media, &mut spots));
                         section_marks.push((section.id.as_str(), spots));
@@ -10067,9 +10125,14 @@ fn note_card(
         || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
     // Sections have no edit of their text: their marks only show.
-    let mark = text_marks_view::mark_clicks(ui, t, Id::new(("card", &note.id)), &marks, look.marks);
+    let of = Id::new(("card", &note.id));
+    let mark = text_marks_view::mark_clicks(ui, t, of, &marks.marks, look.marks);
+    // A click on a tag searches for it, and opens no card (#126).
+    let mut tag = text_marks_view::tag_clicks(ui, t, of, &marks.tags);
     for (id, spots) in &section_marks {
-        text_marks_view::mark_clicks(ui, t, Id::new(("card", *id)), spots, false);
+        let of = Id::new(("card", *id));
+        text_marks_view::mark_clicks(ui, t, of, &spots.marks, false);
+        tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
     }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
@@ -10078,6 +10141,7 @@ fn note_card(
         photo,
         check,
         mark,
+        tag,
         menu_opened,
         picked,
     }

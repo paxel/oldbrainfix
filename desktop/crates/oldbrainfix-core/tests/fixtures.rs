@@ -4369,6 +4369,35 @@ fn status_marks_are_found_and_changed_as_the_dart_core_does() -> TestResult {
     Ok(())
 }
 
+// ----------------------------------------------------------------- Tags
+
+#[test]
+fn tags_are_found_as_the_dart_core_finds_them() -> TestResult {
+    use oldbrainfix_core::text_tags::find;
+    let fixture = read_json(&fixtures().join("text_tags.json"))?;
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 10);
+    for case in cases {
+        let text = case["text"].as_str().ok_or("text")?;
+        // Offsets as the generator counts them: in code points.
+        let points = |at: usize| text.get(..at).map(|t| t.chars().count());
+        let tags: Vec<Value> = find(text)
+            .iter()
+            .map(|t| {
+                json!({
+                    "end": points(t.end),
+                    "start": points(t.start),
+                    "tag": t.tag,
+                    "written": text.get(t.start..t.end),
+                })
+            })
+            .collect();
+        let ours = json!({ "tags": tags, "text": text });
+        assert_eq!(&ours, case, "{text:?}");
+    }
+    Ok(())
+}
+
 // ------------------------------------------------------ Pending Changes
 
 #[test]

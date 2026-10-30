@@ -29,6 +29,7 @@ import 'system_bars.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
 import 'tally_view.dart';
+import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
 import 'voice_platform.dart';
 
@@ -395,7 +396,8 @@ class NoteEditorScreen extends StatefulWidget {
 }
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
-  final _text = TextEditingController();
+  /// Its tags are highlighted as they are typed (ADR 0032).
+  final _text = TagTextController();
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   late final AppLifecycleListener _lifecycle;
   Timer? _draftTimer;
@@ -1147,7 +1149,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       const SizedBox(height: 8),
                     ],
                     if (section.text.isNotEmpty)
-                      Text(
+                      MarkedText(
                         section.text,
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),

@@ -7,6 +7,7 @@ import 'browser.dart';
 import 'l10n.dart';
 import 'note_card.dart';
 import 'system_bars.dart';
+import 'text_marks_view.dart';
 
 /// Opens "merge into…" for [note] and merges it into the Note picked
 /// there; true when it was merged.
@@ -108,14 +109,18 @@ class _MergeIntoScreenState extends State<MergeIntoScreen> {
                             :author,
                           )
                           in _shown)
-                        NoteCard(
-                          note: note,
-                          when: when,
-                          area: area,
-                          topic: topic,
-                          author: author,
-                          showPlace: true,
-                          onTap: () => Navigator.of(context).pop(note.id),
+                        // A tap picks the Note, also on a tag.
+                        TagSearchScope(
+                          onSearch: null,
+                          child: NoteCard(
+                            note: note,
+                            when: when,
+                            area: area,
+                            topic: topic,
+                            author: author,
+                            showPlace: true,
+                            onTap: () => Navigator.of(context).pop(note.id),
+                          ),
                         ),
                     ],
             ),

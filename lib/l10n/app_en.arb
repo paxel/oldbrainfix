@@ -2212,5 +2212,7 @@
   "textMarkChange": "change the mark",
   "@textMarkChange": {"description": "Screen reader hint of a status mark that can be tapped: it opens Check, Fail and Open."},
   "textMarkInsert": "Put ☐ at the start of the line",
-  "@textMarkInsert": {"description": "Screen reader label of the button in the line above the keyboard that puts an open mark at the start of the cursor's line."}
+  "@textMarkInsert": {"description": "Screen reader label of the button in the line above the keyboard that puts an open mark at the start of the cursor's line."},
+  "searchForTag": "Search for {tag}",
+  "@searchForTag": {"description": "Screen reader label of a word with # in front, such as #Garten, in a Note's text: a tap opens the search for it.", "placeholders": {"tag": {"type": "String", "example": "#Garten"}}}
 }

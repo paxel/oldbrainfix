@@ -1,0 +1,362 @@
+{
+  "cases": [
+    {
+      "tags": [],
+      "text": ""
+    },
+    {
+      "tags": [],
+      "text": "#"
+    },
+    {
+      "tags": [
+        {
+          "end": 7,
+          "start": 0,
+          "tag": "#garten",
+          "written": "#Garten"
+        }
+      ],
+      "text": "#Garten"
+    },
+    {
+      "tags": [
+        {
+          "end": 23,
+          "start": 16,
+          "tag": "#garten",
+          "written": "#Garten"
+        }
+      ],
+      "text": "water the beans #Garten"
+    },
+    {
+      "tags": [
+        {
+          "end": 7,
+          "start": 0,
+          "tag": "#garten",
+          "written": "#Garten"
+        },
+        {
+          "end": 39,
+          "start": 28,
+          "tag": "#urlaub2026",
+          "written": "#urlaub2026"
+        },
+        {
+          "end": 50,
+          "start": 44,
+          "tag": "#to_do",
+          "written": "#to_do"
+        }
+      ],
+      "text": "#Garten water the beans\nsee #urlaub2026 and #to_do"
+    },
+    {
+      "tags": [
+        {
+          "end": 5,
+          "start": 0,
+          "tag": "#müll",
+          "written": "#Müll"
+        },
+        {
+          "end": 13,
+          "start": 6,
+          "tag": "#straße",
+          "written": "#Straße"
+        },
+        {
+          "end": 20,
+          "start": 14,
+          "tag": "#ärger",
+          "written": "#ÄRGER"
+        },
+        {
+          "end": 24,
+          "start": 21,
+          "tag": "#日記",
+          "written": "#日記"
+        },
+        {
+          "end": 30,
+          "start": 25,
+          "tag": "#дача",
+          "written": "#дача"
+        },
+        {
+          "end": 34,
+          "start": 31,
+          "tag": "#𝔸x",
+          "written": "#𝔸x"
+        },
+        {
+          "end": 41,
+          "start": 35,
+          "tag": "#izmir",
+          "written": "#İzmir"
+        },
+        {
+          "end": 47,
+          "start": 42,
+          "tag": "#οδοσ",
+          "written": "#ΟΔΟΣ"
+        },
+        {
+          "end": 51,
+          "start": 48,
+          "tag": "#ǆx",
+          "written": "#ǅx"
+        }
+      ],
+      "text": "#Müll #Straße #ÄRGER #日記 #дача #𝔸x #İzmir #ΟΔΟΣ #ǅx"
+    },
+    {
+      "tags": [
+        {
+          "end": 7,
+          "start": 0,
+          "tag": "#garten",
+          "written": "#garten"
+        },
+        {
+          "end": 16,
+          "start": 9,
+          "tag": "#garten",
+          "written": "#garten"
+        },
+        {
+          "end": 26,
+          "start": 19,
+          "tag": "#garten",
+          "written": "#garten"
+        },
+        {
+          "end": 36,
+          "start": 29,
+          "tag": "#garten",
+          "written": "#garten"
+        },
+        {
+          "end": 46,
+          "start": 39,
+          "tag": "#garten",
+          "written": "#garten"
+        },
+        {
+          "end": 51,
+          "start": 49,
+          "tag": "#h",
+          "written": "#h"
+        },
+        {
+          "end": 56,
+          "start": 54,
+          "tag": "#i",
+          "written": "#i"
+        },
+        {
+          "end": 61,
+          "start": 59,
+          "tag": "#j",
+          "written": "#j"
+        }
+      ],
+      "text": "#garten. #garten, (#garten) \"#garten\"! #garten🌱 „#h“ *#i* 🌱#j"
+    },
+    {
+      "tags": [
+        {
+          "end": 2,
+          "start": 0,
+          "tag": "#a",
+          "written": "#a"
+        },
+        {
+          "end": 7,
+          "start": 5,
+          "tag": "#c",
+          "written": "#c"
+        },
+        {
+          "end": 12,
+          "start": 10,
+          "tag": "#e",
+          "written": "#e"
+        }
+      ],
+      "text": "#a#b #c/d #e's"
+    },
+    {
+      "tags": [
+        {
+          "end": 6,
+          "start": 0,
+          "tag": "#to-do",
+          "written": "#to-do"
+        },
+        {
+          "end": 14,
+          "start": 7,
+          "tag": "#garten",
+          "written": "#Garten"
+        },
+        {
+          "end": 37,
+          "start": 35,
+          "tag": "#a",
+          "written": "#a"
+        }
+      ],
+      "text": "#to-do #Garten- und Balkonpflanzen #a-- #-a #- #--"
+    },
+    {
+      "tags": [
+        {
+          "end": 34,
+          "start": 31,
+          "tag": "#v2",
+          "written": "#v2"
+        },
+        {
+          "end": 44,
+          "start": 35,
+          "tag": "#2024plan",
+          "written": "#2024plan"
+        },
+        {
+          "end": 48,
+          "start": 45,
+          "tag": "#3d",
+          "written": "#3d"
+        },
+        {
+          "end": 51,
+          "start": 49,
+          "tag": "#ⅻ",
+          "written": "#Ⅻ"
+        }
+      ],
+      "text": "#1 issue #126 #2024 #_ #1_2 #² #v2 #2024plan #3d #Ⅻ"
+    },
+    {
+      "tags": [],
+      "text": "# Heading\n## Part\n#\n##double ###three # "
+    },
+    {
+      "tags": [],
+      "text": "C# F#m x#a 1#a _#a -#a https://example.org/#top page.html#anchor \\#escaped &#x27;"
+    },
+    {
+      "tags": [
+        {
+          "end": 3,
+          "start": 1,
+          "tag": "#a",
+          "written": "#a"
+        },
+        {
+          "end": 6,
+          "start": 4,
+          "tag": "#b",
+          "written": "#b"
+        },
+        {
+          "end": 10,
+          "start": 8,
+          "tag": "#c",
+          "written": "#c"
+        },
+        {
+          "end": 13,
+          "start": 11,
+          "tag": "#d",
+          "written": "#d"
+        },
+        {
+          "end": 16,
+          "start": 14,
+          "tag": "#e",
+          "written": "#e"
+        },
+        {
+          "end": 19,
+          "start": 17,
+          "tag": "#f",
+          "written": "#f"
+        },
+        {
+          "end": 22,
+          "start": 20,
+          "tag": "#g",
+          "written": "#g"
+        }
+      ],
+      "text": "\t#a\n#b\r\n#c #d　#e\r#f #g"
+    },
+    {
+      "tags": [
+        {
+          "end": 3,
+          "start": 0,
+          "tag": "#mu",
+          "written": "#Mu"
+        },
+        {
+          "end": 12,
+          "start": 7,
+          "tag": "#müll",
+          "written": "#Müll"
+        },
+        {
+          "end": 21,
+          "start": 19,
+          "tag": "#y",
+          "written": "#y"
+        }
+      ],
+      "text": "#Müll #Müll é#x é#y"
+    },
+    {
+      "tags": [
+        {
+          "end": 7,
+          "start": 2,
+          "tag": "#call",
+          "written": "#call"
+        },
+        {
+          "end": 18,
+          "start": 13,
+          "tag": "#done",
+          "written": "#done"
+        },
+        {
+          "end": 29,
+          "start": 23,
+          "tag": "#later",
+          "written": "#later"
+        }
+      ],
+      "text": "☐ #call mum\n✅#done\n- ❌ #later"
+    },
+    {
+      "tags": [
+        {
+          "end": 4,
+          "start": 2,
+          "tag": "#𝔸",
+          "written": "#𝔸"
+        },
+        {
+          "end": 17,
+          "start": 9,
+          "tag": "#familie",
+          "written": "#Familie"
+        }
+      ],
+      "text": "🧠 #𝔸 👩‍👧 #Familie"
+    }
+  ]
+}

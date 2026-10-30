@@ -11,6 +11,7 @@ import 'alarm_sync.dart';
 import 'announcements.dart';
 import 'app_lock.dart';
 import 'appointments.dart';
+import 'areas_screen.dart';
 import 'auto_sync.dart';
 import 'browser.dart';
 import 'bundle_platform.dart';
@@ -51,6 +52,7 @@ import 'speech_platform.dart';
 import 'starter_set_screen.dart';
 import 'sync_platform.dart';
 import 'sync_screen.dart';
+import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
 class OldBrainFixApp extends StatefulWidget {
@@ -260,6 +262,21 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
     super.dispose();
   }
 
+  /// A tag tapped on a page of its own, such as the editor, opens the
+  /// search over every Note for it on top (ADR 0032).
+  void _searchTag(BuildContext context, String query) => unawaited(
+    Navigator.of(context).push(
+      BrowserRoute<void>(
+        builder: (_) => AreasScreen(
+          notes: _notes,
+          places: _places,
+          trail: _trail,
+          query: query,
+        ),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
@@ -312,8 +329,12 @@ class _OldBrainFixAppState extends State<OldBrainFixApp> {
                                           store: widget.store,
                                           platform: widget.profile,
                                           onChangesSent: _alarms.replan,
-                                          child:
-                                              child ?? const SizedBox.shrink(),
+                                          child: TagSearchScope(
+                                            onSearch: _searchTag,
+                                            child:
+                                                child ??
+                                                const SizedBox.shrink(),
+                                          ),
                                         ),
                                       ),
                                     ),

@@ -1119,5 +1119,6 @@
   "textMarkChecked": "Abgehakt",
   "textMarkFailed": "Gescheitert",
   "textMarkChange": "Zeichen ändern",
-  "textMarkInsert": "☐ an den Anfang der Zeile setzen"
+  "textMarkInsert": "☐ an den Anfang der Zeile setzen",
+  "searchForTag": "Nach {tag} suchen"
 }

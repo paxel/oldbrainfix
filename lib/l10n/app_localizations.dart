@@ -6763,6 +6763,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Put ☐ at the start of the line'**
   String get textMarkInsert;
+
+  /// Screen reader label of a word with # in front, such as #Garten, in a Note's text: a tap opens the search for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for {tag}'**
+  String searchForTag(String tag);
 }
 
 class _AppLocalizationsDelegate
