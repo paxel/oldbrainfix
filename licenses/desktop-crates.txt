@@ -7369,6 +7369,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ================================================================================
 global-hotkey 0.9.0
+muda 0.21.2
+tray-icon 0.26.1
 
 MIT License
 

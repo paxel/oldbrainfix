@@ -66,22 +66,23 @@
 
 <h2>The tray and starting at login</h2>
 <p>
-  On Linux the app shows an icon in the tray, where the desktop has one: KDE, Xfce, Cinnamon, and
-  GNOME with the AppIndicator extension. A click on the icon opens the window; its menu holds
-  <strong>Open Old Brain Fix</strong>, <strong>Capture a Note</strong> and <strong>Quit</strong>.
-  Closing the window leaves the app running in the tray, with its notifications, its hotkey, the
-  sync with paired Devices and the weekly Backup; <strong>Quit</strong> ends it.
+  The app shows an icon in the tray: in the notification area on Windows, in the menu bar on macOS,
+  and on Linux where the desktop has a tray: KDE, Xfce, Cinnamon, and GNOME with the AppIndicator
+  extension. A click on the icon opens the window, on macOS its menu; the menu, on Windows and Linux
+  under the right mouse button, holds <strong>Open Old Brain Fix</strong>, <strong>Capture a
+  Note</strong> and <strong>Quit</strong>. Closing the window leaves the app running in the tray,
+  with its notifications, its hotkey, the sync with paired Devices and the weekly Backup;
+  <strong>Quit</strong> ends it.
 </p>
 <p>
-  Windows and macOS have no tray icon, nor has Linux without a tray. There, closing the window ends
-  the app, and with it the notifications and the hotkey, until it is started again.
+  Linux without a tray has no icon. There, closing the window ends the app, and with it the
+  notifications and the hotkey, until it is started again.
 </p>
 <p>
   Settings, "This computer", <strong>Start at login</strong> is on unless switched off. It writes
   an autostart entry on Linux (inside the Flatpak through the desktop's Background portal), a
-  LaunchAgent on macOS and a Run entry for your user on Windows. On Linux with a tray the login start
-  goes into the tray without a window; on Windows, on macOS and on Linux without a tray it opens the
-  window.
+  LaunchAgent on macOS and a Run entry for your user on Windows. The login start goes into the tray
+  without a window; on Linux without a tray it opens the window.
 </p>
 <p>
   The app runs once per user. A second start, from the menu or a command, hands its wish to the
@@ -97,7 +98,7 @@
 <h2>The capture popup and its hotkey</h2>
 <p>
   The hotkey, Ctrl+Alt+N unless changed, opens the popup "Capture a Note" over all other windows,
-  on Linux also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong> and the command
+  also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong> and the command
   <code>oldbrainfix capture</code> open it too. It takes text, a voice recording and the clipboard,
   offers the same action row as the capture field, and never asks anything: Enter saves the Note
   with a Nudge in 1 h, and Esc keeps what is typed the same way (see
@@ -106,7 +107,7 @@
 <ul>
   <li>The hotkey is set in Settings under "Quick capture", in the field "Hotkey": Ctrl, Alt or Super, maybe Shift, and a letter, a digit, F1 to F12 or Space, such as Super+Shift+F5.</li>
   <li>On X11, Windows and macOS the app takes the key itself; on Wayland the desktop manages it, asks once and lets you change it in its own keyboard settings. The line under the field says when the key is taken or no hotkey is possible.</li>
-  <li>The key works while the app runs: on Linux also from the tray, on Windows and macOS only while the window or the popup is open.</li>
+  <li>The key works while the app runs, also from the tray.</li>
   <li>On Wayland the desktop decides whether the popup stays above other windows and where the keyboard goes once it closes.</li>
 </ul>
 
@@ -171,7 +172,7 @@
   is asked about first, <strong>Trust</strong> or <strong>Refuse</strong>. A code the phone shows
   is typed or pasted into <strong>Pair code</strong> and joined with <strong>Sync with this
   code</strong>. Paired Devices on the same network then sync on their own for as long as the app
-  runs, on Linux also in the tray; the shared folder syncs every half minute. See
+  runs, also in the tray; the shared folder syncs every half minute. See
   <a href="sharing-and-sync.html#pairing">Sharing and sync</a> for pairing, the shared folder,
   bundles and Conflicts.
 </p>

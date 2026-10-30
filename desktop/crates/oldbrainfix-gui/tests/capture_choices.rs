@@ -400,3 +400,40 @@ fn file_into_without_areas_says_how_the_desktop_makes_one() -> TestResult {
     assert!(harness.query_all_by_label_contains("Tap").next().is_none());
     Ok(())
 }
+
+#[test]
+fn a_place_picked_by_keyboard_or_screen_reader_closes_file_into() -> TestResult {
+    let (store, _, _) = store()?;
+    let mut harness = window(&store);
+    type_in_window(&mut harness, "Water the plants");
+    // "Household" in the left pane, and in the menu while it is open.
+    let households = |harness: &Harness<'_, App>| {
+        harness
+            .query_all_by_role_and_label(Role::Button, "Household")
+            .count()
+    };
+    let shut = households(&harness);
+    click(&mut harness, "File into…");
+    assert_eq!(households(&harness), shut + 1);
+    // No pointer click: the pick alone closes the menu.
+    let menu = harness
+        .query_all_by_role_and_label(Role::Button, "Household")
+        .last()
+        .ok_or("the menu's Household")?;
+    menu.click_accesskit();
+    harness.run();
+    assert!(shows(&harness, "Into: Household"));
+    assert_eq!(households(&harness), shut);
+    // It opens again with the next click on it, and the same pick, which
+    // changes nothing on the card, closes it too.
+    click(&mut harness, "File into…");
+    assert_eq!(households(&harness), shut + 1);
+    let menu = harness
+        .query_all_by_role_and_label(Role::Button, "Household")
+        .last()
+        .ok_or("the menu's Household")?;
+    menu.click_accesskit();
+    harness.run();
+    assert_eq!(households(&harness), shut);
+    Ok(())
+}

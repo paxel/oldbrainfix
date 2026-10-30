@@ -69,25 +69,25 @@
 
 <h2>Der Infobereich und der Start beim Anmelden</h2>
 <p>
-  Unter Linux zeigt die App ein Symbol im Infobereich, wo die Arbeitsumgebung einen hat: KDE, Xfce,
-  Cinnamon und GNOME mit der Erweiterung AppIndicator. Ein Klick auf das Symbol öffnet das Fenster;
-  sein Menü enthält <strong>Old Brain Fix öffnen</strong>, <strong>Notiz erfassen</strong> und
+  Die App zeigt ein Symbol im Infobereich: unter Windows im Infobereich der Taskleiste, unter macOS
+  in der Menüleiste und unter Linux, wo die Arbeitsumgebung einen Infobereich hat: KDE, Xfce,
+  Cinnamon und GNOME mit der Erweiterung AppIndicator. Ein Klick auf das Symbol öffnet das Fenster,
+  unter macOS sein Menü; das Menü, unter Windows und Linux mit der rechten Maustaste, enthält
+  <strong>Old Brain Fix öffnen</strong>, <strong>Notiz erfassen</strong> und
   <strong>Beenden</strong>. Schließt du das Fenster, läuft die App im Infobereich weiter, mit ihren
   Benachrichtigungen, ihrem Tastenkürzel, dem Abgleich mit gekoppelten Geräten und der wöchentlichen
   Sicherung; <strong>Beenden</strong> beendet sie.
 </p>
 <p>
-  Windows und macOS haben kein Symbol im Infobereich, ebenso wenig Linux ohne Infobereich. Dort
-  beendet das Schließen des Fensters die App, und mit ihr die Benachrichtigungen und das
-  Tastenkürzel, bis sie wieder gestartet wird.
+  Linux ohne Infobereich hat kein Symbol. Dort beendet das Schließen des Fensters die App, und mit
+  ihr die Benachrichtigungen und das Tastenkürzel, bis sie wieder gestartet wird.
 </p>
 <p>
   Einstellungen, „Dieser Computer“, <strong>Beim Anmelden starten</strong> ist an, solange es nicht
   abgeschaltet wird. Es schreibt unter Linux einen Autostart-Eintrag (im Flatpak über das
   Hintergrund-Portal der Arbeitsumgebung), unter macOS einen LaunchAgent und unter Windows einen
-  Run-Eintrag für deinen Benutzer. Unter Linux mit Infobereich startet die App beim Anmelden ohne
-  Fenster in den Infobereich; unter Windows, unter macOS und unter Linux ohne Infobereich öffnet sie
-  das Fenster.
+  Run-Eintrag für deinen Benutzer. Beim Anmelden startet die App ohne Fenster in den Infobereich;
+  unter Linux ohne Infobereich öffnet sie das Fenster.
 </p>
 <p>
   Die App läuft einmal pro Benutzer. Ein zweiter Start, aus dem Menü oder per Befehl, gibt seinen
@@ -103,7 +103,7 @@
 <h2>Das Erfassen-Fenster und sein Tastenkürzel</h2>
 <p>
   Das Tastenkürzel, Strg+Alt+N, solange nicht geändert, öffnet das Fenster „Notiz erfassen“ über
-  allen anderen Fenstern, unter Linux auch während die App ohne ihr Fenster im Infobereich läuft.
+  allen anderen Fenstern, auch während die App ohne ihr Fenster im Infobereich läuft.
   <strong>Notiz erfassen</strong> im Infobereich und der Befehl <code>oldbrainfix capture</code>
   öffnen es ebenfalls. Es nimmt Text, eine Sprachaufnahme und die Zwischenablage, bietet dieselbe
   Aktionszeile wie das Erfassungsfeld und fragt nie etwas: Enter speichert die Notiz mit einem
@@ -114,7 +114,7 @@
 <ul>
   <li>Das Tastenkürzel stellst du in den Einstellungen unter „Schnell erfassen“ im Feld „Tastenkürzel“ ein: Strg, Alt oder Super, wahlweise Umschalt, und ein Buchstabe, eine Ziffer, F1 bis F12 oder die Leertaste, etwa Super+Shift+F5.</li>
   <li>Unter X11, Windows und macOS belegt die App die Taste selbst; unter Wayland verwaltet die Arbeitsumgebung sie, fragt einmal nach und lässt sie dich in ihren eigenen Tastatureinstellungen ändern. Die Zeile unter dem Feld sagt, wenn die Taste belegt oder kein Tastenkürzel möglich ist.</li>
-  <li>Die Taste wirkt, solange die App läuft: unter Linux auch aus dem Infobereich, unter Windows und macOS nur, solange das Fenster oder das Erfassen-Fenster offen ist.</li>
+  <li>Die Taste wirkt, solange die App läuft, auch aus dem Infobereich.</li>
   <li>Unter Wayland entscheidet die Arbeitsumgebung, ob das Erfassen-Fenster über anderen Fenstern bleibt und wohin die Tastatur geht, wenn es schließt.</li>
 </ul>
 
@@ -182,7 +182,7 @@
   <strong>Vertrauen</strong> oder <strong>Ablehnen</strong>. Einen Code, den das Handy zeigt, tippst
   oder fügst du unter <strong>Kopplungscode</strong> ein und trittst mit <strong>Mit diesem Code
   synchronisieren</strong> bei. Gekoppelte Geräte im selben Netz gleichen sich danach von selbst ab,
-  solange die App läuft, unter Linux auch im Infobereich; der geteilte Ordner wird alle halbe Minute abgeglichen.
+  solange die App läuft, auch im Infobereich; der geteilte Ordner wird alle halbe Minute abgeglichen.
   Zum Koppeln, zum geteilten Ordner, zu Bündeln und Konflikten siehe
   <a href="sharing-and-sync.html#koppeln">Teilen und abgleichen</a>.
 </p>

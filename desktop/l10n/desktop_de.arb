@@ -45,7 +45,7 @@
   "alertsSwitch": "Benachrichtigungen auf diesem Computer",
   "alertsDetail": "Routinen, Erinnerungen und Stupser erscheinen als Benachrichtigungen, solange Old Brain Fix läuft, auch im Infobereich.",
   "autostartSwitch": "Beim Anmelden starten",
-  "autostartDetail": "Old Brain Fix startet beim Anmelden, damit Erinnerungen kommen, ohne dass du etwas startest; unter Linux mit Infobereich startet es dort ohne Fenster.",
+  "autostartDetail": "Old Brain Fix startet beim Anmelden, damit Erinnerungen kommen, ohne dass du etwas startest; es startet ohne Fenster im Infobereich, unter Linux, wo die Arbeitsumgebung einen hat.",
   "autostartFailed": "Das Starten beim Anmelden ließ sich nicht ändern.",
   "trayOpen": "Old Brain Fix öffnen",
   "trayQuit": "Beenden",

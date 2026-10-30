@@ -3,8 +3,7 @@
 //! date with its weekday (`yMEd`), and how a schedule repeats.
 
 use oldbrainfix_core::{
-    ClockTime, Day, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Schedule,
-    SimpleRepeat,
+    ClockTime, Day, Occurrence, RepeatKind, RepeatUnit, Schedule, SimpleRepeat,
 };
 
 use crate::l10n::L10n;
@@ -114,26 +113,13 @@ pub fn schedule_text(t: &L10n, schedule: &Schedule) -> String {
     format!("{} · {at}", repeat_text(t, schedule))
 }
 
-/// What the desktop's simple editor shows for `rule`: once, every N
-/// days, weeks, months or years, or chosen weekdays, without an end. The
-/// phone's monthly kinds and ends stay in the advanced mode here, so
-/// nothing of them is dropped on save.
-pub fn desktop_simple(rule: Option<&Recurrence>) -> Option<SimpleRepeat> {
-    SimpleRepeat::of(rule).filter(|simple| {
-        matches!(
-            simple.kind,
-            RepeatKind::Once | RepeatKind::Every | RepeatKind::Weekdays
-        ) && simple.end() == RepeatEnd::Never
-    })
-}
-
-/// How `schedule` repeats, in words, without its times.
+/// How `schedule` repeats, in words, without its times, with its end.
 pub fn repeat_text(t: &L10n, schedule: &Schedule) -> String {
     let rule = schedule.rule.as_ref();
-    let Some(simple) = desktop_simple(rule) else {
+    let Some(simple) = SimpleRepeat::of(rule) else {
         return t.rule_summary(&rule.map(|r| r.format()).unwrap_or_default());
     };
-    match simple.kind {
+    let repeat = match simple.kind {
         RepeatKind::Once => t.once_on(&day_text(t, schedule.start)),
         RepeatKind::Every => match simple.unit {
             RepeatUnit::Days => t.every_n_days(simple.every),
@@ -149,15 +135,41 @@ pub fn repeat_text(t: &L10n, schedule: &Schedule) -> String {
                 .collect::<Vec<_>>()
                 .join(", "),
         ),
-        // Not shown simply here; see `desktop_simple`.
-        RepeatKind::MonthDay | RepeatKind::MonthWeekday => {
-            t.rule_summary(&rule.map(|r| r.format()).unwrap_or_default())
-        }
+        RepeatKind::MonthDay => t.every_month_on_day(
+            simple.every,
+            simple.month_day.unwrap_or(i64::from(schedule.start.day)),
+        ),
+        RepeatKind::MonthWeekday => t.every_month_on_nth(
+            simple.every,
+            // `1` to `4`; anything else is the last.
+            &t.nth_word(
+                &simple
+                    .nth
+                    .and_then(|nth| nth.ordinal)
+                    .unwrap_or(-1)
+                    .to_string(),
+            ),
+            weekday_long(
+                t,
+                simple
+                    .nth
+                    .map_or(schedule.start.weekday(), |nth| nth.weekday),
+            ),
+        ),
+    };
+    if let Some(count) = simple.count {
+        return t.repeat_count(count, &repeat);
     }
+    if let Some(until) = simple.until {
+        return t.repeat_until(&repeat, &day_text(t, until));
+    }
+    repeat
 }
 
 #[cfg(test)]
 mod tests {
+    use oldbrainfix_core::Recurrence;
+
     use super::*;
 
     #[test]
@@ -188,13 +200,33 @@ mod tests {
             panic!("a Reminder")
         };
         assert_eq!(schedule_text(&en, &once), "Once, Mon, 10/26/2026 · All day");
-        let odd = Schedule::new(day, &[], Recurrence::parse("FREQ=MONTHLY;BYDAY=1MO").ok());
-        let Some(odd) = odd else { panic!("a schedule") };
-        assert!(repeat_text(&en, &odd).contains("FREQ=MONTHLY;BYDAY=1MO"));
-        let ends = Schedule::new(day, &[], Recurrence::parse("FREQ=DAILY;COUNT=3").ok());
-        let Some(ends) = ends else {
-            panic!("a schedule")
+        // The phone's monthly kinds and ends read as on the phone.
+        let repeat = |rule: &str| {
+            let schedule = Schedule::new(day, &[], Recurrence::parse(rule).ok());
+            let Some(schedule) = schedule else {
+                panic!("a schedule")
+            };
+            (repeat_text(&en, &schedule), repeat_text(&de, &schedule))
         };
-        assert!(repeat_text(&en, &ends).contains("FREQ=DAILY;COUNT=3"));
+        let (first_monday, erster_montag) = repeat("FREQ=MONTHLY;BYDAY=1MO");
+        assert_eq!(first_monday, en.every_month_on_nth(1, "first", "Monday"));
+        assert_eq!(
+            erster_montag,
+            de.every_month_on_nth(1, &de.nth_word("1"), "Montag")
+        );
+        let (last_friday, _) = repeat("FREQ=MONTHLY;INTERVAL=2;BYDAY=-1FR");
+        assert_eq!(last_friday, en.every_month_on_nth(2, "last", "Friday"));
+        let (fifteenth, _) = repeat("FREQ=MONTHLY;BYMONTHDAY=15");
+        assert_eq!(fifteenth, en.every_month_on_day(1, 15));
+        let (three_times, _) = repeat("FREQ=DAILY;COUNT=3");
+        assert_eq!(three_times, en.repeat_count(3, &en.every_n_days(1)));
+        let (until, _) = repeat("FREQ=WEEKLY;BYDAY=MO;UNTIL=20261130");
+        assert_eq!(
+            until,
+            en.repeat_until(&en.on_weekdays("Mon"), "Mon, 11/30/2026")
+        );
+        // What the simple editor cannot show reads as its rule.
+        let (odd, _) = repeat("FREQ=MONTHLY;BYDAY=1MO,2TU");
+        assert!(odd.contains("FREQ=MONTHLY;BYDAY=1MO,2TU"));
     }
 }

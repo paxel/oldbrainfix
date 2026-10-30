@@ -441,3 +441,29 @@ fn a_photo_pasted_in_the_popup_drops_the_list_and_none_is_offered_while_held() -
     assert_eq!(lines(&store, &list)?, ["Milk"]);
     Ok(())
 }
+
+#[test]
+fn a_list_picked_by_keyboard_or_screen_reader_closes_more() -> TestResult {
+    let (store, _, _) = store()?;
+    let mut harness = popup(&store);
+    harness.get_by(|n| n.is_focused()).type_text("Bread");
+    harness.run();
+    // No pointer click: the pick alone closes the menu.
+    pick(&mut harness, "Groceries");
+    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    assert!(
+        harness
+            .query_by_role_and_label(Role::RadioButton, "Groceries")
+            .is_none()
+    );
+    // The list picked again, in the "More" that holds only it, closes it
+    // too and keeps it.
+    pick(&mut harness, "Groceries");
+    assert!(
+        harness
+            .query_by_role_and_label(Role::RadioButton, "Groceries")
+            .is_none()
+    );
+    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    Ok(())
+}

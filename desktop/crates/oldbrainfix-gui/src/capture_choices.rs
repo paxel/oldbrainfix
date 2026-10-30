@@ -576,6 +576,9 @@ pub fn file_into_menu(ui: &mut Ui, t: &L10n, areas: &[(Area, Vec<Topic>)]) -> Op
                     ui.add_space(indent);
                     if ui.button(RichText::new(label).color(text)).clicked() {
                         picked = Some(id.to_string());
+                        // A pick closes the menu, also one by keyboard or
+                        // screen reader, which no pointer click closes.
+                        ui.close();
                     }
                 });
             };
@@ -605,8 +608,13 @@ fn shopping_picker(
     let mut picked = None;
     for (id, title) in lists {
         let on = current == Some(id.as_str());
-        if ui.radio(on, RichText::new(title).color(text)).clicked() && !on {
-            picked = Some(id.clone());
+        if ui.radio(on, RichText::new(title).color(text)).clicked() {
+            if !on {
+                picked = Some(id.clone());
+            }
+            // A pick closes the menu, also one by keyboard or screen
+            // reader, which no pointer click closes.
+            ui.close();
         }
     }
     picked

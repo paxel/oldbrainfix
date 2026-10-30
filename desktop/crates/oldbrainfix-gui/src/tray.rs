@@ -1,9 +1,42 @@
 //! The tray icon with Open, Capture and Quit. On Linux it is a
-//! StatusNotifierItem (ksni), which KDE, Xfce, Cinnamon and GNOME with
-//! the AppIndicator extension show; where no tray host runs, or on other
-//! systems, there is none and closing the window quits the app.
+//! StatusNotifierItem (ksni) on a thread of its own, which KDE, Xfce,
+//! Cinnamon and GNOME with the AppIndicator extension show; where no tray
+//! host runs there is none and closing the window quits the app. On
+//! Windows it sits in the notification area and on macOS in the menu bar
+//! (tray-icon); both hear it only while an event loop runs on the main
+//! thread, so it goes up inside the window's, and closing the window
+//! hides it there instead of ending that loop ([`IN_EVENT_LOOP`]).
 
 use std::sync::mpsc::Sender;
+
+/// Whether the tray lives in the window's event loop, as on Windows and
+/// macOS: it is put up once that loop runs, and the window hides into it
+/// rather than closing, so the loop goes on for as long as the app.
+pub const IN_EVENT_LOOP: bool = cfg!(any(windows, target_os = "macos"));
+
+/// What closing the window does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnClose {
+    /// The window hides; the app runs on in the tray (Windows, macOS).
+    Hide,
+    /// The window closes; the app runs on in the tray (Linux).
+    Close,
+    /// The window closes and the app ends.
+    Quit,
+}
+
+/// What closing the window does with `tray` up or not, the tray in the
+/// window's event loop when `in_event_loop`, while Quit was asked for
+/// when `quitting`.
+pub fn on_close(tray: bool, in_event_loop: bool, quitting: bool) -> OnClose {
+    if quitting || !tray {
+        OnClose::Quit
+    } else if in_event_loop {
+        OnClose::Hide
+    } else {
+        OnClose::Close
+    }
+}
 
 /// What the tray, a second start or a notification asks of the app.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +62,8 @@ pub struct Labels {
 pub struct Tray {
     #[cfg(target_os = "linux")]
     handle: ksni::blocking::Handle<Item>,
+    #[cfg(any(windows, target_os = "macos"))]
+    _icon: tray_icon::TrayIcon,
 }
 
 impl Drop for Tray {
@@ -38,22 +73,52 @@ impl Drop for Tray {
     }
 }
 
-/// The square icon of `size` pixels as ARGB32 rows, big-endian: the
-/// packaged 256 px icon, scaled down. Empty if it does not decode.
-pub fn icon_argb(size: i32) -> Vec<u8> {
-    let Ok(icon) = image::load_from_memory(crate::ICON) else {
-        return Vec::new();
-    };
+/// The packaged 256 px icon scaled down to `size` pixels square;
+/// `None` if it does not decode.
+fn icon_of(size: i32) -> Option<image::RgbaImage> {
+    let icon = image::load_from_memory(crate::ICON).ok()?;
     let side = size.max(1) as u32;
-    image::imageops::resize(
+    Some(image::imageops::resize(
         &icon.to_rgba8(),
         side,
         side,
         image::imageops::FilterType::Lanczos3,
-    )
-    .pixels()
-    .flat_map(|p| [p[3], p[0], p[1], p[2]])
-    .collect()
+    ))
+}
+
+/// The square icon of `size` pixels as ARGB32 rows, big-endian, as a
+/// StatusNotifierItem takes it. Empty if it does not decode.
+pub fn icon_argb(size: i32) -> Vec<u8> {
+    icon_of(size)
+        .map(|icon| {
+            icon.pixels()
+                .flat_map(|p| [p[3], p[0], p[1], p[2]])
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The square icon of `size` pixels as RGBA rows, as Windows and macOS
+/// take it. Empty if it does not decode.
+pub fn icon_rgba(size: i32) -> Vec<u8> {
+    icon_of(size)
+        .map(image::RgbaImage::into_raw)
+        .unwrap_or_default()
+}
+
+/// The ids of the tray menu's entries on Windows and macOS.
+const OPEN_ID: &str = "open";
+const CAPTURE_ID: &str = "capture";
+const QUIT_ID: &str = "quit";
+
+/// What the tray menu's entry `id` asks of the app.
+pub fn command_of(id: &str) -> Option<Command> {
+    match id {
+        OPEN_ID => Some(Command::Open),
+        CAPTURE_ID => Some(Command::Capture),
+        QUIT_ID => Some(Command::Quit),
+        _ => None,
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -145,8 +210,80 @@ pub fn spawn(
     }
 }
 
-/// Puts the tray icon up; there is none on this system yet.
-#[cfg(not(target_os = "linux"))]
+/// Puts the tray icon up, in the notification area on Windows and the
+/// menu bar on macOS; its menu, and on Windows a left click (Open), send
+/// to `commands` and then call `wake`. Call it on the main thread once
+/// its event loop runs. `None` where it cannot go up.
+#[cfg(any(windows, target_os = "macos"))]
+pub fn spawn(
+    labels: Labels,
+    commands: Sender<Command>,
+    wake: Box<dyn Fn() + Send>,
+) -> Option<Tray> {
+    use std::sync::{Arc, Mutex};
+    use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+    use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    let menu = Menu::new();
+    let open = MenuItem::with_id(OPEN_ID, &labels.open, true, None);
+    let capture = MenuItem::with_id(CAPTURE_ID, &labels.capture, true, None);
+    let quit = MenuItem::with_id(QUIT_ID, &labels.quit, true, None);
+    let separator = PredefinedMenuItem::separator();
+    if let Err(e) = menu.append_items(&[&open, &capture, &separator, &quit]) {
+        eprintln!("oldbrainfix: no tray: {e}");
+        return None;
+    }
+    // The handlers run on the main thread, `wake` behind a lock as it
+    // need not be shareable.
+    let wake = Mutex::new(wake);
+    let send = Arc::new(move |command: Command| {
+        let _ = commands.send(command);
+        if let Ok(wake) = wake.lock() {
+            wake();
+        }
+    });
+    {
+        let send = send.clone();
+        MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
+            if let Some(command) = command_of(event.id.as_ref()) {
+                send(command);
+            }
+        }));
+    }
+    // On Windows a left click opens the window and the right click the
+    // menu; on macOS either click opens the menu, as menu bar icons do.
+    // The handler takes every event, so none piles up unread.
+    TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
+        if cfg!(windows)
+            && let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+        {
+            send(Command::Open);
+        }
+    }));
+    let side = if cfg!(windows) { 32 } else { 64 };
+    let mut builder = TrayIconBuilder::new()
+        .with_menu(Box::new(menu))
+        .with_tooltip(&labels.title)
+        .with_menu_on_left_click(cfg!(target_os = "macos"));
+    match Icon::from_rgba(icon_rgba(side), side as u32, side as u32) {
+        Ok(icon) => builder = builder.with_icon(icon),
+        Err(e) => eprintln!("oldbrainfix: tray icon: {e}"),
+    }
+    match builder.build() {
+        Ok(icon) => Some(Tray { _icon: icon }),
+        Err(e) => {
+            eprintln!("oldbrainfix: no tray: {e}");
+            None
+        }
+    }
+}
+
+/// Puts the tray icon up; there is none on this system.
+#[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
 pub fn spawn(
     _labels: Labels,
     _commands: Sender<Command>,
@@ -162,6 +299,41 @@ mod tests {
     /// The pixel at `x`, `y` of a square ARGB icon `size` wide.
     fn at(icon: &[u8], size: usize, x: usize, y: usize) -> &[u8] {
         &icon[(y * size + x) * 4..(y * size + x) * 4 + 4]
+    }
+
+    #[test]
+    fn closing_the_window_hides_it_into_a_tray_in_its_event_loop() {
+        // Windows and macOS: the event loop goes on, the window hidden.
+        assert_eq!(on_close(true, true, false), OnClose::Hide);
+        // Linux: the window closes, ksni's thread keeps the tray.
+        assert_eq!(on_close(true, false, false), OnClose::Close);
+        // Without a tray nothing is left to come back to, and Quit ends
+        // the app with a tray too.
+        for in_event_loop in [true, false] {
+            assert_eq!(on_close(false, in_event_loop, false), OnClose::Quit);
+            assert_eq!(on_close(true, in_event_loop, true), OnClose::Quit);
+            assert_eq!(on_close(false, in_event_loop, true), OnClose::Quit);
+        }
+        assert_eq!(IN_EVENT_LOOP, cfg!(any(windows, target_os = "macos")));
+    }
+
+    #[test]
+    fn the_tray_menu_entries_ask_for_open_capture_and_quit() {
+        assert_eq!(command_of("open"), Some(Command::Open));
+        assert_eq!(command_of("capture"), Some(Command::Capture));
+        assert_eq!(command_of("quit"), Some(Command::Quit));
+        assert_eq!(command_of("about"), None);
+    }
+
+    #[test]
+    fn the_rgba_tray_icon_is_the_argb_one_reordered() {
+        let (argb, rgba) = (icon_argb(32), icon_rgba(32));
+        assert_eq!(rgba.len(), 32 * 32 * 4);
+        let reordered: Vec<u8> = rgba
+            .chunks(4)
+            .flat_map(|p| [p[3], p[0], p[1], p[2]])
+            .collect();
+        assert_eq!(reordered, argb);
     }
 
     #[test]

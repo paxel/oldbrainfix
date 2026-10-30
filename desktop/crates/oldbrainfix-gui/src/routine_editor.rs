@@ -1,8 +1,10 @@
 //! Making or changing a Routine or Reminder in the right pane, as the
 //! phone's Routine editor does: the Note it comes from (or a text for a
 //! new Note), its schedule in a simple editor (once, every N days, weeks,
-//! months or years, chosen weekdays) or as an RRULE in the advanced mode,
-//! its start day and times of day, the next Occurrences, its own Re-nag
+//! months or years, chosen weekdays, every N months on a day or on the
+//! Nth or last weekday, each but once ending never, on a day or after a
+//! number of times) or as an RRULE in the advanced mode, its start day
+//! and times of day, the next Occurrences, its own Re-nag
 //! interval or this Device's default, and Escalation. A Session (#104)
 //! has its pool, count, weekdays' counts and rule on top of the schedule
 //! ([`SessionDraft`]); Save says under each field what to fix. Save
@@ -16,16 +18,17 @@ use std::collections::BTreeSet;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use egui::{Id, RichText, TextEdit, Ui};
 use oldbrainfix_core::alarms::DEFAULT_ESCALATION;
+use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::{
-    ClockTime, Day, Note, Occurrence, Recurrence, RepeatKind, RepeatUnit, Routine, Routines,
-    Schedule, Session, SimpleRepeat, Store,
+    ClockTime, Day, Note, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Routine,
+    Routines, Schedule, Session, SimpleRepeat, Store,
 };
 
 use crate::app::{embossed, icon_button, pill, radio_column};
 use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::schedule_text::{clock_text, day_text, desktop_simple, occurrence_time, weekday_text};
+use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_long, weekday_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::theme::Tones;
 
@@ -37,6 +40,9 @@ pub const ESCALATION_CHOICES: [i64; 5] = [1, 2, 3, 5, 10];
 
 /// How many coming Occurrences the editor shows.
 const PREVIEW: usize = 3;
+
+/// The most times a repeat can end after, as on the phone.
+const MAX_COUNT: i64 = 99_999;
 
 /// What the user asked of the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +78,20 @@ pub struct RoutineEditor {
     pub every: i64,
     pub unit: RepeatUnit,
     pub weekdays: BTreeSet<u32>,
+    /// N in every N months, for the month kinds.
+    pub months: i64,
+    /// The day of the month; the start's until one is chosen.
+    pub month_day: Option<i64>,
+    /// 1 to 4 or -1 for the last, and the weekday; the start's position
+    /// in its month until they are chosen.
+    pub ordinal: Option<i64>,
+    pub nth_weekday: Option<u32>,
+    pub end: RepeatEnd,
+    /// The end day and number, kept while another end is chosen.
+    pub until: Option<Day>,
+    /// The end day as typed.
+    pub until_text: String,
+    pub count: i64,
     /// The RRULE of the advanced mode.
     pub rule: String,
     pub start: Day,
@@ -135,6 +155,14 @@ impl RoutineEditor {
             every: 1,
             unit: RepeatUnit::Days,
             weekdays: BTreeSet::new(),
+            months: 1,
+            month_day: None,
+            ordinal: None,
+            nth_weekday: None,
+            end: RepeatEnd::Never,
+            until: None,
+            until_text: String::new(),
+            count: 10,
             rule: String::new(),
             start,
             start_text: start.to_string(),
@@ -205,6 +233,14 @@ impl RoutineEditor {
             every: 1,
             unit: RepeatUnit::Days,
             weekdays: BTreeSet::new(),
+            months: 1,
+            month_day: None,
+            ordinal: None,
+            nth_weekday: None,
+            end: RepeatEnd::Never,
+            until: None,
+            until_text: String::new(),
+            count: 10,
             rule: schedule
                 .rule
                 .as_ref()
@@ -223,7 +259,7 @@ impl RoutineEditor {
             next: Vec::new(),
             session: None,
         };
-        match desktop_simple(schedule.rule.as_ref()) {
+        match SimpleRepeat::of(schedule.rule.as_ref()) {
             Some(simple) => editor.take_simple(&simple),
             None => editor.advanced = true,
         }
@@ -233,23 +269,74 @@ impl RoutineEditor {
 
     fn take_simple(&mut self, simple: &SimpleRepeat) {
         self.kind = simple.kind;
-        if simple.kind == RepeatKind::Every {
-            self.every = simple.every;
-            self.unit = simple.unit;
+        match simple.kind {
+            RepeatKind::Once => {}
+            RepeatKind::Every => {
+                self.every = simple.every;
+                self.unit = simple.unit;
+            }
+            RepeatKind::Weekdays => self.weekdays = simple.weekdays.clone(),
+            RepeatKind::MonthDay => {
+                self.months = simple.every;
+                self.month_day = simple.month_day;
+            }
+            RepeatKind::MonthWeekday => {
+                if let Some(nth) = simple.nth {
+                    self.months = simple.every;
+                    self.ordinal = nth.ordinal;
+                    self.nth_weekday = Some(nth.weekday);
+                }
+            }
         }
-        if simple.kind == RepeatKind::Weekdays {
-            self.weekdays = simple.weekdays.clone();
+        self.end = simple.end();
+        if let Some(until) = simple.until {
+            self.until = Some(until);
+            self.until_text = until.to_string();
+        }
+        if let Some(count) = simple.count {
+            self.count = count;
         }
     }
 
+    /// Where `day` lies in its month: the 1st to 4th of its weekday, or
+    /// -1 for a 5th, which is the last.
+    fn ordinal_of(day: Day) -> i64 {
+        let nth = i64::from((day.day - 1) / 7 + 1);
+        if nth > 4 { -1 } else { nth }
+    }
+
+    /// The end day, or a month after the start while none is chosen.
+    fn until_day(&self) -> Day {
+        self.until.unwrap_or_else(|| {
+            Day::new(
+                self.start.year,
+                i64::from(self.start.month) + 1,
+                i64::from(self.start.day),
+            )
+        })
+    }
+
+    /// The rule the simple editor shows.
     fn simple_rule(&self) -> Option<Recurrence> {
-        match self.kind {
-            RepeatKind::Once => None,
-            RepeatKind::Every => SimpleRepeat::every(self.every, self.unit).to_rule(),
-            RepeatKind::Weekdays => SimpleRepeat::weekdays(self.weekdays.clone()).to_rule(),
-            // `desktop_simple` keeps these in the advanced mode.
-            RepeatKind::MonthDay | RepeatKind::MonthWeekday => None,
-        }
+        let count = (self.end == RepeatEnd::Count).then_some(self.count);
+        let until = (self.end == RepeatEnd::Until).then(|| self.until_day());
+        let simple = match self.kind {
+            RepeatKind::Once => return None,
+            RepeatKind::Every => SimpleRepeat::every(self.every, self.unit),
+            RepeatKind::Weekdays => SimpleRepeat::weekdays(self.weekdays.clone()),
+            RepeatKind::MonthDay => SimpleRepeat::month_day(
+                self.month_day.unwrap_or(i64::from(self.start.day)),
+                self.months,
+            ),
+            RepeatKind::MonthWeekday => SimpleRepeat::month_weekday(
+                WeekdayRule {
+                    weekday: self.nth_weekday.unwrap_or(self.start.weekday()),
+                    ordinal: Some(self.ordinal.unwrap_or(Self::ordinal_of(self.start))),
+                },
+                self.months,
+            ),
+        };
+        simple.ending(count, until).to_rule()
     }
 
     /// Whether what is edited happens once.
@@ -486,6 +573,9 @@ impl RoutineEditor {
                         changed |= self.simple_editor(ui, t, tones);
                     }
                     changed |= self.start_editor(ui, t, once);
+                    if !self.advanced && self.kind != RepeatKind::Once {
+                        changed |= self.end_editor(ui, t);
+                    }
                 });
                 embossed(ui, tones, false, None, |ui| {
                     changed |= self.times_editor(ui, t, tones, once);
@@ -535,7 +625,7 @@ impl RoutineEditor {
             } else {
                 Recurrence::parse(text)
                     .ok()
-                    .and_then(|rule| desktop_simple(Some(&rule)))
+                    .and_then(|rule| SimpleRepeat::of(Some(&rule)))
             };
             if let Some(simple) = simple {
                 self.take_simple(&simple);
@@ -545,37 +635,40 @@ impl RoutineEditor {
     }
 
     fn simple_editor(&mut self, ui: &mut Ui, t: &L10n, tones: Tones) -> bool {
-        let mut changed = false;
         let text = ui.visuals().text_color();
-        ui.horizontal_wrapped(|ui| {
-            let kinds = [
-                (RepeatKind::Once, t.repeat_once()),
-                (RepeatKind::Every, t.repeat_every()),
-                (RepeatKind::Weekdays, t.repeat_weekdays()),
-            ];
-            for (kind, label) in kinds {
-                if pill(ui, tones, self.kind == kind, label).clicked() && self.kind != kind {
-                    self.kind = kind;
-                    if kind == RepeatKind::Weekdays && self.weekdays.is_empty() {
-                        self.weekdays.insert(self.start.weekday());
-                    }
-                    changed = true;
+        let mut kind = self.kind;
+        let kinds = [
+            (RepeatKind::Once, t.repeat_once()),
+            (RepeatKind::Every, t.repeat_every()),
+            (RepeatKind::Weekdays, t.repeat_weekdays()),
+            (RepeatKind::MonthDay, t.repeat_month_day()),
+            (RepeatKind::MonthWeekday, t.repeat_month_weekday()),
+        ];
+        radio_column(
+            ui,
+            &mut kind,
+            kinds.map(|(k, label)| (k, label.to_string())),
+        );
+        let mut changed = kind != self.kind;
+        if changed {
+            self.kind = kind;
+            match kind {
+                RepeatKind::Weekdays if self.weekdays.is_empty() => {
+                    self.weekdays.insert(self.start.weekday());
                 }
+                RepeatKind::MonthDay => {
+                    self.month_day.get_or_insert(i64::from(self.start.day));
+                }
+                RepeatKind::MonthWeekday => {
+                    self.ordinal.get_or_insert(Self::ordinal_of(self.start));
+                    self.nth_weekday.get_or_insert(self.start.weekday());
+                }
+                _ => {}
             }
-        });
+        }
         if self.kind == RepeatKind::Every {
             ui.label(RichText::new(t.every_label()).color(text));
-            ui.horizontal(|ui| {
-                if self.every > 1 && icon_button(ui, icons::REMOVE, t.fewer(), text).clicked() {
-                    self.every -= 1;
-                    changed = true;
-                }
-                ui.label(RichText::new(self.every.to_string()).strong().color(text));
-                if icon_button(ui, icons::ADD, t.more(), text).clicked() {
-                    self.every += 1;
-                    changed = true;
-                }
-            });
+            changed |= stepper(ui, t, &mut self.every, (1, None), None);
             let unit_text = |unit: RepeatUnit| match unit {
                 RepeatUnit::Days => t.unit_days(self.every),
                 RepeatUnit::Weeks => t.unit_weeks(self.every),
@@ -610,6 +703,96 @@ impl RoutineEditor {
                 }
             });
         }
+        if matches!(self.kind, RepeatKind::MonthDay | RepeatKind::MonthWeekday) {
+            changed |= self.month_editor(ui, t);
+        }
+        changed
+    }
+
+    /// The controls of the month kinds: every N months, and the day or
+    /// the Nth weekday.
+    fn month_editor(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        ui.label(RichText::new(t.every_label()).color(text));
+        let unit = t.unit_months(self.months);
+        let mut changed = stepper(ui, t, &mut self.months, (1, None), Some(&unit));
+        if self.kind == RepeatKind::MonthDay {
+            let mut day = self.month_day.unwrap_or(i64::from(self.start.day));
+            ui.label(RichText::new(t.day_of_month_label()).color(text));
+            if day > 28 {
+                ui.label(RichText::new(t.month_day_skipped()).small().color(weak));
+            }
+            if stepper(ui, t, &mut day, (1, Some(31)), None) {
+                self.month_day = Some(day);
+                changed = true;
+            }
+            return changed;
+        }
+        let mut ordinal = self.ordinal.unwrap_or(Self::ordinal_of(self.start));
+        ui.label(RichText::new(t.which_in_month_label()).color(text));
+        let ordinals = [1, 2, 3, 4, -1].map(|n| (n, t.nth_option(&n.to_string())));
+        if radio_column(ui, &mut ordinal, ordinals) {
+            self.ordinal = Some(ordinal);
+            changed = true;
+        }
+        let mut weekday = self.nth_weekday.unwrap_or(self.start.weekday());
+        ui.label(RichText::new(t.weekday_label()).color(text));
+        let weekdays = (1..=7).map(|day| (day, weekday_long(t, day).to_string()));
+        if radio_column(ui, &mut weekday, weekdays) {
+            self.nth_weekday = Some(weekday);
+            changed = true;
+        }
+        changed
+    }
+
+    /// How a repeat ends: never, on a day, or after a number of times.
+    fn end_editor(&mut self, ui: &mut Ui, t: &L10n) -> bool {
+        let text = ui.visuals().text_color();
+        let weak = ui.visuals().weak_text_color();
+        ui.label(RichText::new(t.ends_label()).color(text));
+        let mut end = self.end;
+        let ends = [
+            (RepeatEnd::Never, t.end_never()),
+            (RepeatEnd::Until, t.end_on_day()),
+            (RepeatEnd::Count, t.end_after_count()),
+        ];
+        radio_column(ui, &mut end, ends.map(|(e, label)| (e, label.to_string())));
+        let mut changed = end != self.end;
+        if changed {
+            self.end = end;
+            // The day offered first is kept from here on.
+            if end == RepeatEnd::Until && self.until.is_none() {
+                let day = self.until_day();
+                self.until = Some(day);
+                self.until_text = day.to_string();
+            }
+        }
+        match self.end {
+            RepeatEnd::Never => {}
+            RepeatEnd::Until => {
+                ui.label(RichText::new(t.end_last_day()).color(text));
+                let mut day = self.until_day();
+                let stepped = ui
+                    .horizontal_wrapped(|ui| {
+                        day_stepper(ui, t, &mut day, &mut self.until_text, "until day")
+                    })
+                    .inner;
+                if stepped {
+                    self.until = Some(day);
+                    changed = true;
+                }
+                if Day::parse(self.until_text.trim()) != Some(day) {
+                    ui.label(RichText::new(t.date_invalid()).color(ui.visuals().error_fg_color));
+                }
+            }
+            RepeatEnd::Count => {
+                ui.label(RichText::new(t.end_count_label()).color(text));
+                ui.label(RichText::new(t.end_count_explain()).small().color(weak));
+                let unit = t.unit_times(self.count);
+                changed |= stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), Some(&unit));
+            }
+        }
         changed
     }
 
@@ -632,36 +815,13 @@ impl RoutineEditor {
     }
 
     fn start_editor(&mut self, ui: &mut Ui, t: &L10n, once: bool) -> bool {
-        let mut changed = false;
         let text = ui.visuals().text_color();
-        ui.horizontal_wrapped(|ui| {
-            ui.label(RichText::new(if once { t.on_day() } else { t.starts_on() }).color(text));
-            if icon_button(ui, icons::PREVIOUS, t.day_before(), text).clicked() {
-                self.start = self.start.add_days(-1);
-                changed = true;
-            }
-            ui.label(RichText::new(day_text(t, self.start)).strong().color(text));
-            if icon_button(ui, icons::NEXT, t.day_after(), text).clicked() {
-                self.start = self.start.add_days(1);
-                changed = true;
-            }
-            if changed {
-                self.start_text = self.start.to_string();
-            }
-            let field = ui.add(
-                TextEdit::singleline(&mut self.start_text)
-                    .id(Id::new("start day"))
-                    .hint_text(t.date_hint())
-                    .text_color(text)
-                    .desired_width(110.0),
-            );
-            if field.changed()
-                && let Some(day) = Day::parse(self.start_text.trim())
-            {
-                self.start = day;
-                changed = true;
-            }
-        });
+        let changed = ui
+            .horizontal_wrapped(|ui| {
+                ui.label(RichText::new(if once { t.on_day() } else { t.starts_on() }).color(text));
+                day_stepper(ui, t, &mut self.start, &mut self.start_text, "start day")
+            })
+            .inner;
         if Day::parse(self.start_text.trim()) != Some(self.start) {
             ui.label(RichText::new(t.date_invalid()).color(ui.visuals().error_fg_color));
         }
@@ -780,6 +940,69 @@ impl RoutineEditor {
     }
 }
 
+/// A number from `min` to `max` with a minus and a plus button, and its
+/// `unit` after it; whether it changed.
+fn stepper(
+    ui: &mut Ui,
+    t: &L10n,
+    value: &mut i64,
+    (min, max): (i64, Option<i64>),
+    unit: Option<&str>,
+) -> bool {
+    let text = ui.visuals().text_color();
+    let mut changed = false;
+    ui.horizontal(|ui| {
+        if *value > min && icon_button(ui, icons::REMOVE, t.fewer(), text).clicked() {
+            *value -= 1;
+            changed = true;
+        }
+        ui.label(RichText::new(value.to_string()).strong().color(text));
+        if max.is_none_or(|max| *value < max)
+            && icon_button(ui, icons::ADD, t.more(), text).clicked()
+        {
+            *value += 1;
+            changed = true;
+        }
+        if let Some(unit) = unit {
+            ui.label(RichText::new(unit).color(text));
+        }
+    });
+    changed
+}
+
+/// A day with the day before and after as buttons and a field to type it
+/// in, `text` as typed, in a row; whether `day` changed.
+fn day_stepper(ui: &mut Ui, t: &L10n, day: &mut Day, text: &mut String, id: &str) -> bool {
+    let colour = ui.visuals().text_color();
+    let mut changed = false;
+    if icon_button(ui, icons::PREVIOUS, t.day_before(), colour).clicked() {
+        *day = day.add_days(-1);
+        changed = true;
+    }
+    ui.label(RichText::new(day_text(t, *day)).strong().color(colour));
+    if icon_button(ui, icons::NEXT, t.day_after(), colour).clicked() {
+        *day = day.add_days(1);
+        changed = true;
+    }
+    if changed {
+        *text = day.to_string();
+    }
+    let field = ui.add(
+        TextEdit::singleline(text)
+            .id(Id::new(id))
+            .hint_text(t.date_hint())
+            .text_color(colour)
+            .desired_width(110.0),
+    );
+    if field.changed()
+        && let Some(typed) = Day::parse(text.trim())
+    {
+        *day = typed;
+        changed = true;
+    }
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -827,5 +1050,54 @@ mod tests {
             (editor.kind, editor.every, editor.unit),
             (RepeatKind::Every, 3, RepeatUnit::Days)
         );
+    }
+
+    #[test]
+    fn the_monthly_kinds_and_ends_stay_in_the_simple_mode() {
+        let mut editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
+        for rule in [
+            "FREQ=MONTHLY;INTERVAL=2;COUNT=5;BYDAY=-1FR",
+            "FREQ=MONTHLY;UNTIL=20270131;BYMONTHDAY=31",
+            "FREQ=WEEKLY;COUNT=8;BYDAY=MO,TH",
+        ] {
+            editor.advanced = true;
+            editor.rule = rule.into();
+            editor.update();
+            editor.switch_mode(false);
+            editor.update();
+            assert!(!editor.advanced, "{rule}");
+            let Some(rule_back) = editor.simple_rule() else {
+                panic!("a rule for {rule}")
+            };
+            assert_eq!(rule_back.format(), rule);
+        }
+        assert_eq!(editor.end, RepeatEnd::Count);
+        assert_eq!(editor.count, 8);
+        // The last-Friday kind kept its choices while another was shown.
+        editor.kind = RepeatKind::MonthWeekday;
+        assert_eq!((editor.ordinal, editor.nth_weekday), (Some(-1), Some(5)));
+    }
+
+    #[test]
+    fn a_new_monthly_repeat_starts_from_the_start_day() {
+        // Saturday, 24 October 2026: the fourth Saturday of its month.
+        let mut editor = RoutineEditor::new(None, false, now(), &utc_wall, Duration::minutes(10));
+        editor.kind = RepeatKind::MonthWeekday;
+        editor.update();
+        assert_eq!(
+            editor.simple_rule().map(|r| r.format()).as_deref(),
+            Some("FREQ=MONTHLY;BYDAY=4SA")
+        );
+        editor.kind = RepeatKind::MonthDay;
+        editor.end = RepeatEnd::Until;
+        editor.update();
+        // A month after the start while no end day is chosen.
+        assert_eq!(
+            editor.simple_rule().map(|r| r.format()).as_deref(),
+            Some("FREQ=MONTHLY;UNTIL=20261124;BYMONTHDAY=24")
+        );
+        // The 31st of October is a fifth weekday: the last.
+        assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 31)), -1);
+        assert_eq!(RoutineEditor::ordinal_of(Day::new(2026, 10, 28)), 4);
     }
 }

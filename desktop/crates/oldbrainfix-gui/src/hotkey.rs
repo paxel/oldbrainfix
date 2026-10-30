@@ -5,8 +5,9 @@
 //! neither works there is no hotkey, and a key bound to
 //! `oldbrainfix capture` in the desktop's own settings stands in.
 //!
-//! On Windows and macOS the key is only heard while the window or the
-//! popup runs, as the app has no tray there yet.
+//! On Windows and macOS the key is heard through the window's event
+//! loop, which runs for as long as the app, the window hidden into the
+//! tray while closed; without a tray, closing the window ends the app.
 
 use std::fmt;
 use std::str::FromStr;

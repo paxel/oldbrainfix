@@ -9,9 +9,10 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use egui::accesskit::{Role, Toggled};
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
+use oldbrainfix_core::schedule::WeekdayRule;
 use oldbrainfix_core::{
-    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, Schedule, SigningKey, Store,
-    WireEntry, parse_time,
+    ClockTime, Day, DeviceSettings, Notes, Occurrence, Routines, Schedule, SigningKey,
+    SimpleRepeat, Store, WireEntry, parse_time,
 };
 use oldbrainfix_gui::autostart::Autostart;
 use oldbrainfix_gui::{App, Selection};
@@ -375,6 +376,102 @@ fn the_unit_of_every_n_is_a_column_of_radio_buttons_below_the_stepper() -> TestR
     assert_eq!(
         routine.schedule.rule.map(|r| r.format()).as_deref(),
         Some("FREQ=WEEKLY;INTERVAL=2")
+    );
+    Ok(())
+}
+
+/// Whether the radio button `label` is on.
+fn picked(harness: &Harness<'_, App>, label: &str) -> bool {
+    radio(harness, label).accesskit_node().toggled() == Some(Toggled::True)
+}
+
+/// The `n`th plus button of the steppers shown, from the top.
+fn plus<'a>(harness: &'a Harness<'_, App>, n: usize) -> egui_kittest::Node<'a> {
+    harness
+        .query_all_by(|node| node.role() == Role::Button && node.label().as_deref() == Some("More"))
+        .nth(n)
+        .unwrap_or_else(|| panic!("no plus button {n}"))
+}
+
+#[test]
+fn the_simple_editor_repeats_on_the_last_weekday_of_a_month_a_number_of_times() -> TestResult {
+    // Sunday, 25 October 2026: the fourth Sunday of its month.
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    harness.get_by_label("New Routine or Reminder").click();
+    harness.run();
+    type_into(&mut harness, "What is to be done?", "Descale the kettle");
+    // The kinds are one column of radio buttons.
+    let kinds: Vec<_> = [
+        "Once",
+        "Every …",
+        "Weekdays",
+        "Monthly on a day",
+        "Monthly on a weekday",
+    ]
+    .iter()
+    .map(|k| radio(&harness, k).rect())
+    .collect();
+    assert!(kinds.windows(2).all(|w| w[0].bottom() <= w[1].top()));
+    radio(&harness, "Monthly on a weekday").click();
+    harness.run();
+    // The start's place in its month until another is chosen.
+    assert!(picked(&harness, "Fourth"));
+    assert!(picked(&harness, "Sunday"));
+    assert!(picked(&harness, "Never"));
+    radio(&harness, "Last").click();
+    harness.run();
+    radio(&harness, "Friday").click();
+    harness.run();
+    radio(&harness, "After a number of times").click();
+    harness.run();
+    assert!(shows(&harness, "How many times"));
+    assert!(shows(&harness, "Each time of day counts separately."));
+    // Every N months first, the number of times below.
+    plus(&harness, 1).click();
+    harness.run();
+    assert!(shows(&harness, "11"));
+    harness.get_by_label("Save").click();
+    harness.run();
+    let routine = routine_of(harness.state(), "Descale the kettle")?;
+    let last_friday = WeekdayRule {
+        weekday: 5,
+        ordinal: Some(-1),
+    };
+    assert_eq!(
+        SimpleRepeat::of(routine.schedule.rule.as_ref()),
+        Some(SimpleRepeat::month_weekday(last_friday, 1).ending(Some(11), None))
+    );
+    Ok(())
+}
+
+#[test]
+fn the_simple_editor_repeats_on_a_day_of_the_month_until_a_day() -> TestResult {
+    let mut harness = harness("2026-10-25T11:00:00.000Z", "en")?;
+    harness.get_by_label("New Routine or Reminder").click();
+    harness.run();
+    type_into(&mut harness, "What is to be done?", "Clean the gutters");
+    radio(&harness, "Monthly on a day").click();
+    harness.run();
+    assert!(shows(&harness, "Day of the month"));
+    assert!(!shows(&harness, "Months without this day are skipped."));
+    // From the start's 25th to the 29th, which some months lack.
+    for _ in 0..4 {
+        plus(&harness, 1).click();
+        harness.run();
+    }
+    assert!(shows(&harness, "29"));
+    assert!(shows(&harness, "Months without this day are skipped."));
+    radio(&harness, "On a day").click();
+    harness.run();
+    // A month after the start until another day is set.
+    assert!(shows(&harness, "Last day"));
+    type_over(&mut harness, "2026-11-25", "2027-03-31");
+    harness.get_by_label("Save").click();
+    harness.run();
+    let routine = routine_of(harness.state(), "Clean the gutters")?;
+    assert_eq!(
+        SimpleRepeat::of(routine.schedule.rule.as_ref()),
+        Some(SimpleRepeat::month_day(29, 1).ending(None, Some(Day::new(2027, 3, 31))))
     );
     Ok(())
 }

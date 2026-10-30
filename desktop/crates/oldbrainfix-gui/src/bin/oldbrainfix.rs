@@ -2,8 +2,11 @@
 //! tray, the capture hotkey and the login start, and opens the native
 //! window, which hands every frame to `oldbrainfix_gui::App`. Closing the
 //! window leaves the app running in the tray, where Open brings the
-//! window back; without a tray, closing it quits. `--tray` (the login
-//! start) starts without the window. A second start hands its wish to the
+//! window back; without a tray, closing it quits. On Linux the window
+//! closes and the tray runs on its own thread; on Windows and macOS the
+//! tray is heard only through the window's event loop, so the window
+//! hides instead and its loop runs for as long as the app. `--tray` (the
+//! login start) starts without the window. A second start hands its wish to the
 //! running app and ends. A database a newer version saved opens nothing:
 //! a window of its own says so, whatever the start, and the command line
 //! prints it.
@@ -52,7 +55,7 @@ use oldbrainfix_gui::ring::SpeakerRinger;
 use oldbrainfix_gui::speech::SpeechModel;
 use oldbrainfix_gui::store_needs_update::StoreNeedsUpdateView;
 use oldbrainfix_gui::sync_view::{device_name, import_bundle_text};
-use oldbrainfix_gui::tray::{self, Command};
+use oldbrainfix_gui::tray::{self, Command, OnClose, Tray};
 use oldbrainfix_gui::{App, instance, local_wall};
 
 /// The window's context while it is open, to wake it from other threads.
@@ -73,6 +76,15 @@ fn wake(window: &Window) {
     }
 }
 
+/// Wakes the window, from any thread.
+fn waker(window: &Window) -> Box<dyn Fn() + Send> {
+    let window = window.clone();
+    Box::new(move || wake(&window))
+}
+
+/// The tray once it is up; shared by the windows.
+type TrayHeld = Rc<RefCell<Option<Tray>>>;
+
 fn waiting(commands: &Mutex<Receiver<Command>>) -> Vec<Command> {
     match commands.lock() {
         Ok(rx) => rx.try_iter().collect(),
@@ -89,18 +101,22 @@ struct Native {
     app: App,
     commands: Arc<Mutex<Receiver<Command>>>,
     quit: Arc<AtomicBool>,
-    /// Whether closing the window leaves the app in the tray.
-    tray: bool,
+    /// The tray: closing the window leaves the app there.
+    tray: TrayHeld,
+    /// Whether the window is to hide into the tray at once, as a login
+    /// start on Windows and macOS runs.
+    start_hidden: bool,
     new_popup: NewPopup,
     popup: Option<CapturePopup>,
 }
 
 impl eframe::App for Native {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        App::install(ui.ctx());
+    /// Runs while the window is hidden too, which `ui` does not.
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        App::install(ctx);
         for command in waiting(&self.commands) {
             match command {
-                Command::Open => focus(ui.ctx()),
+                Command::Open => focus(ctx),
                 // The window stays where it is, so the keyboard goes back
                 // to whatever had it once the popup closes.
                 Command::Capture => match &mut self.popup {
@@ -109,23 +125,40 @@ impl eframe::App for Native {
                 },
                 Command::Quit => {
                     self.quit.store(true, Ordering::SeqCst);
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    ctx.request_repaint();
                 }
             }
         }
-        if !self.tray && ui.input(|i| i.viewport().close_requested()) {
-            self.quit.store(true, Ordering::SeqCst);
+        let tray = self.tray.borrow().is_some();
+        // Without a tray it stays, or nothing would bring it back.
+        if std::mem::take(&mut self.start_hidden) && tray {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
         }
-        self.app.show(ui);
+        if ctx.input(|i| i.viewport().close_requested()) {
+            let quitting = self.quit.load(Ordering::SeqCst);
+            match tray::on_close(tray, tray::IN_EVENT_LOOP, quitting) {
+                OnClose::Hide => {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                    // Kept as closing the window keeps it.
+                    self.app.flush();
+                }
+                OnClose::Close => {}
+                OnClose::Quit => self.quit.store(true, Ordering::SeqCst),
+            }
+        }
         if let Some(popup) = &mut self.popup {
             let builder = popup.viewport();
-            let outcome = ui
-                .ctx()
-                .show_viewport_immediate(popup_id(), builder, |ui, _| popup.show(ui));
+            let outcome = ctx.show_viewport_immediate(popup_id(), builder, |ui, _| popup.show(ui));
             if outcome == Outcome::Closed {
                 self.popup = None;
             }
         }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.app.show(ui);
     }
 
     fn on_exit(&mut self) {
@@ -171,6 +204,8 @@ impl eframe::App for PopupWindow {
 }
 
 fn focus(ctx: &egui::Context) {
+    // Hidden into the tray on Windows and macOS.
+    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
     ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
     ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
 }
@@ -197,6 +232,10 @@ struct Shell {
     changes_wanted: Arc<AtomicBool>,
     /// Files for the window to open.
     handed: Arc<Mutex<Vec<std::path::PathBuf>>>,
+    tray: TrayHeld,
+    /// The tray's texts and where it sends, until it goes up in the first
+    /// event loop (Windows, macOS).
+    tray_wanted: RefCell<Option<(tray::Labels, Sender<Command>)>>,
 }
 
 impl Shell {
@@ -218,6 +257,11 @@ impl Shell {
                 if let Ok(mut held) = window.lock() {
                     *held = Some(cc.egui_ctx.clone());
                 }
+                // On the main thread with its event loop running, where
+                // Windows and macOS put a tray up.
+                if let Some((labels, commands)) = self.tray_wanted.borrow_mut().take() {
+                    *self.tray.borrow_mut() = tray::spawn(labels, commands, waker(&window));
+                }
                 Ok(app)
             }),
         );
@@ -227,9 +271,9 @@ impl Shell {
         ran.map_err(|e| e.to_string())
     }
 
-    /// Opens the window and runs it until it closes; whether the app is
-    /// to quit.
-    fn window(&self, tray: bool) -> Result<bool, String> {
+    /// Opens the window, at once hidden into the tray when `hidden`, and
+    /// runs it until it closes; whether the app is to quit.
+    fn window(&self, hidden: bool) -> Result<bool, String> {
         let mut app = App::new(self.store.clone(), self.locale);
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
@@ -261,12 +305,15 @@ impl Shell {
             app,
             commands: self.commands.clone(),
             quit: quit.clone(),
-            tray,
+            tray: self.tray.clone(),
+            start_hidden: hidden,
             new_popup: self.new_popup.clone(),
             popup: None,
         };
         self.run(viewport, Box::new(native))?;
-        Ok(quit.load(Ordering::SeqCst) || !tray)
+        // Where the tray lives in the window's event loop, its end is the
+        // app's: nothing hears the tray or the hotkey after it.
+        Ok(quit.load(Ordering::SeqCst) || self.tray.borrow().is_none() || tray::IN_EVENT_LOOP)
     }
 
     /// Opens the capture popup on its own and runs it until it closes;
@@ -458,10 +505,6 @@ fn run() -> Result<i32, String> {
     let window: Window = Arc::new(Mutex::new(None));
     let (command_tx, command_rx) = std::sync::mpsc::channel::<Command>();
     let commands = Arc::new(Mutex::new(command_rx));
-    let waker = |window: &Window| -> Box<dyn Fn() + Send> {
-        let window = window.clone();
-        Box::new(move || wake(&window))
-    };
 
     // The alarm layer, on its own thread for as long as the app runs.
     let (events_tx, events_rx) = std::sync::mpsc::channel::<Event>();
@@ -636,7 +679,16 @@ fn run() -> Result<i32, String> {
         capture: t.capture_tooltip().into(),
         quit: t.tray_quit().into(),
     };
-    let tray = tray::spawn(labels, command_tx.clone(), waker(&window));
+    // On Linux on ksni's own thread, now; on Windows and macOS in the
+    // window's event loop, once it runs.
+    let tray: TrayHeld = Rc::default();
+    let mut tray_wanted = None;
+    if tray::IN_EVENT_LOOP {
+        tray_wanted = Some((labels, command_tx.clone()));
+    } else {
+        *tray.borrow_mut() = tray::spawn(labels, command_tx.clone(), waker(&window));
+    }
+    let asked = command_tx.clone();
 
     // On the main thread, where Windows and macOS hear the key.
     let chord = DeviceSettings::new(&store)
@@ -673,12 +725,26 @@ fn run() -> Result<i32, String> {
         unsorted_wanted,
         changes_wanted,
         handed,
+        tray: tray.clone(),
+        tray_wanted: RefCell::new(tray_wanted),
     };
+    if tray::IN_EVENT_LOOP {
+        // Windows, macOS: the window runs for as long as the app, hidden
+        // into the tray unless it was asked for, the popup over it.
+        if first == Some(Command::Capture) {
+            let _ = asked.send(Command::Capture);
+        }
+        shell.window(first != Some(Command::Open))?;
+    }
     // A login start stays in the tray; without one it shows the window.
-    let mut next = first.or(tray.is_none().then_some(Command::Open));
+    let mut next = first.or(tray.borrow().is_none().then_some(Command::Open));
     loop {
+        // There the window's loop has ended, and the app with it.
+        if tray::IN_EVENT_LOOP {
+            break;
+        }
         let quit = match next.take() {
-            Some(Command::Open) => shell.window(tray.is_some())?,
+            Some(Command::Open) => shell.window(false)?,
             Some(Command::Capture) => match shell.popup()? {
                 Some(Command::Open) => {
                     next = Some(Command::Open);
@@ -686,7 +752,7 @@ fn run() -> Result<i32, String> {
                 }
                 Some(Command::Quit) => true,
                 // Without a tray nothing is left to come back to.
-                _ => tray.is_none(),
+                _ => tray.borrow().is_none(),
             },
             Some(Command::Quit) => true,
             None => false,
@@ -706,7 +772,7 @@ fn run() -> Result<i32, String> {
             Err(_) => break,
         }
     }
-    drop(tray);
+    drop(tray.borrow_mut().take());
     // The mDNS record says goodbye before the app ends.
     auto_stop.store(true, Ordering::SeqCst);
     let _ = auto_sync.join();
