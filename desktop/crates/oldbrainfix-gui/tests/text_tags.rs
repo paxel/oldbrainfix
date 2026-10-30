@@ -176,8 +176,11 @@ fn a_sections_tag_searches_for_it_on_the_card_and_in_the_editor() -> TestResult 
 fn the_editors_field_colours_a_tag_and_links_none() -> TestResult {
     let g = garden()?;
     let harness = window(&g.store, Selection::All, Some(&g.tagged));
+    // The field with a text: the empty capture field is one too.
     let field = harness
-        .query_by(|n| n.role() == Role::MultilineTextInput)
+        .query_by(|n| {
+            n.role() == Role::MultilineTextInput && n.value().is_some_and(|v| !v.is_empty())
+        })
         .and_then(|n| n.value());
     assert_eq!(field.as_deref(), Some("Seeds for the #Garten"));
     // The card's link alone.

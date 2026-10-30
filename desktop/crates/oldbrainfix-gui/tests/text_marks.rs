@@ -108,10 +108,13 @@ fn stored(store: &Store, note: &str) -> Result<String, Box<dyn std::error::Error
     Ok(Notes::new(store).by_id(note)?.ok_or("the Note")?.text)
 }
 
-/// The text the editor's field holds.
+/// The text the editor's field holds: the field of many lines with a
+/// text, as the empty capture field above the cards is one too.
 fn field(harness: &Harness<'_, App>) -> Option<String> {
     harness
-        .query_by(|n| n.role() == Role::MultilineTextInput)
+        .query_by(|n| {
+            n.role() == Role::MultilineTextInput && n.value().is_some_and(|v| !v.is_empty())
+        })
         .and_then(|n| n.value())
 }
 
