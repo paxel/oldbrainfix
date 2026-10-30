@@ -1,18 +1,35 @@
 import 'dart:convert';
 
+import 'markdown.dart';
+
 /// The formats of user text (ADR 0018): the text of a Note or a Section
-/// is stored with the format it is in. This version knows only [plain];
-/// formatted text comes later (#57).
+/// is stored with the format it is in. This version knows [plain] and
+/// [markdown].
 abstract final class TextFormats {
   /// Text as typed, without formatting.
   static const plain = 'plain';
 
+  /// Formatted text, the subset of Markdown [Markdown] reads (ADR 0033).
+  /// A text stays plain until it is first formatted, and is formatted
+  /// from then on.
+  static const markdown = 'markdown';
+
   /// Every format this version reads and writes.
-  static const known = {plain};
+  static const known = {plain, markdown};
 
   /// The newest structure of the stored value this version knows: `v` 1
   /// holds `format` and `text` and nothing else.
   static const version = 1;
+
+  /// [text] in [format] as it reads without its marks, for search and
+  /// previews; a text in any other format as it is.
+  static String visible(String format, String text) =>
+      format == markdown ? Markdown.plain(text) : text;
+
+  /// The plain text [text] as it is written into a text in [format] to
+  /// read as itself, such as a Transcript put into a Note's text.
+  static String literal(String format, String text) =>
+      format == markdown ? Markdown.escape(text) : text;
 }
 
 /// A user text as stored: its [format], its [text], the source text for a
@@ -38,7 +55,7 @@ class StoredText {
 
   const StoredText._(this.format, this.text, this.version, this.editable);
 
-  /// [text] as plain text, the only format this version writes.
+  /// [text] as plain text.
   const StoredText.plain(this.text)
     : format = TextFormats.plain,
       version = TextFormats.version,
@@ -93,6 +110,9 @@ class StoredText {
     final known = TextFormats.known.contains(format);
     return StoredText._(format, text, version, known && json.length == keys);
   }
+
+  /// The text as it reads without its marks ([TextFormats.visible]).
+  String get visible => TextFormats.visible(format, text);
 
   /// The value it is stored as; version 1, the default, says no `v`.
   String encode() => jsonEncode({

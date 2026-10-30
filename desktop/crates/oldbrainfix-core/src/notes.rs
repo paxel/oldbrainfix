@@ -13,7 +13,7 @@ use crate::entry::{dart_iso, parse_time};
 use crate::named_places::{Coordinates, NamedPlace, NamedPlaces};
 use crate::places::Places;
 use crate::store::{Fields, Store};
-use crate::text_format::StoredText;
+use crate::text_format::{self, StoredText};
 use crate::transcript_prompts::dart_trim;
 use crate::{Error, Result};
 
@@ -253,6 +253,11 @@ pub struct Note {
 }
 
 impl Note {
+    /// `text` as it reads without its marks, for search and previews.
+    pub fn visible_text(&self) -> String {
+        text_format::visible(&self.text_format, &self.text)
+    }
+
     pub fn is_trashed(&self) -> bool {
         self.trashed.is_some()
     }
@@ -324,6 +329,23 @@ pub struct Section {
     pub removed_photo_texts: Vec<String>,
 }
 
+/// An error unless `format` is a format this version writes.
+fn require_format(format: &str) -> Result<()> {
+    if text_format::KNOWN.contains(&format) {
+        Ok(())
+    } else {
+        Err(Error::Invalid(format!("not a format known here: {format}")))
+    }
+}
+
+impl Section {
+    /// `text` as it reads without its marks, as for
+    /// [`Note::visible_text`].
+    pub fn visible_text(&self) -> String {
+        text_format::visible(&self.text_format, &self.text)
+    }
+}
+
 /// A Note's photos or recordings, their texts and those removed.
 type Waiting<'n> = (
     &'n Vec<String>,
@@ -368,7 +390,19 @@ impl<'a> Notes<'a> {
         place: Option<&str>,
         nudge_in: Option<Duration>,
     ) -> Result<Note> {
-        self.capture_with(text, place, nudge_in, &[], &[])
+        self.capture_full(text, text_format::PLAIN, place, nudge_in, &[], &[])
+    }
+
+    /// Captures a new Note as [`Notes::capture`] does, its text in
+    /// `format`.
+    pub fn capture_as(
+        &self,
+        text: &str,
+        format: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+    ) -> Result<Note> {
+        self.capture_full(text, format, place, nudge_in, &[], &[])
     }
 
     /// Captures a new Note as [`Notes::capture`] does, with `photos` and
@@ -382,6 +416,26 @@ impl<'a> Notes<'a> {
         photos: &[Vec<u8>],
         recordings: &[Vec<u8>],
     ) -> Result<Note> {
+        self.capture_full(
+            text,
+            text_format::PLAIN,
+            place,
+            nudge_in,
+            photos,
+            recordings,
+        )
+    }
+
+    fn capture_full(
+        &self,
+        text: &str,
+        format: &str,
+        place: Option<&str>,
+        nudge_in: Option<Duration>,
+        photos: &[Vec<u8>],
+        recordings: &[Vec<u8>],
+    ) -> Result<Note> {
+        require_format(format)?;
         if let Some(place) = place
             && !Places::new(self.store).is_place(place)?
         {
@@ -410,7 +464,7 @@ impl<'a> Notes<'a> {
             let s = self.store;
             s.append(&id, keys::TYPE, Some(keys::TYPE_NOTE), at)?;
             s.append(&id, keys::CAPTURED, Some(&dart_iso(now)), at)?;
-            let text = StoredText::plain(text).encode();
+            let text = StoredText::of(format, text, text_format::VERSION).encode();
             s.append(&id, keys::TEXT, Some(&text), at)?;
             if let Some(place) = place {
                 s.append(&id, keys::PLACE, Some(place), at)?;
@@ -693,8 +747,22 @@ impl<'a> Notes<'a> {
 
     /// Fixes the text of the Note `note_id` in place. The old text stays
     /// in the log only. A text in a format this version does not know is
-    /// never overwritten (ADR 0018).
+    /// never overwritten (ADR 0018). The text keeps the Note's format.
     pub fn edit(&self, note_id: &str, text: &str) -> Result<()> {
+        self.edit_in(note_id, text, None)
+    }
+
+    /// Fixes the text of the Note `note_id` as [`Notes::edit`] does, in
+    /// `format`; a formatted text stays formatted, whatever `format` says
+    /// (ADR 0033).
+    pub fn edit_as(&self, note_id: &str, text: &str, format: &str) -> Result<()> {
+        self.edit_in(note_id, text, Some(format))
+    }
+
+    fn edit_in(&self, note_id: &str, text: &str, format: Option<&str>) -> Result<()> {
+        if let Some(format) = format {
+            require_format(format)?;
+        }
         let Some(note) = self.by_id(note_id)? else {
             return Err(Error::Invalid(format!("not a Note: {note_id}")));
         };
@@ -703,22 +771,71 @@ impl<'a> Notes<'a> {
                 "the text of {note_id} is in a format not known here"
             )));
         }
-        let text = StoredText::plain(Self::text(text)?).encode();
+        let written = if note.text_format == text_format::MARKDOWN {
+            text_format::MARKDOWN
+        } else {
+            format.unwrap_or(&note.text_format)
+        };
+        let text = StoredText::of(written, Self::text(text)?, text_format::VERSION).encode();
         self.store
             .append(note_id, keys::TEXT, Some(&text), None)
             .map(drop)
     }
 
+    /// Puts the text of the Note `note_id` in `format` as it is: a plain
+    /// text becomes formatted, for its first format. A formatted text
+    /// stays formatted, and nothing is written when the format is the
+    /// same.
+    pub fn set_format(&self, note_id: &str, format: &str) -> Result<()> {
+        require_format(format)?;
+        let Some(note) = self.by_id(note_id)? else {
+            return Err(Error::Invalid(format!("not a Note: {note_id}")));
+        };
+        if note.text_format == format
+            || note.text_format == text_format::MARKDOWN
+            || note.text.trim().is_empty()
+        {
+            return Ok(());
+        }
+        self.edit_in(note_id, &note.text, Some(format))
+    }
+
+    /// Takes the Transcript or Photo Text `generated` over into the text
+    /// of the Note `note_id` (ADR 0025): it becomes the text, or with
+    /// `append` goes on a line of its own after it. Into a formatted text
+    /// it goes as plain text, escaped so that it reads as itself. Gives
+    /// the text written.
+    pub fn take_over(&self, note_id: &str, generated: &str, append: bool) -> Result<String> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Err(Error::Invalid(format!("not a Note: {note_id}")));
+        };
+        let taken = text_format::literal(&note.text_format, generated);
+        let joined = if !append || note.text.trim().is_empty() {
+            taken
+        } else {
+            format!("{}\n{}", note.text.trim_end(), taken)
+        };
+        self.edit(note_id, &joined)?;
+        Ok(Self::text(&joined)?.to_string())
+    }
+
     /// Amends the Note `note_id` with a new Section holding `text`,
     /// captured at the store's now.
     pub fn amend(&self, note_id: &str, text: &str) -> Result<Section> {
+        self.amend_as(note_id, text, text_format::PLAIN)
+    }
+
+    /// Amends the Note `note_id` as [`Notes::amend`] does, the Section's
+    /// text in `format`.
+    pub fn amend_as(&self, note_id: &str, text: &str, format: &str) -> Result<Section> {
+        require_format(format)?;
         self.require_note(note_id)?;
         if !self.store.may_write_in(note_id)? {
             return Err(Error::Invalid(format!(
                 "no role in the Shared Area of {note_id}"
             )));
         }
-        let text = StoredText::plain(Self::text(text)?).encode();
+        let text = StoredText::of(format, Self::text(text)?, text_format::VERSION).encode();
         let id = format!("section:{}", self.store.new_id()?);
         let now = self.store.now();
         let at = Some(now);
@@ -1318,6 +1435,88 @@ mod tests {
         assert_eq!(texts("note:never-synced"), ["orphan"]);
         assert_eq!(read.get("note:unknown"), Some(&Vec::new()));
         assert!(notes.sections_of(&[])?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_plain_text_becomes_formatted_at_its_first_format_and_stays_so() -> Result<()> {
+        use crate::text_format::{MARKDOWN, PLAIN};
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let shop = notes.capture_as("# Shop", MARKDOWN, None, None)?;
+        assert_eq!(
+            store.current(&shop.id, keys::TEXT)?.as_deref(),
+            Some(r##"{"format":"markdown","text":"# Shop"}"##)
+        );
+        let section = notes.amend_as(&shop.id, "~~old~~ new", MARKDOWN)?;
+        assert_eq!(section.visible_text(), "old new");
+        assert!(notes.capture_as("x", "x-future", None, None).is_err());
+        let note = notes.capture("Call mum", None, None)?;
+        notes.edit(&note.id, "Call mum later")?;
+        let format =
+            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
+        assert_eq!(format(&note.id)?.as_deref(), Some(PLAIN));
+        notes.edit_as(&note.id, "Call **mum**", MARKDOWN)?;
+        // An edit without a format, or asking for plain, keeps it formatted.
+        notes.edit(&note.id, "Call **mum** now")?;
+        notes.edit_as(&note.id, "Call mum", PLAIN)?;
+        assert_eq!(
+            store.current(&note.id, keys::TEXT)?.as_deref(),
+            Some(r#"{"format":"markdown","text":"Call mum"}"#)
+        );
+        assert!(notes.edit_as(&note.id, "x", "x-future").is_err());
+        // set_format makes a plain text formatted, never back.
+        let list = notes.capture("- milk", None, None)?;
+        notes.set_format(&list.id, MARKDOWN)?;
+        assert_eq!(format(&list.id)?.as_deref(), Some(MARKDOWN));
+        let entries = store.history(&list.id)?.len();
+        notes.set_format(&list.id, PLAIN)?;
+        notes.set_format(&list.id, MARKDOWN)?;
+        assert_eq!(store.history(&list.id)?.len(), entries);
+        Ok(())
+    }
+
+    #[test]
+    fn a_transcript_taken_over_into_a_formatted_text_reads_as_itself() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let note = notes.capture_as("**Todo**", crate::text_format::MARKDOWN, None, None)?;
+        let written = notes.take_over(&note.id, "2*3*4 and #tag_x\n- not a list ", true)?;
+        assert_eq!(written, "**Todo**\n2\\*3\\*4 and #tag_x\n\\- not a list");
+        let got = notes
+            .by_id(&note.id)?
+            .ok_or(Error::Invalid("gone".into()))?;
+        assert_eq!(got.text, written);
+        assert_eq!(got.visible_text(), "Todo\n2*3*4 and #tag_x\n- not a list");
+        assert_eq!(notes.take_over(&note.id, "*x*", false)?, "\\*x\\*");
+        // Into a plain text it goes as it is.
+        let plain = notes.capture("Plain", None, None)?;
+        assert_eq!(notes.take_over(&plain.id, "*x*", true)?, "Plain\n*x*");
+        Ok(())
+    }
+
+    #[test]
+    fn a_checklist_or_shopping_list_keeps_the_text_formatted() -> Result<()> {
+        use crate::text_format::MARKDOWN;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let format =
+            |id: &str| -> Result<Option<String>> { Ok(notes.by_id(id)?.map(|n| n.text_format)) };
+        let packing = notes.capture_as("**Packing**\n- socks", MARKDOWN, None, None)?;
+        let checklists = crate::Checklists::new(&store);
+        checklists.make(&packing.id)?;
+        assert_eq!(
+            store.current(&packing.id, keys::TEXT)?.as_deref(),
+            Some(r#"{"format":"markdown","text":"**Packing**"}"#)
+        );
+        checklists.to_plain(&packing.id)?;
+        assert_eq!(format(&packing.id)?.as_deref(), Some(MARKDOWN));
+        let weekly = notes.capture_as("# Weekly\nmilk", MARKDOWN, None, None)?;
+        let shopping = crate::ShoppingLists::new(&store);
+        shopping.make(&weekly.id)?;
+        assert_eq!(format(&weekly.id)?.as_deref(), Some(MARKDOWN));
+        shopping.to_plain(&weekly.id, &|utc| utc.naive_utc())?;
+        assert_eq!(format(&weekly.id)?.as_deref(), Some(MARKDOWN));
         Ok(())
     }
 

@@ -454,7 +454,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           note != null &&
           note.textEditable &&
           note.text != text) {
-        notes.edit(captured.noteId, text);
+        notes.edit(captured.noteId, text, format: _formatOf(text));
       }
       if (nudgeIn != null && !_sorted) {
         notes.setNudge(captured.noteId, nudgeIn);
@@ -626,6 +626,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     List<Uint8List> recordings = const [],
   }) => widget.notes.capture(
     text,
+    format: _formatOf(text) ?? TextFormats.plain,
     place: _shopping == null ? _place : null,
     // A sorted Note needs no Nudge (#113).
     nudgeIn: _sorted ? null : nudgeIn ?? Notes.defaultNudge,
@@ -633,6 +634,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
     recordings: recordings,
     sourceApp: widget.shared?.sourceApp,
   );
+
+  /// Formatted for a text that uses a format, pasted, shared or typed as
+  /// Markdown (ADR 0033); null leaves it as it is.
+  static String? _formatOf(String text) =>
+      Markdown.uses(text) ? TextFormats.markdown : null;
 
   /// Holds the written [note] as the one being captured, and attaches
   /// where and amid what it was captured once that is known.

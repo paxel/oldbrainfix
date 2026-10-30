@@ -6769,6 +6769,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search for {tag}'**
   String searchForTag(String tag);
+
+  /// Button of the format bar above the keyboard: makes the selection or the word at the cursor bold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get formatBold;
+
+  /// Format bar button: italic.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic'**
+  String get formatItalic;
+
+  /// Format bar button: strike-through.
+  ///
+  /// In en, this message translates to:
+  /// **'Strike through'**
+  String get formatStrike;
+
+  /// Format bar button: makes the cursor's line a large heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Large heading'**
+  String get formatHeading1;
+
+  /// Format bar button: makes the cursor's line a small heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Small heading'**
+  String get formatHeading2;
+
+  /// Format bar button: makes the lines a bulleted list.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulleted list'**
+  String get formatBullets;
+
+  /// Format bar button: makes the lines a numbered list.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbered list'**
+  String get formatNumbers;
+
+  /// Format bar button: makes the lines a quote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get formatQuote;
+
+  /// Format bar button and title of the dialog asking for a link's address.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get formatLink;
+
+  /// Format bar button: shows the selection or word as code, in a fixed-width font.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get formatCode;
+
+  /// Format bar button: moves a list item one level in.
+  ///
+  /// In en, this message translates to:
+  /// **'Indent list item'**
+  String get formatIndent;
+
+  /// Format bar button: moves a list item one level out.
+  ///
+  /// In en, this message translates to:
+  /// **'Move list item out'**
+  String get formatOutdent;
+
+  /// Screen reader label of the ⋮ button at the end of the format bar that opens the formats with no room on it.
+  ///
+  /// In en, this message translates to:
+  /// **'More formats'**
+  String get moreFormats;
+
+  /// Label of the field for a link's address.
+  ///
+  /// In en, this message translates to:
+  /// **'Web or e-mail address'**
+  String get linkAddress;
+
+  /// Hint under the address field when the cursor is in a link already.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave it empty to remove the link.'**
+  String get linkRemoveHint;
+
+  /// Button that puts the link on the selection or word.
+  ///
+  /// In en, this message translates to:
+  /// **'Set link'**
+  String get linkSet;
 }
 
 class _AppLocalizationsDelegate

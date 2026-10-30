@@ -205,7 +205,8 @@ pub struct PlannedAlarm {
     pub escalation: Option<i64>,
     pub ends: WallMoment,
     pub ends_at: DateTime<Utc>,
-    /// The text of the Note the Routine links back to; `None` when gone.
+    /// The text of the Note the Routine links back to as it reads without
+    /// its marks ([`Note::visible_text`]); `None` when gone.
     pub text: Option<String>,
     /// What that Note is titled as while `text` is blank
     /// ([`Note::wordless`]).
@@ -300,7 +301,7 @@ pub fn alarm_plan(
                 escalation: routine.escalation,
                 ends: t.ends,
                 ends_at: t.ends_at,
-                text: note.as_ref().map(|n| n.text.clone()),
+                text: note.as_ref().map(Note::visible_text),
                 wordless: note.as_ref().map(Note::wordless).unwrap_or_default(),
             });
             planned += 1;
@@ -667,6 +668,28 @@ mod tests {
             titled,
             BTreeMap::from([(voice, Wordless::VoiceRecording), (photo, Wordless::Photo)])
         );
+        Ok(())
+    }
+
+    #[test]
+    fn an_alarm_names_a_formatted_note_as_it_reads() -> Result<()> {
+        let store = crate::store::tests::store();
+        let note = Notes::new(&store).capture_as(
+            "**pills** ~~now~~",
+            crate::text_format::MARKDOWN,
+            None,
+            None,
+        )?;
+        let ten = ClockTime::new(10, 0).into_iter().collect::<Vec<_>>();
+        let schedule = crate::schedule::Schedule::new(Day::new(2026, 1, 2), &ten, None)
+            .ok_or_else(|| Error::Invalid("a schedule".into()))?;
+        Routines::new(&store).spawn(&note.id, &schedule)?;
+        let texts: Vec<Option<String>> = Alarms::new(&store)
+            .plan(&utc_wall)?
+            .into_iter()
+            .map(|a| a.text)
+            .collect();
+        assert_eq!(texts.first(), Some(&Some("pills now".to_string())));
         Ok(())
     }
 

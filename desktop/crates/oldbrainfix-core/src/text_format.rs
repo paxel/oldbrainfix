@@ -1,19 +1,46 @@
 //! The formats of user text (ADR 0018), as the Dart core's
 //! `text_format.dart` reads and writes them: the text of a Note or a
-//! Section is stored with the format it is in. This version knows only
-//! [`PLAIN`]; formatted text comes later (#57).
+//! Section is stored with the format it is in. This version knows
+//! [`PLAIN`] and [`MARKDOWN`].
 
 use serde_json::{Map, Value};
+
+use crate::markdown;
 
 /// Text as typed, without formatting.
 pub const PLAIN: &str = "plain";
 
+/// Formatted text, the subset of Markdown [`crate::markdown`] reads (ADR
+/// 0033). A text stays plain until it is first formatted, and is
+/// formatted from then on.
+pub const MARKDOWN: &str = "markdown";
+
 /// Every format this version reads and writes.
-pub const KNOWN: [&str; 1] = [PLAIN];
+pub const KNOWN: [&str; 2] = [PLAIN, MARKDOWN];
 
 /// The newest structure of the stored value this version knows: `v` 1
 /// holds `format` and `text` and nothing else.
 pub const VERSION: i64 = 1;
+
+/// `text` in `format` as it reads without its marks, for search and
+/// previews; a text in any other format as it is.
+pub fn visible(format: &str, text: &str) -> String {
+    if format == MARKDOWN {
+        markdown::plain(text)
+    } else {
+        text.to_string()
+    }
+}
+
+/// The plain text `text` as it is written into a text in `format` to
+/// read as itself, such as a Transcript put into a Note's text.
+pub fn literal(format: &str, text: &str) -> String {
+    if format == MARKDOWN {
+        markdown::escape(text)
+    } else {
+        text.to_string()
+    }
+}
 
 /// A user text as stored: its format, its text, the source text for a
 /// format this version does not know, and the version of the value's
@@ -37,7 +64,7 @@ pub struct StoredText {
 }
 
 impl StoredText {
-    /// `text` as plain text, the only format this version writes.
+    /// `text` as plain text.
     pub fn plain(text: &str) -> StoredText {
         StoredText {
             format: PLAIN.to_string(),
@@ -104,6 +131,11 @@ impl StoredText {
             version,
             editable,
         })
+    }
+
+    /// The text as it reads without its marks ([`visible`]).
+    pub fn visible(&self) -> String {
+        visible(&self.format, &self.text)
     }
 
     /// The value it is stored as, keys inserted in order so the bytes are

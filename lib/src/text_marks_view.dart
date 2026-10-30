@@ -1,5 +1,9 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'l10n.dart';
@@ -76,6 +80,29 @@ class TagSearchScope extends InheritedWidget {
       onSearch != oldWidget.onSearch;
 }
 
+/// Opens the address of a link in another app.
+typedef LinkOpen = Future<void> Function(Uri address);
+
+/// How a tapped link in a formatted text below is opened (ADR 0033);
+/// without one, the system opens it in the app it belongs to. Only a
+/// web or e-mail address ever gets here ([Markdown.mayOpen]).
+class LinkOpenScope extends InheritedWidget {
+  final LinkOpen onOpen;
+
+  const LinkOpenScope({super.key, required this.onOpen, required super.child});
+
+  static LinkOpen of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<LinkOpenScope>()?.onOpen ?? _launch;
+
+  static Future<void> _launch(Uri address) async {
+    await launchUrl(address, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  bool updateShouldNotify(LinkOpenScope oldWidget) =>
+      onOpen != oldWidget.onOpen;
+}
+
 /// How a tag is drawn: in the accent colour.
 TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
     (style ?? const TextStyle()).copyWith(
@@ -84,8 +111,28 @@ TextStyle tagStyle(BuildContext context, [TextStyle? style]) =>
 
 /// A text field's controller that draws each tag of its text highlighted
 /// as it is typed (ADR 0032); a tap in the field still puts the cursor.
+///
+/// A [markdown] text is drawn formatted as it is typed (ADR 0033): its
+/// headings larger, bold, italic, struck through, code and links as they
+/// show, a bullet for an item's mark and a bar for a quote's. The marks
+/// themselves are dimmed, or with [hideMarks] drawn as nothing, for a
+/// field that shows the source of the cursor's line elsewhere. Every
+/// character of the text stays where it is, so the cursor counts as in
+/// the source.
 class TagTextController extends TextEditingController {
-  TagTextController({super.text});
+  final bool hideMarks;
+
+  TagTextController({super.text, this.hideMarks = false});
+
+  bool _markdown = false;
+
+  /// Whether the text is formatted; it is drawn anew when this changes.
+  bool get markdown => _markdown;
+  set markdown(bool value) {
+    if (value == _markdown) return;
+    _markdown = value;
+    notifyListeners();
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -93,6 +140,10 @@ class TagTextController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    final composing = withComposing && value.isComposingRangeValid
+        ? value.composing
+        : TextRange.empty;
+    if (_markdown) return _formatted(context, style, composing);
     final tags = TextTags.find(text);
     if (tags.isEmpty) {
       return super.buildTextSpan(
@@ -101,9 +152,6 @@ class TagTextController extends TextEditingController {
         withComposing: withComposing,
       );
     }
-    final composing = withComposing && value.isComposingRangeValid
-        ? value.composing
-        : TextRange.empty;
     final cuts = <int>{
       0,
       text.length,
@@ -134,6 +182,157 @@ class TagTextController extends TextEditingController {
       ],
     );
   }
+
+  // What a character of a formatted text is, as bits.
+  static const _mark = 1;
+  static const _bold = 2;
+  static const _italic = 4;
+  static const _strike = 8;
+  static const _code = 16;
+  static const _link = 32;
+  static const _tag = 64;
+  static const _heading1 = 128;
+  static const _heading2 = 256;
+  static const _quote = 512;
+  static const _sign = 1024;
+  static const _composing = 2048;
+
+  /// The text formatted, character for character: each one gets the bits
+  /// of what it is, and neighbours with the same bits share a span.
+  TextSpan _formatted(
+    BuildContext context,
+    TextStyle? style,
+    TextRange composing,
+  ) {
+    final text = this.text;
+    final bits = List<int>.filled(text.length, 0);
+    final shown = text.codeUnits.toList();
+    void set(int from, int to, int bit) {
+      for (var i = from; i < to && i < bits.length; i++) {
+        bits[i] |= bit;
+      }
+    }
+
+    void walk(MarkdownSpan span) {
+      switch (span.kind) {
+        case MarkdownSpanKind.text:
+          // An escape's backslash.
+          set(span.start, span.contentStart, _mark);
+        case MarkdownSpanKind.code:
+          set(span.contentStart, span.contentEnd, _code);
+          set(span.start, span.contentStart, _mark);
+          set(span.contentEnd, span.end, _mark);
+        case MarkdownSpanKind.bold ||
+            MarkdownSpanKind.italic ||
+            MarkdownSpanKind.strike ||
+            MarkdownSpanKind.link:
+          set(span.contentStart, span.contentEnd, switch (span.kind) {
+            MarkdownSpanKind.bold => _bold,
+            MarkdownSpanKind.italic => _italic,
+            MarkdownSpanKind.strike => _strike,
+            _ => _link,
+          });
+          set(span.start, span.contentStart, _mark);
+          set(span.contentEnd, span.end, _mark);
+          span.children.forEach(walk);
+      }
+    }
+
+    for (final block in Markdown.parse(text)) {
+      set(block.start, block.end, switch (block.kind) {
+        MarkdownBlockKind.heading1 => _heading1,
+        MarkdownBlockKind.heading2 => _heading2,
+        MarkdownBlockKind.quote => _quote,
+        _ => 0,
+      });
+      var sign = block.start;
+      while (sign < block.contentStart &&
+          (text[sign] == ' ' || text[sign] == '\t')) {
+        sign++;
+      }
+      switch (block.kind) {
+        case MarkdownBlockKind.heading1 || MarkdownBlockKind.heading2:
+          set(block.start, block.contentStart, _mark);
+        case MarkdownBlockKind.bullet:
+          shown[sign] = (block.level == 0 ? '•' : '◦').codeUnitAt(0);
+          set(sign, sign + 1, _sign);
+        case MarkdownBlockKind.quote:
+          shown[sign] = '▎'.codeUnitAt(0);
+          set(sign, sign + 1, _sign);
+        case MarkdownBlockKind.numbered:
+          var dot = sign;
+          while (dot < block.contentStart && text[dot] != '.') {
+            dot++;
+          }
+          // The number it counts to, where it fits in the digits written.
+          final number = '${block.number}';
+          if (number.length == dot - sign) {
+            shown.setRange(sign, dot, number.codeUnits);
+          }
+          set(sign, dot + 1, _sign);
+        case MarkdownBlockKind.paragraph:
+          break;
+      }
+      block.spans.forEach(walk);
+    }
+    for (final tag in Markdown.tags(text)) {
+      set(tag.start, tag.end, _tag);
+    }
+    if (composing.isValid) set(composing.start, composing.end, _composing);
+    final drawn = String.fromCharCodes(shown);
+    final styles = <int, TextStyle>{};
+    final children = <TextSpan>[];
+    var from = 0;
+    for (var i = 1; i <= text.length; i++) {
+      if (i < text.length && bits[i] == bits[from]) continue;
+      final b = bits[from];
+      children.add(
+        TextSpan(
+          text: drawn.substring(from, i),
+          style: styles.putIfAbsent(b, () => _styleOf(context, style, b)),
+        ),
+      );
+      from = i;
+    }
+    return TextSpan(style: style, children: children);
+  }
+
+  TextStyle _styleOf(BuildContext context, TextStyle? base, int bits) {
+    final scheme = Theme.of(context).colorScheme;
+    final size = base?.fontSize ?? 16;
+    bool has(int bit) => bits & bit != 0;
+    final lines = [
+      if (has(_strike)) TextDecoration.lineThrough,
+      if (has(_link) || has(_composing)) TextDecoration.underline,
+    ];
+    final style = TextStyle(
+      fontSize: has(_heading1)
+          ? size * 1.5
+          : has(_heading2)
+          ? size * 1.25
+          : null,
+      fontWeight: has(_bold) || has(_heading1) || has(_heading2)
+          ? FontWeight.bold
+          : null,
+      fontStyle: has(_italic) ? FontStyle.italic : null,
+      fontFamily: has(_code) ? 'monospace' : null,
+      backgroundColor: has(_code) ? scheme.surfaceContainerHighest : null,
+      color: has(_link) || has(_tag) || has(_sign)
+          ? scheme.primary
+          : has(_quote)
+          ? scheme.onSurfaceVariant
+          : null,
+      decoration: lines.isEmpty ? null : TextDecoration.combine(lines),
+    );
+    if (!has(_mark)) return style;
+    return hideMarks
+        ? style.copyWith(
+            fontSize: 0.01,
+            color: Colors.transparent,
+            backgroundColor: Colors.transparent,
+          )
+        : style.copyWith(color: scheme.outline);
+  }
 }
 
 /// The part [start] to [end] of [text] (all of it while they are null),
@@ -144,8 +343,17 @@ class TagTextController extends TextEditingController {
 /// middle of a line is never one (ADR 0031). Each tag is highlighted
 /// and, under a [TagSearchScope], a link that opens the search for it
 /// (ADR 0032).
-class MarkedText extends StatelessWidget {
+///
+/// A text in [TextFormats.markdown] is drawn formatted (ADR 0033), each
+/// of its lines that [start] to [end] touches: headings larger, items
+/// after a bullet or their number, quotes beside a bar, bold, italic,
+/// struck through, code in a fixed width on grey and links. A link to a
+/// web or e-mail address opens with a tap ([LinkOpenScope]); any other
+/// stays text. Status marks and tags work in it as in a plain text,
+/// except a tag in a link's label, which is part of the link.
+class MarkedText extends StatefulWidget {
   final String text;
+  final String format;
   final int? start;
   final int? end;
   final TextStyle? style;
@@ -156,6 +364,7 @@ class MarkedText extends StatelessWidget {
   const MarkedText(
     this.text, {
     super.key,
+    this.format = TextFormats.plain,
     this.start,
     this.end,
     this.style,
@@ -165,9 +374,46 @@ class MarkedText extends StatelessWidget {
   });
 
   @override
+  State<MarkedText> createState() => _MarkedTextState();
+}
+
+class _MarkedTextState extends State<MarkedText> {
+  /// The taps of the links drawn last.
+  final _links = <TapGestureRecognizer>[];
+
+  // What is drawn anew follows one of these: the taps of the links
+  // drawn before go with them.
+  @override
+  void didUpdateWidget(MarkedText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _dropLinks();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _dropLinks();
+  }
+
+  @override
+  void dispose() {
+    _dropLinks();
+    super.dispose();
+  }
+
+  void _dropLinks() {
+    for (final link in _links) {
+      link.dispose();
+    }
+    _links.clear();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final from = start ?? 0;
-    final to = end ?? text.length;
+    if (widget.format == TextFormats.markdown) return _formatted(context);
+    final text = widget.text;
+    final from = widget.start ?? 0;
+    final to = widget.end ?? text.length;
     final marks = [
       for (final mark in TextMarks.find(text))
         if (mark.start >= from && mark.end <= to) mark,
@@ -179,17 +425,16 @@ class MarkedText extends StatelessWidget {
     if (marks.isEmpty && tags.isEmpty) {
       return Text(
         text.substring(from, to),
-        style: style,
-        maxLines: maxLines,
-        overflow: overflow,
+        style: widget.style,
+        maxLines: widget.maxLines,
+        overflow: widget.overflow,
       );
     }
     final t = context.t;
-    final onMark = this.onMark;
     final onSearch = TagSearchScope.of(context);
     final highlighted = tagStyle(
       context,
-      style ?? DefaultTextStyle.of(context).style,
+      widget.style ?? DefaultTextStyle.of(context).style,
     );
     // Marks and tags never overlap: a mark is no tag character.
     final parts = <({int start, int end, InlineSpan span})>[
@@ -197,7 +442,7 @@ class MarkedText extends StatelessWidget {
         (
           start: mark.start,
           end: mark.end,
-          span: _markSpan(context, t, mark, onMark),
+          span: _markSpan(context, t, mark, widget.style),
         ),
       for (final tag in tags)
         (
@@ -218,21 +463,271 @@ class MarkedText extends StatelessWidget {
     if (to > at) spans.add(TextSpan(text: text.substring(at, to)));
     return Text.rich(
       TextSpan(children: spans),
-      style: style,
-      maxLines: maxLines,
-      overflow: overflow,
+      style: widget.style,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
     );
+  }
+
+  /// Each line of a formatted text in [start] to [end], one under the
+  /// other.
+  Widget _formatted(BuildContext context) {
+    final text = widget.text;
+    final from = widget.start ?? 0;
+    final to = widget.end ?? text.length;
+    final marks = TextMarks.find(text);
+    final tags = Markdown.tags(text);
+    final base = DefaultTextStyle.of(context).style.merge(widget.style);
+    final lines = [
+      for (final block in Markdown.parse(text))
+        if (block.end >= from && block.start <= to)
+          _line(context, block, base, marks, tags),
+    ];
+    if (lines.length == 1) return lines.single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: lines,
+    );
+  }
+
+  Widget _line(
+    BuildContext context,
+    MarkdownBlock block,
+    TextStyle base,
+    List<MarkedLine> marks,
+    List<FoundTag> tags,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    // A compact card's line keeps the size of the text around it.
+    final grows = widget.maxLines == null;
+    final size = base.fontSize ?? 14;
+    final style = switch (block.kind) {
+      MarkdownBlockKind.heading1 => base.copyWith(
+        fontWeight: FontWeight.bold,
+        fontSize: grows ? size * 1.5 : null,
+      ),
+      MarkdownBlockKind.heading2 => base.copyWith(
+        fontWeight: FontWeight.bold,
+        fontSize: grows ? size * 1.25 : null,
+      ),
+      MarkdownBlockKind.quote => base.copyWith(color: scheme.onSurfaceVariant),
+      _ => base,
+    };
+    final spans = <InlineSpan>[];
+    for (final span in block.spans) {
+      _inline(context, span, style, null, marks, tags, spans);
+    }
+    final words = Text.rich(
+      TextSpan(children: spans),
+      style: style,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
+    );
+    return switch (block.kind) {
+      MarkdownBlockKind.paragraph => words,
+      MarkdownBlockKind.heading1 ||
+      MarkdownBlockKind.heading2 => Semantics(header: true, child: words),
+      MarkdownBlockKind.bullet => _item(
+        block.level == 0 ? '•' : '◦',
+        block.level,
+        style,
+        words,
+      ),
+      MarkdownBlockKind.numbered => _item(
+        '${block.number}.',
+        block.level,
+        style,
+        words,
+      ),
+      MarkdownBlockKind.quote => DecoratedBox(
+        decoration: BoxDecoration(
+          border: BorderDirectional(
+            start: BorderSide(color: scheme.primary, width: 3),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.only(start: 8),
+          child: words,
+        ),
+      ),
+    };
+  }
+
+  /// An item of a list: its bullet or number, the words beside it.
+  Widget _item(String sign, int level, TextStyle style, Widget words) =>
+      Padding(
+        padding: EdgeInsetsDirectional.only(start: level * 20.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 20),
+              child: Text(sign, style: style),
+            ),
+            const SizedBox(width: 4),
+            Flexible(child: words),
+          ],
+        ),
+      );
+
+  /// The spans [span] shows, in [style], a part of the link that [link]
+  /// opens when there is one.
+  void _inline(
+    BuildContext context,
+    MarkdownSpan span,
+    TextStyle style,
+    TapGestureRecognizer? link,
+    List<MarkedLine> marks,
+    List<FoundTag> tags,
+    List<InlineSpan> out,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    void inner(TextStyle style, [TapGestureRecognizer? to]) {
+      for (final child in span.children) {
+        _inline(context, child, style, to ?? link, marks, tags, out);
+      }
+    }
+
+    switch (span.kind) {
+      case MarkdownSpanKind.text when span.contentStart > span.start:
+        // An escaped character.
+        out.add(TextSpan(text: span.text, style: style, recognizer: link));
+      case MarkdownSpanKind.text:
+        _literal(context, span.start, span.end, style, link, marks, tags, out);
+      case MarkdownSpanKind.code:
+        out.add(
+          TextSpan(
+            text: span.text,
+            style: style.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: scheme.surfaceContainerHighest,
+            ),
+            recognizer: link,
+          ),
+        );
+      case MarkdownSpanKind.bold:
+        inner(style.copyWith(fontWeight: FontWeight.bold));
+      case MarkdownSpanKind.italic:
+        inner(style.copyWith(fontStyle: FontStyle.italic));
+      case MarkdownSpanKind.strike:
+        inner(
+          style.copyWith(
+            decoration: TextDecoration.combine([
+              ?style.decoration,
+              TextDecoration.lineThrough,
+            ]),
+          ),
+        );
+      case MarkdownSpanKind.link:
+        // Another person may have written it: only the web and e-mail.
+        if (!Markdown.mayOpen(span.url)) {
+          inner(style);
+          return;
+        }
+        final address = Uri.tryParse(span.url);
+        if (address == null) {
+          inner(style);
+          return;
+        }
+        final open = LinkOpenScope.of(context);
+        final tap = TapGestureRecognizer()
+          ..onTap = () => unawaited(_open(open, address));
+        _links.add(tap);
+        inner(
+          style.copyWith(
+            color: scheme.primary,
+            decoration: TextDecoration.combine([
+              ?style.decoration,
+              TextDecoration.underline,
+            ]),
+          ),
+          tap,
+        );
+    }
+  }
+
+  static Future<void> _open(LinkOpen open, Uri address) async {
+    try {
+      await open(address);
+    } on Object {
+      // No app takes it: the tap does nothing.
+    }
+  }
+
+  /// The characters [start] to [end], written as they show, with the
+  /// status marks and tags among them.
+  void _literal(
+    BuildContext context,
+    int start,
+    int end,
+    TextStyle style,
+    TapGestureRecognizer? link,
+    List<MarkedLine> marks,
+    List<FoundTag> tags,
+    List<InlineSpan> out,
+  ) {
+    final text = widget.text;
+    final t = context.t;
+    final onSearch = TagSearchScope.of(context);
+    final parts = <({int start, int end, InlineSpan span})>[
+      for (final mark in marks)
+        if (mark.start >= start && mark.end <= end)
+          (
+            start: mark.start,
+            end: mark.end,
+            span: _markSpan(context, t, mark, style),
+          ),
+      // A tag in a link's label is part of the link.
+      if (link == null)
+        for (final tag in tags)
+          if (tag.start >= start && tag.end <= end)
+            (
+              start: tag.start,
+              end: tag.end,
+              span: _tagSpan(
+                context,
+                t,
+                tag,
+                tagStyle(context, style),
+                onSearch,
+              ),
+            ),
+    ]..sort((a, b) => a.start.compareTo(b.start));
+    var at = start;
+    for (final part in parts) {
+      if (part.start > at) {
+        out.add(
+          TextSpan(
+            text: text.substring(at, part.start),
+            style: style,
+            recognizer: link,
+          ),
+        );
+      }
+      out.add(part.span);
+      at = part.end;
+    }
+    if (end > at) {
+      out.add(
+        TextSpan(text: text.substring(at, end), style: style, recognizer: link),
+      );
+    }
   }
 
   InlineSpan _markSpan(
     BuildContext context,
     AppLocalizations t,
     MarkedLine mark,
-    void Function(int line, TextMark to)? onMark,
+    TextStyle? style,
   ) {
-    final glyph = text.substring(mark.start, mark.end);
+    final onMark = widget.onMark;
+    final glyph = widget.text.substring(mark.start, mark.end);
     final label = textMarkLabel(t, mark.mark);
-    if (onMark == null) return TextSpan(text: glyph, semanticsLabel: label);
+    if (onMark == null) {
+      return TextSpan(text: glyph, semanticsLabel: label, style: style);
+    }
     return WidgetSpan(
       alignment: PlaceholderAlignment.baseline,
       baseline: TextBaseline.alphabetic,
@@ -257,7 +752,7 @@ class MarkedText extends StatelessWidget {
     TextStyle highlighted,
     TagSearch? onSearch,
   ) {
-    final written = text.substring(tag.start, tag.end);
+    final written = widget.text.substring(tag.start, tag.end);
     if (onSearch == null) {
       return TextSpan(
         text: written,

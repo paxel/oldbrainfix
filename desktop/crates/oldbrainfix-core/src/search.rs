@@ -2,8 +2,9 @@
 //! them: their text, the Transcripts of their voice recordings, the Photo
 //! Texts of their photos and the same of their Sections (Amends and
 //! merged Notes), the text lines of the entries of a Tally and the Lines
-//! of a Checklist or a Shopping List, but those gone. A text in a format
-//! not known here counts as its source text.
+//! of a Checklist or a Shopping List, but those gone. A formatted text
+//! counts as it reads without its marks (ADR 0033), a text in a format
+//! not known here as its source text.
 
 use std::collections::HashMap;
 
@@ -46,7 +47,7 @@ impl<'a> Search<'a> {
         Ok(scope
             .into_iter()
             .filter(|note| {
-                holds(&note.text)
+                holds(&note.visible_text())
                     || note.transcripts.values().any(holds)
                     || note.photo_texts.values().any(holds)
                     || sections.get(&note.id).is_some_and(|s| s.iter().any(holds))
@@ -63,10 +64,10 @@ impl<'a> Search<'a> {
         let mut texts: HashMap<String, Vec<String>> = HashMap::new();
         for id in self.store.entities_of_type(keys::TYPE_NOTE)? {
             if let Some(note) = notes.by_id(&id)?
-                && let Some(into) = note.merged_into
+                && let Some(into) = note.merged_into.clone()
             {
                 let list = texts.entry(into).or_default();
-                list.push(note.text);
+                list.push(note.visible_text());
                 list.extend(note.transcripts.into_values());
                 list.extend(note.photo_texts.into_values());
             }
@@ -83,7 +84,7 @@ impl<'a> Search<'a> {
             texts
                 .entry(shown_under)
                 .or_default()
-                .push(StoredText::read(fields.get(keys::TEXT)).text);
+                .push(StoredText::read(fields.get(keys::TEXT)).visible());
         }
         for id in self.store.entities_of_type(tally_keys::TYPE_ENTRY)? {
             let fields = self.store.current_fields(&id)?;
@@ -202,6 +203,32 @@ mod tests {
                 .set_photo_text(&voice.id, &voice.recordings[0], "x")
                 .is_err()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_formatted_text_is_found_by_its_words_never_its_marks() -> Result<()> {
+        use crate::text_format::MARKDOWN;
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let bold = notes.capture_as("**bold** `code`", MARKDOWN, None, None)?;
+        let plain = notes.capture("stars ** here", None, None)?;
+        let host = notes.capture("Host", None, None)?;
+        notes.amend_as(&host.id, "~~struck~~", MARKDOWN)?;
+        let merged = notes.capture_as("[label](https://x.org)", MARKDOWN, None, None)?;
+        notes.merge(&merged.id, &host.id)?;
+        let search = Search::new(&store);
+        let ids = |q: &str| -> Result<Vec<String>> {
+            Ok(search.notes(q, None)?.into_iter().map(|n| n.id).collect())
+        };
+        assert_eq!(ids("bold")?, vec![bold.id.clone()]);
+        assert_eq!(ids("bold code")?, vec![bold.id]);
+        assert_eq!(ids("**")?, vec![plain.id]);
+        assert!(ids("`")?.is_empty());
+        assert_eq!(ids("struck")?, vec![host.id.clone()]);
+        assert!(ids("~~")?.is_empty());
+        assert_eq!(ids("label")?, vec![host.id]);
+        assert!(ids("x.org")?.is_empty());
         Ok(())
     }
 

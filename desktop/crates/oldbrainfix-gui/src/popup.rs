@@ -38,7 +38,9 @@ use egui::{
     FontId, Frame, Id, Key, Margin, Modifiers, PointerButton, RichText, TextEdit, Ui,
     ViewportCommand,
 };
-use oldbrainfix_core::{APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic};
+use oldbrainfix_core::{
+    APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic, markdown, text_format,
+};
 
 use crate::app::{Wall, failure_form, local_wall, region_of};
 use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Opens};
@@ -76,8 +78,14 @@ pub fn capture(
     let Some(text) = note_text(text) else {
         return Ok(None);
     };
+    // Typed or pasted with a format, it is a formatted text (#127).
+    let format = if markdown::uses(text) {
+        text_format::MARKDOWN
+    } else {
+        text_format::PLAIN
+    };
     Notes::new(store)
-        .capture(text, None, Some(nudge_in))
+        .capture_as(text, format, None, Some(nudge_in))
         .map(Some)
 }
 

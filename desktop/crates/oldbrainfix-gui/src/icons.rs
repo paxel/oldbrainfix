@@ -72,6 +72,19 @@ pub const EXPORT: char = '\u{f05d}';
 /// `shopping_cart_outlined`, as the phone marks a Shopping List's row on
 /// the Agenda (#123).
 pub const SHOPPING_CART: char = '\u{f37f}';
+/// The format bar's, as the phone's (#127): `format_bold`,
+/// `format_italic`, `format_strikethrough`, `format_list_numbered`,
+/// `format_quote`, `link`, `code`, `format_indent_increase` and
+/// `format_indent_decrease`; the bulleted list is [`ALL_ROUTINES`].
+pub const FORMAT_BOLD: char = '\u{e2af}';
+pub const FORMAT_ITALIC: char = '\u{e2b6}';
+pub const FORMAT_STRIKE: char = '\u{e2bf}';
+pub const FORMAT_NUMBERS: char = '\u{e2b9}';
+pub const FORMAT_QUOTE: char = '\u{e2bc}';
+pub const LINK: char = '\u{e380}';
+pub const CODE: char = '\u{e176}';
+pub const INDENT: char = '\u{e2b5}';
+pub const OUTDENT: char = '\u{e2b4}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

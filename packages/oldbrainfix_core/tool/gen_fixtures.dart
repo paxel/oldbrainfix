@@ -175,6 +175,38 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'markdown',
+    about:
+        'Formatted texts: one captured so and edited, a plain one formatted '
+        'at an edit that stays formatted when edited as plain, one '
+        'formatted as it is, an Amend formatted, a Transcript\'s words '
+        'taken over escaped, a formatted Note made a Checklist and back, '
+        'and a plain text holding marks, searched as written.',
+    build: (store) {
+      final notes = Notes(store);
+      const markdown = TextFormats.markdown;
+      notes.capture('Plain stars ** stay');
+      final shop = notes.capture(
+        '# Shopping\n- **milk** `#code` #real',
+        format: markdown,
+      );
+      notes.edit(shop.id, '# Shopping\n- **oat milk** `#code` #real');
+      final call = notes.capture('Call mum');
+      notes.edit(call.id, 'Call **mum**', format: markdown);
+      notes.edit(call.id, 'Call **mum** later', format: TextFormats.plain);
+      final eggs = notes.capture('- eggs\n- ~~bread~~');
+      notes.setFormat(eggs.id, markdown);
+      notes.amend(shop.id, '> ~~old~~ *new*', format: markdown);
+      notes.takeOver(shop.id, '2*3 [x] _y_', append: true);
+      final packing = notes.capture(
+        '**Packing**\n- socks\n  - wool',
+        format: markdown,
+      );
+      Checklists(store).make(packing.id);
+      Checklists(store).toPlain(packing.id);
+    },
+  ),
+  (
     name: 'places',
     about:
         'The whole Starter Set planted, one starter Area renamed; an Area '
@@ -1524,6 +1556,10 @@ const _queries = [
   ' e ',
   'heading',
   'format',
+  // Marks only a text in a format not known here holds as written, and
+  // words a formatted text reads as, never as written.
+  '**',
+  'milk #code',
   // A removed Photo Text, found nowhere.
   '4711',
 ];
@@ -5258,6 +5294,215 @@ Map<String, Object?> _textTags() {
   };
 }
 
+/// Formatted text (ADR 0033): for each text its lines and their parts,
+/// what it reads as, whether it uses a format, how it is escaped, its
+/// tags, where a typed shortcut ends and the word at every offset; then
+/// the edits the editors make, each with what it gave. Offsets are
+/// counted in code points, so that the cores' UTF-16 and UTF-8 offsets
+/// compare.
+Map<String, Object?> _markdown() {
+  const texts = [
+    '',
+    'plain words, nothing more',
+    '**bold** *it* _it_ __bold__ ~~gone~~ `co de` [site](https://x.org)',
+    '***both*** **a *b* c** *a **b** c* a**b**c 2*3*4 2 * 3 * 4',
+    'snake_case_name _x_y_ __x__y **unclosed *a **b ~x~ ~~~x~~~ ~~a~~b',
+    '*(x)* **"q"** _(a)_ a_(b)_ ****x**** *a*b* **a*',
+    r'\*not\* \\ \_ \a \# a\ ``a`b`` ` x ` `  ` `open ``x` ',
+    '[**a** `b`](u) [a [b](c)](d) ![img](u) \\![no](u) [x](a(b)c) '
+        '[x](a b) [x]( <u> ) [x](u "t") [x]() [x] (u) [x]',
+    '# One\n## Two\n### Three\n#NoSpace\n   # three spaces\n    # four\n#\n##',
+    '> said\n>tight\n   > far\n    > code\n> **b** `c`',
+    '- a\n* b\n+ c\n  - d\n\t- e\n -f\n-\n- \n---\n* * *',
+    '1. one\n1. two\n   1. sub\n   - mixed\n3. three\n\n5. five\n'
+        '0. zero\n123456789. nine\n1234567890. ten\n1.x\n2.',
+    'a\r\nb\rc\n\n\r\n',
+    '🧠 **ü** `日記` [𝔸](https://x.org/𝔸) ~~Straße~~ é*x*',
+    '- ☐ milk\n* ✅ **eggs**\n1. ❌ `x`\n> ☐ q',
+    '#tag `#code` [#label](https://x.org/#anchor) **#bold** #a_b\n'
+        '# Heading #h\n`#a` #b `#c`',
+    '| a | b |\n|---|---|\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>',
+    ' *x*  　**y**　 \t*z*\t',
+  ];
+  int cp(String text, int offset) => text.substring(0, offset).runes.length;
+  int u16(String text, int point) =>
+      String.fromCharCodes(text.runes.take(point)).length;
+  Map<String, Object?> span(String text, MarkdownSpan s) => {
+    'children': [for (final c in s.children) span(text, c)],
+    'contentEnd': cp(text, s.contentEnd),
+    'contentStart': cp(text, s.contentStart),
+    'end': cp(text, s.end),
+    'kind': s.kind.name,
+    'start': cp(text, s.start),
+    'text': s.text,
+    'url': s.url,
+  };
+  Map<String, Object?> change(String text, MarkdownChange c) => {
+    'end': cp(c.text, c.end),
+    'start': cp(c.text, c.start),
+    'text': c.text,
+  };
+  final edits = <Map<String, Object?>>[];
+  void toggle(String text, int start, int end, MarkdownSpanKind kind) =>
+      edits.add({
+        'kind': kind.name,
+        'op': 'toggle',
+        'start': start,
+        'end': end,
+        'text': text,
+        'result': change(
+          text,
+          Markdown.toggle(text, u16(text, start), u16(text, end), kind),
+        ),
+      });
+  void link(String text, int start, int end, String url) => edits.add({
+    'op': 'link',
+    'start': start,
+    'end': end,
+    'text': text,
+    'url': url,
+    'result': change(
+      text,
+      Markdown.link(text, u16(text, start), u16(text, end), url),
+    ),
+  });
+  void line(String text, int start, int end, MarkdownBlockKind kind) =>
+      edits.add({
+        'kind': kind.name,
+        'op': 'line',
+        'start': start,
+        'end': end,
+        'text': text,
+        'result': change(
+          text,
+          Markdown.toggleLine(text, u16(text, start), u16(text, end), kind),
+        ),
+      });
+  void indent(String text, int start, int end, bool out) => edits.add({
+    'op': out ? 'outdent' : 'indent',
+    'start': start,
+    'end': end,
+    'text': text,
+    'result': change(
+      text,
+      Markdown.indent(text, u16(text, start), u16(text, end), out: out),
+    ),
+  });
+  for (final kind in [
+    MarkdownSpanKind.bold,
+    MarkdownSpanKind.italic,
+    MarkdownSpanKind.strike,
+    MarkdownSpanKind.code,
+  ]) {
+    toggle('buy milk now', 5, 5, kind);
+    toggle('buy milk now', 4, 4, kind);
+    toggle('buy milk now', 8, 8, kind);
+    toggle('buy milk now', 3, 9, kind);
+    toggle('a  b', 2, 2, kind);
+    toggle('', 0, 0, kind);
+    toggle('one\n\n two \r\nthree', 0, 17, kind);
+    toggle('x a`b y', 2, 5, kind);
+    toggle('`', 0, 1, kind);
+    toggle('see #garten now', 7, 7, kind);
+    toggle("it's 🧠ü-x, ok", 6, 6, kind);
+  }
+  toggle('buy **milk** now', 7, 7, MarkdownSpanKind.bold);
+  toggle('buy **milk** now', 4, 12, MarkdownSpanKind.bold);
+  toggle('buy **milk** now', 6, 10, MarkdownSpanKind.bold);
+  toggle('**one**\n**two**', 0, 15, MarkdownSpanKind.bold);
+  toggle('**one**\ntwo', 0, 11, MarkdownSpanKind.bold);
+  toggle('**a *b* c**', 5, 5, MarkdownSpanKind.italic);
+  toggle('**a *b* c**', 5, 5, MarkdownSpanKind.bold);
+  toggle('***x***', 3, 3, MarkdownSpanKind.italic);
+  toggle('~~x~~ `y`', 7, 7, MarkdownSpanKind.code);
+  toggle('`` a`b ``', 4, 4, MarkdownSpanKind.code);
+  toggle('a\nb', 2, 0, MarkdownSpanKind.strike);
+  toggle('abc', 9, 1, MarkdownSpanKind.bold);
+  link('see docs here', 6, 6, ' https://x.org/a b(c)\\ ');
+  link('see [docs](https://x.org) here', 6, 6, 'https://y.org');
+  link('see [docs](https://x.org) here', 4, 25, '');
+  link('see ', 4, 4, 'https://x.org/*x*');
+  link('', 0, 0, r'https://x.org/[a]\]');
+  link('see', 1, 1, '  ');
+  link('one two\nthree', 4, 13, 'u');
+  link('🧠 x', 2, 3, 'https://x.org/ ü');
+  for (final kind in MarkdownBlockKind.values) {
+    line('one\ntwo', 0, 7, kind);
+    line('# a\n- b\n  1. c\n> d', 0, 17, kind);
+    line('', 0, 0, kind);
+    line('  plain', 2, 2, kind);
+  }
+  line('1. one\n2. two', 0, 13, MarkdownBlockKind.numbered);
+  line('1. a\nb', 5, 5, MarkdownBlockKind.numbered);
+  line('1. a\n  1. b\nc', 12, 12, MarkdownBlockKind.numbered);
+  line('a\nb', 0, 2, MarkdownBlockKind.quote);
+  line('  - one', 7, 7, MarkdownBlockKind.numbered);
+  line('x\r\ny', 0, 4, MarkdownBlockKind.bullet);
+  indent('- a\n- b\nc', 0, 9, false);
+  indent(' - a\n  - b', 0, 10, false);
+  indent('  - a\n\t- b\nc', 0, 12, true);
+  indent('- a', 0, 0, true);
+  indent('1. a', 4, 4, false);
+  return {
+    'cases': [
+      for (final text in texts)
+        {
+          'blocks': [
+            for (final b in Markdown.parse(text))
+              {
+                'contentStart': cp(text, b.contentStart),
+                'end': cp(text, b.end),
+                'kind': b.kind.name,
+                'level': b.level,
+                'line': b.line,
+                'number': b.number,
+                'spans': [for (final s in b.spans) span(text, s)],
+                'start': cp(text, b.start),
+              },
+          ],
+          'escaped': Markdown.escape(text),
+          'plain': Markdown.plain(text),
+          'shortcuts': [
+            for (var p = 0; p <= text.runes.length; p++)
+              if (Markdown.shortcutAt(text, u16(text, p))) p,
+          ],
+          'tags': [
+            for (final t in Markdown.tags(text))
+              {
+                'end': cp(text, t.end),
+                'start': cp(text, t.start),
+                'tag': t.tag,
+              },
+          ],
+          'text': text,
+          'uses': Markdown.uses(text),
+          'words': [
+            for (var p = 0; p <= text.runes.length; p++)
+              switch (Markdown.wordAt(text, u16(text, p))) {
+                (final s, final e) => [cp(text, s), cp(text, e)],
+              },
+          ],
+        },
+    ],
+    'edits': edits,
+    'mayOpen': {
+      for (final url in [
+        'https://x.org',
+        'HTTP://x.org',
+        'mailto:a@x.org',
+        'javascript:alert(1)',
+        'file:///etc/passwd',
+        'intent://x',
+        'x.org',
+        ' https://x.org',
+        'ʜttps://x.org',
+        '',
+      ])
+        url: Markdown.mayOpen(url),
+    },
+  };
+}
+
 /// The lead-ins Whisper gets: name lists as given, and three stores,
 /// each seen in English and German: one with the Starter Set, one with
 /// names too long to all fit, one with more names than are listed. Then
@@ -5863,6 +6108,19 @@ Future<void> main(List<String> args) async {
     'marks, with a `-` inside and at the end, and those that are none: '
     'numbers alone, headings, `##`, a `#` after a letter, a digit, `/`, '
     '`\\` or `&`, as in "C#" and web addresses.\n'
+    '- `markdown.json`: formatted text: for each text its lines with their '
+    'kind, level, number and parts, as read, what it reads as without its '
+    'marks, whether it uses a format, the text escaped, its tags but those '
+    'in code and link destinations, the offsets where a typed shortcut '
+    'ends and the word at every offset; bold, italic, strike-through, '
+    'code, links, headings, quotes, bulleted and numbered items one level '
+    'in, and what is no format: three hashes, code blocks, tables, '
+    'images, raw HTML, a link inside a link. Then the edits: each format '
+    'put on and taken off at a cursor, on a word, a selection and lines, '
+    'links put on, changed and taken off, every line format on and off, '
+    'items in and out, with the text and the selection they gave; and '
+    'which link destinations may be opened. Offsets are counted in code '
+    'points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -6032,6 +6290,7 @@ Future<void> main(List<String> args) async {
     File('${root.path}/text_tags.json'),
     '${_json.convert(_textTags())}\n',
   );
+  _write(File('${root.path}/markdown.json'), '${_json.convert(_markdown())}\n');
   _sync(root);
   _conflictsFixture(root);
   await _folder(root);

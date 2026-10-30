@@ -38,12 +38,13 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 14] = [
+const SCENARIOS: [&str; 15] = [
     "checklist-routines",
     "checklists",
     "edits",
     "formats",
     "frogs",
+    "markdown",
     "media",
     "notes",
     "places",
@@ -56,9 +57,22 @@ const SCENARIOS: [&str; 14] = [
 ];
 
 /// The queries every scenario's search is checked with, the generator's.
-const QUERIES: [&str; 13] = [
-    "", "sauce", "MILK", "receipt", "dentist", "x-ray", "müller", "called", "loop", " e ",
-    "heading", "format", "4711",
+const QUERIES: [&str; 15] = [
+    "",
+    "sauce",
+    "MILK",
+    "receipt",
+    "dentist",
+    "x-ray",
+    "müller",
+    "called",
+    "loop",
+    " e ",
+    "heading",
+    "format",
+    "**",
+    "milk #code",
+    "4711",
 ];
 
 /// A text in a format this version does not know, as the generator's
@@ -789,6 +803,26 @@ fn write_formats(store: &Store) -> Built {
     Ok(())
 }
 
+/// The generator's `markdown` scenario.
+fn write_markdown(store: &Store) -> Built {
+    use oldbrainfix_core::text_format::{MARKDOWN, PLAIN};
+    let notes = Notes::new(store);
+    notes.capture("Plain stars ** stay", None, None)?;
+    let shop = notes.capture_as("# Shopping\n- **milk** `#code` #real", MARKDOWN, None, None)?;
+    notes.edit(&shop.id, "# Shopping\n- **oat milk** `#code` #real")?;
+    let call = notes.capture("Call mum", None, None)?;
+    notes.edit_as(&call.id, "Call **mum**", MARKDOWN)?;
+    notes.edit_as(&call.id, "Call **mum** later", PLAIN)?;
+    let eggs = notes.capture("- eggs\n- ~~bread~~", None, None)?;
+    notes.set_format(&eggs.id, MARKDOWN)?;
+    notes.amend_as(&shop.id, "> ~~old~~ *new*", MARKDOWN)?;
+    notes.take_over(&shop.id, "2*3 [x] _y_", true)?;
+    let packing = notes.capture_as("**Packing**\n- socks\n  - wool", MARKDOWN, None, None)?;
+    Checklists::new(store).make(&packing.id)?;
+    Checklists::new(store).to_plain(&packing.id)?;
+    Ok(())
+}
+
 /// The generator's `places` scenario.
 fn write_places(store: &Store) -> Built {
     let places = Places::new(store);
@@ -1016,12 +1050,13 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 14] = [
+    let writers: [(&str, Writer); 15] = [
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
+        ("markdown", write_markdown),
         ("media", write_media),
         ("notes", write_notes),
         ("places", write_places),
@@ -4394,6 +4429,146 @@ fn tags_are_found_as_the_dart_core_finds_them() -> TestResult {
             .collect();
         let ours = json!({ "tags": tags, "text": text });
         assert_eq!(&ours, case, "{text:?}");
+    }
+    Ok(())
+}
+
+// ------------------------------------------------------- Formatted text
+
+/// `spans` as the generator writes them, offsets in code points.
+fn markdown_spans(text: &str, spans: &[oldbrainfix_core::markdown::Span]) -> Value {
+    let points = |at: usize| text.get(..at).map(|t| t.chars().count());
+    Value::Array(
+        spans
+            .iter()
+            .map(|s| {
+                json!({
+                    "children": markdown_spans(text, &s.children),
+                    "contentEnd": points(s.content_end),
+                    "contentStart": points(s.content_start),
+                    "end": points(s.end),
+                    "kind": s.kind.name(),
+                    "start": points(s.start),
+                    "text": s.text,
+                    "url": s.url,
+                })
+            })
+            .collect(),
+    )
+}
+
+#[test]
+fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::markdown::{
+        self, BlockKind, Change, SpanKind, indent, link, may_open, toggle, toggle_line,
+    };
+    let fixture = read_json(&fixtures().join("markdown.json"))?;
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 15);
+    // The byte offset of the code point `point` of `text`.
+    let byte = |text: &str, point: usize| {
+        text.char_indices()
+            .map(|(i, _)| i)
+            .chain([text.len()])
+            .nth(point)
+            .unwrap_or(text.len())
+    };
+    let every = |text: &str| -> Vec<usize> {
+        text.char_indices()
+            .map(|(i, _)| i)
+            .chain([text.len()])
+            .collect()
+    };
+    for case in cases {
+        let text = case["text"].as_str().ok_or("text")?;
+        let points = |at: usize| text.get(..at).map(|t| t.chars().count());
+        let blocks: Vec<Value> = markdown::parse(text)
+            .iter()
+            .map(|b| {
+                json!({
+                    "contentStart": points(b.content_start),
+                    "end": points(b.end),
+                    "kind": b.kind.name(),
+                    "level": b.level,
+                    "line": b.line,
+                    "number": b.number,
+                    "spans": markdown_spans(text, &b.spans),
+                    "start": points(b.start),
+                })
+            })
+            .collect();
+        let tags: Vec<Value> = markdown::tags(text)
+            .iter()
+            .map(|t| json!({"end": points(t.end), "start": points(t.start), "tag": t.tag}))
+            .collect();
+        let shortcuts: Vec<usize> = every(text)
+            .into_iter()
+            .enumerate()
+            .filter(|&(_, at)| markdown::shortcut_at(text, at))
+            .map(|(p, _)| p)
+            .collect();
+        let words: Vec<Value> = every(text)
+            .into_iter()
+            .map(|at| {
+                let (s, e) = markdown::word_at(text, at);
+                json!([points(s), points(e)])
+            })
+            .collect();
+        let ours = json!({
+            "blocks": blocks,
+            "escaped": markdown::escape(text),
+            "plain": markdown::plain(text),
+            "shortcuts": shortcuts,
+            "tags": tags,
+            "text": text,
+            "uses": markdown::uses(text),
+            "words": words,
+        });
+        assert_eq!(&ours, case, "{text:?}");
+    }
+    let span_kind = |name: &str| match name {
+        "bold" => Ok(SpanKind::Bold),
+        "italic" => Ok(SpanKind::Italic),
+        "strike" => Ok(SpanKind::Strike),
+        "code" => Ok(SpanKind::Code),
+        _ => Err(format!("a span kind: {name}")),
+    };
+    let block_kind = |name: &str| match name {
+        "paragraph" => Ok(BlockKind::Paragraph),
+        "heading1" => Ok(BlockKind::Heading1),
+        "heading2" => Ok(BlockKind::Heading2),
+        "bullet" => Ok(BlockKind::Bullet),
+        "numbered" => Ok(BlockKind::Numbered),
+        "quote" => Ok(BlockKind::Quote),
+        _ => Err(format!("a block kind: {name}")),
+    };
+    let edits = fixture["edits"].as_array().ok_or("edits")?;
+    assert!(edits.len() >= 50);
+    for edit in edits {
+        let text = edit["text"].as_str().ok_or("text")?;
+        let at = |key: &str| -> Result<usize, Box<dyn std::error::Error>> {
+            Ok(byte(text, edit[key].as_u64().ok_or("an offset")? as usize))
+        };
+        let (start, end) = (at("start")?, at("end")?);
+        let kind = edit["kind"].as_str().unwrap_or_default();
+        let got: Change = match edit["op"].as_str().ok_or("op")? {
+            "toggle" => toggle(text, start, end, span_kind(kind)?)?,
+            "link" => link(text, start, end, edit["url"].as_str().ok_or("url")?),
+            "line" => toggle_line(text, start, end, block_kind(kind)?),
+            "indent" => indent(text, start, end, false),
+            "outdent" => indent(text, start, end, true),
+            op => return Err(format!("an op: {op}").into()),
+        };
+        let points = |at: usize| got.text.get(..at).map(|t| t.chars().count());
+        let ours = json!({
+            "end": points(got.end),
+            "start": points(got.start),
+            "text": got.text,
+        });
+        assert_eq!(&ours, &edit["result"], "{edit}");
+    }
+    for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
+        assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
     }
     Ok(())
 }

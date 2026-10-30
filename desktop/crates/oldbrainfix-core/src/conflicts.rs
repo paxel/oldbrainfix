@@ -412,6 +412,24 @@ mod tests {
     }
 
     #[test]
+    fn a_conflict_over_a_formatted_text_is_resolved_as_over_a_plain_one() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let note = Notes::new(&a).capture_as("Milk", crate::text_format::MARKDOWN, None, None)?;
+        send(&a, &b)?;
+        Notes::new(&a).edit(&note.id, "**Milk**")?;
+        Notes::new(&b).edit(&note.id, "*Milk*")?;
+        send(&b, &a)?;
+        let conflict = a.conflicts()?.remove(0);
+        assert!(conflict.resolvable());
+        a.resolve_conflict(&conflict, &conflict.versions[0])?;
+        assert!(a.conflicts()?.is_empty());
+        let format = Notes::new(&a).by_id(&note.id)?.map(|n| n.text_format);
+        assert_eq!(format.as_deref(), Some(crate::text_format::MARKDOWN));
+        Ok(())
+    }
+
+    #[test]
     fn a_text_written_before_its_format_is_the_same_as_it_marked_plain() -> Result<()> {
         let a = device(1)?;
         let b = device(2)?;

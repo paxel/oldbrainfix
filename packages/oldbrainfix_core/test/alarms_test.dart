@@ -113,6 +113,14 @@ void main() {
       ]);
     });
 
+    test('names a formatted Note as it reads, without its marks', () {
+      routines.spawn(
+        notes.capture('**pills** ~~now~~', format: TextFormats.markdown).id,
+        daily([at(20)]),
+      );
+      expect(alarms.plan(europe).first.text, 'pills now');
+    });
+
     test('looks ahead the horizon, so alarms go on without the app', () {
       routines.spawn(notes.capture('pills').id, daily([at(20)]));
       final planned = alarms.plan(europe);

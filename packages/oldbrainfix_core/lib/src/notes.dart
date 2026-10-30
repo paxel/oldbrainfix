@@ -301,6 +301,9 @@ class Note {
   /// When the Note was captured.
   DateTime get captured => context.captured;
 
+  /// [text] as it reads without its marks, for search and previews.
+  String get visibleText => TextFormats.visible(textFormat, text);
+
   bool get isTrashed => trashed != null;
 
   bool get isMerged => mergedInto != null;
@@ -384,6 +387,9 @@ class Section {
     this.removedTranscripts = const [],
     this.removedPhotoTexts = const [],
   });
+
+  /// [text] as it reads without its marks, as for [Note.visibleText].
+  String get visibleText => TextFormats.visible(textFormat, text);
 }
 
 /// How a diary of cards is ordered.
@@ -432,17 +438,19 @@ class Notes {
   /// Captures a new Note at the store's now with [text], [photos] and
   /// voice [recordings], filed into the Area or Topic [place] when one is
   /// given, nudged [nudgeIn] from now while it is Unsorted. The text may
-  /// be empty for a photo or voice Note. The photos are kept without
-  /// their metadata. A Note shared in from another app records it as
-  /// [sourceApp].
+  /// be empty for a photo or voice Note, and is in [format]. The photos
+  /// are kept without their metadata. A Note shared in from another app
+  /// records it as [sourceApp].
   Note capture(
     String text, {
+    String format = TextFormats.plain,
     String? place,
     Duration? nudgeIn,
     List<Uint8List> photos = const [],
     List<Uint8List> recordings = const [],
     SourceApp? sourceApp,
   }) {
+    _requireFormat(format);
     if (place != null && !Places(store).isPlace(place)) {
       throw ArgumentError.value(place, 'place', 'not an Area or Topic');
     }
@@ -460,7 +468,7 @@ class Notes {
       store.append(
         id,
         NoteKeys.text,
-        StoredText.plain(text).encode(),
+        StoredText.of(format, text).encode(),
         date: now,
       );
       if (place != null) store.append(id, NoteKeys.place, place, date: now);
@@ -707,7 +715,12 @@ class Notes {
   /// Fixes the text of the Note [noteId] in place. The old text stays in
   /// the log only. A text in a format this version does not know is
   /// never overwritten (ADR 0018).
-  void edit(String noteId, String text) {
+  ///
+  /// The text keeps the Note's format, or takes [format] when one is
+  /// given; a formatted text stays formatted, whatever [format] says
+  /// (ADR 0033).
+  void edit(String noteId, String text, {String? format}) {
+    if (format != null) _requireFormat(format);
     final note = byId(noteId);
     if (note == null) {
       throw ArgumentError.value(noteId, 'noteId', 'not a Note');
@@ -715,7 +728,51 @@ class Notes {
     if (!note.textEditable) {
       throw StateError('the text of $noteId is in a format not known here');
     }
-    store.append(noteId, NoteKeys.text, StoredText.plain(_text(text)).encode());
+    final written = note.textFormat == TextFormats.markdown
+        ? TextFormats.markdown
+        : format ?? note.textFormat;
+    store.append(
+      noteId,
+      NoteKeys.text,
+      StoredText.of(written, _text(text)).encode(),
+    );
+  }
+
+  /// Puts the text of the Note [noteId] in [format] as it is: a plain
+  /// text becomes formatted, for its first format. A formatted text
+  /// stays formatted, and nothing is written when the format is the
+  /// same.
+  void setFormat(String noteId, String format) {
+    _requireFormat(format);
+    final note = byId(noteId);
+    if (note == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note');
+    }
+    if (note.textFormat == format ||
+        note.textFormat == TextFormats.markdown ||
+        note.text.trim().isEmpty) {
+      return;
+    }
+    edit(noteId, note.text, format: format);
+  }
+
+  /// Takes the Transcript or Photo Text [generated] over into the text
+  /// of the Note [noteId] (ADR 0025): it becomes the text, or with
+  /// [append] goes on a line of its own after it. Into a formatted text
+  /// it goes as plain text, escaped so that it reads as itself. Gives
+  /// the text written.
+  String takeOver(String noteId, String generated, {required bool append}) {
+    final note = byId(noteId);
+    if (note == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note');
+    }
+    final taken = TextFormats.literal(note.textFormat, generated);
+    final text = note.text;
+    final joined = !append || text.trim().isEmpty
+        ? taken
+        : '${text.trimRight()}\n$taken';
+    edit(noteId, joined);
+    return _text(joined);
   }
 
   /// When the text of the Note [noteId] was last set, by capture or edit;
@@ -729,9 +786,14 @@ class Notes {
     return latest;
   }
 
-  /// Amends the Note [noteId] with a new Section holding [text], captured
-  /// at the store's now.
-  Section amend(String noteId, String text) {
+  /// Amends the Note [noteId] with a new Section holding [text] in
+  /// [format], captured at the store's now.
+  Section amend(
+    String noteId,
+    String text, {
+    String format = TextFormats.plain,
+  }) {
+    _requireFormat(format);
     _requireNote(noteId);
     if (!store.mayWriteIn(noteId)) {
       throw StateError('no role in the Shared Area of $noteId');
@@ -746,7 +808,7 @@ class Notes {
       store.append(
         id,
         SectionKeys.text,
-        StoredText.plain(trimmed).encode(),
+        StoredText.of(format, trimmed).encode(),
         date: now,
       );
     });
@@ -1154,6 +1216,12 @@ class Notes {
 
   void _requireNote(String id) {
     if (byId(id) == null) throw ArgumentError.value(id, 'noteId', 'not a Note');
+  }
+
+  static void _requireFormat(String format) {
+    if (!TextFormats.known.contains(format)) {
+      throw ArgumentError.value(format, 'format', 'not a format known here');
+    }
   }
 
   static String _text(String text) {

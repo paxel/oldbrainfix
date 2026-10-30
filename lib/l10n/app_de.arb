@@ -1120,5 +1120,21 @@
   "textMarkFailed": "Gescheitert",
   "textMarkChange": "Zeichen ändern",
   "textMarkInsert": "☐ an den Anfang der Zeile setzen",
-  "searchForTag": "Nach {tag} suchen"
+  "searchForTag": "Nach {tag} suchen",
+  "formatBold": "Fett",
+  "formatItalic": "Kursiv",
+  "formatStrike": "Durchstreichen",
+  "formatHeading1": "Große Überschrift",
+  "formatHeading2": "Kleine Überschrift",
+  "formatBullets": "Aufzählung",
+  "formatNumbers": "Nummerierte Liste",
+  "formatQuote": "Zitat",
+  "formatLink": "Link",
+  "formatCode": "Code",
+  "formatIndent": "Listenpunkt einrücken",
+  "formatOutdent": "Listenpunkt ausrücken",
+  "moreFormats": "Weitere Formate",
+  "linkAddress": "Web- oder E-Mail-Adresse",
+  "linkRemoveHint": "Leer lassen, um den Link zu entfernen.",
+  "linkSet": "Link setzen"
 }

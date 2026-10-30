@@ -32,6 +32,7 @@ pub mod ics;
 pub mod join;
 pub mod keys;
 pub mod lan;
+pub mod markdown;
 pub mod named_places;
 pub mod notes;
 pub mod nudges;

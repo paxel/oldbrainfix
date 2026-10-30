@@ -27,6 +27,10 @@ Nothing here overwrites it:
 
 A Sent Item (ADR 0015) carries the format of the Note's text and of every Section's text next to the text, and the version of its structure in `v` when it is more than 1: `"note":{"format":…,"sections":[{"captured":…,"format":…,"text":…,"v":…}],"text":…,"v":…}`. A file without `format` reads as plain and one without `v` as version 1; a `format` that is not a string, or a `v` that is not a whole number from 1, makes the file unreadable. Accepting writes each text in the format and version it came in, so a text in a format not known here arrives whole. An update replaces the receiver's text only as before, and in addition never replaces a text in a format not known here unless it is the text the sender sent last: what a later version of the receiver's own wrote stays, while the sender's own formatted text follows the sender's updates.
 
+## Formatted text (ADR 0033)
+
+Amended by ADR 0033 (#127): this version knows two formats, `plain` and `markdown`, both in structure version 1, and edits a text in either. A plain text becomes `markdown` at its first format and stays so; a Device of 0.1.x, which knows only `plain`, keeps a formatted text read-only as this section describes. Sent Items, the shared folder, bundles and Backups carry `markdown` as they carry any format.
+
 ## Considered Options
 
 - The format as a field of its own next to `text` (rejected: text and format could be won by latest wins from different writers, and a text would become a Conflict unit of two fields).

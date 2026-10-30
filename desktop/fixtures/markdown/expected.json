@@ -1,0 +1,243 @@
+{
+  "now": "2026-01-02T10:00:49.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Plain stars ** stay",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000002",
+      "text": "# Shopping\n- **oat milk** `#code` #real\n2\\*3 \\[x] \\_y\\_",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:05.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000003",
+      "text": "Call **mum** later",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:10.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000004",
+      "text": "- eggs\n- ~~bread~~",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:16.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000006",
+      "text": "**Packing**\n- socks\n  - wool",
+      "textFormat": "markdown",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:27.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000006",
+    "note:00000000000000000000000000000004",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000001",
+    "note:00000000000000000000000000000002",
+    "note:00000000000000000000000000000003",
+    "note:00000000000000000000000000000004"
+  ],
+  "trashed": [],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000006": [],
+    "note:00000000000000000000000000000004": [],
+    "note:00000000000000000000000000000003": [],
+    "note:00000000000000000000000000000002": [
+      {
+        "id": "section:00000000000000000000000000000005",
+        "noteId": "note:00000000000000000000000000000002",
+        "text": "> ~~old~~ *new*",
+        "textFormat": "markdown",
+        "textVersion": 1,
+        "textEditable": true,
+        "captured": "2026-01-01T10:00:21.000Z",
+        "context": {
+          "location": null,
+          "namedPlace": null,
+          "sourceApp": null,
+          "calendarEvents": [],
+          "bluetoothDevices": [],
+          "hasMore": false
+        },
+        "photos": [],
+        "recordings": [],
+        "transcripts": {},
+        "photoTexts": {},
+        "removedPhotos": [],
+        "removedRecordings": [],
+        "removedTranscripts": [],
+        "removedPhotoTexts": []
+      }
+    ],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "search": {
+    "": [
+      "note:00000000000000000000000000000006",
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000002"
+    ],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000004",
+      "note:00000000000000000000000000000003",
+      "note:00000000000000000000000000000002"
+    ],
+    "heading": [],
+    "format": [],
+    "**": [
+      "note:00000000000000000000000000000001"
+    ],
+    "milk #code": [
+      "note:00000000000000000000000000000002"
+    ],
+    "4711": []
+  },
+  "searchWithin": {},
+  "conflicts": []
+}

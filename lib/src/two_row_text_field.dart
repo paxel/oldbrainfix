@@ -71,11 +71,22 @@ int wordEdgeNear(String text, int offset) {
 ///
 /// With [marks], in either form, a tap on a ☐, ✅ or ❌ at the start of a
 /// line opens Check, Fail and Open at the finger and changes it in the
-/// text, and the bottom row has a button that puts ☐ at the start of the
-/// cursor's line (ADR 0031); a [readOnly] field has neither.
+/// text, and the bar above the keyboard has a button that puts ☐ at the
+/// start of the cursor's line (ADR 0031); a [readOnly] field has neither.
+///
+/// With [formats], for a [TagTextController], the same bar formats the
+/// selection or the word at the cursor, or the lines they touch (ADR
+/// 0033), each button telling whether the cursor is in its format. The
+/// first format makes a plain text formatted for good, and so do a
+/// format typed as Markdown (`Markdown.shortcutAt`) and a pasted text
+/// that uses one; [onFormatted] runs then. In two rows, the bottom row
+/// of a formatted text shows the source of the cursor's line only.
 class TwoRowTextField extends StatefulWidget {
   /// The height of the bottom row.
   static const rowHeight = 56.0;
+
+  /// The height of the bar of formats above it.
+  static const barHeight = 48.0;
 
   /// How long ◀ or ▶ is held before it repeats.
   static const holdDelay = Duration(milliseconds: 400);
@@ -95,6 +106,8 @@ class TwoRowTextField extends StatefulWidget {
   final TextStyle? style;
   final InputDecoration decoration;
   final bool marks;
+  final bool formats;
+  final VoidCallback? onFormatted;
 
   const TwoRowTextField({
     super.key,
@@ -105,7 +118,14 @@ class TwoRowTextField extends StatefulWidget {
     this.style,
     this.decoration = const InputDecoration(),
     this.marks = false,
+    this.formats = false,
+    this.onFormatted,
   });
+
+  /// The height of what rides on the keyboard above a field that types
+  /// in [twoRows], with the bar of formats or status marks when [bar].
+  static double above({required bool twoRows, required bool bar}) =>
+      (twoRows ? rowHeight : 0) + (bar ? barHeight : 0);
 
   @override
   State<TwoRowTextField> createState() => _TwoRowTextFieldState();
@@ -145,12 +165,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   /// Where the finger last went down on the plain field, for its tap.
   Offset? _down;
 
+  /// The text before its last change, and now, to tell what was typed
+  /// or pasted.
+  String _before = '';
+  late String _now = widget.controller.text;
+
+  /// Whether the text was formatted when last drawn.
+  bool _markdown = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _focus.addListener(_focusChanged);
     widget.controller.addListener(_changed);
+    _markdown = _formatting?.markdown ?? false;
     _row.show();
   }
 
@@ -166,7 +195,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
+      _before = '';
+      _now = widget.controller.text;
     }
+    _markdown = _formatting?.markdown ?? false;
   }
 
   @override
@@ -204,13 +236,155 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   /// Typing ends selecting: the typed text replaced the selection.
   void _changed() {
-    if (_selecting && widget.controller.text != _selectingText) {
+    final text = widget.controller.text;
+    if (text != _now) {
+      _before = _now;
+      _now = text;
+    }
+    if (_selecting && text != _selectingText) {
       setState(() => _selecting = false);
+    }
+    final markdown = _formatting?.markdown ?? false;
+    if (markdown != _markdown) setState(() => _markdown = markdown);
+  }
+
+  bool get _keyboardOpen =>
+      !widget.readOnly && _focus.hasFocus && _keyboard > 0;
+
+  bool get _rowShown => widget.twoRows && _keyboardOpen;
+
+  /// Whether the field has the bar of formats or status marks.
+  bool get _hasBar => _formatting != null || _marks;
+
+  bool get _barShown => _hasBar && _keyboardOpen;
+
+  /// The controller, when this field formats its text.
+  TagTextController? get _formatting => switch (widget.controller) {
+    final TagTextController controller
+        when widget.formats && !widget.readOnly =>
+      controller,
+    _ => null,
+  };
+
+  /// A change the user made, typed or pasted: a plain text becomes
+  /// formatted with a format typed as Markdown or pasted (ADR 0033).
+  void _userChanged(String text) {
+    final controller = _formatting;
+    if (controller == null || controller.markdown) return;
+    final before = _before;
+    final most = math.min(before.length, text.length);
+    var head = 0;
+    while (head < most && before.codeUnitAt(head) == text.codeUnitAt(head)) {
+      head++;
+    }
+    var tail = 0;
+    while (tail < most - head &&
+        before.codeUnitAt(before.length - 1 - tail) ==
+            text.codeUnitAt(text.length - 1 - tail)) {
+      tail++;
+    }
+    final inserted = text.substring(head, text.length - tail);
+    if (inserted.isEmpty) return;
+    final selection = controller.selection;
+    final cursor = selection.isValid ? selection.extentOffset : text.length;
+    if (Markdown.shortcutAt(text, cursor) ||
+        (inserted.length > 1 && Markdown.uses(inserted))) {
+      _becomeFormatted(controller);
     }
   }
 
-  bool get _rowShown =>
-      widget.twoRows && !widget.readOnly && _focus.hasFocus && _keyboard > 0;
+  void _becomeFormatted(TagTextController controller) {
+    controller.markdown = true;
+    widget.onFormatted?.call();
+  }
+
+  /// Applies [edit] of the bar to the selection, or to the cursor, and
+  /// selects what it gives; a change makes the text formatted.
+  void _format(
+    MarkdownChange Function(String text, int start, int end) edit, {
+    TextSelection? at,
+  }) {
+    final controller = _formatting;
+    if (controller == null) return;
+    final value = controller.value;
+    final text = value.text;
+    final selection = at ?? value.selection;
+    final start = selection.isValid ? selection.start : text.length;
+    final end = selection.isValid ? selection.end : text.length;
+    final change = edit(
+      text,
+      start.clamp(0, text.length),
+      end.clamp(0, text.length),
+    );
+    if (change.text == text && change.start == start && change.end == end) {
+      return;
+    }
+    if (_selecting) setState(() => _selecting = false);
+    final next = TextEditingValue(
+      text: change.text,
+      selection: TextSelection(
+        baseOffset: change.start,
+        extentOffset: change.end,
+      ),
+    );
+    final editable = _editable();
+    if (editable == null) {
+      controller.value = next;
+    } else {
+      editable.userUpdateTextEditingValue(next, SelectionChangedCause.toolbar);
+    }
+    if (change.text != text && !controller.markdown) {
+      _becomeFormatted(controller);
+    }
+  }
+
+  /// Asks for the address of a link on the selection or the word at the
+  /// cursor, the one there already offered for change.
+  Future<void> _link(String? current) async {
+    final selection = widget.controller.selection;
+    final address = await askLinkAddress(context, current);
+    if (!mounted || address == null) return;
+    _focus.requestFocus();
+    _format(
+      (text, start, end) => Markdown.link(text, start, end, address),
+      at: selection,
+    );
+  }
+
+  /// The bar's buttons not shown for want of room, in a menu at [at].
+  Future<void> _more(Offset at, List<_Format> formats) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final picked = await showMenu<_Format>(
+      context: context,
+      position: RelativeRect.fromRect(
+        overlay.globalToLocal(at) & Size.zero,
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        for (final format in formats)
+          PopupMenuItem(
+            key: ValueKey('${format.key}-more'),
+            value: format,
+            child: Row(
+              children: [
+                SizedBox(width: 32, child: format.icon(context)),
+                const SizedBox(width: 12),
+                Flexible(child: Text(format.label)),
+                if (format.active) ...[
+                  const SizedBox(width: 12),
+                  const Icon(Icons.check, size: 20),
+                ],
+              ],
+            ),
+          ),
+      ],
+    );
+    if (!mounted || picked == null) return;
+    _focus.requestFocus();
+    picked.run();
+  }
 
   /// The field's own editable text, which tells the keyboard of a moved
   /// cursor as a key press would.
@@ -469,27 +643,55 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   @override
   Widget build(BuildContext context) {
+    // Hidden or small marks must not make a line lower than the text,
+    // also where it is only read.
+    final controller = widget.controller;
+    final strut = controller is TagTextController && controller.markdown
+        ? StrutStyle.fromTextStyle(
+            widget.style ??
+                Theme.of(context).textTheme.bodyLarge ??
+                const TextStyle(),
+          )
+        : null;
+    // What rides on the keyboard must not hide the line being typed.
+    final scrollPadding = EdgeInsets.fromLTRB(
+      20,
+      20,
+      20,
+      20 + TwoRowTextField.above(twoRows: widget.twoRows, bar: _hasBar),
+    );
     if (!widget.twoRows) {
       final field = TextField(
         key: _field,
         controller: widget.controller,
+        focusNode: _focus,
         readOnly: widget.readOnly,
         autofocus: widget.autofocus,
         maxLines: null,
         textCapitalization: TextCapitalization.sentences,
         style: widget.style,
+        strutStyle: strut,
         decoration: widget.decoration,
+        onChanged: _userChanged,
+        scrollPadding: scrollPadding,
         onTap: _marks
             ? () {
                 if (_down case final at?) _tappedMark(at);
               }
             : null,
       );
-      if (!_marks) return field;
-      // The field tells its tap, not where it was.
-      return Listener(
-        onPointerDown: (event) => _down = event.position,
-        child: field,
+      final Widget tapped = !_marks
+          ? field
+          // The field tells its tap, not where it was.
+          : Listener(
+              onPointerDown: (event) => _down = event.position,
+              child: field,
+            );
+      if (!_hasBar) return tapped;
+      return OverlayPortal(
+        controller: _row,
+        overlayChildBuilder: _aboveKeyboard,
+        child: tapped,
       );
     }
     final field = TextField(
@@ -501,17 +703,13 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       maxLines: null,
       textCapitalization: TextCapitalization.sentences,
       style: widget.style,
+      strutStyle: strut,
       decoration: widget.decoration,
+      onChanged: _userChanged,
       magnifierConfiguration: TextMagnifierConfiguration.disabled,
       selectionControls: _handles,
       contextMenuBuilder: _menu,
-      // The bottom row must not hide the line being typed.
-      scrollPadding: const EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        20 + TwoRowTextField.rowHeight,
-      ),
+      scrollPadding: scrollPadding,
     );
     // The field's own gestures would let a sideways drag move the cursor:
     // they are switched off, and these, which drag nothing, take their
@@ -519,7 +717,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     // menu work as in the field.
     return OverlayPortal(
       controller: _row,
-      overlayChildBuilder: _bottomRow,
+      overlayChildBuilder: _aboveKeyboard,
       child: TextFieldTapRegion(
         child: _gestures.buildGestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -529,60 +727,226 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     );
   }
 
-  Widget _bottomRow(BuildContext context) {
-    if (!_rowShown) return const SizedBox.shrink();
-    final t = context.t;
+  /// The bar of formats and, in two rows, the bottom row, on the
+  /// keyboard while it is open.
+  Widget _aboveKeyboard(BuildContext context) {
+    final bar = _barShown;
+    final row = _rowShown;
+    if (!bar && !row) return const SizedBox.shrink();
     return Positioned(
       left: 0,
       right: 0,
       bottom: _keyboard,
       // Part of the field: a tap here keeps the keyboard open.
       child: TextFieldTapRegion(
-        child: Material(
-          key: const ValueKey('two-row-bar'),
-          elevation: 3,
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          child: SizedBox(
-            height: TwoRowTextField.rowHeight,
-            child: Row(
-              children: [
-                _StepButton(
-                  key: const ValueKey('two-row-back'),
-                  icon: Icons.arrow_left,
-                  label: _selecting ? t.selectionBack : t.cursorBack,
-                  inverted: _selecting,
-                  onDown: () => _press(forward: false),
-                  onUp: _stopRepeat,
-                  onActivate: () => _step(forward: false),
-                ),
-                Expanded(
-                  child: ListenableBuilder(
-                    listenable: widget.controller,
-                    builder: (context, _) => _CursorLine(
-                      value: widget.controller.value,
-                      selecting: _selecting,
-                      onLongPress: _toggleSelecting,
-                    ),
-                  ),
-                ),
-                if (_marks)
-                  _InsertMarkButton(
-                    key: const ValueKey('two-row-insert-mark'),
-                    label: t.textMarkInsert,
-                    onTap: _insertMark,
-                  ),
-                _StepButton(
-                  key: const ValueKey('two-row-forward'),
-                  icon: Icons.arrow_right,
-                  label: _selecting ? t.selectionForward : t.cursorForward,
-                  inverted: _selecting,
-                  onDown: () => _press(forward: true),
-                  onUp: _stopRepeat,
-                  onActivate: () => _step(forward: true),
-                ),
-              ],
-            ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (bar)
+              ListenableBuilder(
+                listenable: widget.controller,
+                builder: (context, _) => _formatBar(context),
+              ),
+            if (row) _bottomRow(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The bar of formats: ☐ first, then each format; those that find no
+  /// room go into ⋮ at its end.
+  Widget _formatBar(BuildContext context) {
+    final t = context.t;
+    final controller = _formatting;
+    final value = widget.controller.value;
+    final at = _FormatsAt.of(value, markdown: controller?.markdown ?? false);
+    void toggle(MarkdownSpanKind kind) =>
+        _format((text, start, end) => Markdown.toggle(text, start, end, kind));
+    void line(MarkdownBlockKind kind) => _format(
+      (text, start, end) => Markdown.toggleLine(text, start, end, kind),
+    );
+    Widget glyph(String text) => Text(
+      text,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    );
+    final formats = [
+      if (_marks)
+        _Format(
+          key: 'two-row-insert-mark',
+          label: t.textMarkInsert,
+          icon: (_) => const Icon(Icons.check_box_outline_blank),
+          run: _insertMark,
+        ),
+      if (controller != null) ...[
+        _Format(
+          key: 'format-bold',
+          label: t.formatBold,
+          icon: (_) => const Icon(Icons.format_bold),
+          toggles: true,
+          active: at.spans.contains(MarkdownSpanKind.bold),
+          run: () => toggle(MarkdownSpanKind.bold),
+        ),
+        _Format(
+          key: 'format-italic',
+          label: t.formatItalic,
+          icon: (_) => const Icon(Icons.format_italic),
+          toggles: true,
+          active: at.spans.contains(MarkdownSpanKind.italic),
+          run: () => toggle(MarkdownSpanKind.italic),
+        ),
+        _Format(
+          key: 'format-strike',
+          label: t.formatStrike,
+          icon: (_) => const Icon(Icons.format_strikethrough),
+          toggles: true,
+          active: at.spans.contains(MarkdownSpanKind.strike),
+          run: () => toggle(MarkdownSpanKind.strike),
+        ),
+        _Format(
+          key: 'format-heading1',
+          label: t.formatHeading1,
+          icon: (_) => glyph('H1'),
+          toggles: true,
+          active: at.line == MarkdownBlockKind.heading1,
+          run: () => line(MarkdownBlockKind.heading1),
+        ),
+        _Format(
+          key: 'format-heading2',
+          label: t.formatHeading2,
+          icon: (_) => glyph('H2'),
+          toggles: true,
+          active: at.line == MarkdownBlockKind.heading2,
+          run: () => line(MarkdownBlockKind.heading2),
+        ),
+        _Format(
+          key: 'format-bullet',
+          label: t.formatBullets,
+          icon: (_) => const Icon(Icons.format_list_bulleted),
+          toggles: true,
+          active: at.line == MarkdownBlockKind.bullet,
+          run: () => line(MarkdownBlockKind.bullet),
+        ),
+        _Format(
+          key: 'format-numbered',
+          label: t.formatNumbers,
+          icon: (_) => const Icon(Icons.format_list_numbered),
+          toggles: true,
+          active: at.line == MarkdownBlockKind.numbered,
+          run: () => line(MarkdownBlockKind.numbered),
+        ),
+        _Format(
+          key: 'format-quote',
+          label: t.formatQuote,
+          icon: (_) => const Icon(Icons.format_quote),
+          toggles: true,
+          active: at.line == MarkdownBlockKind.quote,
+          run: () => line(MarkdownBlockKind.quote),
+        ),
+        _Format(
+          key: 'format-link',
+          label: t.formatLink,
+          icon: (_) => const Icon(Icons.link),
+          toggles: true,
+          active: at.url != null,
+          run: () => unawaited(_link(at.url)),
+        ),
+        _Format(
+          key: 'format-code',
+          label: t.formatCode,
+          icon: (_) => const Icon(Icons.code),
+          toggles: true,
+          active: at.spans.contains(MarkdownSpanKind.code),
+          run: () => toggle(MarkdownSpanKind.code),
+        ),
+        _Format(
+          key: 'format-indent',
+          label: t.formatIndent,
+          icon: (_) => const Icon(Icons.format_indent_increase),
+          run: () =>
+              _format((text, start, end) => Markdown.indent(text, start, end)),
+        ),
+        _Format(
+          key: 'format-outdent',
+          label: t.formatOutdent,
+          icon: (_) => const Icon(Icons.format_indent_decrease),
+          run: () => _format(
+            (text, start, end) => Markdown.indent(text, start, end, out: true),
           ),
+        ),
+      ],
+    ];
+    return Material(
+      key: const ValueKey('format-bar'),
+      elevation: 3,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: SizedBox(
+        height: TwoRowTextField.barHeight,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final room = (constraints.maxWidth / _FormatButton.width).floor();
+            final fits = formats.length <= room;
+            final shown = fits ? formats : formats.take(room - 1).toList();
+            final rest = fits ? const <_Format>[] : formats.skip(room - 1);
+            return Row(
+              children: [
+                for (final format in shown) _FormatButton(format: format),
+                if (rest.isNotEmpty)
+                  _MoreButton(
+                    key: const ValueKey('format-more'),
+                    label: t.moreFormats,
+                    onTap: (at) => unawaited(_more(at, rest.toList())),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomRow(BuildContext context) {
+    final t = context.t;
+    return Material(
+      key: const ValueKey('two-row-bar'),
+      elevation: 3,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: SizedBox(
+        height: TwoRowTextField.rowHeight,
+        child: Row(
+          children: [
+            _StepButton(
+              key: const ValueKey('two-row-back'),
+              icon: Icons.arrow_left,
+              label: _selecting ? t.selectionBack : t.cursorBack,
+              inverted: _selecting,
+              onDown: () => _press(forward: false),
+              onUp: _stopRepeat,
+              onActivate: () => _step(forward: false),
+            ),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: widget.controller,
+                builder: (context, _) => _CursorLine(
+                  value: widget.controller.value,
+                  selecting: _selecting,
+                  onLongPress: _toggleSelecting,
+                  // The source of the formatted line being typed.
+                  lineOnly: _formatting?.markdown ?? false,
+                ),
+              ),
+            ),
+            _StepButton(
+              key: const ValueKey('two-row-forward'),
+              icon: Icons.arrow_right,
+              label: _selecting ? t.selectionForward : t.cursorForward,
+              inverted: _selecting,
+              onDown: () => _press(forward: true),
+              onUp: _stopRepeat,
+              onActivate: () => _step(forward: true),
+            ),
+          ],
         ),
       ),
     );
@@ -711,38 +1075,234 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-/// The button that puts ☐ at the start of the cursor's line; it never
-/// takes the focus.
-class _InsertMarkButton extends StatelessWidget {
+/// A button of the bar of formats: what it shows and says, whether the
+/// cursor is in its format, and what it does.
+class _Format {
+  final String key;
   final String label;
-  final VoidCallback onTap;
+  final Widget Function(BuildContext context) icon;
 
-  const _InsertMarkButton({
-    super.key,
+  /// Whether it is a format the cursor can be in, [active] or not.
+  final bool toggles;
+  final bool active;
+  final VoidCallback run;
+
+  const _Format({
+    required this.key,
     required this.label,
-    required this.onTap,
+    required this.icon,
+    required this.run,
+    this.toggles = false,
+    this.active = false,
   });
+}
+
+/// The formats at the cursor or the selection's start of a formatted
+/// text: its line's, the parts it is in, and the address of the link it
+/// is in.
+class _FormatsAt {
+  final MarkdownBlockKind line;
+  final Set<MarkdownSpanKind> spans;
+  final String? url;
+
+  const _FormatsAt(this.line, this.spans, this.url);
+
+  static const none = _FormatsAt(MarkdownBlockKind.paragraph, {}, null);
+
+  static _FormatsAt of(TextEditingValue value, {required bool markdown}) {
+    final text = value.text;
+    if (!markdown) return none;
+    final selection = value.selection;
+    final start = (selection.isValid ? selection.start : text.length).clamp(
+      0,
+      text.length,
+    );
+    final end = (selection.isValid ? selection.end : text.length).clamp(
+      start,
+      text.length,
+    );
+    final blocks = Markdown.parse(text);
+    final line = TextMarks.lineAt(text, start);
+    if (line >= blocks.length) return none;
+    final block = blocks[line];
+    final spans = <MarkdownSpanKind>{};
+    String? url;
+    void walk(List<MarkdownSpan> parts) {
+      for (final span in parts) {
+        if (span.kind == MarkdownSpanKind.text) continue;
+        if (span.contentStart <= start && end <= span.contentEnd) {
+          spans.add(span.kind);
+          if (span.kind == MarkdownSpanKind.link) url = span.url;
+          walk(span.children);
+        }
+      }
+    }
+
+    walk(block.spans);
+    return _FormatsAt(block.kind, spans, url);
+  }
+}
+
+/// A button of the bar of formats; it never takes the focus. A screen
+/// reader reads its name and, for a format, whether the cursor is in it.
+class _FormatButton extends StatelessWidget {
+  static const width = 44.0;
+
+  final _Format format;
+
+  const _FormatButton({required this.format});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final active = format.active;
+    return Semantics(
+      button: true,
+      label: format.label,
+      toggled: format.toggles ? active : null,
+      onTap: format.run,
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: ValueKey(format.key),
+        behavior: HitTestBehavior.opaque,
+        onTap: format.run,
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: active ? scheme.primaryContainer : null,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SizedBox(
+              width: width - 8,
+              height: double.infinity,
+              child: Center(
+                child: IconTheme.merge(
+                  data: IconThemeData(
+                    size: 24,
+                    color: active ? scheme.onPrimaryContainer : scheme.primary,
+                  ),
+                  child: DefaultTextStyle.merge(
+                    style: TextStyle(
+                      color: active
+                          ? scheme.onPrimaryContainer
+                          : scheme.primary,
+                    ),
+                    child: format.icon(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ⋮ at the end of the bar of formats, with the buttons that found no
+/// room; it never takes the focus.
+class _MoreButton extends StatelessWidget {
+  final String label;
+  final void Function(Offset at) onTap;
+
+  const _MoreButton({super.key, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
     label: label,
-    onTap: onTap,
+    onTap: () {
+      // A screen reader has no finger: the menu opens at the button.
+      final box = context.findRenderObject() as RenderBox?;
+      if (box == null) return;
+      onTap(box.localToGlobal(box.size.center(Offset.zero)));
+    },
     excludeSemantics: true,
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTapUp: (details) => onTap(details.globalPosition),
       child: SizedBox(
-        width: 48,
+        width: _FormatButton.width,
         height: double.infinity,
         child: Icon(
-          Icons.check_box_outline_blank,
-          size: 28,
+          Icons.more_vert,
           color: Theme.of(context).colorScheme.primary,
         ),
       ),
     ),
   );
+}
+
+/// Asks for the address of a link, [current] filled in when there is
+/// one; an empty answer removes it. Gives null when the dialog was
+/// cancelled. An address written without its kind is taken as one of the
+/// web, or of e-mail when it holds an "@", so that it opens.
+Future<String?> askLinkAddress(BuildContext context, String? current) async {
+  final address = await showDialog<String>(
+    context: context,
+    builder: (_) => _LinkDialog(current: current),
+  );
+  if (address == null) return null;
+  final trimmed = address.trim();
+  if (trimmed.isEmpty ||
+      RegExp(r'^[A-Za-z][A-Za-z0-9+.-]*:').hasMatch(trimmed)) {
+    return trimmed;
+  }
+  return trimmed.contains('@') && !trimmed.contains('/')
+      ? 'mailto:$trimmed'
+      : 'https://$trimmed';
+}
+
+class _LinkDialog extends StatefulWidget {
+  final String? current;
+
+  const _LinkDialog({required this.current});
+
+  @override
+  State<_LinkDialog> createState() => _LinkDialogState();
+}
+
+class _LinkDialogState extends State<_LinkDialog> {
+  late final _address = TextEditingController(text: widget.current ?? '');
+
+  @override
+  void dispose() {
+    _address.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.t;
+    return AlertDialog(
+      title: Text(t.formatLink),
+      content: TextField(
+        key: const ValueKey('link-address'),
+        controller: _address,
+        autofocus: true,
+        keyboardType: TextInputType.url,
+        autocorrect: false,
+        decoration: InputDecoration(
+          labelText: t.linkAddress,
+          helperText: widget.current == null ? null : t.linkRemoveHint,
+          helperMaxLines: 2,
+        ),
+        onSubmitted: (text) => Navigator.of(context).pop(text),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(t.cancel),
+        ),
+        TextButton(
+          key: const ValueKey('link-done'),
+          onPressed: () => Navigator.of(context).pop(_address.text),
+          child: Text(t.linkSet),
+        ),
+      ],
+    );
+  }
 }
 
 /// The text around the cursor on one line, the cursor in the middle and
@@ -752,10 +1312,14 @@ class _CursorLine extends StatelessWidget {
   final bool selecting;
   final VoidCallback onLongPress;
 
+  /// Whether it shows only the cursor's line, not across line breaks.
+  final bool lineOnly;
+
   const _CursorLine({
     required this.value,
     required this.selecting,
     required this.onLongPress,
+    this.lineOnly = false,
   });
 
   /// [text] from [from] to [to] as one line, the selection highlighted.
@@ -795,6 +1359,19 @@ class _CursorLine extends StatelessWidget {
     for (var i = 0; i < TwoRowTextField.reach; i++) {
       from = graphemeBefore(text, from);
       to = graphemeAfter(text, to);
+    }
+    if (lineOnly) {
+      bool breaks(int i) => text[i] == '\n' || text[i] == '\r';
+      var start = math.min(cursor, text.length);
+      while (start > from && !breaks(start - 1)) {
+        start--;
+      }
+      var end = math.min(cursor, text.length);
+      while (end < to && !breaks(end)) {
+        end++;
+      }
+      from = start;
+      to = end;
     }
     final style = theme.textTheme.titleMedium;
     final marked = TextStyle(

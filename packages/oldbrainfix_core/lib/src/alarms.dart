@@ -179,8 +179,8 @@ class PlannedAlarm {
   final WallMoment ends;
   final DateTime endsAt;
 
-  /// The text of the Note the Routine links back to; null when it is
-  /// gone.
+  /// The text of the Note the Routine links back to as it reads without
+  /// its marks ([Note.visibleText]); null when it is gone.
   final String? text;
 
   /// What that Note is titled as while [text] is blank ([Note.wordless]).
@@ -281,7 +281,7 @@ List<PlannedAlarm> alarmPlan({
           escalation: routine.escalation,
           ends: t.ends,
           endsAt: t.endsAt,
-          text: note?.text,
+          text: note?.visibleText,
           wordless: note?.wordless ?? Wordless.photo,
         ),
       );

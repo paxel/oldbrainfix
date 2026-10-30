@@ -4138,4 +4138,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String searchForTag(String tag) {
     return 'Search for $tag';
   }
+
+  @override
+  String get formatBold => 'Bold';
+
+  @override
+  String get formatItalic => 'Italic';
+
+  @override
+  String get formatStrike => 'Strike through';
+
+  @override
+  String get formatHeading1 => 'Large heading';
+
+  @override
+  String get formatHeading2 => 'Small heading';
+
+  @override
+  String get formatBullets => 'Bulleted list';
+
+  @override
+  String get formatNumbers => 'Numbered list';
+
+  @override
+  String get formatQuote => 'Quote';
+
+  @override
+  String get formatLink => 'Link';
+
+  @override
+  String get formatCode => 'Code';
+
+  @override
+  String get formatIndent => 'Indent list item';
+
+  @override
+  String get formatOutdent => 'Move list item out';
+
+  @override
+  String get moreFormats => 'More formats';
+
+  @override
+  String get linkAddress => 'Web or e-mail address';
+
+  @override
+  String get linkRemoveHint => 'Leave it empty to remove the link.';
+
+  @override
+  String get linkSet => 'Set link';
 }

@@ -15,6 +15,7 @@ import 'person_screen.dart';
 import 'profile.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
+import 'text_marks_view.dart';
 
 /// Sends the Note [noteId] as a Sent Item (ADR 0009, 0015): asks who
 /// gets it, writes the file, encrypted to that person or signed only,
@@ -436,258 +437,280 @@ class _SentItemScreenState extends State<SentItemScreen> {
     String schedule(Schedule s) => scheduleText(t, locale, s);
     return Scaffold(
       appBar: AppBar(title: Text(t.sentItemTitle)),
-      body: ListView(
-        padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
-        children: [
-          EditorPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // A sender kept here opens their Profile (#52); one
-                    // not kept yet has nothing to open until accepted.
-                    GestureDetector(
-                      onTap:
-                          opened.trust == SenderTrust.unknown ||
-                              !canOpenPerson(context, opened.sender.id)
-                          ? null
-                          : () async {
-                              await openPerson(context, opened.sender.id);
-                              if (mounted) _reopen();
-                            },
-                      child: ProfileAvatar(
-                        key: const ValueKey('sent-from-picture'),
-                        profile: opened.sender,
-                        size: 48,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        t.sentItemFrom(name),
-                        style: text.titleMedium,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                _Line(icon: trustIcon, text: trustText),
-                if (_compared == _Compared.match &&
-                    opened.trust != SenderTrust.verified)
-                  _Line(
-                    icon: Icons.info_outline,
-                    text: t.sentItemVerifiedOnAccept,
-                  ),
-                if (_compared == _Compared.differ)
-                  _Line(
-                    icon: Icons.warning_amber,
-                    text: t.sentItemCodesDiffered,
-                  ),
-                if (accept != null && trust != SenderTrust.verified)
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                      key: const ValueKey('compare-codes'),
-                      onPressed: () => _compare(name),
-                      icon: const Icon(Icons.compare_arrows),
-                      label: Text(t.sentItemCompare),
-                    ),
-                  ),
-                _Line(
-                  icon: opened.encrypted ? Icons.lock_outline : Icons.lock_open,
-                  text: opened.encrypted
-                      ? t.sentItemEncrypted
-                      : t.sentItemPlain,
-                ),
-                ...switch (state) {
-                  SentItemState.fresh => const <Widget>[],
-                  SentItemState.update => [
-                    _Line(icon: Icons.update, text: t.sentItemUpdate),
-                  ],
-                  SentItemState.cancel => [
-                    _Line(
-                      icon: Icons.event_busy,
-                      text: t.sentItemCancelled(item.text),
-                    ),
-                    _Line(
-                      icon: Icons.delete_outline,
-                      text: t.sentItemCancelDetail,
-                    ),
-                  ],
-                  SentItemState.upToDate => [
-                    _Line(icon: Icons.check, text: t.sentItemAlready),
-                  ],
-                  SentItemState.nothingToCancel => [
-                    _Line(
-                      icon: Icons.info_outline,
-                      text: t.sentItemNothingToCancel,
-                    ),
-                  ],
-                },
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (accept != null)
-                      FilledButton.icon(
-                        key: const ValueKey('accept-sent'),
-                        onPressed: () => _accept(context),
-                        icon: const Icon(Icons.check),
-                        label: Text(accept),
-                      ),
-                    OutlinedButton.icon(
-                      key: const ValueKey('decline-sent'),
-                      onPressed: () =>
-                          accept == null ? _close(context) : _decline(context),
-                      icon: const Icon(Icons.close),
-                      label: Text(
-                        accept == null ? t.sentItemClose : t.sentItemDecline,
-                      ),
-                    ),
-                  ],
-                ),
-                if (!_fromSelf) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    key: const ValueKey('block-sent'),
-                    onPressed: () => _declineAndBlock(name),
-                    icon: const Icon(Icons.block),
-                    label: Text(t.sentItemBlock),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (opened.changes case final changes?)
+      // Its tags are shown, not followed: the preview is no place to
+      // leave before Accept or Decline.
+      body: TagSearchScope(
+        onSearch: null,
+        child: ListView(
+          padding: clearOfSystemBars(context, const EdgeInsets.all(16)),
+          children: [
             EditorPanel(
-              heading: t.sentItemChanges,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (changes.restores)
-                    _Line(icon: Icons.restore, text: t.sentItemRestores),
-                  if (changes.textBefore case final before?) ...[
-                    _Line(icon: Icons.notes, text: t.sentItemTextWas(before)),
-                    _Line(
-                      icon: Icons.edit_note,
-                      text: t.sentItemTextNow(item.text),
-                    ),
-                    if (changes.textEdited)
-                      _Line(
-                        icon: Icons.warning_amber,
-                        text: t.sentItemTextYours,
-                      ),
-                  ],
-                  if (changes.makesChecklist)
-                    _Line(
-                      icon: Icons.checklist,
-                      text: t.sentItemMakesChecklist,
-                    ),
-                  if (changes.makesPlain)
-                    _Line(icon: Icons.notes, text: t.sentItemMakesPlain),
-                  for (final l in changes.linesAdded)
-                    _Line(
-                      icon: Icons.playlist_add,
-                      text: t.sentItemLineAdded(l.text),
-                    ),
-                  for (final r in changes.linesRenamed)
-                    _Line(
-                      icon: Icons.edit_outlined,
-                      text: t.sentItemLineRenamed(r.before, r.after),
-                    ),
-                  for (final l in changes.linesRemoved)
-                    _Line(
-                      icon: Icons.playlist_remove,
-                      text: t.sentItemLineRemoved(l.text),
-                    ),
-                  for (final s in changes.sectionsAdded)
-                    _Line(
-                      icon: Icons.add,
-                      text: t.sentItemSectionAdded(s.text),
-                    ),
-                  for (final r in changes.rescheduled)
-                    _Line(
-                      icon: Icons.schedule,
-                      text: t.sentItemRescheduled(
-                        schedule(r.before),
-                        schedule(r.after),
-                      ),
-                    ),
-                  for (final r in changes.routinesAdded)
-                    _Line(
-                      icon: Icons.alarm_add,
-                      text: t.sentItemRoutineAdded(schedule(r.schedule)),
-                    ),
-                  for (final r in changes.routinesRemoved)
-                    _Line(
-                      icon: Icons.alarm_off,
-                      text: t.sentItemRoutineRemoved(schedule(r.schedule)),
-                    ),
-                  if (changes.isEmpty)
-                    _Line(icon: Icons.check, text: t.sentItemNoChanges),
-                  const SizedBox(height: 4),
-                  Text(t.sentItemKeeps, style: text.bodySmall),
-                ],
-              ),
-            ),
-          EditorPanel(
-            heading: t.noteTitle,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(item.text, style: text.bodyLarge),
-                // The Lines of a Checklist, to look at, not to check.
-                if (item.lines case final lines? when full)
-                  ChecklistLines(
-                    key: const ValueKey('sent-lines'),
-                    lines: [
-                      for (final l in lines)
-                        (
-                          id: l.id,
-                          text: l.text,
-                          inGroup: l.indent,
-                          below: null,
-                          checked: l.checked,
+                  Row(
+                    children: [
+                      // A sender kept here opens their Profile (#52); one
+                      // not kept yet has nothing to open until accepted.
+                      GestureDetector(
+                        onTap:
+                            opened.trust == SenderTrust.unknown ||
+                                !canOpenPerson(context, opened.sender.id)
+                            ? null
+                            : () async {
+                                await openPerson(context, opened.sender.id);
+                                if (mounted) _reopen();
+                              },
+                        child: ProfileAvatar(
+                          key: const ValueKey('sent-from-picture'),
+                          profile: opened.sender,
+                          size: 48,
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          t.sentItemFrom(name),
+                          style: text.titleMedium,
+                        ),
+                      ),
                     ],
                   ),
-              ],
-            ),
-          ),
-          if (full && item.routines.isNotEmpty)
-            EditorPanel(
-              heading: t.routinesHeading,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final r in item.routines)
+                  const SizedBox(height: 8),
+                  _Line(icon: trustIcon, text: trustText),
+                  if (_compared == _Compared.match &&
+                      opened.trust != SenderTrust.verified)
                     _Line(
-                      icon: r.schedule.once
-                          ? Icons.notifications_outlined
-                          : Icons.repeat,
-                      text: schedule(r.schedule),
+                      icon: Icons.info_outline,
+                      text: t.sentItemVerifiedOnAccept,
                     ),
+                  if (_compared == _Compared.differ)
+                    _Line(
+                      icon: Icons.warning_amber,
+                      text: t.sentItemCodesDiffered,
+                    ),
+                  if (accept != null && trust != SenderTrust.verified)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        key: const ValueKey('compare-codes'),
+                        onPressed: () => _compare(name),
+                        icon: const Icon(Icons.compare_arrows),
+                        label: Text(t.sentItemCompare),
+                      ),
+                    ),
+                  _Line(
+                    icon: opened.encrypted
+                        ? Icons.lock_outline
+                        : Icons.lock_open,
+                    text: opened.encrypted
+                        ? t.sentItemEncrypted
+                        : t.sentItemPlain,
+                  ),
+                  ...switch (state) {
+                    SentItemState.fresh => const <Widget>[],
+                    SentItemState.update => [
+                      _Line(icon: Icons.update, text: t.sentItemUpdate),
+                    ],
+                    SentItemState.cancel => [
+                      _Line(
+                        icon: Icons.event_busy,
+                        text: t.sentItemCancelled(
+                          TextFormats.visible(item.textFormat, item.text),
+                        ),
+                      ),
+                      _Line(
+                        icon: Icons.delete_outline,
+                        text: t.sentItemCancelDetail,
+                      ),
+                    ],
+                    SentItemState.upToDate => [
+                      _Line(icon: Icons.check, text: t.sentItemAlready),
+                    ],
+                    SentItemState.nothingToCancel => [
+                      _Line(
+                        icon: Icons.info_outline,
+                        text: t.sentItemNothingToCancel,
+                      ),
+                    ],
+                  },
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (accept != null)
+                        FilledButton.icon(
+                          key: const ValueKey('accept-sent'),
+                          onPressed: () => _accept(context),
+                          icon: const Icon(Icons.check),
+                          label: Text(accept),
+                        ),
+                      OutlinedButton.icon(
+                        key: const ValueKey('decline-sent'),
+                        onPressed: () => accept == null
+                            ? _close(context)
+                            : _decline(context),
+                        icon: const Icon(Icons.close),
+                        label: Text(
+                          accept == null ? t.sentItemClose : t.sentItemDecline,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!_fromSelf) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      key: const ValueKey('block-sent'),
+                      onPressed: () => _declineAndBlock(name),
+                      icon: const Icon(Icons.block),
+                      label: Text(t.sentItemBlock),
+                    ),
+                  ],
                 ],
               ),
             ),
-          if (full)
-            for (final section in item.sections)
+            if (opened.changes case final changes?)
               EditorPanel(
+                heading: t.sentItemChanges,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(section.text, style: text.bodyLarge),
+                    if (changes.restores)
+                      _Line(icon: Icons.restore, text: t.sentItemRestores),
+                    if (changes.textBefore case final before?) ...[
+                      _Line(icon: Icons.notes, text: t.sentItemTextWas(before)),
+                      _Line(
+                        icon: Icons.edit_note,
+                        text: t.sentItemTextNow(
+                          TextFormats.visible(item.textFormat, item.text),
+                        ),
+                      ),
+                      if (changes.textEdited)
+                        _Line(
+                          icon: Icons.warning_amber,
+                          text: t.sentItemTextYours,
+                        ),
+                    ],
+                    if (changes.makesChecklist)
+                      _Line(
+                        icon: Icons.checklist,
+                        text: t.sentItemMakesChecklist,
+                      ),
+                    if (changes.makesPlain)
+                      _Line(icon: Icons.notes, text: t.sentItemMakesPlain),
+                    for (final l in changes.linesAdded)
+                      _Line(
+                        icon: Icons.playlist_add,
+                        text: t.sentItemLineAdded(l.text),
+                      ),
+                    for (final r in changes.linesRenamed)
+                      _Line(
+                        icon: Icons.edit_outlined,
+                        text: t.sentItemLineRenamed(r.before, r.after),
+                      ),
+                    for (final l in changes.linesRemoved)
+                      _Line(
+                        icon: Icons.playlist_remove,
+                        text: t.sentItemLineRemoved(l.text),
+                      ),
+                    for (final s in changes.sectionsAdded)
+                      _Line(
+                        icon: Icons.add,
+                        text: t.sentItemSectionAdded(
+                          TextFormats.visible(s.format, s.text),
+                        ),
+                      ),
+                    for (final r in changes.rescheduled)
+                      _Line(
+                        icon: Icons.schedule,
+                        text: t.sentItemRescheduled(
+                          schedule(r.before),
+                          schedule(r.after),
+                        ),
+                      ),
+                    for (final r in changes.routinesAdded)
+                      _Line(
+                        icon: Icons.alarm_add,
+                        text: t.sentItemRoutineAdded(schedule(r.schedule)),
+                      ),
+                    for (final r in changes.routinesRemoved)
+                      _Line(
+                        icon: Icons.alarm_off,
+                        text: t.sentItemRoutineRemoved(schedule(r.schedule)),
+                      ),
+                    if (changes.isEmpty)
+                      _Line(icon: Icons.check, text: t.sentItemNoChanges),
                     const SizedBox(height: 4),
-                    Text(
-                      when.format(section.captured.toLocal()),
-                      style: text.labelMedium,
-                    ),
+                    Text(t.sentItemKeeps, style: text.bodySmall),
                   ],
                 ),
               ),
-        ],
+            EditorPanel(
+              heading: t.noteTitle,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MarkedText(
+                    item.text,
+                    format: item.textFormat,
+                    style: text.bodyLarge,
+                  ),
+                  // The Lines of a Checklist, to look at, not to check.
+                  if (item.lines case final lines? when full)
+                    ChecklistLines(
+                      key: const ValueKey('sent-lines'),
+                      lines: [
+                        for (final l in lines)
+                          (
+                            id: l.id,
+                            text: l.text,
+                            inGroup: l.indent,
+                            below: null,
+                            checked: l.checked,
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            if (full && item.routines.isNotEmpty)
+              EditorPanel(
+                heading: t.routinesHeading,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final r in item.routines)
+                      _Line(
+                        icon: r.schedule.once
+                            ? Icons.notifications_outlined
+                            : Icons.repeat,
+                        text: schedule(r.schedule),
+                      ),
+                  ],
+                ),
+              ),
+            if (full)
+              for (final section in item.sections)
+                EditorPanel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      MarkedText(
+                        section.text,
+                        format: section.format,
+                        style: text.bodyLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        when.format(section.captured.toLocal()),
+                        style: text.labelMedium,
+                      ),
+                    ],
+                  ),
+                ),
+          ],
+        ),
       ),
     );
   }

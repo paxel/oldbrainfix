@@ -132,6 +132,29 @@ void main() {
       expect(await field(tester), 'doctor\nRoom 12');
     });
 
+    testWidgets('Append into a formatted Note writes the Transcript '
+        'escaped, so it reads as itself', (tester) async {
+      final captured = notes.capture(
+        '**doctor**',
+        format: TextFormats.markdown,
+        recordings: [talk],
+      );
+      notes.setTranscript(
+        captured.id,
+        captured.recordings.single,
+        'Bring *2* cards',
+      );
+      await start(tester);
+      await edit(tester, captured.id);
+      await tap(tester, key('append-text', captured.recordings.single));
+
+      final note = notes.byId(captured.id)!;
+      expect(note.text, '**doctor**\nBring \\*2\\* cards');
+      expect(note.textFormat, TextFormats.markdown);
+      expect(note.visibleText, 'doctor\nBring *2* cards');
+      expect(await field(tester), '**doctor**\nBring \\*2\\* cards');
+    });
+
     testWidgets('Append saves what was typed first', (tester) async {
       final note = mixed();
       await start(tester);

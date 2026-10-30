@@ -19,7 +19,7 @@ List<Note> shoppingListsToAddTo(Store store, AppLock? lock) => [
 /// What a Shopping List is called where it is picked: the first line of
 /// its text, "Shopping List" while that is blank.
 String shoppingTitle(AppLocalizations t, Note note) =>
-    switch (note.text.trim().split('\n').first.trim()) {
+    switch (note.visibleText.trim().split('\n').first.trim()) {
       '' => t.shoppingHeading,
       final title => title,
     };

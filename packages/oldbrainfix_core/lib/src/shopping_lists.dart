@@ -318,7 +318,7 @@ class ShoppingLists {
   /// text, every other line not blank becomes a Line, indented or not,
   /// struck when it starts with "✓ ". Every Line comes in at one moment,
   /// so they show in the order of the text. Takes it out of Unsorted, as
-  /// a Checklist does.
+  /// a Checklist does. The text keeps its format.
   void make(String noteId) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
@@ -331,7 +331,11 @@ class ShoppingLists {
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ShoppingKeys.kindOf(making));
       if (title != note.text) {
-        store.append(noteId, NoteKeys.text, StoredText.plain(title).encode());
+        store.append(
+          noteId,
+          NoteKeys.text,
+          StoredText.of(note.textFormat, title).encode(),
+        );
       }
       if (!note.spawned) {
         store.append(
@@ -358,8 +362,8 @@ class ShoppingLists {
 
   /// Turns the Shopping List of [noteId] back into a plain Note: every
   /// Line that shows goes into its text, one per line, under its text,
-  /// a struck one marked "✓ ". The Lines and their checks stay in the
-  /// log.
+  /// a struck one marked "✓ ", in the format the text is in. The Lines
+  /// and their checks stay in the log.
   void toPlain(String noteId, WallClock wallClock) {
     final (note, list) = _requireList(noteId, wallClock);
     if (!store.mayChange(noteId)) throw StateError('may not change $noteId');
@@ -368,7 +372,11 @@ class ShoppingLists {
     }
     final text = plainText(note.text, list);
     store.batch(() {
-      store.append(noteId, NoteKeys.text, StoredText.plain(text).encode());
+      store.append(
+        noteId,
+        NoteKeys.text,
+        StoredText.of(note.textFormat, text).encode(),
+      );
       store.append(noteId, ChecklistKeys.kind, null);
     });
   }

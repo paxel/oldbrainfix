@@ -393,7 +393,8 @@ class Checklists {
   /// Makes the Note [noteId] a Checklist: its first line stays its text,
   /// every other line not blank becomes a Line, under the line above
   /// when it starts with a space or a tab, checked when it starts with
-  /// "✓ ". Takes it out of Unsorted, as a Tally does.
+  /// "✓ ". Takes it out of Unsorted, as a Tally does. The text keeps its
+  /// format.
   void make(String noteId) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
@@ -406,7 +407,11 @@ class Checklists {
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ChecklistKeys.kindOf(making));
       if (title != note.text) {
-        store.append(noteId, NoteKeys.text, StoredText.plain(title).encode());
+        store.append(
+          noteId,
+          NoteKeys.text,
+          StoredText.of(note.textFormat, title).encode(),
+        );
       }
       if (!note.spawned) {
         store.append(
@@ -433,8 +438,8 @@ class Checklists {
 
   /// Turns the Checklist of [noteId] back into a plain Note: every Line
   /// goes into its text, one per line, under its text, a checked one
-  /// marked "✓ ", one of a group indented. The Lines and their checks
-  /// stay in the log.
+  /// marked "✓ ", one of a group indented, in the format the text is in.
+  /// The Lines and their checks stay in the log.
   void toPlain(String noteId) {
     final (note, list) = _requireList(noteId);
     if (!store.mayChange(noteId)) throw StateError('may not change $noteId');
@@ -443,7 +448,11 @@ class Checklists {
     }
     final text = plainText(note.text, list);
     store.batch(() {
-      store.append(noteId, NoteKeys.text, StoredText.plain(text).encode());
+      store.append(
+        noteId,
+        NoteKeys.text,
+        StoredText.of(note.textFormat, text).encode(),
+      );
       store.append(noteId, ChecklistKeys.kind, null);
     });
   }

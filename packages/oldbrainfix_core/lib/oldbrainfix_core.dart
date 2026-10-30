@@ -24,6 +24,7 @@ export 'src/ics.dart';
 export 'src/lan.dart';
 export 'src/lan_host.dart';
 export 'src/locks.dart';
+export 'src/markdown.dart';
 export 'src/named_places.dart';
 export 'src/notes.dart';
 export 'src/nudges.dart';

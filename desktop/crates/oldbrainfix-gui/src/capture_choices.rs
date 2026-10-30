@@ -27,7 +27,7 @@ use chrono::Duration;
 use egui::{Frame, Margin, RichText, Stroke, Ui};
 use oldbrainfix_core::{
     Area, Error, Frogs, Importance, Note, Notes, Routines, Schedule, SessionRule, Sessions,
-    ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock,
+    ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock, markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
@@ -315,6 +315,7 @@ pub fn capture(
         let nudge = (!choices.sorted(place)).then_some(nudge_in);
         store.batch(|| {
             let note = Notes::new(store).capture_with(text, place, nudge, photos, recordings)?;
+            formatted(store, &note)?;
             choices.write(store, &note.id)?;
             Ok(note)
         })
@@ -332,9 +333,18 @@ pub fn capture(
         };
     }
     // Until the Transcripts are there, the Note holds all of it.
-    Notes::new(store)
-        .capture_with(text, None, None, &[], recordings)
-        .map(Captured::Waiting)
+    let note = Notes::new(store).capture_with(text, None, None, &[], recordings)?;
+    formatted(store, &note)?;
+    Ok(Captured::Waiting(note))
+}
+
+/// Makes the text of the Note `note`, just captured, a formatted text
+/// when it was typed or pasted with a format (#127, ADR 0033).
+fn formatted(store: &Store, note: &Note) -> oldbrainfix_core::Result<()> {
+    if markdown::uses(&note.text) {
+        Notes::new(store).set_format(&note.id, text_format::MARKDOWN)?;
+    }
+    Ok(())
 }
 
 /// Makes each line of the text of the Note `note_id` and of its
@@ -416,7 +426,7 @@ pub fn pour_later(
 /// What a Shopping List is called where it is picked: the first line of
 /// its text, "Shopping List" while that is blank.
 pub fn shopping_title(t: &L10n, note: &Note) -> String {
-    match note.text.trim().split('\n').next().map(str::trim) {
+    match note.visible_text().trim().split('\n').next().map(str::trim) {
         Some(title) if !title.is_empty() => title.to_string(),
         _ => t.shopping_heading().to_string(),
     }

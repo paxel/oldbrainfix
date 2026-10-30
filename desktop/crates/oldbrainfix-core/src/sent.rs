@@ -1946,6 +1946,31 @@ mod tests {
     }
 
     #[test]
+    fn a_formatted_text_goes_out_and_arrives_editable() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let notes = Notes::new(&ann);
+        let note = notes.capture_as("**Milk**", text_format::MARKDOWN, None, None)?;
+        notes.amend_as(&note.id, "- oat", text_format::MARKDOWN)?;
+        let opened = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "opened")?;
+        let payload = opened.item.encode();
+        assert!(payload.contains(r#""note":{"format":"markdown","sections":["#));
+        assert_eq!(opened.item.sections[0].format, text_format::MARKDOWN);
+        let got = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        let received = Notes::new(&ben).by_id(&got)?.ok_or("note")?;
+        assert_eq!(received.text, "**Milk**");
+        assert_eq!(received.text_format, text_format::MARKDOWN);
+        assert!(received.text_editable);
+        let sections = Notes::new(&ben).sections(&got)?;
+        assert_eq!(sections[0].text_format, text_format::MARKDOWN);
+        Ok(())
+    }
+
+    #[test]
     fn every_text_travels_in_its_format_and_one_made_here_is_never_overwritten() -> TestResult {
         const FUTURE: &str = r##"{"format":"x-future","text":"# Heading"}"##;
         let ann = device(1);

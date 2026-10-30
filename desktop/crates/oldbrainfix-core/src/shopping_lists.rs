@@ -21,7 +21,7 @@ use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{Day, WallClock};
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
-use crate::text_format::StoredText;
+use crate::text_format::{StoredText, VERSION};
 use crate::transcript_prompts::{dart_trim, lower};
 use crate::{Error, Result};
 
@@ -523,7 +523,7 @@ impl<'a> ShoppingLists<'a> {
     /// text, every other line not blank becomes a Line, indented or not,
     /// struck when it starts with "✓ ". Every Line comes in at one moment,
     /// so they show in the order of the text. Takes it out of Unsorted, as
-    /// a Checklist does.
+    /// a Checklist does. The text keeps its format.
     pub fn make(&self, note_id: &str) -> Result<()> {
         let refused = || Error::Invalid(format!("{note_id} may not be made a Shopping List here"));
         let note = Notes::new(self.store).by_id(note_id)?.ok_or_else(refused)?;
@@ -539,7 +539,7 @@ impl<'a> ShoppingLists<'a> {
             let kind = keys::kind_of(&making);
             s.append(note_id, checklist_keys::KIND, Some(&kind), None)?;
             if title != note.text {
-                let text = StoredText::plain(title).encode();
+                let text = StoredText::of(&note.text_format, title, VERSION).encode();
                 s.append(note_id, note_keys::TEXT, Some(&text), None)?;
             }
             if !note.spawned {
@@ -558,7 +558,8 @@ impl<'a> ShoppingLists<'a> {
 
     /// Turns the Shopping List of `note_id` back into a plain Note: every
     /// Line that shows goes into its text, one per line, under its text, a
-    /// struck one marked "✓ ". The Lines and their checks stay in the log.
+    /// struck one marked "✓ ", in the format the text is in. The Lines and
+    /// their checks stay in the log.
     pub fn to_plain(&self, note_id: &str, wall: &WallClock) -> Result<()> {
         let (note, list) = self.require_list(note_id, wall)?;
         if !self.store.may_change(note_id)? {
@@ -569,7 +570,8 @@ impl<'a> ShoppingLists<'a> {
                 "the text of {note_id} is in a format not known here"
             )));
         }
-        let text = StoredText::plain(&ShoppingLists::plain_text(&note.text, &list)).encode();
+        let text = ShoppingLists::plain_text(&note.text, &list);
+        let text = StoredText::of(&note.text_format, &text, VERSION).encode();
         self.store.batch(|| {
             self.store
                 .append(note_id, note_keys::TEXT, Some(&text), None)?;

@@ -23,6 +23,10 @@ Offsets are each core's own, UTF-16 code units in the Dart core and UTF-8 bytes 
 
 The search stays as it is: a query is found in a text as typed, ignoring case, in the text of a Note and of its Sections, in Transcripts, Photo Texts, Tally entries and the Lines of a Checklist or a Shopping List. A tap on a tag opens the search with the tag as written. So "#Garten" finds every Note holding "#garten" in any case, and not one that only says "Garten". It also finds "#Gartenarbeit", which begins with it, and a "#garten" that is no tag, such as in "C#garten"; finding a little more is better for a memory aid than missing a Note, and typing "#gar" finds tags as they are typed.
 
+## Formatted text (ADR 0033)
+
+Amended by ADR 0033 (#127): in a formatted text, a `#word` inside inline code or inside a link's destination is no tag; one in a link's label, a heading's text or bold is. Search looks in a formatted text's visible text, without its marks.
+
 ## Considered Options
 
 - Searching for a tag as a whole tag, so that "#garten" does not find "#Gartenarbeit" (rejected: a query being typed would find nothing until the tag is complete, and a Note filed under a longer tag would be missed).

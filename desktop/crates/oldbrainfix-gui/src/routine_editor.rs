@@ -439,15 +439,17 @@ impl RoutineEditor {
                     match &self.note {
                         None => drop(ui.label(RichText::new(t.note_deleted()).color(weak))),
                         Some(note) if note.is_trashed() => {
-                            ui.label(RichText::new(&note.text).color(text));
+                            ui.label(RichText::new(note.visible_text()).color(text));
                             ui.label(RichText::new(t.note_in_trash()).color(weak));
                         }
                         Some(note) => {
                             let link = ui.horizontal(|ui| {
                                 icons::show(ui, icons::NOTE, 18.0, text);
                                 ui.add(
-                                    egui::Label::new(RichText::new(&note.text).color(text))
-                                        .sense(egui::Sense::click()),
+                                    egui::Label::new(
+                                        RichText::new(note.visible_text()).color(text),
+                                    )
+                                    .sense(egui::Sense::click()),
                                 )
                             });
                             if link

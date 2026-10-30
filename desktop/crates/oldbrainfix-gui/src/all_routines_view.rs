@@ -30,7 +30,7 @@ pub enum AllRoutinesAction {
 pub fn routine_name(t: &L10n, note: Option<&Note>) -> String {
     match note {
         Some(note) if note.text.trim().is_empty() => l10n::wordless(t, note.wordless()).to_string(),
-        Some(note) => note.text.clone(),
+        Some(note) => note.visible_text(),
         None => t.note_gone().to_string(),
     }
 }

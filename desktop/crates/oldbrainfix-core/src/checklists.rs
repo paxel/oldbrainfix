@@ -20,7 +20,7 @@ use crate::schedule::{Day, Occurrence, Schedule, WallClock};
 use crate::sent::keys as sent_keys;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
-use crate::text_format::StoredText;
+use crate::text_format::{StoredText, VERSION};
 use crate::transcript_prompts::dart_trim;
 use crate::{Error, Result};
 
@@ -703,7 +703,8 @@ impl<'a> Checklists<'a> {
     /// Makes the Note `note_id` a Checklist: its first line stays its
     /// text, every other line not blank becomes a Line, under the line
     /// above when it starts with a space or a tab, checked when it starts
-    /// with "✓ ". Takes it out of Unsorted, as a Tally does.
+    /// with "✓ ". Takes it out of Unsorted, as a Tally does. The text
+    /// keeps its format.
     pub fn make(&self, note_id: &str) -> Result<()> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let Some(note) = note else {
@@ -724,7 +725,7 @@ impl<'a> Checklists<'a> {
             let s = self.store;
             s.append(note_id, keys::KIND, Some(&keys::kind_of(&making)), None)?;
             if title != note.text {
-                let text = StoredText::plain(title).encode();
+                let text = StoredText::of(&note.text_format, title, VERSION).encode();
                 s.append(note_id, note_keys::TEXT, Some(&text), None)?;
             }
             if !note.spawned {
@@ -754,8 +755,8 @@ impl<'a> Checklists<'a> {
 
     /// Turns the Checklist of `note_id` back into a plain Note: every Line
     /// goes into its text, one per line, under its text, a checked one
-    /// marked "✓ ", one of a group indented. The Lines and their checks
-    /// stay in the log.
+    /// marked "✓ ", one of a group indented, in the format the text is
+    /// in. The Lines and their checks stay in the log.
     pub fn to_plain(&self, note_id: &str) -> Result<()> {
         let (note, list) = self.require_list(note_id)?;
         if !self.store.may_change(note_id)? {
@@ -766,7 +767,8 @@ impl<'a> Checklists<'a> {
                 "the text of {note_id} is in a format not known here"
             )));
         }
-        let text = StoredText::plain(&Checklists::plain_text(&note.text, &list)).encode();
+        let text = Checklists::plain_text(&note.text, &list);
+        let text = StoredText::of(&note.text_format, &text, VERSION).encode();
         self.store.batch(|| {
             self.store
                 .append(note_id, note_keys::TEXT, Some(&text), None)?;

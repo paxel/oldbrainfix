@@ -10,7 +10,8 @@ import 'text_format.dart';
 /// their Sections (Amends and merged Notes), the text lines of the
 /// entries of a Tally and the Lines of a Checklist or a Shopping List,
 /// but those gone. Capture Context joins later.
-/// A text in a format not known here counts as its source text.
+/// A formatted text counts as it reads without its marks (ADR 0033), a
+/// text in a format not known here as its source text.
 class Search {
   final Store store;
 
@@ -32,7 +33,7 @@ class Search {
     bool holds(String text) => text.toLowerCase().contains(wanted);
     return [
       for (final note in scope)
-        if (holds(note.text) ||
+        if (holds(note.visibleText) ||
             note.transcripts.values.any(holds) ||
             note.photoTexts.values.any(holds) ||
             (sections[note.id] ?? const []).any(holds))
@@ -48,16 +49,13 @@ class Search {
   Map<String, List<String>> _sectionTexts(Notes notes) {
     final texts = <String, List<String>>{};
     for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
-      if (notes.byId(id) case Note(
-        mergedInto: final into?,
-        :final text,
-        :final transcripts,
-        :final photoTexts,
-      )) {
+      if (notes.byId(id) case final note?) {
+        final into = note.mergedInto;
+        if (into == null) continue;
         (texts[into] ??= []).addAll([
-          text,
-          ...transcripts.values,
-          ...photoTexts.values,
+          note.visibleText,
+          ...note.transcripts.values,
+          ...note.photoTexts.values,
         ]);
       }
     }
@@ -67,7 +65,7 @@ class Search {
       if (owner == null) continue;
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
       (texts[shownUnder] ??= []).add(
-        StoredText.read(fields[SectionKeys.text]).text,
+        StoredText.read(fields[SectionKeys.text]).visible,
       );
     }
     for (final id in store.entitiesOfType(TallyKeys.typeEntry)) {

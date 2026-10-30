@@ -98,13 +98,18 @@ Future<bool> amendNote(
   String noteId, {
   VoidCallback? attached,
 }) async {
-  final text = await showDialog<String>(
+  final typed = await showDialog<({String text, bool markdown})>(
     context: context,
     builder: (_) => _AmendDialog(twoRows: notes.store.twoRowEditorOn),
   );
-  final trimmed = text?.trim();
-  if (!context.mounted || trimmed == null || trimmed.isEmpty) return false;
-  final section = notes.amend(noteId, trimmed);
+  final trimmed = typed?.text.trim();
+  if (!context.mounted || typed == null || trimmed == null) return false;
+  if (trimmed.isEmpty) return false;
+  final section = notes.amend(
+    noteId,
+    trimmed,
+    format: typed.markdown ? TextFormats.markdown : TextFormats.plain,
+  );
   final here = currentIfGranted(LocationScope.of(context));
   final extras = currentExtras(notes.store, ContextScope.of(context));
   for (final attaching in [
@@ -396,8 +401,11 @@ class NoteEditorScreen extends StatefulWidget {
 }
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
-  /// Its tags are highlighted as they are typed (ADR 0032).
-  final _text = TagTextController();
+  /// Its tags are highlighted as they are typed (ADR 0032), a formatted
+  /// text formatted, its marks shown in the bottom row (ADR 0033).
+  late final _text = TagTextController(
+    hideMarks: widget.notes.store.twoRowEditorOn,
+  );
   late final _twoRows = widget.notes.store.twoRowEditorOn;
   late final AppLifecycleListener _lifecycle;
   Timer? _draftTimer;
@@ -440,7 +448,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void initState() {
     super.initState();
     _load();
-    _text.text = _placed?.note.text ?? '';
+    _show();
     _text.addListener(_typed);
     _lifecycle = AppLifecycleListener(onStateChange: _lifecycleChanged);
     _restoreDraft();
@@ -554,6 +562,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _reload() => setState(_load);
 
+  /// Puts the Note's text as it is stored into the field, in its format.
+  void _show() {
+    final note = _placed?.note;
+    _text.markdown = note?.textFormat == TextFormats.markdown;
+    _text.text = note?.text ?? '';
+  }
+
   /// Writes the text when it changed; a blank text keeps the old one.
   /// The draft goes either way: the log now holds what counts.
   void _saveText() {
@@ -564,8 +579,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     // A text in a format not known here is never overwritten.
     if (!note.textEditable) return;
     final text = _text.text.trim();
-    if (text.isEmpty || text == note.text) return;
-    widget.notes.edit(note.id, text);
+    // The first format makes it formatted for good (ADR 0033).
+    final formats = _text.markdown && note.textFormat != TextFormats.markdown;
+    if (text.isEmpty || (text == note.text && !formats)) return;
+    widget.notes.edit(
+      note.id,
+      text,
+      format: _text.markdown ? TextFormats.markdown : null,
+    );
     _load();
   }
 
@@ -681,17 +702,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     final target = widget.notes.byId(id);
     if (target == null || !target.textEditable) return;
-    final text = target.text;
-    widget.notes.edit(
-      id,
-      !append
-          ? generated
-          : text.trim().isEmpty
-          ? generated
-          : '${text.trimRight()}\n$generated',
-    );
+    // Into a formatted text it goes escaped, reading as itself.
+    widget.notes.takeOver(id, generated, append: append);
     setState(_load);
-    if (id == widget.noteId) _text.text = _placed?.note.text ?? '';
+    if (id == widget.noteId) _show();
   }
 
   /// Removes the Photo Text ([photo]) or Transcript of [hash] of the Note
@@ -840,7 +854,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     if (!makeChecklist(widget.notes, widget.noteId)) return;
     setState(_load);
-    _text.text = _placed?.note.text ?? '';
+    _show();
   }
 
   /// Makes the Note a Shopping List of its text as typed, as
@@ -849,7 +863,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveText();
     if (!makeShoppingList(widget.notes, widget.noteId)) return;
     setState(_load);
-    _text.text = _placed?.note.text ?? '';
+    _show();
   }
 
   /// Turns the Checklist or Shopping List back into a plain Note: the
@@ -859,7 +873,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final back = _isShopping ? shoppingListToPlain : checklistToPlain;
     if (!back(widget.notes, widget.noteId)) return;
     setState(_load);
-    _text.text = _placed?.note.text ?? '';
+    _show();
   }
 
   /// Asks once whether the Note goes to the trash, with the same dialog
@@ -940,6 +954,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   readOnly: !changes || !note.textEditable,
                   // Its status marks change as its text (ADR 0031).
                   marks: true,
+                  // The first format is written at once (ADR 0033).
+                  formats: true,
+                  onFormatted: () => setState(_saveText),
                   style: Theme.of(context).textTheme.bodyLarge,
                   decoration: const InputDecoration(
                     filled: false,
@@ -1151,6 +1168,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     if (section.text.isNotEmpty)
                       MarkedText(
                         section.text,
+                        format: section.textFormat,
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     for (final hash in section.photos) ...[
@@ -1401,7 +1419,8 @@ class _AmendDialog extends StatefulWidget {
 }
 
 class _AmendDialogState extends State<_AmendDialog> {
-  final _text = TextEditingController();
+  /// Formatted once a format is applied (ADR 0033).
+  late final _text = TagTextController(hideMarks: widget.twoRows);
 
   @override
   void dispose() {
@@ -1414,9 +1433,9 @@ class _AmendDialogState extends State<_AmendDialog> {
     final t = context.t;
     final media = MediaQuery.of(context);
     final keyboard = media.viewInsets.bottom;
-    // The dialog stays clear of the bottom row above the keyboard.
-    final below = widget.twoRows && keyboard > 0
-        ? keyboard + TwoRowTextField.rowHeight
+    // The dialog stays clear of what rides on the keyboard.
+    final below = keyboard > 0
+        ? keyboard + TwoRowTextField.above(twoRows: widget.twoRows, bar: true)
         : keyboard;
     return MediaQuery(
       data: media.copyWith(
@@ -1428,6 +1447,7 @@ class _AmendDialogState extends State<_AmendDialog> {
           controller: _text,
           twoRows: widget.twoRows,
           autofocus: true,
+          formats: true,
           decoration: InputDecoration(hintText: t.amendHint),
         ),
         actions: [
@@ -1436,7 +1456,9 @@ class _AmendDialogState extends State<_AmendDialog> {
             child: Text(t.cancel),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(_text.text),
+            onPressed: () =>
+                Navigator.of(context)
+                    .pop((text: _text.text, markdown: _text.markdown)),
             child: Text(t.add),
           ),
         ],

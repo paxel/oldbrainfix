@@ -77,7 +77,7 @@ use oldbrainfix_core::{
     Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
     PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
     Section, Sessions, ShoppingAgenda, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies,
-    TextMark, Topic, UnitSystem, bundle, text_marks,
+    TextMark, Topic, UnitSystem, bundle, markdown, text_format, text_marks,
 };
 
 use crate::about_view;
@@ -92,6 +92,7 @@ use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Ope
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_sync;
+use crate::format_bar::{self, Format};
 use crate::frogs_view::{self, FrogAction, FrogShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
@@ -398,6 +399,14 @@ struct Trail {
 /// A dialog over the window.
 #[derive(Debug, Clone, PartialEq)]
 enum Dialog {
+    /// The address of a link on the bytes `start..end` of the text being
+    /// edited, `linked` when they are in a link already (#127).
+    Link {
+        address: String,
+        start: usize,
+        end: usize,
+        linked: bool,
+    },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
         area: Option<String>,
@@ -671,6 +680,18 @@ enum Action {
     Speech(Speech),
     /// Keeps the selected Note's edited text.
     SaveText,
+    /// Keeps it as a formatted text, its first format just applied
+    /// (#127, ADR 0033).
+    FormatText,
+    /// Asks for the address of a link on the bytes `start..end` of the
+    /// edited text, `url` the link's there is one already.
+    AskLink {
+        start: usize,
+        end: usize,
+        url: Option<String>,
+    },
+    /// Puts the link asked for on the edited text.
+    SetLink,
     Amend,
     Importance(Importance),
     File {
@@ -936,6 +957,13 @@ pub struct App {
     /// The selected Note's text as it is being edited, and that Note.
     text: String,
     text_of: Option<String>,
+    /// Whether its text is being edited: a formatted text shows its
+    /// source in the field meanwhile, and as it reads otherwise (#127).
+    text_editing: bool,
+    /// Whether the field is to take the keyboard, once, with the
+    /// selection `text_select` in bytes when there is one.
+    text_focus: bool,
+    text_select: Option<(usize, usize)>,
     /// The text of the Section being added.
     amend: String,
     dialog: Option<Dialog>,
@@ -1222,6 +1250,9 @@ impl App {
             capture_choices: CaptureChoices::default(),
             text: String::new(),
             text_of: None,
+            text_editing: false,
+            text_focus: false,
+            text_select: None,
             amend: String::new(),
             dialog: None,
             focus: false,
@@ -2644,6 +2675,9 @@ impl App {
         if shown.map(|n| &n.id) != self.text_of.as_ref() {
             self.text = shown.map(|n| n.text.clone()).unwrap_or_default();
             self.text_of = shown.map(|n| n.id.clone());
+            self.text_editing = false;
+            self.text_focus = false;
+            self.text_select = None;
             self.amend.clear();
             self.line_text.clear();
         }
@@ -3410,8 +3444,41 @@ impl App {
                 }
             }
             Action::SaveText => self.save_text()?,
+            Action::FormatText => self.save_formatted()?,
+            Action::AskLink { start, end, url } => {
+                self.dialog = Some(Dialog::Link {
+                    linked: url.is_some(),
+                    address: url.unwrap_or_default(),
+                    start,
+                    end,
+                });
+                self.focus = true;
+            }
+            Action::SetLink => {
+                if let Some(Dialog::Link {
+                    address,
+                    start,
+                    end,
+                    ..
+                }) = self.dialog.take()
+                {
+                    let url = format_bar::address(&address);
+                    let linked = markdown::link(&self.text, start, end, &url);
+                    self.text = linked.text;
+                    self.text_select = Some((linked.start, linked.end));
+                    self.text_editing = true;
+                    self.text_focus = true;
+                    self.save_formatted()?;
+                }
+            }
             Action::Amend => {
-                notes.amend(&selected, &self.amend)?;
+                // Typed or pasted with a format, it is a formatted text.
+                let format = if markdown::uses(&self.amend) {
+                    text_format::MARKDOWN
+                } else {
+                    text_format::PLAIN
+                };
+                notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
@@ -3987,16 +4054,11 @@ impl App {
                 if !target.text_editable || !self.store.may_change(&note)? {
                     return Ok(());
                 }
-                // As the phone joins them.
-                let text = &target.text;
-                let joined = if !append || text.trim().is_empty() {
-                    generated.clone()
-                } else {
-                    format!("{}\n{}", text.trim_end(), generated)
-                };
-                notes.edit(&note, &joined)?;
+                // As the phone joins them, escaped into a formatted text
+                // (ADR 0033).
+                let written = notes.take_over(&note, generated, append)?;
                 if self.text_of.as_deref() == Some(note.as_str()) {
-                    self.text = joined.trim().to_string();
+                    self.text = written;
                 }
             }
             Action::AskRemoveText { note, hash, photo } => {
@@ -4722,6 +4784,30 @@ impl App {
         } else if text != note.text {
             Notes::new(&self.store).edit(&note.id, text)?;
             self.text = text.to_string();
+        }
+        Ok(())
+    }
+
+    /// Keeps the selected Note's edited text as a formatted text, at
+    /// once, as its first format is applied (ADR 0033); the field keeps
+    /// what is typed as it is, spaces at its end included.
+    fn save_formatted(&mut self) -> oldbrainfix_core::Result<()> {
+        let Some((placed, _)) = &self.view.detail else {
+            return Ok(());
+        };
+        let note = &placed.note;
+        if self.text_of.as_deref() != Some(note.id.as_str())
+            || note.is_trashed()
+            || !note.text_editable
+        {
+            return Ok(());
+        }
+        let text = self.text.trim();
+        if text.is_empty() {
+            return Ok(());
+        }
+        if note.text_format != text_format::MARKDOWN || text != note.text {
+            Notes::new(&self.store).edit_as(&note.id, text, text_format::MARKDOWN)?;
         }
         Ok(())
     }
@@ -5848,6 +5934,9 @@ impl App {
         let weak = ui.visuals().weak_text_color();
         let areas = &self.view.areas;
         let edited = &mut self.text;
+        let editing = &mut self.text_editing;
+        let focus = &mut self.text_focus;
+        let select = &mut self.text_select;
         let amend = &mut self.amend;
         let cache = &mut self.photos;
         let store = &self.store;
@@ -5877,12 +5966,14 @@ impl App {
                     if !note.text_editable {
                         ui.label(RichText::new(t.text_newer_format()).color(weak));
                     }
+                    let formatted = note.text_format == text_format::MARKDOWN;
                     if trashed || !may.changes || !note.text_editable {
-                        // Its marks show, to read (#125).
+                        // Its marks show, to read (#125), and a formatted
+                        // text reads as it is formatted (#127).
                         let all = (0, note.text.len());
-                        let spots = text_marks_view::marked_label(
+                        let spots = text_marks_view::formatted_label(
                             ui,
-                            &note.text,
+                            (&note.text, &note.text_format),
                             all,
                             (Some(18.0), text),
                             false,
@@ -5892,61 +5983,183 @@ impl App {
                         if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
                             actions.push(Action::SearchFor(tag));
                         }
+                        text_marks_view::link_clicks(ui, of, &spots.links);
                         return;
                     }
                     let id = Id::new("note text");
-                    if ui.memory(|m| m.has_focus(id))
-                        && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
-                    {
-                        actions.push(Action::SaveText);
+                    let focused = ui.memory(|m| m.has_focus(id));
+                    if focused {
+                        *editing = true;
+                        if ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter)) {
+                            actions.push(Action::SaveText);
+                        }
                     }
-                    // Its tags in the accent colour; a click on one places
-                    // the cursor, as anywhere in the field (#126).
-                    let accent = ui.visuals().hyperlink_color;
-                    let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
-                        let typed = typed.as_str();
-                        let mut job = text_marks_view::tag_job(
+                    // The format bar above the field (#127), on its
+                    // selection as the field last had it; Ctrl+B and
+                    // Ctrl+I as its bold and italic while typing.
+                    let selected = format_bar::selection(ui, id, edited);
+                    let at = format_bar::At::of(edited, selected, formatted);
+                    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent));
+                    if focused {
+                        ui.input_mut(|i| {
+                            if i.consume_key(Modifiers::COMMAND, Key::B) {
+                                picked = Some(Format::Bold);
+                            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
+                                picked = Some(Format::Italic);
+                            }
+                        });
+                    }
+                    if formatted && !*editing {
+                        // As it reads; a click on it edits its source.
+                        let all = (0, edited.len());
+                        let shown = ui.scope(|ui| {
+                            text_marks_view::formatted_label(
+                                ui,
+                                (edited, text_format::MARKDOWN),
+                                all,
+                                (Some(18.0), text),
+                                false,
+                            )
+                        });
+                        let read = Id::new(("read", &note.id));
+                        let open = ui.interact(shown.response.rect, read, Sense::click());
+                        open.widget_info(|| {
+                            WidgetInfo::labeled(WidgetType::Button, true, t.edit())
+                        });
+                        if open.on_hover_cursor(egui::CursorIcon::Text).clicked() {
+                            *editing = true;
+                            *focus = true;
+                        }
+                        let spots = shown.inner;
+                        let marked = Id::new(("field", &note.id));
+                        if let Some((line, to)) =
+                            text_marks_view::mark_clicks(ui, &t, marked, &spots.marks, true)
+                            && let Some(swapped) = text_marks::swap(edited, line, to)
+                        {
+                            *edited = swapped;
+                            actions.push(Action::SaveText);
+                        }
+                        if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags)
+                        {
+                            actions.push(Action::SearchFor(tag));
+                        }
+                        text_marks_view::link_clicks(ui, marked, &spots.links);
+                    } else {
+                        // Its tags in the accent colour, a formatted text's
+                        // marks dimmed; a click on a tag places the cursor,
+                        // as anywhere in the field (#126).
+                        let accent = ui.visuals().hyperlink_color;
+                        let weak = ui.visuals().weak_text_color();
+                        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+                            let typed = typed.as_str();
+                            let font = FontId::proportional(18.0);
+                            let mut job = if formatted {
+                                text_marks_view::source_job(typed, font, (text, accent, weak))
+                            } else {
+                                text_marks_view::tag_job(
+                                    typed,
+                                    (0, typed.len()),
+                                    font,
+                                    (text, accent),
+                                )
+                            };
+                            job.wrap.max_width = width;
+                            ui.fonts_mut(|f| f.layout_job(job))
+                        };
+                        // Pasted with a format, a plain text becomes a
+                        // formatted one (ADR 0033).
+                        let pasted = focused
+                            && ui.input(|i| {
+                                i.events.iter().any(
+                                    |e| matches!(e, egui::Event::Paste(p) if markdown::uses(p)),
+                                )
+                            });
+                        if std::mem::take(focus) {
+                            let typed = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id)
+                                .and_then(|s| s.cursor.char_range())
+                                .is_some();
+                            match select.take() {
+                                Some(range) => format_bar::select(ui, id, edited, range),
+                                // Never typed into: the cursor at the end.
+                                None if !typed => {
+                                    let end = edited.len();
+                                    format_bar::select(ui, id, edited, (end, end));
+                                }
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            }
+                        }
+                        let output = TextEdit::multiline(edited)
+                            .id(id)
+                            .font(FontId::proportional(18.0))
+                            .layouter(&mut layouter)
+                            .desired_rows(1)
+                            .desired_width(f32::INFINITY)
+                            .frame(Frame::NONE)
+                            .show(ui);
+                        // A click on the bar keeps the field being edited.
+                        if output.response.response.lost_focus() && picked.is_none() {
+                            *editing = false;
+                            actions.push(Action::SaveText);
+                        }
+                        // A shortcut typed makes a plain text a formatted
+                        // one, as the first format from the bar does.
+                        if output.response.response.changed() && !formatted {
+                            let cursor =
+                                output.cursor_range.map_or(0, |range| range.primary.index.0);
+                            let byte = edited
+                                .char_indices()
+                                .nth(cursor)
+                                .map_or(edited.len(), |(b, _)| b);
+                            if pasted || markdown::shortcut_at(edited, byte) {
+                                actions.push(Action::FormatText);
+                            }
+                        }
+                        // A click on a mark at the start of a line changes
+                        // it in the field, saved at once (#125).
+                        let typed = output.galley.text();
+                        let spots = text_marks_view::spots(
+                            &output.galley,
+                            output.galley_pos,
                             typed,
                             (0, typed.len()),
-                            FontId::proportional(18.0),
-                            (text, accent),
                         );
-                        job.wrap.max_width = width;
-                        ui.fonts_mut(|f| f.layout_job(job))
-                    };
-                    let output = TextEdit::multiline(edited)
-                        .id(id)
-                        .font(FontId::proportional(18.0))
-                        .layouter(&mut layouter)
-                        .desired_rows(1)
-                        .desired_width(f32::INFINITY)
-                        .frame(Frame::NONE)
-                        .show(ui);
-                    if output.response.response.lost_focus() {
-                        actions.push(Action::SaveText);
+                        let marked = Id::new(("field", &note.id));
+                        if let Some((line, to)) =
+                            text_marks_view::mark_clicks(ui, &t, marked, &spots, true)
+                            && let Some(swapped) = text_marks::swap(edited, line, to)
+                        {
+                            *edited = swapped;
+                            actions.push(Action::SaveText);
+                        }
                     }
-                    // A click on a mark at the start of a line changes it in
-                    // the field, saved at once (#125).
-                    let typed = output.galley.text();
-                    let spots = text_marks_view::spots(
-                        &output.galley,
-                        output.galley_pos,
-                        typed,
-                        (0, typed.len()),
-                    );
-                    let marked = Id::new(("field", &note.id));
-                    if let Some((line, to)) =
-                        text_marks_view::mark_clicks(ui, &t, marked, &spots, true)
-                        && let Some(swapped) = text_marks::swap(edited, line, to)
-                    {
-                        *edited = swapped;
-                        actions.push(Action::SaveText);
+                    match picked {
+                        Some(Format::Link) => {
+                            *editing = true;
+                            actions.push(Action::AskLink {
+                                start: selected.0,
+                                end: selected.1,
+                                url: at.url.clone(),
+                            });
+                        }
+                        Some(format) => {
+                            *editing = true;
+                            match format_bar::change(format, edited, selected) {
+                                Some(changed) => {
+                                    *edited = changed.text;
+                                    let range = (changed.start, changed.end);
+                                    format_bar::select(ui, id, edited, range);
+                                    // The first format makes it a formatted
+                                    // text, kept at once.
+                                    if format != Format::Mark && !formatted {
+                                        actions.push(Action::FormatText);
+                                    }
+                                }
+                                None => ui.memory_mut(|m| m.request_focus(id)),
+                            }
+                        }
+                        None => {}
                     }
                     ui.horizontal(|ui| {
-                        let insert = RichText::new(t.text_mark_insert()).color(text);
-                        if ui.button(insert).clicked() {
-                            insert_open_mark(ui, id, edited);
-                        }
                         let changed = edited.trim();
                         if !changed.is_empty()
                             && changed != note.text
@@ -6065,17 +6278,23 @@ impl App {
                         }
                         if !section.text.is_empty() {
                             // Its marks show; a Section's text has no edit
-                            // (ADR 0031).
+                            // (ADR 0031). A formatted one reads formatted.
                             let all = (0, section.text.len());
                             let shown = (None, text);
-                            let spots =
-                                text_marks_view::marked_label(ui, &section.text, all, shown, false);
+                            let spots = text_marks_view::formatted_label(
+                                ui,
+                                (&section.text, &section.text_format),
+                                all,
+                                shown,
+                                false,
+                            );
                             let of = Id::new(("text", &section.id));
                             text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
                             if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
                             {
                                 actions.push(Action::SearchFor(tag));
                             }
+                            text_marks_view::link_clicks(ui, of, &spots.links);
                         }
                         let media = Media {
                             id: &section.id,
@@ -6272,6 +6491,9 @@ impl App {
                 ui.set_width(400.0);
                 ui.spacing_mut().item_spacing.y = 10.0;
                 match dialog {
+                    Dialog::Link {
+                        address, linked, ..
+                    } => link_form(ui, &t, (address, focus), *linked, actions),
                     Dialog::NewPlace { area, name } => {
                         let title = if area.is_some() {
                             t.new_topic()
@@ -6955,6 +7177,10 @@ impl App {
     /// whose sender the user blocked there shows nothing more and closes
     /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
+        // The link not set: the field has the keyboard again.
+        if matches!(self.dialog, Some(Dialog::Link { .. })) {
+            self.text_focus = true;
+        }
         let behind = self.dialog_behind.take();
         if let Some(Dialog::Person { id, name, .. }) = self.dialog.take() {
             self.store.set_override_name(&id, &name)?;
@@ -7645,7 +7871,7 @@ impl App {
                     .show(ui, |ui| {
                         ui.set_max_width(240.0);
                         let text = ui.visuals().text_color();
-                        ui.label(RichText::new(&placed.note.text).color(text));
+                        ui.label(RichText::new(placed.note.visible_text()).color(text));
                     });
             });
     }
@@ -7934,6 +8160,35 @@ fn name_form(
         let button = egui::Button::new(RichText::new(verb).color(text));
         if ui.add_enabled(ready, button).clicked() {
             actions.push(done);
+        }
+    });
+}
+
+/// Asks for the address of a link (#127): one already there is filled
+/// in, `linked`, and taken off when left empty. Enter takes it.
+fn link_form(
+    ui: &mut Ui,
+    t: &L10n,
+    (address, focus): (&mut String, bool),
+    linked: bool,
+    actions: &mut Vec<Action>,
+) {
+    title(ui, t.format_link());
+    let field = focused_field(ui, (&mut *address, focus), "link", t.link_address());
+    if linked {
+        let weak = ui.visuals().weak_text_color();
+        ui.label(RichText::new(t.link_remove_hint()).small().color(weak));
+    }
+    let ready = linked || !address.trim().is_empty();
+    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+        actions.push(Action::SetLink);
+    }
+    ui.horizontal(|ui| {
+        cancel(ui, t, actions);
+        let text = ui.visuals().text_color();
+        let button = egui::Button::new(RichText::new(t.link_set()).color(text));
+        if ui.add_enabled(ready, button).clicked() {
+            actions.push(Action::SetLink);
         }
     });
 }
@@ -8410,9 +8665,11 @@ fn sent_item_form(
         }
         SentItemState::Cancel => {
             ui.label(
-                RichText::new(t.sent_item_cancelled(&item.text))
-                    .strong()
-                    .color(tones.accent),
+                RichText::new(
+                    t.sent_item_cancelled(&text_format::visible(&item.text_format, &item.text)),
+                )
+                .strong()
+                .color(tones.accent),
             );
             ui.label(RichText::new(t.sent_item_cancel_detail()).color(text));
         }
@@ -8468,7 +8725,9 @@ fn sent_item_form(
                 }
                 if let Some(before) = &changes.text_before {
                     line(t.sent_item_text_was(before));
-                    line(t.sent_item_text_now(&item.text));
+                    line(
+                        t.sent_item_text_now(&text_format::visible(&item.text_format, &item.text)),
+                    );
                     if changes.text_edited {
                         line(t.sent_item_text_yours().to_string());
                     }
@@ -8489,7 +8748,7 @@ fn sent_item_form(
                     line(t.sent_item_line_removed(&l.text));
                 }
                 for s in &changes.sections_added {
-                    line(t.sent_item_section_added(&s.text));
+                    line(t.sent_item_section_added(&text_format::visible(&s.format, &s.text)));
                 }
                 for r in &changes.rescheduled {
                     line(t.sent_item_rescheduled(
@@ -8509,7 +8768,17 @@ fn sent_item_form(
                 ui.label(RichText::new(t.sent_item_keeps()).small().color(weak));
                 ui.separator();
             }
-            ui.label(RichText::new(&item.text).color(text));
+            // Formatted as it reads; its tags are not followed before it
+            // is taken, its links open (#127).
+            let shown = (0, item.text.len());
+            let spots = text_marks_view::formatted_label(
+                ui,
+                (&item.text, &item.text_format),
+                shown,
+                (None, text),
+                false,
+            );
+            text_marks_view::link_clicks(ui, Id::new("sent text"), &spots.links);
             if !full {
                 return;
             }
@@ -8523,9 +8792,17 @@ fn sent_item_form(
                     ui.label(RichText::new(schedule_text(t, &r.schedule)).color(text));
                 }
             }
-            for section in &item.sections {
+            for (i, section) in item.sections.iter().enumerate() {
                 ui.separator();
-                ui.label(RichText::new(&section.text).color(text));
+                let shown = (0, section.text.len());
+                let spots = text_marks_view::formatted_label(
+                    ui,
+                    (&section.text, &section.format),
+                    shown,
+                    (None, text),
+                    false,
+                );
+                text_marks_view::link_clicks(ui, Id::new(("sent section", i)), &spots.links);
             }
         });
 }
@@ -9065,7 +9342,7 @@ pub(crate) fn check(ui: &mut Ui, tones: Tones, done: bool, label: &str) -> egui:
 /// Note holds when it has no words, or that the Note is gone.
 pub(crate) fn row_title(t: &L10n, note: Option<&Note>) -> String {
     match note {
-        Some(note) if !note.text.trim().is_empty() => note.text.trim().to_string(),
+        Some(note) if !note.text.trim().is_empty() => note.visible_text().trim().to_string(),
         Some(note) => l10n::wordless(t, note.wordless()).to_string(),
         None => t.note_gone().to_string(),
     }
@@ -9713,6 +9990,7 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
 /// each as `(shown, removed, texts)`.
 struct Part<'a> {
     text: &'a str,
+    format: &'a str,
     photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
     recordings: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
 }
@@ -9721,6 +9999,7 @@ impl<'a> Part<'a> {
     fn of_note(note: &'a Note) -> Part<'a> {
         Part {
             text: &note.text,
+            format: &note.text_format,
             photos: (&note.photos, &note.removed_photos, &note.photo_texts),
             recordings: (
                 &note.recordings,
@@ -9733,6 +10012,7 @@ impl<'a> Part<'a> {
     fn of_section(section: &'a Section) -> Part<'a> {
         Part {
             text: &section.text,
+            format: &section.text_format,
             photos: (
                 &section.photos,
                 &section.removed_photos,
@@ -9747,39 +10027,6 @@ impl<'a> Part<'a> {
     }
 }
 
-/// Puts "☐ " at the start of the line of the text field `id` its cursor
-/// is on, after its spaces, tabs and bullet (#125, ADR 0031), and moves
-/// the cursor with the text after it; nothing on a line with a mark.
-/// The field then has the keyboard again, to type on.
-fn insert_open_mark(ui: &Ui, id: Id, edited: &mut String) {
-    let mut state = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
-    // A field never typed into has its cursor at the start.
-    let cursor = state
-        .cursor
-        .char_range()
-        .map_or(0, |range| range.primary.index.0);
-    let byte = edited
-        .char_indices()
-        .nth(cursor)
-        .map_or(edited.len(), |(b, _)| b);
-    let Some(inserted) = text_marks::insert_open(edited, text_marks::line_at(edited, byte)) else {
-        return;
-    };
-    let at = edited
-        .chars()
-        .zip(inserted.chars())
-        .take_while(|(a, b)| a == b)
-        .count();
-    let moved = if cursor >= at { cursor + 2 } else { cursor };
-    *edited = inserted;
-    let cursor = egui::text::CCursor::new(moved);
-    state
-        .cursor
-        .set_char_range(Some(egui::text::CCursorRange::one(cursor)));
-    state.store(ui.ctx(), id);
-    ui.memory_mut(|m| m.request_focus(id));
-}
-
 /// The text, photos and recordings of a Note or Section in full on a
 /// card (#114), with their Transcripts and Photo Texts; the photos shown
 /// with where they lie.
@@ -9790,7 +10037,7 @@ fn whole(
     (cache, store, transcribing): ShownMedia,
     marks: &mut Spots,
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, part.text, marks);
+    card_text(ui, (part.text, part.format), marks);
     media_view::whole_media(
         ui,
         t,
@@ -9801,15 +10048,16 @@ fn whole(
     )
 }
 
-/// The whole text `text` of a Note or Section on a full card, where its
-/// status marks (#125) and tags (#126) lie added to `marks`.
-fn card_text(ui: &mut Ui, text: &str, marks: &mut Spots) {
+/// The whole text `text` of a Note or Section in `format` on a full
+/// card, where its status marks (#125), tags (#126) and links (#127) lie
+/// added to `marks`.
+fn card_text(ui: &mut Ui, (text, format): (&str, &str), marks: &mut Spots) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
-        marks.extend(text_marks_view::marked_label(
+        marks.extend(text_marks_view::formatted_label(
             ui,
-            text,
+            (text, format),
             shown,
             (Some(16.0), colour),
             false,
@@ -9961,7 +10209,7 @@ fn note_card(
                     };
                     if let Some(lines) = lines {
                         // Its Lines right under its text.
-                        card_text(ui, part.text, &mut marks);
+                        card_text(ui, (part.text, part.format), &mut marks);
                         boxes = checklist_view::card_lines(ui, tones, &lines);
                         shown.extend(media_view::whole_media(
                             ui,
@@ -9990,7 +10238,8 @@ fn note_card(
             // A photo Note may have no words.
             if let Some(line) = first_line(&note.text) {
                 let shown = (Some(16.0), text);
-                marks = text_marks_view::marked_label(ui, &note.text, line, shown, true);
+                let text = (note.text.as_str(), note.text_format.as_str());
+                marks = text_marks_view::formatted_label(ui, text, line, shown, true);
             }
             if let Some((list, _)) = look.checklist {
                 checklist_view::card_count(ui, t, list);
@@ -10042,7 +10291,8 @@ fn note_card(
         Sense::click()
     };
     let resp = ui.interact(rect, Id::new(("card", &note.id)), sense);
-    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, selected, &note.text));
+    let label = note.visible_text();
+    resp.widget_info(|| WidgetInfo::selected(WidgetType::Button, true, selected, &label));
     if draggable {
         resp.dnd_set_drag_payload(DraggedNote(note.id.clone()));
     }
@@ -10129,10 +10379,13 @@ fn note_card(
     let mark = text_marks_view::mark_clicks(ui, t, of, &marks.marks, look.marks);
     // A click on a tag searches for it, and opens no card (#126).
     let mut tag = text_marks_view::tag_clicks(ui, t, of, &marks.tags);
+    // A click on a link opens it, and no card (#127).
+    text_marks_view::link_clicks(ui, of, &marks.links);
     for (id, spots) in &section_marks {
         let of = Id::new(("card", *id));
         text_marks_view::mark_clicks(ui, t, of, &spots.marks, false);
         tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
+        text_marks_view::link_clicks(ui, of, &spots.links);
     }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),

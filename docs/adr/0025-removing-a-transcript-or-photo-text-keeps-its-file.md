@@ -18,6 +18,10 @@ ADR 0013 lets a Member add Transcripts and Photo Texts to any Note, since the ma
 
 An older version reads the null as absent: the recording or photo has no text, so it does not show one and search does not find it, but it transcribes or reads the file again when it holds the bytes and the model, and the new text then reaches every Device. An older version also judges a Member's removal as a text a Member may add, so on it such a removal counts.
 
+## Formatted text (ADR 0033)
+
+Amended by ADR 0033 (#127): "Replace Note text" and "Append to Note text" go through `takeOver` in both cores, which writes the generated text escaped into a formatted Note's text, so it reads as the plain text it is; into a plain Note it goes as it is.
+
 ## Considered Options
 
 - An empty text instead of null (rejected: a removal would read as "nothing found", and the judge could not tell a Member's machine finding nothing from a Member removing another person's text).

@@ -454,6 +454,7 @@ class NoteCard extends StatelessWidget {
                           MarkedText(
                             note.text,
                             key: const ValueKey('note-first-line'),
+                            format: note.textFormat,
                             start: start,
                             end: end,
                             style: text.bodyLarge,
@@ -1003,6 +1004,7 @@ class _FullNoteState extends State<_FullNote> {
         _Whole(
           id: note.id,
           text: note.text,
+          format: note.textFormat,
           photos: note.photos,
           photoTexts: note.photoTexts,
           removedPhotos: note.removedPhotos,
@@ -1023,6 +1025,7 @@ class _FullNoteState extends State<_FullNote> {
               _Whole(
                 id: section.id,
                 text: section.text,
+                format: section.textFormat,
                 photos: section.photos,
                 photoTexts: section.photoTexts,
                 removedPhotos: section.removedPhotos,
@@ -1045,6 +1048,9 @@ class _FullNoteState extends State<_FullNote> {
 class _Whole extends StatelessWidget {
   final String id;
   final String text;
+
+  /// The format [text] is in: a formatted one is drawn formatted.
+  final String format;
   final List<String> photos;
   final Map<String, String> photoTexts;
   final List<String> removedPhotos;
@@ -1061,6 +1067,7 @@ class _Whole extends StatelessWidget {
   const _Whole({
     required this.id,
     required this.text,
+    required this.format,
     required this.photos,
     required this.photoTexts,
     required this.removedPhotos,
@@ -1078,13 +1085,14 @@ class _Whole extends StatelessWidget {
     final parts = <Widget>[
       // A photo Note may have no words.
       if (text.isNotEmpty && list == null)
-        MarkedText(text, style: style, onMark: onMark),
+        MarkedText(text, format: format, style: style, onMark: onMark),
       // It keeps its own space: it is nothing on a Note that is none.
       if (list != null)
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (text.isNotEmpty) MarkedText(text, style: style, onMark: onMark),
+            if (text.isNotEmpty)
+              MarkedText(text, format: format, style: style, onMark: onMark),
             list,
           ],
         ),
