@@ -1,5 +1,5 @@
 //! The format bar of the desktop's Note editor (#127, ADR 0033), with the
-//! phone's buttons: ☐ at the start of the line, bold, italic,
+//! phone's buttons: ☐ at the cursor (ADR 0035), bold, italic,
 //! strike-through, the two headings, bulleted and numbered items, a
 //! quote, a link, code, an item one level in and out, and a table (#128),
 //! which the window puts in or opens. The Amend field has the bar too,
@@ -12,11 +12,12 @@
 use egui::text::{CCursor, CCursorRange};
 use egui::widgets::text_edit::TextEditState;
 use egui::{Color32, Id, Sense, Ui, WidgetInfo, WidgetType};
+use oldbrainfix_core::BoxState;
 use oldbrainfix_core::markdown::{self, BlockKind, Change, Span, SpanKind};
-use oldbrainfix_core::text_marks;
 
 use crate::icons;
 use crate::l10n::L10n;
+use crate::text_marks_view::line_at;
 
 /// A button of the format bar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +60,7 @@ impl Format {
     /// What a screen reader and the tooltip say for it.
     pub fn label(self, t: &L10n) -> &'static str {
         match self {
-            Format::Mark => t.text_mark_insert(),
+            Format::Mark => t.box_insert(),
             Format::Bold => t.format_bold(),
             Format::Italic => t.format_italic(),
             Format::Strike => t.format_strike(),
@@ -149,7 +150,7 @@ impl At {
         }
         let blocks = markdown::parse(text);
         let mut at = At::default();
-        if let Some(block) = blocks.get(text_marks::line_at(text, start)) {
+        if let Some(block) = blocks.get(line_at(text, start)) {
             at.line = Some(block.kind);
             inside(&block.spans, (start, end), &mut at);
         }
@@ -173,7 +174,8 @@ impl At {
 
 /// What `format` makes of `text` with the bytes `start..end` selected;
 /// none for the link, which asks for its address first, for the table,
-/// which the table view takes, and for ☐ on a line with a mark.
+/// which the table view takes. ☐ goes in at the cursor, also in the
+/// middle of a word, or before the selection, which stays after it.
 pub fn change(format: Format, text: &str, (start, end): (usize, usize)) -> Option<Change> {
     if let Some(kind) = format.span() {
         return markdown::toggle(text, start, end, kind).ok();
@@ -185,20 +187,18 @@ pub fn change(format: Format, text: &str, (start, end): (usize, usize)) -> Optio
         Format::Indent => Some(markdown::indent(text, start, end, false)),
         Format::Outdent => Some(markdown::indent(text, start, end, true)),
         Format::Mark => {
-            let inserted =
-                text_marks::insert_open(text, text_marks::line_at(text, start.min(end)))?;
-            // Where "☐ " went in: the selection after it moves with it.
-            let at = text
-                .char_indices()
-                .zip(inserted.chars())
-                .find(|((_, a), b)| a != b)
-                .map_or(text.len(), |((i, _), _)| i);
-            let moved = inserted.len() - text.len();
-            let shift = |b: usize| if b >= at { b + moved } else { b };
+            let at = start.min(end);
+            if !text.is_char_boundary(at) {
+                return None;
+            }
+            let glyph = BoxState::Open.glyph();
+            let mut inserted = text.to_string();
+            inserted.insert(at, glyph);
+            let moved = glyph.len_utf8();
             Some(Change {
                 text: inserted,
-                start: shift(start),
-                end: shift(end),
+                start: start + moved,
+                end: end + moved,
             })
         }
         _ => None,
@@ -348,9 +348,9 @@ mod tests {
         assert_eq!(
             marked,
             Some(Change {
-                text: "Pack\n☐ Passport".into(),
-                start: 11,
-                end: 11,
+                text: "Pack\nPa☐ssport".into(),
+                start: 10,
+                end: 10,
             })
         );
     }

@@ -75,12 +75,13 @@ use oldbrainfix_core::sent::{
 use oldbrainfix_core::share::{self, NoteShare};
 use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
-    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
-    Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
-    Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
-    PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
-    Section, Sessions, ShoppingAgenda, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies,
-    TextMark, Topic, UnitSystem, bundle, markdown, text_format, text_marks,
+    AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
+    CaptureContext, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings,
+    Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo,
+    Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
+    RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda, ShoppingLine,
+    ShoppingList, ShoppingLists, ShownBox, Store, Tallies, Topic, UnitSystem, bundle, markdown,
+    text_format,
 };
 
 use crate::about_view;
@@ -129,7 +130,7 @@ use crate::table_view::{self, Opening, TableView};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
 };
-use crate::text_marks_view::{self, Spots};
+use crate::text_marks_view::{self, BoxAsk, BoxLook, Spots};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -271,6 +272,19 @@ impl Default for NoteMay {
     }
 }
 
+/// How the boxes of texts show, by id, the texts whose boxes this Device
+/// may tick and the Notes with Show ticks on, as [`App::box_looks`] reads
+/// them.
+type BoxLooks =
+    oldbrainfix_core::Result<(HashMap<String, BoxLook>, HashSet<String>, HashSet<String>)>;
+
+/// The local setting of this Device that says whether the Note `note`
+/// shows after each box who ticked it last and when (ADR 0035), the
+/// phone's `showTicksKey`.
+fn show_ticks_key(note: &str) -> String {
+    format!("showTicks:{note}")
+}
+
 /// What the panes show, read once per change.
 #[derive(Debug, Clone, Default)]
 struct View {
@@ -323,10 +337,22 @@ struct View {
     /// pass for the cards, each with whether this Device may check its
     /// Lines (#122).
     shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
-    /// The Notes listed whose status marks this Device may change on
-    /// their cards (#125): its to change, not in the trash, in a format
-    /// known here.
-    marks: HashSet<String>,
+    /// The Notes listed whose text this Device may change from their
+    /// cards, a table full screen (#128): its to change, not in the
+    /// trash, in a format known here.
+    card_changes: HashSet<String>,
+    /// How the boxes of each Note's and Section's text listed or shown
+    /// show (ADR 0035), by its id: their states, and with Show ticks on
+    /// what each says after it.
+    box_looks: HashMap<String, BoxLook>,
+    /// The Notes and Sections listed or shown whose boxes this Device may
+    /// tick: where it holds a role, not in the trash.
+    box_ticks: HashSet<String>,
+    /// The Notes listed or shown with Show ticks on, on this Device.
+    show_ticks: HashSet<String>,
+    /// How the boxes of the table shown full screen show, while it is
+    /// one of a stored text.
+    table_ticking: Option<table_view::Ticking>,
     /// Whether the list shows its Notes compact, by their first line,
     /// as this Device keeps it for that list (#114).
     compact: bool,
@@ -430,6 +456,11 @@ struct Trail {
 /// A dialog over the window.
 #[derive(Debug, Clone, PartialEq)]
 enum Dialog {
+    /// Every tick of a box, the oldest first: the state it set and who
+    /// set it when (ADR 0035).
+    BoxHistory {
+        lines: Vec<(BoxState, String)>,
+    },
     /// The address of a link on the bytes `start..end` of the text being
     /// edited, `linked` when they are in a link already (#127).
     Link {
@@ -805,14 +836,23 @@ enum Action {
     /// Something asked of a Shopping List, on a card or in the editor
     /// (#122).
     Shopping(ShoppingAction),
-    /// Changes the status mark at the start of the line `line` of the
-    /// Note's text to `to`, on a card (#125), or at the start of the cell
-    /// in `column` of a table's row there (#128).
-    Mark {
+    /// Ticks the box `id` in the text of `entity`, a Note's or a
+    /// Section's, to `to` (ADR 0035): an entry beside the text, no edit.
+    Tick {
+        entity: String,
+        id: String,
+        to: BoxState,
+    },
+    /// Shows every tick of the box `id` in the text of `entity`.
+    BoxHistory {
+        entity: String,
+        id: String,
+    },
+    /// Shows after each box of the Note's text, and its Sections', who
+    /// ticked it last and when, or no more, on this Device.
+    ShowTicks {
         note: String,
-        line: usize,
-        column: Option<usize>,
-        to: TextMark,
+        on: bool,
     },
     /// Gives the Line the dialog renames its new text.
     RenameLine,
@@ -3084,13 +3124,30 @@ impl App {
                 shopping_lists.insert(id, (list, checks));
             }
         }
-        let mut marks = HashSet::new();
+        let mut card_changes = HashSet::new();
         for p in &placed {
             let note = &p.note;
             if !note.is_trashed() && note.text_editable && store.may_change(&note.id)? {
-                marks.insert(note.id.clone());
+                card_changes.insert(note.id.clone());
             }
         }
+        // Every text with boxes listed or shown, with the Note it is of
+        // and whether that is in the trash.
+        let mut texts: Vec<(&str, &[ShownBox], &str, bool)> = Vec::new();
+        for p in placed.iter().chain(detail.as_ref().map(|(p, _)| p)) {
+            let note = &p.note;
+            texts.push((&note.id, &note.boxes, &note.id, note.is_trashed()));
+            let of_note = sections.get(&note.id).into_iter().flatten();
+            let detailed = detail
+                .as_ref()
+                .filter(|(d, _)| d.note.id == note.id)
+                .map(|(_, s)| s.as_slice())
+                .unwrap_or_default();
+            for section in of_note.chain(detailed) {
+                texts.push((&section.id, &section.boxes, &note.id, note.is_trashed()));
+            }
+        }
+        let (box_looks, box_ticks, show_ticks) = self.box_looks(&texts)?;
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
         let compact = match cards_key(&self.selection, &self.people, is_area) {
             Some(key) => {
@@ -3436,10 +3493,14 @@ impl App {
             remakeable,
             text_changeable,
             notes: placed,
+            table_ticking: self.table_ticking(&box_looks, &box_ticks)?,
             sections,
             checklists,
             shopping_lists,
-            marks,
+            card_changes,
+            box_looks,
+            box_ticks,
+            show_ticks,
             compact,
             detail,
             capture_spawns: capture_choices::may_spawn(
@@ -3753,6 +3814,7 @@ impl App {
                         at: table.start,
                         cell: None,
                         tags: true,
+                        boxes: None,
                     },
                     None => {
                         let change = markdown::table::insert(&self.amend, at);
@@ -3763,6 +3825,7 @@ impl App {
                             at: change.start,
                             cell: Some((0, 0)),
                             tags: true,
+                            boxes: None,
                         }
                     }
                 };
@@ -4027,12 +4090,30 @@ impl App {
             }
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
-            Action::Mark {
-                note,
-                line,
-                column,
-                to,
-            } => self.change_mark(&note, (line, column), to)?,
+            Action::Tick { entity, id, to } => {
+                // A sync may have taken the box or the role meanwhile.
+                let boxes = Boxes::new(&self.store);
+                if boxes.may_tick(&entity)? && boxes.of(&entity)?.iter().any(|b| b.id == id) {
+                    boxes.tick(&entity, &id, to)?;
+                }
+            }
+            Action::BoxHistory { entity, id } => {
+                let now = self.store.now();
+                let mut lines = Vec::new();
+                for tick in Boxes::new(&self.store).history(&entity, &id)? {
+                    let by = self.store.ticked_by(&entity, &tick)?;
+                    let name = by
+                        .as_ref()
+                        .map(|p| profile_view::display_name(&self.t, &p.name));
+                    let said = text_marks_view::tick_text(&self.t, &tick, name, (now, true));
+                    lines.push((tick.state, said));
+                }
+                self.dialog = Some(Dialog::BoxHistory { lines });
+            }
+            Action::ShowTicks { note, on } => {
+                self.store
+                    .set_local_setting(&show_ticks_key(&note), if on { "true" } else { "false" })?;
+            }
             Action::RenameLine => {
                 if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
                     && let Some(named) = checklist_view::renamed(&text)
@@ -4699,42 +4780,74 @@ impl App {
         Ok(())
     }
 
-    /// Changes the status mark of the line `line` of the Note `note`'s
-    /// text, or of the cell in `column` of a table's row there (#128), to
-    /// `to` (#125, ADR 0031), an edit of its text like any other, where
-    /// this Device may change it as it is stored now. On the Note shown,
-    /// what is typed into its text goes in first, and the field then holds
-    /// the text it has now.
-    fn change_mark(
-        &mut self,
-        note: &str,
-        (line, column): (usize, Option<usize>),
-        to: TextMark,
-    ) -> oldbrainfix_core::Result<()> {
-        let shown = self.text_of.as_deref() == Some(note);
-        if shown {
-            self.save_text()?;
+    /// How the boxes of each of `texts` show, by its id (ADR 0035): a
+    /// text's id, its boxes, the Note it is of and whether that is in the
+    /// trash. Gives them, the texts whose boxes this Device may tick and
+    /// the Notes with Show ticks on.
+    fn box_looks(&self, texts: &[(&str, &[ShownBox], &str, bool)]) -> BoxLooks {
+        let boxes = Boxes::new(&self.store);
+        let now = self.store.now();
+        let (mut looks, mut ticks, mut shows) = (HashMap::new(), HashSet::new(), HashSet::new());
+        for &(entity, shown, note, trashed) in texts {
+            if shown.is_empty() || looks.contains_key(entity) {
+                continue;
+            }
+            let show = self.store.local_setting(&show_ticks_key(note))?.as_deref() == Some("true");
+            if show {
+                shows.insert(note.to_string());
+            }
+            if !trashed && boxes.may_tick(entity)? {
+                ticks.insert(entity.to_string());
+            }
+            let mut look = BoxLook::of(shown);
+            if show {
+                for b in shown {
+                    let Some(last) = &b.last else {
+                        continue;
+                    };
+                    let by = self.store.ticked_by(entity, last)?;
+                    let name = by
+                        .as_ref()
+                        .map(|p| profile_view::display_name(&self.t, &p.name));
+                    let said = text_marks_view::tick_text(&self.t, last, name, (now, false));
+                    look.after.insert(b.id.clone(), said);
+                }
+            }
+            looks.insert(entity.to_string(), look);
         }
-        let notes = Notes::new(&self.store);
-        let Some(now) = notes.by_id(note)? else {
-            return Ok(());
+        Ok((looks, ticks, shows))
+    }
+
+    /// How the boxes of the table shown full screen show, while it is one
+    /// of a stored text: read anew when it is no text `looks` holds.
+    fn table_ticking(
+        &self,
+        looks: &HashMap<String, BoxLook>,
+        ticks: &HashSet<String>,
+    ) -> oldbrainfix_core::Result<Option<table_view::Ticking>> {
+        let Some(entity) = self.table.as_ref().and_then(TableView::boxes) else {
+            return Ok(None);
         };
-        if now.is_trashed() || !now.text_editable || !self.store.may_change(note)? {
-            return Ok(());
-        }
-        let swapped = if now.text_format == text_format::MARKDOWN {
-            markdown::swap_mark(&now.text, line, column, to)
+        let boxes = Boxes::new(&self.store);
+        let shown = boxes.of(entity)?;
+        let look = match looks.get(entity) {
+            Some(look) => look.clone(),
+            None => BoxLook::of(&shown),
+        };
+        let may_tick = if looks.contains_key(entity) {
+            ticks.contains(entity)
         } else {
-            text_marks::swap(&now.text, line, to)
+            boxes.may_tick(entity)?
         };
-        let Some(swapped) = swapped else {
-            return Ok(());
-        };
-        notes.edit(note, &swapped)?;
-        if shown && let Some(now) = notes.by_id(note)? {
-            self.text = now.text;
-        }
-        Ok(())
+        Ok(Some(table_view::Ticking {
+            look,
+            may_tick,
+            ticked: shown
+                .iter()
+                .filter(|b| b.last.is_some())
+                .map(|b| b.id.clone())
+                .collect(),
+        }))
     }
 
     /// Shows the table `opening` says full screen (#128). A Note's table
@@ -4787,6 +4900,18 @@ impl App {
                 self.table_asked(table_view::Asked::Close)?;
                 self.act(Action::SearchFor(tag))?;
             }
+            table_view::Asked::Tick(id, to) => {
+                if let Some(entity) = self.table.as_ref().and_then(TableView::boxes) {
+                    let entity = entity.to_string();
+                    self.act(Action::Tick { entity, id, to })?;
+                }
+            }
+            table_view::Asked::History(id) => {
+                if let Some(entity) = self.table.as_ref().and_then(TableView::boxes) {
+                    let entity = entity.to_string();
+                    self.act(Action::BoxHistory { entity, id })?;
+                }
+            }
         }
         Ok(())
     }
@@ -4822,8 +4947,18 @@ impl App {
             return Ok(());
         }
         notes.edit_as(&note, text, text_format::MARKDOWN)?;
+        // As stored, its new boxes with their ids (ADR 0035), here and in
+        // the view, so the next write keeps them.
+        let Some(stored) = notes.by_id(&note)?.map(|n| n.text) else {
+            return Ok(());
+        };
+        if let Some(table) = &mut self.table
+            && let Some(at) = same_table((table.text(), table.at()), &stored)
+        {
+            table.take_stored(stored.clone(), at);
+        }
         if self.text_of.as_deref() == Some(note.as_str()) {
-            self.text = text.to_string();
+            self.text = stored;
         }
         Ok(())
     }
@@ -5189,8 +5324,14 @@ impl App {
         if text.is_empty() {
             self.text = note.text.clone();
         } else if text != note.text {
-            Notes::new(&self.store).edit(&note.id, text)?;
-            self.text = text.to_string();
+            let notes = Notes::new(&self.store);
+            notes.edit(&note.id, text)?;
+            // As stored: its new boxes with their ids (ADR 0035), or the
+            // next save gives them new ones and their ticks are lost.
+            self.text = match notes.by_id(&note.id)? {
+                Some(now) => now.text,
+                None => text.to_string(),
+            };
         }
         Ok(())
     }
@@ -5214,7 +5355,18 @@ impl App {
             return Ok(());
         }
         if note.text_format != text_format::MARKDOWN || text != note.text {
-            Notes::new(&self.store).edit_as(&note.id, text, text_format::MARKDOWN)?;
+            let notes = Notes::new(&self.store);
+            notes.edit_as(&note.id, text, text_format::MARKDOWN)?;
+            // As stored, its new boxes with their ids, what is typed
+            // around it kept.
+            if let Some(now) = notes.by_id(&note.id)?
+                && now.text != text
+            {
+                let typed = self.text.clone();
+                let before = &typed[..typed.len() - typed.trim_start().len()];
+                let after = &typed[typed.trim_end().len()..];
+                self.text = format!("{before}{}{after}", now.text);
+            }
         }
         Ok(())
     }
@@ -5754,11 +5906,20 @@ impl App {
         egui::CentralPanel::default()
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| self.notes_pane(ui, tones, &mut actions));
-        self.dialog(ui.ctx(), tones, &mut actions);
+        if !matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(ui.ctx(), tones, &mut actions);
+        }
         // A table full screen over the dialog it may be opened from.
         if let Some(table) = &mut self.table {
+            if let Some(ticking) = &self.view.table_ticking {
+                table.set_ticking(ticking.clone());
+            }
             let asked = table.show(ui.ctx(), &self.t, tones);
             actions.extend(asked.into_iter().map(Action::Table));
+        }
+        // A box's History over the table it may be opened from.
+        if matches!(self.dialog, Some(Dialog::BoxHistory { .. })) {
+            self.dialog(ui.ctx(), tones, &mut actions);
         }
         // The photo full screen, over everything else.
         if let Some(viewer) = &mut self.viewer
@@ -6210,7 +6371,12 @@ impl App {
                         checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                         shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                         menu: self.card_menu.as_ref(),
-                        marks: self.view.marks.contains(id),
+                        changes: self.view.card_changes.contains(id),
+                        boxes: CardBoxes {
+                            looks: &self.view.box_looks,
+                            ticks: &self.view.box_ticks,
+                            show: self.view.show_ticks.contains(id),
+                        },
                     };
                     let clicks = note_card(
                         ui,
@@ -6231,14 +6397,8 @@ impl App {
                         actions.push(picked);
                     } else if let Some(tag) = clicks.tag {
                         actions.push(Action::SearchFor(tag));
-                    } else if let Some((line, column, to)) = clicks.mark {
-                        let note = id.clone();
-                        actions.push(Action::Mark {
-                            note,
-                            line,
-                            column,
-                            to,
-                        });
+                    } else if let Some((entity, asked)) = clicks.tick {
+                        actions.push(box_action(entity, asked));
                     } else if let Some(opening) = clicks.table {
                         actions.push(Action::OpenTable(opening));
                     } else if let Some((line, checked)) = clicks.check {
@@ -6423,6 +6583,17 @@ impl App {
             reader: self.reader.as_ref(),
         };
         let offering = &offering;
+        // Its boxes and its Sections' (ADR 0035): how they show, and
+        // whether this Device may tick them.
+        let no_boxes = BoxLook::default();
+        let box_looks = &self.view.box_looks;
+        let box_ticks = &self.view.box_ticks;
+        let look_of = |id: &str| box_looks.get(id).unwrap_or(&no_boxes);
+        let boxes = look_of(&note.id);
+        let ticks = box_ticks.contains(&note.id);
+        let ticked = ticked_in(&note.boxes);
+        let show_ticks = self.view.show_ticks.contains(&note.id);
+        let has_boxes = !note.boxes.is_empty() || sections.iter().any(|s| !s.boxes.is_empty());
         egui::ScrollArea::vertical()
             .id_salt("note")
             .auto_shrink([false, false])
@@ -6443,7 +6614,7 @@ impl App {
                         let all = (0, note.text.len());
                         let spots = text_marks_view::formatted_label(
                             ui,
-                            (&note.text, &note.text_format),
+                            (&note.text, &note.text_format, boxes),
                             all,
                             (Some(18.0), text),
                             false,
@@ -6457,9 +6628,15 @@ impl App {
                                 at,
                                 cell: None,
                                 tags: true,
+                                boxes: Some(note.id.clone()),
                             }));
                         }
-                        text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
+                        // A Member ticks the boxes of a Note not theirs.
+                        if let Some(asked) =
+                            text_marks_view::box_clicks(ui, &t, of, &spots.boxes, (ticks, &ticked))
+                        {
+                            actions.push(box_action(note.id.clone(), asked));
+                        }
                         if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
                             actions.push(Action::SearchFor(tag));
                         }
@@ -6496,7 +6673,7 @@ impl App {
                         let shown = ui.scope(|ui| {
                             text_marks_view::formatted_label(
                                 ui,
-                                (edited, text_format::MARKDOWN),
+                                (edited, text_format::MARKDOWN, boxes),
                                 all,
                                 (Some(18.0), text),
                                 false,
@@ -6524,14 +6701,18 @@ impl App {
                                 at,
                                 cell: None,
                                 tags: true,
+                                boxes: Some(note.id.clone()),
                             }));
                         }
-                        if let Some((line, column, to)) =
-                            text_marks_view::mark_clicks(ui, &t, marked, &spots.marks, true)
-                            && let Some(swapped) = markdown::swap_mark(edited, line, column, to)
-                        {
-                            *edited = swapped;
-                            actions.push(Action::SaveText);
+                        // A tick is no edit: what is typed stays.
+                        if let Some(asked) = text_marks_view::box_clicks(
+                            ui,
+                            &t,
+                            marked,
+                            &spots.boxes,
+                            (ticks, &ticked),
+                        ) {
+                            actions.push(box_action(note.id.clone(), asked));
                         }
                         if let Some(tag) = text_marks_view::tag_clicks(ui, &t, marked, &spots.tags)
                         {
@@ -6541,13 +6722,16 @@ impl App {
                     } else {
                         // Its tags in the accent colour, a formatted text's
                         // marks dimmed; a click on a tag places the cursor,
-                        // as anywhere in the field (#126).
+                        // as anywhere in the field (#126). Its boxes as they
+                        // show, their ids not drawn (ADR 0035), with Show
+                        // ticks room after each for who ticked it.
                         let accent = ui.visuals().hyperlink_color;
                         let weak = ui.visuals().weak_text_color();
+                        let small = FontId::proportional(13.0);
                         let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
                             let typed = typed.as_str();
                             let font = FontId::proportional(18.0);
-                            let mut job = if formatted {
+                            let job = if formatted {
                                 text_marks_view::source_job(typed, font, (text, accent, weak))
                             } else {
                                 text_marks_view::tag_job(
@@ -6557,6 +6741,13 @@ impl App {
                                     (text, accent),
                                 )
                             };
+                            let gap = |after: &str| {
+                                let said = after.to_string();
+                                let galley =
+                                    ui.fonts_mut(|f| f.layout_no_wrap(said, small.clone(), weak));
+                                galley.size().x + 8.0
+                            };
+                            let mut job = text_marks_view::field_job(job, boxes, &gap);
                             job.wrap.max_width = width;
                             ui.fonts_mut(|f| f.layout_job(job))
                         };
@@ -6568,6 +6759,7 @@ impl App {
                                     |e| matches!(e, egui::Event::Paste(p) if markdown::uses(p)),
                                 )
                             });
+                        let placed = *focus && select.is_some();
                         if std::mem::take(focus) {
                             let typed = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id)
                                 .and_then(|s| s.cursor.char_range())
@@ -6582,6 +6774,9 @@ impl App {
                                 None => ui.memory_mut(|m| m.request_focus(id)),
                             }
                         }
+                        // A box goes whole, its id with it, and the cursor
+                        // stays where it was as a save gives boxes ids.
+                        let cut = text_marks_view::guard_field(ui, id, edited, !placed);
                         let output = TextEdit::multiline(edited)
                             .id(id)
                             .font(FontId::proportional(18.0))
@@ -6590,6 +6785,10 @@ impl App {
                             .desired_width(f32::INFINITY)
                             .frame(Frame::NONE)
                             .show(ui);
+                        text_marks_view::guard_cursor(ui, id, edited);
+                        if cut {
+                            ui.ctx().request_repaint();
+                        }
                         name_field(ui, &output.response.response, t.note_text_field_name());
                         // A click on the bar keeps the field being edited.
                         if output.response.response.lost_focus() && picked.is_none() {
@@ -6609,22 +6808,22 @@ impl App {
                                 actions.push(Action::FormatText);
                             }
                         }
-                        // A click on a mark at the start of a line changes
-                        // it in the field, saved at once (#125).
-                        let typed = output.galley.text();
-                        let spots = text_marks_view::spots(
+                        // With Show ticks, who ticked each box, after it.
+                        let place = (&output.galley, output.galley_pos);
+                        text_marks_view::paint_after(ui, place, (edited, boxes), (small, weak));
+                        // A click on a box ticks it, no edit of the text
+                        // (ADR 0035).
+                        let spots = text_marks_view::field_spots(
                             &output.galley,
                             output.galley_pos,
-                            typed,
-                            (0, typed.len()),
+                            edited,
+                            boxes,
                         );
                         let marked = Id::new(("field", &note.id));
-                        if let Some((line, _, to)) =
-                            text_marks_view::mark_clicks(ui, &t, marked, &spots, true)
-                            && let Some(swapped) = text_marks::swap(edited, line, to)
+                        if let Some(asked) =
+                            text_marks_view::box_clicks(ui, &t, marked, &spots, (ticks, &ticked))
                         {
-                            *edited = swapped;
-                            actions.push(Action::SaveText);
+                            actions.push(box_action(note.id.clone(), asked));
                         }
                     }
                     match picked {
@@ -6639,6 +6838,7 @@ impl App {
                                     at: table.start,
                                     cell: None,
                                     tags: true,
+                                    boxes: Some(note.id.clone()),
                                 },
                                 None => {
                                     let change = markdown::table::insert(edited, selected.0);
@@ -6654,6 +6854,7 @@ impl App {
                                         at: change.start,
                                         cell: Some((0, 0)),
                                         tags: true,
+                                        boxes: Some(note.id.clone()),
                                     }
                                 }
                             };
@@ -6686,6 +6887,7 @@ impl App {
                         }
                         None => {}
                     }
+                    text_marks_view::remember_text(ui, id, edited);
                     ui.horizontal(|ui| {
                         let changed = edited.trim();
                         if !changed.is_empty()
@@ -6804,13 +7006,14 @@ impl App {
                             ui.label(RichText::new(t.text_newer_format()).color(weak));
                         }
                         if !section.text.is_empty() {
-                            // Its marks show; a Section's text has no edit
-                            // (ADR 0031). A formatted one reads formatted.
+                            // Its boxes tick; a Section's text has no edit
+                            // (ADR 0035). A formatted one reads formatted.
                             let all = (0, section.text.len());
                             let shown = (None, text);
+                            let look = look_of(&section.id);
                             let spots = text_marks_view::formatted_label(
                                 ui,
-                                (&section.text, &section.text_format),
+                                (&section.text, &section.text_format, look),
                                 all,
                                 shown,
                                 false,
@@ -6825,9 +7028,20 @@ impl App {
                                     at,
                                     cell: None,
                                     tags: true,
+                                    boxes: Some(section.id.clone()),
                                 }));
                             }
-                            text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
+                            let section_ticks = box_ticks.contains(&section.id);
+                            let section_ticked = ticked_in(&section.boxes);
+                            if let Some(asked) = text_marks_view::box_clicks(
+                                ui,
+                                &t,
+                                of,
+                                &spots.boxes,
+                                (section_ticks, &section_ticked),
+                            ) {
+                                actions.push(box_action(section.id.clone(), asked));
+                            }
                             if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
                             {
                                 actions.push(Action::SearchFor(tag));
@@ -7037,6 +7251,18 @@ impl App {
                     {
                         actions.push(Action::SaveAsMarkdown(note.id.clone()));
                     }
+                    // Who ticked each box last and when (ADR 0035).
+                    let mut on = show_ticks;
+                    if has_boxes
+                        && ui
+                            .checkbox(&mut on, RichText::new(t.box_show_ticks()).color(text))
+                            .clicked()
+                    {
+                        actions.push(Action::ShowTicks {
+                            note: note.id.clone(),
+                            on,
+                        });
+                    }
                 });
                 if !may.changes {
                     return;
@@ -7092,6 +7318,33 @@ impl App {
                 ui.set_width(400.0);
                 ui.spacing_mut().item_spacing.y = 10.0;
                 match dialog {
+                    Dialog::BoxHistory { lines } => {
+                        title(ui, t.history_title());
+                        let text = ui.visuals().text_color();
+                        let weak = ui.visuals().weak_text_color();
+                        ui.label(RichText::new(t.box_history_hint()).color(text));
+                        egui::ScrollArea::vertical()
+                            .max_height(360.0)
+                            .show(ui, |ui| {
+                                for (state, said) in lines.iter() {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            RichText::new(state.glyph().to_string())
+                                                .size(20.0)
+                                                .color(text),
+                                        );
+                                        ui.vertical(|ui| {
+                                            let label = text_marks_view::box_label(&t, *state);
+                                            ui.label(RichText::new(label).color(text));
+                                            ui.label(RichText::new(said).small().color(weak));
+                                        });
+                                    });
+                                }
+                            });
+                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                            actions.push(Action::CloseDialog);
+                        }
+                    }
                     Dialog::Link {
                         address, linked, ..
                     } => link_form(ui, &t, (address, focus), *linked, actions),
@@ -9412,9 +9665,11 @@ fn sent_item_form(
             // Formatted as it reads; its tags are not followed before it
             // is taken, its links open (#127).
             let shown = (0, item.text.len());
+            // Its boxes as the sender left them, never ticked here.
+            let unticked = BoxLook::default();
             let spots = text_marks_view::formatted_label(
                 ui,
-                (&item.text, &item.text_format),
+                (&item.text, &item.text_format, &unticked),
                 shown,
                 (None, text),
                 false,
@@ -9427,6 +9682,7 @@ fn sent_item_form(
                     at,
                     cell: None,
                     tags: false,
+                    boxes: None,
                 }));
             }
             text_marks_view::link_clicks(ui, of, &spots.links);
@@ -9449,7 +9705,7 @@ fn sent_item_form(
                 let shown = (0, section.text.len());
                 let spots = text_marks_view::formatted_label(
                     ui,
-                    (&section.text, &section.format),
+                    (&section.text, &section.format, &unticked),
                     shown,
                     (None, text),
                     false,
@@ -9462,6 +9718,7 @@ fn sent_item_form(
                         at,
                         cell: None,
                         tags: false,
+                        boxes: None,
                     }));
                 }
                 text_marks_view::link_clicks(ui, of, &spots.links);
@@ -10606,9 +10863,32 @@ struct CardLook<'a> {
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
     menu: Option<&'a CardMenu>,
-    /// Whether this Device may change the status marks of its text
-    /// (#125).
-    marks: bool,
+    /// Whether this Device may change its text, its tables full screen
+    /// (#128).
+    changes: bool,
+    /// How the boxes of its text and its Sections' show, by id, those of
+    /// them this Device may tick, and whether Show ticks is on for it
+    /// (ADR 0035).
+    boxes: CardBoxes<'a>,
+}
+
+/// How the boxes of the texts listed show, by id, the texts whose boxes
+/// this Device may tick and whether the Note has Show ticks on.
+#[derive(Debug, Clone, Copy)]
+struct CardBoxes<'a> {
+    looks: &'a HashMap<String, BoxLook>,
+    ticks: &'a HashSet<String>,
+    show: bool,
+}
+
+impl CardBoxes<'_> {
+    /// How the boxes of the text `id` show.
+    fn look(&self, id: &str) -> &BoxLook {
+        static NONE: std::sync::OnceLock<BoxLook> = std::sync::OnceLock::new();
+        self.looks
+            .get(id)
+            .unwrap_or_else(|| NONE.get_or_init(BoxLook::default))
+    }
 }
 
 /// What can be clicked on a card: the card, the author's picture on
@@ -10621,9 +10901,9 @@ struct CardClicks {
     edit: egui::Response,
     photo: Option<String>,
     check: Option<(String, bool)>,
-    /// The line of the Note's text whose status mark was changed, the
-    /// column of its table's cell, and to what (#125).
-    mark: Option<(usize, Option<usize>, TextMark)>,
+    /// What a click on a box of the Note's text or a Section's asked,
+    /// with that text's id (ADR 0035).
+    tick: Option<(String, BoxAsk)>,
     /// The table clicked, to show full screen (#128).
     table: Option<Opening>,
     /// The tag clicked, as written (#126).
@@ -10658,9 +10938,23 @@ fn compact_button(ui: &mut Ui, tones: Tones, t: &L10n, compact: bool) -> bool {
     resp.on_hover_text(label).clicked()
 }
 
+/// What a click on a box of the text `entity` asked, as an action.
+fn box_action(entity: String, asked: BoxAsk) -> Action {
+    match asked {
+        BoxAsk::Tick(id, to) => Action::Tick { entity, id, to },
+        BoxAsk::History(id) => Action::BoxHistory { entity, id },
+    }
+}
+
+/// Whether a box of `look` has been ticked: it offers its History then.
+fn ticked_in(boxes: &[ShownBox]) -> impl Fn(&str) -> bool + '_ {
+    move |id| boxes.iter().any(|b| b.id == id && b.last.is_some())
+}
+
 /// The text of a Note or Section and its photos and voice recordings,
 /// each as `(shown, removed, texts)`.
 struct Part<'a> {
+    id: &'a str,
     text: &'a str,
     format: &'a str,
     photos: (&'a [String], &'a [String], &'a BTreeMap<String, String>),
@@ -10670,6 +10964,7 @@ struct Part<'a> {
 impl<'a> Part<'a> {
     fn of_note(note: &'a Note) -> Part<'a> {
         Part {
+            id: &note.id,
             text: &note.text,
             format: &note.text_format,
             photos: (&note.photos, &note.removed_photos, &note.photo_texts),
@@ -10683,6 +10978,7 @@ impl<'a> Part<'a> {
 
     fn of_section(section: &'a Section) -> Part<'a> {
         Part {
+            id: &section.id,
             text: &section.text,
             format: &section.text_format,
             photos: (
@@ -10707,9 +11003,9 @@ fn whole(
     t: &L10n,
     part: Part,
     (cache, store, transcribing): ShownMedia,
-    marks: &mut Spots,
+    (look, marks): (&BoxLook, &mut Spots),
 ) -> Vec<(String, egui::Rect)> {
-    card_text(ui, (part.text, part.format), marks);
+    card_text(ui, (part.text, part.format, look), marks);
     media_view::whole_media(
         ui,
         t,
@@ -10721,15 +11017,15 @@ fn whole(
 }
 
 /// The whole text `text` of a Note or Section in `format` on a full
-/// card, where its status marks (#125), tags (#126) and links (#127) lie
-/// added to `marks`.
-fn card_text(ui: &mut Ui, (text, format): (&str, &str), marks: &mut Spots) {
+/// card, its boxes as `look` says, where its boxes (ADR 0035), tags
+/// (#126) and links (#127) lie added to `marks`.
+fn card_text(ui: &mut Ui, (text, format, look): (&str, &str, &BoxLook), marks: &mut Spots) {
     if !text.is_empty() {
         let colour = ui.visuals().text_color();
         let shown = (0, text.len());
         marks.extend(text_marks_view::formatted_label(
             ui,
-            (text, format),
+            (text, format, look),
             shown,
             (Some(16.0), colour),
             false,
@@ -10881,7 +11177,8 @@ fn note_card(
                     };
                     if let Some(lines) = lines {
                         // Its Lines right under its text.
-                        card_text(ui, (part.text, part.format), &mut marks);
+                        let text = (part.text, part.format, look.boxes.look(part.id));
+                        card_text(ui, text, &mut marks);
                         boxes = checklist_view::card_lines(ui, tones, &lines);
                         shown.extend(media_view::whole_media(
                             ui,
@@ -10893,7 +11190,8 @@ fn note_card(
                         ));
                     } else {
                         let media = (&mut *photos, store, transcribing);
-                        shown.extend(whole(ui, t, part, media, &mut marks));
+                        let boxes = look.boxes.look(part.id);
+                        shown.extend(whole(ui, t, part, media, (boxes, &mut marks)));
                     }
                     for section in look.sections {
                         ui.separator();
@@ -10901,7 +11199,8 @@ fn note_card(
                         let part = Part::of_section(section);
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);
-                        shown.extend(whole(ui, t, part, media, &mut spots));
+                        let boxes = look.boxes.look(part.id);
+                        shown.extend(whole(ui, t, part, media, (boxes, &mut spots)));
                         section_marks.push((section, spots));
                     }
                 });
@@ -10910,7 +11209,8 @@ fn note_card(
             // A photo Note may have no words.
             if let Some(line) = first_line(&note.text) {
                 let shown = (Some(16.0), text);
-                let text = (note.text.as_str(), note.text_format.as_str());
+                let boxes = look.boxes.look(&note.id);
+                let text = (note.text.as_str(), note.text_format.as_str(), boxes);
                 marks = text_marks_view::formatted_label(ui, text, line, shown, true);
             }
             if let Some((list, _)) = look.checklist {
@@ -11002,6 +11302,7 @@ fn note_card(
     let mut menu_opened = resp.secondary_clicked();
     let mut picked = None;
     let menu = look.menu.filter(|m| m.note == note.id);
+    let has_boxes = !note.boxes.is_empty() || look.sections.iter().any(|s| !s.boxes.is_empty());
     let mut entries = |ui: &mut Ui| {
         let text = ui.visuals().text_color();
         if ui.button(RichText::new(t.edit()).color(text)).clicked() {
@@ -11031,6 +11332,17 @@ fn note_card(
             .clicked()
         {
             picked = Some(Action::SaveAsMarkdown(note.id.clone()));
+        }
+        // Who ticked each box last and when (ADR 0035), where it has any.
+        if has_boxes {
+            let mut on = look.boxes.show;
+            let label = RichText::new(t.box_show_ticks()).color(text);
+            if ui.checkbox(&mut on, label).clicked() {
+                picked = Some(Action::ShowTicks {
+                    note: note.id.clone(),
+                    on,
+                });
+            }
         }
         // A pick closes the menu, also one made with the keyboard or a
         // screen reader, which no pointer click closes.
@@ -11075,11 +11387,12 @@ fn note_card(
     // taken first, its marks, tags and links keep their clicks.
     let of = Id::new(("card", &note.id));
     let mut table = text_marks_view::table_clicks(ui, t, of, &marks.tables).map(|at| Opening {
-        note: look.marks.then(|| note.id.clone()),
+        note: look.changes.then(|| note.id.clone()),
         text: note.text.clone(),
         at,
         cell: None,
         tags: true,
+        boxes: Some(note.id.clone()),
     });
     for (section, spots) in &section_marks {
         let of = Id::new(("card", &section.id));
@@ -11090,17 +11403,28 @@ fn note_card(
                 at,
                 cell: None,
                 tags: true,
+                boxes: Some(section.id.clone()),
             });
         }
     }
-    let mark = text_marks_view::mark_clicks(ui, t, of, &marks.marks, look.marks);
+    // A box of its text, or of a Section's, ticks where this Device may
+    // (ADR 0035).
+    let ticks = look.boxes.ticks.contains(&note.id);
+    let mut tick =
+        text_marks_view::box_clicks(ui, t, of, &marks.boxes, (ticks, &ticked_in(&note.boxes)))
+            .map(|asked| (note.id.clone(), asked));
     // A click on a tag searches for it, and opens no card (#126).
     let mut tag = text_marks_view::tag_clicks(ui, t, of, &marks.tags);
     // A click on a link opens it, and no card (#127).
     text_marks_view::link_clicks(ui, of, &marks.links);
     for (section, spots) in &section_marks {
         let of = Id::new(("card", &section.id));
-        text_marks_view::mark_clicks(ui, t, of, &spots.marks, false);
+        let ticks = look.boxes.ticks.contains(&section.id);
+        let ticked = ticked_in(&section.boxes);
+        if let Some(asked) = text_marks_view::box_clicks(ui, t, of, &spots.boxes, (ticks, &ticked))
+        {
+            tick = Some((section.id.clone(), asked));
+        }
         tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
         text_marks_view::link_clicks(ui, of, &spots.links);
     }
@@ -11110,7 +11434,7 @@ fn note_card(
         edit: edit.on_hover_text(t.edit()),
         photo,
         check,
-        mark,
+        tick,
         table,
         tag,
         menu_opened,

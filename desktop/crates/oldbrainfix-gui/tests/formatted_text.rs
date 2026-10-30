@@ -315,7 +315,7 @@ fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
     // ☐ only over the Note's text, the rest over both fields.
     assert_eq!(
         harness
-            .query_all_by_role_and_label(Role::Button, "Put ☐ at the start of the line")
+            .query_all_by_role_and_label(Role::Button, "Put in ☐")
             .count(),
         1
     );

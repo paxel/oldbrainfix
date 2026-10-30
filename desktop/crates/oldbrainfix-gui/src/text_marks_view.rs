@@ -1,11 +1,16 @@
-//! Status marks on the desktop's screen (#125, ADR 0031), as the phone's
-//! `text_marks_view.dart` draws them: a ☐, ✅ or ❌ at the start of a
-//! line of a text is read by a screen reader as the state it shows, and
-//! where the text may be changed a click on it opens Check, Fail and
-//! Open, the current state left out. A mark in the middle of a line is
-//! plain text.
+//! Boxes in text on the desktop's screen (ADR 0035), as the phone's
+//! `text_marks_view.dart` draws them: a ☐, ✅ or ❌ anywhere in a text
+//! that carries an id of its own shows the state of its latest tick and
+//! is read by a screen reader as that state; where this Device may tick
+//! it, a click on it opens Check, Fail and Open at the pointer, the
+//! current state left out, and its History once it has been ticked. A
+//! tick is an entry beside the text, never an edit of it. The ids are
+//! never drawn: a text is laid out from its source, each box as the
+//! glyph of its state, its id left out (or, in an edit field, kept but
+//! drawn invisibly small, so the field's cursor counts every character).
+//! With Show ticks on, a box says after it who ticked it last and when.
 //!
-//! The marks are found in the text as it is drawn and taken as widgets
+//! The boxes are found in the text as it is drawn and taken as widgets
 //! of their own afterwards, over whatever lies under them (a card, the
 //! editor's field), so that they get the click.
 //!
@@ -18,40 +23,66 @@
 //! A formatted text (#127, ADR 0033) is drawn as it reads, without its
 //! marks: bold, italic, struck through, two sizes of heading, bulleted
 //! and numbered items, quotes, links and code, line by line as the core
-//! reads it. Its status marks and tags are found in its source and take
-//! clicks as in a plain text; a link to a web or e-mail address opens in
-//! the system's browser or mail program on a click, and any other stays
+//! reads it. Its boxes and tags are found in its source and take clicks
+//! as in a plain text; a link to a web or e-mail address opens in the
+//! system's browser or mail program on a click, and any other stays
 //! text.
 //!
 //! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
 //! scaled down to the width there is: its header row bold on grey, its
 //! first column bold while it holds headings, each cell one line of the
-//! formats above with its status mark and tags taking clicks. A click
+//! formats above with its boxes and tags taking clicks. A click
 //! elsewhere on it opens it in the full-screen table view.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Local, Utc};
 use egui::text::{CCursor, CharIndex, Galley, LayoutJob, TextFormat};
 use egui::{
-    Color32, FontId, FontSelection, Id, Popup, Pos2, Rect, RichText, Sense, Stroke, TextStyle,
-    TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
+    Color32, FontId, FontSelection, Id, Modifiers, Popup, Pos2, Rect, RichText, Sense, Stroke,
+    TextStyle, TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
 use oldbrainfix_core::markdown::table::{Align, Cell, Table};
-use oldbrainfix_core::markdown::{self, Block, BlockKind, Mark, Span, SpanKind};
-use oldbrainfix_core::text_marks::{find, line_at};
-use oldbrainfix_core::{FoundTag, TextMark, text_format, text_tags};
+use oldbrainfix_core::markdown::{self, Block, BlockKind, Span, SpanKind};
+use oldbrainfix_core::text_boxes::{self, FoundBox};
+use oldbrainfix_core::{BoxState, BoxTick, FoundTag, ShownBox, text_format, text_tags};
 
 use crate::l10n::L10n;
+use crate::schedule_text;
 
-/// A status mark as it is drawn: the line it begins in the whole text,
-/// counted from 0, the column of the table's cell it begins while it is
-/// in one, the state it shows and where it lies on the screen.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MarkSpot {
-    pub line: usize,
-    pub column: Option<usize>,
-    pub mark: TextMark,
+/// A box as it is drawn: its id, the state it shows and where it lies
+/// on the screen.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoxSpot {
+    pub id: String,
+    pub state: BoxState,
     pub rect: Rect,
+}
+
+/// How the boxes of a text show (ADR 0035): the state each shows now, by
+/// its id, a box not among them in the state its glyph was written in;
+/// and, with Show ticks on, what each ticked box says after it.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BoxLook {
+    pub states: BTreeMap<String, BoxState>,
+    pub after: BTreeMap<String, String>,
+}
+
+impl BoxLook {
+    /// The states of `boxes`, a Note's or a Section's, nothing said after
+    /// them.
+    pub fn of(boxes: &[ShownBox]) -> BoxLook {
+        BoxLook {
+            states: boxes.iter().map(|b| (b.id.clone(), b.state)).collect(),
+            after: BTreeMap::new(),
+        }
+    }
+
+    /// The state the box `found` shows.
+    pub fn state(&self, found: &FoundBox) -> BoxState {
+        self.states.get(&found.id).copied().unwrap_or(found.state)
+    }
 }
 
 /// A tag as it is drawn: where it begins in the whole text, in bytes,
@@ -82,11 +113,11 @@ pub struct TableSpot {
     pub rect: Rect,
 }
 
-/// The status marks, the tags, the links and the tables of a text as it
-/// is drawn.
+/// The boxes, the tags, the links and the tables of a text as it is
+/// drawn.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spots {
-    pub marks: Vec<MarkSpot>,
+    pub boxes: Vec<BoxSpot>,
     pub tags: Vec<TagSpot>,
     pub links: Vec<LinkSpot>,
     pub tables: Vec<TableSpot>,
@@ -95,7 +126,7 @@ pub struct Spots {
 impl Spots {
     /// Adds the spots of another text drawn.
     pub fn extend(&mut self, other: Spots) {
-        self.marks.extend(other.marks);
+        self.boxes.extend(other.boxes);
         self.tags.extend(other.tags);
         self.links.extend(other.links);
         self.tables.extend(other.tables);
@@ -130,47 +161,83 @@ pub fn tag_job(
     job
 }
 
-/// What a screen reader says for `mark`: the state it shows.
-pub fn mark_label(t: &L10n, mark: TextMark) -> &'static str {
-    match mark {
-        TextMark::Open => t.text_mark_open(),
-        TextMark::Checked => t.text_mark_checked(),
-        TextMark::Failed => t.text_mark_failed(),
+/// What a screen reader says for a box showing `state`.
+pub fn box_label(t: &L10n, state: BoxState) -> &'static str {
+    match state {
+        BoxState::Open => t.text_mark_open(),
+        BoxState::Done => t.text_mark_checked(),
+        BoxState::Failed => t.text_mark_failed(),
     }
 }
 
-/// The menu entry that changes a mark to `to`, its character first.
-pub fn menu_entry(t: &L10n, to: TextMark) -> String {
+/// The menu entry that ticks a box to `to`, its glyph first.
+pub fn menu_entry(t: &L10n, to: BoxState) -> String {
     let word = match to {
-        TextMark::Checked => t.text_mark_check(),
-        TextMark::Failed => t.text_mark_fail(),
-        TextMark::Open => t.text_mark_reopen(),
+        BoxState::Done => t.text_mark_check(),
+        BoxState::Failed => t.text_mark_fail(),
+        BoxState::Open => t.text_mark_reopen(),
     };
     format!("{} {word}", to.glyph())
 }
 
-/// Draws the bytes `shown` of `text` as a label of `size` (the body's
-/// while `None`) in `colour`, its tags in the accent colour, cut off at
-/// the edge with `truncate` and wrapped otherwise, and gives where its
-/// marks and tags lie. Without either it is the plain label it was.
+/// Who wrote `tick` and when, as "Ann, Tue 14:02", the phone's
+/// `tickText`: "You" for the user's own, the time alone when the person
+/// is not known (`by` none) or blocked. The weekday stands for a time
+/// within six days of `now`, the date before; `full`, as the History
+/// lists them, always the weekday and the date.
+pub fn tick_text(
+    t: &L10n,
+    tick: &BoxTick,
+    by: Option<&str>,
+    (now, full): (DateTime<Utc>, bool),
+) -> String {
+    let at = tick.at.with_timezone(&Local);
+    let day = oldbrainfix_core::Day {
+        year: i64::from(chrono::Datelike::year(&at)),
+        month: chrono::Datelike::month(&at),
+        day: chrono::Datelike::day(&at),
+    };
+    let clock = at.format("%H:%M");
+    let when = if full {
+        format!("{} {clock}", schedule_text::day_text(t, day))
+    } else if now - tick.at < chrono::Duration::days(6) {
+        let weekday = schedule_text::weekday_text(t, day.weekday());
+        format!("{weekday} {clock}")
+    } else {
+        format!("{} {clock}", schedule_text::short_day_text(t, day))
+    };
+    let name = if tick.own { Some(t.box_tick_you()) } else { by };
+    match name {
+        Some(name) => t.box_tick_by(name, &when),
+        None => when,
+    }
+}
+
+/// Draws the bytes `shown` of the source `text` as a label of `size`
+/// (the body's while `None`) in `colour`, its tags in the accent colour,
+/// its boxes as `boxes` says without their ids, cut off at the edge with
+/// `truncate` and wrapped otherwise, and gives where its boxes and tags
+/// lie. Without either it is the plain label it was.
 pub fn marked_label(
     ui: &mut Ui,
-    text: &str,
+    (text, boxes): (&str, &BoxLook),
     shown: (usize, usize),
-    (size, colour): (Option<f32>, Color32),
+    look: (Option<f32>, Color32),
     truncate: bool,
 ) -> Spots {
     let (from, to) = shown;
     let Some(part) = text.get(from..to) else {
         return Spots::default();
     };
-    let marked = find(text).iter().any(|m| m.start >= from && m.end <= to);
-    let tagged = text_tags::find(text)
+    let found = Found::of(text, text_format::PLAIN, boxes);
+    let marked = found
+        .boxes
         .iter()
-        .any(|t| t.start >= from && t.end <= to);
+        .any(|b| b.0.start >= from && b.0.end <= to);
+    let tagged = found.tags.iter().any(|t| t.start >= from && t.end <= to);
     if !marked && !tagged {
-        let mut rich = RichText::new(part).color(colour);
-        if let Some(size) = size {
+        let mut rich = RichText::new(part).color(look.1);
+        if let Some(size) = look.0 {
             rich = rich.size(size);
         }
         let label = egui::Label::new(rich);
@@ -182,47 +249,40 @@ pub fn marked_label(
     } else {
         TextWrapMode::Wrap
     };
-    let mut font = TextStyle::Body.resolve(ui.style());
-    if let Some(size) = size {
-        font.size = size;
-    }
-    let accent = ui.visuals().hyperlink_color;
-    let job = tag_job(text, shown, font, (colour, accent));
-    let galley = WidgetText::from(job).into_galley(
+    let look = Look::of(ui, look);
+    let mut line = Line::default();
+    add_written(&mut line, text, shown, Style::default(), (&found, &look));
+    let galley = WidgetText::from(std::mem::take(&mut line.job)).into_galley(
         ui,
         Some(wrap),
         ui.available_width(),
         FontSelection::Default,
     );
     let response = ui.add(egui::Label::new(galley.clone()));
-    let origin = response.rect.min;
-    Spots {
-        marks: spots(&galley, origin, text, shown),
-        tags: tag_spots(&galley, origin, text, shown),
-        ..Spots::default()
-    }
+    line_spots(&galley, response.rect.min, &line)
 }
 
-/// Draws the bytes `shown` of `text`, in `format`, as [`marked_label`]
-/// draws them: a formatted text as it reads, line by line, a table as a
-/// grid (a row's cells one after another while cut off), a plain one as
-/// it is written. Gives where its marks, tags, links and tables lie.
+/// Draws the bytes `shown` of the source `text`, in `format`, its boxes
+/// as `boxes` says, as [`marked_label`] draws them: a formatted text as
+/// it reads, line by line, a table as a grid (a row's cells one after
+/// another while cut off), a plain one as it is written. Gives where its
+/// boxes, tags, links and tables lie.
 pub fn formatted_label(
     ui: &mut Ui,
-    (text, format): (&str, &str),
+    (text, format, boxes): (&str, &str, &BoxLook),
     shown: (usize, usize),
     look: (Option<f32>, Color32),
     truncate: bool,
 ) -> Spots {
     if format != text_format::MARKDOWN {
-        return marked_label(ui, text, shown, look, truncate);
+        return marked_label(ui, (text, boxes), shown, look, truncate);
     }
     let (from, to) = shown;
     if text.get(from..to).is_none() {
         return Spots::default();
     }
     let look = Look::of(ui, look);
-    let found = Found::of(text);
+    let found = Found::of(text, format, boxes);
     let blocks = markdown::parse(text);
     let (first, last) = (line_at(text, from), line_at(text, to));
     let mut spots = Spots::default();
@@ -282,19 +342,40 @@ impl Look {
     }
 }
 
-/// The status marks and the tags of a formatted text, in its source: a
-/// table's cell's marks among them.
+/// The line `at`, a byte of `text`, lies on, counted from 0.
+pub(crate) fn line_at(text: &str, at: usize) -> usize {
+    text.get(..at)
+        .unwrap_or(text)
+        .bytes()
+        .filter(|&b| b == b'\n')
+        .count()
+}
+
+/// The boxes and the tags of a text, in its source, a table's cells'
+/// among them: each box with the state it shows and what it says after
+/// it.
 pub(crate) struct Found {
-    marks: Vec<Mark>,
+    boxes: Vec<(FoundBox, BoxState, Option<String>)>,
     tags: Vec<FoundTag>,
 }
 
 impl Found {
-    pub(crate) fn of(text: &str) -> Found {
-        Found {
-            marks: markdown::marks(text),
-            tags: markdown::tags(text),
-        }
+    /// Those of the source `text` in `format`, its boxes as `look` says.
+    pub(crate) fn of(text: &str, format: &str, look: &BoxLook) -> Found {
+        let boxes = text_boxes::find(text)
+            .into_iter()
+            .map(|b| {
+                let state = look.state(&b);
+                let after = look.after.get(&b.id).cloned();
+                (b, state, after)
+            })
+            .collect();
+        let tags = if format == text_format::MARKDOWN {
+            markdown::tags(text)
+        } else {
+            text_tags::find(text)
+        };
+        Found { boxes, tags }
     }
 }
 
@@ -309,12 +390,9 @@ struct Style {
     quote: bool,
 }
 
-/// Where a status mark is: its line, and the column of its table's cell.
-type MarkAt = (usize, Option<usize>);
-
 /// A line of a formatted text laid out: what it shows, in `job`; its bold
 /// parts once more, in `ghost`, drawn a little to the right over them, as
-/// egui's fonts have no bold; and where its marks, tags and links lie in
+/// egui's fonts have no bold; and where its boxes, tags and links lie in
 /// it, in characters.
 #[derive(Default)]
 struct Line {
@@ -322,7 +400,7 @@ struct Line {
     ghost: LayoutJob,
     bold: bool,
     chars: usize,
-    marks: Vec<(MarkAt, TextMark, (usize, usize))>,
+    boxes: Vec<(String, BoxState, (usize, usize))>,
     tags: Vec<(usize, String, (usize, usize))>,
     links: Vec<(usize, String, (usize, usize))>,
 }
@@ -386,11 +464,14 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
             SpanKind::Text if span.content_start == span.start => {
                 add_written(line, text, (span.start, span.end), style, ctx);
             }
+            // Never an id drawn, of a box or of a glyph copied in.
             SpanKind::Text => {
-                line.push(&span.text, part_format(look, style, false), style.bold);
+                let shown = text_boxes::strip(&span.text);
+                line.push(&shown, part_format(look, style, false), style.bold);
             }
             SpanKind::Code => {
-                line.push(&span.text, part_format(look, style, true), style.bold);
+                let shown = text_boxes::strip(&span.text);
+                line.push(&shown, part_format(look, style, true), style.bold);
             }
             SpanKind::Bold => {
                 let inner = Style {
@@ -431,16 +512,17 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
     }
 }
 
-/// What a run of characters shown as written holds: a status mark of a
-/// line, or a tag.
+/// What a run of characters shown as written holds: a box, by its place
+/// among those found, or a tag.
 enum Cut {
-    Mark(usize, Option<usize>, TextMark),
+    Box(usize),
     Tag,
 }
 
 /// Adds the bytes `start..end` of `text`, shown as written, to `line`,
-/// its status marks and tags cut out of it; a tag in a link's words is
-/// part of the link.
+/// its boxes and tags cut out of it: a box as the glyph of the state it
+/// shows, its id left out, and with Show ticks what it says after it,
+/// small and dim; a tag in a link's words is part of the link.
 fn add_written(
     line: &mut Line,
     text: &str,
@@ -450,10 +532,11 @@ fn add_written(
 ) {
     let format = part_format(look, style, false);
     let mut cuts: Vec<(usize, usize, Cut)> = found
-        .marks
+        .boxes
         .iter()
-        .filter(|m| m.start >= start && m.end <= end)
-        .map(|m| (m.start, m.end, Cut::Mark(m.line, m.column, m.mark)))
+        .enumerate()
+        .filter(|(_, b)| b.0.start >= start && b.0.end <= end)
+        .map(|(i, b)| (b.0.start, b.0.end, Cut::Box(i)))
         .collect();
     if !style.link {
         cuts.extend(
@@ -472,9 +555,18 @@ fn add_written(
         };
         line.push(before, format.clone(), style.bold);
         match cut {
-            Cut::Mark(number, column, mark) => {
-                let chars = line.push(piece, format.clone(), style.bold);
-                line.marks.push(((number, column), mark, chars));
+            Cut::Box(i) => {
+                let Some((found, state, after)) = found.boxes.get(i) else {
+                    continue;
+                };
+                let glyph = state.glyph().to_string();
+                let chars = line.push(&glyph, format.clone(), style.bold);
+                line.boxes.push((found.id.clone(), *state, chars));
+                if let Some(after) = after {
+                    let small =
+                        TextFormat::simple(FontId::proportional(look.font.size * 0.75), look.weak);
+                    line.push(&format!(" {after} "), small, false);
+                }
             }
             Cut::Tag => {
                 let mut tagged = format.clone();
@@ -837,21 +929,20 @@ pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Optio
     picked
 }
 
-/// Where the marks, tags and links of `line`, laid out in `galley` at
+/// Where the boxes, tags and links of `line`, laid out in `galley` at
 /// `origin`, lie on the screen.
 fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
     let at =
         |chars: (usize, usize)| place_chars(galley, chars).map(|r| r.translate(origin.to_vec2()));
     Spots {
-        marks: line
-            .marks
+        boxes: line
+            .boxes
             .iter()
-            .filter_map(|&((line, column), mark, chars)| {
-                Some(MarkSpot {
-                    line,
-                    column,
-                    mark,
-                    rect: at(chars)?,
+            .filter_map(|(id, state, chars)| {
+                Some(BoxSpot {
+                    id: id.clone(),
+                    state: *state,
+                    rect: at(*chars)?,
                 })
             })
             .collect(),
@@ -1104,60 +1195,175 @@ pub fn tag_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TagSpot]) -> Option<St
     picked
 }
 
-/// Where the marks of `text` lie in `galley`, laid out at `origin` from
-/// its bytes `shown`.
-pub fn spots(
-    galley: &Arc<Galley>,
-    origin: egui::Pos2,
-    text: &str,
-    (from, to): (usize, usize),
-) -> Vec<MarkSpot> {
-    let mut out = Vec::new();
-    for found in find(text) {
-        if found.start < from || found.end > to {
-            continue;
-        }
-        let Some(rect) = place(galley, text, from, (found.start, found.end)) else {
-            continue;
-        };
-        out.push(MarkSpot {
-            line: found.line,
-            column: None,
-            mark: found.mark,
-            rect: rect.translate(origin.to_vec2()),
-        });
-    }
-    out
+/// The format the characters of a box's id are drawn in, in an edit
+/// field: too small and too faint to be seen, with room after them for
+/// what the box says (`gap`, in points).
+fn hidden_format(format: &TextFormat, gap: f32) -> TextFormat {
+    let mut hidden = format.clone();
+    hidden.font_id = FontId::new(1.0, format.font_id.family.clone());
+    hidden.color = Color32::TRANSPARENT;
+    hidden.background = Color32::TRANSPARENT;
+    hidden.underline = Stroke::NONE;
+    hidden.strikethrough = Stroke::NONE;
+    hidden.extra_letter_spacing = gap;
+    hidden
 }
 
-/// Takes the marks `spots` of the text `of`, by id, as widgets over what was
-/// drawn under them: read as their state, and while `changes` each a
-/// button opening Check, Fail and Open at the mark, the current state
-/// left out. Gives the line of the mark picked, the column of its cell in
-/// a table, and the state it is to show.
-pub fn mark_clicks(
+/// `job`, laid out for an edit field from the source text it holds, with
+/// every box drawn as the glyph of the state it shows by `look` (each of
+/// the three glyphs is three bytes, so every offset stays) and its id
+/// drawn invisibly, every character still there for the field's cursor.
+/// The last character of an id leaves `gap` of the text it says after
+/// it room.
+pub fn field_job(mut job: LayoutJob, look: &BoxLook, gap: &dyn Fn(&str) -> f32) -> LayoutJob {
+    let found = text_boxes::find(&job.text);
+    if found.is_empty() {
+        return job;
+    }
+    // Where each id lies, with what its box says after it.
+    let mut hidden = Vec::new();
+    for b in &found {
+        let glyph = look.state(b).glyph();
+        let width = glyph.len_utf8();
+        let written = job.text.get(b.start..).and_then(|s| s.chars().next());
+        if written.is_some_and(|c| c.len_utf8() == width) {
+            job.text
+                .replace_range(b.start..b.start + width, glyph.encode_utf8(&mut [0; 4]));
+        }
+        let after = look.after.get(&b.id).map_or(0.0, |a| gap(a));
+        hidden.push((b.start + width, b.end, after));
+    }
+    let sections = std::mem::take(&mut job.sections);
+    let mut out = Vec::with_capacity(sections.len() + hidden.len() * 2);
+    for section in sections {
+        let (from, to) = (section.byte_range.start.0, section.byte_range.end.0);
+        let mut at = from;
+        let mut piece = |a: usize, b: usize, format: TextFormat, lead: f32| {
+            if a < b {
+                out.push(egui::text::LayoutSection {
+                    leading_space: lead,
+                    byte_range: egui::text::ByteIndex(a)..egui::text::ByteIndex(b),
+                    format,
+                });
+            }
+        };
+        for &(h_from, h_to, after) in &hidden {
+            if h_to <= at || h_from >= to {
+                continue;
+            }
+            let lead = if at == from {
+                section.leading_space
+            } else {
+                0.0
+            };
+            piece(at, h_from.max(at), section.format.clone(), lead);
+            let (a, b) = (h_from.max(at), h_to.min(to));
+            // The last character of the id leaves the room.
+            let last = text_last_char(&job.text, b);
+            if b == h_to && after > 0.0 && last > a {
+                piece(a, last, hidden_format(&section.format, 0.0), 0.0);
+                piece(last, b, hidden_format(&section.format, after), 0.0);
+            } else {
+                piece(a, b, hidden_format(&section.format, 0.0), 0.0);
+            }
+            at = b;
+        }
+        let lead = if at == from {
+            section.leading_space
+        } else {
+            0.0
+        };
+        piece(at, to, section.format, lead);
+    }
+    job.sections = out;
+    job
+}
+
+/// Where the last character before the byte `end` of `text` begins.
+fn text_last_char(text: &str, end: usize) -> usize {
+    text.get(..end)
+        .and_then(|s| s.char_indices().next_back())
+        .map_or(end, |(i, _)| i)
+}
+
+/// Where the boxes of the source `text`, laid out in an edit field's
+/// `galley` at `origin` with [`field_job`], lie on the screen, each as
+/// `look` says it shows.
+pub fn field_spots(galley: &Arc<Galley>, origin: Pos2, text: &str, look: &BoxLook) -> Vec<BoxSpot> {
+    text_boxes::find(text)
+        .into_iter()
+        .filter_map(|b| {
+            let rect = place(galley, text, 0, (b.start, b.id_start))?;
+            Some(BoxSpot {
+                state: look.state(&b),
+                id: b.id,
+                rect: rect.translate(origin.to_vec2()),
+            })
+        })
+        .collect()
+}
+
+/// Paints what each box of the source `text` says after it, with Show
+/// ticks on, into the room [`field_job`] left for it in an edit field's
+/// `galley` at `origin`, in `font` and `colour`.
+pub fn paint_after(
+    ui: &Ui,
+    (galley, origin): (&Arc<Galley>, Pos2),
+    (text, look): (&str, &BoxLook),
+    (font, colour): (FontId, Color32),
+) {
+    for b in text_boxes::find(text) {
+        let Some(after) = look.after.get(&b.id) else {
+            continue;
+        };
+        let Some(glyph) = place(galley, text, 0, (b.start, b.id_start)) else {
+            continue;
+        };
+        let pos = origin + egui::vec2(glyph.right() + 2.0, glyph.center().y);
+        ui.painter()
+            .text(pos, egui::Align2::LEFT_CENTER, after, font.clone(), colour);
+    }
+}
+
+/// What a click on a box asks: to tick it to a state, or to show its
+/// History; each with the box's id.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BoxAsk {
+    Tick(String, BoxState),
+    History(String),
+}
+
+/// Takes the boxes `spots` of the text `of`, by id, as widgets over what
+/// was drawn under them: read as their state, and each a button opening
+/// at the box, where the pointer is and where a screen reader's click
+/// lands, Check, Fail and Open, the current state left out, while
+/// `ticks`, and History while it was ticked (`ticked` holds its id).
+/// Gives what was picked.
+pub fn box_clicks(
     ui: &mut Ui,
     t: &L10n,
     of: Id,
-    spots: &[MarkSpot],
-    changes: bool,
-) -> Option<(usize, Option<usize>, TextMark)> {
+    spots: &[BoxSpot],
+    (ticks, ticked): (bool, &dyn Fn(&str) -> bool),
+) -> Option<BoxAsk> {
     let mut picked = None;
-    let sense = if changes {
-        Sense::click()
-    } else {
-        Sense::hover()
-    };
     for spot in spots {
-        let resp = ui.interact(spot.rect, of.with(("mark", spot.line, spot.column)), sense);
-        let label = mark_label(t, spot.mark);
-        let typ = if changes {
+        let history = ticked(&spot.id);
+        let opens = ticks || history;
+        let sense = if opens {
+            Sense::click()
+        } else {
+            Sense::hover()
+        };
+        let resp = ui.interact(spot.rect, of.with(("box", &spot.id)), sense);
+        let label = box_label(t, spot.state);
+        let typ = if opens {
             WidgetType::Button
         } else {
             WidgetType::Label
         };
         resp.widget_info(|| WidgetInfo::labeled(typ, true, label));
-        if !changes {
+        if !opens {
             continue;
         }
         if resp.hovered() && ui.is_rect_visible(spot.rect) {
@@ -1170,23 +1376,215 @@ pub fn mark_clicks(
             );
         }
         let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
-        // At the mark: where the pointer is, and where a screen reader's
-        // click lands.
         Popup::menu(&resp).show(|ui| {
             let text = ui.visuals().text_color();
-            for to in TextMark::ALL {
-                if to != spot.mark
-                    && ui
-                        .button(RichText::new(menu_entry(t, to)).color(text))
-                        .clicked()
-                {
-                    picked = Some((spot.line, spot.column, to));
-                    ui.close();
+            if ticks {
+                for to in BoxState::ALL {
+                    if to != spot.state
+                        && ui
+                            .button(RichText::new(menu_entry(t, to)).color(text))
+                            .clicked()
+                    {
+                        picked = Some(BoxAsk::Tick(spot.id.clone(), to));
+                        ui.close();
+                    }
                 }
+            }
+            if history
+                && ui
+                    .button(RichText::new(t.history_title()).color(text))
+                    .clicked()
+            {
+                picked = Some(BoxAsk::History(spot.id.clone()));
+                ui.close();
             }
         });
     }
     picked
+}
+
+/// Where each box of the source `text` lies, in characters: its glyph's
+/// first and the one after its id.
+pub fn box_chars(text: &str) -> Vec<(usize, usize)> {
+    text_boxes::find(text)
+        .into_iter()
+        .filter_map(|b| {
+            let start = text.get(..b.start)?.chars().count();
+            let end = start + text.get(b.start..b.end)?.chars().count();
+            Some((start, end))
+        })
+        .collect()
+}
+
+/// The cursor at the character `at` kept out of every box of `boxes`
+/// ([`box_chars`]): one inside a box, behind its glyph, goes to its end
+/// when it came from before it (`from`, where it was), and before its
+/// glyph otherwise.
+pub fn kept_out(boxes: &[(usize, usize)], at: usize, from: usize) -> usize {
+    match boxes.iter().find(|&&(start, end)| start < at && at < end) {
+        Some(&(start, end)) => {
+            if from <= start {
+                end
+            } else {
+                start
+            }
+        }
+        None => at,
+    }
+}
+
+/// Where the character `at` of `old` is in `new`, the text it became:
+/// counted through what both share, what `new` put in between (the ids
+/// saving gave its boxes) skipped; past a change that is no putting in,
+/// as far from the end as it was.
+pub fn followed(old: &str, new: &str, at: usize) -> usize {
+    let (mut a, mut b) = (old.chars().peekable(), new.chars());
+    let mut i = 0;
+    let mut j = 0;
+    while i < at {
+        let Some(&c) = a.peek() else {
+            break;
+        };
+        match b.next() {
+            Some(d) if d == c => {
+                a.next();
+                i += 1;
+                j += 1;
+            }
+            Some(_) => j += 1,
+            None => {
+                let (old_n, new_n) = (old.chars().count(), new.chars().count());
+                return (at + new_n).saturating_sub(old_n).min(new_n);
+            }
+        }
+    }
+    j
+}
+
+/// `text` without the characters of an id that belongs to no box, as a
+/// cut through one leaves them; those of a flag's emoji stay.
+pub fn without_stray_ids(text: &str) -> Option<String> {
+    let kept: Vec<(usize, usize)> = text_boxes::find(text)
+        .iter()
+        .map(|b| (b.id_start, b.end))
+        .collect();
+    let tag = |c: char| ('\u{E0020}'..='\u{E007F}').contains(&c);
+    let mut out = String::with_capacity(text.len());
+    let mut stray = false;
+    let mut flag = false;
+    for (i, c) in text.char_indices() {
+        if tag(c) {
+            if flag || kept.iter().any(|&(a, b)| a <= i && i < b) {
+                out.push(c);
+            } else {
+                stray = true;
+            }
+            continue;
+        }
+        // A black flag begins the tags of a subdivision's flag.
+        flag = c == '\u{1F3F4}';
+        out.push(c);
+    }
+    stray.then_some(out)
+}
+
+/// Keeps the boxes of the source text `text` of the edit field `id` whole
+/// before the field shows: Backspace right after a box, or Delete right
+/// before one, takes the whole box, its id with it, and while `follow`,
+/// a text changed since the field last showed it ([`remember_text`]; a
+/// save gave its boxes ids) keeps the cursor where it was among its
+/// characters. Whether `text` changed.
+pub fn guard_field(ui: &mut Ui, id: Id, text: &mut String, follow: bool) -> bool {
+    use egui::text::CCursorRange;
+    use egui::widgets::text_edit::TextEditState;
+    let seen_id = id.with("box text seen");
+    let seen: Option<String> = ui.data(|d| d.get_temp(seen_id));
+    let focused = ui.memory(|m| m.has_focus(id));
+    let mut state = match TextEditState::load(ui.ctx(), id) {
+        Some(state) => state,
+        None if focused => TextEditState::default(),
+        None => return false,
+    };
+    // A field with the keyboard and no cursor yet has it at its end.
+    let end = CCursorRange::one(CCursor::new(text.chars().count()));
+    let mut range = match state.cursor.char_range() {
+        Some(range) => range,
+        None if focused => end,
+        None => return false,
+    };
+    if let Some(seen) = seen.filter(|s| follow && s != text) {
+        let follow = |c: CCursor| CCursor::new(followed(&seen, text, c.index.0));
+        range = CCursorRange::two(follow(range.secondary), follow(range.primary));
+        state.cursor.set_char_range(Some(range));
+        state.clone().store(ui.ctx(), id);
+    }
+    if !focused || range.primary != range.secondary {
+        return false;
+    }
+    let at = range.primary.index.0;
+    let boxes = text_boxes::find(text);
+    let chars = box_chars(text);
+    let (back, forward) = ui.input(|i| {
+        (
+            i.key_pressed(egui::Key::Backspace) && i.modifiers.is_none(),
+            i.key_pressed(egui::Key::Delete) && i.modifiers.is_none(),
+        )
+    });
+    let hit = chars
+        .iter()
+        .zip(&boxes)
+        .find(|((start, end), _)| (back && *end == at) || (forward && *start == at));
+    let Some((&(start, _), found)) = hit else {
+        return false;
+    };
+    let key = if back {
+        egui::Key::Backspace
+    } else {
+        egui::Key::Delete
+    };
+    ui.input_mut(|i| i.consume_key(Modifiers::NONE, key));
+    text.replace_range(found.start..found.end, "");
+    state
+        .cursor
+        .set_char_range(Some(CCursorRange::one(CCursor::new(start))));
+    state.store(ui.ctx(), id);
+    true
+}
+
+/// Remembers `text` as the edit field `id` holds it at the end of this
+/// frame, for [`guard_field`].
+pub fn remember_text(ui: &Ui, id: Id, text: &str) {
+    ui.data_mut(|d| d.insert_temp(id.with("box text seen"), text.to_string()));
+}
+
+/// Keeps the cursor of the edit field `id`, after it showed the source
+/// text `text`, out of the ids of its boxes, and cuts the stray parts of
+/// an id a cut through a box left.
+pub fn guard_cursor(ui: &mut Ui, id: Id, text: &mut String) {
+    use egui::text::CCursorRange;
+    use egui::widgets::text_edit::TextEditState;
+    if let Some(cleaned) = without_stray_ids(text) {
+        *text = cleaned;
+    }
+    let Some(mut state) = TextEditState::load(ui.ctx(), id) else {
+        return;
+    };
+    let Some(range) = state.cursor.char_range() else {
+        return;
+    };
+    let was_id = id.with("box cursor was");
+    let was: usize = ui.data(|d| d.get_temp(was_id)).unwrap_or(0);
+    let chars = box_chars(text);
+    let primary = kept_out(&chars, range.primary.index.0, was);
+    let secondary = kept_out(&chars, range.secondary.index.0, was);
+    ui.data_mut(|d| d.insert_temp(was_id, primary));
+    if (primary, secondary) != (range.primary.index.0, range.secondary.index.0) {
+        state.cursor.set_char_range(Some(CCursorRange::two(
+            CCursor::new(secondary),
+            CCursor::new(primary),
+        )));
+        state.store(ui.ctx(), id);
+    }
 }
 
 #[cfg(test)]
@@ -1196,13 +1594,13 @@ mod tests {
     #[test]
     fn the_menu_names_each_state_after_its_character() {
         let en = L10n::new("en");
-        assert_eq!(menu_entry(&en, TextMark::Checked), "✅ Check");
-        assert_eq!(menu_entry(&en, TextMark::Failed), "❌ Fail");
-        assert_eq!(menu_entry(&en, TextMark::Open), "☐ Open");
-        assert_eq!(mark_label(&en, TextMark::Checked), "Checked");
+        assert_eq!(menu_entry(&en, BoxState::Done), "✅ Check");
+        assert_eq!(menu_entry(&en, BoxState::Failed), "❌ Fail");
+        assert_eq!(menu_entry(&en, BoxState::Open), "☐ Open");
+        assert_eq!(box_label(&en, BoxState::Done), "Checked");
         let de = L10n::new("de");
-        assert_eq!(menu_entry(&de, TextMark::Open), "☐ Wieder öffnen");
-        assert_eq!(mark_label(&de, TextMark::Failed), "Gescheitert");
+        assert_eq!(menu_entry(&de, BoxState::Open), "☐ Wieder öffnen");
+        assert_eq!(box_label(&de, BoxState::Failed), "Gescheitert");
     }
 
     #[test]
@@ -1237,5 +1635,65 @@ mod tests {
             (Color32::WHITE, Color32::RED),
         );
         assert_eq!(part.text, "#Garten");
+    }
+
+    /// "Pack ☐" with the box of the id `a7k2`, and the box.
+    fn boxed() -> (String, FoundBox) {
+        let text = format!("Pack \u{2610}{}", text_boxes::encode_id("a7k2"));
+        let found = text_boxes::find(&text).remove(0);
+        (text, found)
+    }
+
+    #[test]
+    fn an_edit_fields_job_shows_the_state_and_hides_the_id() {
+        let (text, found) = boxed();
+        let font = FontId::proportional(14.0);
+        let job = tag_job(&text, (0, text.len()), font, (Color32::WHITE, Color32::RED));
+        let mut look = BoxLook::default();
+        look.states.insert("a7k2".into(), BoxState::Done);
+        look.after.insert("a7k2".into(), "You, Mon 11:00".into());
+        let laid = field_job(job, &look, &|_| 40.0);
+        // As many characters, the glyph of its state.
+        assert_eq!(laid.text.chars().count(), text.chars().count());
+        assert_eq!(laid.text.get(found.start..found.id_start), Some("\u{2705}"));
+        let hidden: Vec<_> = laid
+            .sections
+            .iter()
+            .filter(|s| s.format.color == Color32::TRANSPARENT)
+            .collect();
+        assert_eq!(
+            hidden.first().map(|s| s.byte_range.start.0),
+            Some(found.id_start)
+        );
+        assert_eq!(hidden.last().map(|s| s.byte_range.end.0), Some(found.end));
+        assert_eq!(
+            hidden.last().map(|s| s.format.extra_letter_spacing),
+            Some(40.0)
+        );
+    }
+
+    #[test]
+    fn the_cursor_steps_over_a_box_and_follows_a_save() {
+        let (text, _) = boxed();
+        let chars = box_chars(&text);
+        assert_eq!(chars, [(5, 11)]);
+        // Into the id from before it: to its end; from after it: before it.
+        assert_eq!(kept_out(&chars, 6, 5), 11);
+        assert_eq!(kept_out(&chars, 10, 11), 5);
+        assert_eq!(kept_out(&chars, 4, 11), 4);
+        // A save gave the box its id: the cursor after it stays after it.
+        assert_eq!(followed("Pack \u{2610}!", &format!("{text}!"), 7), 12);
+        assert_eq!(followed("Pack \u{2610}!", &format!("{text}!"), 2), 2);
+    }
+
+    #[test]
+    fn a_cut_through_an_id_leaves_none_of_it() {
+        let (text, _) = boxed();
+        let cut: String = text.chars().take(8).collect();
+        assert_eq!(without_stray_ids(&cut).as_deref(), Some("Pack \u{2610}"));
+        assert_eq!(without_stray_ids(&text), None);
+        // A subdivision's flag keeps its tags.
+        let flag = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}";
+        assert_eq!(without_stray_ids(flag), None);
     }
 }

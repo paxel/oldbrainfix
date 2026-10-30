@@ -14,23 +14,30 @@
 //! takes the table with it and leaves the view), and on the first column
 //! whether it holds headings. An empty row and column after the last add
 //! one when words are typed into them. Every edit writes the whole table
-//! anew through the core.
+//! anew through the core. A box in a cell (ADR 0035) shows the state of
+//! its latest tick and, where this Device may tick it, opens Check, Fail,
+//! Open and its History as on a card; a tick is no edit of the table.
 
 use egui::{Color32, Frame, Id, Key, Margin, Modifiers, Rect, RichText, Sense, TextEdit, Ui};
+use std::collections::BTreeSet;
+
 use egui::{FontId, Popup, Vec2, WidgetInfo, WidgetType};
+use oldbrainfix_core::markdown::Change;
 use oldbrainfix_core::markdown::table::{self, Align, Table};
-use oldbrainfix_core::markdown::{self, Change};
+use oldbrainfix_core::{BoxState, text_boxes, text_format};
 
 use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::text_marks_view::{self, Found, LaidCell, Look, Spots};
+use crate::text_marks_view::{self, BoxAsk, BoxLook, Found, LaidCell, Look, Spots};
 use crate::theme::{self, Tones};
 
 /// A table to show full screen: the text it is in and where it begins
 /// there, in bytes; the Note to write it to while this Device may change
 /// it (none to read it only); the cell to edit at once, by row and
-/// column; and whether a click on a tag searches for it.
+/// column; whether a click on a tag searches for it; and the Note or
+/// Section whose text holds its boxes, to tick them (none for a text
+/// that is not stored).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Opening {
     pub note: Option<String>,
@@ -38,6 +45,7 @@ pub struct Opening {
     pub at: usize,
     pub cell: Option<(usize, usize)>,
     pub tags: bool,
+    pub boxes: Option<String>,
 }
 
 /// What the view asks of the window.
@@ -49,6 +57,10 @@ pub enum Asked {
     Close,
     /// Search for this tag, as written.
     SearchFor(String),
+    /// Tick the box of this id to this state.
+    Tick(String, BoxState),
+    /// Show the History of the box of this id.
+    History(String),
 }
 
 /// The table shown full screen and what is being done to it.
@@ -58,8 +70,19 @@ pub struct TableView {
     text: String,
     at: usize,
     tags: bool,
+    boxes: Option<String>,
+    ticking: Ticking,
     editing: Option<Editing>,
     deleting: Option<Deleting>,
+}
+
+/// How the boxes of the table show and what a click on one offers: as
+/// the window read them for the Note or Section they are in.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Ticking {
+    pub look: BoxLook,
+    pub may_tick: bool,
+    pub ticked: BTreeSet<String>,
 }
 
 /// The cell being edited, the row or column after the last adding one,
@@ -113,6 +136,8 @@ impl TableView {
             text: opening.text,
             at: opening.at,
             tags: opening.tags,
+            boxes: opening.boxes,
+            ticking: Ticking::default(),
             editing: None,
             deleting: None,
         };
@@ -130,6 +155,28 @@ impl TableView {
     /// The text the table is in, as edited here.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// Where the table begins in its text, in bytes.
+    pub fn at(&self) -> usize {
+        self.at
+    }
+
+    /// The Note or Section whose text holds its boxes, while it is stored.
+    pub fn boxes(&self) -> Option<&str> {
+        self.boxes.as_deref()
+    }
+
+    /// Shows its boxes as `ticking` says.
+    pub fn set_ticking(&mut self, ticking: Ticking) {
+        self.ticking = ticking;
+    }
+
+    /// Takes `text` as the text the table is in, the table at `at`: the
+    /// text as it was stored, its new boxes with their ids.
+    pub fn take_stored(&mut self, text: String, at: usize) {
+        self.text = text;
+        self.at = at;
     }
 
     /// The table shown, while it is there.
@@ -410,7 +457,7 @@ impl TableView {
         let edits = self.edits();
         let colour = ui.visuals().text_color();
         let look = Look::of(ui, (Some(SIZE), colour));
-        let found = Found::of(&self.text);
+        let found = Found::of(&self.text, text_format::MARKDOWN, &self.ticking.look);
         let laid = text_marks_view::lay_table(ui, (&self.text, &table), (&found, &look));
         let (mut widths, mut heights) = text_marks_view::grid(ui, &laid, &look, PAD);
         let lowest = ui.fonts_mut(|f| f.row_height(&FontId::proportional(SIZE))) + PAD.y * 2.0;
@@ -511,7 +558,7 @@ impl TableView {
                 .rows
                 .get(r)
                 .and_then(|row| row.cells.get(c))
-                .map(|cell| cell.visible())
+                .map(|cell| text_boxes::strip(&cell.visible()))
                 .unwrap_or_default();
             let label = if r >= rows {
                 t.table_add_row().to_string()
@@ -529,24 +576,14 @@ impl TableView {
             if edits && resp.on_hover_cursor(egui::CursorIcon::Text).clicked() {
                 self.edit((r, c), asked);
             }
-            // The cell's marks, tags and links over it, under the cells
+            // The cell's boxes, tags and links over it, under the cells
             // drawn after it.
-            if let Some((line, column, to)) =
-                text_marks_view::mark_clicks(ui, t, of, &spots.marks, edits)
-            {
-                if let Some(text) = self.commit() {
-                    asked.push(Asked::Write(text));
-                }
-                if let Some(swapped) = markdown::swap_mark(&self.text, line, column, to) {
-                    let at = self.at;
-                    if let Some(text) = self.take(Change {
-                        text: swapped,
-                        start: at,
-                        end: at,
-                    }) {
-                        asked.push(Asked::Write(text));
-                    }
-                }
+            let ticked = |id: &str| self.ticking.ticked.contains(id);
+            let ticks = self.ticking.may_tick && self.boxes.is_some();
+            match text_marks_view::box_clicks(ui, t, of, &spots.boxes, (ticks, &ticked)) {
+                Some(BoxAsk::Tick(id, to)) => asked.push(Asked::Tick(id, to)),
+                Some(BoxAsk::History(id)) => asked.push(Asked::History(id)),
+                None => {}
             }
             if self.tags
                 && let Some(tag) = text_marks_view::tag_clicks(ui, t, of, &spots.tags)
@@ -693,17 +730,32 @@ impl TableView {
             format_bar::select(ui, id, &editing.typed, (end, end));
         }
         let text = ui.visuals().text_color();
+        // Its boxes as they show, their ids not drawn and the cursor kept
+        // out of them (ADR 0035).
+        let look = &self.ticking.look;
+        let mut layouter = |ui: &Ui, typed: &dyn egui::TextBuffer, width: f32| {
+            let typed = typed.as_str();
+            let font = FontId::proportional(SIZE);
+            let job = text_marks_view::tag_job(typed, (0, typed.len()), font, (text, accent));
+            let mut job = text_marks_view::field_job(job, look, &|_| 0.0);
+            job.wrap.max_width = width;
+            ui.fonts_mut(|f| f.layout_job(job))
+        };
+        text_marks_view::guard_field(ui, id, &mut editing.typed, !editing.focus);
         let response = ui.put(
             rect.shrink2(egui::vec2(PAD.x, 0.0)),
             TextEdit::singleline(&mut editing.typed)
                 .id(id)
                 .font(FontId::proportional(SIZE))
                 .text_color(text)
+                .layouter(&mut layouter)
                 .lock_focus(true)
                 .frame(Frame::NONE)
                 .desired_width(f32::INFINITY)
                 .vertical_align(egui::Align::Center),
         );
+        text_marks_view::guard_cursor(ui, id, &mut editing.typed);
+        text_marks_view::remember_text(ui, id, &editing.typed);
         ui.painter().rect_stroke(
             rect,
             0.0,
@@ -734,7 +786,7 @@ impl TableView {
 }
 
 /// Paints the words `laid` of a cell in `rect`, lined up as `align` says,
-/// and gives where its marks, tags and links lie.
+/// and gives where its boxes, tags and links lie.
 fn paint_cell(ui: &mut Ui, laid: &LaidCell, rect: Rect, align: Align, look: &Look) -> Spots {
     let words = laid.size(ui, look);
     let left = text_marks_view::aligned(align, rect.width(), words.x, PAD.x);
@@ -926,6 +978,7 @@ mod tests {
             at: 0,
             cell,
             tags: true,
+            boxes: Some("n".into()),
         })
     }
 
@@ -1028,6 +1081,7 @@ mod tests {
             at: 0,
             cell: Some((0, 0)),
             tags: false,
+            boxes: None,
         });
         assert_eq!(read.editing, None);
         assert_eq!(read.commit(), None);

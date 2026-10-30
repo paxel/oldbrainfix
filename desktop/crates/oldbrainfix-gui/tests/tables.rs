@@ -3,7 +3,8 @@
 //! leaves it; a cell is edited on one line, Enter writes it, Tab goes on,
 //! Esc leaves it as it was; a row's or column's heading opens its menu;
 //! the empty row adds one; the format bar puts a new table in; a cell's
-//! status mark is changed in place; a Section's table opens to read only.
+//! box ticks in place, its text as it was; a Section's table opens to
+//! read only.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -255,12 +256,25 @@ fn the_format_bar_puts_a_new_table_in_and_edits_its_first_cell() -> TestResult {
 }
 
 #[test]
-fn a_cells_status_mark_is_changed_in_place() -> TestResult {
+fn a_cells_box_ticks_in_place() -> TestResult {
     let (store, note) = with_note("| ☐ milk | 2 |\n| --- | --- |", MARKDOWN)?;
+    let before = stored(&store, &note)?.0;
     let mut harness = editor(&store, &note);
     press(&mut harness, "Open")?;
     press(&mut harness, "✅ Check")?;
-    assert_eq!(stored(&store, &note)?.0, "| ✅ milk | 2 |\n| --- | --- |");
+    // A tick beside the text, which stays as it was.
+    assert_eq!(stored(&store, &note)?.0, before);
+    let shown = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(shown.shown_text(), "| ✅ milk | 2 |\n| --- | --- |");
+    assert_eq!(buttons(&harness, "Checked"), 1);
+    // In the table full screen too, and there it ticks back.
+    press(&mut harness, "Open the table")?;
+    assert!(harness.state().shown_table().is_some());
+    press(&mut harness, "Checked")?;
+    press(&mut harness, "☐ Open")?;
+    let shown = Notes::new(&store).by_id(&note)?.ok_or("the Note")?;
+    assert_eq!(shown.shown_text(), "| ☐ milk | 2 |\n| --- | --- |");
+    assert_eq!(stored(&store, &note)?.0, before);
     Ok(())
 }
 
