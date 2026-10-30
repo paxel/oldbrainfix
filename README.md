@@ -11,6 +11,12 @@
   <a href="https://paxel.github.io/fdroid/"><img src="https://img.shields.io/badge/F--Droid-paxel.github.io-1976D2?logo=f-droid" alt="F-Droid repository"/></a>
   <a href="https://paxel.github.io/oldbrainfix/"><img src="https://img.shields.io/badge/docs-paxel.github.io-informational" alt="Documentation"/></a>
   <img src="https://img.shields.io/badge/platforms-Android%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-informational" alt="Platforms"/>
+  <img src="https://img.shields.io/github/languages/top/paxel/oldbrainfix" alt="Top language"/>
+  <img src="https://img.shields.io/github/languages/code-size/paxel/oldbrainfix" alt="Code size"/>
+  <img src="https://img.shields.io/github/repo-size/paxel/oldbrainfix" alt="Repository size"/>
+  <img src="https://tokei.rs/b1/github/paxel/oldbrainfix?category=code" alt="Lines of code"/>
+  <img src="https://img.shields.io/github/commit-activity/m/paxel/oldbrainfix" alt="Commit activity"/>
+  <img src="https://img.shields.io/github/last-commit/paxel/oldbrainfix/summer" alt="Last commit"/>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue" alt="License"/></a>
 </p>
 
