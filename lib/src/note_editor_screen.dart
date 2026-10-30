@@ -28,6 +28,7 @@ import 'speech_platform.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
 import 'tally_field_screen.dart';
+import 'table_screen.dart';
 import 'tally_view.dart';
 import 'text_marks_view.dart';
 import 'two_row_text_field.dart';
@@ -328,14 +329,10 @@ NoteActions noteActions(
 /// as an edit of the text; null where this Device may not change the
 /// text (ADR 0013, ADR 0018), so the marks stay plain characters.
 /// [changed] runs after the edit.
-void Function(int line, TextMark to)? markEdit(
-  Notes notes,
-  PlacedNote placed,
-  VoidCallback changed,
-) {
+MarkSwap? markEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
   if (!placed.changes || !placed.note.textEditable) return null;
   final id = placed.note.id;
-  return (line, to) {
+  return (line, to, {column}) {
     // A sync while the menu was open may have changed it.
     final note = notes.byId(id);
     if (note == null ||
@@ -344,11 +341,40 @@ void Function(int line, TextMark to)? markEdit(
         note.isTrashed) {
       return;
     }
-    final swapped = TextMarks.swap(note.text, line, to);
+    // In a formatted text also the mark of a table's cell (ADR 0033).
+    final swapped = note.textFormat == TextFormats.markdown
+        ? Markdown.swapMark(note.text, line, to, column: column)
+        : TextMarks.swap(note.text, line, to);
     if (swapped == null) return;
     notes.edit(id, swapped);
     changed();
   };
+}
+
+/// What the full-screen view of a table of [placed]'s card writes (ADR
+/// 0033): the Note's text after each change, as an edit of the text;
+/// null where this Device may not change it, so the table is only read
+/// there. A change that leaves no text keeps the old one, as the editor
+/// does. [changed] runs after the edit.
+TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
+  if (!placed.changes || !placed.note.textEditable) return null;
+  final id = placed.note.id;
+  return TableEditing(
+    twoRows: notes.store.twoRowEditorOn,
+    write: (change) {
+      // A sync while it was open may have changed what may be written.
+      final note = notes.byId(id);
+      if (note == null ||
+          !note.textEditable ||
+          !notes.store.mayChange(id) ||
+          note.isTrashed ||
+          change.text.trim().isEmpty) {
+        return;
+      }
+      notes.edit(id, change.text);
+      changed();
+    },
+  );
 }
 
 /// Everything about one Note: its text, fixed in place and saved on

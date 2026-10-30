@@ -34,10 +34,17 @@
 /// end of the line as space, one for italic and two for bold; a run of
 /// exactly two `~` is strike-through, by the flanking rules of `*`. A
 /// `[` right after a `!` is no link, so an image shows as written.
+///
+/// A table (GFM, #128) takes a line of its own per row: a header row,
+/// the delimiter row under it, `| --- | :-: |`, with as many cells, and
+/// the rows under those; [MarkdownTables] reads and edits them, every
+/// line of one a [MarkdownBlockKind.table] block.
 library;
 
 import 'text_marks.dart';
 import 'text_tags.dart';
+
+part 'markdown_table.dart';
 
 /// What a line of a formatted text is.
 enum MarkdownBlockKind {
@@ -47,6 +54,10 @@ enum MarkdownBlockKind {
   bullet,
   numbered,
   quote,
+
+  /// A line of a table: its header row, its delimiter row, one of its
+  /// rows, or the line marking its first column as headings.
+  table,
 }
 
 /// What a part of a line is: [text] and [code] hold what shows, the
@@ -102,6 +113,11 @@ class MarkdownSpan {
 /// `TextMarks.lineAt` counts lines, where it lies in the text from
 /// [start] to [end] without its line break, and where its content begins
 /// after the mark, [contentStart]. Offsets are UTF-16 code units.
+///
+/// A line of a table holds the [table] it belongs to and, a row of it,
+/// its [row] there, the header row 0; its [spans] are those of its cells,
+/// left to right. The delimiter row and the line marking the first
+/// column as headings have no [row].
 class MarkdownBlock {
   final MarkdownBlockKind kind;
   final int line;
@@ -115,6 +131,8 @@ class MarkdownBlock {
   final int end;
   final int contentStart;
   final List<MarkdownSpan> spans;
+  final MarkdownTable? table;
+  final int? row;
 
   const MarkdownBlock(
     this.kind, {
@@ -125,11 +143,31 @@ class MarkdownBlock {
     required this.end,
     required this.contentStart,
     required this.spans,
+    this.table,
+    this.row,
   });
 
-  /// The text this line shows, without its marks.
-  String get visible => spans.map((s) => s.visible).join();
+  /// The text this line shows, without its marks: a table's row its
+  /// cells that show something, a space between them, its other lines
+  /// nothing.
+  String get visible => switch ((table, row)) {
+    (final table?, final row?) => table.rows[row].visible,
+    (_?, null) => '',
+    _ => spans.map((s) => s.visible).join(),
+  };
 }
+
+/// A status mark found in a formatted text: as `TextMarks.find` finds
+/// it at the start of a line, [column] null, or at the start of the cell
+/// in [column] of a table's row on the line [line]. Offsets are UTF-16
+/// code units, a variation selector after the mark included.
+typedef MarkdownMark = ({
+  int line,
+  int? column,
+  TextMark mark,
+  int start,
+  int end,
+});
 
 /// A text after an edit and the selection in it, in UTF-16 code units;
 /// [start] and [end] are equal for a cursor.
@@ -140,7 +178,38 @@ abstract final class Markdown {
   /// Every line of [text] as a block, top line first.
   static List<MarkdownBlock> parse(String text) {
     final blocks = <MarkdownBlock>[];
-    for (final (i, (start, end)) in _lines(text).indexed) {
+    final lines = _lines(text);
+    for (var i = 0; i < lines.length; i++) {
+      if (_tableAt(text, lines, i) case final table?) {
+        final header = table.rows.first.line;
+        for (; i <= table.lastLine; i++) {
+          final row = i == header
+              ? 0
+              : i > table.delimiterLine
+              ? i - table.delimiterLine
+              : null;
+          blocks.add(
+            MarkdownBlock(
+              MarkdownBlockKind.table,
+              line: i,
+              level: 0,
+              number: 0,
+              start: lines[i].$1,
+              end: lines[i].$2,
+              contentStart: lines[i].$1,
+              spans: [
+                if (row != null)
+                  for (final cell in table.rows[row].cells) ...cell.spans,
+              ],
+              table: table,
+              row: row,
+            ),
+          );
+        }
+        i--;
+        continue;
+      }
+      final (start, end) = lines[i];
       final (kind, level, written, content) = _block(text, start, end);
       blocks.add(
         MarkdownBlock(
@@ -161,11 +230,21 @@ abstract final class Markdown {
   }
 
   /// [text] as it reads without its marks, its line breaks as they are:
-  /// what search looks in and what a preview shows.
+  /// what search looks in and what a preview shows. A table's delimiter
+  /// row and the line marking its first column as headings go with a
+  /// line break; each of its rows reads as its cells that show
+  /// something, a space between them.
   static String plain(String text) {
     final out = StringBuffer();
     var at = 0;
-    for (final block in parse(text)) {
+    final blocks = parse(text);
+    for (final (i, block) in blocks.indexed) {
+      if (block.table != null && block.row == null) {
+        // The line break before it goes, or the one after the first
+        // line, which is followed by its table's header row.
+        at = i == 0 ? blocks[1].start : block.end;
+        continue;
+      }
       out
         ..write(text.substring(at, block.start))
         ..write(block.visible);
@@ -186,15 +265,17 @@ abstract final class Markdown {
   /// [text], taken as plain text, written so that it reads as itself:
   /// [plain] of the result is [text], and it uses no format. For a
   /// Transcript or Photo Text put into a formatted text. A `\` goes
-  /// before a line's mark, every `*`, `` ` `` and `[`, a `~` next to
+  /// before a line's mark, every `*`, `` ` ``, `[` and `|`, a `~` next to
   /// another, a `_` not between two characters that are neither space
-  /// nor punctuation, and a `\` before ASCII punctuation.
+  /// nor punctuation, and a `\` before ASCII punctuation. With every `|`
+  /// escaped no line is a table's, so a line's mark is the one it has
+  /// as a line of its own.
   static String escape(String text) {
     final out = StringBuffer();
     var at = 0;
     for (final block in parse(text)) {
       out.write(text.substring(at, block.start));
-      final mark = switch (block.kind) {
+      final mark = switch (_block(text, block.start, block.end).$1) {
         MarkdownBlockKind.paragraph => -1,
         MarkdownBlockKind.numbered => text.indexOf('.', block.start),
         _ => _skipBlank(text, block.start, block.end),
@@ -233,6 +314,58 @@ abstract final class Markdown {
       for (final tag in TextTags.find(text))
         if (!hidden.any((h) => tag.start < h.$2 && h.$1 < tag.end)) tag,
     ];
+  }
+
+  /// Every status mark of [text], top line first and left to right: those
+  /// `TextMarks.find` finds on a line that is no table's, and one at the
+  /// start of a cell of a table's row.
+  static List<MarkdownMark> marks(String text) {
+    final blocks = parse(text);
+    final marks = <MarkdownMark>[];
+    for (final m in TextMarks.find(text)) {
+      if (blocks[m.line].table != null) continue;
+      marks.add((
+        line: m.line,
+        column: null,
+        mark: m.mark,
+        start: m.start,
+        end: m.end,
+      ));
+    }
+    for (final block in blocks) {
+      final (table, row) = (block.table, block.row);
+      if (table == null || row == null) continue;
+      for (final (column, cell) in table.rows[row].cells.indexed) {
+        if (_cellMark(text, cell.start, cell.end) case (
+          final mark,
+          final start,
+          final end,
+        )) {
+          marks.add((
+            line: block.line,
+            column: column,
+            mark: mark,
+            start: start,
+            end: end,
+          ));
+        }
+      }
+    }
+    marks.sort((a, b) => a.start.compareTo(b.start));
+    return marks;
+  }
+
+  /// [text] with the status mark [marks] finds on the line [line], in the
+  /// cell in [column] of a table's row or, [column] null, at the line's
+  /// start, changed to [to], everything else as it was. Null when there
+  /// is nothing to change: no such mark, or it is [to] already.
+  static String? swapMark(String text, int line, TextMark to, {int? column}) {
+    for (final m in marks(text)) {
+      if (m.line != line || m.column != column) continue;
+      if (m.mark == to) return null;
+      return text.replaceRange(m.start, m.end, to.glyph);
+    }
+    return null;
   }
 
   /// Whether a link to [url] may be opened: a web address, `http://` or
@@ -423,7 +556,8 @@ abstract final class Markdown {
   /// line out. The old mark goes and the new one comes at the line's
   /// start, an item keeping how far in it is; numbered items count on
   /// from one of their level right above, or from 1. A cursor in a
-  /// line's mark goes after the new one.
+  /// line's mark goes after the new one. A table's lines stay as they
+  /// are, and [MarkdownBlockKind.table] changes nothing.
   static MarkdownChange toggleLine(
     String text,
     int start,
@@ -431,9 +565,14 @@ abstract final class Markdown {
     MarkdownBlockKind kind,
   ) {
     final (s, e) = _ordered(text, start, end);
+    if (kind == MarkdownBlockKind.table) return (text: text, start: s, end: e);
     final blocks = parse(text);
     final (first, last) = _touched(text, blocks, s, e);
-    final lines = blocks.sublist(first, last + 1);
+    // A table's lines stay its own.
+    final lines = [
+      for (final b in blocks.sublist(first, last + 1))
+        if (b.kind != MarkdownBlockKind.table) b,
+    ];
     final target =
         kind != MarkdownBlockKind.paragraph &&
             lines.every((b) => b.kind == kind)
@@ -454,7 +593,7 @@ abstract final class Markdown {
           ? text.substring(b.start, _skipBlank(text, b.start, b.end))
           : '';
       final prefix = switch (target) {
-        MarkdownBlockKind.paragraph => '',
+        MarkdownBlockKind.paragraph || MarkdownBlockKind.table => '',
         MarkdownBlockKind.heading1 => '# ',
         MarkdownBlockKind.heading2 => '## ',
         MarkdownBlockKind.quote => '> ',
@@ -519,6 +658,24 @@ abstract final class Markdown {
           (s.kind != MarkdownSpanKind.text && s.end == at) || ends(s.children),
     );
     return ends(block.spans);
+  }
+
+  /// The status mark at the start of a table's cell from [start] to
+  /// [end], as `TextMarks` reads one at the start of a line, or null.
+  static (TextMark, int, int)? _cellMark(String text, int start, int end) {
+    if (start >= end) return null;
+    final c = text.codeUnitAt(start);
+    for (final mark in TextMark.values) {
+      if (mark.glyph.codeUnitAt(0) != c) continue;
+      var stop = start + 1;
+      if (stop < end) {
+        final next = text.codeUnitAt(stop);
+        if (next == 0xFE0E || next == 0xFE0F) stop++;
+      }
+      if (stop < end && text.codeUnitAt(stop) == 0x200D) return null;
+      return (mark, start, stop);
+    }
+    return null;
   }
 
   static const _inline = {
@@ -677,7 +834,7 @@ abstract final class Markdown {
     switch (c) {
       case _backslash:
         return i + 1 < end && _punct(text.codeUnitAt(i + 1));
-      case _star || _backtick || 0x5B:
+      case _star || _backtick || 0x5B || 0x7C:
         return true;
       case _tilde:
         return (i > start && text.codeUnitAt(i - 1) == _tilde) ||
@@ -931,7 +1088,17 @@ class _Inline {
   final int to;
   final bool links;
 
-  _Inline(this.text, this.from, this.to, {required this.links});
+  /// Whether it is a table's cell, where `\|` in code shows `|`, as GFM
+  /// takes a cell's escaped pipes out before reading it.
+  final bool cell;
+
+  _Inline(
+    this.text,
+    this.from,
+    this.to, {
+    required this.links,
+    this.cell = false,
+  });
 
   List<MarkdownSpan> parse() {
     final items = <Object>[];
@@ -1034,6 +1201,7 @@ class _Inline {
 
   MarkdownSpan _code(int p, int n, int close) {
     var content = text.substring(p + n, close);
+    if (cell) content = content.replaceAll(r'\|', '|');
     if (content.length >= 2 &&
         content.startsWith(' ') &&
         content.endsWith(' ') &&
@@ -1108,7 +1276,13 @@ class _Inline {
       contentStart: p + 1,
       contentEnd: labelEnd,
       url: url.toString(),
-      children: _Inline(text, p + 1, labelEnd, links: false).parse(),
+      children: _Inline(
+        text,
+        p + 1,
+        labelEnd,
+        links: false,
+        cell: cell,
+      ).parse(),
     );
   }
 

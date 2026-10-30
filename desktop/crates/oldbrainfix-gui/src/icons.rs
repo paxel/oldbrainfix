@@ -85,6 +85,10 @@ pub const LINK: char = '\u{e380}';
 pub const CODE: char = '\u{e176}';
 pub const INDENT: char = '\u{e2b5}';
 pub const OUTDENT: char = '\u{e2b4}';
+/// The format bar's table and the table view's, as the phone's (#128):
+/// `table_chart_outlined`, and `arrow_back` to leave it.
+pub const TABLE: char = '\u{f41d}';
+pub const ARROW_BACK: char = '\u{e092}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

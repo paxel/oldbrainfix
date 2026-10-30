@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_localizations.dart';
 import 'l10n.dart';
+import 'table_screen.dart';
 
 /// What a screen reader says for [mark]: the state it shows.
 String textMarkLabel(AppLocalizations t, TextMark mark) => switch (mark) {
@@ -270,6 +272,26 @@ class TagTextController extends TextEditingController {
             shown.setRange(sign, dot, number.codeUnits);
           }
           set(sign, dot + 1, _sign);
+        case MarkdownBlockKind.table:
+          // A table's pipes, its delimiter row and its comment line are
+          // marks; its cells' words are not.
+          final row = switch ((block.table, block.row)) {
+            (final table?, final row?) => table.rows[row],
+            _ => null,
+          };
+          if (row == null) {
+            set(block.start, block.end, _mark);
+          } else {
+            var from = row.start;
+            for (final cell in [...row.cells, null]) {
+              final to = cell?.start ?? row.end;
+              for (var i = from; i < to; i++) {
+                if (text[i] == '|') set(i, i + 1, _mark);
+              }
+              if (cell == null) break;
+              from = math.max(from, cell.end);
+            }
+          }
         case MarkdownBlockKind.paragraph:
           break;
       }
@@ -335,6 +357,11 @@ class TagTextController extends TextEditingController {
   }
 }
 
+/// Changes the status mark on [line] to [to] (ADR 0031): the one at the
+/// line's start, or, with [column], the one at the start of that cell of
+/// a table's row (ADR 0033).
+typedef MarkSwap = void Function(int line, TextMark to, {int? column});
+
 /// The part [start] to [end] of [text] (all of it while they are null),
 /// its status marks at the start of a line read by a screen reader as
 /// the state they show. With [onMark] each of them is a button that
@@ -351,6 +378,12 @@ class TagTextController extends TextEditingController {
 /// web or e-mail address opens with a tap ([LinkOpenScope]); any other
 /// stays text. Status marks and tags work in it as in a plain text,
 /// except a tag in a link's label, which is part of the link.
+///
+/// A table is drawn as a grid, made smaller to fit the width, its header
+/// row in bold, a status mark at the start of a cell a button as at the
+/// start of a line. A tap on it opens it full screen ([openTable]),
+/// where [tableEdit] changes it; it is only read there without one. A
+/// compact line ([maxLines]) of a table shows the words of its row.
 class MarkedText extends StatefulWidget {
   final String text;
   final String format;
@@ -359,7 +392,8 @@ class MarkedText extends StatefulWidget {
   final TextStyle? style;
   final int? maxLines;
   final TextOverflow? overflow;
-  final void Function(int line, TextMark to)? onMark;
+  final MarkSwap? onMark;
+  final TableEditing? tableEdit;
 
   const MarkedText(
     this.text, {
@@ -371,42 +405,19 @@ class MarkedText extends StatefulWidget {
     this.maxLines,
     this.overflow,
     this.onMark,
+    this.tableEdit,
   });
 
   @override
   State<MarkedText> createState() => _MarkedTextState();
 }
 
-class _MarkedTextState extends State<MarkedText> {
-  /// The taps of the links drawn last.
-  final _links = <TapGestureRecognizer>[];
-
-  // What is drawn anew follows one of these: the taps of the links
-  // drawn before go with them.
+class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   @override
-  void didUpdateWidget(MarkedText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _dropLinks();
-  }
+  String get _source => widget.text;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _dropLinks();
-  }
-
-  @override
-  void dispose() {
-    _dropLinks();
-    super.dispose();
-  }
-
-  void _dropLinks() {
-    for (final link in _links) {
-      link.dispose();
-    }
-    _links.clear();
-  }
+  MarkSwap? get _onMark => widget.onMark;
 
   @override
   Widget build(BuildContext context) {
@@ -442,7 +453,13 @@ class _MarkedTextState extends State<MarkedText> {
         (
           start: mark.start,
           end: mark.end,
-          span: _markSpan(context, t, mark, widget.style),
+          span: _markSpan(context, t, (
+            line: mark.line,
+            column: null,
+            mark: mark.mark,
+            start: mark.start,
+            end: mark.end,
+          ), widget.style),
         ),
       for (final tag in tags)
         (
@@ -470,19 +487,31 @@ class _MarkedTextState extends State<MarkedText> {
   }
 
   /// Each line of a formatted text in [start] to [end], one under the
-  /// other.
+  /// other; a table once, as a grid.
   Widget _formatted(BuildContext context) {
     final text = widget.text;
     final from = widget.start ?? 0;
     final to = widget.end ?? text.length;
-    final marks = TextMarks.find(text);
+    final marks = Markdown.marks(text);
     final tags = Markdown.tags(text);
     final base = DefaultTextStyle.of(context).style.merge(widget.style);
-    final lines = [
-      for (final block in Markdown.parse(text))
-        if (block.end >= from && block.start <= to)
-          _line(context, block, base, marks, tags),
-    ];
+    final compact = widget.maxLines != null;
+    final lines = <Widget>[];
+    for (final block in Markdown.parse(text)) {
+      if (block.end < from || block.start > to) continue;
+      final table = block.table;
+      if (table == null) {
+        lines.add(_line(context, block, base, marks, tags));
+      } else if (compact) {
+        // Its comment line reads as nothing: the header row stands in.
+        final row = block.row ?? (block.line == table.firstLine ? 0 : null);
+        if (row != null) {
+          lines.add(_rowLine(context, table.rows[row], base, marks, tags));
+        }
+      } else if (block.line == table.firstLine) {
+        lines.add(_table(context, table, base, marks, tags));
+      }
+    }
     if (lines.length == 1) return lines.single;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,7 +524,7 @@ class _MarkedTextState extends State<MarkedText> {
     BuildContext context,
     MarkdownBlock block,
     TextStyle base,
-    List<MarkedLine> marks,
+    List<MarkdownMark> marks,
     List<FoundTag> tags,
   ) {
     final scheme = Theme.of(context).colorScheme;
@@ -525,7 +554,7 @@ class _MarkedTextState extends State<MarkedText> {
       overflow: widget.overflow,
     );
     return switch (block.kind) {
-      MarkdownBlockKind.paragraph => words,
+      MarkdownBlockKind.paragraph || MarkdownBlockKind.table => words,
       MarkdownBlockKind.heading1 ||
       MarkdownBlockKind.heading2 => Semantics(header: true, child: words),
       MarkdownBlockKind.bullet => _item(
@@ -554,6 +583,119 @@ class _MarkedTextState extends State<MarkedText> {
     };
   }
 
+  /// A row of a table on one line: the cells that show something, a
+  /// space between them.
+  Widget _rowLine(
+    BuildContext context,
+    MarkdownTableRow row,
+    TextStyle base,
+    List<MarkdownMark> marks,
+    List<FoundTag> tags,
+  ) {
+    final spans = <InlineSpan>[];
+    for (final cell in row.cells) {
+      if (cell.spans.isEmpty) continue;
+      if (spans.isNotEmpty) spans.add(const TextSpan(text: ' '));
+      for (final span in cell.spans) {
+        _inline(context, span, base, null, marks, tags, spans);
+      }
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      style: base,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
+    );
+  }
+
+  /// [table] as a grid, made smaller when it is wider than the room it
+  /// has; a tap opens it full screen.
+  Widget _table(
+    BuildContext context,
+    MarkdownTable table,
+    TextStyle base,
+    List<MarkdownMark> marks,
+    List<FoundTag> tags,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    final bold = base.copyWith(fontWeight: FontWeight.bold);
+    final grid = Table(
+      defaultColumnWidth: const IntrinsicColumnWidth(),
+      border: TableBorder.all(color: scheme.outline),
+      children: [
+        for (final (r, row) in table.rows.indexed)
+          TableRow(
+            decoration: r == 0
+                ? BoxDecoration(color: scheme.surfaceContainerHighest)
+                : null,
+            children: [
+              for (final (c, cell) in row.cells.indexed)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        for (final span in cell.spans)
+                          ..._inlineOf(
+                            context,
+                            span,
+                            r == 0 || (c == 0 && table.headingColumn)
+                                ? bold
+                                : base,
+                            marks,
+                            tags,
+                          ),
+                      ],
+                    ),
+                    textAlign: cellAlign(table.aligns[c]),
+                    softWrap: false,
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+    final text = widget.text;
+    final edit = widget.tableEdit;
+    return Semantics(
+      container: true,
+      onTapHint: context.t.tableOpen,
+      child: GestureDetector(
+        key: ValueKey('table-${table.firstLine}'),
+        behavior: HitTestBehavior.opaque,
+        onTap: () => unawaited(
+          openTable(context, text: text, at: table.start, edit: edit),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: grid,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<InlineSpan> _inlineOf(
+    BuildContext context,
+    MarkdownSpan span,
+    TextStyle style,
+    List<MarkdownMark> marks,
+    List<FoundTag> tags,
+  ) {
+    final out = <InlineSpan>[];
+    _inline(context, span, style, null, marks, tags, out);
+    return out;
+  }
+
   /// An item of a list: its bullet or number, the words beside it.
   Widget _item(String sign, int level, TextStyle style, Widget words) =>
       Padding(
@@ -571,6 +713,101 @@ class _MarkedTextState extends State<MarkedText> {
           ],
         ),
       );
+}
+
+/// How a cell of a column that lines up as [align] sets its words.
+TextAlign cellAlign(MarkdownAlign align) => switch (align) {
+  MarkdownAlign.none || MarkdownAlign.left => TextAlign.start,
+  MarkdownAlign.center => TextAlign.center,
+  MarkdownAlign.right => TextAlign.end,
+};
+
+/// The words of [cell] of a table of the formatted [text], its row on
+/// [line], as [MarkedText] draws them: bold, italic, struck through, code
+/// and links, its status mark a button with [onMark], its tags links to
+/// the search. [marks] and [tags] are those of the whole text.
+class MarkedCell extends StatefulWidget {
+  final String text;
+  final MarkdownTableCell cell;
+  final List<MarkdownMark> marks;
+  final List<FoundTag> tags;
+  final TextStyle? style;
+  final TextAlign textAlign;
+  final MarkSwap? onMark;
+
+  const MarkedCell(
+    this.text,
+    this.cell, {
+    super.key,
+    required this.marks,
+    required this.tags,
+    this.style,
+    this.textAlign = TextAlign.start,
+    this.onMark,
+  });
+
+  @override
+  State<MarkedCell> createState() => _MarkedCellState();
+}
+
+class _MarkedCellState extends State<MarkedCell> with _InlineSpans {
+  @override
+  String get _source => widget.text;
+
+  @override
+  MarkSwap? get _onMark => widget.onMark;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style.merge(widget.style);
+    final spans = <InlineSpan>[];
+    for (final span in widget.cell.spans) {
+      _inline(context, span, style, null, widget.marks, widget.tags, spans);
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      style: style,
+      textAlign: widget.textAlign,
+    );
+  }
+}
+
+/// The spans of a formatted text's parts, with the taps of its links,
+/// its status marks and its tags; the taps go when it is drawn anew.
+mixin _InlineSpans<T extends StatefulWidget> on State<T> {
+  /// The taps of the links drawn last.
+  final _links = <TapGestureRecognizer>[];
+
+  /// The whole text the parts are of, and what a tapped mark changes.
+  String get _source;
+  MarkSwap? get _onMark;
+
+  // What is drawn anew follows one of these: the taps of the links
+  // drawn before go with them.
+  @override
+  void didUpdateWidget(covariant T oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _dropLinks();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _dropLinks();
+  }
+
+  @override
+  void dispose() {
+    _dropLinks();
+    super.dispose();
+  }
+
+  void _dropLinks() {
+    for (final link in _links) {
+      link.dispose();
+    }
+    _links.clear();
+  }
 
   /// The spans [span] shows, in [style], a part of the link that [link]
   /// opens when there is one.
@@ -579,7 +816,7 @@ class _MarkedTextState extends State<MarkedText> {
     MarkdownSpan span,
     TextStyle style,
     TapGestureRecognizer? link,
-    List<MarkedLine> marks,
+    List<MarkdownMark> marks,
     List<FoundTag> tags,
     List<InlineSpan> out,
   ) {
@@ -664,11 +901,11 @@ class _MarkedTextState extends State<MarkedText> {
     int end,
     TextStyle style,
     TapGestureRecognizer? link,
-    List<MarkedLine> marks,
+    List<MarkdownMark> marks,
     List<FoundTag> tags,
     List<InlineSpan> out,
   ) {
-    final text = widget.text;
+    final text = _source;
     final t = context.t;
     final onSearch = TagSearchScope.of(context);
     final parts = <({int start, int end, InlineSpan span})>[
@@ -716,30 +953,35 @@ class _MarkedTextState extends State<MarkedText> {
     }
   }
 
+  /// [mark], a button while there is [_onMark]; keyed `mark-<line>`, in a
+  /// table's cell `mark-<line>-<column>`.
   InlineSpan _markSpan(
     BuildContext context,
     AppLocalizations t,
-    MarkedLine mark,
+    MarkdownMark mark,
     TextStyle? style,
   ) {
-    final onMark = widget.onMark;
-    final glyph = widget.text.substring(mark.start, mark.end);
+    final onMark = _onMark;
+    final glyph = _source.substring(mark.start, mark.end);
     final label = textMarkLabel(t, mark.mark);
     if (onMark == null) {
       return TextSpan(text: glyph, semanticsLabel: label, style: style);
     }
+    final column = mark.column;
     return WidgetSpan(
       alignment: PlaceholderAlignment.baseline,
       baseline: TextBaseline.alphabetic,
       child: _MarkButton(
-        key: ValueKey('mark-${mark.line}'),
+        key: ValueKey(
+          column == null ? 'mark-${mark.line}' : 'mark-${mark.line}-$column',
+        ),
         glyph: glyph,
         label: label,
         style: style,
         onTap: (at) async {
           final picked = await pickTextMark(context, at, mark.mark);
           if (!context.mounted || picked == null) return;
-          onMark(mark.line, picked);
+          onMark(mark.line, picked, column: column);
         },
       ),
     );
@@ -752,7 +994,7 @@ class _MarkedTextState extends State<MarkedText> {
     TextStyle highlighted,
     TagSearch? onSearch,
   ) {
-    final written = widget.text.substring(tag.start, tag.end);
+    final written = _source.substring(tag.start, tag.end);
     if (onSearch == null) {
       return TextSpan(
         text: written,

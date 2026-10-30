@@ -181,7 +181,8 @@ final _scenarios = <Scenario>[
         'at an edit that stays formatted when edited as plain, one '
         'formatted as it is, an Amend formatted, a Transcript\'s words '
         'taken over escaped, a formatted Note made a Checklist and back, '
-        'and a plain text holding marks, searched as written.',
+        'a plain text holding marks, searched as written, and a table '
+        'whose cell was set, written anew.',
     build: (store) {
       final notes = Notes(store);
       const markdown = TextFormats.markdown;
@@ -204,6 +205,14 @@ final _scenarios = <Scenario>[
       );
       Checklists(store).make(packing.id);
       Checklists(store).toPlain(packing.id);
+      final table = notes.capture(
+        'Item | Qty\n:-|-:\n**Milk** | 2',
+        format: markdown,
+      );
+      notes.edit(
+        table.id,
+        MarkdownTables.setCell(table.text, 0, 1, 1, '3 | 4').text,
+      );
     },
   ),
   (
@@ -5301,6 +5310,9 @@ Map<String, Object?> _textTags() {
 /// counted in code points, so that the cores' UTF-16 and UTF-8 offsets
 /// compare.
 Map<String, Object?> _markdown() {
+  const marked =
+      '<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n'
+      '❌ c | d\n☐\u200d x |\n# ☐ end';
   const texts = [
     '',
     'plain words, nothing more',
@@ -5323,6 +5335,21 @@ Map<String, Object?> _markdown() {
         '# Heading #h\n`#a` #b `#c`',
     '| a | b |\n|---|---|\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>',
     ' *x*  　**y**　 \t*z*\t',
+    'Shop\n| Item | **Qty** | Note |\n|:-----|----:|:-:|\n| milk | 2 |\n'
+        '| eggs | 6 | free range | beyond |\nbread | 1 | `a\\|b` \\| c\n\nafter',
+    r'a \| b | c'
+        '\n'
+        '-|-'
+        '\n'
+        r'a \\| b | c\|',
+    'a\r\n|-\r\nb\r\n\r\n|x|\n|---|\n||\n|',
+    marked,
+    'a | b\n|---|\na | b\n- | -\n# a | b\n--|--\na\n---\na | b\n|--|:x:|',
+    'a | b\n-|-\nc\n```\ne | f\n-|-\n---\ng | h\n-|-\n    x | y\n'
+        'i | j\n-|-\n<!-- x -->\nk | l\n-|-\n* * *',
+    'x\n  <!-- first column headings --> \na|b\n-|-\n\n'
+        '<!-- first column headings -->\nno table',
+    '🧠 | ü\n:-:|-\n日記 | [𝔸](https://x.org/𝔸) #tag `#code`\n**b** | *i* ~~s~~',
   ];
   int cp(String text, int offset) => text.substring(0, offset).runes.length;
   int u16(String text, int point) =>
@@ -5341,6 +5368,34 @@ Map<String, Object?> _markdown() {
     'end': cp(c.text, c.end),
     'start': cp(c.text, c.start),
     'text': c.text,
+  };
+  Map<String, Object?> table(String text, MarkdownTable t) => {
+    'aligns': [for (final a in t.aligns) a.name],
+    'delimiterLine': t.delimiterLine,
+    'end': cp(text, t.end),
+    'firstLine': t.firstLine,
+    'headingColumn': t.headingColumn,
+    'lastLine': t.lastLine,
+    'rows': [
+      for (final (r, row) in t.rows.indexed)
+        {
+          'cells': [
+            for (final (c, cell) in row.cells.indexed)
+              {
+                'end': cp(text, cell.end),
+                'source': MarkdownTables.cell(text, t.start, r, c),
+                'spans': [for (final s in cell.spans) span(text, s)],
+                'start': cp(text, cell.start),
+                'visible': cell.visible,
+              },
+          ],
+          'end': cp(text, row.end),
+          'line': row.line,
+          'start': cp(text, row.start),
+          'visible': row.visible,
+        },
+    ],
+    'start': cp(text, t.start),
   };
   final edits = <Map<String, Object?>>[];
   void toggle(String text, int start, int end, MarkdownSpanKind kind) =>
@@ -5443,6 +5498,130 @@ Map<String, Object?> _markdown() {
   indent('  - a\n\t- b\nc', 0, 12, true);
   indent('- a', 0, 0, true);
   indent('1. a', 4, 4, false);
+  // The table editor's edits, `start` and `end` a code point within the
+  // table.
+  void tableEdit(
+    String op,
+    String text,
+    int at,
+    Map<String, Object?> args,
+    MarkdownChange Function(int at) edit,
+  ) => edits.add({
+    ...args,
+    'op': op,
+    'start': at,
+    'end': at,
+    'text': text,
+    'result': change(text, edit(u16(text, at))),
+  });
+  const grid = 'x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny';
+  const flagged =
+      '<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next';
+  for (final (cell, row, column) in [
+    ('# x', 1, 1),
+    ('- x', 0, 0),
+    ('a|b', 2, 1),
+    ('`a|b` \\| c', 1, 0),
+    ('a\r\nb\nc\rd', 2, 0),
+    ('  **ü**\t', 1, 1),
+    (r'x\', 0, 1),
+    ('x', 3, 0),
+    ('x', 0, 2),
+  ]) {
+    tableEdit('setCell', grid, 5, {
+      'cell': cell,
+      'column': column,
+      'row': row,
+    }, (at) => MarkdownTables.setCell(grid, at, row, column, cell));
+  }
+  tableEdit('setCell', flagged, 40, {
+    'cell': '日記',
+    'column': 0,
+    'row': 0,
+  }, (at) => MarkdownTables.setCell(flagged, at, 0, 0, '日記'));
+  for (final index in [0, 1, 3, 4]) {
+    tableEdit('insertRow', grid, 5, {
+      'index': index,
+    }, (at) => MarkdownTables.insertRow(grid, at, index));
+    tableEdit('insertColumn', grid, 5, {
+      'index': index,
+    }, (at) => MarkdownTables.insertColumn(grid, at, index));
+    tableEdit('deleteRow', grid, 5, {
+      'index': index,
+    }, (at) => MarkdownTables.deleteRow(grid, at, index));
+    tableEdit('deleteColumn', grid, 5, {
+      'index': index,
+    }, (at) => MarkdownTables.deleteColumn(grid, at, index));
+  }
+  for (final (from, to) in [(0, 2), (2, 0), (1, 1), (0, 3)]) {
+    tableEdit('moveRow', grid, 5, {
+      'from': from,
+      'to': to,
+    }, (at) => MarkdownTables.moveRow(grid, at, from, to));
+    tableEdit('moveColumn', grid, 5, {
+      'from': from,
+      'to': to,
+    }, (at) => MarkdownTables.moveColumn(grid, at, from, to));
+  }
+  for (final (text, at) in [
+    (grid, 5),
+    (flagged, 0),
+    (flagged, 34),
+    ('x\n| a |\n|---|', 3),
+    ('a\n| b |\n|-|', 0),
+  ]) {
+    tableEdit(
+      'headingColumn',
+      text,
+      at,
+      {},
+      (at) => MarkdownTables.toggleHeadingColumn(text, at),
+    );
+    tableEdit('deleteRow', text, at, {
+      'index': 0,
+    }, (at) => MarkdownTables.deleteRow(text, at, 0));
+    tableEdit('deleteColumn', text, at, {
+      'index': 0,
+    }, (at) => MarkdownTables.deleteColumn(text, at, 0));
+  }
+  for (final (text, at) in [
+    ('', 0),
+    ('abc def', 5),
+    ('abc\ndef', 1),
+    ('abc\ndef', 4),
+    ('abc\n\ndef', 4),
+    ('abc\n  \n\ndef', 5),
+    ('abc\n', 4),
+    ('a\r\nb', 0),
+    ('  a\rb', 1),
+    ('a | b\n-|-\nc | d\n# next', 2),
+    ('🧠\n', 1),
+  ]) {
+    tableEdit(
+      'insertTable',
+      text,
+      at,
+      {},
+      (at) => MarkdownTables.insert(text, at),
+    );
+  }
+  final swaps = [
+    for (final (line, column, to) in [
+      (1, 1, TextMark.failed),
+      (1, 1, TextMark.checked),
+      (3, 0, TextMark.open),
+      (3, null, TextMark.open),
+      (1, 2, TextMark.open),
+      (5, null, TextMark.checked),
+      (4, 0, TextMark.checked),
+    ])
+      {
+        'column': column,
+        'line': line,
+        'result': Markdown.swapMark(marked, line, to, column: column),
+        'to': to.name,
+      },
+  ];
   return {
     'cases': [
       for (final text in texts)
@@ -5456,11 +5635,22 @@ Map<String, Object?> _markdown() {
                 'level': b.level,
                 'line': b.line,
                 'number': b.number,
+                if (b.table != null) 'row': b.row,
                 'spans': [for (final s in b.spans) span(text, s)],
                 'start': cp(text, b.start),
               },
           ],
           'escaped': Markdown.escape(text),
+          'marks': [
+            for (final m in _checkedMarks(text))
+              {
+                'column': m.column,
+                'end': cp(text, m.end),
+                'line': m.line,
+                'mark': m.mark.name,
+                'start': cp(text, m.start),
+              },
+          ],
           'plain': Markdown.plain(text),
           'shortcuts': [
             for (var p = 0; p <= text.runes.length; p++)
@@ -5474,6 +5664,7 @@ Map<String, Object?> _markdown() {
                 'tag': t.tag,
               },
           ],
+          'tables': [for (final t in MarkdownTables.all(text)) table(text, t)],
           'text': text,
           'uses': Markdown.uses(text),
           'words': [
@@ -5500,7 +5691,32 @@ Map<String, Object?> _markdown() {
       ])
         url: Markdown.mayOpen(url),
     },
+    'swaps': {'cases': swaps, 'text': marked},
   };
+}
+
+/// [Markdown.marks] of [text], checked to be [TextMarks.find]'s on every
+/// line that is no table's.
+List<MarkdownMark> _checkedMarks(String text) {
+  final marks = Markdown.marks(text);
+  final tables = {
+    for (final t in MarkdownTables.all(text))
+      for (var l = t.firstLine; l <= t.lastLine; l++) l,
+  };
+  final lines = [
+    for (final m in marks)
+      if (m.column == null) (m.line, m.mark, m.start, m.end),
+  ];
+  final found = [
+    for (final m in TextMarks.find(text))
+      if (!tables.contains(m.line)) (m.line, m.mark, m.start, m.end),
+  ];
+  if (lines.length != found.length ||
+      [for (var i = 0; i < lines.length; i++) lines[i] == found[i]]
+          .contains(false)) {
+    throw StateError('marks differ from TextMarks.find: $text');
+  }
+  return marks;
 }
 
 /// The lead-ins Whisper gets: name lists as given, and three stores,
@@ -6110,17 +6326,22 @@ Future<void> main(List<String> args) async {
     '`\\` or `&`, as in "C#" and web addresses.\n'
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
-    'marks, whether it uses a format, the text escaped, its tags but those '
-    'in code and link destinations, the offsets where a typed shortcut '
-    'ends and the word at every offset; bold, italic, strike-through, '
-    'code, links, headings, quotes, bulleted and numbered items one level '
-    'in, and what is no format: three hashes, code blocks, tables, '
-    'images, raw HTML, a link inside a link. Then the edits: each format '
+    'marks, whether it uses a format, the text escaped, its status marks, '
+    'those at the start of a table\'s cell included, its tables with their '
+    'rows and cells, its tags but those in code and link destinations, the '
+    'offsets where a typed shortcut ends and the word at every offset; '
+    'bold, italic, strike-through, code, links, headings, quotes, bulleted '
+    'and numbered items one level in, tables with ragged rows, escaped '
+    'pipes, alignment and the line marking the first column as headings, '
+    'and what is no format: three hashes, code blocks, images, raw HTML, a '
+    'link inside a link, what is no table. Then the edits: each format '
     'put on and taken off at a cursor, on a word, a selection and lines, '
     'links put on, changed and taken off, every line format on and off, '
-    'items in and out, with the text and the selection they gave; and '
-    'which link destinations may be opened. Offsets are counted in code '
-    'points.\n'
+    'items in and out, a table\'s cell set, its rows and columns put in, '
+    'moved and deleted, its first column marked, a new table put in, with '
+    'the text and the selection they gave; status marks of cells changed; '
+    'and which link destinations may be opened. Offsets are counted in '
+    'code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '

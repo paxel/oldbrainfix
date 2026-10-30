@@ -4241,4 +4241,78 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get linkSet => 'Link setzen';
+
+  @override
+  String get formatTable => 'Tabelle';
+
+  @override
+  String get tableTitle => 'Tabelle';
+
+  @override
+  String get tableOpen => 'Tabelle öffnen';
+
+  @override
+  String get tableSideways => 'Tabelle seitlich verschieben';
+
+  @override
+  String tableRow(int number) {
+    return 'Zeile $number';
+  }
+
+  @override
+  String tableColumn(String letter) {
+    return 'Spalte $letter';
+  }
+
+  @override
+  String get tableAddRow => 'Zeile hinzufügen';
+
+  @override
+  String get tableAddColumn => 'Spalte hinzufügen';
+
+  @override
+  String get tableRowAbove => 'Zeile darüber einfügen';
+
+  @override
+  String get tableRowBelow => 'Zeile darunter einfügen';
+
+  @override
+  String get tableRowUp => 'Nach oben';
+
+  @override
+  String get tableRowDown => 'Nach unten';
+
+  @override
+  String get tableRowDelete => 'Zeile löschen';
+
+  @override
+  String get tableColumnBefore => 'Spalte links einfügen';
+
+  @override
+  String get tableColumnAfter => 'Spalte rechts einfügen';
+
+  @override
+  String get tableColumnLeft => 'Nach links';
+
+  @override
+  String get tableColumnRight => 'Nach rechts';
+
+  @override
+  String get tableColumnDelete => 'Spalte löschen';
+
+  @override
+  String get tableHeadingColumn => 'Erste Spalte als Überschriften';
+
+  @override
+  String get tableDeleteRowQuestion => 'Diese Zeile löschen?';
+
+  @override
+  String get tableDeleteColumnQuestion => 'Diese Spalte löschen?';
+
+  @override
+  String get tableDeleteTableQuestion => 'Die Tabelle löschen?';
+
+  @override
+  String get tableDeleteBody =>
+      'Die Wörter in ihren Zellen werden aus der Notiz gelöscht.';
 }

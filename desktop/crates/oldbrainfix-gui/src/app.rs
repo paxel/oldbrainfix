@@ -119,6 +119,7 @@ use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
 };
+use crate::table_view::{self, Opening, TableView};
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
 };
@@ -646,6 +647,10 @@ enum Action {
     ViewPhoto(String),
     /// Closes the photo shown full screen.
     ClosePhoto,
+    /// Shows a table of a formatted text full screen (#128).
+    OpenTable(Opening),
+    /// Something asked of the table shown full screen.
+    Table(table_view::Asked),
     /// Captures the capture field's text and the recording running,
     /// nudged this long from now.
     Capture(Duration),
@@ -766,10 +771,12 @@ enum Action {
     /// (#122).
     Shopping(ShoppingAction),
     /// Changes the status mark at the start of the line `line` of the
-    /// Note's text to `to`, on a card (#125).
+    /// Note's text to `to`, on a card (#125), or at the start of the cell
+    /// in `column` of a table's row there (#128).
     Mark {
         note: String,
         line: usize,
+        column: Option<usize>,
         to: TextMark,
     },
     /// Gives the Line the dialog renames its new text.
@@ -949,6 +956,8 @@ pub struct App {
     unfolded_of: Option<String>,
     /// The photo shown full screen over the window, while one is (#114).
     viewer: Option<Viewer>,
+    /// The table shown full screen over the window, while one is (#128).
+    table: Option<TableView>,
     trail: Trail,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
@@ -1245,6 +1254,7 @@ impl App {
             unfolded: HashSet::new(),
             unfolded_of: None,
             viewer: None,
+            table: None,
             trail: Trail::default(),
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
@@ -2695,6 +2705,12 @@ impl App {
         self.view.compact
     }
 
+    /// The text of the table shown full screen, as edited there, while
+    /// one is (#128).
+    pub fn shown_table(&self) -> Option<&str> {
+        self.table.as_ref().map(TableView::text)
+    }
+
     /// The photo shown full screen, by hash, and how far it is zoomed in,
     /// 1 fitting the window (#114).
     pub fn viewed_photo(&self) -> Option<(&str, f32)> {
@@ -3415,6 +3431,8 @@ impl App {
             Action::FilterPeople(people) => self.people = people,
             Action::ViewPhoto(hash) => self.viewer = Some(Viewer::new(hash)),
             Action::ClosePhoto => self.viewer = None,
+            Action::OpenTable(opening) => self.open_table(opening)?,
+            Action::Table(asked) => self.table_asked(asked)?,
             Action::Unfold(id) => {
                 self.unfolded.insert(id);
             }
@@ -3738,7 +3756,12 @@ impl App {
             }
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
-            Action::Mark { note, line, to } => self.change_mark(&note, line, to)?,
+            Action::Mark {
+                note,
+                line,
+                column,
+                to,
+            } => self.change_mark(&note, (line, column), to)?,
             Action::RenameLine => {
                 if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
                     && let Some(named) = checklist_view::renamed(&text)
@@ -4393,14 +4416,15 @@ impl App {
     }
 
     /// Changes the status mark of the line `line` of the Note `note`'s
-    /// text to `to` (#125, ADR 0031), an edit of its text like any other,
-    /// where this Device may change it as it is stored now. On the Note
-    /// shown, what is typed into its text goes in first, and the field
-    /// then holds the text it has now.
+    /// text, or of the cell in `column` of a table's row there (#128), to
+    /// `to` (#125, ADR 0031), an edit of its text like any other, where
+    /// this Device may change it as it is stored now. On the Note shown,
+    /// what is typed into its text goes in first, and the field then holds
+    /// the text it has now.
     fn change_mark(
         &mut self,
         note: &str,
-        line: usize,
+        (line, column): (usize, Option<usize>),
         to: TextMark,
     ) -> oldbrainfix_core::Result<()> {
         let shown = self.text_of.as_deref() == Some(note);
@@ -4414,12 +4438,97 @@ impl App {
         if now.is_trashed() || !now.text_editable || !self.store.may_change(note)? {
             return Ok(());
         }
-        let Some(swapped) = text_marks::swap(&now.text, line, to) else {
+        let swapped = if now.text_format == text_format::MARKDOWN {
+            markdown::swap_mark(&now.text, line, column, to)
+        } else {
+            text_marks::swap(&now.text, line, to)
+        };
+        let Some(swapped) = swapped else {
             return Ok(());
         };
         notes.edit(note, &swapped)?;
         if shown && let Some(now) = notes.by_id(note)? {
             self.text = now.text;
+        }
+        Ok(())
+    }
+
+    /// Shows the table `opening` says full screen (#128). A Note's table
+    /// is edited there only where this Device may change the Note as it
+    /// is stored now; what is typed into the Note shown goes in first, and
+    /// the view holds the text as stored, at the same table.
+    fn open_table(&mut self, mut opening: Opening) -> oldbrainfix_core::Result<()> {
+        if let Some(note) = opening.note.take() {
+            if self.text_of.as_deref() == Some(note.as_str()) {
+                self.save_text()?;
+            }
+            let now = Notes::new(&self.store).by_id(&note)?;
+            if let Some(now) = now
+                && !now.is_trashed()
+                && now.text_editable
+                && now.text_format == text_format::MARKDOWN
+                && self.store.may_change(&note)?
+                && let Some(at) = same_table((&opening.text, opening.at), &now.text)
+            {
+                opening.note = Some(note);
+                opening.text = now.text;
+                opening.at = at;
+            } else {
+                opening.cell = None;
+            }
+        }
+        if markdown::table::at(&opening.text, opening.at).is_some() {
+            self.table = Some(TableView::new(opening));
+        }
+        Ok(())
+    }
+
+    /// Does what the table shown full screen asked (#128).
+    fn table_asked(&mut self, asked: table_view::Asked) -> oldbrainfix_core::Result<()> {
+        match asked {
+            table_view::Asked::Write(text) => self.write_table(&text)?,
+            table_view::Asked::Close => {
+                // The cell being edited is written as it is left.
+                if let Some(text) = self.table.as_mut().and_then(TableView::commit) {
+                    self.write_table(&text)?;
+                }
+                self.table = None;
+            }
+            table_view::Asked::SearchFor(tag) => {
+                self.table_asked(table_view::Asked::Close)?;
+                self.act(Action::SearchFor(tag))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Keeps `text`, its table edited full screen, as the text of the
+    /// Note the table is in, where this Device may change it as it is
+    /// stored now; a text left blank is not kept. The Note shown then
+    /// holds it in its field.
+    fn write_table(&mut self, text: &str) -> oldbrainfix_core::Result<()> {
+        let Some(note) = self
+            .table
+            .as_ref()
+            .and_then(TableView::note)
+            .map(str::to_string)
+        else {
+            return Ok(());
+        };
+        let notes = Notes::new(&self.store);
+        let Some(now) = notes.by_id(&note)? else {
+            return Ok(());
+        };
+        if now.is_trashed() || !now.text_editable || !self.store.may_change(&note)? {
+            return Ok(());
+        }
+        let text = text.trim();
+        if text.is_empty() || text == now.text {
+            return Ok(());
+        }
+        notes.edit_as(&note, text, text_format::MARKDOWN)?;
+        if self.text_of.as_deref() == Some(note.as_str()) {
+            self.text = text.to_string();
         }
         Ok(())
     }
@@ -5152,7 +5261,18 @@ impl App {
         if !files.is_empty() {
             actions.push(Action::Files(files));
         }
-        if self.viewer.is_some() {
+        if self.viewer.is_none() && self.table.is_some() {
+            // Back closes the table shown full screen, the cell being
+            // edited written; Alt+Left rests while a cell is typed into.
+            let typing = ui.ctx().text_edit_focused();
+            let back = ui.input_mut(|i| {
+                i.pointer.button_pressed(PointerButton::Extra1)
+                    || (!typing && i.consume_key(Modifiers::ALT, Key::ArrowLeft))
+            });
+            if back {
+                actions.push(Action::Table(table_view::Asked::Close));
+            }
+        } else if self.viewer.is_some() {
             // Back closes the photo shown full screen, and goes nowhere
             // else.
             let back = ui.input_mut(|i| {
@@ -5323,6 +5443,11 @@ impl App {
             .frame(Frame::NONE.inner_margin(Margin::same(12)))
             .show(ui, |ui| self.notes_pane(ui, tones, &mut actions));
         self.dialog(ui.ctx(), tones, &mut actions);
+        // A table full screen over the dialog it may be opened from.
+        if let Some(table) = &mut self.table {
+            let asked = table.show(ui.ctx(), &self.t, tones);
+            actions.extend(asked.into_iter().map(Action::Table));
+        }
         // The photo full screen, over everything else.
         if let Some(viewer) = &mut self.viewer
             && media_view::photo_viewer(ui.ctx(), &self.t, (&mut self.photos, &self.store), viewer)
@@ -5771,9 +5896,16 @@ impl App {
                         actions.push(picked);
                     } else if let Some(tag) = clicks.tag {
                         actions.push(Action::SearchFor(tag));
-                    } else if let Some((line, to)) = clicks.mark {
+                    } else if let Some((line, column, to)) = clicks.mark {
                         let note = id.clone();
-                        actions.push(Action::Mark { note, line, to });
+                        actions.push(Action::Mark {
+                            note,
+                            line,
+                            column,
+                            to,
+                        });
+                    } else if let Some(opening) = clicks.table {
+                        actions.push(Action::OpenTable(opening));
                     } else if let Some((line, checked)) = clicks.check {
                         if self.view.shopping_lists.contains_key(id) {
                             actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
@@ -5979,6 +6111,16 @@ impl App {
                             false,
                         );
                         let of = Id::new(("text", &note.id));
+                        // Its tables open to read (#128).
+                        if let Some(at) = text_marks_view::table_clicks(ui, &t, of, &spots.tables) {
+                            actions.push(Action::OpenTable(Opening {
+                                note: None,
+                                text: note.text.clone(),
+                                at,
+                                cell: None,
+                                tags: true,
+                            }));
+                        }
                         text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
                         if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags) {
                             actions.push(Action::SearchFor(tag));
@@ -6032,9 +6174,22 @@ impl App {
                         }
                         let spots = shown.inner;
                         let marked = Id::new(("field", &note.id));
-                        if let Some((line, to)) =
+                        // A click on a table opens it full screen, to
+                        // edit (#128).
+                        if let Some(at) =
+                            text_marks_view::table_clicks(ui, &t, marked, &spots.tables)
+                        {
+                            actions.push(Action::OpenTable(Opening {
+                                note: Some(note.id.clone()),
+                                text: edited.clone(),
+                                at,
+                                cell: None,
+                                tags: true,
+                            }));
+                        }
+                        if let Some((line, column, to)) =
                             text_marks_view::mark_clicks(ui, &t, marked, &spots.marks, true)
-                            && let Some(swapped) = text_marks::swap(edited, line, to)
+                            && let Some(swapped) = markdown::swap_mark(edited, line, column, to)
                         {
                             *edited = swapped;
                             actions.push(Action::SaveText);
@@ -6124,7 +6279,7 @@ impl App {
                             (0, typed.len()),
                         );
                         let marked = Id::new(("field", &note.id));
-                        if let Some((line, to)) =
+                        if let Some((line, _, to)) =
                             text_marks_view::mark_clicks(ui, &t, marked, &spots, true)
                             && let Some(swapped) = text_marks::swap(edited, line, to)
                         {
@@ -6133,6 +6288,37 @@ impl App {
                         }
                     }
                     match picked {
+                        // In a table it opens it; elsewhere it puts a new
+                        // one in and edits its first cell (#128), the
+                        // text formatted from then on.
+                        Some(Format::Table) => {
+                            let opening = match markdown::table::at(edited, selected.0) {
+                                Some(table) => Opening {
+                                    note: Some(note.id.clone()),
+                                    text: edited.clone(),
+                                    at: table.start,
+                                    cell: None,
+                                    tags: true,
+                                },
+                                None => {
+                                    let change = markdown::table::insert(edited, selected.0);
+                                    *edited = change.text;
+                                    actions.push(if formatted {
+                                        Action::SaveText
+                                    } else {
+                                        Action::FormatText
+                                    });
+                                    Opening {
+                                        note: Some(note.id.clone()),
+                                        text: edited.clone(),
+                                        at: change.start,
+                                        cell: Some((0, 0)),
+                                        tags: true,
+                                    }
+                                }
+                            };
+                            actions.push(Action::OpenTable(opening));
+                        }
                         Some(Format::Link) => {
                             *editing = true;
                             actions.push(Action::AskLink {
@@ -6289,6 +6475,17 @@ impl App {
                                 false,
                             );
                             let of = Id::new(("text", &section.id));
+                            if let Some(at) =
+                                text_marks_view::table_clicks(ui, &t, of, &spots.tables)
+                            {
+                                actions.push(Action::OpenTable(Opening {
+                                    note: None,
+                                    text: section.text.clone(),
+                                    at,
+                                    cell: None,
+                                    tags: true,
+                                }));
+                            }
                             text_marks_view::mark_clicks(ui, &t, of, &spots.marks, false);
                             if let Some(tag) = text_marks_view::tag_clicks(ui, &t, of, &spots.tags)
                             {
@@ -8778,7 +8975,17 @@ fn sent_item_form(
                 (None, text),
                 false,
             );
-            text_marks_view::link_clicks(ui, Id::new("sent text"), &spots.links);
+            let of = Id::new("sent text");
+            if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
+                actions.push(Action::OpenTable(Opening {
+                    note: None,
+                    text: item.text.clone(),
+                    at,
+                    cell: None,
+                    tags: false,
+                }));
+            }
+            text_marks_view::link_clicks(ui, of, &spots.links);
             if !full {
                 return;
             }
@@ -8802,7 +9009,17 @@ fn sent_item_form(
                     (None, text),
                     false,
                 );
-                text_marks_view::link_clicks(ui, Id::new(("sent section", i)), &spots.links);
+                let of = Id::new(("sent section", i));
+                if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
+                    actions.push(Action::OpenTable(Opening {
+                        note: None,
+                        text: section.text.clone(),
+                        at,
+                        cell: None,
+                        tags: false,
+                    }));
+                }
+                text_marks_view::link_clicks(ui, of, &spots.links);
             }
         });
 }
@@ -9951,9 +10168,11 @@ struct CardClicks {
     edit: egui::Response,
     photo: Option<String>,
     check: Option<(String, bool)>,
-    /// The line of the Note's text whose status mark was changed and to
-    /// what (#125).
-    mark: Option<(usize, TextMark)>,
+    /// The line of the Note's text whose status mark was changed, the
+    /// column of its table's cell, and to what (#125).
+    mark: Option<(usize, Option<usize>, TextMark)>,
+    /// The table clicked, to show full screen (#128).
+    table: Option<Opening>,
     /// The tag clicked, as written (#126).
     tag: Option<String>,
     menu_opened: bool,
@@ -10107,7 +10326,7 @@ fn note_card(
     let mut shown = Vec::new();
     let mut boxes = Vec::new();
     let mut marks = Spots::default();
-    let mut section_marks: Vec<(&str, Spots)> = Vec::new();
+    let mut section_marks: Vec<(&Section, Spots)> = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -10230,7 +10449,7 @@ fn note_card(
                         let mut spots = Spots::default();
                         let media = (&mut *photos, store, transcribing);
                         shown.extend(whole(ui, t, part, media, &mut spots));
-                        section_marks.push((section.id.as_str(), spots));
+                        section_marks.push((section, spots));
                     }
                 });
                 return;
@@ -10374,15 +10593,36 @@ fn note_card(
     let checks = look.checklist.is_some_and(|(_, checks)| checks)
         || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
-    // Sections have no edit of their text: their marks only show.
+    // Sections have no edit of their text: their marks only show. A
+    // table opens full screen, to edit where its marks may change (#128);
+    // taken first, its marks, tags and links keep their clicks.
     let of = Id::new(("card", &note.id));
+    let mut table = text_marks_view::table_clicks(ui, t, of, &marks.tables).map(|at| Opening {
+        note: look.marks.then(|| note.id.clone()),
+        text: note.text.clone(),
+        at,
+        cell: None,
+        tags: true,
+    });
+    for (section, spots) in &section_marks {
+        let of = Id::new(("card", &section.id));
+        if let Some(at) = text_marks_view::table_clicks(ui, t, of, &spots.tables) {
+            table = Some(Opening {
+                note: None,
+                text: section.text.clone(),
+                at,
+                cell: None,
+                tags: true,
+            });
+        }
+    }
     let mark = text_marks_view::mark_clicks(ui, t, of, &marks.marks, look.marks);
     // A click on a tag searches for it, and opens no card (#126).
     let mut tag = text_marks_view::tag_clicks(ui, t, of, &marks.tags);
     // A click on a link opens it, and no card (#127).
     text_marks_view::link_clicks(ui, of, &marks.links);
-    for (id, spots) in &section_marks {
-        let of = Id::new(("card", *id));
+    for (section, spots) in &section_marks {
+        let of = Id::new(("card", &section.id));
         text_marks_view::mark_clicks(ui, t, of, &spots.marks, false);
         tag = text_marks_view::tag_clicks(ui, t, of, &spots.tags).or(tag);
         text_marks_view::link_clicks(ui, of, &spots.links);
@@ -10394,10 +10634,21 @@ fn note_card(
         photo,
         check,
         mark,
+        table,
         tag,
         menu_opened,
         picked,
     }
+}
+
+/// Where the table beginning at the byte `at` of `from` begins in `to`:
+/// the table in the same place among the tables there, for `to` the same
+/// text written again (its ends trimmed, say).
+fn same_table((from, at): (&str, usize), to: &str) -> Option<usize> {
+    let index = markdown::table::all(from)
+        .iter()
+        .position(|t| t.start == at)?;
+    markdown::table::all(to).get(index).map(|t| t.start)
 }
 
 /// Where the first line of `text` that a compact card shows lies in it,

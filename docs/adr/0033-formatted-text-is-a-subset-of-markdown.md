@@ -1,6 +1,6 @@
 # Formatted text is a subset of Markdown, kept as written
 
-Notes and Sections can hold formatted text: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links and inline code (#127). Both cores read it the same way into lines and their parts (`markdown.dart`, `markdown.rs`), so the phone and the desktop draw the same, and the editors' helpers live there too.
+Notes and Sections can hold formatted text: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links and inline code (#127), and tables (#128). Both cores read it the same way into lines and their parts (`markdown.dart`, `markdown.rs`), so the phone and the desktop draw the same, and the editors' helpers live there too.
 
 ## Stored as Markdown in the text marker
 
@@ -24,7 +24,25 @@ Spaces count one and a tab four; an item indented by two or more is one level in
 
 Within a line, never across lines: `\` before ASCII punctuation shows that character; a run of backticks up to the next run of as many is code, shown as it is, one space at both ends dropped when there is one at both; `[label](destination)` is a link, its destination without spaces and with any parentheses balanced, and no link inside a link; `*` and `_` are emphasis by CommonMark's delimiter rules, one for italic and two for bold, with ASCII punctuation as punctuation and the line's start and end as space; a run of exactly two `~` is strike-through. A `[` right after a `!` is no link, so an image shows as written.
 
-Shown as written: `###` and deeper headings, code blocks, tables (#128), images, raw HTML, character references, autolinks, reference links, link titles, Setext headings, a rule written as `---`, lists numbered with `)`, and a line that only CommonMark's continuation would put into the item or paragraph above. Items deeper than one level show one level in. The fixture `markdown.json` compares the lines and parts both cores read, offsets counted in code points.
+Shown as written: `###` and deeper headings, code blocks, images, raw HTML, character references, autolinks, reference links, link titles, Setext headings, a rule written as `---`, lists numbered with `)`, and a line that only CommonMark's continuation would put into the item or paragraph above. Items deeper than one level show one level in. The fixture `markdown.json` compares the lines and parts both cores read, offsets counted in code points.
+
+## Tables
+
+A table is GFM's: a header row, the delimiter row right under it, and every line under those that is a row too, each row a line of its own and every one of those lines a block of the table (`MarkdownTables`, `markdown::table`). A line is a row when it would be a paragraph line, is indented by at most three, is not blank, and is no comment (`<!--`), no fence (three backticks or tildes) and no rule (three `-`, `*` or `_` and spaces); so a heading, a quote, an item or a blank line ends a table, as GFM has it, and so does a fence or a rule. A row needs no pipe, so a line typed right under a table is a row of it. The delimiter row holds a `|`, its cells are `-` with a `:` at either end telling the alignment (`:--` left, `:-:` center, `--:` right), and it has as many cells as the header row, or neither line is a table's.
+
+A row is split into cells at each `|` that does not follow a `\`, a `|` at its start or end opening or closing it; code does not keep a pipe in. A cell is its content without the spaces and tabs around it, read as one line of the formats above with the cell's edges as the line's; `\|` shows `|`, in code too. A row with fewer cells than the header row gets empty ones; cells beyond the header row's show nowhere but stay in the text.
+
+### The first column as headings
+
+GFM has no way to say that a table's first column holds headings. The line `<!-- first column headings -->` right before the header row says it: an HTML comment, which a Markdown viewer such as GitHub's shows nowhere, and which reads as what it says on a Device of 0.1.x that shows the source. It belongs to the table, so it shows as nothing in the formatted view and the visible text; alone it is a line as written.
+
+### Edits
+
+The table editor reads a cell as written, `\|` as `|`, and writes it with each `|` as `\|` and each line break as a space, so a cell stays one cell of one line whatever is typed into it. An edit writes the whole table anew, every other character of the text kept: each row between pipes, `| a | b |`, the delimiter row `| --- | :-: |`, a cell's content as it was written, the comment line first when the first column holds headings, and the line break that followed the header row. Every line begins with a `|`, so no cell can make a line a heading, a quote or an item. The rows and columns are in the order shown, the header row first: a row put in at the top becomes the header row, deleting the header row makes the next row the header row, and deleting the last row or column deletes the table with its line break. A new table has two empty columns, a header row and one more row, and stands on lines of its own with a blank line between it and the lines around it, so it neither joins a table above it nor takes the line under it as a row.
+
+### Reading
+
+A table's rows read as their cells that show something, a space between them; its delimiter row and comment line go with their line break. Search, previews and alarms see that. A status mark (ADR 0031) counts at the start of a table's cell, as at the start of a line, and is changed in place (`Markdown.marks`, `Markdown.swapMark`); on a line that is no table's the marks are those of ADR 0031. A line format leaves a table's lines as they are. `Markdown.escape` writes every `|` as `\|`, so an escaped text has no table.
 
 ## Visible text, tags and status marks
 
@@ -47,9 +65,14 @@ Transcripts and Photo Texts stay plain (ADR 0018). Replacing a formatted Note's 
 - A rich text model, such as spans with offsets in JSON (rejected: a Device of 0.1.x shows the source, and Markdown reads as text where JSON does not).
 - Escaping the plain text when it is first formatted (rejected: backslashes would appear in the source, and a list typed with "- " would stay dashes).
 - A new structure version `v` (rejected: no key is added, a new format name is enough).
+- The first column as headings written as a bold first column (rejected: a user's own bold cells would turn the flag on, and an empty cell cannot be bold), as a count of hyphens in the delimiter row (rejected: invisible, and people type any count), or as an attribute such as `{.headings}` (rejected: GitHub and most viewers show it as text).
+- Keeping a table's spacing as written and changing only the cells an edit touches (rejected: putting in or moving a column changes every row anyway, and one written form is the same bytes from both cores).
+- Writing a table with its columns padded to one width (rejected: the widths of characters differ in the fonts the apps use, and one long cell would pad every row).
+- Dropping the cells beyond the header row's when a table is written anew, as GFM ignores them (rejected: nothing a person wrote is lost by an edit).
 
 ## Consequences
 
 - A Device of 0.1.x shows a formatted text as its source, read-only; a Conflict over it is resolved on a newer Device (ADR 0018).
 - A plain text holding "2*3*4" or "- " lines changes how it reads when it is first formatted; nothing of it is lost.
-- Code blocks and tables are left for #128; until then they show as written.
+- Code blocks show as written. A table edited on a Device of this version is written in its one form, so its spacing changes with the first edit; nothing in its cells changes.
+- A line typed right under a table without a blank line becomes a row of it, as in GFM.

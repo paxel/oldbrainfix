@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'table_screen.dart';
 import 'text_marks_view.dart';
 
 /// The offset of the grapheme boundary after [offset] in [text]; the end
@@ -81,6 +82,11 @@ int wordEdgeNear(String text, int offset) {
 /// format typed as Markdown (`Markdown.shortcutAt`) and a pasted text
 /// that uses one; [onFormatted] runs then. In two rows, the bottom row
 /// of a formatted text shows the source of the cursor's line only.
+///
+/// With [lineFormats], the bar also has the formats of whole lines and
+/// the table button, which puts a new table at the cursor or opens the
+/// table the cursor is in full screen ([openTable]); a tap on a table of
+/// a formatted text opens it too. A table's cell is edited without them.
 class TwoRowTextField extends StatefulWidget {
   /// The height of the bottom row.
   static const rowHeight = 56.0;
@@ -107,6 +113,7 @@ class TwoRowTextField extends StatefulWidget {
   final InputDecoration decoration;
   final bool marks;
   final bool formats;
+  final bool lineFormats;
   final VoidCallback? onFormatted;
 
   const TwoRowTextField({
@@ -119,6 +126,7 @@ class TwoRowTextField extends StatefulWidget {
     this.decoration = const InputDecoration(),
     this.marks = false,
     this.formats = false,
+    this.lineFormats = true,
     this.onFormatted,
   });
 
@@ -542,14 +550,29 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   bool get _marks => widget.marks && !widget.readOnly;
 
+  /// The status marks of the text: in a formatted one also those at the
+  /// start of a table's cell.
+  List<MarkdownMark> _marksOf(String text) => _formatting?.markdown ?? false
+      ? Markdown.marks(text)
+      : [
+          for (final m in TextMarks.find(text))
+            (
+              line: m.line,
+              column: null,
+              mark: m.mark,
+              start: m.start,
+              end: m.end,
+            ),
+        ];
+
   /// Opens the menu of the status mark at [at] (global), if there is one
-  /// at the start of a line there; whether there was.
+  /// at the start of a line or a cell there; whether there was.
   bool _tappedMark(Offset at) {
     if (!_marks) return false;
     final editable = _editable()?.renderEditable;
     if (editable == null) return false;
     final local = editable.globalToLocal(at);
-    for (final mark in TextMarks.find(widget.controller.text)) {
+    for (final mark in _marksOf(widget.controller.text)) {
       final boxes = editable.getBoxesForSelection(
         TextSelection(baseOffset: mark.start, extentOffset: mark.end),
       );
@@ -563,17 +586,88 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   /// Changes [mark] to the state picked in its menu at [at]; the cursor
   /// keeps its place in the text around it.
-  Future<void> _changeMark(MarkedLine mark, Offset at) async {
+  Future<void> _changeMark(MarkdownMark mark, Offset at) async {
     final to = await pickTextMark(context, at, mark.mark);
     if (to == null || !mounted) return;
     final value = widget.controller.value;
     final text = value.text;
-    final swapped = TextMarks.swap(text, mark.line, to);
+    final swapped = _formatting?.markdown ?? false
+        ? Markdown.swapMark(text, mark.line, to, column: mark.column)
+        : TextMarks.swap(text, mark.line, to);
     if (swapped == null) return;
     // Typing while the menu was open cannot happen; a sync can.
-    final now = TextMarks.find(text).where((m) => m.line == mark.line);
+    final now = _marksOf(text)
+        .where((m) => m.line == mark.line && m.column == mark.column);
     final end = now.isEmpty ? mark.end : now.first.end;
     _replace(value, swapped, end);
+  }
+
+  /// Opens the table of a formatted text at [at] (global) full screen,
+  /// if there is one there; whether there was.
+  bool _tappedTable(Offset at) {
+    final controller = _formatting;
+    if (controller == null || !controller.markdown || !widget.lineFormats) {
+      return false;
+    }
+    final editable = _editable()?.renderEditable;
+    if (editable == null) return false;
+    final local = editable.globalToLocal(at);
+    for (final table in MarkdownTables.all(controller.text)) {
+      final boxes = editable.getBoxesForSelection(
+        TextSelection(baseOffset: table.start, extentOffset: table.end),
+      );
+      if (boxes.any((box) => box.toRect().contains(local))) {
+        unawaited(_openTable(table.start));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// The table button: the table the cursor is in opens full screen; else
+  /// a new one goes in at the cursor and opens with its first cell being
+  /// edited.
+  void _table() {
+    final controller = _formatting;
+    if (controller == null) return;
+    final value = controller.value;
+    final text = value.text;
+    final cursor = (value.selection.isValid ? value.selection.start : 0).clamp(
+      0,
+      text.length,
+    );
+    if (MarkdownTables.at(text, cursor) case final table?) {
+      unawaited(_openTable(table.start));
+      return;
+    }
+    final change = MarkdownTables.insert(text, cursor);
+    _format((_, _, _) => change);
+    unawaited(_openTable(change.start, cell: (row: 0, column: 0)));
+  }
+
+  /// Opens the table at [at] full screen, [cell] being edited; what it
+  /// changes comes back into the field, the cursor after the table.
+  Future<void> _openTable(int at, {({int row, int column})? cell}) async {
+    final controller = _formatting;
+    if (controller == null) return;
+    if (_selecting) setState(() => _selecting = false);
+    await openTable(
+      context,
+      text: controller.text,
+      at: at,
+      cell: cell,
+      edit: TableEditing(
+        twoRows: widget.twoRows,
+        write: (change) {
+          final end =
+              MarkdownTables.at(change.text, change.start)?.end ?? change.start;
+          controller.value = TextEditingValue(
+            text: change.text,
+            selection: TextSelection.collapsed(offset: end),
+          );
+        },
+      ),
+    );
   }
 
   /// Puts ☐ at the start of the cursor's line, after its spaces, tabs
@@ -674,13 +768,15 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         decoration: widget.decoration,
         onChanged: _userChanged,
         scrollPadding: scrollPadding,
-        onTap: _marks
+        onTap: _marks || _formatting != null
             ? () {
-                if (_down case final at?) _tappedMark(at);
+                if (_down case final at?) {
+                  if (!_tappedMark(at)) _tappedTable(at);
+                }
               }
             : null,
       );
-      final Widget tapped = !_marks
+      final Widget tapped = !_marks && _formatting == null
           ? field
           // The field tells its tap, not where it was.
           : Listener(
@@ -804,46 +900,48 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.spans.contains(MarkdownSpanKind.strike),
           run: () => toggle(MarkdownSpanKind.strike),
         ),
-        _Format(
-          key: 'format-heading1',
-          label: t.formatHeading1,
-          icon: (_) => glyph('H1'),
-          toggles: true,
-          active: at.line == MarkdownBlockKind.heading1,
-          run: () => line(MarkdownBlockKind.heading1),
-        ),
-        _Format(
-          key: 'format-heading2',
-          label: t.formatHeading2,
-          icon: (_) => glyph('H2'),
-          toggles: true,
-          active: at.line == MarkdownBlockKind.heading2,
-          run: () => line(MarkdownBlockKind.heading2),
-        ),
-        _Format(
-          key: 'format-bullet',
-          label: t.formatBullets,
-          icon: (_) => const Icon(Icons.format_list_bulleted),
-          toggles: true,
-          active: at.line == MarkdownBlockKind.bullet,
-          run: () => line(MarkdownBlockKind.bullet),
-        ),
-        _Format(
-          key: 'format-numbered',
-          label: t.formatNumbers,
-          icon: (_) => const Icon(Icons.format_list_numbered),
-          toggles: true,
-          active: at.line == MarkdownBlockKind.numbered,
-          run: () => line(MarkdownBlockKind.numbered),
-        ),
-        _Format(
-          key: 'format-quote',
-          label: t.formatQuote,
-          icon: (_) => const Icon(Icons.format_quote),
-          toggles: true,
-          active: at.line == MarkdownBlockKind.quote,
-          run: () => line(MarkdownBlockKind.quote),
-        ),
+        if (widget.lineFormats) ...[
+          _Format(
+            key: 'format-heading1',
+            label: t.formatHeading1,
+            icon: (_) => glyph('H1'),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.heading1,
+            run: () => line(MarkdownBlockKind.heading1),
+          ),
+          _Format(
+            key: 'format-heading2',
+            label: t.formatHeading2,
+            icon: (_) => glyph('H2'),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.heading2,
+            run: () => line(MarkdownBlockKind.heading2),
+          ),
+          _Format(
+            key: 'format-bullet',
+            label: t.formatBullets,
+            icon: (_) => const Icon(Icons.format_list_bulleted),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.bullet,
+            run: () => line(MarkdownBlockKind.bullet),
+          ),
+          _Format(
+            key: 'format-numbered',
+            label: t.formatNumbers,
+            icon: (_) => const Icon(Icons.format_list_numbered),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.numbered,
+            run: () => line(MarkdownBlockKind.numbered),
+          ),
+          _Format(
+            key: 'format-quote',
+            label: t.formatQuote,
+            icon: (_) => const Icon(Icons.format_quote),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.quote,
+            run: () => line(MarkdownBlockKind.quote),
+          ),
+        ],
         _Format(
           key: 'format-link',
           label: t.formatLink,
@@ -860,21 +958,33 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
           active: at.spans.contains(MarkdownSpanKind.code),
           run: () => toggle(MarkdownSpanKind.code),
         ),
-        _Format(
-          key: 'format-indent',
-          label: t.formatIndent,
-          icon: (_) => const Icon(Icons.format_indent_increase),
-          run: () =>
-              _format((text, start, end) => Markdown.indent(text, start, end)),
-        ),
-        _Format(
-          key: 'format-outdent',
-          label: t.formatOutdent,
-          icon: (_) => const Icon(Icons.format_indent_decrease),
-          run: () => _format(
-            (text, start, end) => Markdown.indent(text, start, end, out: true),
+        if (widget.lineFormats) ...[
+          _Format(
+            key: 'format-indent',
+            label: t.formatIndent,
+            icon: (_) => const Icon(Icons.format_indent_increase),
+            run: () => _format(
+              (text, start, end) => Markdown.indent(text, start, end),
+            ),
           ),
-        ),
+          _Format(
+            key: 'format-outdent',
+            label: t.formatOutdent,
+            icon: (_) => const Icon(Icons.format_indent_decrease),
+            run: () => _format(
+              (text, start, end) =>
+                  Markdown.indent(text, start, end, out: true),
+            ),
+          ),
+          _Format(
+            key: 'format-table',
+            label: t.formatTable,
+            icon: (_) => const Icon(Icons.table_chart_outlined),
+            toggles: true,
+            active: at.line == MarkdownBlockKind.table,
+            run: _table,
+          ),
+        ],
       ],
     ];
     return Material(
@@ -964,6 +1074,8 @@ class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
   void onSingleTapUp(TapDragUpDetails details) {
     // A status mark opens its menu; the cursor stays where it was.
     if (_field._tappedMark(details.globalPosition)) return;
+    // A table opens full screen; the cursor stays where it was.
+    if (_field._tappedTable(details.globalPosition)) return;
     super.onSingleTapUp(details);
     _field._tapped();
   }

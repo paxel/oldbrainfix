@@ -1,9 +1,10 @@
 //! The format bar of the desktop's Note editor (#127, ADR 0033), with the
 //! phone's buttons: ☐ at the start of the line, bold, italic,
 //! strike-through, the two headings, bulleted and numbered items, a
-//! quote, a link, code, and an item one level in and out. Each works on
-//! the selection of the edit field, or on the word at its cursor, with
-//! the core's helpers; a button whose format holds there shows it. The
+//! quote, a link, code, an item one level in and out, and a table (#128),
+//! which the window puts in or opens. Each works on the selection of the
+//! edit field, or on the word at its cursor, with the core's helpers; a
+//! button whose format holds there shows it. The
 //! bar sits above the field and never keeps the keyboard: the field has
 //! it again after a click, its selection on what was formatted.
 
@@ -32,11 +33,12 @@ pub enum Format {
     Code,
     Indent,
     Outdent,
+    Table,
 }
 
 impl Format {
     /// The buttons in the phone's order.
-    pub const ALL: [Format; 13] = [
+    pub const ALL: [Format; 14] = [
         Format::Mark,
         Format::Bold,
         Format::Italic,
@@ -50,6 +52,7 @@ impl Format {
         Format::Code,
         Format::Indent,
         Format::Outdent,
+        Format::Table,
     ];
 
     /// What a screen reader and the tooltip say for it.
@@ -68,6 +71,7 @@ impl Format {
             Format::Code => t.format_code(),
             Format::Indent => t.format_indent(),
             Format::Outdent => t.format_outdent(),
+            Format::Table => t.format_table(),
         }
     }
 
@@ -87,6 +91,7 @@ impl Format {
             Format::Code => Ok(icons::CODE),
             Format::Indent => Ok(icons::INDENT),
             Format::Outdent => Ok(icons::OUTDENT),
+            Format::Table => Ok(icons::TABLE),
         }
     }
 
@@ -155,6 +160,9 @@ impl At {
         if format == Format::Link {
             return self.url.is_some();
         }
+        if format == Format::Table {
+            return self.line == Some(BlockKind::Table);
+        }
         if let Some(kind) = format.block() {
             return self.line == Some(kind);
         }
@@ -163,8 +171,8 @@ impl At {
 }
 
 /// What `format` makes of `text` with the bytes `start..end` selected;
-/// none for the link, which asks for its address first, and for ☐ on a
-/// line with a mark.
+/// none for the link, which asks for its address first, for the table,
+/// which the table view takes, and for ☐ on a line with a mark.
 pub fn change(format: Format, text: &str, (start, end): (usize, usize)) -> Option<Change> {
     if let Some(kind) = format.span() {
         return markdown::toggle(text, start, end, kind).ok();
@@ -270,7 +278,9 @@ fn button(
 ) -> egui::Response {
     let label = format.label(t);
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::click());
-    let toggles = format.block().is_some() || format.span().is_some() || format == Format::Link;
+    let toggles = format.block().is_some()
+        || format.span().is_some()
+        || matches!(format, Format::Link | Format::Table);
     resp.widget_info(|| {
         if toggles {
             WidgetInfo::selected(WidgetType::Button, true, holds, label)
@@ -326,6 +336,7 @@ mod tests {
         let list = change(Format::Bullets, "milk", (0, 0));
         assert_eq!(list.map(|c| c.text).as_deref(), Some("- milk"));
         assert_eq!(change(Format::Link, "milk", (0, 0)), None);
+        assert_eq!(change(Format::Table, "milk", (0, 0)), None);
         let marked = change(Format::Mark, "Pack\nPassport", (7, 7));
         assert_eq!(
             marked,
@@ -345,6 +356,9 @@ mod tests {
         assert!(at.holds(Format::Bold));
         assert!(!at.holds(Format::Italic));
         assert_eq!(At::of(text, (11, 11), false), At::default());
+        let table = At::of("| a | b |\n| --- | --- |", (2, 2), true);
+        assert!(table.holds(Format::Table));
+        assert!(!at.holds(Format::Table));
         let link = At::of("[a](https://x.org)", (1, 1), true);
         assert_eq!(link.url.as_deref(), Some("https://x.org"));
     }

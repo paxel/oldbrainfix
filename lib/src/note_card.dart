@@ -14,6 +14,7 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
+import 'table_screen.dart';
 import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
@@ -254,7 +255,11 @@ class NoteCard extends StatelessWidget {
   /// picked (ADR 0031): each ☐, ✅ or ❌ at the start of a line opens Check,
   /// Fail and Open at the finger; they are plain characters when null, as
   /// in a Section's text, which has no edit.
-  final void Function(int line, TextMark to)? onMark;
+  final MarkSwap? onMark;
+
+  /// Changes a table of the Note's text in its full-screen view (ADR
+  /// 0033); the table is only read there when null, as a Section's.
+  final TableEditing? onTable;
 
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
@@ -286,6 +291,7 @@ class NoteCard extends StatelessWidget {
     this.checklist,
     this.shopping,
     this.onMark,
+    this.onTable,
   });
 
   /// Where the first line with words of [text] starts and ends, without
@@ -446,6 +452,7 @@ class NoteCard extends StatelessWidget {
                         sections: sections,
                         list: lists(true),
                         onMark: onMark,
+                        onTable: onTable,
                       )
                     else ...[
                       // A photo Note may have no words.
@@ -960,7 +967,10 @@ class _FullNote extends StatefulWidget {
   final Widget? list;
 
   /// Changes a status mark of the Note's text; never one of a Section's.
-  final void Function(int line, TextMark to)? onMark;
+  final MarkSwap? onMark;
+
+  /// Changes a table of the Note's text; never one of a Section's.
+  final TableEditing? onTable;
 
   const _FullNote({
     required this.note,
@@ -968,6 +978,7 @@ class _FullNote extends StatefulWidget {
     this.sections,
     this.list,
     this.onMark,
+    this.onTable,
   });
 
   @override
@@ -1013,6 +1024,7 @@ class _FullNoteState extends State<_FullNote> {
           removedRecordings: note.removedRecordings,
           list: widget.list,
           onMark: widget.onMark,
+          onTable: widget.onTable,
         ),
         for (final section in _sections)
           Column(
@@ -1062,7 +1074,10 @@ class _Whole extends StatelessWidget {
   final Widget? list;
 
   /// Changes a status mark of the text; plain characters when null.
-  final void Function(int line, TextMark to)? onMark;
+  final MarkSwap? onMark;
+
+  /// Changes a table of the text; it is only read when null.
+  final TableEditing? onTable;
 
   const _Whole({
     required this.id,
@@ -1076,6 +1091,7 @@ class _Whole extends StatelessWidget {
     required this.removedRecordings,
     this.list,
     this.onMark,
+    this.onTable,
   });
 
   @override
@@ -1085,14 +1101,26 @@ class _Whole extends StatelessWidget {
     final parts = <Widget>[
       // A photo Note may have no words.
       if (text.isNotEmpty && list == null)
-        MarkedText(text, format: format, style: style, onMark: onMark),
+        MarkedText(
+          text,
+          format: format,
+          style: style,
+          onMark: onMark,
+          tableEdit: onTable,
+        ),
       // It keeps its own space: it is nothing on a Note that is none.
       if (list != null)
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (text.isNotEmpty)
-              MarkedText(text, format: format, style: style, onMark: onMark),
+              MarkedText(
+                text,
+                format: format,
+                style: style,
+                onMark: onMark,
+                tableEdit: onTable,
+              ),
             list,
           ],
         ),

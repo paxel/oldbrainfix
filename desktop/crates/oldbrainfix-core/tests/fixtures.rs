@@ -820,6 +820,9 @@ fn write_markdown(store: &Store) -> Built {
     let packing = notes.capture_as("**Packing**\n- socks\n  - wool", MARKDOWN, None, None)?;
     Checklists::new(store).make(&packing.id)?;
     Checklists::new(store).to_plain(&packing.id)?;
+    let table = notes.capture_as("Item | Qty\n:-|-:\n**Milk** | 2", MARKDOWN, None, None)?;
+    let set = oldbrainfix_core::markdown::table::set_cell(&table.text, 0, 1, 1, "3 | 4");
+    notes.edit(&table.id, &set.text)?;
     Ok(())
 }
 
@@ -4457,11 +4460,57 @@ fn markdown_spans(text: &str, spans: &[oldbrainfix_core::markdown::Span]) -> Val
     )
 }
 
+/// `table` as the generator writes it, offsets in code points.
+fn markdown_table(text: &str, table: &oldbrainfix_core::markdown::table::Table) -> Value {
+    use oldbrainfix_core::markdown::table::cell;
+    let points = |at: usize| text.get(..at).map(|t| t.chars().count());
+    let rows: Vec<Value> = table
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(r, row)| {
+            let cells: Vec<Value> = row
+                .cells
+                .iter()
+                .enumerate()
+                .map(|(c, one)| {
+                    json!({
+                        "end": points(one.end),
+                        "source": cell(text, table.start, r, c),
+                        "spans": markdown_spans(text, &one.spans),
+                        "start": points(one.start),
+                        "visible": one.visible(),
+                    })
+                })
+                .collect();
+            json!({
+                "cells": cells,
+                "end": points(row.end),
+                "line": row.line,
+                "start": points(row.start),
+                "visible": row.visible(),
+            })
+        })
+        .collect();
+    let aligns: Vec<&str> = table.aligns.iter().map(|a| a.name()).collect();
+    json!({
+        "aligns": aligns,
+        "delimiterLine": table.delimiter_line,
+        "end": points(table.end),
+        "firstLine": table.first_line,
+        "headingColumn": table.heading_column,
+        "lastLine": table.last_line,
+        "rows": rows,
+        "start": points(table.start),
+    })
+}
+
 #[test]
 fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::markdown::{
-        self, BlockKind, Change, SpanKind, indent, link, may_open, toggle, toggle_line,
+        self, BlockKind, Change, SpanKind, indent, link, may_open, table, toggle, toggle_line,
     };
+    use oldbrainfix_core::text_marks::TextMark;
     let fixture = read_json(&fixtures().join("markdown.json"))?;
     let cases = fixture["cases"].as_array().ok_or("cases")?;
     assert!(cases.len() >= 15);
@@ -4485,7 +4534,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         let blocks: Vec<Value> = markdown::parse(text)
             .iter()
             .map(|b| {
-                json!({
+                let mut block = json!({
                     "contentStart": points(b.content_start),
                     "end": points(b.end),
                     "kind": b.kind.name(),
@@ -4494,8 +4543,28 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                     "number": b.number,
                     "spans": markdown_spans(text, &b.spans),
                     "start": points(b.start),
+                });
+                if b.table.is_some() {
+                    block["row"] = json!(b.row);
+                }
+                block
+            })
+            .collect();
+        let marks: Vec<Value> = markdown::marks(text)
+            .iter()
+            .map(|m| {
+                json!({
+                    "column": m.column,
+                    "end": points(m.end),
+                    "line": m.line,
+                    "mark": m.mark.name(),
+                    "start": points(m.start),
                 })
             })
+            .collect();
+        let tables: Vec<Value> = table::all(text)
+            .iter()
+            .map(|t| markdown_table(text, t))
             .collect();
         let tags: Vec<Value> = markdown::tags(text)
             .iter()
@@ -4517,8 +4586,10 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         let ours = json!({
             "blocks": blocks,
             "escaped": markdown::escape(text),
+            "marks": marks,
             "plain": markdown::plain(text),
             "shortcuts": shortcuts,
+            "tables": tables,
             "tags": tags,
             "text": text,
             "uses": markdown::uses(text),
@@ -4540,6 +4611,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         "bullet" => Ok(BlockKind::Bullet),
         "numbered" => Ok(BlockKind::Numbered),
         "quote" => Ok(BlockKind::Quote),
+        "table" => Ok(BlockKind::Table),
         _ => Err(format!("a block kind: {name}")),
     };
     let edits = fixture["edits"].as_array().ok_or("edits")?;
@@ -4551,12 +4623,30 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         };
         let (start, end) = (at("start")?, at("end")?);
         let kind = edit["kind"].as_str().unwrap_or_default();
+        let number = |key: &str| -> Result<usize, Box<dyn std::error::Error>> {
+            Ok(edit[key].as_u64().ok_or("a number")? as usize)
+        };
         let got: Change = match edit["op"].as_str().ok_or("op")? {
             "toggle" => toggle(text, start, end, span_kind(kind)?)?,
             "link" => link(text, start, end, edit["url"].as_str().ok_or("url")?),
             "line" => toggle_line(text, start, end, block_kind(kind)?),
             "indent" => indent(text, start, end, false),
             "outdent" => indent(text, start, end, true),
+            "setCell" => table::set_cell(
+                text,
+                start,
+                number("row")?,
+                number("column")?,
+                edit["cell"].as_str().ok_or("cell")?,
+            ),
+            "insertRow" => table::insert_row(text, start, number("index")?),
+            "insertColumn" => table::insert_column(text, start, number("index")?),
+            "deleteRow" => table::delete_row(text, start, number("index")?),
+            "deleteColumn" => table::delete_column(text, start, number("index")?),
+            "moveRow" => table::move_row(text, start, number("from")?, number("to")?),
+            "moveColumn" => table::move_column(text, start, number("from")?, number("to")?),
+            "headingColumn" => table::toggle_heading_column(text, start),
+            "insertTable" => table::insert(text, start),
             op => return Err(format!("an op: {op}").into()),
         };
         let points = |at: usize| got.text.get(..at).map(|t| t.chars().count());
@@ -4569,6 +4659,22 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
+    }
+    let swaps = &fixture["swaps"];
+    let marked = swaps["text"].as_str().ok_or("text")?;
+    let cases = swaps["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 5);
+    for case in cases {
+        let to = match case["to"].as_str().ok_or("to")? {
+            "open" => TextMark::Open,
+            "checked" => TextMark::Checked,
+            "failed" => TextMark::Failed,
+            mark => return Err(format!("a mark: {mark}").into()),
+        };
+        let line = case["line"].as_u64().ok_or("line")? as usize;
+        let column = case["column"].as_u64().map(|c| c as usize);
+        let got = markdown::swap_mark(marked, line, column, to);
+        assert_eq!(json!(got), case["result"], "{case}");
     }
     Ok(())
 }

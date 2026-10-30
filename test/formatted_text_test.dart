@@ -80,7 +80,7 @@ void main() {
       WidgetTester tester,
       String text, {
       String format = TextFormats.markdown,
-      void Function(int line, TextMark to)? onMark,
+      MarkSwap? onMark,
       TagSearch? onSearch,
       int? start,
       int? end,
@@ -240,7 +240,7 @@ void main() {
       await pump(
         tester,
         '# Plan #Garten\n- ☐ **seeds** for #Beet\n`#code` [#tag](https://x.y)',
-        onMark: (line, to) => marked.add((line, to)),
+        onMark: (line, to, {column}) => marked.add((line, to)),
         onSearch: (_, query) => searched.add(query),
       );
       expect(key('mark-1'), findsOneWidget);

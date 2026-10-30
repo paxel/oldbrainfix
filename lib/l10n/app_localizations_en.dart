@@ -4186,4 +4186,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get linkSet => 'Set link';
+
+  @override
+  String get formatTable => 'Table';
+
+  @override
+  String get tableTitle => 'Table';
+
+  @override
+  String get tableOpen => 'Open the table';
+
+  @override
+  String get tableSideways => 'Move the table sideways';
+
+  @override
+  String tableRow(int number) {
+    return 'Row $number';
+  }
+
+  @override
+  String tableColumn(String letter) {
+    return 'Column $letter';
+  }
+
+  @override
+  String get tableAddRow => 'Add a row';
+
+  @override
+  String get tableAddColumn => 'Add a column';
+
+  @override
+  String get tableRowAbove => 'Insert a row above';
+
+  @override
+  String get tableRowBelow => 'Insert a row below';
+
+  @override
+  String get tableRowUp => 'Move up';
+
+  @override
+  String get tableRowDown => 'Move down';
+
+  @override
+  String get tableRowDelete => 'Delete row';
+
+  @override
+  String get tableColumnBefore => 'Insert a column to the left';
+
+  @override
+  String get tableColumnAfter => 'Insert a column to the right';
+
+  @override
+  String get tableColumnLeft => 'Move left';
+
+  @override
+  String get tableColumnRight => 'Move right';
+
+  @override
+  String get tableColumnDelete => 'Delete column';
+
+  @override
+  String get tableHeadingColumn => 'First column as headings';
+
+  @override
+  String get tableDeleteRowQuestion => 'Delete this row?';
+
+  @override
+  String get tableDeleteColumnQuestion => 'Delete this column?';
+
+  @override
+  String get tableDeleteTableQuestion => 'Delete the table?';
+
+  @override
+  String get tableDeleteBody =>
+      'The words in its cells are deleted from the Note.';
 }

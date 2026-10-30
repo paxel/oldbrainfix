@@ -13,6 +13,8 @@ A mark counts only as the first character of a line, so one in the middle of a l
 - any spaces and tabs, so an indented line counts; no other kind of space, such as a no-break space or a byte order mark, so both cores agree on every text;
 - after those, one list item's bullet, `-`, `*` or `+`, then at least one space or tab, then any more of them, so "- ☐ x" counts in plain text and in Markdown (#127). A bullet without a space after it, a second bullet, a numbered item ("1. ☐") and a quote ("> ☐") do not; #127 may widen this for formatted text.
 
+In a formatted text, a mark at the start of a table's cell counts too, one per cell, the same variation selector and joiner rules applying within the cell (#128, ADR 0033).
+
 Lines break at `\n`, `\r\n` and a lone `\r`, as the Lines of a Checklist are split, and are counted from 0. One variation selector right after the mark, U+FE0E or U+FE0F, belongs to it, as some keyboards add one; a zero-width joiner after the mark, or after its selector, makes it part of another emoji, which is no mark. Any other character may follow, a space or not.
 
 ## Changing and inserting

@@ -6865,6 +6865,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set link'**
   String get linkSet;
+
+  /// Format bar button: puts a new table at the cursor, or opens the table the cursor is in full screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get formatTable;
+
+  /// Title of the page that shows a table of a Note's text full screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Table'**
+  String get tableTitle;
+
+  /// Screen reader hint of a table in a text: a tap opens it full screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the table'**
+  String get tableOpen;
+
+  /// Screen reader label of the bar above a table shown full screen that moves the table left and right.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the table sideways'**
+  String get tableSideways;
+
+  /// Screen reader label of a row's number beside a table: a tap or long press opens the row's menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {number}'**
+  String tableRow(int number);
+
+  /// Screen reader label of a column's letter above a table: a tap or long press opens the column's menu.
+  ///
+  /// In en, this message translates to:
+  /// **'Column {letter}'**
+  String tableColumn(String letter);
+
+  /// Screen reader label of the + under a table's rows: a tap edits a cell of a new row.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a row'**
+  String get tableAddRow;
+
+  /// Screen reader label of the + beside a table's columns: a tap edits a cell of a new column.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a column'**
+  String get tableAddColumn;
+
+  /// Menu item of a table's row: puts an empty row above it.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert a row above'**
+  String get tableRowAbove;
+
+  /// Menu item of a table's row: puts an empty row below it.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert a row below'**
+  String get tableRowBelow;
+
+  /// Menu item of a table's row: moves it one row up.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get tableRowUp;
+
+  /// Menu item of a table's row: moves it one row down.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get tableRowDown;
+
+  /// Menu item of a table's row: deletes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete row'**
+  String get tableRowDelete;
+
+  /// Menu item of a table's column: puts an empty column to its left.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert a column to the left'**
+  String get tableColumnBefore;
+
+  /// Menu item of a table's column: puts an empty column to its right.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert a column to the right'**
+  String get tableColumnAfter;
+
+  /// Menu item of a table's column: moves it one column to the left.
+  ///
+  /// In en, this message translates to:
+  /// **'Move left'**
+  String get tableColumnLeft;
+
+  /// Menu item of a table's column: moves it one column to the right.
+  ///
+  /// In en, this message translates to:
+  /// **'Move right'**
+  String get tableColumnRight;
+
+  /// Menu item of a table's column: deletes it.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete column'**
+  String get tableColumnDelete;
+
+  /// Switch in the menu of a table's first column: its cells are headings and stay on screen when the table moves sideways.
+  ///
+  /// In en, this message translates to:
+  /// **'First column as headings'**
+  String get tableHeadingColumn;
+
+  /// Question before a row of a table that holds words is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this row?'**
+  String get tableDeleteRowQuestion;
+
+  /// Question before a column of a table that holds words is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this column?'**
+  String get tableDeleteColumnQuestion;
+
+  /// Question before the last row or column of a table is deleted, which deletes the whole table.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the table?'**
+  String get tableDeleteTableQuestion;
+
+  /// Body of the question before a row, column or table is deleted.
+  ///
+  /// In en, this message translates to:
+  /// **'The words in its cells are deleted from the Note.'**
+  String get tableDeleteBody;
 }
 
 class _AppLocalizationsDelegate

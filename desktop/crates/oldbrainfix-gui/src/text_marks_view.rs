@@ -22,25 +22,34 @@
 //! clicks as in a plain text; a link to a web or e-mail address opens in
 //! the system's browser or mail program on a click, and any other stays
 //! text.
+//!
+//! A table of a formatted text (#128, ADR 0033) is drawn as a grid,
+//! scaled down to the width there is: its header row bold on grey, its
+//! first column bold while it holds headings, each cell one line of the
+//! formats above with its status mark and tags taking clicks. A click
+//! elsewhere on it opens it in the full-screen table view.
 
 use std::sync::Arc;
 
 use egui::text::{CCursor, CharIndex, Galley, LayoutJob, TextFormat};
 use egui::{
-    Color32, FontId, FontSelection, Id, Popup, Rect, RichText, Sense, Stroke, TextStyle,
-    TextWrapMode, Ui, WidgetInfo, WidgetText, WidgetType,
+    Color32, FontId, FontSelection, Id, Popup, Pos2, Rect, RichText, Sense, Stroke, TextStyle,
+    TextWrapMode, Ui, Vec2, WidgetInfo, WidgetText, WidgetType,
 };
-use oldbrainfix_core::markdown::{self, Block, BlockKind, Span, SpanKind};
-use oldbrainfix_core::text_marks::{MarkedLine, find, line_at};
+use oldbrainfix_core::markdown::table::{Align, Cell, Table};
+use oldbrainfix_core::markdown::{self, Block, BlockKind, Mark, Span, SpanKind};
+use oldbrainfix_core::text_marks::{find, line_at};
 use oldbrainfix_core::{FoundTag, TextMark, text_format, text_tags};
 
 use crate::l10n::L10n;
 
 /// A status mark as it is drawn: the line it begins in the whole text,
-/// counted from 0, the state it shows and where it lies on the screen.
+/// counted from 0, the column of the table's cell it begins while it is
+/// in one, the state it shows and where it lies on the screen.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MarkSpot {
     pub line: usize,
+    pub column: Option<usize>,
     pub mark: TextMark,
     pub rect: Rect,
 }
@@ -65,12 +74,22 @@ pub struct LinkSpot {
     pub rects: Vec<Rect>,
 }
 
-/// The status marks, the tags and the links of a text as it is drawn.
+/// A table of a formatted text as it is drawn: where it begins in the
+/// whole text, in bytes, and where it lies on the screen.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TableSpot {
+    pub at: usize,
+    pub rect: Rect,
+}
+
+/// The status marks, the tags, the links and the tables of a text as it
+/// is drawn.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Spots {
     pub marks: Vec<MarkSpot>,
     pub tags: Vec<TagSpot>,
     pub links: Vec<LinkSpot>,
+    pub tables: Vec<TableSpot>,
 }
 
 impl Spots {
@@ -79,6 +98,7 @@ impl Spots {
         self.marks.extend(other.marks);
         self.tags.extend(other.tags);
         self.links.extend(other.links);
+        self.tables.extend(other.tables);
     }
 }
 
@@ -179,13 +199,14 @@ pub fn marked_label(
     Spots {
         marks: spots(&galley, origin, text, shown),
         tags: tag_spots(&galley, origin, text, shown),
-        links: Vec::new(),
+        ..Spots::default()
     }
 }
 
 /// Draws the bytes `shown` of `text`, in `format`, as [`marked_label`]
-/// draws them: a formatted text as it reads, line by line, a plain one
-/// as it is written. Gives where its marks, tags and links lie.
+/// draws them: a formatted text as it reads, line by line, a table as a
+/// grid (a row's cells one after another while cut off), a plain one as
+/// it is written. Gives where its marks, tags, links and tables lie.
 pub fn formatted_label(
     ui: &mut Ui,
     (text, format): (&str, &str),
@@ -200,30 +221,24 @@ pub fn formatted_label(
     if text.get(from..to).is_none() {
         return Spots::default();
     }
-    let (size, colour) = look;
-    let mut font = TextStyle::Body.resolve(ui.style());
-    if let Some(size) = size {
-        font.size = size;
-    }
-    let visuals = ui.visuals();
-    let look = Look {
-        font,
-        colour,
-        accent: visuals.hyperlink_color,
-        weak: visuals.weak_text_color(),
-        code: visuals.code_bg_color,
-    };
-    let found = Found {
-        marks: find(text),
-        tags: markdown::tags(text),
-    };
+    let look = Look::of(ui, look);
+    let found = Found::of(text);
     let blocks = markdown::parse(text);
     let (first, last) = (line_at(text, from), line_at(text, to));
     let mut spots = Spots::default();
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
         for block in blocks.get(first..=last).unwrap_or_default() {
-            spots.extend(block_label(ui, (text, block), &found, &look, truncate));
+            match &block.table {
+                // A table is drawn once, at its first line shown; cut
+                // off, each line as its row reads.
+                Some(table) if !truncate => {
+                    if block.line == table.first_line.max(first) {
+                        spots.extend(table_label(ui, text, table, (&found, &look)));
+                    }
+                }
+                _ => spots.extend(block_label(ui, (text, block), &found, &look, truncate)),
+            }
         }
     });
     spots
@@ -232,7 +247,8 @@ pub fn formatted_label(
 /// How a formatted text is drawn: its font, its colour, the accent for
 /// links, tags and a quote's bar, the dimmer colour of a quote's words
 /// and the background of code.
-struct Look {
+#[derive(Clone)]
+pub(crate) struct Look {
     font: FontId,
     colour: Color32,
     accent: Color32,
@@ -240,10 +256,46 @@ struct Look {
     code: Color32,
 }
 
-/// The status marks and the tags of a formatted text, in its source.
-struct Found {
-    marks: Vec<MarkedLine>,
+impl Look {
+    /// The body's font of `size` (its own while `None`) in `colour`, the
+    /// rest as `ui`'s visuals have it.
+    pub(crate) fn of(ui: &Ui, (size, colour): (Option<f32>, Color32)) -> Look {
+        let mut font = TextStyle::Body.resolve(ui.style());
+        if let Some(size) = size {
+            font.size = size;
+        }
+        let visuals = ui.visuals();
+        Look {
+            font,
+            colour,
+            accent: visuals.hyperlink_color,
+            weak: visuals.weak_text_color(),
+            code: visuals.code_bg_color,
+        }
+    }
+
+    /// The same, `scale` times as large.
+    fn scaled(&self, scale: f32) -> Look {
+        let mut look = self.clone();
+        look.font.size *= scale;
+        look
+    }
+}
+
+/// The status marks and the tags of a formatted text, in its source: a
+/// table's cell's marks among them.
+pub(crate) struct Found {
+    marks: Vec<Mark>,
     tags: Vec<FoundTag>,
+}
+
+impl Found {
+    pub(crate) fn of(text: &str) -> Found {
+        Found {
+            marks: markdown::marks(text),
+            tags: markdown::tags(text),
+        }
+    }
 }
 
 /// What a part of a line is inside of.
@@ -257,6 +309,9 @@ struct Style {
     quote: bool,
 }
 
+/// Where a status mark is: its line, and the column of its table's cell.
+type MarkAt = (usize, Option<usize>);
+
 /// A line of a formatted text laid out: what it shows, in `job`; its bold
 /// parts once more, in `ghost`, drawn a little to the right over them, as
 /// egui's fonts have no bold; and where its marks, tags and links lie in
@@ -267,7 +322,7 @@ struct Line {
     ghost: LayoutJob,
     bold: bool,
     chars: usize,
-    marks: Vec<(usize, TextMark, (usize, usize))>,
+    marks: Vec<(MarkAt, TextMark, (usize, usize))>,
     tags: Vec<(usize, String, (usize, usize))>,
     links: Vec<(usize, String, (usize, usize))>,
 }
@@ -379,7 +434,7 @@ fn add_spans(line: &mut Line, text: &str, spans: &[Span], style: Style, ctx: (&F
 /// What a run of characters shown as written holds: a status mark of a
 /// line, or a tag.
 enum Cut {
-    Mark(usize, TextMark),
+    Mark(usize, Option<usize>, TextMark),
     Tag,
 }
 
@@ -398,7 +453,7 @@ fn add_written(
         .marks
         .iter()
         .filter(|m| m.start >= start && m.end <= end)
-        .map(|m| (m.start, m.end, Cut::Mark(m.line, m.mark)))
+        .map(|m| (m.start, m.end, Cut::Mark(m.line, m.column, m.mark)))
         .collect();
     if !style.link {
         cuts.extend(
@@ -417,9 +472,9 @@ fn add_written(
         };
         line.push(before, format.clone(), style.bold);
         match cut {
-            Cut::Mark(number, mark) => {
+            Cut::Mark(number, column, mark) => {
                 let chars = line.push(piece, format.clone(), style.bold);
-                line.marks.push((number, mark, chars));
+                line.marks.push(((number, column), mark, chars));
             }
             Cut::Tag => {
                 let mut tagged = format.clone();
@@ -481,7 +536,31 @@ fn block_label(
         ..Style::default()
     };
     let mut line = Line::default();
-    add_spans(&mut line, text, &block.spans, style, (found, &look));
+    match &block.table {
+        // A row cut off: its cells that show something, one after
+        // another; the line marking the first column as headings as the
+        // header row, the delimiter row as nothing.
+        Some(table) => {
+            let shown = block
+                .row
+                .or((block.line + 2 == table.delimiter_line).then_some(0))
+                .and_then(|row| Some((row, table.rows.get(row)?)));
+            if let Some((number, row)) = shown {
+                let cells = row.cells.iter().filter(|c| c.end > c.start);
+                for (i, cell) in cells.enumerate() {
+                    if i > 0 {
+                        line.push(" ", part_format(&look, style, false), false);
+                    }
+                    let style = Style {
+                        bold: number == 0,
+                        ..style
+                    };
+                    add_spans(&mut line, text, &cell.spans, style, (found, &look));
+                }
+            }
+        }
+        None => add_spans(&mut line, text, &block.spans, style, (found, &look)),
+    }
     let quote = block.kind == BlockKind::Quote;
     let indent = match block.kind {
         BlockKind::Bullet | BlockKind::Numbered if block.level > 0 => 20.0,
@@ -515,7 +594,7 @@ fn block_label(
             ui.allocate_exact_size(egui::vec2(1.0, height), Sense::hover());
             return Spots::default();
         }
-        let galley = WidgetText::from(line.job).into_galley(
+        let galley = WidgetText::from(std::mem::take(&mut line.job)).into_galley(
             ui,
             Some(wrap),
             ui.available_width(),
@@ -524,66 +603,14 @@ fn block_label(
         let response = ui.add(egui::Label::new(galley.clone()));
         let origin = response.rect.min;
         if line.bold && ui.is_rect_visible(response.rect) {
-            let mut ghost = line.ghost;
+            let mut ghost = std::mem::take(&mut line.ghost);
             ghost.wrap = galley.job.wrap.clone();
             ghost.halign = galley.job.halign;
             let ghost = ui.fonts_mut(|f| f.layout_job(ghost));
             ui.painter()
                 .galley(origin + egui::vec2(0.6, 0.0), ghost, look.colour);
         }
-        let at = |chars: (usize, usize)| {
-            place_chars(&galley, chars).map(|r| r.translate(origin.to_vec2()))
-        };
-        Spots {
-            marks: line
-                .marks
-                .iter()
-                .filter_map(|&(line, mark, chars)| {
-                    Some(MarkSpot {
-                        line,
-                        mark,
-                        rect: at(chars)?,
-                    })
-                })
-                .collect(),
-            tags: line
-                .tags
-                .into_iter()
-                .filter_map(|(start, written, chars)| {
-                    Some(TagSpot {
-                        start,
-                        written,
-                        rect: at(chars)?,
-                    })
-                })
-                .collect(),
-            links: line
-                .links
-                .into_iter()
-                .filter_map(|(start, url, chars)| {
-                    let rects: Vec<Rect> = row_rects(&galley, chars)
-                        .into_iter()
-                        .map(|r| r.translate(origin.to_vec2()))
-                        .collect();
-                    if rects.is_empty() {
-                        return None;
-                    }
-                    let label = galley
-                        .job
-                        .text
-                        .chars()
-                        .skip(chars.0)
-                        .take(chars.1 - chars.0)
-                        .collect();
-                    Some(LinkSpot {
-                        start,
-                        url,
-                        label,
-                        rects,
-                    })
-                })
-                .collect(),
-        }
+        line_spots(&galley, origin, &line)
     });
     if quote && ui.is_rect_visible(row.response.rect) {
         let rect = row.response.rect;
@@ -592,6 +619,281 @@ fn block_label(
             .vline(x, rect.y_range(), Stroke::new(3.0, look.accent));
     }
     row.inner
+}
+
+/// A cell of a table laid out on one line: what it shows, its bold parts
+/// once more for the ghost, and where its marks, tags and links lie in
+/// it.
+pub(crate) struct LaidCell {
+    galley: Arc<Galley>,
+    ghost: Option<Arc<Galley>>,
+    line: Line,
+}
+
+impl LaidCell {
+    /// How much room its words take, at least a row of `look`'s font.
+    pub(crate) fn size(&self, ui: &Ui, look: &Look) -> Vec2 {
+        let height = ui.fonts_mut(|f| f.row_height(&look.font));
+        let ghost = if self.ghost.is_some() { 0.6 } else { 0.0 };
+        let size = self.galley.size();
+        egui::vec2(size.x + ghost, size.y.max(height))
+    }
+
+    /// Draws it with its top left at `pos`, as a label to a screen reader
+    /// while `label`, and gives where its marks, tags and links lie.
+    pub(crate) fn paint(&self, ui: &mut Ui, pos: Pos2, colour: Color32, label: bool) -> Spots {
+        let rect = Rect::from_min_size(pos, self.galley.size());
+        if label {
+            ui.put(rect, egui::Label::new(self.galley.clone()));
+        } else if ui.is_rect_visible(rect) {
+            ui.painter().galley(pos, self.galley.clone(), colour);
+        }
+        if let Some(ghost) = &self.ghost
+            && ui.is_rect_visible(rect)
+        {
+            ui.painter()
+                .galley(pos + egui::vec2(0.6, 0.0), ghost.clone(), colour);
+        }
+        line_spots(&self.galley, pos, &self.line)
+    }
+}
+
+/// Lays out `cell` of `text`, bold while `bold`, on one line.
+pub(crate) fn lay_cell(
+    ui: &Ui,
+    (text, cell): (&str, &Cell),
+    (found, look): (&Found, &Look),
+    bold: bool,
+) -> LaidCell {
+    let mut line = Line::default();
+    let style = Style {
+        bold,
+        ..Style::default()
+    };
+    add_spans(&mut line, text, &cell.spans, style, (found, look));
+    let job = std::mem::take(&mut line.job);
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let ghost = line.bold.then(|| {
+        let ghost = std::mem::take(&mut line.ghost);
+        ui.fonts_mut(|f| f.layout_job(ghost))
+    });
+    LaidCell {
+        galley,
+        ghost,
+        line,
+    }
+}
+
+/// Every cell of `table` laid out, row by row: the header row bold, and
+/// the first column too while it holds headings.
+pub(crate) fn lay_table(
+    ui: &Ui,
+    (text, table): (&str, &Table),
+    ctx: (&Found, &Look),
+) -> Vec<Vec<LaidCell>> {
+    table
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(r, row)| {
+            row.cells
+                .iter()
+                .enumerate()
+                .map(|(c, cell)| {
+                    let bold = r == 0 || (table.heading_column && c == 0);
+                    lay_cell(ui, (text, cell), ctx, bold)
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// How wide each column of `laid` is and how high each row, each with
+/// `pad` around its words.
+pub(crate) fn grid(
+    ui: &Ui,
+    laid: &[Vec<LaidCell>],
+    look: &Look,
+    pad: Vec2,
+) -> (Vec<f32>, Vec<f32>) {
+    let columns = laid.first().map_or(0, Vec::len);
+    let mut widths = vec![0.0f32; columns];
+    let mut heights = Vec::with_capacity(laid.len());
+    for row in laid {
+        let mut height = 0.0f32;
+        for (c, cell) in row.iter().enumerate() {
+            let size = cell.size(ui, look) + pad * 2.0;
+            if let Some(width) = widths.get_mut(c) {
+                *width = width.max(size.x);
+            }
+            height = height.max(size.y);
+        }
+        heights.push(height);
+    }
+    (widths, heights)
+}
+
+/// Where in a column `width` wide the words of a cell `size` wide begin,
+/// from its left edge, as the column lines them up, `pad` in from either
+/// edge.
+pub(crate) fn aligned(align: Align, width: f32, size: f32, pad: f32) -> f32 {
+    match align {
+        Align::None | Align::Left => pad,
+        Align::Center => (width - size) / 2.0,
+        Align::Right => width - size - pad,
+    }
+}
+
+/// How the lines of a table are drawn and its header row filled, in a
+/// text drawn in `colour`.
+pub(crate) fn table_tones(colour: Color32) -> (Stroke, Color32) {
+    (
+        Stroke::new(1.0, colour.gamma_multiply(0.35)),
+        colour.gamma_multiply(0.12),
+    )
+}
+
+/// The room around a cell's words in a table, at full size.
+const CELL_PAD: Vec2 = egui::vec2(6.0, 3.0);
+
+/// Draws `table` of `text` as a grid, scaled down to the width there is,
+/// and gives where its marks, tags and links lie and where it does.
+fn table_label(ui: &mut Ui, text: &str, table: &Table, (found, look): (&Found, &Look)) -> Spots {
+    let room = ui.available_width().max(1.0);
+    let mut scale = 1.0f32;
+    let mut scaled = look.clone();
+    let mut laid = lay_table(ui, (text, table), (found, &scaled));
+    let (mut widths, mut heights) = grid(ui, &laid, &scaled, CELL_PAD);
+    // Smaller till it fits; a font does not shrink quite in proportion.
+    for _ in 0..3 {
+        let wide: f32 = widths.iter().sum();
+        if wide <= room {
+            break;
+        }
+        scale = (scale * room / wide).max(0.2);
+        scaled = look.scaled(scale);
+        laid = lay_table(ui, (text, table), (found, &scaled));
+        (widths, heights) = grid(ui, &laid, &scaled, CELL_PAD * scale);
+    }
+    let pad = CELL_PAD * scale;
+    let size = egui::vec2(widths.iter().sum(), heights.iter().sum());
+    let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
+    // The cells' labels in a part of their own, which moves nothing after
+    // the table.
+    let mut cells = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(rect)
+            .id_salt(("table", table.start)),
+    );
+    let (stroke, header) = table_tones(look.colour);
+    let mut spots = Spots::default();
+    let mut y = rect.top();
+    for (r, row) in laid.iter().enumerate() {
+        let height = heights.get(r).copied().unwrap_or_default();
+        let mut x = rect.left();
+        for (c, cell) in row.iter().enumerate() {
+            let width = widths.get(c).copied().unwrap_or_default();
+            let at = Rect::from_min_size(egui::pos2(x, y), egui::vec2(width, height));
+            if r == 0 && ui.is_rect_visible(at) {
+                ui.painter().rect_filled(at, 0.0, header);
+            }
+            let align = table.aligns.get(c).copied().unwrap_or(Align::None);
+            let words = cell.size(ui, &scaled);
+            let left = aligned(align, width, words.x, pad.x);
+            let pos = egui::pos2(x + left, y + pad.y);
+            spots.extend(cell.paint(&mut cells, pos, scaled.colour, true));
+            if ui.is_rect_visible(at) {
+                ui.painter()
+                    .rect_stroke(at, 0.0, stroke, egui::StrokeKind::Inside);
+            }
+            x += width;
+        }
+        y += height;
+    }
+    spots.tables.push(TableSpot {
+        at: table.start,
+        rect,
+    });
+    spots
+}
+
+/// Takes the tables `spots` of the text `of`, by id, as buttons over
+/// what was drawn of them, read as "Open the table". Gives where the
+/// table clicked begins in the text. Taken before the marks, tags and
+/// links in them, those keep their clicks.
+pub fn table_clicks(ui: &mut Ui, t: &L10n, of: Id, spots: &[TableSpot]) -> Option<usize> {
+    let mut picked = None;
+    for spot in spots {
+        let resp = ui.interact(spot.rect, of.with(("table", spot.at)), Sense::click());
+        resp.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, t.table_open()));
+        if resp
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
+            .on_hover_text(t.table_open())
+            .clicked()
+        {
+            picked = Some(spot.at);
+        }
+    }
+    picked
+}
+
+/// Where the marks, tags and links of `line`, laid out in `galley` at
+/// `origin`, lie on the screen.
+fn line_spots(galley: &Galley, origin: Pos2, line: &Line) -> Spots {
+    let at =
+        |chars: (usize, usize)| place_chars(galley, chars).map(|r| r.translate(origin.to_vec2()));
+    Spots {
+        marks: line
+            .marks
+            .iter()
+            .filter_map(|&((line, column), mark, chars)| {
+                Some(MarkSpot {
+                    line,
+                    column,
+                    mark,
+                    rect: at(chars)?,
+                })
+            })
+            .collect(),
+        tags: line
+            .tags
+            .iter()
+            .filter_map(|(start, written, chars)| {
+                Some(TagSpot {
+                    start: *start,
+                    written: written.clone(),
+                    rect: at(*chars)?,
+                })
+            })
+            .collect(),
+        links: line
+            .links
+            .iter()
+            .filter_map(|(start, url, chars)| {
+                let rects: Vec<Rect> = row_rects(galley, *chars)
+                    .into_iter()
+                    .map(|r| r.translate(origin.to_vec2()))
+                    .collect();
+                if rects.is_empty() {
+                    return None;
+                }
+                let label = galley
+                    .job
+                    .text
+                    .chars()
+                    .skip(chars.0)
+                    .take(chars.1 - chars.0)
+                    .collect();
+                Some(LinkSpot {
+                    start: *start,
+                    url: url.clone(),
+                    label,
+                    rects,
+                })
+            })
+            .collect(),
+        tables: Vec::new(),
+    }
 }
 
 /// Where the characters `start..end` of `galley` lie, a rectangle on each
@@ -637,7 +939,8 @@ pub fn link_clicks(ui: &mut Ui, of: Id, spots: &[LinkSpot]) {
 
 /// The source `text` of a formatted text laid out for its edit field in
 /// `font` and `colour`: every character where it is, its marks in `dim`
-/// and its tags in `accent`, unwrapped.
+/// and its tags in `accent`, unwrapped. A table's pipes, its delimiter
+/// row and the line marking its first column as headings are marks.
 pub fn source_job(
     text: &str,
     font: FontId,
@@ -666,12 +969,30 @@ pub fn source_job(
             marks_of(&s.children, out);
         }
     }
-    let mut dimmed = Vec::new();
+    // A line's mark, or a table's line whole; then its cells' words
+    // again; then the marks of its words.
+    let (mut lines, mut cells, mut inline) = (Vec::new(), Vec::new(), Vec::new());
     for block in markdown::parse(text) {
-        dimmed.push((block.start, block.content_start));
-        marks_of(&block.spans, &mut dimmed);
+        match (&block.table, block.row) {
+            (Some(table), row) => {
+                lines.push((block.start, block.end));
+                let row = row.and_then(|r| table.rows.get(r));
+                cells.extend(
+                    row.iter()
+                        .flat_map(|r| r.cells.iter().map(|c| (c.start, c.end))),
+                );
+            }
+            (None, _) => lines.push((block.start, block.content_start)),
+        }
+        marks_of(&block.spans, &mut inline);
     }
-    for (a, b) in dimmed {
+    for (a, b) in lines {
+        mark(a, b, 1);
+    }
+    for (a, b) in cells {
+        mark(a, b, 0);
+    }
+    for (a, b) in inline {
         mark(a, b, 1);
     }
     for tag in markdown::tags(text) {
@@ -801,6 +1122,7 @@ pub fn spots(
         };
         out.push(MarkSpot {
             line: found.line,
+            column: None,
             mark: found.mark,
             rect: rect.translate(origin.to_vec2()),
         });
@@ -811,15 +1133,15 @@ pub fn spots(
 /// Takes the marks `spots` of the text `of`, by id, as widgets over what was
 /// drawn under them: read as their state, and while `changes` each a
 /// button opening Check, Fail and Open at the mark, the current state
-/// left out. Gives the line of the mark picked and the state it is to
-/// show.
+/// left out. Gives the line of the mark picked, the column of its cell in
+/// a table, and the state it is to show.
 pub fn mark_clicks(
     ui: &mut Ui,
     t: &L10n,
     of: Id,
     spots: &[MarkSpot],
     changes: bool,
-) -> Option<(usize, TextMark)> {
+) -> Option<(usize, Option<usize>, TextMark)> {
     let mut picked = None;
     let sense = if changes {
         Sense::click()
@@ -827,7 +1149,7 @@ pub fn mark_clicks(
         Sense::hover()
     };
     for spot in spots {
-        let resp = ui.interact(spot.rect, of.with(("mark", spot.line)), sense);
+        let resp = ui.interact(spot.rect, of.with(("mark", spot.line, spot.column)), sense);
         let label = mark_label(t, spot.mark);
         let typ = if changes {
             WidgetType::Button
@@ -858,7 +1180,7 @@ pub fn mark_clicks(
                         .button(RichText::new(menu_entry(t, to)).color(text))
                         .clicked()
                 {
-                    picked = Some((spot.line, to));
+                    picked = Some((spot.line, spot.column, to));
                     ui.close();
                 }
             }

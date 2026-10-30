@@ -35,10 +35,20 @@
 //! end of the line as space, one for italic and two for bold; a run of
 //! exactly two `~` is strike-through, by the flanking rules of `*`. A
 //! `[` right after a `!` is no link, so an image shows as written.
+//!
+//! A table (GFM, #128) takes a line of its own per row: a header row,
+//! the delimiter row under it, `| --- | :-: |`, with as many cells, and
+//! the rows under those; [`table`] reads and edits them, every line of
+//! one a [`BlockKind::Table`] block.
 
-use crate::text_marks::line_at;
+pub mod table;
+
+use std::sync::Arc;
+
+use crate::text_marks::{self, TextMark, line_at};
 use crate::text_tags::{self, FoundTag};
 use crate::{Error, Result};
+use table::Table;
 
 /// What a line of a formatted text is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +59,9 @@ pub enum BlockKind {
     Bullet,
     Numbered,
     Quote,
+    /// A line of a table: its header row, its delimiter row, one of its
+    /// rows, or the line marking its first column as headings.
+    Table,
 }
 
 impl BlockKind {
@@ -61,6 +74,7 @@ impl BlockKind {
             BlockKind::Bullet => "bullet",
             BlockKind::Numbered => "numbered",
             BlockKind::Quote => "quote",
+            BlockKind::Table => "table",
         }
     }
 
@@ -151,6 +165,11 @@ impl Span {
 /// [`line_at`] counts lines, where it lies in the text, `start..end`
 /// without its line break, and where its content begins after the mark,
 /// `content_start`. Offsets are bytes.
+///
+/// A line of a table holds the table it belongs to and, a row of it, its
+/// row there, the header row 0; its spans are those of its cells, left to
+/// right. The delimiter row and the line marking the first column as
+/// headings have no row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub kind: BlockKind,
@@ -163,13 +182,38 @@ pub struct Block {
     pub end: usize,
     pub content_start: usize,
     pub spans: Vec<Span>,
+    pub table: Option<Arc<Table>>,
+    pub row: Option<usize>,
 }
 
 impl Block {
-    /// The text this line shows, without its marks.
+    /// The text this line shows, without its marks: a table's row its
+    /// cells that show something, a space between them, its other lines
+    /// nothing.
     pub fn visible(&self) -> String {
-        self.spans.iter().map(Span::visible).collect()
+        match (&self.table, self.row) {
+            (Some(table), Some(row)) => table
+                .rows
+                .get(row)
+                .map(table::Row::visible)
+                .unwrap_or_default(),
+            (Some(_), None) => String::new(),
+            _ => self.spans.iter().map(Span::visible).collect(),
+        }
     }
+}
+
+/// A status mark found in a formatted text: as [`text_marks::find`]
+/// finds it at the start of a line, `column` `None`, or at the start of
+/// the cell in `column` of a table's row on the line `line`. Offsets are
+/// bytes, a variation selector after the mark included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mark {
+    pub line: usize,
+    pub column: Option<usize>,
+    pub mark: TextMark,
+    pub start: usize,
+    pub end: usize,
 }
 
 /// A text after an edit and the selection in it, in bytes; `start` and
@@ -184,7 +228,14 @@ pub struct Change {
 /// Every line of `text` as a block, top line first.
 pub fn parse(text: &str) -> Vec<Block> {
     let mut blocks: Vec<Block> = Vec::new();
-    for (i, (start, end)) in lines(text).into_iter().enumerate() {
+    let lines = lines(text);
+    let mut i = 0;
+    while let Some(&(start, end)) = lines.get(i) {
+        if let Some(table) = table::table_at(text, &lines, i) {
+            i = table.last_line + 1;
+            blocks.extend(table::blocks(table, &lines));
+            continue;
+        }
         let (kind, level, written, content) = block(text, start, end);
         let number = if kind == BlockKind::Numbered {
             match number_after(&blocks, blocks.len(), level) {
@@ -199,6 +250,7 @@ pub fn parse(text: &str) -> Vec<Block> {
             from: content,
             to: end,
             links: true,
+            cell: false,
         }
         .parse();
         blocks.push(Block {
@@ -210,17 +262,34 @@ pub fn parse(text: &str) -> Vec<Block> {
             end,
             content_start: content,
             spans,
+            table: None,
+            row: None,
         });
+        i += 1;
     }
     blocks
 }
 
 /// `text` as it reads without its marks, its line breaks as they are:
-/// what search looks in and what a preview shows.
+/// what search looks in and what a preview shows. A table's delimiter row
+/// and the line marking its first column as headings go with a line
+/// break; each of its rows reads as its cells that show something, a
+/// space between them.
 pub fn plain(text: &str) -> String {
     let mut out = String::new();
     let mut at = 0;
-    for block in parse(text) {
+    let blocks = parse(text);
+    for (i, block) in blocks.iter().enumerate() {
+        if block.table.is_some() && block.row.is_none() {
+            // The line break before it goes, or the one after the first
+            // line, which is followed by its table's header row.
+            at = if i == 0 {
+                blocks.get(1).map_or(block.end, |b| b.start)
+            } else {
+                block.end
+            };
+            continue;
+        }
         out.push_str(slice(text, at, block.start));
         out.push_str(&block.visible());
         at = block.end;
@@ -240,16 +309,18 @@ pub fn uses(text: &str) -> bool {
 /// `text`, taken as plain text, written so that it reads as itself:
 /// [`plain`] of the result is `text`, and it uses no format. For a
 /// Transcript or Photo Text put into a formatted text. A `\` goes before
-/// a line's mark, every `*`, `` ` `` and `[`, a `~` next to another, a
-/// `_` not between two characters that are neither space nor
-/// punctuation, and a `\` before ASCII punctuation.
+/// a line's mark, every `*`, `` ` ``, `[` and `|`, a `~` next to another,
+/// a `_` not between two characters that are neither space nor
+/// punctuation, and a `\` before ASCII punctuation. With every `|`
+/// escaped no line is a table's, so a line's mark is the one it has as a
+/// line of its own.
 pub fn escape(text: &str) -> String {
     let bytes = text.as_bytes();
     let mut out = String::new();
     let mut at = 0;
     for block in parse(text) {
         out.push_str(slice(text, at, block.start));
-        let mark = match block.kind {
+        let mark = match self::block(text, block.start, block.end).0 {
             BlockKind::Paragraph => None,
             BlockKind::Numbered => text
                 .get(block.start..)
@@ -296,6 +367,80 @@ pub fn tags(text: &str) -> Vec<FoundTag> {
         .into_iter()
         .filter(|t| !hidden.iter().any(|&(a, b)| t.start < b && a < t.end))
         .collect()
+}
+
+/// Every status mark of `text`, top line first and left to right: those
+/// [`text_marks::find`] finds on a line that is no table's, and one at
+/// the start of a cell of a table's row.
+pub fn marks(text: &str) -> Vec<Mark> {
+    let blocks = parse(text);
+    let mut marks: Vec<Mark> = text_marks::find(text)
+        .into_iter()
+        .filter(|m| blocks.get(m.line).is_some_and(|b| b.table.is_none()))
+        .map(|m| Mark {
+            line: m.line,
+            column: None,
+            mark: m.mark,
+            start: m.start,
+            end: m.end,
+        })
+        .collect();
+    for block in &blocks {
+        let (Some(table), Some(row)) = (&block.table, block.row) else {
+            continue;
+        };
+        let Some(row) = table.rows.get(row) else {
+            continue;
+        };
+        for (column, cell) in row.cells.iter().enumerate() {
+            if let Some((mark, start, end)) = cell_mark(text, cell.start, cell.end) {
+                marks.push(Mark {
+                    line: block.line,
+                    column: Some(column),
+                    mark,
+                    start,
+                    end,
+                });
+            }
+        }
+    }
+    marks.sort_by_key(|m| m.start);
+    marks
+}
+
+/// `text` with the status mark [`marks`] finds on the line `line`, in the
+/// cell in `column` of a table's row or, `column` `None`, at the line's
+/// start, changed to `to`, everything else as it was. `None` when there
+/// is nothing to change: no such mark, or it is `to` already.
+pub fn swap_mark(text: &str, line: usize, column: Option<usize>, to: TextMark) -> Option<String> {
+    let found = marks(text)
+        .into_iter()
+        .find(|m| m.line == line && m.column == column)?;
+    if found.mark == to {
+        return None;
+    }
+    Some(format!(
+        "{}{}{}",
+        text.get(..found.start)?,
+        to.glyph(),
+        text.get(found.end..)?
+    ))
+}
+
+/// The status mark at the start of a table's cell `start..end`, as
+/// [`text_marks`] reads one at the start of a line.
+fn cell_mark(text: &str, start: usize, end: usize) -> Option<(TextMark, usize, usize)> {
+    let rest = text.get(start..end)?;
+    let (mark, after) = TextMark::ALL
+        .into_iter()
+        .find_map(|m| rest.strip_prefix(m.glyph()).map(|after| (m, after)))?;
+    let after = after
+        .strip_prefix(['\u{FE0E}', '\u{FE0F}'])
+        .unwrap_or(after);
+    if after.starts_with('\u{200D}') {
+        return None;
+    }
+    Some((mark, start, end - after.len()))
 }
 
 /// Whether a link to `url` may be opened: a web address, `http://` or
@@ -384,7 +529,7 @@ pub fn toggle(text: &str, start: usize, end: usize, kind: SpanKind) -> Result<Ch
         }
         let (from, to) = word_at(text, s);
         if from == to {
-            let (open, close) = marks(kind, "");
+            let (open, close) = span_marks(kind, "");
             return Ok(Change {
                 text: format!(
                     "{}{open}{close}{}",
@@ -495,15 +640,24 @@ pub fn link(text: &str, start: usize, end: usize, url: &str) -> Change {
 /// The old mark goes and the new one comes at the line's start, an item
 /// keeping how far in it is; numbered items count on from one of their
 /// level right above, or from 1. A cursor in a line's mark goes after
-/// the new one.
+/// the new one. A table's lines stay as they are, and
+/// [`BlockKind::Table`] changes nothing.
 pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Change {
     let (s, e) = ordered(text, start, end);
+    if kind == BlockKind::Table {
+        return unchanged(text, s, e);
+    }
     let bytes = text.as_bytes();
     let blocks = parse(text);
     let (first, last) = touched(text, &blocks, s, e);
     let Some(lines) = blocks.get(first..=last) else {
         return unchanged(text, s, e);
     };
+    // A table's lines stay its own.
+    let lines: Vec<&Block> = lines
+        .iter()
+        .filter(|b| b.kind != BlockKind::Table)
+        .collect();
     let target = if kind != BlockKind::Paragraph && lines.iter().all(|b| b.kind == kind) {
         BlockKind::Paragraph
     } else {
@@ -523,7 +677,7 @@ pub fn toggle_line(text: &str, start: usize, end: usize, kind: BlockKind) -> Cha
             ""
         };
         let prefix = match target {
-            BlockKind::Paragraph => String::new(),
+            BlockKind::Paragraph | BlockKind::Table => String::new(),
             BlockKind::Heading1 => "# ".into(),
             BlockKind::Heading2 => "## ".into(),
             BlockKind::Quote => "> ".into(),
@@ -754,7 +908,7 @@ fn needs_escape(text: &str, i: usize, start: usize, end: usize) -> bool {
     let byte = |j: usize| bytes.get(j).copied().unwrap_or(0);
     match byte(i) {
         b'\\' => i + 1 < end && byte(i + 1).is_ascii_punctuation(),
-        b'*' | b'`' | b'[' => true,
+        b'*' | b'`' | b'[' | b'|' => true,
         b'~' => (i > start && byte(i - 1) == b'~') || (i + 1 < end && byte(i + 1) == b'~'),
         b'_' => {
             let plain = |c: Option<char>| c.is_some_and(|c| !white(c) && !punct(c));
@@ -831,7 +985,7 @@ fn deepest<'s>(
 }
 
 /// The marks `kind` puts around `content`.
-fn marks(kind: SpanKind, content: &str) -> (String, String) {
+fn span_marks(kind: SpanKind, content: &str) -> (String, String) {
     match kind {
         SpanKind::Bold => ("**".into(), "**".into()),
         SpanKind::Strike => ("~~".into(), "~~".into()),
@@ -863,7 +1017,7 @@ struct Edit {
 }
 
 fn wrap(text: &str, from: usize, to: usize, kind: SpanKind) -> Vec<Edit> {
-    let (open, close) = marks(kind, slice(text, from, to));
+    let (open, close) = span_marks(kind, slice(text, from, to));
     vec![
         Edit {
             at: from,
@@ -983,6 +1137,9 @@ struct Inline<'t> {
     from: usize,
     to: usize,
     links: bool,
+    /// Whether it is a table's cell, where `\|` in code shows `|`, as GFM
+    /// takes a cell's escaped pipes out before reading it.
+    cell: bool,
 }
 
 impl Inline<'_> {
@@ -1099,7 +1256,12 @@ impl Inline<'_> {
     }
 
     fn code(&self, p: usize, n: usize, close: usize) -> Span {
+        let unescaped;
         let mut content = slice(self.text, p + n, close);
+        if self.cell {
+            unescaped = content.replace("\\|", "|");
+            content = &unescaped;
+        }
         if content.len() >= 2
             && content.starts_with(' ')
             && content.ends_with(' ')
@@ -1193,6 +1355,7 @@ impl Inline<'_> {
             from: p + 1,
             to: label_end,
             links: false,
+            cell: self.cell,
         }
         .parse();
         Some(Span {
@@ -1417,6 +1580,8 @@ mod tests {
             "# x\n1. y\n* z\n> q",
             "**b** `c` [l](u) ~~s~~ snake_case #my_tag \\* \\",
             "ü_ü _ü 🧠~~",
+            "| a | b |\n|---|:-:|\n| c | d |",
+            "- | -\n|-|\nx",
         ] {
             let escaped = escape(text);
             assert_eq!(plain(&escaped), text, "{escaped}");

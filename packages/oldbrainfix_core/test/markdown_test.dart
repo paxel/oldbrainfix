@@ -108,7 +108,7 @@ void main() {
       expect(_line('[a [b](c)](d)'), 'link<d>("a [b](c)")');
     });
 
-    test('the visible text keeps every line break as it is', () {
+    test('the visible text keeps every line break outside tables', () {
       expect(
         Markdown.plain('# Shop\r\n- **milk**\n\n> `x` [y](z)'),
         'Shop\r\nmilk\n\nx y',
@@ -140,6 +140,9 @@ void main() {
         '**not bold** *nor* ~~this~~ `or` [this](u) ![or](this)',
         r'C:\path\*x \\ end\',
         '#tag snake_case my_tag _x_ a~b ~~',
+        '| a | b |\n|---|:-:|\n| c | d |',
+        '- | -\n|-|\nx',
+        '${MarkdownTables.headingColumnLine}\na|b\n-|-',
         '',
       ]) {
         final escaped = Markdown.escape(text);
@@ -161,7 +164,8 @@ void main() {
       const alphabet = [
         ' ', '\t', '\n', '\r', 'a', 'b', '1', '.', '#', '>', '-', '+', //
         '*', '_', '~', '`', '[', ']', '(', ')', '!', r'\', 'ü', '🧠',
-        '\u00a0',
+        '\u00a0', '|', '|', ':', '-', '---', '\n|-|-|\n', '<!--',
+        MarkdownTables.headingColumnLine,
       ];
       final random = Random(127);
       for (var n = 0; n < 3000; n++) {
@@ -402,6 +406,382 @@ void main() {
       expect(Markdown.wordAt('a , b', 2), (2, 2));
       expect(Markdown.wordAt('🧠x Straße', 9), (4, 10));
       expect(Markdown.wordAt('x', 9), (0, 1));
+    });
+  });
+
+  group('tables', () {
+    /// The rows of the table in [text] as their cells show.
+    List<List<String>> rows(String text) => [
+      for (final row in MarkdownTables.all(text).single.rows)
+        [for (final cell in row.cells) cell.visible],
+    ];
+
+    test('a table is a header row, a delimiter row and the rows under', () {
+      const text =
+          'Shop\n'
+          '| Item | **Qty** | Note |\n'
+          '|:-----|----:|:-:|\n'
+          '| milk | 2 |\n'
+          '| eggs | 6 | free range | beyond |\n'
+          'bread | 1 | `a\\|b` \\| c\n'
+          '\n'
+          'after';
+      final blocks = Markdown.parse(text);
+      expect(blocks, hasLength(8));
+      expect(
+        [for (final b in blocks) b.kind.name],
+        [
+          'paragraph',
+          for (var i = 0; i < 5; i++) 'table',
+          'paragraph',
+          'paragraph',
+        ],
+      );
+      expect(
+        [for (final b in blocks) b.row],
+        [null, 0, null, 1, 2, 3, null, null],
+      );
+      final table = blocks[1].table!;
+      expect(identical(table, blocks[5].table), isTrue);
+      expect((table.firstLine, table.delimiterLine, table.lastLine), (1, 2, 5));
+      expect(text.substring(table.start, table.end), startsWith('| Item'));
+      expect(text.substring(table.end), '\n\nafter');
+      expect(table.aligns, [
+        MarkdownAlign.left,
+        MarkdownAlign.right,
+        MarkdownAlign.center,
+      ]);
+      expect(table.headingColumn, isFalse);
+      expect(rows(text), [
+        ['Item', 'Qty', 'Note'],
+        ['milk', '2', ''],
+        ['eggs', '6', 'free range'],
+        ['bread', '1', 'a|b | c'],
+      ]);
+      // A cell is one line of parts; a short row's missing cell lies at
+      // its end.
+      final head = table.rows.first.cells[1];
+      expect(text.substring(head.start, head.end), '**Qty**');
+      expect(_tree(head.spans), 'bold("Qty")');
+      final missing = table.rows[1].cells[2];
+      expect(
+        (missing.start, missing.end),
+        (table.rows[1].end, table.rows[1].end),
+      );
+      expect(_tree(blocks[5].spans), '"bread" "1" code"a|b" " " "|" " c"');
+      expect(blocks[5].visible, 'bread 1 a|b | c');
+      // One column, and a table in a text of CRLF lines.
+      expect(rows('a\r\n|-\r\nb'), [
+        ['a'],
+        ['b'],
+      ]);
+      expect(rows('|x|\n|---|\n||'), [
+        ['x'],
+        [''],
+      ]);
+    });
+
+    test('a pipe after a backslash is part of its cell', () {
+      expect(
+        rows(
+          r'a \| b | c'
+          '\n'
+          '-|-',
+        ),
+        [
+          ['a | b', 'c'],
+        ],
+      );
+      // As GFM splits a row, a `\` before a pipe always keeps it in.
+      expect(
+        rows(
+          r'a \\| b | c'
+          '\n'
+          '-|-',
+        ),
+        [
+          [r'a \| b', 'c'],
+        ],
+      );
+    });
+
+    test('what is no table shows as it is written', () {
+      for (final text in [
+        '| a | b |\n|---|',
+        'a | b\n---',
+        'a\n---',
+        'a | b\n- | -',
+        '# a | b\n--|--',
+        'a | b\n|--|:x:|',
+        'a | b\n|--||',
+        '    a | b\n--|--',
+        '<!-- x --> | b\n--|--',
+        '|\n|-|',
+      ]) {
+        expect(
+          Markdown.parse(text).any((b) => b.kind == MarkdownBlockKind.table),
+          isFalse,
+          reason: text,
+        );
+        expect(MarkdownTables.all(text), isEmpty, reason: text);
+      }
+    });
+
+    test('a table ends where a line is no row of it', () {
+      for (final after in [
+        '',
+        '  ',
+        '# x',
+        '> x',
+        '- x',
+        '1. x',
+        '```',
+        '~~~ x',
+        '---',
+        '* * *',
+        '<!-- x -->',
+        '    x | y',
+        '|',
+      ]) {
+        final text = 'a | b\n-|-\nc | d\n$after\ne | f';
+        expect(MarkdownTables.all(text).single.lastLine, 2, reason: after);
+      }
+      // A row needs no pipe, as in GFM.
+      expect(MarkdownTables.all('a | b\n-|-\nc\nd').single.lastLine, 3);
+    });
+
+    test('the line before the header row marks the first column', () {
+      const line = MarkdownTables.headingColumnLine;
+      final table = MarkdownTables.all('x\n  $line \na | b\n-|-\nc | d').single;
+      expect(table.headingColumn, isTrue);
+      expect((table.firstLine, table.delimiterLine), (1, 3));
+      expect(Markdown.parse('$line\na|b\n-|-')[0].row, isNull);
+      // Alone, it is a line as written.
+      expect(MarkdownTables.all('$line\nx'), isEmpty);
+      expect(Markdown.plain('$line\nx'), '$line\nx');
+    });
+
+    test('a table reads as its cells, without its marks', () {
+      const line = MarkdownTables.headingColumnLine;
+      expect(
+        Markdown.plain('# T\r\n$line\r\n| a | *b* |\r\n|---|---|\r\n|  | c |'),
+        'T\r\na b\r\nc',
+      );
+      expect(Markdown.plain('a | b\n-|-'), 'a b');
+      expect(Markdown.uses('a | b\n-|-'), isTrue);
+      expect(
+        [for (final t in Markdown.tags('#a | `#b`\n-|-\n#c | d')) t.tag],
+        ['#a', '#c'],
+      );
+    });
+
+    test('a status mark at the start of a cell counts and changes', () {
+      const text = '☐ x\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n❌ c | d';
+      final marks = Markdown.marks(text);
+      expect(
+        [for (final m in marks) (m.line, m.column, m.mark)],
+        [
+          (0, null, TextMark.open),
+          (1, 0, TextMark.open),
+          (1, 1, TextMark.checked),
+          (3, 0, TextMark.failed),
+        ],
+      );
+      expect(text.substring(marks[2].start, marks[2].end), '✅️');
+      expect(Markdown.swapMark(text, 1, TextMark.checked, column: 1), isNull);
+      expect(
+        Markdown.swapMark(text, 1, TextMark.failed, column: 1),
+        '☐ x\n| ☐ milk | ❌ 2 | a ❌ |\n|-|-|-|\n❌ c | d',
+      );
+      expect(
+        Markdown.swapMark(text, 3, TextMark.open, column: 0),
+        '☐ x\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n☐ c | d',
+      );
+      expect(Markdown.swapMark(text, 3, TextMark.open), isNull);
+      expect(Markdown.swapMark(text, 1, TextMark.open, column: 2), isNull);
+      expect(
+        Markdown.swapMark(text, 0, TextMark.checked),
+        TextMarks.swap(text, 0, TextMark.checked),
+      );
+      // Outside tables they are the marks of the lines.
+      const lines = '- ☐ a\n* ✅ b\nc ☐\n  ❌ d';
+      expect(
+        [for (final m in Markdown.marks(lines)) (m.line, m.mark, m.start)],
+        [for (final m in TextMarks.find(lines)) (m.line, m.mark, m.start)],
+      );
+    });
+
+    test('a cell is read and written, staying one cell of one line', () {
+      const text = 'Before\n\n| a | b \\| c |\n|---|--:|\n| d |\n\nAfter';
+      final at = text.indexOf('| a');
+      expect(MarkdownTables.cell(text, at, 0, 1), 'b | c');
+      expect(MarkdownTables.cell(text, at, 1, 1), '');
+      expect(MarkdownTables.cell(text, at, 2, 0), isNull);
+      expect(MarkdownTables.cell(text, 0, 0, 0), isNull);
+      for (final (cell, written) in [
+        ('# x', '# x'),
+        ('- x', '- x'),
+        ('a|b', r'a\|b'),
+        ('`a|b`', r'`a\|b`'),
+        ('a\r\nb\nc\rd', 'a b c d'),
+        ('  **x**\t', '**x**'),
+        (r'x\', r'x\'),
+      ]) {
+        final change = MarkdownTables.setCell(text, at, 1, 1, cell);
+        expect(
+          change.text,
+          'Before\n\n| a | b \\| c |\n| --- | --: |\n| d | $written |\n\nAfter',
+          reason: cell,
+        );
+        expect(
+          change.text.substring(change.start, change.end),
+          startsWith('| a'),
+        );
+        final table = MarkdownTables.all(change.text).single;
+        expect(table.rows.length, 2, reason: cell);
+        expect(
+          MarkdownTables.cell(change.text, change.start, 1, 1),
+          cell.replaceAll(RegExp('\r\n|\r|\n'), ' ').trim(),
+          reason: cell,
+        );
+      }
+      // A header cell that would begin a heading or an item stays a cell.
+      final heading = MarkdownTables.setCell(text, at, 0, 0, '# x');
+      expect(MarkdownTables.cell(heading.text, heading.start, 0, 0), '# x');
+      expect(MarkdownTables.setCell(text, at, 2, 0, 'x').text, text);
+    });
+
+    test('rows and columns go in, move and go', () {
+      const text = 'x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n\r\ny';
+      final at = text.indexOf('|');
+      String table(MarkdownChange change) =>
+          change.text.substring(change.start, change.end);
+      expect(
+        table(MarkdownTables.insertRow(text, at, 0)),
+        '|  |  |\r\n| :-- | --: |\r\n| a | b |\r\n| c | d | e |',
+      );
+      expect(
+        table(MarkdownTables.insertRow(text, at, 2)),
+        '| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n|  |  |',
+      );
+      expect(
+        table(MarkdownTables.insertColumn(text, at, 1)),
+        '| a |  | b |\r\n| :-- | --- | --: |\r\n| c |  | d | e |',
+      );
+      // A cell written beyond the columns stays beyond them.
+      expect(
+        table(MarkdownTables.insertColumn(text, at, 2)),
+        '| a | b |  |\r\n| :-- | --: | --- |\r\n| c | d |  | e |',
+      );
+      expect(
+        table(MarkdownTables.moveColumn(text, at, 0, 1)),
+        '| b | a |\r\n| --: | :-- |\r\n| d | c | e |',
+      );
+      expect(
+        table(MarkdownTables.moveRow(text, at, 1, 0)),
+        '| c | d | e |\r\n| :-- | --: |\r\n| a | b |',
+      );
+      expect(
+        table(MarkdownTables.deleteRow(text, at, 0)),
+        '| c | d | e |\r\n| :-- | --: |',
+      );
+      expect(
+        table(MarkdownTables.deleteColumn(text, at, 0)),
+        '| b |\r\n| --: |\r\n| d | e |',
+      );
+      final flagged = MarkdownTables.toggleHeadingColumn(text, at);
+      expect(
+        table(flagged),
+        '${MarkdownTables.headingColumnLine}\r\n'
+        '| a | b |\r\n| :-- | --: |\r\n| c | d | e |',
+      );
+      expect(MarkdownTables.all(flagged.text).single.headingColumn, isTrue);
+      expect(
+        MarkdownTables.toggleHeadingColumn(flagged.text, flagged.start).text,
+        'x\r\n| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n\r\ny',
+      );
+      // Everything outside the table stays as it was.
+      for (final change in [
+        MarkdownTables.insertRow(text, at, 1),
+        MarkdownTables.moveColumn(text, at, 1, 0),
+        flagged,
+      ]) {
+        expect(change.text.substring(0, change.start), 'x\r\n');
+        expect(change.text.substring(change.end), '\r\n\r\ny');
+      }
+      // What cannot be done changes nothing.
+      for (final change in [
+        MarkdownTables.insertRow(text, at, 3),
+        MarkdownTables.insertColumn(text, at, -1),
+        MarkdownTables.moveRow(text, at, 0, 2),
+        MarkdownTables.moveColumn(text, at, 1, 1),
+        MarkdownTables.deleteRow(text, at, 2),
+        MarkdownTables.deleteColumn(text, at, 2),
+        MarkdownTables.insertRow(text, 0, 0),
+      ]) {
+        expect(change.text, text);
+      }
+    });
+
+    test('the last row or column going takes the table with it', () {
+      const text = 'x\n| a |\n|---|\n\ny';
+      final at = text.indexOf('|');
+      final once = MarkdownTables.deleteRow(text, at, 0);
+      expect(once.text, 'x\n\ny');
+      expect(MarkdownTables.all(once.text), isEmpty);
+      final column = MarkdownTables.deleteColumn(text, at, 0);
+      expect((column.text, column.start, column.end), ('x\n\ny', 2, 2));
+      final last = MarkdownTables.deleteColumn('x\r\n| a |\r\n|-|', 4, 0);
+      expect((last.text, last.start), ('x', 1));
+      expect(
+        MarkdownTables.deleteColumn('a|b\n-|-', 0, 1).text,
+        '| a |\n| --- |',
+      );
+    });
+
+    test('a new table stands on lines of its own', () {
+      const table = '|  |  |\n| --- | --- |\n|  |  |';
+      MarkdownChange insert(String text, int at) {
+        final change = MarkdownTables.insert(text, at);
+        final found = MarkdownTables.all(change.text);
+        expect(found, hasLength(MarkdownTables.all(text).length + 1));
+        expect(
+          change.text.substring(change.start, change.end),
+          contains('| --- | --- |'),
+        );
+        return change;
+      }
+
+      expect(insert('', 0).text, table);
+      expect(insert('abc def', 5).text, 'abc def\n\n$table');
+      expect(insert('abc\ndef', 1).text, 'abc\n\n$table\n\ndef');
+      expect(insert('abc\ndef', 4).text, 'abc\n\n$table\n\ndef');
+      expect(insert('abc\n\ndef', 4).text, 'abc\n\n$table\n\ndef');
+      expect(insert('abc\n  \n\ndef', 5).text, 'abc\n\n$table\n\ndef');
+      expect(insert('abc\n', 4).text, 'abc\n\n$table');
+      final crlf = insert('a\r\nb', 0);
+      expect(crlf.text, '${table.replaceAll('\n', '\r\n')}\r\n\r\na\r\nb');
+      expect((crlf.start, crlf.end), (0, table.length + 2));
+      // In a table, after it, so the two stay two.
+      const two = 'a | b\n-|-\nc | d\n# next';
+      expect(insert(two, 2).text, 'a | b\n-|-\nc | d\n\n$table\n\n# next');
+    });
+
+    test('a line format leaves a table\'s lines as they are', () {
+      const text = 'x\na | b\n-|-';
+      expect(
+        Markdown.toggleLine(
+          text,
+          0,
+          text.length,
+          MarkdownBlockKind.heading1,
+        ).text,
+        '# x\na | b\n-|-',
+      );
+      expect(
+        Markdown.toggleLine(text, 0, 0, MarkdownBlockKind.table).text,
+        text,
+      );
     });
   });
 

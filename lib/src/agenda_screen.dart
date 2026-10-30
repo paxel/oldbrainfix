@@ -1251,6 +1251,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                     lists: ShoppingLists(widget.notes.store),
                   ),
                   onMark: markEdit(widget.notes, captured, _reload),
+                  onTable: tableEdit(widget.notes, captured, _reload),
                   onTap: _unfoldedId == captured.note.id
                       ? null
                       : () => setState(() => _unfoldedId = captured.note.id),

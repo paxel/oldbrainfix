@@ -14,9 +14,11 @@
         }
       ],
       "escaped": "",
+      "marks": [],
       "plain": "",
       "shortcuts": [],
       "tags": [],
+      "tables": [],
       "text": "",
       "uses": false,
       "words": [
@@ -51,9 +53,11 @@
         }
       ],
       "escaped": "plain words, nothing more",
+      "marks": [],
       "plain": "plain words, nothing more",
       "shortcuts": [],
       "tags": [],
+      "tables": [],
       "text": "plain words, nothing more",
       "uses": false,
       "words": [
@@ -374,6 +378,7 @@
         }
       ],
       "escaped": "\\*\\*bold\\*\\* \\*it\\* \\_it\\_ \\_\\_bold\\_\\_ \\~\\~gone\\~\\~ \\`co de\\` \\[site](https://x.org)",
+      "marks": [],
       "plain": "bold it it bold gone co de site",
       "shortcuts": [
         8,
@@ -385,6 +390,7 @@
         66
       ],
       "tags": [],
+      "tables": [],
       "text": "**bold** *it* _it_ __bold__ ~~gone~~ `co de` [site](https://x.org)",
       "uses": true,
       "words": [
@@ -901,6 +907,7 @@
         }
       ],
       "escaped": "\\*\\*\\*both\\*\\*\\* \\*\\*a \\*b\\* c\\*\\* \\*a \\*\\*b\\*\\* c\\* a\\*\\*b\\*\\*c 2\\*3\\*4 2 \\* 3 \\* 4",
+      "marks": [],
       "plain": "both a b c a b c abc 234 2 * 3 * 4",
       "shortcuts": [
         9,
@@ -913,6 +920,7 @@
         47
       ],
       "tags": [],
+      "tables": [],
       "text": "***both*** **a *b* c** *a **b** c* a**b**c 2*3*4 2 * 3 * 4",
       "uses": true,
       "words": [
@@ -1241,12 +1249,14 @@
         }
       ],
       "escaped": "snake_case_name \\_x_y\\_ \\_\\_x\\_\\_y \\*\\*unclosed \\*a \\*\\*b ~x~ \\~\\~\\~x\\~\\~\\~ \\~\\~a\\~\\~b",
+      "marks": [],
       "plain": "snake_case_name x_y __x__y **unclosed *a **b ~x~ ~~~x~~~ ab",
       "shortcuts": [
         21,
         64
       ],
       "tags": [],
+      "tables": [],
       "text": "snake_case_name _x_y_ __x__y **unclosed *a **b ~x~ ~~~x~~~ ~~a~~b",
       "uses": true,
       "words": [
@@ -1718,6 +1728,7 @@
         }
       ],
       "escaped": "\\*(x)\\* \\*\\*\"q\"\\*\\* \\_(a)\\_ a\\_(b)\\_ \\*\\*\\*\\*x\\*\\*\\*\\* \\*a\\*b\\* \\*\\*a\\*",
+      "marks": [],
       "plain": "(x) \"q\" (a) a_(b)_ x ab* *a",
       "shortcuts": [
         5,
@@ -1729,6 +1740,7 @@
         47
       ],
       "tags": [],
+      "tables": [],
       "text": "*(x)* **\"q\"** _(a)_ a_(b)_ ****x**** *a*b* **a*",
       "uses": true,
       "words": [
@@ -2121,6 +2133,7 @@
         }
       ],
       "escaped": "\\\\\\*not\\\\\\* \\\\\\ \\\\\\_ \\a \\\\# a\\ \\`\\`a\\`b\\`\\` \\` x \\` \\`  \\` \\`open \\`\\`x\\` ",
+      "marks": [],
       "plain": "*not* \\ _ \\a # a\\ a`b x    open ``x ",
       "shortcuts": [
         30,
@@ -2129,6 +2142,7 @@
         52
       ],
       "tags": [],
+      "tables": [],
       "text": "\\*not\\* \\\\ \\_ \\a \\# a\\ ``a`b`` ` x ` `  ` `open ``x` ",
       "uses": true,
       "words": [
@@ -2592,6 +2606,7 @@
         }
       ],
       "escaped": "\\[\\*\\*a\\*\\* \\`b\\`](u) \\[a \\[b](c)](d) !\\[img](u) \\\\!\\[no](u) \\[x](a(b)c) \\[x](a b) \\[x]( <u> ) \\[x](u \"t\") \\[x]() \\[x] (u) \\[x]",
+      "marks": [],
       "plain": "a b a [b](c) ![img](u) !no x [x](a b) x [x](u \"t\") x [x] (u) [x]",
       "shortcuts": [
         6,
@@ -2604,6 +2619,7 @@
         96
       ],
       "tags": [],
+      "tables": [],
       "text": "[**a** `b`](u) [a [b](c)](d) ![img](u) \\![no](u) [x](a(b)c) [x](a b) [x]( <u> ) [x](u \"t\") [x]() [x] (u) [x]",
       "uses": true,
       "words": [
@@ -3195,6 +3211,7 @@
         }
       ],
       "escaped": "\\# One\n\\## Two\n### Three\n#NoSpace\n   \\# three spaces\n    # four\n\\#\n\\##",
+      "marks": [],
       "plain": "One\nTwo\n### Three\n#NoSpace\nthree spaces\n    # four\n\n",
       "shortcuts": [
         2,
@@ -3208,6 +3225,7 @@
           "tag": "#nospace"
         }
       ],
+      "tables": [],
       "text": "# One\n## Two\n### Three\n#NoSpace\n   # three spaces\n    # four\n#\n##",
       "uses": true,
       "words": [
@@ -3617,6 +3635,7 @@
         }
       ],
       "escaped": "\\> said\n\\>tight\n   \\> far\n    > code\n\\> \\*\\*b\\*\\* \\`c\\`",
+      "marks": [],
       "plain": "said\ntight\nfar\n    > code\nb c",
       "shortcuts": [
         2,
@@ -3626,6 +3645,7 @@
         45
       ],
       "tags": [],
+      "tables": [],
       "text": "> said\n>tight\n   > far\n    > code\n> **b** `c`",
       "uses": true,
       "words": [
@@ -4007,6 +4027,7 @@
         }
       ],
       "escaped": "\\- a\n\\* b\n\\+ c\n  \\- d\n\t\\- e\n -f\n\\-\n\\- \n---\n\\* \\* \\*",
+      "marks": [],
       "plain": "a\nb\nc\nd\ne\n -f\n\n\n---\n* *",
       "shortcuts": [
         2,
@@ -4018,6 +4039,7 @@
         38
       ],
       "tags": [],
+      "tables": [],
       "text": "- a\n* b\n+ c\n  - d\n\t- e\n -f\n-\n- \n---\n* * *",
       "uses": true,
       "words": [
@@ -4425,6 +4447,7 @@
         }
       ],
       "escaped": "1\\. one\n1\\. two\n   1\\. sub\n   \\- mixed\n3\\. three\n\n5\\. five\n0\\. zero\n123456789\\. nine\n1234567890. ten\n1.x\n2\\.",
+      "marks": [],
       "plain": "one\ntwo\nsub\nmixed\nthree\n\nfive\nzero\nnine\n1234567890. ten\n1.x\n",
       "shortcuts": [
         3,
@@ -4437,6 +4460,7 @@
         72
       ],
       "tags": [],
+      "tables": [],
       "text": "1. one\n1. two\n   1. sub\n   - mixed\n3. three\n\n5. five\n0. zero\n123456789. nine\n1234567890. ten\n1.x\n2.",
       "uses": true,
       "words": [
@@ -4939,9 +4963,11 @@
         }
       ],
       "escaped": "a\r\nb\rc\n\n\r\n",
+      "marks": [],
       "plain": "a\r\nb\rc\n\n\r\n",
       "shortcuts": [],
       "tags": [],
+      "tables": [],
       "text": "a\r\nb\rc\n\n\r\n",
       "uses": false,
       "words": [
@@ -5150,6 +5176,7 @@
         }
       ],
       "escaped": "🧠 \\*\\*ü\\*\\* \\`日記\\` \\[𝔸](https://x.org/𝔸) \\~\\~Straße\\~\\~ é\\*x\\*",
+      "marks": [],
       "plain": "🧠 ü 日記 𝔸 Straße éx",
       "shortcuts": [
         7,
@@ -5159,6 +5186,7 @@
         50
       ],
       "tags": [],
+      "tables": [],
       "text": "🧠 **ü** `日記` [𝔸](https://x.org/𝔸) ~~Straße~~ é*x*",
       "uses": true,
       "words": [
@@ -5487,6 +5515,22 @@
         }
       ],
       "escaped": "\\- ☐ milk\n\\* ✅ \\*\\*eggs\\*\\*\n1\\. ❌ \\`x\\`\n\\> ☐ q",
+      "marks": [
+        {
+          "column": null,
+          "end": 3,
+          "line": 0,
+          "mark": "open",
+          "start": 2
+        },
+        {
+          "column": null,
+          "end": 12,
+          "line": 1,
+          "mark": "checked",
+          "start": 11
+        }
+      ],
       "plain": "☐ milk\n✅ eggs\n❌ x\n☐ q",
       "shortcuts": [
         2,
@@ -5497,6 +5541,7 @@
         33
       ],
       "tags": [],
+      "tables": [],
       "text": "- ☐ milk\n* ✅ **eggs**\n1. ❌ `x`\n> ☐ q",
       "uses": true,
       "words": [
@@ -5819,6 +5864,7 @@
         }
       ],
       "escaped": "#tag \\`#code\\` \\[#label](https://x.org/#anchor) \\*\\*#bold\\*\\* #a_b\n\\# Heading #h\n\\`#a\\` #b \\`#c\\`",
+      "marks": [],
       "plain": "#tag #code #label #bold #a_b\nHeading #h\n#a #b #c",
       "shortcuts": [
         12,
@@ -5860,6 +5906,7 @@
           "tag": "#b"
         }
       ],
+      "tables": [],
       "text": "#tag `#code` [#label](https://x.org/#anchor) **#bold** #a_b\n# Heading #h\n`#a` #b `#c`",
       "uses": true,
       "words": [
@@ -6214,19 +6261,30 @@
         {
           "contentStart": 0,
           "end": 9,
-          "kind": "paragraph",
+          "kind": "table",
           "level": 0,
           "line": 0,
           "number": 0,
+          "row": 0,
           "spans": [
             {
               "children": [],
-              "contentEnd": 9,
-              "contentStart": 0,
-              "end": 9,
+              "contentEnd": 3,
+              "contentStart": 2,
+              "end": 3,
               "kind": "text",
-              "start": 0,
-              "text": "| a | b |",
+              "start": 2,
+              "text": "a",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 7,
+              "contentStart": 6,
+              "end": 7,
+              "kind": "text",
+              "start": 6,
+              "text": "b",
               "url": ""
             }
           ],
@@ -6235,22 +6293,12 @@
         {
           "contentStart": 10,
           "end": 19,
-          "kind": "paragraph",
+          "kind": "table",
           "level": 0,
           "line": 1,
           "number": 0,
-          "spans": [
-            {
-              "children": [],
-              "contentEnd": 19,
-              "contentStart": 10,
-              "end": 19,
-              "kind": "text",
-              "start": 10,
-              "text": "|---|---|",
-              "url": ""
-            }
-          ],
+          "row": null,
+          "spans": [],
           "start": 10
         },
         {
@@ -6338,12 +6386,73 @@
           "start": 33
         }
       ],
-      "escaped": "| a | b |\n|---|---|\n\\`\\`\\`\ncode\n\\`\\`\\`\n<b>x</b> &amp; <https://x.org>",
-      "plain": "| a | b |\n|---|---|\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>",
+      "escaped": "\\| a \\| b \\|\n\\|---\\|---\\|\n\\`\\`\\`\ncode\n\\`\\`\\`\n<b>x</b> &amp; <https://x.org>",
+      "marks": [],
+      "plain": "a b\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>",
       "shortcuts": [],
       "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 1,
+          "end": 19,
+          "firstLine": 0,
+          "headingColumn": false,
+          "lastLine": 1,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 3,
+                  "source": "a",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 3,
+                      "contentStart": 2,
+                      "end": 3,
+                      "kind": "text",
+                      "start": 2,
+                      "text": "a",
+                      "url": ""
+                    }
+                  ],
+                  "start": 2,
+                  "visible": "a"
+                },
+                {
+                  "end": 7,
+                  "source": "b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 7,
+                      "contentStart": 6,
+                      "end": 7,
+                      "kind": "text",
+                      "start": 6,
+                      "text": "b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 6,
+                  "visible": "b"
+                }
+              ],
+              "end": 9,
+              "line": 0,
+              "start": 0,
+              "visible": "a b"
+            }
+          ],
+          "start": 0
+        }
+      ],
       "text": "| a | b |\n|---|---|\n```\ncode\n```\n<b>x</b> &amp; <https://x.org>",
-      "uses": false,
+      "uses": true,
       "words": [
         [
           0,
@@ -6721,6 +6830,7 @@
         }
       ],
       "escaped": " \\*x\\*  　\\*\\*y\\*\\*　 \t\\*z\\*\t",
+      "marks": [],
       "plain": " x  　y　 \tz\t",
       "shortcuts": [
         4,
@@ -6728,6 +6838,7 @@
         18
       ],
       "tags": [],
+      "tables": [],
       "text": " *x*  　**y**　 \t*z*\t",
       "uses": true,
       "words": [
@@ -6810,6 +6921,5322 @@
         [
           19,
           19
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 4,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 4,
+              "contentStart": 0,
+              "end": 4,
+              "kind": "text",
+              "start": 0,
+              "text": "Shop",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 5,
+          "end": 30,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 11,
+              "contentStart": 7,
+              "end": 11,
+              "kind": "text",
+              "start": 7,
+              "text": "Item",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 19,
+                  "contentStart": 16,
+                  "end": 19,
+                  "kind": "text",
+                  "start": 16,
+                  "text": "Qty",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 19,
+              "contentStart": 16,
+              "end": 21,
+              "kind": "bold",
+              "start": 14,
+              "text": "",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 28,
+              "contentStart": 24,
+              "end": 28,
+              "kind": "text",
+              "start": 24,
+              "text": "Note",
+              "url": ""
+            }
+          ],
+          "start": 5
+        },
+        {
+          "contentStart": 31,
+          "end": 49,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 31
+        },
+        {
+          "contentStart": 50,
+          "end": 62,
+          "kind": "table",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 56,
+              "contentStart": 52,
+              "end": 56,
+              "kind": "text",
+              "start": 52,
+              "text": "milk",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 60,
+              "contentStart": 59,
+              "end": 60,
+              "kind": "text",
+              "start": 59,
+              "text": "2",
+              "url": ""
+            }
+          ],
+          "start": 50
+        },
+        {
+          "contentStart": 63,
+          "end": 97,
+          "kind": "table",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "row": 2,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 69,
+              "contentStart": 65,
+              "end": 69,
+              "kind": "text",
+              "start": 65,
+              "text": "eggs",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 73,
+              "contentStart": 72,
+              "end": 73,
+              "kind": "text",
+              "start": 72,
+              "text": "6",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 86,
+              "contentStart": 76,
+              "end": 86,
+              "kind": "text",
+              "start": 76,
+              "text": "free range",
+              "url": ""
+            }
+          ],
+          "start": 63
+        },
+        {
+          "contentStart": 98,
+          "end": 121,
+          "kind": "table",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "row": 3,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 103,
+              "contentStart": 98,
+              "end": 103,
+              "kind": "text",
+              "start": 98,
+              "text": "bread",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 107,
+              "contentStart": 106,
+              "end": 107,
+              "kind": "text",
+              "start": 106,
+              "text": "1",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 115,
+              "contentStart": 111,
+              "end": 116,
+              "kind": "code",
+              "start": 110,
+              "text": "a|b",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 117,
+              "contentStart": 116,
+              "end": 117,
+              "kind": "text",
+              "start": 116,
+              "text": " ",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 119,
+              "contentStart": 118,
+              "end": 119,
+              "kind": "text",
+              "start": 117,
+              "text": "|",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 121,
+              "contentStart": 119,
+              "end": 121,
+              "kind": "text",
+              "start": 119,
+              "text": " c",
+              "url": ""
+            }
+          ],
+          "start": 98
+        },
+        {
+          "contentStart": 122,
+          "end": 122,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 6,
+          "number": 0,
+          "spans": [],
+          "start": 122
+        },
+        {
+          "contentStart": 123,
+          "end": 128,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 7,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 128,
+              "contentStart": 123,
+              "end": 128,
+              "kind": "text",
+              "start": 123,
+              "text": "after",
+              "url": ""
+            }
+          ],
+          "start": 123
+        }
+      ],
+      "escaped": "Shop\n\\| Item \\| \\*\\*Qty\\*\\* \\| Note \\|\n\\|:-----\\|----:\\|:-:\\|\n\\| milk \\| 2 \\|\n\\| eggs \\| 6 \\| free range \\| beyond \\|\nbread \\| 1 \\| \\`a\\\\\\|b\\` \\\\\\| c\n\nafter",
+      "marks": [],
+      "plain": "Shop\nItem Qty Note\nmilk 2\neggs 6 free range\nbread 1 a|b | c\n\nafter",
+      "shortcuts": [
+        21,
+        116
+      ],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "left",
+            "right",
+            "center"
+          ],
+          "delimiterLine": 2,
+          "end": 121,
+          "firstLine": 1,
+          "headingColumn": false,
+          "lastLine": 5,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 11,
+                  "source": "Item",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 11,
+                      "contentStart": 7,
+                      "end": 11,
+                      "kind": "text",
+                      "start": 7,
+                      "text": "Item",
+                      "url": ""
+                    }
+                  ],
+                  "start": 7,
+                  "visible": "Item"
+                },
+                {
+                  "end": 21,
+                  "source": "**Qty**",
+                  "spans": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "contentEnd": 19,
+                          "contentStart": 16,
+                          "end": 19,
+                          "kind": "text",
+                          "start": 16,
+                          "text": "Qty",
+                          "url": ""
+                        }
+                      ],
+                      "contentEnd": 19,
+                      "contentStart": 16,
+                      "end": 21,
+                      "kind": "bold",
+                      "start": 14,
+                      "text": "",
+                      "url": ""
+                    }
+                  ],
+                  "start": 14,
+                  "visible": "Qty"
+                },
+                {
+                  "end": 28,
+                  "source": "Note",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 28,
+                      "contentStart": 24,
+                      "end": 28,
+                      "kind": "text",
+                      "start": 24,
+                      "text": "Note",
+                      "url": ""
+                    }
+                  ],
+                  "start": 24,
+                  "visible": "Note"
+                }
+              ],
+              "end": 30,
+              "line": 1,
+              "start": 5,
+              "visible": "Item Qty Note"
+            },
+            {
+              "cells": [
+                {
+                  "end": 56,
+                  "source": "milk",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 56,
+                      "contentStart": 52,
+                      "end": 56,
+                      "kind": "text",
+                      "start": 52,
+                      "text": "milk",
+                      "url": ""
+                    }
+                  ],
+                  "start": 52,
+                  "visible": "milk"
+                },
+                {
+                  "end": 60,
+                  "source": "2",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 60,
+                      "contentStart": 59,
+                      "end": 60,
+                      "kind": "text",
+                      "start": 59,
+                      "text": "2",
+                      "url": ""
+                    }
+                  ],
+                  "start": 59,
+                  "visible": "2"
+                },
+                {
+                  "end": 62,
+                  "source": "",
+                  "spans": [],
+                  "start": 62,
+                  "visible": ""
+                }
+              ],
+              "end": 62,
+              "line": 3,
+              "start": 50,
+              "visible": "milk 2"
+            },
+            {
+              "cells": [
+                {
+                  "end": 69,
+                  "source": "eggs",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 69,
+                      "contentStart": 65,
+                      "end": 69,
+                      "kind": "text",
+                      "start": 65,
+                      "text": "eggs",
+                      "url": ""
+                    }
+                  ],
+                  "start": 65,
+                  "visible": "eggs"
+                },
+                {
+                  "end": 73,
+                  "source": "6",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 73,
+                      "contentStart": 72,
+                      "end": 73,
+                      "kind": "text",
+                      "start": 72,
+                      "text": "6",
+                      "url": ""
+                    }
+                  ],
+                  "start": 72,
+                  "visible": "6"
+                },
+                {
+                  "end": 86,
+                  "source": "free range",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 86,
+                      "contentStart": 76,
+                      "end": 86,
+                      "kind": "text",
+                      "start": 76,
+                      "text": "free range",
+                      "url": ""
+                    }
+                  ],
+                  "start": 76,
+                  "visible": "free range"
+                }
+              ],
+              "end": 97,
+              "line": 4,
+              "start": 63,
+              "visible": "eggs 6 free range"
+            },
+            {
+              "cells": [
+                {
+                  "end": 103,
+                  "source": "bread",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 103,
+                      "contentStart": 98,
+                      "end": 103,
+                      "kind": "text",
+                      "start": 98,
+                      "text": "bread",
+                      "url": ""
+                    }
+                  ],
+                  "start": 98,
+                  "visible": "bread"
+                },
+                {
+                  "end": 107,
+                  "source": "1",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 107,
+                      "contentStart": 106,
+                      "end": 107,
+                      "kind": "text",
+                      "start": 106,
+                      "text": "1",
+                      "url": ""
+                    }
+                  ],
+                  "start": 106,
+                  "visible": "1"
+                },
+                {
+                  "end": 121,
+                  "source": "`a|b` | c",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 115,
+                      "contentStart": 111,
+                      "end": 116,
+                      "kind": "code",
+                      "start": 110,
+                      "text": "a|b",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 117,
+                      "contentStart": 116,
+                      "end": 117,
+                      "kind": "text",
+                      "start": 116,
+                      "text": " ",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 119,
+                      "contentStart": 118,
+                      "end": 119,
+                      "kind": "text",
+                      "start": 117,
+                      "text": "|",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 121,
+                      "contentStart": 119,
+                      "end": 121,
+                      "kind": "text",
+                      "start": 119,
+                      "text": " c",
+                      "url": ""
+                    }
+                  ],
+                  "start": 110,
+                  "visible": "a|b | c"
+                }
+              ],
+              "end": 121,
+              "line": 5,
+              "start": 98,
+              "visible": "bread 1 a|b | c"
+            }
+          ],
+          "start": 5
+        }
+      ],
+      "text": "Shop\n| Item | **Qty** | Note |\n|:-----|----:|:-:|\n| milk | 2 |\n| eggs | 6 | free range | beyond |\nbread | 1 | `a\\|b` \\| c\n\nafter",
+      "uses": true,
+      "words": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          7,
+          11
+        ],
+        [
+          12,
+          12
+        ],
+        [
+          13,
+          13
+        ],
+        [
+          14,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          16,
+          19
+        ],
+        [
+          16,
+          19
+        ],
+        [
+          16,
+          19
+        ],
+        [
+          16,
+          19
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          21,
+          21
+        ],
+        [
+          22,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          24,
+          28
+        ],
+        [
+          29,
+          29
+        ],
+        [
+          30,
+          30
+        ],
+        [
+          31,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          34
+        ],
+        [
+          35,
+          35
+        ],
+        [
+          36,
+          36
+        ],
+        [
+          37,
+          37
+        ],
+        [
+          38,
+          38
+        ],
+        [
+          39,
+          39
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          41,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          45,
+          45
+        ],
+        [
+          46,
+          46
+        ],
+        [
+          47,
+          47
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          49,
+          49
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          51,
+          51
+        ],
+        [
+          52,
+          56
+        ],
+        [
+          52,
+          56
+        ],
+        [
+          52,
+          56
+        ],
+        [
+          52,
+          56
+        ],
+        [
+          52,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          58
+        ],
+        [
+          59,
+          60
+        ],
+        [
+          59,
+          60
+        ],
+        [
+          61,
+          61
+        ],
+        [
+          62,
+          62
+        ],
+        [
+          63,
+          63
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          65,
+          69
+        ],
+        [
+          65,
+          69
+        ],
+        [
+          65,
+          69
+        ],
+        [
+          65,
+          69
+        ],
+        [
+          65,
+          69
+        ],
+        [
+          70,
+          70
+        ],
+        [
+          71,
+          71
+        ],
+        [
+          72,
+          73
+        ],
+        [
+          72,
+          73
+        ],
+        [
+          74,
+          74
+        ],
+        [
+          75,
+          75
+        ],
+        [
+          76,
+          80
+        ],
+        [
+          76,
+          80
+        ],
+        [
+          76,
+          80
+        ],
+        [
+          76,
+          80
+        ],
+        [
+          76,
+          80
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          81,
+          86
+        ],
+        [
+          87,
+          87
+        ],
+        [
+          88,
+          88
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          89,
+          95
+        ],
+        [
+          96,
+          96
+        ],
+        [
+          97,
+          97
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          98,
+          103
+        ],
+        [
+          104,
+          104
+        ],
+        [
+          105,
+          105
+        ],
+        [
+          106,
+          107
+        ],
+        [
+          106,
+          107
+        ],
+        [
+          108,
+          108
+        ],
+        [
+          109,
+          109
+        ],
+        [
+          110,
+          110
+        ],
+        [
+          111,
+          112
+        ],
+        [
+          111,
+          112
+        ],
+        [
+          113,
+          113
+        ],
+        [
+          114,
+          115
+        ],
+        [
+          114,
+          115
+        ],
+        [
+          116,
+          116
+        ],
+        [
+          117,
+          117
+        ],
+        [
+          118,
+          118
+        ],
+        [
+          119,
+          119
+        ],
+        [
+          120,
+          121
+        ],
+        [
+          120,
+          121
+        ],
+        [
+          122,
+          122
+        ],
+        [
+          123,
+          128
+        ],
+        [
+          123,
+          128
+        ],
+        [
+          123,
+          128
+        ],
+        [
+          123,
+          128
+        ],
+        [
+          123,
+          128
+        ],
+        [
+          123,
+          128
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 10,
+          "kind": "table",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 2,
+              "contentStart": 0,
+              "end": 2,
+              "kind": "text",
+              "start": 0,
+              "text": "a ",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 4,
+              "contentStart": 3,
+              "end": 4,
+              "kind": "text",
+              "start": 2,
+              "text": "|",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 6,
+              "contentStart": 4,
+              "end": 6,
+              "kind": "text",
+              "start": 4,
+              "text": " b",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 10,
+              "contentStart": 9,
+              "end": 10,
+              "kind": "text",
+              "start": 9,
+              "text": "c",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 11,
+          "end": 14,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 11
+        },
+        {
+          "contentStart": 15,
+          "end": 28,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 17,
+              "contentStart": 15,
+              "end": 17,
+              "kind": "text",
+              "start": 15,
+              "text": "a ",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 19,
+              "contentStart": 18,
+              "end": 19,
+              "kind": "text",
+              "start": 17,
+              "text": "\\",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 22,
+              "contentStart": 19,
+              "end": 22,
+              "kind": "text",
+              "start": 19,
+              "text": "| b",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 26,
+              "contentStart": 25,
+              "end": 26,
+              "kind": "text",
+              "start": 25,
+              "text": "c",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 28,
+              "contentStart": 27,
+              "end": 28,
+              "kind": "text",
+              "start": 26,
+              "text": "|",
+              "url": ""
+            }
+          ],
+          "start": 15
+        }
+      ],
+      "escaped": "a \\\\\\| b \\| c\n-\\|-\na \\\\\\\\\\| b \\| c\\\\\\|",
+      "marks": [],
+      "plain": "a | b c\na \\| b c|",
+      "shortcuts": [],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 1,
+          "end": 28,
+          "firstLine": 0,
+          "headingColumn": false,
+          "lastLine": 2,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 6,
+                  "source": "a | b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 2,
+                      "contentStart": 0,
+                      "end": 2,
+                      "kind": "text",
+                      "start": 0,
+                      "text": "a ",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 4,
+                      "contentStart": 3,
+                      "end": 4,
+                      "kind": "text",
+                      "start": 2,
+                      "text": "|",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 6,
+                      "contentStart": 4,
+                      "end": 6,
+                      "kind": "text",
+                      "start": 4,
+                      "text": " b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 0,
+                  "visible": "a | b"
+                },
+                {
+                  "end": 10,
+                  "source": "c",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 10,
+                      "contentStart": 9,
+                      "end": 10,
+                      "kind": "text",
+                      "start": 9,
+                      "text": "c",
+                      "url": ""
+                    }
+                  ],
+                  "start": 9,
+                  "visible": "c"
+                }
+              ],
+              "end": 10,
+              "line": 0,
+              "start": 0,
+              "visible": "a | b c"
+            },
+            {
+              "cells": [
+                {
+                  "end": 22,
+                  "source": "a \\| b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 17,
+                      "contentStart": 15,
+                      "end": 17,
+                      "kind": "text",
+                      "start": 15,
+                      "text": "a ",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 19,
+                      "contentStart": 18,
+                      "end": 19,
+                      "kind": "text",
+                      "start": 17,
+                      "text": "\\",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 22,
+                      "contentStart": 19,
+                      "end": 22,
+                      "kind": "text",
+                      "start": 19,
+                      "text": "| b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 15,
+                  "visible": "a \\| b"
+                },
+                {
+                  "end": 28,
+                  "source": "c|",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 26,
+                      "contentStart": 25,
+                      "end": 26,
+                      "kind": "text",
+                      "start": 25,
+                      "text": "c",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 28,
+                      "contentStart": 27,
+                      "end": 28,
+                      "kind": "text",
+                      "start": 26,
+                      "text": "|",
+                      "url": ""
+                    }
+                  ],
+                  "start": 25,
+                  "visible": "c|"
+                }
+              ],
+              "end": 28,
+              "line": 2,
+              "start": 15,
+              "visible": "a \\| b c|"
+            }
+          ],
+          "start": 0
+        }
+      ],
+      "text": "a \\| b | c\n-|-\na \\\\| b | c\\|",
+      "uses": true,
+      "words": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          9,
+          10
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          12,
+          12
+        ],
+        [
+          13,
+          13
+        ],
+        [
+          14,
+          14
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          15,
+          16
+        ],
+        [
+          17,
+          17
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          19,
+          19
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          21,
+          22
+        ],
+        [
+          21,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          25,
+          26
+        ],
+        [
+          25,
+          26
+        ],
+        [
+          27,
+          27
+        ],
+        [
+          28,
+          28
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 1,
+          "kind": "table",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 1,
+              "contentStart": 0,
+              "end": 1,
+              "kind": "text",
+              "start": 0,
+              "text": "a",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 3,
+          "end": 5,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 3
+        },
+        {
+          "contentStart": 7,
+          "end": 8,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 8,
+              "contentStart": 7,
+              "end": 8,
+              "kind": "text",
+              "start": 7,
+              "text": "b",
+              "url": ""
+            }
+          ],
+          "start": 7
+        },
+        {
+          "contentStart": 10,
+          "end": 10,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "spans": [],
+          "start": 10
+        },
+        {
+          "contentStart": 12,
+          "end": 15,
+          "kind": "table",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 14,
+              "contentStart": 13,
+              "end": 14,
+              "kind": "text",
+              "start": 13,
+              "text": "x",
+              "url": ""
+            }
+          ],
+          "start": 12
+        },
+        {
+          "contentStart": 16,
+          "end": 21,
+          "kind": "table",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 16
+        },
+        {
+          "contentStart": 22,
+          "end": 24,
+          "kind": "table",
+          "level": 0,
+          "line": 6,
+          "number": 0,
+          "row": 1,
+          "spans": [],
+          "start": 22
+        },
+        {
+          "contentStart": 25,
+          "end": 26,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 7,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 26,
+              "contentStart": 25,
+              "end": 26,
+              "kind": "text",
+              "start": 25,
+              "text": "|",
+              "url": ""
+            }
+          ],
+          "start": 25
+        }
+      ],
+      "escaped": "a\r\n\\|-\r\nb\r\n\r\n\\|x\\|\n\\|---\\|\n\\|\\|\n\\|",
+      "marks": [],
+      "plain": "a\r\nb\r\n\r\nx\n\n|",
+      "shortcuts": [],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none"
+          ],
+          "delimiterLine": 1,
+          "end": 8,
+          "firstLine": 0,
+          "headingColumn": false,
+          "lastLine": 2,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 1,
+                  "source": "a",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 1,
+                      "contentStart": 0,
+                      "end": 1,
+                      "kind": "text",
+                      "start": 0,
+                      "text": "a",
+                      "url": ""
+                    }
+                  ],
+                  "start": 0,
+                  "visible": "a"
+                }
+              ],
+              "end": 1,
+              "line": 0,
+              "start": 0,
+              "visible": "a"
+            },
+            {
+              "cells": [
+                {
+                  "end": 8,
+                  "source": "b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 8,
+                      "contentStart": 7,
+                      "end": 8,
+                      "kind": "text",
+                      "start": 7,
+                      "text": "b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 7,
+                  "visible": "b"
+                }
+              ],
+              "end": 8,
+              "line": 2,
+              "start": 7,
+              "visible": "b"
+            }
+          ],
+          "start": 0
+        },
+        {
+          "aligns": [
+            "none"
+          ],
+          "delimiterLine": 5,
+          "end": 24,
+          "firstLine": 4,
+          "headingColumn": false,
+          "lastLine": 6,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 14,
+                  "source": "x",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 14,
+                      "contentStart": 13,
+                      "end": 14,
+                      "kind": "text",
+                      "start": 13,
+                      "text": "x",
+                      "url": ""
+                    }
+                  ],
+                  "start": 13,
+                  "visible": "x"
+                }
+              ],
+              "end": 15,
+              "line": 4,
+              "start": 12,
+              "visible": "x"
+            },
+            {
+              "cells": [
+                {
+                  "end": 23,
+                  "source": "",
+                  "spans": [],
+                  "start": 23,
+                  "visible": ""
+                }
+              ],
+              "end": 24,
+              "line": 6,
+              "start": 22,
+              "visible": ""
+            }
+          ],
+          "start": 12
+        }
+      ],
+      "text": "a\r\n|-\r\nb\r\n\r\n|x|\n|---|\n||\n|",
+      "uses": true,
+      "words": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          7,
+          8
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          10,
+          10
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          12,
+          12
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          17,
+          17
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          19,
+          19
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          21,
+          21
+        ],
+        [
+          22,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          25,
+          25
+        ],
+        [
+          26,
+          26
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 30,
+          "kind": "table",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 0
+        },
+        {
+          "contentStart": 31,
+          "end": 54,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 39,
+              "contentStart": 33,
+              "end": 39,
+              "kind": "text",
+              "start": 33,
+              "text": "☐ milk",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 46,
+              "contentStart": 42,
+              "end": 46,
+              "kind": "text",
+              "start": 42,
+              "text": "✅️ 2",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 52,
+              "contentStart": 49,
+              "end": 52,
+              "kind": "text",
+              "start": 49,
+              "text": "a ❌",
+              "url": ""
+            }
+          ],
+          "start": 31
+        },
+        {
+          "contentStart": 55,
+          "end": 62,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 55
+        },
+        {
+          "contentStart": 63,
+          "end": 70,
+          "kind": "table",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 66,
+              "contentStart": 63,
+              "end": 66,
+              "kind": "text",
+              "start": 63,
+              "text": "❌ c",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 70,
+              "contentStart": 69,
+              "end": 70,
+              "kind": "text",
+              "start": 69,
+              "text": "d",
+              "url": ""
+            }
+          ],
+          "start": 63
+        },
+        {
+          "contentStart": 71,
+          "end": 77,
+          "kind": "table",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "row": 2,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 75,
+              "contentStart": 71,
+              "end": 75,
+              "kind": "text",
+              "start": 71,
+              "text": "☐‍ x",
+              "url": ""
+            }
+          ],
+          "start": 71
+        },
+        {
+          "contentStart": 80,
+          "end": 85,
+          "kind": "heading1",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 85,
+              "contentStart": 80,
+              "end": 85,
+              "kind": "text",
+              "start": 80,
+              "text": "☐ end",
+              "url": ""
+            }
+          ],
+          "start": 78
+        }
+      ],
+      "escaped": "<!-- first column headings -->\n\\| ☐ milk \\| ✅️ 2 \\| a ❌ \\|\n\\|-\\|-\\|-\\|\n❌ c \\| d\n☐‍ x \\|\n\\# ☐ end",
+      "marks": [
+        {
+          "column": 0,
+          "end": 34,
+          "line": 1,
+          "mark": "open",
+          "start": 33
+        },
+        {
+          "column": 1,
+          "end": 44,
+          "line": 1,
+          "mark": "checked",
+          "start": 42
+        },
+        {
+          "column": 0,
+          "end": 64,
+          "line": 3,
+          "mark": "failed",
+          "start": 63
+        }
+      ],
+      "plain": "☐ milk ✅️ 2 a ❌\n❌ c d\n☐‍ x\n☐ end",
+      "shortcuts": [
+        80
+      ],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none",
+            "none",
+            "none"
+          ],
+          "delimiterLine": 2,
+          "end": 77,
+          "firstLine": 0,
+          "headingColumn": true,
+          "lastLine": 4,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 39,
+                  "source": "☐ milk",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 39,
+                      "contentStart": 33,
+                      "end": 39,
+                      "kind": "text",
+                      "start": 33,
+                      "text": "☐ milk",
+                      "url": ""
+                    }
+                  ],
+                  "start": 33,
+                  "visible": "☐ milk"
+                },
+                {
+                  "end": 46,
+                  "source": "✅️ 2",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 46,
+                      "contentStart": 42,
+                      "end": 46,
+                      "kind": "text",
+                      "start": 42,
+                      "text": "✅️ 2",
+                      "url": ""
+                    }
+                  ],
+                  "start": 42,
+                  "visible": "✅️ 2"
+                },
+                {
+                  "end": 52,
+                  "source": "a ❌",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 52,
+                      "contentStart": 49,
+                      "end": 52,
+                      "kind": "text",
+                      "start": 49,
+                      "text": "a ❌",
+                      "url": ""
+                    }
+                  ],
+                  "start": 49,
+                  "visible": "a ❌"
+                }
+              ],
+              "end": 54,
+              "line": 1,
+              "start": 31,
+              "visible": "☐ milk ✅️ 2 a ❌"
+            },
+            {
+              "cells": [
+                {
+                  "end": 66,
+                  "source": "❌ c",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 66,
+                      "contentStart": 63,
+                      "end": 66,
+                      "kind": "text",
+                      "start": 63,
+                      "text": "❌ c",
+                      "url": ""
+                    }
+                  ],
+                  "start": 63,
+                  "visible": "❌ c"
+                },
+                {
+                  "end": 70,
+                  "source": "d",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 70,
+                      "contentStart": 69,
+                      "end": 70,
+                      "kind": "text",
+                      "start": 69,
+                      "text": "d",
+                      "url": ""
+                    }
+                  ],
+                  "start": 69,
+                  "visible": "d"
+                },
+                {
+                  "end": 70,
+                  "source": "",
+                  "spans": [],
+                  "start": 70,
+                  "visible": ""
+                }
+              ],
+              "end": 70,
+              "line": 3,
+              "start": 63,
+              "visible": "❌ c d"
+            },
+            {
+              "cells": [
+                {
+                  "end": 75,
+                  "source": "☐‍ x",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 75,
+                      "contentStart": 71,
+                      "end": 75,
+                      "kind": "text",
+                      "start": 71,
+                      "text": "☐‍ x",
+                      "url": ""
+                    }
+                  ],
+                  "start": 71,
+                  "visible": "☐‍ x"
+                },
+                {
+                  "end": 77,
+                  "source": "",
+                  "spans": [],
+                  "start": 77,
+                  "visible": ""
+                },
+                {
+                  "end": 77,
+                  "source": "",
+                  "spans": [],
+                  "start": 77,
+                  "visible": ""
+                }
+              ],
+              "end": 77,
+              "line": 4,
+              "start": 71,
+              "visible": "☐‍ x"
+            }
+          ],
+          "start": 0
+        }
+      ],
+      "text": "<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n❌ c | d\n☐‍ x |\n# ☐ end",
+      "uses": true,
+      "words": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          5,
+          10
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          11,
+          17
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          18,
+          26
+        ],
+        [
+          27,
+          27
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          29,
+          29
+        ],
+        [
+          30,
+          30
+        ],
+        [
+          31,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          34
+        ],
+        [
+          35,
+          39
+        ],
+        [
+          35,
+          39
+        ],
+        [
+          35,
+          39
+        ],
+        [
+          35,
+          39
+        ],
+        [
+          35,
+          39
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          41,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          45,
+          46
+        ],
+        [
+          45,
+          46
+        ],
+        [
+          47,
+          47
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          49,
+          50
+        ],
+        [
+          49,
+          50
+        ],
+        [
+          51,
+          51
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          53,
+          53
+        ],
+        [
+          54,
+          54
+        ],
+        [
+          55,
+          55
+        ],
+        [
+          56,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          58
+        ],
+        [
+          59,
+          59
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          61,
+          61
+        ],
+        [
+          62,
+          62
+        ],
+        [
+          63,
+          63
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          67,
+          67
+        ],
+        [
+          68,
+          68
+        ],
+        [
+          69,
+          70
+        ],
+        [
+          69,
+          70
+        ],
+        [
+          71,
+          71
+        ],
+        [
+          72,
+          72
+        ],
+        [
+          73,
+          73
+        ],
+        [
+          74,
+          75
+        ],
+        [
+          74,
+          75
+        ],
+        [
+          76,
+          76
+        ],
+        [
+          77,
+          77
+        ],
+        [
+          78,
+          78
+        ],
+        [
+          79,
+          79
+        ],
+        [
+          80,
+          80
+        ],
+        [
+          81,
+          81
+        ],
+        [
+          82,
+          85
+        ],
+        [
+          82,
+          85
+        ],
+        [
+          82,
+          85
+        ],
+        [
+          82,
+          85
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 5,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 5,
+              "contentStart": 0,
+              "end": 5,
+              "kind": "text",
+              "start": 0,
+              "text": "a | b",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 6,
+          "end": 11,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 11,
+              "contentStart": 6,
+              "end": 11,
+              "kind": "text",
+              "start": 6,
+              "text": "|---|",
+              "url": ""
+            }
+          ],
+          "start": 6
+        },
+        {
+          "contentStart": 12,
+          "end": 17,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 17,
+              "contentStart": 12,
+              "end": 17,
+              "kind": "text",
+              "start": 12,
+              "text": "a | b",
+              "url": ""
+            }
+          ],
+          "start": 12
+        },
+        {
+          "contentStart": 20,
+          "end": 23,
+          "kind": "bullet",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 23,
+              "contentStart": 20,
+              "end": 23,
+              "kind": "text",
+              "start": 20,
+              "text": "| -",
+              "url": ""
+            }
+          ],
+          "start": 18
+        },
+        {
+          "contentStart": 26,
+          "end": 31,
+          "kind": "heading1",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 31,
+              "contentStart": 26,
+              "end": 31,
+              "kind": "text",
+              "start": 26,
+              "text": "a | b",
+              "url": ""
+            }
+          ],
+          "start": 24
+        },
+        {
+          "contentStart": 32,
+          "end": 37,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 37,
+              "contentStart": 32,
+              "end": 37,
+              "kind": "text",
+              "start": 32,
+              "text": "--|--",
+              "url": ""
+            }
+          ],
+          "start": 32
+        },
+        {
+          "contentStart": 38,
+          "end": 39,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 6,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 39,
+              "contentStart": 38,
+              "end": 39,
+              "kind": "text",
+              "start": 38,
+              "text": "a",
+              "url": ""
+            }
+          ],
+          "start": 38
+        },
+        {
+          "contentStart": 40,
+          "end": 43,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 7,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 43,
+              "contentStart": 40,
+              "end": 43,
+              "kind": "text",
+              "start": 40,
+              "text": "---",
+              "url": ""
+            }
+          ],
+          "start": 40
+        },
+        {
+          "contentStart": 44,
+          "end": 49,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 8,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 49,
+              "contentStart": 44,
+              "end": 49,
+              "kind": "text",
+              "start": 44,
+              "text": "a | b",
+              "url": ""
+            }
+          ],
+          "start": 44
+        },
+        {
+          "contentStart": 50,
+          "end": 58,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 9,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 58,
+              "contentStart": 50,
+              "end": 58,
+              "kind": "text",
+              "start": 50,
+              "text": "|--|:x:|",
+              "url": ""
+            }
+          ],
+          "start": 50
+        }
+      ],
+      "escaped": "a \\| b\n\\|---\\|\na \\| b\n\\- \\| -\n\\# a \\| b\n--\\|--\na\n---\na \\| b\n\\|--\\|:x:\\|",
+      "marks": [],
+      "plain": "a | b\n|---|\na | b\n| -\na | b\n--|--\na\n---\na | b\n|--|:x:|",
+      "shortcuts": [
+        20,
+        26
+      ],
+      "tags": [],
+      "tables": [],
+      "text": "a | b\n|---|\na | b\n- | -\n# a | b\n--|--\na\n---\na | b\n|--|:x:|",
+      "uses": true,
+      "words": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          10,
+          10
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          12,
+          13
+        ],
+        [
+          14,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          16,
+          17
+        ],
+        [
+          16,
+          17
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          19,
+          19
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          21,
+          21
+        ],
+        [
+          22,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          25,
+          25
+        ],
+        [
+          26,
+          27
+        ],
+        [
+          26,
+          27
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          29,
+          29
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          34
+        ],
+        [
+          35,
+          35
+        ],
+        [
+          36,
+          36
+        ],
+        [
+          37,
+          37
+        ],
+        [
+          38,
+          39
+        ],
+        [
+          38,
+          39
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          41,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          45
+        ],
+        [
+          44,
+          45
+        ],
+        [
+          46,
+          46
+        ],
+        [
+          47,
+          47
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          51,
+          51
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          53,
+          53
+        ],
+        [
+          54,
+          54
+        ],
+        [
+          55,
+          56
+        ],
+        [
+          55,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          58
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 5,
+          "kind": "table",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 1,
+              "contentStart": 0,
+              "end": 1,
+              "kind": "text",
+              "start": 0,
+              "text": "a",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 5,
+              "contentStart": 4,
+              "end": 5,
+              "kind": "text",
+              "start": 4,
+              "text": "b",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 6,
+          "end": 9,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 6
+        },
+        {
+          "contentStart": 10,
+          "end": 11,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 11,
+              "contentStart": 10,
+              "end": 11,
+              "kind": "text",
+              "start": 10,
+              "text": "c",
+              "url": ""
+            }
+          ],
+          "start": 10
+        },
+        {
+          "contentStart": 12,
+          "end": 15,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 15,
+              "contentStart": 12,
+              "end": 15,
+              "kind": "text",
+              "start": 12,
+              "text": "```",
+              "url": ""
+            }
+          ],
+          "start": 12
+        },
+        {
+          "contentStart": 16,
+          "end": 21,
+          "kind": "table",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 17,
+              "contentStart": 16,
+              "end": 17,
+              "kind": "text",
+              "start": 16,
+              "text": "e",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 21,
+              "contentStart": 20,
+              "end": 21,
+              "kind": "text",
+              "start": 20,
+              "text": "f",
+              "url": ""
+            }
+          ],
+          "start": 16
+        },
+        {
+          "contentStart": 22,
+          "end": 25,
+          "kind": "table",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 22
+        },
+        {
+          "contentStart": 26,
+          "end": 29,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 6,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 29,
+              "contentStart": 26,
+              "end": 29,
+              "kind": "text",
+              "start": 26,
+              "text": "---",
+              "url": ""
+            }
+          ],
+          "start": 26
+        },
+        {
+          "contentStart": 30,
+          "end": 35,
+          "kind": "table",
+          "level": 0,
+          "line": 7,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 31,
+              "contentStart": 30,
+              "end": 31,
+              "kind": "text",
+              "start": 30,
+              "text": "g",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 35,
+              "contentStart": 34,
+              "end": 35,
+              "kind": "text",
+              "start": 34,
+              "text": "h",
+              "url": ""
+            }
+          ],
+          "start": 30
+        },
+        {
+          "contentStart": 36,
+          "end": 39,
+          "kind": "table",
+          "level": 0,
+          "line": 8,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 36
+        },
+        {
+          "contentStart": 40,
+          "end": 49,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 9,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 49,
+              "contentStart": 40,
+              "end": 49,
+              "kind": "text",
+              "start": 40,
+              "text": "    x | y",
+              "url": ""
+            }
+          ],
+          "start": 40
+        },
+        {
+          "contentStart": 50,
+          "end": 55,
+          "kind": "table",
+          "level": 0,
+          "line": 10,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 51,
+              "contentStart": 50,
+              "end": 51,
+              "kind": "text",
+              "start": 50,
+              "text": "i",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 55,
+              "contentStart": 54,
+              "end": 55,
+              "kind": "text",
+              "start": 54,
+              "text": "j",
+              "url": ""
+            }
+          ],
+          "start": 50
+        },
+        {
+          "contentStart": 56,
+          "end": 59,
+          "kind": "table",
+          "level": 0,
+          "line": 11,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 56
+        },
+        {
+          "contentStart": 60,
+          "end": 70,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 12,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 70,
+              "contentStart": 60,
+              "end": 70,
+              "kind": "text",
+              "start": 60,
+              "text": "<!-- x -->",
+              "url": ""
+            }
+          ],
+          "start": 60
+        },
+        {
+          "contentStart": 71,
+          "end": 76,
+          "kind": "table",
+          "level": 0,
+          "line": 13,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 72,
+              "contentStart": 71,
+              "end": 72,
+              "kind": "text",
+              "start": 71,
+              "text": "k",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 76,
+              "contentStart": 75,
+              "end": 76,
+              "kind": "text",
+              "start": 75,
+              "text": "l",
+              "url": ""
+            }
+          ],
+          "start": 71
+        },
+        {
+          "contentStart": 77,
+          "end": 80,
+          "kind": "table",
+          "level": 0,
+          "line": 14,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 77
+        },
+        {
+          "contentStart": 83,
+          "end": 86,
+          "kind": "bullet",
+          "level": 0,
+          "line": 15,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 86,
+              "contentStart": 83,
+              "end": 86,
+              "kind": "text",
+              "start": 83,
+              "text": "* *",
+              "url": ""
+            }
+          ],
+          "start": 81
+        }
+      ],
+      "escaped": "a \\| b\n-\\|-\nc\n\\`\\`\\`\ne \\| f\n-\\|-\n---\ng \\| h\n-\\|-\n    x \\| y\ni \\| j\n-\\|-\n<!-- x -->\nk \\| l\n-\\|-\n\\* \\* \\*",
+      "marks": [],
+      "plain": "a b\nc\n```\ne f\n---\ng h\n    x | y\ni j\n<!-- x -->\nk l\n* *",
+      "shortcuts": [
+        83
+      ],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 1,
+          "end": 11,
+          "firstLine": 0,
+          "headingColumn": false,
+          "lastLine": 2,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 1,
+                  "source": "a",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 1,
+                      "contentStart": 0,
+                      "end": 1,
+                      "kind": "text",
+                      "start": 0,
+                      "text": "a",
+                      "url": ""
+                    }
+                  ],
+                  "start": 0,
+                  "visible": "a"
+                },
+                {
+                  "end": 5,
+                  "source": "b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 5,
+                      "contentStart": 4,
+                      "end": 5,
+                      "kind": "text",
+                      "start": 4,
+                      "text": "b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 4,
+                  "visible": "b"
+                }
+              ],
+              "end": 5,
+              "line": 0,
+              "start": 0,
+              "visible": "a b"
+            },
+            {
+              "cells": [
+                {
+                  "end": 11,
+                  "source": "c",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 11,
+                      "contentStart": 10,
+                      "end": 11,
+                      "kind": "text",
+                      "start": 10,
+                      "text": "c",
+                      "url": ""
+                    }
+                  ],
+                  "start": 10,
+                  "visible": "c"
+                },
+                {
+                  "end": 11,
+                  "source": "",
+                  "spans": [],
+                  "start": 11,
+                  "visible": ""
+                }
+              ],
+              "end": 11,
+              "line": 2,
+              "start": 10,
+              "visible": "c"
+            }
+          ],
+          "start": 0
+        },
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 5,
+          "end": 25,
+          "firstLine": 4,
+          "headingColumn": false,
+          "lastLine": 5,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 17,
+                  "source": "e",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 17,
+                      "contentStart": 16,
+                      "end": 17,
+                      "kind": "text",
+                      "start": 16,
+                      "text": "e",
+                      "url": ""
+                    }
+                  ],
+                  "start": 16,
+                  "visible": "e"
+                },
+                {
+                  "end": 21,
+                  "source": "f",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 21,
+                      "contentStart": 20,
+                      "end": 21,
+                      "kind": "text",
+                      "start": 20,
+                      "text": "f",
+                      "url": ""
+                    }
+                  ],
+                  "start": 20,
+                  "visible": "f"
+                }
+              ],
+              "end": 21,
+              "line": 4,
+              "start": 16,
+              "visible": "e f"
+            }
+          ],
+          "start": 16
+        },
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 8,
+          "end": 39,
+          "firstLine": 7,
+          "headingColumn": false,
+          "lastLine": 8,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 31,
+                  "source": "g",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 31,
+                      "contentStart": 30,
+                      "end": 31,
+                      "kind": "text",
+                      "start": 30,
+                      "text": "g",
+                      "url": ""
+                    }
+                  ],
+                  "start": 30,
+                  "visible": "g"
+                },
+                {
+                  "end": 35,
+                  "source": "h",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 35,
+                      "contentStart": 34,
+                      "end": 35,
+                      "kind": "text",
+                      "start": 34,
+                      "text": "h",
+                      "url": ""
+                    }
+                  ],
+                  "start": 34,
+                  "visible": "h"
+                }
+              ],
+              "end": 35,
+              "line": 7,
+              "start": 30,
+              "visible": "g h"
+            }
+          ],
+          "start": 30
+        },
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 11,
+          "end": 59,
+          "firstLine": 10,
+          "headingColumn": false,
+          "lastLine": 11,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 51,
+                  "source": "i",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 51,
+                      "contentStart": 50,
+                      "end": 51,
+                      "kind": "text",
+                      "start": 50,
+                      "text": "i",
+                      "url": ""
+                    }
+                  ],
+                  "start": 50,
+                  "visible": "i"
+                },
+                {
+                  "end": 55,
+                  "source": "j",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 55,
+                      "contentStart": 54,
+                      "end": 55,
+                      "kind": "text",
+                      "start": 54,
+                      "text": "j",
+                      "url": ""
+                    }
+                  ],
+                  "start": 54,
+                  "visible": "j"
+                }
+              ],
+              "end": 55,
+              "line": 10,
+              "start": 50,
+              "visible": "i j"
+            }
+          ],
+          "start": 50
+        },
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 14,
+          "end": 80,
+          "firstLine": 13,
+          "headingColumn": false,
+          "lastLine": 14,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 72,
+                  "source": "k",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 72,
+                      "contentStart": 71,
+                      "end": 72,
+                      "kind": "text",
+                      "start": 71,
+                      "text": "k",
+                      "url": ""
+                    }
+                  ],
+                  "start": 71,
+                  "visible": "k"
+                },
+                {
+                  "end": 76,
+                  "source": "l",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 76,
+                      "contentStart": 75,
+                      "end": 76,
+                      "kind": "text",
+                      "start": 75,
+                      "text": "l",
+                      "url": ""
+                    }
+                  ],
+                  "start": 75,
+                  "visible": "l"
+                }
+              ],
+              "end": 76,
+              "line": 13,
+              "start": 71,
+              "visible": "k l"
+            }
+          ],
+          "start": 71
+        }
+      ],
+      "text": "a | b\n-|-\nc\n```\ne | f\n-|-\n---\ng | h\n-|-\n    x | y\ni | j\n-|-\n<!-- x -->\nk | l\n-|-\n* * *",
+      "uses": true,
+      "words": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          12,
+          12
+        ],
+        [
+          13,
+          13
+        ],
+        [
+          14,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          16,
+          17
+        ],
+        [
+          16,
+          17
+        ],
+        [
+          18,
+          18
+        ],
+        [
+          19,
+          19
+        ],
+        [
+          20,
+          21
+        ],
+        [
+          20,
+          21
+        ],
+        [
+          22,
+          22
+        ],
+        [
+          23,
+          23
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          25,
+          25
+        ],
+        [
+          26,
+          26
+        ],
+        [
+          27,
+          27
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          29,
+          29
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          30,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          35
+        ],
+        [
+          34,
+          35
+        ],
+        [
+          36,
+          36
+        ],
+        [
+          37,
+          37
+        ],
+        [
+          38,
+          38
+        ],
+        [
+          39,
+          39
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          41,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          45
+        ],
+        [
+          44,
+          45
+        ],
+        [
+          46,
+          46
+        ],
+        [
+          47,
+          47
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          48,
+          49
+        ],
+        [
+          50,
+          51
+        ],
+        [
+          50,
+          51
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          53,
+          53
+        ],
+        [
+          54,
+          55
+        ],
+        [
+          54,
+          55
+        ],
+        [
+          56,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          58
+        ],
+        [
+          59,
+          59
+        ],
+        [
+          60,
+          60
+        ],
+        [
+          61,
+          61
+        ],
+        [
+          62,
+          62
+        ],
+        [
+          63,
+          63
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          67,
+          67
+        ],
+        [
+          68,
+          68
+        ],
+        [
+          69,
+          69
+        ],
+        [
+          70,
+          70
+        ],
+        [
+          71,
+          72
+        ],
+        [
+          71,
+          72
+        ],
+        [
+          73,
+          73
+        ],
+        [
+          74,
+          74
+        ],
+        [
+          75,
+          76
+        ],
+        [
+          75,
+          76
+        ],
+        [
+          77,
+          77
+        ],
+        [
+          78,
+          78
+        ],
+        [
+          79,
+          79
+        ],
+        [
+          80,
+          80
+        ],
+        [
+          81,
+          81
+        ],
+        [
+          82,
+          82
+        ],
+        [
+          83,
+          83
+        ],
+        [
+          84,
+          84
+        ],
+        [
+          85,
+          85
+        ],
+        [
+          86,
+          86
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 1,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 1,
+              "contentStart": 0,
+              "end": 1,
+              "kind": "text",
+              "start": 0,
+              "text": "x",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 2,
+          "end": 35,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 2
+        },
+        {
+          "contentStart": 36,
+          "end": 39,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 37,
+              "contentStart": 36,
+              "end": 37,
+              "kind": "text",
+              "start": 36,
+              "text": "a",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 39,
+              "contentStart": 38,
+              "end": 39,
+              "kind": "text",
+              "start": 38,
+              "text": "b",
+              "url": ""
+            }
+          ],
+          "start": 36
+        },
+        {
+          "contentStart": 40,
+          "end": 43,
+          "kind": "table",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 40
+        },
+        {
+          "contentStart": 44,
+          "end": 44,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 4,
+          "number": 0,
+          "spans": [],
+          "start": 44
+        },
+        {
+          "contentStart": 45,
+          "end": 75,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 5,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 75,
+              "contentStart": 45,
+              "end": 75,
+              "kind": "text",
+              "start": 45,
+              "text": "<!-- first column headings -->",
+              "url": ""
+            }
+          ],
+          "start": 45
+        },
+        {
+          "contentStart": 76,
+          "end": 84,
+          "kind": "paragraph",
+          "level": 0,
+          "line": 6,
+          "number": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 84,
+              "contentStart": 76,
+              "end": 84,
+              "kind": "text",
+              "start": 76,
+              "text": "no table",
+              "url": ""
+            }
+          ],
+          "start": 76
+        }
+      ],
+      "escaped": "x\n  <!-- first column headings --> \na\\|b\n-\\|-\n\n<!-- first column headings -->\nno table",
+      "marks": [],
+      "plain": "x\na b\n\n<!-- first column headings -->\nno table",
+      "shortcuts": [],
+      "tags": [],
+      "tables": [
+        {
+          "aligns": [
+            "none",
+            "none"
+          ],
+          "delimiterLine": 3,
+          "end": 43,
+          "firstLine": 1,
+          "headingColumn": true,
+          "lastLine": 3,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 37,
+                  "source": "a",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 37,
+                      "contentStart": 36,
+                      "end": 37,
+                      "kind": "text",
+                      "start": 36,
+                      "text": "a",
+                      "url": ""
+                    }
+                  ],
+                  "start": 36,
+                  "visible": "a"
+                },
+                {
+                  "end": 39,
+                  "source": "b",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 39,
+                      "contentStart": 38,
+                      "end": 39,
+                      "kind": "text",
+                      "start": 38,
+                      "text": "b",
+                      "url": ""
+                    }
+                  ],
+                  "start": 38,
+                  "visible": "b"
+                }
+              ],
+              "end": 39,
+              "line": 2,
+              "start": 36,
+              "visible": "a b"
+            }
+          ],
+          "start": 2
+        }
+      ],
+      "text": "x\n  <!-- first column headings --> \na|b\n-|-\n\n<!-- first column headings -->\nno table",
+      "uses": true,
+      "words": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          9,
+          14
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          15,
+          21
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          22,
+          30
+        ],
+        [
+          31,
+          31
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          34,
+          34
+        ],
+        [
+          35,
+          35
+        ],
+        [
+          36,
+          37
+        ],
+        [
+          36,
+          37
+        ],
+        [
+          38,
+          39
+        ],
+        [
+          38,
+          39
+        ],
+        [
+          40,
+          40
+        ],
+        [
+          41,
+          41
+        ],
+        [
+          42,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          45,
+          45
+        ],
+        [
+          46,
+          46
+        ],
+        [
+          47,
+          47
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          49,
+          49
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          50,
+          55
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          56,
+          62
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          63,
+          71
+        ],
+        [
+          72,
+          72
+        ],
+        [
+          73,
+          73
+        ],
+        [
+          74,
+          74
+        ],
+        [
+          75,
+          75
+        ],
+        [
+          76,
+          78
+        ],
+        [
+          76,
+          78
+        ],
+        [
+          76,
+          78
+        ],
+        [
+          79,
+          84
+        ],
+        [
+          79,
+          84
+        ],
+        [
+          79,
+          84
+        ],
+        [
+          79,
+          84
+        ],
+        [
+          79,
+          84
+        ],
+        [
+          79,
+          84
+        ]
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "contentStart": 0,
+          "end": 5,
+          "kind": "table",
+          "level": 0,
+          "line": 0,
+          "number": 0,
+          "row": 0,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 1,
+              "contentStart": 0,
+              "end": 1,
+              "kind": "text",
+              "start": 0,
+              "text": "🧠",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 5,
+              "contentStart": 4,
+              "end": 5,
+              "kind": "text",
+              "start": 4,
+              "text": "ü",
+              "url": ""
+            }
+          ],
+          "start": 0
+        },
+        {
+          "contentStart": 6,
+          "end": 11,
+          "kind": "table",
+          "level": 0,
+          "line": 1,
+          "number": 0,
+          "row": null,
+          "spans": [],
+          "start": 6
+        },
+        {
+          "contentStart": 12,
+          "end": 50,
+          "kind": "table",
+          "level": 0,
+          "line": 2,
+          "number": 0,
+          "row": 1,
+          "spans": [
+            {
+              "children": [],
+              "contentEnd": 14,
+              "contentStart": 12,
+              "end": 14,
+              "kind": "text",
+              "start": 12,
+              "text": "日記",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 19,
+                  "contentStart": 18,
+                  "end": 19,
+                  "kind": "text",
+                  "start": 18,
+                  "text": "𝔸",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 19,
+              "contentStart": 18,
+              "end": 37,
+              "kind": "link",
+              "start": 17,
+              "text": "",
+              "url": "https://x.org/𝔸"
+            },
+            {
+              "children": [],
+              "contentEnd": 43,
+              "contentStart": 37,
+              "end": 43,
+              "kind": "text",
+              "start": 37,
+              "text": " #tag ",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 49,
+              "contentStart": 44,
+              "end": 50,
+              "kind": "code",
+              "start": 43,
+              "text": "#code",
+              "url": ""
+            }
+          ],
+          "start": 12
+        },
+        {
+          "contentStart": 51,
+          "end": 68,
+          "kind": "table",
+          "level": 0,
+          "line": 3,
+          "number": 0,
+          "row": 2,
+          "spans": [
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 54,
+                  "contentStart": 53,
+                  "end": 54,
+                  "kind": "text",
+                  "start": 53,
+                  "text": "b",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 54,
+              "contentStart": 53,
+              "end": 56,
+              "kind": "bold",
+              "start": 51,
+              "text": "",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 61,
+                  "contentStart": 60,
+                  "end": 61,
+                  "kind": "text",
+                  "start": 60,
+                  "text": "i",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 61,
+              "contentStart": 60,
+              "end": 62,
+              "kind": "italic",
+              "start": 59,
+              "text": "",
+              "url": ""
+            },
+            {
+              "children": [],
+              "contentEnd": 63,
+              "contentStart": 62,
+              "end": 63,
+              "kind": "text",
+              "start": 62,
+              "text": " ",
+              "url": ""
+            },
+            {
+              "children": [
+                {
+                  "children": [],
+                  "contentEnd": 66,
+                  "contentStart": 65,
+                  "end": 66,
+                  "kind": "text",
+                  "start": 65,
+                  "text": "s",
+                  "url": ""
+                }
+              ],
+              "contentEnd": 66,
+              "contentStart": 65,
+              "end": 68,
+              "kind": "strike",
+              "start": 63,
+              "text": "",
+              "url": ""
+            }
+          ],
+          "start": 51
+        }
+      ],
+      "escaped": "🧠 \\| ü\n:-:\\|-\n日記 \\| \\[𝔸](https://x.org/𝔸) #tag \\`#code\\`\n\\*\\*b\\*\\* \\| \\*i\\* \\~\\~s\\~\\~",
+      "marks": [],
+      "plain": "🧠 ü\n日記 𝔸 #tag #code\nb i s",
+      "shortcuts": [
+        37,
+        50,
+        56,
+        62,
+        68
+      ],
+      "tags": [
+        {
+          "end": 42,
+          "start": 38,
+          "tag": "#tag"
+        }
+      ],
+      "tables": [
+        {
+          "aligns": [
+            "center",
+            "none"
+          ],
+          "delimiterLine": 1,
+          "end": 68,
+          "firstLine": 0,
+          "headingColumn": false,
+          "lastLine": 3,
+          "rows": [
+            {
+              "cells": [
+                {
+                  "end": 1,
+                  "source": "🧠",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 1,
+                      "contentStart": 0,
+                      "end": 1,
+                      "kind": "text",
+                      "start": 0,
+                      "text": "🧠",
+                      "url": ""
+                    }
+                  ],
+                  "start": 0,
+                  "visible": "🧠"
+                },
+                {
+                  "end": 5,
+                  "source": "ü",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 5,
+                      "contentStart": 4,
+                      "end": 5,
+                      "kind": "text",
+                      "start": 4,
+                      "text": "ü",
+                      "url": ""
+                    }
+                  ],
+                  "start": 4,
+                  "visible": "ü"
+                }
+              ],
+              "end": 5,
+              "line": 0,
+              "start": 0,
+              "visible": "🧠 ü"
+            },
+            {
+              "cells": [
+                {
+                  "end": 14,
+                  "source": "日記",
+                  "spans": [
+                    {
+                      "children": [],
+                      "contentEnd": 14,
+                      "contentStart": 12,
+                      "end": 14,
+                      "kind": "text",
+                      "start": 12,
+                      "text": "日記",
+                      "url": ""
+                    }
+                  ],
+                  "start": 12,
+                  "visible": "日記"
+                },
+                {
+                  "end": 50,
+                  "source": "[𝔸](https://x.org/𝔸) #tag `#code`",
+                  "spans": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "contentEnd": 19,
+                          "contentStart": 18,
+                          "end": 19,
+                          "kind": "text",
+                          "start": 18,
+                          "text": "𝔸",
+                          "url": ""
+                        }
+                      ],
+                      "contentEnd": 19,
+                      "contentStart": 18,
+                      "end": 37,
+                      "kind": "link",
+                      "start": 17,
+                      "text": "",
+                      "url": "https://x.org/𝔸"
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 43,
+                      "contentStart": 37,
+                      "end": 43,
+                      "kind": "text",
+                      "start": 37,
+                      "text": " #tag ",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 49,
+                      "contentStart": 44,
+                      "end": 50,
+                      "kind": "code",
+                      "start": 43,
+                      "text": "#code",
+                      "url": ""
+                    }
+                  ],
+                  "start": 17,
+                  "visible": "𝔸 #tag #code"
+                }
+              ],
+              "end": 50,
+              "line": 2,
+              "start": 12,
+              "visible": "日記 𝔸 #tag #code"
+            },
+            {
+              "cells": [
+                {
+                  "end": 56,
+                  "source": "**b**",
+                  "spans": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "contentEnd": 54,
+                          "contentStart": 53,
+                          "end": 54,
+                          "kind": "text",
+                          "start": 53,
+                          "text": "b",
+                          "url": ""
+                        }
+                      ],
+                      "contentEnd": 54,
+                      "contentStart": 53,
+                      "end": 56,
+                      "kind": "bold",
+                      "start": 51,
+                      "text": "",
+                      "url": ""
+                    }
+                  ],
+                  "start": 51,
+                  "visible": "b"
+                },
+                {
+                  "end": 68,
+                  "source": "*i* ~~s~~",
+                  "spans": [
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "contentEnd": 61,
+                          "contentStart": 60,
+                          "end": 61,
+                          "kind": "text",
+                          "start": 60,
+                          "text": "i",
+                          "url": ""
+                        }
+                      ],
+                      "contentEnd": 61,
+                      "contentStart": 60,
+                      "end": 62,
+                      "kind": "italic",
+                      "start": 59,
+                      "text": "",
+                      "url": ""
+                    },
+                    {
+                      "children": [],
+                      "contentEnd": 63,
+                      "contentStart": 62,
+                      "end": 63,
+                      "kind": "text",
+                      "start": 62,
+                      "text": " ",
+                      "url": ""
+                    },
+                    {
+                      "children": [
+                        {
+                          "children": [],
+                          "contentEnd": 66,
+                          "contentStart": 65,
+                          "end": 66,
+                          "kind": "text",
+                          "start": 65,
+                          "text": "s",
+                          "url": ""
+                        }
+                      ],
+                      "contentEnd": 66,
+                      "contentStart": 65,
+                      "end": 68,
+                      "kind": "strike",
+                      "start": 63,
+                      "text": "",
+                      "url": ""
+                    }
+                  ],
+                  "start": 59,
+                  "visible": "i s"
+                }
+              ],
+              "end": 68,
+              "line": 3,
+              "start": 51,
+              "visible": "b i s"
+            }
+          ],
+          "start": 0
+        }
+      ],
+      "text": "🧠 | ü\n:-:|-\n日記 | [𝔸](https://x.org/𝔸) #tag `#code`\n**b** | *i* ~~s~~",
+      "uses": true,
+      "words": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          8,
+          8
+        ],
+        [
+          9,
+          9
+        ],
+        [
+          10,
+          10
+        ],
+        [
+          11,
+          11
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          15,
+          15
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          17,
+          17
+        ],
+        [
+          18,
+          19
+        ],
+        [
+          18,
+          19
+        ],
+        [
+          20,
+          20
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          21,
+          26
+        ],
+        [
+          27,
+          27
+        ],
+        [
+          28,
+          28
+        ],
+        [
+          29,
+          30
+        ],
+        [
+          29,
+          30
+        ],
+        [
+          31,
+          34
+        ],
+        [
+          31,
+          34
+        ],
+        [
+          31,
+          34
+        ],
+        [
+          31,
+          34
+        ],
+        [
+          35,
+          36
+        ],
+        [
+          35,
+          36
+        ],
+        [
+          37,
+          37
+        ],
+        [
+          38,
+          38
+        ],
+        [
+          38,
+          42
+        ],
+        [
+          38,
+          42
+        ],
+        [
+          38,
+          42
+        ],
+        [
+          38,
+          42
+        ],
+        [
+          43,
+          43
+        ],
+        [
+          44,
+          44
+        ],
+        [
+          44,
+          49
+        ],
+        [
+          44,
+          49
+        ],
+        [
+          44,
+          49
+        ],
+        [
+          44,
+          49
+        ],
+        [
+          44,
+          49
+        ],
+        [
+          50,
+          50
+        ],
+        [
+          51,
+          51
+        ],
+        [
+          52,
+          52
+        ],
+        [
+          53,
+          54
+        ],
+        [
+          53,
+          54
+        ],
+        [
+          55,
+          55
+        ],
+        [
+          56,
+          56
+        ],
+        [
+          57,
+          57
+        ],
+        [
+          58,
+          58
+        ],
+        [
+          59,
+          59
+        ],
+        [
+          60,
+          61
+        ],
+        [
+          60,
+          61
+        ],
+        [
+          62,
+          62
+        ],
+        [
+          63,
+          63
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          65,
+          66
+        ],
+        [
+          67,
+          67
+        ],
+        [
+          68,
+          68
         ]
       ]
     }
@@ -7872,6 +13299,54 @@
       }
     },
     {
+      "kind": "table",
+      "op": "line",
+      "start": 0,
+      "end": 7,
+      "text": "one\ntwo",
+      "result": {
+        "end": 7,
+        "start": 0,
+        "text": "one\ntwo"
+      }
+    },
+    {
+      "kind": "table",
+      "op": "line",
+      "start": 0,
+      "end": 17,
+      "text": "# a\n- b\n  1. c\n> d",
+      "result": {
+        "end": 17,
+        "start": 0,
+        "text": "# a\n- b\n  1. c\n> d"
+      }
+    },
+    {
+      "kind": "table",
+      "op": "line",
+      "start": 0,
+      "end": 0,
+      "text": "",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": ""
+      }
+    },
+    {
+      "kind": "table",
+      "op": "line",
+      "start": 2,
+      "end": 2,
+      "text": "  plain",
+      "result": {
+        "end": 2,
+        "start": 2,
+        "text": "  plain"
+      }
+    },
+    {
       "kind": "numbered",
       "op": "line",
       "start": 0,
@@ -7997,6 +13472,738 @@
         "start": 6,
         "text": "  1. a"
       }
+    },
+    {
+      "cell": "# x",
+      "column": 1,
+      "row": 1,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 54,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| c | # x | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "- x",
+      "column": 0,
+      "row": 0,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 54,
+        "start": 3,
+        "text": "x\r\n| - x | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "a|b",
+      "column": 1,
+      "row": 2,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 56,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n| f | a\\|b |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "`a|b` \\| c",
+      "column": 0,
+      "row": 1,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 63,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| `a\\|b` \\\\| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "a\r\nb\nc\rd",
+      "column": 0,
+      "row": 2,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 58,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n| a b c d |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "  **ü**\t",
+      "column": 1,
+      "row": 1,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 56,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| c | **ü** | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "x\\",
+      "column": 1,
+      "row": 0,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 53,
+        "start": 3,
+        "text": "x\r\n| a | x\\ |\r\n| :-- | --: |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "x",
+      "column": 0,
+      "row": 3,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "x",
+      "column": 2,
+      "row": 0,
+      "op": "setCell",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "cell": "日記",
+      "column": 0,
+      "row": 0,
+      "op": "setCell",
+      "start": 40,
+      "end": 40,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 55,
+        "start": 0,
+        "text": "<!-- first column headings -->\n| 日記 | ü |\n| --- | --- |\n\n# next"
+      }
+    },
+    {
+      "index": 0,
+      "op": "insertRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 61,
+        "start": 3,
+        "text": "x\r\n|  |  |\r\n| :-- | --: |\r\n| a | b |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 0,
+      "op": "insertColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 67,
+        "start": 3,
+        "text": "x\r\n|  | a | b |\r\n| --- | :-- | --: |\r\n|  | c | d | e |\r\n|  | f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 41,
+        "start": 3,
+        "text": "x\r\n| c | d | e |\r\n| :-- | --: |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 34,
+        "start": 3,
+        "text": "x\r\n| b |\r\n| --: |\r\n| d | e |\r\n|  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 1,
+      "op": "insertRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 61,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n|  |  |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 1,
+      "op": "insertColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 67,
+        "start": 3,
+        "text": "x\r\n| a |  | b |\r\n| :-- | --- | --: |\r\n| c |  | d | e |\r\n| f |  |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 1,
+      "op": "deleteRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 37,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 1,
+      "op": "deleteColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 35,
+        "start": 3,
+        "text": "x\r\n| a |\r\n| :-- |\r\n| c | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 3,
+      "op": "insertRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 61,
+        "start": 3,
+        "text": "x\r\n| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n| f |  |\r\n|  |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 3,
+      "op": "insertColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 3,
+      "op": "deleteRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 3,
+      "op": "deleteColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 4,
+      "op": "insertRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 4,
+      "op": "insertColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 4,
+      "op": "deleteRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 4,
+      "op": "deleteColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 0,
+      "to": 2,
+      "op": "moveRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 52,
+        "start": 3,
+        "text": "x\r\n| c | d | e |\r\n| :-- | --: |\r\n| f |  |\r\n| a | b |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 0,
+      "to": 2,
+      "op": "moveColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 2,
+      "to": 0,
+      "op": "moveRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 52,
+        "start": 3,
+        "text": "x\r\n| f |  |\r\n| :-- | --: |\r\n| a | b |\r\n| c | d | e |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 2,
+      "to": 0,
+      "op": "moveColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 1,
+      "to": 1,
+      "op": "moveRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 1,
+      "to": 1,
+      "op": "moveColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 0,
+      "to": 3,
+      "op": "moveRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "from": 0,
+      "to": 3,
+      "op": "moveColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 5,
+        "start": 5,
+        "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny"
+      }
+    },
+    {
+      "op": "headingColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 84,
+        "start": 3,
+        "text": "x\r\n<!-- first column headings -->\r\n| a | b |\r\n| :-- | --: |\r\n| c | d | e |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 41,
+        "start": 3,
+        "text": "x\r\n| c | d | e |\r\n| :-- | --: |\r\n| f |  |\r\n\r\ny"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 5,
+      "end": 5,
+      "text": "x\r\n| a | b |\r\n|:-|-:|\r\n| c | d | e |\r\n| f |\r\n\r\ny",
+      "result": {
+        "end": 34,
+        "start": 3,
+        "text": "x\r\n| b |\r\n| --: |\r\n| d | e |\r\n|  |\r\n\r\ny"
+      }
+    },
+    {
+      "op": "headingColumn",
+      "start": 0,
+      "end": 0,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 23,
+        "start": 0,
+        "text": "| 🧠 | ü |\n| --- | --- |\n\n# next"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 0,
+      "end": 0,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": "\n# next"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 0,
+      "end": 0,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 44,
+        "start": 0,
+        "text": "<!-- first column headings -->\n| ü |\n| --- |\n\n# next"
+      }
+    },
+    {
+      "op": "headingColumn",
+      "start": 34,
+      "end": 34,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 23,
+        "start": 0,
+        "text": "| 🧠 | ü |\n| --- | --- |\n\n# next"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 34,
+      "end": 34,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": "\n# next"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 34,
+      "end": 34,
+      "text": "<!-- first column headings -->\n| 🧠 | ü |\n|---|---|\n\n# next",
+      "result": {
+        "end": 44,
+        "start": 0,
+        "text": "<!-- first column headings -->\n| ü |\n| --- |\n\n# next"
+      }
+    },
+    {
+      "op": "headingColumn",
+      "start": 3,
+      "end": 3,
+      "text": "x\n| a |\n|---|",
+      "result": {
+        "end": 46,
+        "start": 2,
+        "text": "x\n<!-- first column headings -->\n| a |\n| --- |"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 3,
+      "end": 3,
+      "text": "x\n| a |\n|---|",
+      "result": {
+        "end": 1,
+        "start": 1,
+        "text": "x"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 3,
+      "end": 3,
+      "text": "x\n| a |\n|---|",
+      "result": {
+        "end": 1,
+        "start": 1,
+        "text": "x"
+      }
+    },
+    {
+      "op": "headingColumn",
+      "start": 0,
+      "end": 0,
+      "text": "a\n| b |\n|-|",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": "a\n| b |\n|-|"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteRow",
+      "start": 0,
+      "end": 0,
+      "text": "a\n| b |\n|-|",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": "a\n| b |\n|-|"
+      }
+    },
+    {
+      "index": 0,
+      "op": "deleteColumn",
+      "start": 0,
+      "end": 0,
+      "text": "a\n| b |\n|-|",
+      "result": {
+        "end": 0,
+        "start": 0,
+        "text": "a\n| b |\n|-|"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 0,
+      "end": 0,
+      "text": "",
+      "result": {
+        "end": 29,
+        "start": 0,
+        "text": "|  |  |\n| --- | --- |\n|  |  |"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 5,
+      "end": 5,
+      "text": "abc def",
+      "result": {
+        "end": 38,
+        "start": 9,
+        "text": "abc def\n\n|  |  |\n| --- | --- |\n|  |  |"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 1,
+      "end": 1,
+      "text": "abc\ndef",
+      "result": {
+        "end": 34,
+        "start": 5,
+        "text": "abc\n\n|  |  |\n| --- | --- |\n|  |  |\n\ndef"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 4,
+      "end": 4,
+      "text": "abc\ndef",
+      "result": {
+        "end": 34,
+        "start": 5,
+        "text": "abc\n\n|  |  |\n| --- | --- |\n|  |  |\n\ndef"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 4,
+      "end": 4,
+      "text": "abc\n\ndef",
+      "result": {
+        "end": 34,
+        "start": 5,
+        "text": "abc\n\n|  |  |\n| --- | --- |\n|  |  |\n\ndef"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 5,
+      "end": 5,
+      "text": "abc\n  \n\ndef",
+      "result": {
+        "end": 34,
+        "start": 5,
+        "text": "abc\n\n|  |  |\n| --- | --- |\n|  |  |\n\ndef"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 4,
+      "end": 4,
+      "text": "abc\n",
+      "result": {
+        "end": 34,
+        "start": 5,
+        "text": "abc\n\n|  |  |\n| --- | --- |\n|  |  |"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 0,
+      "end": 0,
+      "text": "a\r\nb",
+      "result": {
+        "end": 31,
+        "start": 0,
+        "text": "|  |  |\r\n| --- | --- |\r\n|  |  |\r\n\r\na\r\nb"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 1,
+      "end": 1,
+      "text": "  a\rb",
+      "result": {
+        "end": 29,
+        "start": 0,
+        "text": "|  |  |\r| --- | --- |\r|  |  |\r\r  a\rb"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 2,
+      "end": 2,
+      "text": "a | b\n-|-\nc | d\n# next",
+      "result": {
+        "end": 46,
+        "start": 17,
+        "text": "a | b\n-|-\nc | d\n\n|  |  |\n| --- | --- |\n|  |  |\n\n# next"
+      }
+    },
+    {
+      "op": "insertTable",
+      "start": 1,
+      "end": 1,
+      "text": "🧠\n",
+      "result": {
+        "end": 32,
+        "start": 3,
+        "text": "🧠\n\n|  |  |\n| --- | --- |\n|  |  |\n"
+      }
     }
   ],
   "mayOpen": {
@@ -8010,5 +14217,52 @@
     " https://x.org": false,
     "ʜttps://x.org": false,
     "": false
+  },
+  "swaps": {
+    "cases": [
+      {
+        "column": 1,
+        "line": 1,
+        "result": "<!-- first column headings -->\n| ☐ milk | ❌ 2 | a ❌ |\n|-|-|-|\n❌ c | d\n☐‍ x |\n# ☐ end",
+        "to": "failed"
+      },
+      {
+        "column": 1,
+        "line": 1,
+        "result": null,
+        "to": "checked"
+      },
+      {
+        "column": 0,
+        "line": 3,
+        "result": "<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n☐ c | d\n☐‍ x |\n# ☐ end",
+        "to": "open"
+      },
+      {
+        "column": null,
+        "line": 3,
+        "result": null,
+        "to": "open"
+      },
+      {
+        "column": 2,
+        "line": 1,
+        "result": null,
+        "to": "open"
+      },
+      {
+        "column": null,
+        "line": 5,
+        "result": null,
+        "to": "checked"
+      },
+      {
+        "column": 0,
+        "line": 4,
+        "result": null,
+        "to": "checked"
+      }
+    ],
+    "text": "<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n❌ c | d\n☐‍ x |\n# ☐ end"
   }
 }
