@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use egui::accesskit::Role;
 use egui::{Event, Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -81,10 +82,13 @@ fn window(store: Arc<Store>, board: &Shared) -> Harness<'static, App> {
     harness
 }
 
-/// What the capture field holds.
+/// What the capture field holds: the window's one field of many lines.
+/// Its hint is no use here, as AccessKit tells a field's placeholder
+/// only while the field is empty.
 fn typed<S>(harness: &Harness<'_, S>) -> Option<String> {
-    let hint = t().capture_hint();
-    harness.get_by(|n| n.placeholder() == Some(hint)).value()
+    harness
+        .get_by(|n| n.role() == Role::MultilineTextInput)
+        .value()
 }
 
 /// Gives the capture field the keyboard.
