@@ -22,6 +22,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::{DateTime, Duration, Utc};
 use egui_kittest::Harness;
@@ -124,9 +125,15 @@ const DE: Texts = Texts {
 fn demo(x: &Texts) -> Result<(Store, Vec<String>), Box<dyn std::error::Error>> {
     let now = Arc::new(Mutex::new(parse_time("2026-10-22T17:40:00.000Z")?));
     let clock = now.clone();
-    let store = Store::in_memory(Box::new(move || *clock.lock()), || {
+    let mut store = Store::in_memory(Box::new(move || *clock.lock()), || {
         Ok(SigningKey::from_seed([45; 32]))
     })?;
+    // Counted ids, not random ones: Notes captured at the same moment
+    // keep one order on every machine.
+    let next = AtomicU64::new(0);
+    store.set_id_maker(Box::new(move || {
+        Ok(format!("{:032x}", next.fetch_add(1, Ordering::SeqCst) + 1))
+    }));
     store.set_local_setting("author", "Sam")?;
     let places = Places::new(&store);
     let household = places.add_area(x.household)?;
