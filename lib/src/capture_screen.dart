@@ -113,7 +113,8 @@ bool? pourIntoShopping(Notes notes, String noteId, String listId) {
     return null;
   }
   final text = [
-    note.text,
+    // Its boxes as they show, without their ids (ADR 0035).
+    note.shownText,
     for (final hash in note.recordings) ?note.transcripts[hash],
   ].join('\n');
   try {
@@ -476,7 +477,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       if (text.isNotEmpty &&
           note != null &&
           note.textEditable &&
-          note.text != text) {
+          // Its boxes got ids when it was kept (ADR 0035).
+          TextBoxes.strip(note.text) != text) {
         notes.edit(captured.noteId, text, format: _formatOf(text));
       }
       if (nudgeIn != null && !_sorted) {

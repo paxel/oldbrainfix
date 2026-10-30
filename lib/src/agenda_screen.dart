@@ -1251,7 +1251,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
                             .byNote(captured.note.id, deviceWallClock),
                     lists: ShoppingLists(widget.notes.store),
                   ),
-                  onMark: markEdit(widget.notes, captured, _reload),
+                  boxes: boxTicks(widget.notes, captured, _reload),
                   onTable: tableEdit(widget.notes, captured, _reload),
                   onTap: _unfoldedId == captured.note.id
                       ? null

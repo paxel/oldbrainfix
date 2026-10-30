@@ -4255,6 +4255,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String get textMarkInsert => '☐ an den Anfang der Zeile setzen';
 
   @override
+  String get boxInsert => '☐ einfügen';
+
+  @override
+  String get boxChange => 'Statuskästchen ändern';
+
+  @override
+  String get boxShowTicks => 'Ticks zeigen';
+
+  @override
+  String boxTickBy(String name, String when) {
+    return '$name, $when';
+  }
+
+  @override
+  String get boxTickYou => 'Du';
+
+  @override
+  String get boxHistoryHint =>
+      'Jede Änderung dieses Statuskästchens, die älteste zuerst.';
+
+  @override
   String searchForTag(String tag) {
     return 'Nach $tag suchen';
   }

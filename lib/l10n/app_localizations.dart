@@ -6866,6 +6866,42 @@ abstract class AppLocalizations {
   /// **'Put ☐ at the start of the line'**
   String get textMarkInsert;
 
+  /// Label of the button in the bar above the keyboard that puts an open box ☐ in at the cursor, also in the middle of a word.
+  ///
+  /// In en, this message translates to:
+  /// **'Put in ☐'**
+  String get boxInsert;
+
+  /// Screen reader hint of a box ☐ ✅ ❌ in a text that can be tapped: it opens Check, Fail, Open and History.
+  ///
+  /// In en, this message translates to:
+  /// **'change the box'**
+  String get boxChange;
+
+  /// Switch in a Note's menu: shows after each box in its text who changed its state last and when. Kept for this Note on this Device only.
+  ///
+  /// In en, this message translates to:
+  /// **'Show ticks'**
+  String get boxShowTicks;
+
+  /// Small grey text after a box with Show ticks on, and a line of its History: who changed its state and when, such as 'Ann, Tue 14:02'.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {when}'**
+  String boxTickBy(String name, String when);
+
+  /// Who changed the state of a box when it was the user, on one of their own Devices: 'You, Tue 14:02'.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get boxTickYou;
+
+  /// Line under the title of a box's History dialog, which lists each change of its state with who made it and when.
+  ///
+  /// In en, this message translates to:
+  /// **'Every change of this box, the oldest first.'**
+  String get boxHistoryHint;
+
   /// Screen reader label of a word with # in front, such as #Garten, in a Note's text: a tap opens the search for it.
   ///
   /// In en, this message translates to:

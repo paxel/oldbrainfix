@@ -147,6 +147,11 @@ class NoteActions {
   /// null.
   final VoidCallback? Function()? addToShopping;
 
+  /// Whether the Note shows after each box who ticked it last and when,
+  /// and switching that, read as the menu opens (ADR 0035); left out
+  /// while it is null or gives null, as for a Note without boxes.
+  final ({bool on, VoidCallback toggle})? Function()? showTicks;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -163,6 +168,7 @@ class NoteActions {
     this.onAddEntry,
     this.checklist,
     this.addToShopping,
+    this.showTicks,
     this.onDelete,
   });
 }
@@ -255,11 +261,11 @@ class NoteCard extends StatelessWidget {
   /// how many are open on a compact one (#122); nothing when null.
   final NoteShoppingList? shopping;
 
-  /// Changes the status mark of a line of the Note's text to the state
-  /// picked (ADR 0031): each ☐, ✅ or ❌ at the start of a line opens Check,
-  /// Fail and Open at the finger; they are plain characters when null, as
-  /// in a Section's text, which has no edit.
-  final MarkSwap? onMark;
+  /// How the boxes of the Note's text, or of a Section's, given by its
+  /// entity and its boxes, are ticked (ADR 0035): each ☐, ✅ or ❌ opens
+  /// Check, Fail, Open and its History at the finger; they are plain
+  /// characters when null.
+  final BoxTicking Function(String entity, List<ShownBox> boxes)? boxes;
 
   /// Changes a table of the Note's text in its full-screen view (ADR
   /// 0033); the table is only read there when null, as a Section's.
@@ -294,7 +300,7 @@ class NoteCard extends StatelessWidget {
     this.footer,
     this.checklist,
     this.shopping,
-    this.onMark,
+    this.boxes,
     this.onTable,
   });
 
@@ -455,24 +461,27 @@ class NoteCard extends StatelessWidget {
                         when: when,
                         sections: sections,
                         list: lists(true),
-                        onMark: onMark,
+                        boxes: boxes,
                         onTable: onTable,
                       )
                     else ...[
                       // A photo Note may have no words.
                       if (note.text.isNotEmpty)
-                        if (firstLine(note.text) case (final start, final end))
-                          MarkedText(
-                            note.text,
-                            key: const ValueKey('note-first-line'),
-                            format: note.textFormat,
-                            start: start,
-                            end: end,
-                            style: text.bodyLarge,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            onMark: onMark,
-                          ),
+                        if (note.shownText case final shown)
+                          if (firstLine(shown) case (final start, final end))
+                            MarkedText(
+                              shown,
+                              key: const ValueKey('note-first-line'),
+                              format: note.textFormat,
+                              start: start,
+                              end: end,
+                              style: text.bodyLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              boxes: note.boxes,
+                              source: note.text,
+                              ticking: boxes?.call(note.id, note.boxes),
+                            ),
                       ?lists(false),
                       if (note.photos.isNotEmpty) ...[
                         if (note.text.isNotEmpty) const SizedBox(height: 8),
@@ -629,7 +638,7 @@ class NoteActionRow extends StatelessWidget {
 
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with Edit, then the Note's Importance as radio buttons, the one it has
-/// marked, then sending, the calendar, adding to the Note, "Add entry" of
+/// marked, then Show ticks while it has boxes, then sending, the calendar, adding to the Note, "Add entry" of
 /// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
 /// Shopping List" or, for one, "Uncheck all" (a Checklist's) and "Back to
 /// a plain Note", removing a photo or recording while its
@@ -656,6 +665,7 @@ class _MoreButton extends StatelessWidget {
         final tally = actions.isTally?.call();
         final list = actions.checklist?.call();
         final addToShopping = actions.addToShopping?.call();
+        final ticks = actions.showTicks?.call();
         PopupMenuItem<VoidCallback> item(
           String key,
           IconData icon,
@@ -709,6 +719,7 @@ class _MoreButton extends StatelessWidget {
               ),
             const PopupMenuDivider(),
           ],
+          if (ticks != null) showTicksItem(button, ticks),
           if (actions.onSend case final send?)
             item('note-send', Icons.send_outlined, t.sendToPerson, send),
           if (actions.onShare case final share?)
@@ -807,6 +818,40 @@ class _MoreButton extends StatelessWidget {
     );
   }
 }
+
+/// The menu entry that switches Show ticks of a Note on and off, [ticks]
+/// telling whether it is on (ADR 0035): its words, and the switch below
+/// them.
+PopupMenuItem<VoidCallback> showTicksItem(
+  BuildContext context,
+  ({bool on, VoidCallback toggle}) ticks,
+) => PopupMenuItem(
+  key: const ValueKey('note-show-ticks'),
+  value: ticks.toggle,
+  child: Semantics(
+    toggled: ticks.on,
+    child: Row(
+      children: [
+        const Icon(Icons.history_toggle_off),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.t.boxShowTicks),
+              ExcludeSemantics(
+                child: IgnorePointer(
+                  child: Switch(value: ticks.on, onChanged: (_) {}),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ),
+);
 
 /// Another person's Profile on a card, picture and name, opening their
 /// Profile (#52) with room around it for a finger. It follows their
@@ -972,8 +1017,8 @@ class _FullNote extends StatefulWidget {
   /// The Note's Checklist, under its text.
   final Widget? list;
 
-  /// Changes a status mark of the Note's text; never one of a Section's.
-  final MarkSwap? onMark;
+  /// How the boxes of the Note's text and of its Sections' are ticked.
+  final BoxTicking Function(String entity, List<ShownBox> boxes)? boxes;
 
   /// Changes a table of the Note's text; never one of a Section's.
   final TableEditing? onTable;
@@ -983,7 +1028,7 @@ class _FullNote extends StatefulWidget {
     required this.when,
     this.sections,
     this.list,
-    this.onMark,
+    this.boxes,
     this.onTable,
   });
 
@@ -1020,7 +1065,10 @@ class _FullNoteState extends State<_FullNote> {
       children: [
         _Whole(
           id: note.id,
-          text: note.text,
+          text: note.shownText,
+          source: note.text,
+          boxes: note.boxes,
+          ticking: widget.boxes?.call(note.id, note.boxes),
           format: note.textFormat,
           photos: note.photos,
           photoTexts: note.photoTexts,
@@ -1029,7 +1077,6 @@ class _FullNoteState extends State<_FullNote> {
           transcripts: note.transcripts,
           removedRecordings: note.removedRecordings,
           list: widget.list,
-          onMark: widget.onMark,
           onTable: widget.onTable,
         ),
         for (final section in _sections)
@@ -1042,7 +1089,10 @@ class _FullNoteState extends State<_FullNote> {
               const SizedBox(height: 8),
               _Whole(
                 id: section.id,
-                text: section.text,
+                text: section.shownText,
+                source: section.text,
+                boxes: section.boxes,
+                ticking: widget.boxes?.call(section.id, section.boxes),
                 format: section.textFormat,
                 photos: section.photos,
                 photoTexts: section.photoTexts,
@@ -1065,7 +1115,11 @@ class _FullNoteState extends State<_FullNote> {
 /// photos and recordings removed while their texts stay.
 class _Whole extends StatelessWidget {
   final String id;
+
+  /// The text as it shows, its [boxes] in it, and as it is stored.
   final String text;
+  final String source;
+  final List<ShownBox> boxes;
 
   /// The format [text] is in: a formatted one is drawn formatted.
   final String format;
@@ -1079,8 +1133,8 @@ class _Whole extends StatelessWidget {
   /// A Checklist's Lines, right under the text.
   final Widget? list;
 
-  /// Changes a status mark of the text; plain characters when null.
-  final MarkSwap? onMark;
+  /// How the boxes of the text are ticked; plain characters when null.
+  final BoxTicking? ticking;
 
   /// Changes a table of the text; it is only read when null.
   final TableEditing? onTable;
@@ -1088,6 +1142,8 @@ class _Whole extends StatelessWidget {
   const _Whole({
     required this.id,
     required this.text,
+    required this.source,
+    required this.boxes,
     required this.format,
     required this.photos,
     required this.photoTexts,
@@ -1096,7 +1152,7 @@ class _Whole extends StatelessWidget {
     required this.transcripts,
     required this.removedRecordings,
     this.list,
-    this.onMark,
+    this.ticking,
     this.onTable,
   });
 
@@ -1111,7 +1167,9 @@ class _Whole extends StatelessWidget {
           text,
           format: format,
           style: style,
-          onMark: onMark,
+          boxes: boxes,
+          source: source,
+          ticking: ticking,
           tableEdit: onTable,
         ),
       // It keeps its own space: it is nothing on a Note that is none.
@@ -1124,7 +1182,9 @@ class _Whole extends StatelessWidget {
                 text,
                 format: format,
                 style: style,
-                onMark: onMark,
+                boxes: boxes,
+                source: source,
+                ticking: ticking,
                 tableEdit: onTable,
               ),
             list,

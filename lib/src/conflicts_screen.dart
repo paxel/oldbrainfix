@@ -107,11 +107,11 @@ class _ConflictCard extends StatelessWidget {
         : null;
     final note = conflict.unit == scheduleUnit
         ? switch (Routines(store).byId(conflict.entity)) {
-            final routine? => Routines(store).note(routine)?.text,
+            final routine? => Routines(store).note(routine)?.shownText,
             null => null,
           }
         : lineNote != null
-        ? Notes(store).byId(lineNote)?.text
+        ? Notes(store).byId(lineNote)?.shownText
         : null;
     final shopping =
         lineNote != null && ShoppingLists(store).isShoppingList(lineNote);
@@ -241,9 +241,10 @@ String conflictValue(
         ? t.conflictEmpty
         : scheduleText(t, locale, schedule);
   }
-  // A text shows as its source text, whatever its format.
+  // A text shows as its source text, whatever its format, its boxes
+  // without their ids (ADR 0035).
   final value = conflict.unit == NoteKeys.text
-      ? version.text.text
+      ? TextBoxes.strip(version.text.text)
       : version.value;
   if (value == null || value.isEmpty) return t.conflictEmpty;
   if (conflict.unit == NamedPlaceKeys.radius) {

@@ -1,6 +1,6 @@
-<!-- page: title="Formatierter Text, Transkripte und Fototexte" track="guide" order=5 summary="Den Text einer Notiz formatieren, Statuszeichen und #Wörter, Tabellen, Transkripte mit den Sprachmodellen, Fototexte und die Suche." -->
+<!-- page: title="Formatierter Text, Transkripte und Fototexte" track="guide" order=5 summary="Den Text einer Notiz formatieren, Statuskästchen und #Wörter, Tabellen, Transkripte mit den Sprachmodellen, Fototexte und die Suche." -->
 <p class="lede">
-  Der Text einer Notiz kann formatiert sein und Statuszeichen, #Wörter und Tabellen enthalten.
+  Der Text einer Notiz kann formatiert sein und Statuskästchen, #Wörter und Tabellen enthalten.
   Sprachaufnahmen bekommen ein Transkript und Fotos einen Fototext, beides auf dem Gerät erzeugt;
   die Suche findet Notizen an all dem.
 </p>
@@ -22,7 +22,7 @@
   hinzufügen sie geöffnet hat. Ihre Tasten, in dieser Reihenfolge:
 </p>
 <ul>
-  <li>☐: <strong>☐ an den Anfang der Zeile setzen</strong> (nur im Notiz-Editor; siehe Statuszeichen).</li>
+  <li>☐: <strong>☐ einfügen</strong> am Cursor (nur im Notiz-Editor; siehe Statuskästchen).</li>
   <li><strong>Fett</strong>, <strong>Kursiv</strong> und <strong>Durchstreichen</strong>.</li>
   <li><strong>H1</strong> und <strong>H2</strong>: <strong>Große Überschrift</strong> und <strong>Kleine Überschrift</strong>.</li>
   <li><strong>Aufzählung</strong>, <strong>Nummerierte Liste</strong> und <strong>Zitat</strong>.</li>
@@ -109,20 +109,25 @@
   <figcaption>Eine Tabelle im Vollbild, ihre erste Spalte als Überschriften.</figcaption>
 </figure>
 
-<h2>Statuszeichen</h2>
+<h2>Statuskästchen</h2>
 <p>
-  Ein ☐, ✅ oder ❌ am Anfang einer Zeile ist ein Statuszeichen: offen, abgehakt oder gescheitert,
-  etwa „✅ v2 beim Kunden unterstützt“. Ein Tippen darauf öffnet am Finger ein Menü mit
-  <strong>Abhaken</strong>, <strong>Als gescheitert markieren</strong> und <strong>Wieder
-  öffnen</strong>, ohne den aktuellen Zustand, und die Wahl ändert das Zeichen im Text. Das ist eine
-  Änderung des Notiztexts wie jede andere und wird auf jedes Gerät synchronisiert.
+  Ein ☐, ✅ oder ❌ irgendwo im Text einer Notiz oder eines Abschnitts ist ein Statuskästchen: offen,
+  abgehakt oder gescheitert, etwa „✅ v2 beim Kunden unterstützt“. Es wird beim Speichern des Textes
+  zu einem Statuskästchen, und das Zeichen, mit dem es geschrieben wurde, ist der Zustand, mit dem es
+  beginnt. Ein Tippen darauf öffnet am Finger ein Menü mit <strong>Abhaken</strong>, <strong>Als
+  gescheitert markieren</strong> und <strong>Wieder öffnen</strong>, ohne den aktuellen Zustand. Die
+  Wahl wird neben dem Text gespeichert, mit Person und Zeitpunkt, und auf jedes Gerät synchronisiert;
+  der Text selbst bleibt, wie er ist.
 </p>
 <ul>
-  <li>Vor dem Zeichen dürfen Leerzeichen und Tabulatoren stehen und ein Listenzeichen, <code>-</code>, <code>*</code> oder <code>+</code>, mit einem Leerzeichen danach, sodass „- ☐ Milch“ zählt. Nach einer Nummer („1. ☐“) oder in einem Zitat zählt es nicht; ebenso wenig ein Zeichen mitten in einer Zeile oder andere Kästchen und Haken wie ☑ oder ✓.</li>
-  <li>In einem formatierten Text zählt auch ein Zeichen am Anfang einer Tabellenzelle.</li>
-  <li>Die Zeichen lassen sich auf der Karte der Notiz, im Notiz-Editor und in einer Tabelle im Vollbild ändern. Die eines Abschnitts erscheinen, lassen sich aber nicht ändern.</li>
-  <li>☐ in der Formatleiste setzt „☐ “ an den Anfang der Zeile mit dem Cursor, nach ihren Leerzeichen und ihrem Listenzeichen; auf einer Zeile, die schon ein Zeichen hat, tut es nichts.</li>
-  <li>In einem geteilten Bereich ändern nur die Person, die die Notiz geschrieben hat, und die Verwalter ihre Zeichen.</li>
+  <li>Ein Statuskästchen kann mitten in einem Wort oder einer Zeile stehen, in einem Listenpunkt, einem Zitat, den Wörtern eines Links und einer Tabellenzelle. In Code im Text oder in der Adresse eines Links zählt es nicht; ebenso wenig andere Kästchen und Haken wie ☑ oder ✓.</li>
+  <li>Statuskästchen werden auf der Karte der Notiz, in ihren Abschnitten, im Notiz-Editor und in einer Tabelle im Vollbild abgehakt. Ein Statuskästchen, das gerade getippt wird, lässt sich abhaken, sobald der Text gespeichert ist.</li>
+  <li>☐ in der Formatleiste setzt ☐ am Cursor ein, auch mitten in einem Wort.</li>
+  <li>Jedes Statuskästchen trägt eine Kennung, die nie zu sehen ist. Der Cursor springt über ein Statuskästchen wie über ein Zeichen; wird sein Zeichen gelöscht, ist das Statuskästchen gelöscht.</li>
+  <li><strong>Ticks zeigen</strong> im ⋮ der Karte der Notiz und des Notiz-Editors zeigt nach jedem abgehakten Statuskästchen klein und grau, wer es zuletzt wann geändert hat, etwa „Ann, Di. 14:02“. Das gilt für diese Notiz auf diesem Gerät.</li>
+  <li>Sobald ein Statuskästchen geändert wurde, hat sein Menü auch <strong>Verlauf</strong>: jede Änderung, die älteste zuerst, mit Zustand, Person und Zeitpunkt.</li>
+  <li>In einem geteilten Bereich ändert jeder mit einer Rolle dort jedes Statuskästchen jeder Notiz und jedes Abschnitts. Statuskästchen hinzufügen, verschieben und löschen ist eine Änderung des Textes und bleibt der Person, die die Notiz geschrieben hat, und den Verwaltern.</li>
+  <li>Kopien, Weitergaben, Markdown-Dateien und gesendete Notizen zeigen jedes Statuskästchen in seinem jetzigen Zustand.</li>
 </ul>
 
 <h2>#Wörter</h2>

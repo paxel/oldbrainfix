@@ -80,7 +80,8 @@ void main() {
       WidgetTester tester,
       String text, {
       String format = TextFormats.markdown,
-      MarkSwap? onMark,
+      List<ShownBox>? boxes,
+      BoxTicking? ticking,
       TagSearch? onSearch,
       int? start,
       int? end,
@@ -106,7 +107,8 @@ void main() {
                     end: end,
                     maxLines: maxLines,
                     style: const TextStyle(fontSize: 16),
-                    onMark: onMark,
+                    boxes: boxes,
+                    ticking: ticking,
                   ),
                 ),
               ),
@@ -232,23 +234,43 @@ void main() {
       ]);
     });
 
-    testWidgets('status marks stay buttons and tags stay links inside it', (
+    testWidgets('boxes stay buttons and tags stay links inside it', (
       tester,
     ) async {
-      final marked = <(int, TextMark)>[];
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes
+          .capture(
+            '# Plan #Garten\n- ☐ **seeds** for #Beet\n`#code ✅` '
+            '[#tag](https://x.y)',
+            format: TextFormats.markdown,
+          )
+          .id;
+      final note = notes.byId(id)!;
+      // The one in code is none.
+      final box = note.boxes.single;
+      var ticked = 0;
       final searched = <String>[];
       await pump(
         tester,
-        '# Plan #Garten\n- ☐ **seeds** for #Beet\n`#code` [#tag](https://x.y)',
-        onMark: (line, to, {column}) => marked.add((line, to)),
+        note.shownText,
+        boxes: note.boxes,
+        ticking: BoxTicking(
+          notes: notes,
+          entity: id,
+          ticks: const {},
+          mayTick: true,
+          changed: () => ticked++,
+        ),
         onSearch: (_, query) => searched.add(query),
       );
-      expect(key('mark-1'), findsOneWidget);
-      await tester.tap(key('mark-1'));
+      await tester.tap(key('box-${box.id}'));
       await tester.pumpAndSettle();
-      await tester.tap(key('mark-checked'));
+      await tester.tap(key('box-done'));
       await tester.pumpAndSettle();
-      expect(marked, [(1, TextMark.checked)]);
+      expect(ticked, 1);
+      expect(notes.byId(id)!.boxes.single.state, BoxState.done);
 
       // Tags in code and in a link's label are none of their own.
       final tags = find.byWidgetPredicate(
@@ -346,7 +368,7 @@ void main() {
                 TwoRowTextField(
                   controller: controller,
                   twoRows: twoRows,
-                  marks: true,
+                  boxes: true,
                   formats: true,
                   onFormatted: onFormatted,
                 ),
@@ -375,7 +397,7 @@ void main() {
       final row = key('two-row-bar');
       expect(tester.getBottomLeft(bar).dy, tester.getTopLeft(row).dy);
       expect(
-        tester.getTopLeft(key('two-row-insert-mark')).dx,
+        tester.getTopLeft(key('two-row-insert-box')).dx,
         lessThan(tester.getTopLeft(key('format-bold')).dx),
       );
     });

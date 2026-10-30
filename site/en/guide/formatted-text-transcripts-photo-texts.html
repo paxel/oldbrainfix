@@ -1,6 +1,6 @@
-<!-- page: title="Formatted text, Transcripts and Photo Texts" track="guide" order=5 summary="Formatting a Note's text, status marks and #tags, tables, Transcripts with the speech models, Photo Texts, and the search." -->
+<!-- page: title="Formatted text, Transcripts and Photo Texts" track="guide" order=5 summary="Formatting a Note's text, boxes and #tags, tables, Transcripts with the speech models, Photo Texts, and the search." -->
 <p class="lede">
-  A Note's text can be formatted, hold status marks, #tags and tables. Voice recordings get a
+  A Note's text can be formatted, hold boxes, #tags and tables. Voice recordings get a
   Transcript and photos a Photo Text, both written on the Device; the search finds Notes by all of
   them.
 </p>
@@ -21,7 +21,7 @@
   open. Its buttons, in this order:
 </p>
 <ul>
-  <li>☐: <strong>Put ☐ at the start of the line</strong> (in the Note editor only; see Status marks).</li>
+  <li>☐: <strong>Put in ☐</strong> at the cursor (in the Note editor only; see Boxes).</li>
   <li><strong>Bold</strong>, <strong>Italic</strong> and <strong>Strike through</strong>.</li>
   <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
   <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
@@ -105,20 +105,24 @@
   <figcaption>A table full screen, its first column as headings.</figcaption>
 </figure>
 
-<h2>Status marks</h2>
+<h2>Boxes</h2>
 <p>
-  A ☐, ✅ or ❌ at the start of a line is a status mark: open, checked or failed, such as "✅ v2
-  supported at the customer". A tap on it opens a menu at the finger with <strong>Check</strong>,
-  <strong>Fail</strong> and <strong>Open</strong>, the current state left out, and the choice
-  changes the character in the text. This is an edit of the Note's text like any other, synced to
-  every Device.
+  A ☐, ✅ or ❌ anywhere in the text of a Note or a Section is a box: open, checked or failed, such
+  as "✅ v2 supported at the customer". It becomes a box when the text is saved, and the character it
+  was written with is the state it starts in. A tap on it opens a menu at the finger with
+  <strong>Check</strong>, <strong>Fail</strong> and <strong>Open</strong>, the current state left
+  out. The choice is kept beside the text with who made it and when, synced to every Device; the
+  text itself stays as it is.
 </p>
 <ul>
-  <li>Spaces and tabs may come before the mark, and one list bullet, <code>-</code>, <code>*</code> or <code>+</code>, with a space after it, so "- ☐ milk" counts. After a number ("1. ☐") or in a quote it does not; nor does a mark in the middle of a line, nor other boxes and ticks such as ☑ or ✓.</li>
-  <li>In a formatted text, a mark at the start of a table's cell counts too.</li>
-  <li>The marks can be changed on the Note's card, in the Note editor and in a table full screen. Those of a Section show but cannot be changed.</li>
-  <li>☐ in the format bar puts "☐ " at the start of the cursor's line, after its spaces and bullet; on a line that has a mark it does nothing.</li>
-  <li>In a Shared Area only the Note's author and the Managers change its marks.</li>
+  <li>A box can stand in the middle of a word or line, in a list item, a quote, a link's words and a table's cell. In inline code or a link's address it does not; nor do other boxes and ticks such as ☑ or ✓.</li>
+  <li>Boxes are ticked on the Note's card, in its Sections, in the Note editor and in a table full screen. A box being typed can be ticked once the text is saved.</li>
+  <li>☐ in the format bar puts ☐ in at the cursor, also in the middle of a word.</li>
+  <li>Each box carries an id that is never seen. The cursor steps over a box as one character; deleting the box's character deletes the box.</li>
+  <li><strong>Show ticks</strong> in the ⋮ of the Note's card and of the Note editor shows after each ticked box, small and grey, who ticked it last and when, such as "Ann, Tue 14:02". It is kept for that Note on that Device.</li>
+  <li>Once a box has been ticked, its menu also has <strong>History</strong>: every change, the oldest first, with its state, who made it and when.</li>
+  <li>In a Shared Area everyone with a role there ticks every box of every Note and Section. Adding, moving and deleting boxes is an edit of the text, which stays with the Note's author and the Managers.</li>
+  <li>Copies, shares, Markdown files and Sent Items show each box in its state now.</li>
 </ul>
 
 <h2>#tags</h2>

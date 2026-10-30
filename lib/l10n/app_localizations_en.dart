@@ -4198,6 +4198,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get textMarkInsert => 'Put ☐ at the start of the line';
 
   @override
+  String get boxInsert => 'Put in ☐';
+
+  @override
+  String get boxChange => 'change the box';
+
+  @override
+  String get boxShowTicks => 'Show ticks';
+
+  @override
+  String boxTickBy(String name, String when) {
+    return '$name, $when';
+  }
+
+  @override
+  String get boxTickYou => 'You';
+
+  @override
+  String get boxHistoryHint => 'Every change of this box, the oldest first.';
+
+  @override
   String searchForTag(String tag) {
     return 'Search for $tag';
   }

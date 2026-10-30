@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'box_ids.dart';
 import 'l10n.dart';
 import 'table_screen.dart';
 import 'text_marks_view.dart';
@@ -32,6 +33,23 @@ int graphemeBefore(String text, int offset) {
     at += grapheme.length;
   }
   return math.min(before, offset);
+}
+
+/// The line of [text] that [offset] is on, counted from 0; `\r\n` is
+/// one break.
+int _lineAt(String text, int offset) {
+  final stop = offset.clamp(0, text.length);
+  var line = 0;
+  for (var i = 0; i < stop; i++) {
+    final c = text.codeUnitAt(i);
+    if (c == 0x0D && i + 1 < text.length && text.codeUnitAt(i + 1) == 0x0A) {
+      if (i + 1 < stop) line++;
+      i++;
+    } else if (c == 0x0A || c == 0x0D) {
+      line++;
+    }
+  }
+  return line;
 }
 
 final _wordCharacter = RegExp(r'^[\p{L}\p{N}\p{M}]', unicode: true);
@@ -70,10 +88,13 @@ int wordEdgeNear(String text, int offset) {
 /// the keyboard's suggestions, autocorrect, swipe typing and voice input
 /// work as in any text field.
 ///
-/// With [marks], in either form, a tap on a ☐, ✅ or ❌ at the start of a
-/// line opens Check, Fail and Open at the finger and changes it in the
-/// text, and the bar above the keyboard has a button that puts ☐ at the
-/// start of the cursor's line (ADR 0031); a [readOnly] field has neither.
+/// With [boxes], in either form, the bar above the keyboard has a button
+/// that puts ☐ in at the cursor, also in the middle of a word; a
+/// [readOnly] field has none. A tap on a box of the text (ADR 0035), one
+/// with its id, goes to [onBox] with where the box starts and where the
+/// finger is, also in a [readOnly] field; the cursor stays where it was.
+/// The ids of the boxes are never typed into, nor taken in part
+/// ([BoxIdsFormatter]).
 ///
 /// With [formats], for a [TagTextController], the same bar formats the
 /// selection or the word at the cursor, or the lines they touch (ADR
@@ -111,7 +132,8 @@ class TwoRowTextField extends StatefulWidget {
   final bool autofocus;
   final TextStyle? style;
   final InputDecoration decoration;
-  final bool marks;
+  final bool boxes;
+  final void Function(int start, Offset at)? onBox;
   final bool formats;
   final bool lineFormats;
   final VoidCallback? onFormatted;
@@ -124,14 +146,15 @@ class TwoRowTextField extends StatefulWidget {
     this.autofocus = false,
     this.style,
     this.decoration = const InputDecoration(),
-    this.marks = false,
+    this.boxes = false,
+    this.onBox,
     this.formats = false,
     this.lineFormats = true,
     this.onFormatted,
   });
 
   /// The height of what rides on the keyboard above a field that types
-  /// in [twoRows], with the bar of formats or status marks when [bar].
+  /// in [twoRows], with the bar of formats or ☐ when [bar].
   static double above({required bool twoRows, required bool bar}) =>
       (twoRows ? rowHeight : 0) + (bar ? barHeight : 0);
 
@@ -261,8 +284,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   bool get _rowShown => widget.twoRows && _keyboardOpen;
 
-  /// Whether the field has the bar of formats or status marks.
-  bool get _hasBar => _formatting != null || _marks;
+  /// Whether the field has the bar of formats or ☐.
+  bool get _hasBar => _formatting != null || _inserts;
 
   bool get _barShown => _hasBar && _keyboardOpen;
 
@@ -548,7 +571,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
   }
 
-  bool get _marks => widget.marks && !widget.readOnly;
+  bool get _inserts => widget.boxes && !widget.readOnly;
 
   String? _blocksText;
   List<MarkdownBlock> _blocksOf = const [];
@@ -563,56 +586,24 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     return _blocksOf;
   }
 
-  /// The status marks of the text: in a formatted one also those at the
-  /// start of a table's cell.
-  List<MarkdownMark> _marksOf(String text) => _formatting?.markdown ?? false
-      ? Markdown.marks(text)
-      : [
-          for (final m in TextMarks.find(text))
-            (
-              line: m.line,
-              column: null,
-              mark: m.mark,
-              start: m.start,
-              end: m.end,
-            ),
-        ];
-
-  /// Opens the menu of the status mark at [at] (global), if there is one
-  /// at the start of a line or a cell there; whether there was.
-  bool _tappedMark(Offset at) {
-    if (!_marks) return false;
+  /// Tells [TwoRowTextField.onBox] of the box at [at] (global), if
+  /// there is one there; whether there was.
+  bool _tappedBox(Offset at) {
+    final onBox = widget.onBox;
+    if (onBox == null) return false;
     final editable = _editable()?.renderEditable;
     if (editable == null) return false;
     final local = editable.globalToLocal(at);
-    for (final mark in _marksOf(widget.controller.text)) {
-      final boxes = editable.getBoxesForSelection(
-        TextSelection(baseOffset: mark.start, extentOffset: mark.end),
+    for (final box in TextBoxes.find(widget.controller.text)) {
+      final rects = editable.getBoxesForSelection(
+        TextSelection(baseOffset: box.start, extentOffset: box.end),
       );
-      if (boxes.any((box) => box.toRect().inflate(4).contains(local))) {
-        unawaited(_changeMark(mark, at));
+      if (rects.any((rect) => rect.toRect().inflate(4).contains(local))) {
+        onBox(box.start, at);
         return true;
       }
     }
     return false;
-  }
-
-  /// Changes [mark] to the state picked in its menu at [at]; the cursor
-  /// keeps its place in the text around it.
-  Future<void> _changeMark(MarkdownMark mark, Offset at) async {
-    final to = await pickTextMark(context, at, mark.mark);
-    if (to == null || !mounted) return;
-    final value = widget.controller.value;
-    final text = value.text;
-    final swapped = _formatting?.markdown ?? false
-        ? Markdown.swapMark(text, mark.line, to, column: mark.column)
-        : TextMarks.swap(text, mark.line, to);
-    if (swapped == null) return;
-    // Typing while the menu was open cannot happen; a sync can.
-    final now = _marksOf(text)
-        .where((m) => m.line == mark.line && m.column == mark.column);
-    final end = now.isEmpty ? mark.end : now.first.end;
-    _replace(value, swapped, end);
   }
 
   /// Opens the table of a formatted text at [at] (global) full screen,
@@ -669,6 +660,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       text: controller.text,
       at: at,
       cell: cell,
+      ticking: controller.boxes,
       edit: TableEditing(
         twoRows: widget.twoRows,
         write: (change) {
@@ -678,26 +670,21 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
             text: change.text,
             selection: TextSelection.collapsed(offset: end),
           );
+          return change.text;
         },
       ),
     );
   }
 
-  /// Puts ☐ at the start of the cursor's line, after its spaces, tabs
-  /// and bullet; the cursor stays on what it was at.
-  void _insertMark() {
+  /// Puts ☐ in at the cursor, also in the middle of a word, or before
+  /// the selection; the cursor or the selection stays after it.
+  void _insertBox() {
     final value = widget.controller.value;
     final text = value.text;
-    final at = value.selection.isValid
-        ? value.selection.baseOffset
-        : text.length;
-    final next = TextMarks.insertOpen(text, TextMarks.lineAt(text, at));
-    if (next == null) return;
-    var from = 0;
-    while (from < text.length && text[from] == next[from]) {
-      from++;
-    }
-    _replace(value, next, from);
+    final at = (value.selection.isValid ? value.selection.start : text.length)
+        .clamp(0, text.length);
+    final next = text.replaceRange(at, at, BoxState.open.glyph);
+    _replace(value, next, at);
   }
 
   /// Writes [next] into the field as typing would, the selection's ends
@@ -780,16 +767,17 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         strutStyle: strut,
         decoration: widget.decoration,
         onChanged: _userChanged,
+        inputFormatters: const [BoxIdsFormatter()],
         scrollPadding: scrollPadding,
-        onTap: _marks || _formatting != null
+        onTap: widget.onBox != null || _formatting != null
             ? () {
                 if (_down case final at?) {
-                  if (!_tappedMark(at)) _tappedTable(at);
+                  if (!_tappedBox(at)) _tappedTable(at);
                 }
               }
             : null,
       );
-      final Widget tapped = !_marks && _formatting == null
+      final Widget tapped = widget.onBox == null && _formatting == null
           ? field
           // The field tells its tap, not where it was.
           : Listener(
@@ -815,6 +803,7 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       strutStyle: strut,
       decoration: widget.decoration,
       onChanged: _userChanged,
+      inputFormatters: const [BoxIdsFormatter()],
       magnifierConfiguration: TextMagnifierConfiguration.disabled,
       selectionControls: _handles,
       contextMenuBuilder: _menu,
@@ -885,12 +874,12 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
     );
     final formats = [
-      if (_marks)
+      if (_inserts)
         _Format(
-          key: 'two-row-insert-mark',
-          label: t.textMarkInsert,
+          key: 'two-row-insert-box',
+          label: t.boxInsert,
           icon: (_) => const Icon(Icons.check_box_outline_blank),
-          run: _insertMark,
+          run: _insertBox,
         ),
       if (controller != null) ...[
         _Format(
@@ -1059,6 +1048,10 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
                   value: widget.controller.value,
                   selecting: _selecting,
                   onLongPress: _toggleSelecting,
+                  boxes: switch (widget.controller) {
+                    final TagTextController controller => controller.boxes,
+                    _ => null,
+                  },
                   // The source of the formatted line being typed.
                   lineOnly: _formatting?.markdown ?? false,
                 ),
@@ -1089,8 +1082,8 @@ class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
 
   @override
   void onSingleTapUp(TapDragUpDetails details) {
-    // A status mark opens its menu; the cursor stays where it was.
-    if (_field._tappedMark(details.globalPosition)) return;
+    // A box opens its menu; the cursor stays where it was.
+    if (_field._tappedBox(details.globalPosition)) return;
     // A table opens full screen; the cursor stays where it was.
     if (_field._tappedTable(details.globalPosition)) return;
     super.onSingleTapUp(details);
@@ -1255,7 +1248,7 @@ class _FormatsAt {
       text.length,
     );
     final parsed = blocks(text);
-    final line = TextMarks.lineAt(text, start);
+    final line = _lineAt(text, start);
     if (line >= parsed.length) return none;
     final block = parsed[line];
     final spans = <MarkdownSpanKind>{};
@@ -1445,6 +1438,9 @@ class _CursorLine extends StatelessWidget {
   final bool selecting;
   final VoidCallback onLongPress;
 
+  /// The ticks of the text's boxes, each drawn in its state.
+  final BoxTicking? boxes;
+
   /// Whether it shows only the cursor's line, not across line breaks.
   final bool lineOnly;
 
@@ -1452,6 +1448,7 @@ class _CursorLine extends StatelessWidget {
     required this.value,
     required this.selecting,
     required this.onLongPress,
+    this.boxes,
     this.lineOnly = false,
   });
 
@@ -1482,7 +1479,9 @@ class _CursorLine extends StatelessWidget {
     final t = context.t;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final text = value.text;
+    final boxes = this.boxes;
+    // Each glyph is one code unit: the offsets stay.
+    final text = boxes == null ? value.text : tickedGlyphs(value.text, boxes);
     final selection = value.selection.isValid
         ? value.selection
         : TextSelection.collapsed(offset: text.length);

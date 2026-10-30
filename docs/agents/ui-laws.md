@@ -261,7 +261,33 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   it sits directly above the bottom row while the keyboard is open, and
   the buttons without room go into ⋮ at its end, opening at the finger.
   On the desktop it sits above the field, which shows a formatted text's
-  Markdown while it is edited and the text as it reads otherwise.
+  Markdown while it is edited and the text as it reads otherwise. Its ☐
+  puts ☐ in at the cursor, also in the middle of a word.
+
+## Boxes
+
+- **A tap on a box opens its menu at the finger**: Check, Fail and
+  Open, the state it shows left out, and History once it has been
+  ticked. It works wherever the box is drawn: on a full or compact
+  card, in a Section, in a table full screen and in the editor's field,
+  also where the text is only read. A box being typed becomes one when
+  the text is saved.
+- **A tick is no edit of the text.** In a Shared Area everyone with a
+  role there ticks any box of any Note and Section; adding, moving and
+  deleting boxes stays an edit of the text, the author's and the
+  Managers'.
+- **A box's id is never seen.** In the field the cursor and a selection
+  step over a box as one character and never end inside it; typing next
+  to it keeps its id with its glyph, and deleting the glyph, or any part
+  of the box, deletes all of it.
+- **Show ticks** is a switch in the ⋮ of a Note's card and of its
+  editor, there only while the Note or a Section of it has a box: while
+  it is on, each ticked box says after it, small and grey, who ticked it
+  last and when ("Ann, Tue 14:02", "You" for one's own, the time alone
+  for a person not known or blocked). It is kept per Note in a setting
+  of this Device.
+- **History** opens a dialog listing every change of the box, the oldest
+  first: the state, who and when.
 
 ## The bar
 

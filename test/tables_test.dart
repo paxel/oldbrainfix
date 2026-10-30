@@ -43,7 +43,8 @@ void main() {
     Future<void> pump(
       WidgetTester tester,
       String text, {
-      MarkSwap? onMark,
+      List<ShownBox>? boxes,
+      BoxTicking? ticking,
       int? start,
       int? end,
       int? maxLines,
@@ -62,7 +63,8 @@ void main() {
                   end: end,
                   maxLines: maxLines,
                   style: const TextStyle(fontSize: 16),
-                  onMark: onMark,
+                  boxes: boxes,
+                  ticking: ticking,
                 ),
               ),
             ),
@@ -105,14 +107,27 @@ void main() {
       expect(find.text('after'), findsOneWidget);
     });
 
-    testWidgets('a cell\'s mark is a button that changes that cell\'s', (
+    testWidgets('a cell\'s box is a button that ticks it beside the text', (
       tester,
     ) async {
-      final marked = <(int, int?, TextMark)>[];
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes.capture(shop, format: TextFormats.markdown).id;
+      final note = notes.byId(id)!;
+      final box = note.boxes.single;
+      var ticked = 0;
       await pump(
         tester,
-        shop,
-        onMark: (line, to, {column}) => marked.add((line, column, to)),
+        note.shownText,
+        boxes: note.boxes,
+        ticking: BoxTicking(
+          notes: notes,
+          entity: id,
+          ticks: const {},
+          mayTick: true,
+          changed: () => ticked++,
+        ),
       );
       // Bold and a tag inside a cell.
       final spans = <TextSpan>[];
@@ -133,15 +148,14 @@ void main() {
       );
       expect(spans.any((s) => s.text == '#dairy'), isTrue);
 
-      await tester.tap(key('mark-4-0'));
+      await tester.tap(key('box-${box.id}'));
       await tester.pumpAndSettle();
-      await tester.tap(key('mark-checked'));
+      await tester.tap(key('box-done'));
       await tester.pumpAndSettle();
-      expect(marked, [(4, 0, TextMark.checked)]);
-      expect(
-        Markdown.swapMark(shop, 4, TextMark.checked, column: 0),
-        contains('| ✅ **milk**'),
-      );
+      expect(ticked, 1);
+      expect(notes.byId(id)!.text, note.text);
+      expect(notes.byId(id)!.boxes.single.state, BoxState.done);
+      expect(notes.byId(id)!.shownText, contains('| ✅ **milk**'));
     });
 
     testWidgets('a compact line shows the words of the header row', (
@@ -168,6 +182,7 @@ void main() {
       WidgetTester tester,
       String text, {
       bool edits = false,
+      BoxTicking? ticking,
       ({int row, int column})? cell,
     }) async {
       tester.view.physicalSize = const Size(400, 800);
@@ -185,8 +200,15 @@ void main() {
                     text: text,
                     at: MarkdownTables.all(text).first.start,
                     cell: cell,
+                    ticking: ticking,
                     edit: edits
-                        ? TableEditing(write: written.add, twoRows: true)
+                        ? TableEditing(
+                            write: (change) {
+                              written.add(change);
+                              return null;
+                            },
+                            twoRows: true,
+                          )
                         : null,
                   ),
                   child: const Text('open'),
@@ -418,13 +440,36 @@ void main() {
       expect(find.byType(TableScreen), findsNothing);
     });
 
-    testWidgets('a cell\'s mark changes in place', (tester) async {
-      final written = await open(tester, shop, edits: true);
-      await tester.tap(key('mark-4-0'));
+    testWidgets('a cell\'s box is ticked in place, the text unchanged', (
+      tester,
+    ) async {
+      final store = Store.inMemory();
+      addTearDown(store.close);
+      final notes = Notes(store);
+      final id = notes.capture(shop, format: TextFormats.markdown).id;
+      final stored = notes.byId(id)!.text;
+      final box = notes.byId(id)!.boxes.single;
+      final written = await open(
+        tester,
+        stored,
+        edits: true,
+        ticking: BoxTicking(
+          notes: notes,
+          entity: id,
+          ticks: const {},
+          mayTick: true,
+        ),
+      );
+      expect(find.text('☐'), findsOneWidget);
+      await tester.tap(key('box-${box.id}'));
       await tester.pumpAndSettle();
-      await tester.tap(key('mark-failed'));
+      await tester.tap(key('box-failed'));
       await tester.pumpAndSettle();
-      expect(written.single.text, shop.replaceFirst('☐', '❌'));
+      expect(written, isEmpty);
+      expect(notes.byId(id)!.boxes.single.state, BoxState.failed);
+      // Drawn anew in the state it was ticked to, its id never seen.
+      expect(find.text('❌'), findsOneWidget);
+      expect(find.text('☐'), findsNothing);
     });
   });
 
@@ -446,7 +491,7 @@ void main() {
                 TwoRowTextField(
                   controller: controller,
                   twoRows: true,
-                  marks: true,
+                  boxes: true,
                   formats: true,
                   onFormatted: () => formatted++,
                 ),
@@ -559,6 +604,41 @@ void main() {
       expect(note.text, contains('| oats | 1 |'));
       expect(note.textFormat, TextFormats.markdown);
       expect(find.text('oats'), findsOneWidget);
+    });
+
+    testWidgets('a box ticked on the card keeps its tick when a cell is '
+        'written; one typed into a cell becomes a box', (tester) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final id = notes.capture(shop, format: TextFormats.markdown).id;
+      final box = notes.byId(id)!.boxes.single;
+      await tester.pumpWidget(OldBrainFixApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search and browse'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('All Notes'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('box-${box.id}'));
+      await tester.pumpAndSettle();
+      await tester.tap(key('box-done'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(key('table-2'));
+      await tester.pumpAndSettle();
+      expect(find.text('✅'), findsOneWidget);
+      await tester.tap(key('cell-2-0'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, '✅ oats');
+      await tester.tap(key('cell-2-1'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final note = notes.byId(id)!;
+      expect(note.boxes.map((b) => b.state), [BoxState.done, BoxState.done]);
+      expect(note.boxes.first.id, box.id);
+      expect(note.shownText, contains('| ✅ **milk** #dairy | 2 |'));
+      expect(note.shownText, contains('| ✅ oats | 1 |'));
     });
   });
 }

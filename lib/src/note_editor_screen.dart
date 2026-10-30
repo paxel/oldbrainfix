@@ -7,6 +7,7 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'announcements.dart';
 import 'area_look.dart';
 import 'areas_screen.dart';
+import 'box_ids.dart';
 import 'calendar_platform.dart';
 import 'checklist_view.dart';
 import 'context_platform.dart';
@@ -320,37 +321,59 @@ NoteActions noteActions(
             : null,
       );
     },
+    showTicks: () => showTicksEntry(notes, id, changed),
     onDelete: placed.changes
         ? () => then(deleteNote(context, notes, id))
         : null,
   );
 }
 
-/// What a tap on a status mark of [placed]'s card changes (ADR 0031):
-/// the mark of that line of the Note's text as it is stored now, written
-/// as an edit of the text; null where this Device may not change the
-/// text (ADR 0013, ADR 0018), so the marks stay plain characters.
-/// [changed] runs after the edit.
-MarkSwap? markEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
-  if (!placed.changes || !placed.note.textEditable) return null;
-  final id = placed.note.id;
-  return (line, to, {column}) {
-    // A sync while the menu was open may have changed it.
-    final note = notes.byId(id);
-    if (note == null ||
-        !note.textEditable ||
-        !notes.store.mayChange(id) ||
-        note.isTrashed) {
-      return;
-    }
-    // In a formatted text also the mark of a table's cell (ADR 0033).
-    final swapped = note.textFormat == TextFormats.markdown
-        ? Markdown.swapMark(note.text, line, to, column: column)
-        : TextMarks.swap(note.text, line, to);
-    if (swapped == null) return;
-    notes.edit(id, swapped);
-    changed();
-  };
+/// How the boxes of [placed]'s card and of its Sections are ticked (ADR
+/// 0035): wherever this Device holds a role, also on another person's
+/// Note in a Shared Area and in a Section, as long as the Note is not in
+/// the trash; each box says who ticked it last while the Note shows its
+/// ticks on this Device. A tick is no edit of the text. [changed] runs
+/// after a tick.
+BoxTicking Function(String entity, List<ShownBox> boxes) boxTicks(
+  Notes notes,
+  PlacedNote placed,
+  VoidCallback changed,
+) {
+  final store = notes.store;
+  final shows = showsTicks(store, placed.note.id);
+  final trashed = placed.note.isTrashed;
+  return (entity, boxes) => BoxTicking(
+    notes: notes,
+    entity: entity,
+    ticks: {for (final box in boxes) box.id: ?box.last},
+    mayTick: !trashed && store.mayWriteIn(entity),
+    showTicks: shows,
+    changed: changed,
+  );
+}
+
+/// The Show ticks entry of the menu of the Note [noteId] (ADR 0035): on
+/// or off, and switching it on this Device; null while neither the Note
+/// nor a Section of it has a box. [changed] runs after a switch.
+({bool on, VoidCallback toggle})? showTicksEntry(
+  Notes notes,
+  String noteId,
+  VoidCallback changed,
+) {
+  final note = notes.byId(noteId);
+  if (note == null) return null;
+  if (note.boxes.isEmpty &&
+      notes.sections(noteId).every((section) => section.boxes.isEmpty)) {
+    return null;
+  }
+  final on = showsTicks(notes.store, noteId);
+  return (
+    on: on,
+    toggle: () {
+      setShowsTicks(notes.store, noteId, !on);
+      changed();
+    },
+  );
 }
 
 /// What the full-screen view of a table of [placed]'s card writes (ADR
@@ -371,10 +394,12 @@ TableEditing? tableEdit(Notes notes, PlacedNote placed, VoidCallback changed) {
           !notes.store.mayChange(id) ||
           note.isTrashed ||
           change.text.trim().isEmpty) {
-        return;
+        return null;
       }
       notes.edit(id, change.text);
       changed();
+      // As kept: its new boxes have their ids (ADR 0035).
+      return notes.byId(id)?.text;
     },
   );
 }
@@ -461,6 +486,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   /// The Note and Sections whose text this Device may change, by id.
   Set<String> _textChangeable = const {};
+
+  /// How the boxes of the Note's text and of each Section's, by its id,
+  /// are ticked (ADR 0035), and whether any of them has one.
+  BoxTicking? _ticking;
+  Map<String, BoxTicking> _sectionTicking = const {};
+  bool _hasBoxes = false;
   late final _routineBook = Routines(widget.notes.store);
 
   /// Whether this Device may Amend the Note: anywhere it holds a role.
@@ -590,6 +621,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       for (final section in _sections)
         if (section.textEditable && store.mayChange(section.id)) section.id,
     };
+    // Ticks wherever this Device holds a role, unless in the trash.
+    final ticks = note != null && !note.isTrashed;
+    final shows = showsTicks(store, widget.noteId);
+    BoxTicking ticking(String id, List<ShownBox> boxes) => BoxTicking(
+      notes: notes,
+      entity: id,
+      ticks: {for (final box in boxes) box.id: ?box.last},
+      mayTick: ticks && store.mayWriteIn(id),
+      showTicks: shows,
+      changed: _reload,
+    );
+    _ticking = note == null ? null : ticking(note.id, note.boxes);
+    _text.boxes = _ticking;
+    _sectionTicking = {
+      for (final section in _sections)
+        section.id: ticking(section.id, section.boxes),
+    };
+    _hasBoxes =
+        (note?.boxes.isNotEmpty ?? false) ||
+        _sections.any((section) => section.boxes.isNotEmpty);
   }
 
   void _reload() => setState(_load);
@@ -620,6 +671,80 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       format: _text.markdown ? TextFormats.markdown : null,
     );
     _load();
+    _takeStored();
+  }
+
+  /// Takes the text as it was kept back into the field, its new boxes
+  /// with their ids, so the next save keeps them and their ticks (ADR
+  /// 0035); the cursor stays where it was in the text around it, the
+  /// spaces around the text as typed.
+  void _takeStored() {
+    final stored = _placed?.note.text;
+    if (stored == null) return;
+    final value = _text.value;
+    final typed = value.text;
+    final body = typed.trim();
+    if (body == stored) return;
+    final lead = typed.length - typed.trimLeft().length;
+    final next =
+        typed.substring(0, lead) + stored + typed.substring(lead + body.length);
+    if (withoutIds(next) != withoutIds(typed)) {
+      _text.value = TextEditingValue(
+        text: stored,
+        selection: TextSelection.collapsed(offset: stored.length),
+      );
+      return;
+    }
+    int moved(int offset) =>
+        offset < 0 ? offset : idFreeOffset(next, idFreeCount(typed, offset));
+    final selection = value.selection;
+    final composing = value.composing;
+    _text.value = TextEditingValue(
+      text: next,
+      selection: selection.copyWith(
+        baseOffset: moved(selection.baseOffset),
+        extentOffset: moved(selection.extentOffset),
+      ),
+      composing: composing.isValid
+          ? TextRange(start: moved(composing.start), end: moved(composing.end))
+          : composing,
+    );
+  }
+
+  /// A tap on the box at [start] of the field, the finger at [at]: the
+  /// text is kept first, so the box is the one stored, then its menu
+  /// opens there (ADR 0035).
+  Future<void> _tapBox(int start, Offset at) async {
+    final before = _text.text;
+    final id = TextBoxes.find(before)
+        .where((box) => box.start == start)
+        .firstOrNull
+        ?.id;
+    if (id == null) return;
+    _saveText();
+    setState(() {});
+    final box = TextBoxes.find(_text.text)
+        .where((box) => box.id == id)
+        .firstOrNull;
+    final ticking = _ticking;
+    // Only a box of the text as stored can be ticked.
+    final kept = _placed?.note.boxes.any((b) => b.id == id) ?? false;
+    if (box == null || ticking == null || !kept) return;
+    await openBoxMenu(
+      context,
+      at,
+      id: id,
+      state: ticking.stateOf(id, box.state),
+      ticking: ticking,
+    );
+  }
+
+  /// Shows after each box who ticked it last and when, or no more, for
+  /// this Note on this Device.
+  void _toggleTicks() {
+    final store = widget.notes.store;
+    setShowsTicks(store, widget.noteId, !showsTicks(store, widget.noteId));
+    _reload();
   }
 
   void _setImportance(Importance picked) {
@@ -684,7 +809,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       context,
       _routineBook,
       note,
-      text: _text.text,
+      text: TextBoxes.strip(_text.text),
     );
     return [...add, ?file];
   }
@@ -976,6 +1101,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 icon: const Icon(Icons.delete_outline),
               ),
             ],
+            // Only while there is something in it (UI laws, "The bar").
+            if (_hasBoxes)
+              PopupMenuButton<VoidCallback>(
+                key: const ValueKey('editor-menu'),
+                tooltip: t.more,
+                icon: const Icon(Icons.more_vert),
+                onSelected: (run) => run(),
+                itemBuilder: (button) => [
+                  showTicksItem(button, (
+                    on: showsTicks(widget.notes.store, widget.noteId),
+                    toggle: _toggleTicks,
+                  )),
+                ],
+              ),
           ],
         ),
         body: ListView(
@@ -993,8 +1132,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   controller: _text,
                   twoRows: _twoRows,
                   readOnly: !changes || !note.textEditable,
-                  // Its status marks change as its text (ADR 0031).
-                  marks: true,
+                  // ☐ goes in at the cursor; a tap on a box ticks it,
+                  // also where the text is only read (ADR 0035).
+                  boxes: true,
+                  onBox: _tapBox,
                   // The first format is written at once (ADR 0033).
                   formats: true,
                   onFormatted: () => setState(_saveText),
@@ -1215,9 +1356,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     ],
                     if (section.text.isNotEmpty)
                       MarkedText(
-                        section.text,
+                        section.shownText,
                         format: section.textFormat,
                         style: Theme.of(context).textTheme.bodyLarge,
+                        boxes: section.boxes,
+                        source: section.text,
+                        ticking: _sectionTicking[section.id],
                       ),
                     for (final hash in section.photos) ...[
                       const SizedBox(height: 8),

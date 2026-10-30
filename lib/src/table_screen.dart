@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'box_ids.dart';
 import 'l10n.dart';
 import 'system_bars.dart';
 import 'text_marks_view.dart';
@@ -12,9 +13,11 @@ import 'two_row_text_field.dart';
 
 /// How the tables of a text may be changed in their full-screen view:
 /// [write] takes the text after each change, its start and end the
-/// table's in it; [twoRows] says whether a cell types in two rows.
+/// table's in it, and gives the text as it is kept then, its new boxes
+/// with their ids (ADR 0035), or null when it kept nothing; [twoRows]
+/// says whether a cell types in two rows.
 class TableEditing {
-  final void Function(MarkdownChange change) write;
+  final String? Function(MarkdownChange change) write;
   final bool twoRows;
 
   const TableEditing({required this.write, required this.twoRows});
@@ -22,13 +25,15 @@ class TableEditing {
 
 /// Opens the table of the formatted [text] at [at] full screen, changed
 /// through [edit] or, without it, only read; [cell] starts being edited.
-/// The search for a tag and the opening of a link work there as where it
-/// was opened from.
+/// [text] is the text as stored, with the ids of its boxes, which
+/// [ticking] ticks. The search for a tag and the opening of a link work
+/// there as where it was opened from.
 Future<void> openTable(
   BuildContext context, {
   required String text,
   required int at,
   TableEditing? edit,
+  BoxTicking? ticking,
   ({int row, int column})? cell,
 }) {
   final onSearch = TagSearchScope.of(context);
@@ -39,7 +44,13 @@ Future<void> openTable(
         onOpen: onOpen,
         child: TagSearchScope(
           onSearch: onSearch,
-          child: TableScreen(text: text, at: at, edit: edit, cell: cell),
+          child: TableScreen(
+            text: text,
+            at: at,
+            edit: edit,
+            ticking: ticking,
+            cell: cell,
+          ),
         ),
       ),
     ),
@@ -60,6 +71,9 @@ Future<void> openTable(
 /// after it, move it, delete it, and on the first column whether it
 /// holds headings. The empty row under the table and the empty column
 /// beside it add one when a word is written into them.
+///
+/// A tap on a box of a cell opens its menu at the finger while there is
+/// [ticking], also where the table is only read (ADR 0035).
 class TableScreen extends StatefulWidget {
   /// How wide a column may get at most and at least, and how wide the
   /// empty column that adds one is.
@@ -76,6 +90,7 @@ class TableScreen extends StatefulWidget {
   final String text;
   final int at;
   final TableEditing? edit;
+  final BoxTicking? ticking;
   final ({int row, int column})? cell;
 
   const TableScreen({
@@ -83,6 +98,7 @@ class TableScreen extends StatefulWidget {
     required this.text,
     required this.at,
     this.edit,
+    this.ticking,
     this.cell,
   });
 
@@ -108,8 +124,11 @@ class _TableScreenState extends State<TableScreen> {
   late String _text = widget.text;
   late int _at = widget.at;
   MarkdownTable? _table;
-  List<MarkdownMark> _marks = const [];
+  List<DrawnBox> _boxes = const [];
   List<FoundTag> _tags = const [];
+
+  /// The ticks of the boxes, read again after each tick here.
+  late BoxTicking? _ticking = _watched(widget.ticking);
   List<double> _widths = const [];
 
   /// How far the table is moved sideways, and how far it can be.
@@ -158,9 +177,29 @@ class _TableScreenState extends State<TableScreen> {
 
   void _read() {
     _table = MarkdownTables.at(_text, _at);
-    _marks = Markdown.marks(_text);
+    _boxes = storedBoxes(_text, _ticking);
     _tags = Markdown.tags(_text);
   }
+
+  /// [ticking] telling this screen of each tick too.
+  BoxTicking? _watched(BoxTicking? ticking) => ticking == null
+      ? null
+      : BoxTicking(
+          notes: ticking.notes,
+          entity: ticking.entity,
+          ticks: ticking.ticks,
+          mayTick: ticking.mayTick,
+          showTicks: ticking.showTicks,
+          changed: () {
+            ticking.changed?.call();
+            if (!mounted) return;
+            setState(() {
+              _ticking = _ticking?.again();
+              _cell?.boxes = _ticking;
+              _read();
+            });
+          },
+        );
 
   /// Each column as wide as its widest cell's words, within bounds.
   void _measure() {
@@ -192,9 +231,12 @@ class _TableScreenState extends State<TableScreen> {
   /// gives; [gone] when the table went with it, which closes the screen.
   void _apply(MarkdownChange change, {bool gone = false}) {
     if (change.text == _text) return;
-    _text = change.text;
-    _at = change.start;
-    widget.edit?.write(change);
+    // As kept: its new boxes have their ids, the table moved by them.
+    final kept = widget.edit?.write(change) ?? change.text;
+    _text = kept;
+    _at = kept == change.text
+        ? change.start
+        : idFreeOffset(kept, idFreeCount(change.text, change.start));
     if (gone) {
       _table = null;
       Navigator.of(context).pop();
@@ -209,10 +251,13 @@ class _TableScreenState extends State<TableScreen> {
   void _startEditing(({int row, int column}) cell) {
     final table = _table;
     if (table == null) return;
-    final controller = TagTextController(
-      text: MarkdownTables.cell(_text, _at, cell.row, cell.column) ?? '',
-      hideMarks: widget.edit?.twoRows ?? false,
-    )..markdown = true;
+    final controller =
+        TagTextController(
+            text: MarkdownTables.cell(_text, _at, cell.row, cell.column) ?? '',
+            hideMarks: widget.edit?.twoRows ?? false,
+          )
+          ..markdown = true
+          ..boxes = _ticking;
     controller.addListener(_typed);
     _editing = cell;
     _cell = controller;
@@ -298,15 +343,6 @@ class _TableScreenState extends State<TableScreen> {
     } else if (start + width > now + _room) {
       _offset.value = math.min(start + width - _room, math.max(_most, start));
     }
-  }
-
-  /// A mark in a cell changed to [to].
-  void _swap(int line, TextMark to, {int? column}) {
-    _commit();
-    final swapped = Markdown.swapMark(_text, line, to, column: column);
-    final table = _table;
-    if (swapped == null || table == null) return;
-    _apply((text: swapped, start: _at, end: _at));
   }
 
   /// The menu of the row [row] ([column] false) or of the column [row],
@@ -656,7 +692,7 @@ class _TableScreenState extends State<TableScreen> {
         controller: cell,
         twoRows: edit.twoRows,
         autofocus: true,
-        marks: true,
+        boxes: true,
         formats: true,
         lineFormats: false,
         style: style,
@@ -668,11 +704,11 @@ class _TableScreenState extends State<TableScreen> {
       content = MarkedCell(
         _text,
         table.rows[r].cells[c],
-        marks: _marks,
+        boxes: _boxes,
         tags: _tags,
         style: style,
         textAlign: cellAlign(table.aligns[c]),
-        onMark: edit == null ? null : _swap,
+        ticking: _ticking,
       );
     }
     final box = DecoratedBox(
