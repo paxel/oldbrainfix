@@ -45,7 +45,15 @@ jobs:
   desktop:
     name: Desktop (Rust)
     runs-on: ubuntu-latest
+    # Forty test binaries with full debug info filled the runner's disk, and
+    # the linker died with a bus error; line tables keep backtraces readable.
+    env:
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
+      - name: Room on the runner's disk (its preinstalled SDKs are not used here)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v5
       - name: System libraries (ALSA for the microphone, cmake for whisper.cpp, lavapipe for the guide's frames)
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev cmake g++ mesa-vulkan-drivers libvulkan1
