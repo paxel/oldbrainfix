@@ -74,7 +74,7 @@ void main() {
     });
 
     testWidgets('is the only way to Settings: the notes browser keeps just '
-        'All Notes and the trash', (tester) async {
+        'All Notes, Frogs and the trash', (tester) async {
       await start(tester);
       await tap(tester, find.byTooltip('Search and browse'));
       expect(find.byType(AreasScreen), findsOneWidget);
@@ -85,7 +85,7 @@ void main() {
       expect(
         [for (final b in tester.widgetList<IconButton>(actions)) b.tooltip]
             .whereType<String>(),
-        ['Back', 'All Notes', 'Trash'],
+        ['Back', 'All Notes', 'Frogs', 'Trash'],
       );
       expect(profileButton, findsNothing);
     });
