@@ -8,8 +8,15 @@ import 'routine_editor_screen.dart';
 import 'two_row_text_field.dart';
 
 /// A Line as it is drawn: its id, its text, whether it is in the group of
-/// the Line above it and whether it shows checked.
-typedef ShownLine = ({String id, String text, bool inGroup, bool checked});
+/// the Line above it, whether it shows checked and what shows dimmed under
+/// its text, such as the day a Shopping List's Line comes back (#122).
+typedef ShownLine = ({
+  String id,
+  String text,
+  bool inGroup,
+  bool checked,
+  String? below,
+});
 
 /// The Lines of [list] as they are drawn.
 List<ShownLine> shownLines(Checklist list) => [
@@ -19,6 +26,7 @@ List<ShownLine> shownLines(Checklist list) => [
       text: line.text,
       inGroup: line.inGroup,
       checked: line.checked,
+      below: null,
     ),
 ];
 
@@ -133,15 +141,28 @@ class _LineRow extends StatelessWidget {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      line.text,
-                      key: ValueKey('checklist-line-${line.id}'),
-                      style: line.checked
-                          ? style?.copyWith(
-                              decoration: TextDecoration.lineThrough,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          line.text,
+                          key: ValueKey('checklist-line-${line.id}'),
+                          style: line.checked
+                              ? style?.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                )
+                              : style,
+                        ),
+                        if (line.below case final below?)
+                          Text(
+                            below,
+                            key: ValueKey('checklist-below-${line.id}'),
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
-                            )
-                          : style,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -450,7 +471,7 @@ class _ChecklistSectionState extends State<ChecklistSection>
       case _LineStep.rename:
         final text = await showDialog<String>(
           context: context,
-          builder: (_) => _RenameDialog(text: line.text, twoRows: _twoRows),
+          builder: (_) => LineRenameDialog(text: line.text, twoRows: _twoRows),
         );
         final named = text?.replaceAll(RegExp('[\r\n]+'), ' ').trim();
         if (!mounted || named == null || named.isEmpty) return;
@@ -468,41 +489,12 @@ class _ChecklistSectionState extends State<ChecklistSection>
       case _LineStep.outdent:
         _lists.indent(id, under: false);
       case _LineStep.delete:
-        if (!await _deleteLine()) return;
+        if (!await confirmLineDelete(context)) return;
         if (!mounted) return;
         if (_lists.byNote(widget.noteId)?.line(id) == null) return;
         _lists.delete(id);
     }
     setState(_load);
-  }
-
-  /// Asks once whether a Line goes, with the verb on the button in the
-  /// error colour.
-  Future<bool> _deleteLine() async {
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final t = context.t;
-        return AlertDialog(
-          content: Text(t.checklistDeleteQuestion),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(t.cancel),
-            ),
-            TextButton(
-              key: const ValueKey('checklist-delete-confirm'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(t.delete),
-            ),
-          ],
-        );
-      },
-    );
-    return sure ?? false;
   }
 
   @override
@@ -577,19 +569,23 @@ class _ChecklistSectionState extends State<ChecklistSection>
 }
 
 /// Asks for a Line's new text, starting from [text].
-class _RenameDialog extends StatefulWidget {
+class LineRenameDialog extends StatefulWidget {
   final String text;
 
   /// Whether the text is typed in two rows (UI laws, "Text editor").
   final bool twoRows;
 
-  const _RenameDialog({required this.text, required this.twoRows});
+  const LineRenameDialog({
+    super.key,
+    required this.text,
+    required this.twoRows,
+  });
 
   @override
-  State<_RenameDialog> createState() => _RenameDialogState();
+  State<LineRenameDialog> createState() => _LineRenameDialogState();
 }
 
-class _RenameDialogState extends State<_RenameDialog> {
+class _LineRenameDialogState extends State<LineRenameDialog> {
   late final _text = TextEditingController(text: widget.text);
 
   @override
@@ -633,6 +629,35 @@ class _RenameDialogState extends State<_RenameDialog> {
       ),
     );
   }
+}
+
+/// Asks once whether a Line goes, with [verb] (Delete when null) on the
+/// button in the error colour.
+Future<bool> confirmLineDelete(BuildContext context, {String? verb}) async {
+  final sure = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      final t = context.t;
+      return AlertDialog(
+        content: Text(t.checklistDeleteQuestion),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            key: const ValueKey('checklist-delete-confirm'),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(verb ?? t.delete),
+          ),
+        ],
+      );
+    },
+  );
+  return sure ?? false;
 }
 
 /// Makes the Note [noteId] a Checklist where this Device may; whether it

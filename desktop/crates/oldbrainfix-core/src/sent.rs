@@ -28,6 +28,7 @@ use crate::notes::keys as note_keys;
 use crate::pending::PendingSet;
 use crate::profile::{Profile, SentProfile, SignedProfile, short_code};
 use crate::routines::keys as routine_keys;
+use crate::shopping_lists::ShoppingLists;
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
 use crate::store::{ACCEPTED_PENDING_PREFIX, Fields, Store};
 use crate::text_format::{self, StoredText};
@@ -891,7 +892,10 @@ impl Store {
     /// `note_id`, as [`Store::changes`] says; only the parts of a
     /// Checklist are set.
     fn list_changes(&self, note_id: &str, item: &SentItem) -> Result<SentItemChanges> {
-        if Tallies::new(self).is_tally(note_id)? {
+        // The receiver's Tally or Shopping List stays one.
+        if Tallies::new(self).is_tally(note_id)?
+            || ShoppingLists::new(self).is_shopping_list(note_id)?
+        {
             return Ok(SentItemChanges::default());
         }
         let here = Checklists::new(self).by_note(note_id)?;
@@ -1030,6 +1034,7 @@ impl Store {
                     indent: l.indent && !(first && i == 0),
                     checked: l.checked,
                     received: Some(&l.id),
+                    at: None,
                 },
             )?;
         }

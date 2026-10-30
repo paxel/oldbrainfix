@@ -3,7 +3,8 @@
 //! read every log the same, sign every entry the same, and write every
 //! scenario again to the same log, byte for byte. Schedules, the alarm
 //! plan, the Missed Summary, the Nudge, the Frogs offered, the charts
-//! of Tallies, the Lines of Checklists and the picks of Sessions must
+//! of Tallies, the Lines of Checklists and Shopping Lists and the picks
+//! of Sessions must
 //! come to the same on the
 //! same European wall clock, Europe/Berlin here; the calendar files of
 //! Routines and Reminders must be the same bytes.
@@ -26,17 +27,17 @@ use oldbrainfix_core::signing::{entry_bytes, verify_signature};
 use oldbrainfix_core::tally_units::{self, KNOWN};
 use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
-    Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Recurrence,
-    RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search, Section,
-    SessionRule, Sessions, SigningKey, SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod,
-    TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear,
+    Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
+    Section, SessionRule, Sessions, ShoppingList, ShoppingLists, SigningKey, SimpleRepeat, Store,
+    Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 13] = [
+const SCENARIOS: [&str; 14] = [
     "checklist-routines",
     "checklists",
     "edits",
@@ -48,6 +49,7 @@ const SCENARIOS: [&str; 13] = [
     "routines",
     "sections",
     "sessions",
+    "shopping-lists",
     "tallies",
     "trash",
 ];
@@ -544,9 +546,21 @@ fn the_workspace_version_is_the_pubspec_version() -> TestResult {
 
 // ------------------------------------------------- writing the scenarios
 
+thread_local! {
+    /// How far the scenario being written moved the writer's clock on, in
+    /// seconds, as the generator's scenarios move `_tick`.
+    static JUMPED: std::cell::Cell<i64> = const { std::cell::Cell::new(0) };
+}
+
+/// Moves the writer's clock on by `by`.
+fn jump(by: Duration) {
+    JUMPED.with(|j| j.set(j.get() + by.num_seconds()));
+}
+
 /// The generator's store: the writer key, author Ada, a clock that starts
-/// at 2026-01-01 10:00 UTC and moves one second per read, and ids
-/// counted from 1, as `_store()` in the generator makes it.
+/// at 2026-01-01 10:00 UTC and moves one second per read, on by what the
+/// scenario jumps, and ids counted from 1, as `_store()` in the generator
+/// makes it.
 fn writer_store() -> Result<Store, Box<dyn std::error::Error>> {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicI64, Ordering};
@@ -554,8 +568,12 @@ fn writer_store() -> Result<Store, Box<dyn std::error::Error>> {
         .with_ymd_and_hms(2026, 1, 1, 10, 0, 0)
         .single()
         .ok_or("a valid start")?;
+    JUMPED.with(|j| j.set(0));
     let ticks = Arc::new(AtomicI64::new(0));
-    let clock = move || start + Duration::seconds(ticks.fetch_add(1, Ordering::SeqCst) + 1);
+    let clock = move || {
+        let n = ticks.fetch_add(1, Ordering::SeqCst) + 1;
+        start + Duration::seconds(n + JUMPED.with(std::cell::Cell::get))
+    };
     let mut store = Store::in_memory(Box::new(clock), || Ok(writer_key()))?;
     let ids = Arc::new(AtomicI64::new(0));
     store.set_id_maker(Box::new(move || {
@@ -997,7 +1015,7 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 13] = [
+    let writers: [(&str, Writer); 14] = [
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
@@ -1009,6 +1027,7 @@ fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResu
         ("routines", write_routines),
         ("sections", write_sections),
         ("sessions", write_sessions),
+        ("shopping-lists", write_shopping_lists),
         ("tallies", write_tallies),
         ("trash", write_trash),
     ];
@@ -1881,6 +1900,186 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
     }
     assert_eq!(json!(days), expected["now"], "{scenario}");
     assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
+    Ok(())
+}
+
+// ------------------------------------------------------- Shopping Lists
+
+/// The generator's `shopping-lists` scenario.
+fn write_shopping_lists(store: &Store) -> Built {
+    use oldbrainfix_core::checklists::keys;
+    use oldbrainfix_core::shopping_lists::keys as shopping_keys;
+    let notes = Notes::new(store);
+    let lists = ShoppingLists::new(store);
+    let wall = frog_day(0);
+    let line = |note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+        let list = lists.by_note(note, &wall)?.ok_or("a Shopping List")?;
+        Ok(list
+            .lines
+            .iter()
+            .find(|l| l.text == text)
+            .ok_or("a Line")?
+            .id
+            .clone())
+    };
+    let week = notes
+        .capture(
+            "Groceries\r\nMilk\n  Eggs\n\tTea\n\n✓ Bread\r   \nApples\nCoffee\nRice\nSalt",
+            None,
+            None,
+        )?
+        .id;
+    lists.make(&week)?;
+    lists.set_reappear(&line(&week, "Eggs")?, Reappear::Once)?;
+    lists.set_reappear(&line(&week, "Apples")?, Reappear::Week2)?;
+    lists.set_reappear(&line(&week, "Coffee")?, Reappear::Week3)?;
+    lists.set_reappear(&line(&week, "Rice")?, Reappear::Week4)?;
+    lists.set_reappear(&line(&week, "Rice")?, Reappear::Week4)?;
+    for text in ["Milk", "Eggs", "Apples", "Coffee", "Rice"] {
+        lists.check(&line(&week, text)?, &wall)?;
+    }
+    lists.add(&week, " MILK ", &wall)?;
+    lists.add(&week, "tea", &wall)?;
+    lists.add(&week, "Oat milk", &wall)?;
+    lists.add(&week, "eggs", &wall)?;
+    lists.check(&line(&week, "Eggs")?, &wall)?;
+    lists.rename(&line(&week, "Oat milk")?, "Soy milk")?;
+    let salt = line(&week, "Salt")?;
+    lists.delete(&salt)?;
+    lists.restore(&salt)?;
+    lists.uncheck(&line(&week, "Rice")?, &wall)?;
+    lists.check(&line(&week, "Rice")?, &wall)?;
+    // As a modified app would.
+    let making = lists
+        .by_note(&week, &wall)?
+        .ok_or("a Shopping List")?
+        .making;
+    let odd = [
+        ("Odd five", Some("5"), true, "z1"),
+        ("Odd blank", Some(""), true, "z2"),
+        ("Odd garbled", None, false, "z3"),
+        ("Odd key", Some("2w"), false, "é"),
+    ];
+    for (i, (text, reappear, checked, order)) in odd.into_iter().enumerate() {
+        let id = format!("line:{}{i}", "e".repeat(31));
+        store.append(&id, keys::TYPE, Some(keys::TYPE_LINE), None)?;
+        store.append(&id, keys::NOTE, Some(&week), None)?;
+        store.append(&id, keys::MADE, Some(&making), None)?;
+        let text = oldbrainfix_core::StoredText::plain(text).encode();
+        store.append(&id, keys::TEXT, Some(&text), None)?;
+        store.append(&id, keys::ORDER, Some(order), None)?;
+        if let Some(reappear) = reappear {
+            store.append(&id, shopping_keys::REAPPEAR, Some(reappear), None)?;
+        }
+        if checked {
+            lists.check(&id, &wall)?;
+        }
+    }
+    store.append(
+        &line(&week, "Odd garbled")?,
+        keys::CHECKED,
+        Some("garbled"),
+        None,
+    )?;
+    // Late on a UTC evening, the next day in Europe.
+    jump(Duration::hours(13) + Duration::minutes(30));
+    lists.check(&line(&week, "Tea")?, &wall)?;
+    // A week on, Bread is back and Tea not yet.
+    jump(Duration::days(6) + Duration::hours(12));
+    lists.add(&week, "bread", &wall)?;
+    lists.check(&line(&week, "Bread")?, &wall)?;
+    let hardware = notes.capture("Hardware\nNails\n✓ Glue", None, None)?.id;
+    lists.make(&hardware)?;
+    lists.check(&line(&hardware, "Nails")?, &wall)?;
+    lists.to_plain(&hardware, &wall)?;
+    lists.make(&hardware)?;
+    let odd = notes.capture("Odd kind\nOne", None, None)?.id;
+    store.append(&odd, keys::KIND, Some("shopping:a:b"), None)?;
+    let errand = Routines::new(store).spawn(&week, &schedule(Day::new(2026, 1, 9), &[], None)?)?;
+    let check = keys::check_for(
+        &Occurrence::new(Day::new(2026, 1, 9), None),
+        &line(&week, "Milk")?,
+    );
+    store.append(&errand.id, &check, Some("2026-01-09T09:00:00.000Z"), None)?;
+    notes.capture("Unsorted thought", None, None)?;
+    Ok(())
+}
+
+/// A Shopping List as the generator's `_shoppingList` lists it.
+fn shopping_list_json(list: &ShoppingList) -> Value {
+    json!({
+        "making": list.making,
+        "lines": list.lines.iter().map(|l| json!({
+            "id": l.id,
+            "text": l.text,
+            "reappear": l.reappear.code(),
+            "struck": l.struck,
+            "checkedAt": l.checked_at.map(dart_iso),
+            "backOn": l.back_on.map(|d| d.to_string()),
+            "order": l.order,
+        })).collect::<Vec<_>>(),
+        "count": list.count(),
+        "openCount": list.open_count(),
+        "struckCount": list.struck_count(),
+    })
+}
+
+#[test]
+fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
+    let dir = fixtures().join("shopping-lists");
+    let expected = read_json(&dir.join("shopping.json"))?;
+    let wall = frog_day(0);
+    // Each Shopping List at each moment, read with nothing written.
+    let mut at = Vec::new();
+    for moment in expected["at"].as_array().ok_or("at")? {
+        let now = moment["now"].as_str().ok_or("now")?;
+        let store = load("shopping-lists", now)?;
+        let lists = ShoppingLists::new(&store);
+        let mut ids = store.entities_of_type("note")?;
+        ids.sort();
+        let before = store.all_entries()?.len();
+        let mut shown = serde_json::Map::new();
+        let mut plain = serde_json::Map::new();
+        for (id, list) in lists.of_notes(&ids, &wall)? {
+            assert_eq!(Some(&list), lists.by_note(&id, &wall)?.as_ref(), "{id}");
+            let title = Notes::new(&store).by_id(&id)?.ok_or("the Note")?.text;
+            plain.insert(id.clone(), json!(ShoppingLists::plain_text(&title, &list)));
+            shown.insert(id, shopping_list_json(&list));
+        }
+        assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
+        at.push(json!({"now": now, "lists": shown, "plain": plain}));
+    }
+    assert_eq!(json!(at), expected["at"]);
+    let read_at = read_json(&dir.join("expected.json"))?;
+    let store = load("shopping-lists", read_at["now"].as_str().ok_or("now")?)?;
+    let lists = ShoppingLists::new(&store);
+    let mut ids = store.entities_of_type("note")?;
+    ids.sort();
+    let mut is = serde_json::Map::new();
+    let mut may = serde_json::Map::new();
+    for id in &ids {
+        is.insert(id.clone(), json!(lists.is_shopping_list(id)?));
+        may.insert(id.clone(), json!(lists.may_make(id)?));
+    }
+    assert_eq!(Value::Object(is), expected["isShoppingList"]);
+    assert_eq!(Value::Object(may), expected["mayMake"]);
+    // A check for an Occurrence makes no Routine of a Shopping List Done.
+    let routines = Routines::new(&store);
+    let mut routine_ids = store.entities_of_type("routine")?;
+    routine_ids.sort();
+    let mut all = Vec::new();
+    for id in &routine_ids {
+        if let Some(routine) = routines.by_id(id)? {
+            all.push(routine_json(&routine));
+        }
+    }
+    assert_eq!(json!(all), expected["routines"]);
+    for (code, read) in expected["reappear"].as_object().ok_or("reappear")? {
+        assert_eq!(json!(Reappear::read(Some(code)).code()), *read, "{code}");
+    }
+    for (text, key) in expected["names"].as_object().ok_or("names")? {
+        assert_eq!(json!(ShoppingLists::name_key(text)), *key, "{text:?}");
+    }
     Ok(())
 }
 

@@ -2996,6 +2996,12 @@ abstract class AppLocalizations {
   /// **'Line of a Checklist'**
   String get conflictLineText;
 
+  /// No description provided for @conflictShoppingLineText.
+  ///
+  /// In en, this message translates to:
+  /// **'Line of a Shopping List'**
+  String get conflictShoppingLineText;
+
   /// No description provided for @conflictAreaName.
   ///
   /// In en, this message translates to:
@@ -5209,6 +5215,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete this Line?'**
   String get checklistDeleteQuestion;
+
+  /// Makes a Note a Shopping List: its first line stays its text, every other line becomes a Line that comes back a while after it is checked (CONTEXT.md: Shopping List, Line).
+  ///
+  /// In en, this message translates to:
+  /// **'Make it a Shopping List'**
+  String get makeShoppingList;
+
+  /// No description provided for @shoppingHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping List'**
+  String get shoppingHeading;
+
+  /// A compact card of a Shopping List: how many of its Lines are not struck through.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} open'**
+  String shoppingOpenCount(int count);
+
+  /// Under a struck Line of a Shopping List: the day it is open again, as a short weekday and date such as 'Tue, Nov 12'.
+  ///
+  /// In en, this message translates to:
+  /// **'back {day}'**
+  String shoppingBack(String day);
+
+  /// Heading of the choices in a Shopping List Line's menu: how long the Line stays struck once checked (CONTEXT.md: Shopping List).
+  ///
+  /// In en, this message translates to:
+  /// **'Reappear time'**
+  String get shoppingReappear;
+
+  /// Reappear time of a Line that is gone once checked and does not come back.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get shoppingOnce;
+
+  /// Reappear time of a Line: it comes back this many weeks after it was checked.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 week} other{{count} weeks}}'**
+  String shoppingWeeks(int count);
+
+  /// Removes a Line from a Shopping List, so it never comes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for good'**
+  String get shoppingDeleteForGood;
 
   /// No description provided for @tallyHeading.
   ///

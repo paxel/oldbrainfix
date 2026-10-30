@@ -2,14 +2,15 @@
 //! them: their text, the Transcripts of their voice recordings, the Photo
 //! Texts of their photos and the same of their Sections (Amends and
 //! merged Notes), the text lines of the entries of a Tally and the Lines
-//! of a Checklist. A text in a format not known here counts as its
-//! source text.
+//! of a Checklist or a Shopping List, but those gone. A text in a format
+//! not known here counts as its source text.
 
 use std::collections::HashMap;
 
 use crate::Result;
 use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::notes::{Note, Notes, keys};
+use crate::shopping_lists::ShoppingLists;
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
 use crate::text_format::StoredText;
@@ -25,8 +26,8 @@ impl<'a> Search<'a> {
 
     /// The Notes whose text, Transcripts or Photo Texts, or those of one
     /// of their Sections, or the text line of an entry of their Tally, or
-    /// a Line of their Checklist, hold `query`, ignoring case, newest capture
-    /// first. The query counts as typed, inner spaces included; only its
+    /// a Line of their Checklist or Shopping List, hold `query`, ignoring
+    /// case, newest capture first. The query counts as typed, inner spaces included; only its
     /// ends are trimmed, and a blank one finds everything. With `within`,
     /// only the Notes inside that Area or Topic count (an Area's Topics
     /// included).
@@ -100,7 +101,7 @@ impl<'a> Search<'a> {
                 .unwrap_or_else(|| owner.to_string());
             texts.entry(shown_under).or_default().push(line.to_string());
         }
-        let mut makings: HashMap<String, Option<String>> = HashMap::new();
+        let mut makings: HashMap<String, (Option<String>, bool)> = HashMap::new();
         for id in self.store.entities_of_type(checklist_keys::TYPE_LINE)? {
             let fields = self.store.current_fields(&id)?;
             let Some(owner) = fields.get(checklist_keys::NOTE) else {
@@ -109,17 +110,21 @@ impl<'a> Search<'a> {
             if fields.get(checklist_keys::TRASHED).is_some() {
                 continue;
             }
-            let making = match makings.get(owner) {
-                Some(making) => making.clone(),
+            let (making, shopping) = match makings.get(owner) {
+                Some(found) => found.clone(),
                 None => {
-                    let making = Checklists::new(self.store)
-                        .by_note(owner)?
-                        .map(|l| l.making);
-                    makings.insert(owner.to_string(), making.clone());
-                    making
+                    let found = match Checklists::new(self.store).by_note(owner)? {
+                        Some(list) => (Some(list.making), false),
+                        None => (ShoppingLists::new(self.store).making(owner)?, true),
+                    };
+                    makings.insert(owner.to_string(), found.clone());
+                    found
                 }
             };
             if making.is_none() || fields.get(checklist_keys::MADE) != making.as_deref() {
+                continue;
+            }
+            if shopping && ShoppingLists::is_gone(&fields) {
                 continue;
             }
             let shown_under = notes

@@ -41,6 +41,7 @@ export 'src/search.dart';
 export 'src/sent_items.dart';
 export 'src/sessions.dart';
 export 'src/shared_areas.dart';
+export 'src/shopping_lists.dart';
 export 'src/signing.dart';
 export 'src/store.dart';
 export 'src/sync.dart';

@@ -100,18 +100,21 @@ class _ConflictCard extends StatelessWidget {
     final t = context.t;
     final locale = Localizations.localeOf(context).toString();
     final when = DateFormat.yMd(locale).add_Hm();
-    // What it belongs to: the Note of a Routine or of a Checklist's Line.
+    // What it belongs to: the Note of a Routine or of a Checklist's or a
+    // Shopping List's Line.
+    final lineNote = conflict.type == ChecklistKeys.typeLine
+        ? store.current(conflict.entity, ChecklistKeys.note)
+        : null;
     final note = conflict.unit == scheduleUnit
         ? switch (Routines(store).byId(conflict.entity)) {
             final routine? => Routines(store).note(routine)?.text,
             null => null,
           }
-        : conflict.type == ChecklistKeys.typeLine
-        ? switch (store.current(conflict.entity, ChecklistKeys.note)) {
-            final id? => Notes(store).byId(id)?.text,
-            null => null,
-          }
+        : lineNote != null
+        ? Notes(store).byId(lineNote)?.text
         : null;
+    final shopping =
+        lineNote != null && ShoppingLists(store).isShoppingList(lineNote);
     return Card(
       margin: const EdgeInsets.only(top: 16),
       child: Padding(
@@ -120,7 +123,9 @@ class _ConflictCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              conflictLabel(t, conflict),
+              shopping
+                  ? t.conflictShoppingLineText
+                  : conflictLabel(t, conflict),
               style: Theme.of(context).textTheme.titleSmall,
             ),
             if (note != null) Text(note),

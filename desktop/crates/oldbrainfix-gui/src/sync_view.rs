@@ -31,7 +31,7 @@ use oldbrainfix_core::places::keys as place_keys;
 use oldbrainfix_core::sync::{FOLDER_SOURCE, UpdateNeeded};
 use oldbrainfix_core::{
     AreaRole, Conflict, Entry, Error, Fields, Invite, Notes, PairedDevice, Places, ProfileChoice,
-    Routines, Store, StoredText,
+    Routines, ShoppingLists, Store, StoredText,
 };
 
 use crate::app::{Wall, embossed};
@@ -529,7 +529,7 @@ impl SyncHost {
                     for conflict in &self.conflicts {
                         ui.add_space(4.0);
                         ui.label(
-                            RichText::new(conflict_label(t, conflict))
+                            RichText::new(conflict_heading(t, store, conflict))
                                 .strong()
                                 .color(text),
                         );
@@ -1064,6 +1064,20 @@ pub fn conflict_label(t: &L10n, conflict: &Conflict) -> &'static str {
         ("routine", SCHEDULE_UNIT) => t.conflict_schedule(),
         _ => t.conflict_other(),
     }
+}
+
+/// What `conflict` is about as its card heads it: as [`conflict_label`]
+/// says, a Line of a Shopping List named as one (#122).
+fn conflict_heading(t: &L10n, store: &Store, conflict: &Conflict) -> &'static str {
+    if conflict.entity_type == checklist_keys::TYPE_LINE
+        && let Ok(Some(note)) = store.current(&conflict.entity, checklist_keys::NOTE)
+        && ShoppingLists::new(store)
+            .is_shopping_list(&note)
+            .unwrap_or(false)
+    {
+        return t.conflict_shopping_line_text();
+    }
+    conflict_label(t, conflict)
 }
 
 /// A Named Place's `$type`, the Dart core's `NamedPlaceKeys.typeNamedPlace`.

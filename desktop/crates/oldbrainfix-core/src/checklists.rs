@@ -391,8 +391,9 @@ impl LineChecks {
 
     /// The Occurrences whose every Line is checked, by key, each with the
     /// moment of its last check: the Lines of the making that check's
-    /// Line belongs to, of a Note of `note_ids`, not deleted, but those
-    /// added after it and not checked then. Never one without a Line.
+    /// Line belongs to, a making of a Checklist of a Note of `note_ids`,
+    /// not deleted, but those added after it and not checked then. Never
+    /// one without a Line.
     pub fn done(
         &self,
         store: &Store,
@@ -432,6 +433,9 @@ impl LineChecks {
             let (Some(note), Some(made)) = (of.get(keys::NOTE), of.get(keys::MADE)) else {
                 continue;
             };
+            if !of_checklist(store, note, made)? {
+                continue;
+            }
             let mut raw = Vec::new();
             for (id, fields) in &lines {
                 if fields.get(keys::NOTE) != Some(note)
@@ -467,6 +471,16 @@ impl LineChecks {
     }
 }
 
+/// Whether the Note `note` was ever a Checklist of the making `made`:
+/// the Lines of a Shopping List count for no Occurrence.
+fn of_checklist(store: &Store, note: &str, made: &str) -> Result<bool> {
+    let kind = keys::kind_of(made);
+    Ok(store
+        .history(note)?
+        .iter()
+        .any(|e| e.field == keys::KIND && e.value.as_deref() == Some(kind.as_str())))
+}
+
 /// When the Line `id` was added: its earliest `$type`, the same on every
 /// Device.
 fn added_at(store: &Store, id: &str) -> Result<Option<DateTime<Utc>>> {
@@ -486,13 +500,15 @@ fn is_line_id(id: &str) -> bool {
         && !id.contains(',')
 }
 
-/// What a new Line holds, as [`write_line`] writes it.
+/// What a new Line holds, as [`write_line`] writes it, and when it is
+/// written: `None` for now.
 pub(crate) struct NewLine<'a> {
     pub text: &'a str,
     pub order: &'a str,
     pub indent: bool,
     pub checked: bool,
     pub received: Option<&'a str>,
+    pub at: Option<DateTime<Utc>>,
 }
 
 /// Writes a new Line of the Note `note_id` in its making `making`,
@@ -504,7 +520,7 @@ pub(crate) fn write_line(
     line: &NewLine,
 ) -> Result<String> {
     let id = format!("{}{}", keys::LINE_PREFIX, store.new_id()?);
-    let now = store.now();
+    let now = line.at.unwrap_or_else(|| store.now());
     store.append(&id, keys::TYPE, Some(keys::TYPE_LINE), Some(now))?;
     store.append(&id, keys::NOTE, Some(note_id), Some(now))?;
     store.append(&id, keys::MADE, Some(making), Some(now))?;
@@ -728,6 +744,7 @@ impl<'a> Checklists<'a> {
                         indent: i > 0 && line.indent,
                         checked: line.checked,
                         received: None,
+                        at: None,
                     },
                 )?;
             }
@@ -832,6 +849,7 @@ impl<'a> Checklists<'a> {
                     indent: indent && pos > 0,
                     checked: false,
                     received: None,
+                    at: None,
                 },
             )
         })
@@ -1319,8 +1337,9 @@ fn neighbours(lines: &[Line], pos: usize) -> (Option<String>, Option<String>) {
     (a, b)
 }
 
-/// `text` on one line and trimmed; an empty one is refused.
-fn line_text(text: &str) -> Result<String> {
+/// `text` on one line and trimmed, as a Line holds it; an empty one is
+/// refused.
+pub(crate) fn line_text(text: &str) -> Result<String> {
     let mut one = String::new();
     let mut gap = false;
     for c in text.chars() {
@@ -1342,7 +1361,7 @@ fn line_text(text: &str) -> Result<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::lan::{
         Joining, answer_sync, answer_sync_inviting, apply_answer_as, sync_request, sync_request_as,
@@ -1354,7 +1373,7 @@ mod tests {
     use crate::{Entry, OwnProfile, Places, Search};
     use chrono::Duration;
 
-    type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
+    pub(crate) type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
     type Made<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
     /// One clock for every Device of a test, a second further at each
@@ -1379,7 +1398,7 @@ mod tests {
     }
 
     /// One LAN session, `joiner` asking `host`, between two people.
-    fn exchange(joiner: &Store, host: &Store) -> TestResult {
+    pub(crate) fn exchange(joiner: &Store, host: &Store) -> TestResult {
         let request = sync_request(
             joiner,
             &host.version_vector()?,
@@ -1394,7 +1413,7 @@ mod tests {
 
     /// Everything `from` holds that `to` lacks, taken in: two of the
     /// user's own Devices.
-    fn send(from: &Store, to: &Store) -> TestResult {
+    pub(crate) fn send(from: &Store, to: &Store) -> TestResult {
         to.apply_entries(
             &wire(&from.entries_since(&to.version_vector()?)?),
             &from.key_records()?,
@@ -1405,7 +1424,7 @@ mod tests {
     }
 
     /// `member` invited by `ann` into `area` as a Member.
-    fn invite(ann: &Store, member: &Store, area: &str) -> TestResult {
+    pub(crate) fn invite(ann: &Store, member: &Store, area: &str) -> TestResult {
         let invite = Invite {
             area: area.to_string(),
             role: AreaRole::Member,

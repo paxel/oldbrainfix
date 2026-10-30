@@ -1114,6 +1114,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
                           .shownNow(captured.note.id, deviceWallClock),
                   lists: Checklists(widget.notes.store),
                 ),
+                shopping: (
+                  read: () =>
+                      ShoppingLists(widget.notes.store)
+                          .byNote(captured.note.id, deviceWallClock),
+                  lists: ShoppingLists(widget.notes.store),
+                ),
                 onTap: _unfoldedId == captured.note.id
                     ? null
                     : () => setState(() => _unfoldedId = captured.note.id),

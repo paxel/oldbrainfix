@@ -12,6 +12,7 @@ import 'person_screen.dart';
 import 'photo_views.dart';
 import 'place_names.dart';
 import 'profile.dart';
+import 'shopping_list_view.dart';
 import 'speech_platform.dart';
 import 'voice_platform.dart';
 
@@ -154,10 +155,12 @@ class NoteActions {
   });
 }
 
-/// The Checklist entries of a card's ⋮ as the menu opens (#120).
+/// The Checklist and Shopping List entries of a card's ⋮ as the menu
+/// opens (#120, #122): [isList] while the Note is either.
 typedef ChecklistMenu = ({
   bool isList,
   VoidCallback? make,
+  VoidCallback? makeShopping,
   VoidCallback? toPlain,
   VoidCallback? uncheckAll,
 });
@@ -236,6 +239,10 @@ class NoteCard extends StatelessWidget {
   /// many are checked on a compact one (#120); nothing when null.
   final NoteChecklist? checklist;
 
+  /// The Note's Shopping List, if it is one: its Lines on a [full] card,
+  /// how many are open on a compact one (#122); nothing when null.
+  final NoteShoppingList? shopping;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -264,6 +271,7 @@ class NoteCard extends StatelessWidget {
     this.onEdit,
     this.footer,
     this.checklist,
+    this.shopping,
   });
 
   @override
@@ -287,6 +295,27 @@ class NoteCard extends StatelessWidget {
     final footer = this.footer;
     final actions = this.actions;
     final checklist = this.checklist;
+    final shopping = this.shopping;
+    // A Note is at most one of them; the other draws nothing.
+    Widget? lists(bool full) => checklist == null && shopping == null
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (checklist != null)
+                CardChecklist(
+                  noteId: note.id,
+                  checklist: checklist,
+                  full: full,
+                ),
+              if (shopping != null)
+                CardShoppingList(
+                  noteId: note.id,
+                  shopping: shopping,
+                  full: full,
+                ),
+            ],
+          );
     final acts =
         onFile != null ||
         onSchedule != null ||
@@ -390,13 +419,7 @@ class NoteCard extends StatelessWidget {
                         note: note,
                         when: when,
                         sections: sections,
-                        list: checklist == null
-                            ? null
-                            : CardChecklist(
-                                noteId: note.id,
-                                checklist: checklist,
-                                full: true,
-                              ),
+                        list: lists(true),
                       )
                     else ...[
                       // A photo Note may have no words.
@@ -408,12 +431,7 @@ class NoteCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      if (checklist != null)
-                        CardChecklist(
-                          noteId: note.id,
-                          checklist: checklist,
-                          full: false,
-                        ),
+                      ?lists(false),
                       if (note.photos.isNotEmpty) ...[
                         if (note.text.isNotEmpty) const SizedBox(height: 8),
                         // Not a sideways list: swipes on a card belong to
@@ -570,8 +588,9 @@ class NoteActionRow extends StatelessWidget {
 /// The ⋮ of a card's action row: a menu at the button with words. It
 /// leads with Edit, then the Note's Importance as radio buttons, the one it has
 /// marked, then sending, the calendar, adding to the Note, "Add entry" of
-/// a Tally or "Make it a Tally", "Make it a Checklist" or, for one,
-/// "Uncheck all" and "Back to a plain Note", removing a photo or recording while its
+/// a Tally or "Make it a Tally", "Make it a Checklist" and "Make it a
+/// Shopping List" or, for one, "Uncheck all" (a Checklist's) and "Back to
+/// a plain Note", removing a photo or recording while its
 /// text stays, one entry each with the start of that text under it, and
 /// deleting.
 class _MoreButton extends StatelessWidget {
@@ -668,12 +687,19 @@ class _MoreButton extends StatelessWidget {
           if (tally == true)
             if (actions.onAddEntry case final add?)
               item('note-add-entry', Icons.add_chart, t.addTallyEntry, add),
-          // A Checklist is no Tally, and a Tally no Checklist.
+          // A Checklist or Shopping List is no Tally, and a Tally neither.
           if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)
               item('note-make-tally', Icons.bar_chart, t.makeTally, make),
           if (list?.make case final make?)
             item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
+          if (list?.makeShopping case final make?)
+            item(
+              'note-make-shopping',
+              Icons.shopping_cart_outlined,
+              t.makeShoppingList,
+              make,
+            ),
           if (list?.uncheckAll case final uncheck?)
             item(
               'note-uncheck-all',

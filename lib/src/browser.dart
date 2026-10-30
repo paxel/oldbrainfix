@@ -617,6 +617,12 @@ List<Widget> diaryCards(
   Checklist? checklistOf(Note note) => (listed ??= lists.ofNotesNow([
     for (final placed in shown) placed.note.id,
   ], deviceWallClock))[note.id];
+  // And their Shopping Lists, as they show today (#122).
+  final shopping = ShoppingLists(notes.store);
+  Map<String, ShoppingList>? shopped;
+  ShoppingList? shoppingOf(Note note) => (shopped ??= shopping.ofNotes([
+    for (final placed in shown) placed.note.id,
+  ], deviceWallClock))[note.id];
   return [
     for (final placed in shown)
       if (placed case (
@@ -651,6 +657,7 @@ List<Widget> diaryCards(
           full: !compact || unfolded.contains(note.id),
           sections: () => sectionsOf(note),
           checklist: (read: () => checklistOf(note), lists: lists),
+          shopping: (read: () => shoppingOf(note), lists: shopping),
           // A full Note has nothing to unfold (#114).
           onTap: !compact || unfolded.contains(note.id) || onUnfold == null
               ? null

@@ -648,6 +648,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
                           id: l.id,
                           text: l.text,
                           inGroup: l.indent,
+                          below: null,
                           checked: l.checked,
                         ),
                     ],

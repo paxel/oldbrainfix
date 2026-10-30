@@ -479,7 +479,7 @@ class Checklists {
     if (!mayCheck(noteId)) {
       throw StateError('no role in the Shared Area of $noteId');
     }
-    final named = _text(text);
+    final named = lineText(text);
     final lines = list.lines;
     final pos = switch (at) {
       null => lines.length,
@@ -502,7 +502,7 @@ class Checklists {
   /// Renames the Line [lineId].
   void rename(String lineId, String text) {
     final (_, line) = _requireEditable(lineId);
-    final named = _text(text);
+    final named = lineText(text);
     if (named == line.text) return;
     store.append(lineId, ChecklistKeys.text, StoredText.plain(named).encode());
   }
@@ -798,14 +798,16 @@ class Checklists {
     if (!mayEdit(lineId)) throw StateError('may not change $lineId');
     return found;
   }
+}
 
-  static String _text(String text) {
-    final trimmed = text.replaceAll(RegExp('[\r\n]+'), ' ').trim();
-    if (trimmed.isEmpty) {
-      throw ArgumentError.value(text, 'text', 'must not be empty');
-    }
-    return trimmed;
+/// [text] on one line and trimmed, as a Line holds it; an empty one is
+/// refused.
+String lineText(String text) {
+  final trimmed = text.replaceAll(RegExp('[\r\n]+'), ' ').trim();
+  if (trimmed.isEmpty) {
+    throw ArgumentError.value(text, 'text', 'must not be empty');
   }
+  return trimmed;
 }
 
 /// A Line as [Checklists] reads it from its fields.
@@ -881,8 +883,9 @@ class LineChecks {
 
   /// The Occurrences whose every Line is checked, by key, each with the
   /// moment of its last check: the Lines of the making that check's Line
-  /// belongs to, of a Note of [noteIds], not deleted, but those added
-  /// after it and not checked then. Never one without a Line.
+  /// belongs to, a making of a Checklist of a Note of [noteIds], not
+  /// deleted, but those added after it and not checked then. Never one
+  /// without a Line.
   Map<String, DateTime> done(Store store, Set<String> noteIds) {
     if (byOccurrence.isEmpty) return const {};
     final lines = <String, Map<String, String?>>{};
@@ -915,7 +918,9 @@ class LineChecks {
       if (last == null || of == null) continue;
       final note = of[ChecklistKeys.note];
       final made = of[ChecklistKeys.made];
-      if (note == null || made == null) continue;
+      if (note == null || made == null || !_ofChecklist(store, note, made)) {
+        continue;
+      }
       final raw = <_Raw>[];
       for (final MapEntry(key: id, value: fields) in lines.entries) {
         if (fields[ChecklistKeys.note] != note ||
@@ -936,6 +941,15 @@ class LineChecks {
       }
     }
     return done;
+  }
+
+  /// Whether the Note [note] was ever a Checklist of the making [made]:
+  /// the Lines of a Shopping List count for no Occurrence.
+  static bool _ofChecklist(Store store, String note, String made) {
+    final kind = ChecklistKeys.kindOf(made);
+    return store
+        .history(note)
+        .any((e) => e.field == ChecklistKeys.kind && e.value == kind);
   }
 
   static bool _isLine(String id) =>
@@ -972,7 +986,7 @@ ParsedLine? parseLine(String row) {
 }
 
 /// Writes a new Line of the Note [noteId] in its making [making], inside
-/// a batch; returns its id.
+/// a batch, at [date] or now; returns its id.
 String writeLine(
   Store store,
   String noteId,
@@ -982,9 +996,10 @@ String writeLine(
   bool indent = false,
   bool checked = false,
   String? received,
+  DateTime? date,
 }) {
   final id = '${ChecklistKeys.linePrefix}${Store.newId()}';
-  final now = store.clock().toUtc();
+  final now = (date ?? store.clock()).toUtc();
   store.append(id, ChecklistKeys.type, ChecklistKeys.typeLine, date: now);
   store.append(id, ChecklistKeys.note, noteId, date: now);
   store.append(id, ChecklistKeys.made, making, date: now);

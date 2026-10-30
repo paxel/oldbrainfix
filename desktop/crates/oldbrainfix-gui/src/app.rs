@@ -76,7 +76,8 @@ use oldbrainfix_core::{
     Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
     Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
     PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
-    Section, Sessions, Store, Tallies, Topic, UnitSystem, bundle,
+    Section, Sessions, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies, Topic,
+    UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -111,6 +112,7 @@ use crate::routine_editor::{Intent, RENAG_CHOICES, RoutineEditor};
 use crate::schedule_text::{agenda_day_text, day_text, occurrence_time, schedule_text};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
+use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
 use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
@@ -177,6 +179,15 @@ struct Placed {
     area: Option<Area>,
     topic: Option<Topic>,
     author: Option<Profile>,
+}
+
+/// What a Note is made: a Checklist, a Shopping List or a plain Note
+/// again (#120, #122).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Checklist,
+    ShoppingList,
+    Plain,
 }
 
 /// One Agenda row with the Area its Note is filed in.
@@ -276,6 +287,10 @@ struct View {
     /// for the cards as they show now, each with whether this Device may
     /// check its Lines (#120, #121).
     checklists: BTreeMap<String, (Checklist, bool)>,
+    /// The Shopping Lists of the Notes listed that are one, read in one
+    /// pass for the cards, each with whether this Device may check its
+    /// Lines (#122).
+    shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
     /// Whether the list shows its Notes compact, by their first line,
     /// as this Device keeps it for that list (#114).
     compact: bool,
@@ -294,6 +309,10 @@ struct View {
     /// this Device may make the selected Note one (#120).
     checklist: Option<ChecklistShown>,
     makes_checklist: bool,
+    /// The Shopping List of the selected Note, while it is one, and
+    /// whether this Device may make the selected Note one (#122).
+    shopping: Option<ShoppingShown>,
+    makes_shopping: bool,
     /// The Frog view's open and Done Frogs, while it shows, and whether
     /// its "Done" section is open.
     frogs_open: Vec<FrogShown>,
@@ -394,9 +413,11 @@ enum Dialog {
         id: String,
         text: String,
     },
-    /// Whether the Checklist's Line `id` goes.
+    /// Whether the Line `id` of a Checklist goes, or of a Shopping List
+    /// `for_good` (#122).
     DeleteLine {
         id: String,
+        for_good: bool,
     },
     /// Sharing the Area `area`: the role the other person gets, and the
     /// People it can go to from afar (#108).
@@ -690,6 +711,9 @@ enum Action {
     DeleteEntry,
     /// Something asked of a Checklist, on a card or in the editor (#120).
     Checklist(ChecklistAction),
+    /// Something asked of a Shopping List, on a card or in the editor
+    /// (#122).
+    Shopping(ShoppingAction),
     /// Gives the Line the dialog renames its new text.
     RenameLine,
     /// Deletes the Line the dialog asks about.
@@ -2757,6 +2781,14 @@ impl App {
                 checklists.insert(id, (list, checks));
             }
         }
+        let shopping = ShoppingLists::new(store);
+        let mut shopping_lists = BTreeMap::new();
+        if !listed.is_empty() {
+            for (id, list) in shopping.of_notes(&listed, &*self.wall)? {
+                let checks = shopping.may_check(&id)?;
+                shopping_lists.insert(id, (list, checks));
+            }
+        }
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
         let compact = match cards_key(&self.selection, &self.people, is_area) {
             Some(key) => {
@@ -2801,6 +2833,13 @@ impl App {
             Some((p, _)) if !p.note.is_trashed() => (
                 checklist_view::read(store, &p.note, may.changes, &*self.wall)?,
                 lists.may_make(&p.note.id)?,
+            ),
+            _ => (None, false),
+        };
+        let (shopping_shown, makes_shopping) = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => (
+                shopping_view::read(store, &p.note, may.changes, &*self.wall)?,
+                shopping.may_make(&p.note.id)?,
             ),
             _ => (None, false),
         };
@@ -3032,6 +3071,7 @@ impl App {
             notes: placed,
             sections,
             checklists,
+            shopping_lists,
             compact,
             detail,
             capture_spawns: capture_choices::may_spawn(
@@ -3043,6 +3083,8 @@ impl App {
             tally,
             checklist,
             makes_checklist,
+            shopping: shopping_shown,
+            makes_shopping,
             frogs_open,
             all_routines,
             frogs_done,
@@ -3112,6 +3154,7 @@ impl App {
                 | Action::StartMerge
                 | Action::Share(_)
                 | Action::Checklist(ChecklistAction::Step(_, LineStep::Rename))
+                | Action::Shopping(ShoppingAction::Step(_, ShopStep::Rename))
         ) {
             self.focus = true;
         }
@@ -3532,20 +3575,26 @@ impl App {
                 }
             }
             Action::Checklist(asked) => self.checklist_action(asked)?,
+            Action::Shopping(asked) => self.shopping_action(asked)?,
             Action::RenameLine => {
                 if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
                     && let Some(named) = checklist_view::renamed(&text)
-                    // A sync while the dialog was open may have taken it.
-                    && self.line_of(&id)?.is_some()
                 {
-                    Checklists::new(&self.store).rename(&id, &named)?;
+                    // A sync while the dialog was open may have taken it.
+                    if self.line_of(&id)?.is_some() {
+                        Checklists::new(&self.store).rename(&id, &named)?;
+                    } else if self.shopping_line_of(&id)?.is_some() {
+                        ShoppingLists::new(&self.store).rename(&id, &named)?;
+                    }
                 }
             }
             Action::DeleteLine => {
-                if let Some(Dialog::DeleteLine { id }) = self.dialog.take()
-                    && self.line_of(&id)?.is_some()
-                {
-                    Checklists::new(&self.store).delete(&id)?;
+                if let Some(Dialog::DeleteLine { id, .. }) = self.dialog.take() {
+                    if self.line_of(&id)?.is_some() {
+                        Checklists::new(&self.store).delete(&id)?;
+                    } else if self.shopping_line_of(&id)?.is_some() {
+                        ShoppingLists::new(&self.store).delete(&id)?;
+                    }
                 }
             }
             Action::Setting(setting) => self.set(setting)?,
@@ -4024,8 +4073,8 @@ impl App {
     /// (#120).
     fn checklist_action(&mut self, asked: ChecklistAction) -> oldbrainfix_core::Result<()> {
         match asked {
-            ChecklistAction::Make(note) => self.change_kind(&note, true)?,
-            ChecklistAction::ToPlain(note) => self.change_kind(&note, false)?,
+            ChecklistAction::Make(note) => self.change_kind(&note, Kind::Checklist)?,
+            ChecklistAction::ToPlain(note) => self.change_kind(&note, Kind::Plain)?,
             ChecklistAction::UncheckAll(note) => {
                 let lists = Checklists::new(&self.store);
                 if let Some(list) = lists.shown_now(&note, &*self.wall)?
@@ -4073,7 +4122,12 @@ impl App {
                     LineStep::Down => checklist_view::move_down(&self.store, &list, &line)?,
                     LineStep::Indent => lists.indent(&id, true)?,
                     LineStep::Outdent => lists.indent(&id, false)?,
-                    LineStep::Delete => self.dialog = Some(Dialog::DeleteLine { id }),
+                    LineStep::Delete => {
+                        self.dialog = Some(Dialog::DeleteLine {
+                            id,
+                            for_good: false,
+                        });
+                    }
                 }
             }
             ChecklistAction::Menu(note) => {
@@ -4086,31 +4140,107 @@ impl App {
         Ok(())
     }
 
-    /// Makes the Note `note` a Checklist, or with `make` false a plain
+    /// Does what was asked of a Shopping List, on a card or in the
+    /// editor (#122).
+    fn shopping_action(&mut self, asked: ShoppingAction) -> oldbrainfix_core::Result<()> {
+        let lists = ShoppingLists::new(&self.store);
+        match asked {
+            ShoppingAction::Make(note) => self.change_kind(&note, Kind::ShoppingList)?,
+            ShoppingAction::ToPlain(note) => self.change_kind(&note, Kind::Plain)?,
+            ShoppingAction::Check(line, checked) => {
+                // A sync meanwhile may have taken it.
+                if let Some(shown) = self.shopping_line_of(&line)?
+                    && lists.may_check(&shown.note_id)?
+                {
+                    if checked {
+                        lists.check(&line, &*self.wall)?;
+                    } else {
+                        lists.uncheck(&line, &*self.wall)?;
+                    }
+                }
+            }
+            ShoppingAction::Add(note) => {
+                if lists.is_shopping_list(&note)?
+                    && lists.may_check(&note)?
+                    && shopping_view::add_typed(&self.store, &note, &self.line_text, &*self.wall)?
+                {
+                    self.line_text.clear();
+                }
+            }
+            ShoppingAction::Step(id, step) => {
+                let Some(line) = self.shopping_line_of(&id)? else {
+                    return Ok(());
+                };
+                if !lists.may_edit(&id)? {
+                    return Ok(());
+                }
+                match step {
+                    ShopStep::Rename => {
+                        let text = line.text;
+                        self.dialog = Some(Dialog::RenameLine { id, text });
+                    }
+                    ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
+                    ShopStep::Delete => {
+                        self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Makes the Note `note` a Checklist or a Shopping List, or a plain
     /// Note again, where this Device may. On the Note shown, what is
     /// typed into its text goes in first, and the field then holds the
     /// text it has now, so that leaving it writes nothing old back.
-    fn change_kind(&mut self, note: &str, make: bool) -> oldbrainfix_core::Result<()> {
+    fn change_kind(&mut self, note: &str, kind: Kind) -> oldbrainfix_core::Result<()> {
         let shown = self.selected_note.as_deref() == Some(note);
         if shown {
             self.save_text()?;
         }
         let lists = Checklists::new(&self.store);
-        if make {
-            if !lists.may_make(note)? {
-                return Ok(());
+        let shopping = ShoppingLists::new(&self.store);
+        match kind {
+            Kind::Checklist => {
+                if !lists.may_make(note)? {
+                    return Ok(());
+                }
+                lists.make(note)?;
             }
-            lists.make(note)?;
-        } else {
-            if !lists.is_checklist(note)? {
-                return Ok(());
+            Kind::ShoppingList => {
+                if !shopping.may_make(note)? {
+                    return Ok(());
+                }
+                shopping.make(note)?;
             }
-            lists.to_plain(note)?;
+            Kind::Plain => {
+                if lists.is_checklist(note)? {
+                    lists.to_plain(note)?;
+                } else if shopping.is_shopping_list(note)?
+                    && self.store.may_change(note)?
+                    && Notes::new(&self.store)
+                        .by_id(note)?
+                        .is_some_and(|n| n.text_editable)
+                {
+                    shopping.to_plain(note, &*self.wall)?;
+                } else {
+                    return Ok(());
+                }
+            }
         }
         if shown && let Some(now) = Notes::new(&self.store).by_id(note)? {
             self.text = now.text;
         }
         Ok(())
+    }
+
+    /// The Line `id` of a Shopping List, while it shows there (#122).
+    fn shopping_line_of(&self, id: &str) -> oldbrainfix_core::Result<Option<ShoppingLine>> {
+        let Some(note) = self.store.current(id, checklist_keys::NOTE)? else {
+            return Ok(None);
+        };
+        let list = ShoppingLists::new(&self.store).by_note(&note, &*self.wall)?;
+        Ok(list.and_then(|list| list.line(id).cloned()))
     }
 
     /// The Line `id` with its Checklist, while it shows in one.
@@ -5338,6 +5468,7 @@ impl App {
                         full: !self.view.compact || self.unfolded.contains(id),
                         sections: self.view.sections.get(id).map_or(&[], Vec::as_slice),
                         checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
+                        shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                         menu: self.card_menu.as_ref(),
                     };
                     let clicks = note_card(
@@ -5358,9 +5489,14 @@ impl App {
                     if let Some(picked) = clicks.picked {
                         actions.push(picked);
                     } else if let Some((line, checked)) = clicks.check {
-                        // For the Occurrence the card shows it on.
-                        let on = self.view.checklists.get(id).and_then(|(l, _)| l.on.clone());
-                        actions.push(Action::Checklist(ChecklistAction::Check(line, checked, on)));
+                        if self.view.shopping_lists.contains_key(id) {
+                            actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
+                        } else {
+                            // For the Occurrence the card shows it on.
+                            let on = self.view.checklists.get(id).and_then(|(l, _)| l.on.clone());
+                            let check = ChecklistAction::Check(line, checked, on);
+                            actions.push(Action::Checklist(check));
+                        }
                     } else if let Some(hash) = clicks.photo {
                         actions.push(Action::ViewPhoto(hash));
                     } else if let (Some(author), Some(profile)) = (clicks.author, &placed.author)
@@ -5500,6 +5636,8 @@ impl App {
         let tally_count = self.tally_look.count;
         let checklist = self.view.checklist.as_ref();
         let makes_checklist = self.view.makes_checklist;
+        let shopping = self.view.shopping.as_ref();
+        let makes_shopping = self.view.makes_shopping;
         let typed = &mut self.line_text;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
@@ -5575,6 +5713,12 @@ impl App {
                     let mut asked = Vec::new();
                     checklist_view::section(ui, (&t, tones), shown, typed, &mut asked);
                     actions.extend(asked.into_iter().map(Action::Checklist));
+                }
+                // Nothing while the Note is no Shopping List.
+                if let Some(shown) = shopping {
+                    let mut asked = Vec::new();
+                    shopping_view::section(ui, (&t, tones), shown, typed, &mut asked);
+                    actions.extend(asked.into_iter().map(Action::Shopping));
                 }
                 let media = [
                     &note.photos,
@@ -5797,6 +5941,14 @@ impl App {
                         {
                             actions.push(Action::Checklist(ChecklistAction::Make(note.id.clone())));
                         }
+                        // Or a Shopping List of it.
+                        if makes_shopping
+                            && ui
+                                .button(RichText::new(t.make_shopping_list()).color(text))
+                                .clicked()
+                        {
+                            actions.push(Action::Shopping(ShoppingAction::Make(note.id.clone())));
+                        }
                     });
                 });
                 if ui
@@ -5825,9 +5977,10 @@ impl App {
                 });
                 // Only a Note in the lists becomes a Tally (ADR 0028); one
                 // that is adds entries in its Tally part above. A
-                // Checklist is no Tally (ADR 0030).
+                // Checklist or Shopping List is no Tally (ADR 0030).
                 if tally.is_none()
                     && checklist.is_none()
+                    && shopping.is_none()
                     && !note.is_merged()
                     && ui
                         .button(RichText::new(t.make_tally()).color(text))
@@ -5934,11 +6087,17 @@ impl App {
                         let form = (t.checklist_rename_title(), t.save(), Action::RenameLine);
                         line_form(ui, &t, form, (text, focus), actions);
                     }
-                    Dialog::DeleteLine { .. } => {
+                    Dialog::DeleteLine { for_good, .. } => {
                         title(ui, t.checklist_delete_question());
+                        // The verb of the menu it came from.
+                        let verb = if *for_good {
+                            t.shopping_delete_for_good()
+                        } else {
+                            t.delete()
+                        };
                         ui.horizontal(|ui| {
                             cancel(ui, &t, actions);
-                            if destructive(ui, t.delete()) {
+                            if destructive(ui, verb) {
                                 actions.push(Action::DeleteLine);
                             }
                         });
@@ -9090,15 +9249,16 @@ struct CardMedia<'a> {
 }
 
 /// How a card shows its Note (#114): `full`, the whole Note with its
-/// `sections`, or compact, by its first line; its Checklist, if it is
-/// one, as it shows now, with whether this Device may check its Lines,
-/// and what the card's menu offers of it once read for this Note
-/// (#120, #121).
+/// `sections`, or compact, by its first line; its Checklist or Shopping
+/// List, if it is one, as it shows now, with whether this Device may
+/// check its Lines, and what the card's menu offers of it once read for
+/// this Note (#120, #121, #122).
 #[derive(Debug, Clone, Copy)]
 struct CardLook<'a> {
     full: bool,
     sections: &'a [Section],
     checklist: Option<(&'a Checklist, bool)>,
+    shopping: Option<(&'a ShoppingList, bool)>,
     menu: Option<&'a CardMenu>,
 }
 
@@ -9210,15 +9370,15 @@ type ShownMedia<'a, 'b> = (&'b mut PhotoCache, &'a Store, Option<&'a str>);
 /// A Note as a card (UI laws, "Cards"): when it was captured, with ⋮
 /// (but in the trash) and Edit, and where it is filed, its Area's colour
 /// down the left edge and icon before the place; then, as `look` says,
-/// the whole Note under its Capture Context, a Checklist's Lines under
-/// its text, checkable, with every Section oldest first, each under its
-/// own, its photos opening full screen on a click; or, compact, where it
-/// was captured, its first line, how many of its Lines are checked and
-/// its media. ⋮ and a right-click open the same menu: Edit, then making
-/// it a Checklist, "Uncheck all" and "Back to a plain Note" as this
-/// Device may (#120). Important cards carry the
-/// accent marker and a stronger emboss; unimportant ones are dimmed. A
-/// `draggable` card can be dropped onto an Area or Topic; a `selected`
+/// the whole Note under its Capture Context, a Checklist's or a Shopping
+/// List's Lines under its text, checkable, with every Section oldest
+/// first, each under its own, its photos opening full screen on a click;
+/// or, compact, where it was captured, its first line, how many of its
+/// Lines are checked or open and its media. ⋮ and a right-click open
+/// the same menu: Edit, then making it a Checklist, "Uncheck all", "Back
+/// to a plain Note" and making it a Shopping List as this Device may
+/// (#120, #122). Important cards carry the accent marker and a stronger
+/// emboss; unimportant ones are dimmed. A `draggable` card can be dropped onto an Area or Topic; a `selected`
 /// one is outlined while its editor shows.
 fn note_card(
     ui: &mut Ui,
@@ -9337,13 +9497,17 @@ fn note_card(
                 ui.vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 8.0;
                     let part = Part::of_note(note);
-                    if let Some((list, _)) = look.checklist {
+                    let lines = match (look.checklist, look.shopping) {
+                        (Some((list, _)), _) => Some(checklist_view::shown_lines(list)),
+                        (None, Some((list, _))) => Some(shopping_view::shown_lines(t, list)),
+                        (None, None) => None,
+                    };
+                    if let Some(lines) = lines {
                         // Its Lines right under its text.
                         if !part.text.is_empty() {
                             let text = ui.visuals().text_color();
                             ui.label(RichText::new(part.text).size(16.0).color(text));
                         }
-                        let lines = checklist_view::shown_lines(list);
                         boxes = checklist_view::card_lines(ui, tones, &lines);
                         shown.extend(media_view::whole_media(
                             ui,
@@ -9371,6 +9535,8 @@ fn note_card(
             }
             if let Some((list, _)) = look.checklist {
                 checklist_view::card_count(ui, t, list);
+            } else if let Some((list, _)) = look.shopping {
+                shopping_view::card_count(ui, t, list);
             }
             if !note.photos.is_empty() {
                 media_view::thumbnails(ui, t, photos, store, &note.photos, 64.0, 3);
@@ -9463,6 +9629,9 @@ fn note_card(
         if let Some(asked) = menu.and_then(|m| checklist_view::card_menu_entries(ui, t, m)) {
             picked = Some(Action::Checklist(asked));
         }
+        if let Some(asked) = menu.and_then(|m| shopping_view::card_menu_entry(ui, t, m)) {
+            picked = Some(Action::Shopping(asked));
+        }
     };
     if let Some(more_rect) = more_rect {
         let title = row_title(t, Some(note));
@@ -9493,7 +9662,8 @@ fn note_card(
             photo = Some(hash);
         }
     }
-    let checks = look.checklist.is_some_and(|(_, checks)| checks);
+    let checks = look.checklist.is_some_and(|(_, checks)| checks)
+        || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),

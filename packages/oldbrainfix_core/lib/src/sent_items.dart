@@ -12,6 +12,7 @@ import 'profiles.dart';
 import 'routines.dart';
 import 'schedule.dart';
 import 'shared_areas.dart';
+import 'shopping_lists.dart';
 import 'signing.dart';
 import 'store.dart';
 import 'sync.dart';
@@ -1311,7 +1312,11 @@ _listChanges(Store store, String noteId, SentItem item) {
     renamed: <SentRename>[],
     removed: <Line>[],
   );
-  if (Tallies(store).isTally(noteId)) return none;
+  // The receiver's Tally or Shopping List stays one.
+  if (Tallies(store).isTally(noteId) ||
+      ShoppingLists(store).isShoppingList(noteId)) {
+    return none;
+  }
   final here = Checklists(store).byNote(noteId);
   final theirs = <String, Line>{};
   final own = <String, bool>{};

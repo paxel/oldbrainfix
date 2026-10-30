@@ -1,0 +1,177 @@
+{
+  "now": "2026-01-09T11:33:40.000Z",
+  "device": "65b60673d6ed884bf01c2c222d82ada0",
+  "areas": [],
+  "notes": [
+    {
+      "id": "note:00000000000000000000000000000001",
+      "text": "Groceries",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-01T10:00:01.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:0000000000000000000000000000000c",
+      "text": "Hardware",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:32:39.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": true,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000013",
+      "text": "Odd kind\nOne",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:33:25.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    },
+    {
+      "id": "note:00000000000000000000000000000015",
+      "text": "Unsorted thought",
+      "textFormat": "plain",
+      "textVersion": 1,
+      "textEditable": true,
+      "captured": "2026-01-08T11:33:37.000Z",
+      "context": {
+        "location": null,
+        "namedPlace": null,
+        "sourceApp": null,
+        "calendarEvents": [],
+        "bluetoothDevices": [],
+        "hasMore": false
+      },
+      "place": null,
+      "importance": "normal",
+      "trashed": null,
+      "mergedInto": null,
+      "spawned": false,
+      "photos": [],
+      "recordings": [],
+      "transcripts": {},
+      "photoTexts": {},
+      "removedPhotos": [],
+      "removedRecordings": [],
+      "removedTranscripts": [],
+      "removedPhotoTexts": [],
+      "wordless": "photo"
+    }
+  ],
+  "all": [
+    "note:00000000000000000000000000000015",
+    "note:00000000000000000000000000000013",
+    "note:0000000000000000000000000000000c",
+    "note:00000000000000000000000000000001"
+  ],
+  "unsorted": [
+    "note:00000000000000000000000000000013",
+    "note:00000000000000000000000000000015"
+  ],
+  "trashed": [],
+  "inside": {},
+  "sections": {
+    "note:00000000000000000000000000000015": [],
+    "note:00000000000000000000000000000013": [],
+    "note:0000000000000000000000000000000c": [],
+    "note:00000000000000000000000000000001": []
+  },
+  "untranscribed": [],
+  "unreadPhotos": [],
+  "removable": {},
+  "search": {
+    "": [
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000013",
+      "note:0000000000000000000000000000000c",
+      "note:00000000000000000000000000000001"
+    ],
+    "sauce": [],
+    "MILK": [
+      "note:00000000000000000000000000000001"
+    ],
+    "receipt": [],
+    "dentist": [],
+    "x-ray": [],
+    "müller": [],
+    "called": [],
+    "loop": [],
+    " e ": [
+      "note:00000000000000000000000000000015",
+      "note:00000000000000000000000000000013",
+      "note:0000000000000000000000000000000c",
+      "note:00000000000000000000000000000001"
+    ],
+    "heading": [],
+    "format": [],
+    "4711": []
+  },
+  "searchWithin": {},
+  "conflicts": []
+}

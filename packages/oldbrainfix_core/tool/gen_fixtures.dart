@@ -15,7 +15,9 @@
 /// pools, picks and what is Done (`sessions.json`); the Checklist
 /// scenario its Lines, what goes back into a plain Note's text, lines of
 /// text read as Lines and the keys that place them, and with a Routine
-/// the Lines checked for each Occurrence (`checklists.json`).
+/// the Lines checked for each Occurrence (`checklists.json`); the
+/// Shopping List scenario its Lines at moments around the days they come
+/// back (`shopping.json`).
 /// A scenario with photos and voice recordings writes their bytes as the
 /// store keeps them, under `photos/<hash>` and `audio/<hash>`. Next to
 /// them: the store's schema, a signed entry with awkward text, the
@@ -799,6 +801,95 @@ final _scenarios = <Scenario>[
     },
   ),
   (
+    name: 'shopping-lists',
+    about:
+        'Shopping Lists made from Notes: every line not blank a Line, '
+        'indented or not, a marked one struck; reappear times of Once and one '
+        'to four weeks; Lines checked to the end and back at the top at the '
+        'start of the same weekday as many weeks on on the European wall '
+        'clock, one checked late on a UTC evening that is the next day there; '
+        'names added again in another case bringing a struck and a gone Line '
+        'back, an open one and one back by its time staying, a new one at '
+        'the top; a Line renamed, one deleted and restored, one checked again '
+        'after it came back, reappear times, a check and a key no app '
+        'writes; back to a plain Note and made again, a kind no app writes; a '
+        'Reminder spawned from one with a check for its Occurrence no app '
+        'writes; an Unsorted Note beside them.',
+    build: (store) {
+      final notes = Notes(store);
+      final lists = ShoppingLists(store);
+      final wall = _frogDay(0);
+      String line(String note, String text) =>
+          lists.byNote(note, wall)!.lines.firstWhere((l) => l.text == text).id;
+      final week = notes
+          .capture(
+            'Groceries\r\nMilk\n  Eggs\n\tTea\n\n✓ Bread\r   \nApples\n'
+            'Coffee\nRice\nSalt',
+          )
+          .id;
+      lists.make(week);
+      lists.setReappear(line(week, 'Eggs'), Reappear.once);
+      lists.setReappear(line(week, 'Apples'), Reappear.week2);
+      lists.setReappear(line(week, 'Coffee'), Reappear.week3);
+      lists.setReappear(line(week, 'Rice'), Reappear.week4);
+      lists.setReappear(line(week, 'Rice'), Reappear.week4);
+      for (final text in ['Milk', 'Eggs', 'Apples', 'Coffee', 'Rice']) {
+        lists.check(line(week, text), wall);
+      }
+      lists.add(week, ' MILK ', wall);
+      lists.add(week, 'tea', wall);
+      lists.add(week, 'Oat milk', wall);
+      lists.add(week, 'eggs', wall);
+      lists.check(line(week, 'Eggs'), wall);
+      lists.rename(line(week, 'Oat milk'), 'Soy milk');
+      final salt = line(week, 'Salt');
+      lists.delete(salt);
+      lists.restore(salt);
+      lists.uncheck(line(week, 'Rice'), wall);
+      lists.check(line(week, 'Rice'), wall);
+      // As a modified app would.
+      final making = lists.byNote(week, wall)!.making;
+      for (final (i, (text, reappear, checked, order)) in [
+        ('Odd five', '5', true, 'z1'),
+        ('Odd blank', '', true, 'z2'),
+        ('Odd garbled', null, false, 'z3'),
+        ('Odd key', '2w', false, 'é'),
+      ].indexed) {
+        final id = 'line:${'e' * 31}$i';
+        store.append(id, ChecklistKeys.type, ChecklistKeys.typeLine);
+        store.append(id, ChecklistKeys.note, week);
+        store.append(id, ChecklistKeys.made, making);
+        store.append(id, ChecklistKeys.text, StoredText.plain(text).encode());
+        store.append(id, ChecklistKeys.order, order);
+        if (reappear != null) store.append(id, ShoppingKeys.reappear, reappear);
+        if (checked) lists.check(id, wall);
+      }
+      store.append(line(week, 'Odd garbled'), ChecklistKeys.checked, 'garbled');
+      // Late on a UTC evening, the next day in Europe.
+      _tick = _tick.add(const Duration(hours: 13, minutes: 30));
+      lists.check(line(week, 'Tea'), wall);
+      // A week on, Bread is back and Tea not yet.
+      _tick = _tick.add(const Duration(days: 6, hours: 12));
+      lists.add(week, 'bread', wall);
+      lists.check(line(week, 'Bread'), wall);
+      final hardware = notes.capture('Hardware\nNails\n✓ Glue').id;
+      lists.make(hardware);
+      lists.check(line(hardware, 'Nails'), wall);
+      lists.toPlain(hardware, wall);
+      lists.make(hardware);
+      final odd = notes.capture('Odd kind\nOne').id;
+      store.append(odd, ChecklistKeys.kind, 'shopping:a:b');
+      final errand = Routines(store)
+          .spawn(week, Schedule(start: Day(2026, 1, 9)));
+      store.append(
+        errand.id,
+        ChecklistKeys.checkFor(Occurrence(Day(2026, 1, 9)), line(week, 'Milk')),
+        '2026-01-09T09:00:00.000Z',
+      );
+      notes.capture('Unsorted thought');
+    },
+  ),
+  (
     name: 'sessions',
     about:
         'Sessions spawned with their Notes behind the scenes, picking from '
@@ -1109,6 +1200,93 @@ Map<String, Object?> _checklists(Store store) {
           },
         },
     ],
+  };
+}
+
+/// A Shopping List as the fixtures list it.
+Map<String, Object?> _shoppingList(ShoppingList list) => {
+  'making': list.making,
+  'lines': [
+    for (final l in list.lines)
+      {
+        'id': l.id,
+        'text': l.text,
+        'reappear': l.reappear.code,
+        'struck': l.struck,
+        'checkedAt': l.checkedAt?.toIso8601String(),
+        'backOn': l.backOn?.toString(),
+        'order': l.order,
+      },
+  ],
+  'count': list.count,
+  'openCount': list.openCount,
+  'struckCount': list.struckCount,
+};
+
+/// The moments the Shopping Lists are read at: around the starts of the
+/// days Lines come back on the European wall clock.
+final _shoppingMoments = [
+  DateTime.utc(2026, 1, 7, 22, 59, 59),
+  DateTime.utc(2026, 1, 7, 23),
+  DateTime.utc(2026, 1, 8, 22, 59, 59),
+  DateTime.utc(2026, 1, 8, 23),
+  DateTime.utc(2026, 1, 14, 22, 59, 59),
+  DateTime.utc(2026, 1, 14, 23),
+  DateTime.utc(2026, 1, 21, 23),
+  DateTime.utc(2026, 1, 28, 23),
+];
+
+/// Each Shopping List of [store] at each of [_shoppingMoments] on the
+/// European wall clock, with the text each goes back to as a plain Note,
+/// which Notes may become one, the Routines with what is Done, and how
+/// reappear times and names are read. Leaves the clock held as it was.
+Map<String, Object?> _shoppingLists(Store store) {
+  final lists = ShoppingLists(store);
+  final ids = store.entitiesOfType(NoteKeys.typeNote)..sort();
+  final held = _held;
+  final at = [
+    for (final moment in _shoppingMoments)
+      () {
+        _held = moment;
+        final shown = lists.ofNotes(ids, _frogDay(0));
+        return {
+          'now': moment.toIso8601String(),
+          'lists': {
+            for (final MapEntry(:key, :value) in shown.entries)
+              key: _shoppingList(value),
+          },
+          'plain': {
+            for (final MapEntry(:key, :value) in shown.entries)
+              key: ShoppingLists.plainText(Notes(store).byId(key)!.text, value),
+          },
+        };
+      }(),
+  ];
+  _held = held;
+  return {
+    'at': at,
+    'isShoppingList': {for (final id in ids) id: lists.isShoppingList(id)},
+    'mayMake': {for (final id in ids) id: lists.mayMake(id)},
+    'routines': [
+      for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+        if (Routines(store).byId(id) case final routine?) _routine(routine),
+    ],
+    'reappear': {
+      for (final code in ['once', '1w', '2w', '3w', '4w', '0', '5', 'x', ''])
+        code: Reappear.read(code).code,
+    },
+    'names': {
+      for (final text in [
+        ' Milk ',
+        'ÄPFEL',
+        'İstanbul',
+        'STRAẞE',
+        'ΟΔΟΣ',
+        ' Tea　',
+        '﻿Bom',
+      ])
+        text: ShoppingLists.nameKey(text),
+    },
   };
 }
 
@@ -5487,6 +5665,13 @@ Future<void> main(List<String> args) async {
     'Occurrences of its Routines and Reminders with what is Done, the '
     'Occurrence each is on and how it shows from the day before the clock held to three days '
     'after, on the same clock.\n'
+    '- `shopping-lists/shopping.json`: each Shopping List of the '
+    '`shopping-lists` log with its Lines in the order they show, their '
+    'reappear times, which are struck and the day each comes back, and the '
+    'text each goes back to as a plain Note, read at moments around the '
+    'starts of the days they come back on the same clock; which Notes are '
+    'one and may become one, the Routines with what is Done, reappear '
+    'times read, and names as an added one is compared.\n'
     '- `sent-checklist/`: Ada sends a Checklist to Ben (ADR 0030): her log '
     '(`sender.jsonl`) and Profile settings (`settings.json`), what sending '
     'wrote (`sent.jsonl`, ids counted from 0xa01, at held clocks), the '
@@ -5761,10 +5946,17 @@ Future<void> main(List<String> args) async {
           '${_json.convert(_tallies(store))}\n',
         );
       }
-      if (store.entitiesOfType(ChecklistKeys.typeLine).isNotEmpty) {
+      final noteIds = store.entitiesOfType(NoteKeys.typeNote);
+      if (Checklists(store).ofNotes(noteIds).isNotEmpty) {
         _write(
           File('${out.path}/checklists.json'),
           '${_json.convert(_checklists(store))}\n',
+        );
+      }
+      if (ShoppingLists(store).ofNotes(noteIds, _frogDay(0)).isNotEmpty) {
+        _write(
+          File('${out.path}/shopping.json'),
+          '${_json.convert(_shoppingLists(store))}\n',
         );
       }
       index.writeln('- `${scenario.name}`: ${scenario.about}');

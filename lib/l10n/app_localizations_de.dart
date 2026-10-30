@@ -1864,6 +1864,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get conflictLineText => 'Zeile einer Checkliste';
 
   @override
+  String get conflictShoppingLineText => 'Zeile einer Einkaufsliste';
+
+  @override
   String get conflictAreaName => 'Name eines Bereichs';
 
   @override
@@ -3254,6 +3257,42 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get checklistDeleteQuestion => 'Diese Zeile löschen?';
+
+  @override
+  String get makeShoppingList => 'Zur Einkaufsliste machen';
+
+  @override
+  String get shoppingHeading => 'Einkaufsliste';
+
+  @override
+  String shoppingOpenCount(int count) {
+    return '$count offen';
+  }
+
+  @override
+  String shoppingBack(String day) {
+    return 'wieder $day';
+  }
+
+  @override
+  String get shoppingReappear => 'Wiederkehr';
+
+  @override
+  String get shoppingOnce => 'Einmal';
+
+  @override
+  String shoppingWeeks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Wochen',
+      one: '1 Woche',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get shoppingDeleteForGood => 'Endgültig löschen';
 
   @override
   String get tallyHeading => 'Strichliste';

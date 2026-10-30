@@ -1,5 +1,6 @@
 import 'checklists.dart';
 import 'notes.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'tallies.dart';
 import 'text_format.dart';
@@ -7,7 +8,8 @@ import 'text_format.dart';
 /// Finding Notes by what they say: their text, the Transcripts of their
 /// voice recordings, the Photo Texts of their photos and the same of
 /// their Sections (Amends and merged Notes), the text lines of the
-/// entries of a Tally and the Lines of a Checklist. Capture Context joins later.
+/// entries of a Tally and the Lines of a Checklist or a Shopping List,
+/// but those gone. Capture Context joins later.
 /// A text in a format not known here counts as its source text.
 class Search {
   final Store store;
@@ -16,7 +18,7 @@ class Search {
 
   /// The Notes whose text, Transcripts or Photo Texts, or those of one of
   /// their Sections, or the text line of an entry of their Tally, or a
-  /// Line of their Checklist, hold
+  /// Line of their Checklist or Shopping List, hold
   /// [query], ignoring case, newest capture first.
   /// The query counts as typed, inner spaces included; only its ends are
   /// trimmed, and a blank one finds everything. With [within], only the
@@ -78,16 +80,18 @@ class Search {
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
       (texts[shownUnder] ??= []).add(line);
     }
-    final makings = <String, String?>{};
+    final makings = <String, ({String? making, bool shopping})>{};
     for (final id in store.entitiesOfType(ChecklistKeys.typeLine)) {
       final fields = store.currentFields(id);
       final owner = fields[ChecklistKeys.note];
       if (owner == null || fields[ChecklistKeys.trashed] != null) continue;
-      final making = makings.putIfAbsent(
-        owner,
-        () => Checklists(store).byNote(owner)?.making,
-      );
+      final (:making, :shopping) = makings.putIfAbsent(owner, () {
+        final listed = Checklists(store).byNote(owner)?.making;
+        if (listed != null) return (making: listed, shopping: false);
+        return (making: ShoppingLists(store).making(owner), shopping: true);
+      });
       if (making == null || fields[ChecklistKeys.made] != making) continue;
+      if (shopping && ShoppingLists.isGone(fields)) continue;
       final shownUnder = notes.byId(owner)?.mergedInto ?? owner;
       (texts[shownUnder] ??= []).add(
         StoredText.read(fields[ChecklistKeys.text]).text,

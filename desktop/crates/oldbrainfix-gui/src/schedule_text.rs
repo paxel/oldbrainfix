@@ -80,6 +80,17 @@ pub fn agenda_day_text(t: &L10n, day: Day) -> String {
     }
 }
 
+/// `day` as a short weekday and date, as the phone's `MMMEd` writes it:
+/// `Sat, Oct 31` or `Sa., 31. Okt.`
+pub fn short_day_text(t: &L10n, day: Day) -> String {
+    let weekday = weekday_text(t, day.weekday());
+    let month = month_short(t, day.month);
+    match t.locale() {
+        "de" => format!("{weekday}, {}. {month}", day.day),
+        _ => format!("{weekday}, {month} {}", day.day),
+    }
+}
+
 /// When an Occurrence is due: its time, or "All day".
 pub fn occurrence_time(t: &L10n, occurrence: &Occurrence) -> String {
     match occurrence.time {
@@ -162,6 +173,9 @@ mod tests {
         let sunday = Day::new(2026, 11, 1);
         assert_eq!(agenda_day_text(&en, sunday), "Sunday, 1 Nov");
         assert_eq!(agenda_day_text(&de, sunday), "Sonntag, 1. Nov.");
+        let saturday = Day::new(2026, 10, 31);
+        assert_eq!(short_day_text(&en, saturday), "Sat, Oct 31");
+        assert_eq!(short_day_text(&de, saturday), "Sa., 31. Okt.");
         let eight = ClockTime::new(8, 0).into_iter().collect::<Vec<_>>();
         let weekly = Recurrence::parse("FREQ=WEEKLY;BYDAY=SA,MO").ok();
         let schedule = Schedule::new(day, &eight, weekly);

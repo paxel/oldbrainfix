@@ -23,6 +23,7 @@ import 'place_names.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'sent_item_screen.dart';
+import 'shopping_list_view.dart';
 import 'speech_platform.dart';
 import 'system_bars.dart';
 import 'tally_entry_screen.dart';
@@ -283,17 +284,23 @@ NoteActions noteActions(
         : null,
     checklist: () {
       final lists = Checklists(notes.store);
+      final shopping = ShoppingLists(notes.store);
       // As the card shows it: for the Occurrence it is on (#121).
       final list = lists.shownNow(id, deviceWallClock);
+      final shops = shopping.isShoppingList(id);
       void run(bool Function(Notes notes, String id) step) {
         if (step(notes, id)) changed();
       }
 
       return (
-        isList: list != null,
+        isList: list != null || shops,
         make: lists.mayMake(id) ? () => run(makeChecklist) : null,
-        toPlain: list != null && placed.changes && placed.note.textEditable
-            ? () => run(checklistToPlain)
+        makeShopping: shopping.mayMake(id) ? () => run(makeShoppingList) : null,
+        toPlain:
+            (list != null || shops) &&
+                placed.changes &&
+                placed.note.textEditable
+            ? () => run(shops ? shoppingListToPlain : checklistToPlain)
             : null,
         uncheckAll:
             list != null && list.checkedCount > 0 && mayCheckShown(lists, list)
@@ -395,6 +402,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _makesList = false;
   bool _isList = false;
 
+  /// The same for a Shopping List (#122).
+  bool _makesShopping = false;
+  bool _isShopping = false;
+
   @override
   void initState() {
     super.initState();
@@ -466,6 +477,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final lists = Checklists(widget.notes.store);
     _makesList = lists.mayMake(widget.noteId);
     _isList = lists.isChecklist(widget.noteId);
+    final shopping = ShoppingLists(widget.notes.store);
+    _makesShopping = shopping.mayMake(widget.noteId);
+    _isShopping = shopping.isShoppingList(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
     final notes = widget.notes;
@@ -799,11 +813,21 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _text.text = _placed?.note.text ?? '';
   }
 
-  /// Turns the Checklist back into a plain Note: the field then holds
-  /// every Line as a line of its text.
+  /// Makes the Note a Shopping List of its text as typed, as
+  /// [_makeChecklist] does.
+  void _makeShoppingList() {
+    _saveText();
+    if (!makeShoppingList(widget.notes, widget.noteId)) return;
+    setState(_load);
+    _text.text = _placed?.note.text ?? '';
+  }
+
+  /// Turns the Checklist or Shopping List back into a plain Note: the
+  /// field then holds every Line as a line of its text.
   void _toPlain() {
     _saveText();
-    if (!checklistToPlain(widget.notes, widget.noteId)) return;
+    final back = _isShopping ? shoppingListToPlain : checklistToPlain;
+    if (!back(widget.notes, widget.noteId)) return;
     setState(_load);
     _text.text = _placed?.note.text ?? '';
   }
@@ -897,6 +921,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               notes: widget.notes,
               noteId: widget.noteId,
               onToPlain: _isList && changes && note.textEditable
+                  ? _toPlain
+                  : null,
+            ),
+            // Nothing while the Note is no Shopping List.
+            ShoppingSection(
+              notes: widget.notes,
+              noteId: widget.noteId,
+              onToPlain: _isShopping && changes && note.textEditable
                   ? _toPlain
                   : null,
             ),
@@ -1167,7 +1199,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 ),
               ),
             const SizedBox(height: 8),
-            if (amends || _makesList)
+            if (amends || _makesList || _makesShopping)
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1184,6 +1216,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                       onPressed: _makeChecklist,
                       icon: const Icon(Icons.checklist),
                       label: Text(t.makeChecklist),
+                    ),
+                  if (_makesShopping)
+                    FilledButton.tonalIcon(
+                      key: const ValueKey('shopping-make'),
+                      onPressed: _makeShoppingList,
+                      icon: const Icon(Icons.shopping_cart_outlined),
+                      label: Text(t.makeShoppingList),
                     ),
                 ],
               ),

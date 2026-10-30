@@ -54,7 +54,7 @@ Die zweite und letzte Ebene, innerhalb eines Bereichs, etwa Haushalt/Küche, Kin
 _Avoid_: Kategorie, Unterkategorie, Schlagwort
 
 **Unsortiert** [Unsorted]:
-Der Zustand einer Notiz, um die sich noch niemand gekümmert hat. Eine Notiz verlässt Unsortiert, wenn sie einen Bereich oder ein Thema bekommt, eine Routine, Erinnerung oder einen Frosch hervorbringt, zur Strichliste oder Checkliste gemacht, zusammengeführt oder gelöscht wird. Sie wird wieder unsortiert, wenn ihr Bereich oder Thema gelöscht wird und du seine Notizen nach Unsortiert zurückschickst.
+Der Zustand einer Notiz, um die sich noch niemand gekümmert hat. Eine Notiz verlässt Unsortiert, wenn sie einen Bereich oder ein Thema bekommt, eine Routine, Erinnerung oder einen Frosch hervorbringt, zur Strichliste, Checkliste oder Einkaufsliste gemacht, zusammengeführt oder gelöscht wird. Sie wird wieder unsortiert, wenn ihr Bereich oder Thema gelöscht wird und du seine Notizen nach Unsortiert zurückschickst.
 _Avoid_: Unkategorisiert, Posteingang
 
 **Stupser** [Nudge]:
@@ -130,14 +130,18 @@ _Avoid_: Abschnitt (ein Abschnitt ist ein datierter Teil des Textes einer Notiz)
 Eine Routine, die für jede Fälligkeit einige Strichlisten aus ihrem Vorrat auswählt, so viele, wie ihre Anzahl für den Wochentag sagt, nach ihrer Regel: Zufällig, Reihum (in der Reihenfolge des Vorrats, weiter, wo sie stehen blieb) oder Am seltensten (die mit den wenigsten Einträgen zuerst). Die Auswahl ist auf allen deinen Geräten und für alle in einem geteilten Bereich dieselbe, und „Noch eine“ tauscht eine davon aus. Eine Fälligkeit davon ist erledigt, sobald jede ausgewählte Strichliste einen Eintrag daraus hat, von wem auch immer, oder wenn du sie abhakst.
 _Avoid_: Workout, Training, Playlist, Satz
 
-## Checklisten
+## Checklisten und Einkaufslisten
 
 **Checkliste** [Checklist]:
-Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text bleibt oben als Titel und Beschreibung, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste und Checkliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes. Eine Routine oder Erinnerung aus einer Checkliste beginnt jede Fälligkeit ohne abgehakte Zeile, auf allen deinen Geräten und für alle in einem geteilten Bereich gleich; die Fälligkeit ist erledigt, sobald jede Zeile für sie abgehakt ist, von wem auch immer, oder wenn du sie abhakst.
+Eine Notiz, deren Zeilen abgehakt werden, etwa eine Packliste: ihr Text bleibt oben als Titel und Beschreibung, jede Zeile hat ihr Kästchen, und eine Zeile kann eine Gruppe von Zeilen unter sich haben, höchstens zwei Ebenen. Jede Zeile einer Gruppe abzuhaken hakt die übergeordnete Zeile ab, die übergeordnete Zeile abzuhaken hakt ihre ganze Gruppe ab, und den Haken einer Zeile der Gruppe wegzunehmen nimmt auch den der übergeordneten Zeile weg. Eine Notiz ist höchstens eines von Strichliste, Checkliste und Einkaufsliste; sie wird wieder eine einfache Notiz mit jeder Zeile als Zeile ihres Textes. Eine Routine oder Erinnerung aus einer Checkliste beginnt jede Fälligkeit ohne abgehakte Zeile, auf allen deinen Geräten und für alle in einem geteilten Bereich gleich; die Fälligkeit ist erledigt, sobald jede Zeile für sie abgehakt ist, von wem auch immer, oder wenn du sie abhakst.
 _Avoid_: To-do-Liste, Aufgabenliste, Todo
 
+**Einkaufsliste** [Shopping List]:
+Eine Notiz, deren Zeilen eine Weile nach dem Abhaken wiederkommen, etwa für den Wocheneinkauf: ihr Text bleibt oben als Titel und Beschreibung, und ihre Zeilen haben keine Gruppen. Jede Zeile hat ihre Wiederkehr, Einmal oder eine bis vier Wochen, eine Woche für eine neue Zeile. Eine Zeile abzuhaken streicht sie durch und schiebt sie ans Ende, mit dem Tag, an dem sie wiederkommt; mit Beginn dieses Tages, desselben Wochentags so viele Wochen später nach der Uhr des Geräts, ist sie wieder offen, ganz oben. Eine Zeile mit Einmal ist nach dem Abhaken weg. Einen Namen hinzuzufügen, den die Liste schon hat, in beliebiger Schreibung und mit Leerzeichen davor oder danach, fügt nichts hinzu: eine durchgestrichene oder weggegangene Zeile dieses Namens kommt sofort wieder, ganz oben, und eine offene bleibt. Sie wird aus einer Notiz gemacht und wieder eine einfache Notiz wie eine Checkliste, die durchgestrichenen Zeilen mit „✓ “ davor. Eine Routine oder Erinnerung aus ihr ist nur erledigt, wenn du sie abhakst.
+_Avoid_: Einkaufszettel, Dauerliste
+
 **Zeile** [Line]:
-Eine Zeile einer Checkliste: ein Text, ob sie abgehakt ist, und ihr Platz, oben oder in der Gruppe der Zeile darüber. Jedes Abhaken und jedes Zurücknehmen davon ist ein Eintrag für sich; der Text der Notiz wird dabei nie geändert.
+Eine Zeile einer Checkliste oder Einkaufsliste: ein Text, ob sie abgehakt ist, und ihr Platz, oben oder, auf einer Checkliste, in der Gruppe der Zeile darüber; auf einer Einkaufsliste auch ihre Wiederkehr. Jedes Abhaken und jedes Zurücknehmen davon ist ein Eintrag für sich; der Text der Notiz wird dabei nie geändert.
 _Avoid_: Punkt, Aufgabe, To-do, Eintrag (das ist einer Strichliste)
 
 ## Menschen und Geräte
@@ -159,7 +163,7 @@ _Avoid_: Erinnerung (das ist etwas anderes), Abgleich-Erinnerung
 Eine Person, die in einem geteilten Bereich alles darf.
 
 **Mitglied** [Member]:
-Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen, Fälligkeiten und Frösche abhaken und Zeilen jeder Checkliste hinzufügen und abhaken darf, aber keine Routinen, Erinnerungen, Frösche, Notizen anderer oder die Zeilen ihrer Checklisten ändern.
+Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen, Fälligkeiten und Frösche abhaken und Zeilen jeder Checkliste und Einkaufsliste hinzufügen und abhaken darf, aber keine Routinen, Erinnerungen, Frösche, Notizen anderer oder die Zeilen ihrer Checklisten und Einkaufslisten ändern.
 _Avoid_: Gast, Betrachter
 
 **Gesendete Notiz** [Sent Item]:

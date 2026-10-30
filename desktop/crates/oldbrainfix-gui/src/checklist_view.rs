@@ -17,13 +17,19 @@
 //! its editor as checked for the Occurrence it is on now, and on the
 //! Agenda each Occurrence's row shows its Lines as checked for that
 //! Occurrence; a check made there counts for that Occurrence only.
+//!
+//! A Shopping List's Lines (#122) are drawn by the same rows, with the
+//! day a struck one comes back under it and a menu of its own, and the
+//! card's menu offers making a Note one (`shopping_view`).
 
 use std::collections::HashSet;
 
 use egui::{Frame, Id, Key, Modifiers, RichText, Sense, TextEdit, Ui, WidgetInfo};
 use oldbrainfix_core::checklists::split_lines;
 use oldbrainfix_core::sent::SentLine;
-use oldbrainfix_core::{Checklist, Checklists, Line, Note, RoutineOccurrence, Store, WallClock};
+use oldbrainfix_core::{
+    Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, Store, WallClock,
+};
 
 use crate::app::{check, embossed, icon_button};
 use crate::icons;
@@ -31,13 +37,15 @@ use crate::l10n::L10n;
 use crate::theme::Tones;
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
-/// of the Line above it and whether it shows checked.
+/// of the Line above it, whether it shows checked and what shows dimmed
+/// under it, as the day a Shopping List's struck Line comes back (#122).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShownLine {
     pub id: String,
     pub text: String,
     pub in_group: bool,
     pub checked: bool,
+    pub below: Option<String>,
 }
 
 impl ShownLine {
@@ -47,6 +55,7 @@ impl ShownLine {
             text: line.text.clone(),
             in_group: line.in_group(),
             checked: line.checked,
+            below: None,
         }
     }
 
@@ -56,6 +65,7 @@ impl ShownLine {
             text: line.text.clone(),
             in_group: line.indent,
             checked: line.checked,
+            below: None,
         }
     }
 }
@@ -154,13 +164,14 @@ pub fn read(
     }))
 }
 
-/// What the menu of a Note's card offers of a Checklist (#120), read as
-/// it opens: making it one, unchecking all of its Lines and turning it
-/// back into a plain Note.
+/// What the menu of a Note's card offers of a Checklist (#120) and a
+/// Shopping List (#122), read as it opens: making it one, unchecking all
+/// of a Checklist's Lines and turning either back into a plain Note.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CardMenu {
     pub note: String,
     pub make: bool,
+    pub make_shopping: bool,
     pub uncheck_all: bool,
     pub to_plain: bool,
 }
@@ -178,10 +189,13 @@ pub fn card_menu(
         Some(list) => list.checked_count() > 0 && may_check_shown(store, list)?,
         None => false,
     };
-    let to_plain = list.is_some() && note.text_editable && store.may_change(&note.id)?;
+    let shopping = ShoppingLists::new(store);
+    let is_list = list.is_some() || shopping.is_shopping_list(&note.id)?;
+    let to_plain = is_list && note.text_editable && store.may_change(&note.id)?;
     Ok(CardMenu {
         note: note.id.clone(),
         make: list.is_none() && lists.may_make(&note.id)?,
+        make_shopping: shopping.may_make(&note.id)?,
         uncheck_all,
         to_plain,
     })
@@ -379,6 +393,18 @@ fn grouped(ui: &mut Ui, lines: &[ShownLine], row: &mut dyn FnMut(&mut Ui, &Shown
 /// gives.
 pub type LineMenus<'a> = (&'a HashSet<String>, &'a dyn Fn(&str) -> Vec<LineStep>);
 
+/// The Lines that have a menu, by id, and what draws the menu of each,
+/// by its id: what was picked in it (#122).
+pub type MenuOf<'a, P> = (&'a HashSet<String>, &'a dyn Fn(&mut Ui, &str) -> Option<P>);
+
+/// What was asked of a Line drawn by [`line_rows`]: its checkbox clicked,
+/// with whether it is checked now, or something picked in its menu.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LineAsk<P> {
+    Check(String, bool),
+    Menu(String, P),
+}
+
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
 /// and its text; with `menus`, the Lines whose ids it holds have ⋮ and a
@@ -392,7 +418,34 @@ pub fn lines(
     menus: Option<LineMenus>,
     actions: &mut Vec<ChecklistAction>,
 ) {
+    let menu = |ui: &mut Ui, id: &str| menus.and_then(|(_, steps)| line_menu(ui, t, &steps(id)));
+    let menus = menus.map(|(editable, _)| {
+        (
+            editable,
+            &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
+        )
+    });
+    for asked in line_rows(ui, (t, tones), shown, checks, menus) {
+        actions.push(match asked {
+            LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),
+            LineAsk::Menu(id, step) => ChecklistAction::Step(id, step),
+        });
+    }
+}
+
+/// The Lines `shown`, each with its checkbox, checkable with `checks`,
+/// its text and what shows under it; with `menus`, the Lines whose ids
+/// it holds have ⋮ and a right-click with the menu it draws. What is
+/// asked, in the order clicked.
+pub fn line_rows<P>(
+    ui: &mut Ui,
+    (t, tones): (&L10n, Tones),
+    shown: &[ShownLine],
+    checks: bool,
+    menus: Option<MenuOf<P>>,
+) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
+    let mut asked = Vec::new();
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 4.0;
         grouped(ui, shown, &mut |ui, line| {
@@ -401,11 +454,7 @@ pub fn lines(
                     .add_enabled_ui(checks, |ui| check(ui, tones, line.checked, &line.text))
                     .inner;
                 if toggled.clicked() {
-                    actions.push(ChecklistAction::Check(
-                        line.id.clone(),
-                        !line.checked,
-                        on.cloned(),
-                    ));
+                    asked.push(LineAsk::Check(line.id.clone(), !line.checked));
                 }
                 let editable = menus.filter(|(editable, _)| editable.contains(&line.id));
                 let room = if editable.is_some() {
@@ -420,29 +469,42 @@ pub fn lines(
                     Sense::hover()
                 };
                 let words = ui
-                    .allocate_ui(egui::vec2(room, 0.0), |ui| {
-                        ui.add(egui::Label::new(line_text(ui, line)).sense(sense))
-                    })
+                    .allocate_ui(egui::vec2(room, 0.0), |ui| words(ui, line, sense))
                     .inner;
-                let Some((_, steps)) = editable else {
+                let Some((_, menu)) = editable else {
                     return;
                 };
-                let steps = steps(&line.id);
                 let mut picked = None;
-                words.context_menu(|ui| picked = picked.or(line_menu(ui, t, &steps)));
+                words.context_menu(|ui| picked = picked.take().or(menu(ui, &line.id)));
                 // ⋮ at the right edge, as on an Agenda row.
                 let more = ui
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak)
                     })
                     .inner;
-                egui::Popup::menu(&more).show(|ui| picked = picked.or(line_menu(ui, t, &steps)));
+                egui::Popup::menu(&more).show(|ui| picked = picked.take().or(menu(ui, &line.id)));
                 if let Some(step) = picked {
-                    actions.push(ChecklistAction::Step(line.id.clone(), step));
+                    asked.push(LineAsk::Menu(line.id.clone(), step));
                 }
             });
         });
     });
+    asked
+}
+
+/// A Line's words, sensing as `sense` says, and under them, dimmed, what
+/// shows below it: the response of the words.
+fn words(ui: &mut Ui, line: &ShownLine, sense: Sense) -> egui::Response {
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        let words = ui.add(egui::Label::new(line_text(ui, line)).sense(sense));
+        if let Some(below) = &line.below {
+            let weak = ui.visuals().weak_text_color();
+            ui.label(RichText::new(below).size(13.0).color(weak));
+        }
+        words
+    })
+    .inner
 }
 
 /// A Line's checkbox drawn on a card, where the card takes the clicks:
@@ -464,7 +526,7 @@ pub fn card_lines(ui: &mut Ui, tones: Tones, shown: &[ShownLine]) -> Vec<CardBox
             ui.horizontal(|ui| {
                 let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
                 paint_box(ui, tones, rect, line.checked, false);
-                ui.add(egui::Label::new(line_text(ui, line)));
+                words(ui, line, Sense::hover());
                 boxes.push(CardBox {
                     rect,
                     line: line.clone(),
