@@ -74,6 +74,18 @@ void main() {
     await tap(tester, find.byKey(const ValueKey('note-menu')).first);
     expect(find.text('Send to a person'), findsOneWidget);
     await tap(tester, find.byKey(const ValueKey('note-share')));
+    // The files are written outside the test's fake time.
+    for (
+      var i = 0;
+      i < 50 && files.texts.isEmpty && announcements.visible == null;
+      i++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
   }
 
   testWidgets('Share to an app hands the text, its Sections under their '

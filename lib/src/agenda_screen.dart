@@ -101,7 +101,7 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// the five days after the same way, each under its weekday and date.
 /// Each is checked off as Done on its own, the coming days' already
 /// today. "+"
-/// fans out Text, Voice, Photo and Gallery to capture a Note, whose card
+/// fans out Text, Voice, Photo, Gallery and Paste to capture a Note, whose card
 /// then shows on top with its enrich options
 /// until the browser opens or the app comes back; the magnifier opens
 /// the notes browser; the app bar opens the list of all Routines and

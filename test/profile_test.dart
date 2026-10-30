@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -306,6 +307,34 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('of a Profile a newer version saved says so and changes '
+        'nothing', (tester) async {
+      // As a later version writes the record (ADR 0034).
+      final record =
+          jsonDecode(store.localSetting('profile')!) as Map<String, Object?>;
+      store.setLocalSetting('profile', jsonEncode({...record, 'v': 2}));
+      expect(store.ownProfileIsNewer, isTrue);
+      await page(tester);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('profileNewer')),
+          matching: find.text(
+            lookupAppLocalizations(const Locale('en')).newerVersionNeeded,
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('profileName')))
+            .readOnly,
+        isTrue,
+      );
+      await tap(tester, find.byKey(const ValueKey('profilePicture')));
+      expect(find.text('Choose a picture'), findsNothing);
+      expect(store.ownProfile!.name, 'Ada');
+    });
 
     testWidgets('is a square the user picks, kept as a 256 JPEG', (
       tester,

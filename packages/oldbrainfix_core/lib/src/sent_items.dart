@@ -60,6 +60,11 @@ bool _laterFormat(Object? json) =>
       _ => false,
     };
 
+/// Whether [json] says it is in [sentItemListFormat], the format of a
+/// Checklist's file.
+bool _listed(Object? json) =>
+    json is Map && json['format'] == sentItemListFormat;
+
 /// A file larger than this is no Sent Item: it holds only texts.
 const maxSentItemBytes = 1 << 20;
 
@@ -360,17 +365,20 @@ class SentItem {
   }
 
   /// The Lines the note [json] carries, null in the record when it is no
-  /// Checklist; null when they are no Lines.
+  /// Checklist; null when they are no Lines. Of two with one id, the
+  /// first counts.
   static (List<SentLine>?,)? _lines(Object? json) {
     if (json is! Map || !json.containsKey('lines')) return (null,);
     final lines = json['lines'];
     if (lines is! List) return null;
     final out = <SentLine>[];
+    final ids = <String>{};
     for (final l in lines) {
       if (l case {'id': final String id, 'text': final String text}) {
         final indent = l['indent'] ?? false;
         final checked = l['checked'] ?? false;
         if (indent is! bool || checked is! bool) return null;
+        if (!ids.add(id)) continue;
         out.add(SentLine(id, text, indent: indent, checked: checked));
       } else {
         return null;
@@ -822,7 +830,12 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
   if (signed case {'item': final String payload, 'sig': final String sig}
       when _inFormat(signed)) {
     final item = SentItem.parse(payload);
+    // Lines come in format 2 only, and a file in format 2 carries them
+    // (ADR 0030).
+    final listed = item?.lines != null;
     if (item == null ||
+        listed != _listed(signed) ||
+        (encrypted && listed != _listed(outer)) ||
         !item.from.valid ||
         !verifySignature(item.from.publicKey, _signedBytes(payload), sig)) {
       throw const NotASentItem();

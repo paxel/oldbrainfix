@@ -2159,6 +2159,33 @@ const ROWS: [&str; 17] = [
     "✓ ✓ Twice",
 ];
 
+/// Lines of a formatted text, as the Dart generator's `_markdownRows`.
+const MARKDOWN_ROWS: [&str; 23] = [
+    "- Socks",
+    "  - Blue",
+    "* Tent",
+    "\t+ ✓ Pegs",
+    "+",
+    "- ",
+    "-Knife",
+    "1. Map",
+    "123456789. Big",
+    "1234567890. Too long",
+    "12) Paren",
+    "1.",
+    "> Torch",
+    ">Close",
+    ">",
+    "   > Three spaces",
+    "    > Four spaces",
+    "> - Both",
+    "- > Both",
+    "# Heading",
+    "**Bold**",
+    "- \u{a0}Nbsp",
+    "-\tTab",
+];
+
 #[test]
 fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
     for scenario in ["checklist-routines", "checklists"] {
@@ -2168,7 +2195,7 @@ fn checklists_and_their_lines_come_to_what_the_dart_core_says() -> TestResult {
 }
 
 fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
-    use oldbrainfix_core::checklists::{order, parse_line, split_lines};
+    use oldbrainfix_core::checklists::{order, parse_line, parse_line_in, split_lines};
     let dir = fixtures().join(scenario);
     let expected = read_json(&dir.join("checklists.json"))?;
     let read_at = read_json(&dir.join("expected.json"))?;
@@ -2206,6 +2233,15 @@ fn checklists_come_to_what_the_dart_core_says(scenario: &str) -> TestResult {
         })
         .collect();
     assert_eq!(json!(rows), expected["rows"]);
+    let markdown_rows: Vec<Value> = ROWS
+        .iter()
+        .chain(MARKDOWN_ROWS.iter())
+        .map(|row| match parse_line_in(row, true) {
+            None => Value::Null,
+            Some(l) => json!({"text": l.text, "indent": l.indent, "checked": l.checked}),
+        })
+        .collect();
+    assert_eq!(json!(markdown_rows), expected["markdownRows"]);
     assert_eq!(
         json!(split_lines("a\r\nb\rc\n\nd\r\r\n")),
         expected["split"]

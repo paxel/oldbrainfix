@@ -1,4 +1,5 @@
 import 'entry.dart';
+import 'markdown.dart';
 import 'notes.dart';
 import 'profiles.dart';
 import 'routines.dart';
@@ -393,8 +394,9 @@ class Checklists {
   /// Makes the Note [noteId] a Checklist: its first line stays its text,
   /// every other line not blank becomes a Line, under the line above
   /// when it starts with a space or a tab, checked when it starts with
-  /// "✓ ". Takes it out of Unsorted, as a Tally does. The text keeps its
-  /// format.
+  /// "✓ ", in a formatted text without the mark of an item or a quote
+  /// ([parseLine]). Takes it out of Unsorted, as a Tally does. The text
+  /// keeps its format.
   void make(String noteId) {
     final note = Notes(store).byId(noteId);
     if (note == null || !mayMake(noteId)) {
@@ -402,7 +404,10 @@ class Checklists {
     }
     final rows = splitLines(note.text);
     final title = rows.first.trim();
-    final parsed = [for (final row in rows.skip(1)) ?parseLine(row)];
+    final markdown = note.textFormat == TextFormats.markdown;
+    final parsed = [
+      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
+    ];
     final making = Store.newId();
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ChecklistKeys.kindOf(making));
@@ -978,9 +983,11 @@ List<String> splitLines(String text) =>
 
 /// The Line the text line [row] becomes, or null for a blank one: under
 /// the line above when it starts with a space or a tab, checked when its
-/// text starts with "✓ ".
-ParsedLine? parseLine(String row) {
-  var text = row.trim();
+/// text starts with "✓ ". In a [markdown] text, the mark of a bulleted
+/// or numbered item or a quote goes first: "- milk", "1. milk" and
+/// "> milk" become "milk", and "  - milk" goes under the line above.
+ParsedLine? parseLine(String row, {bool markdown = false}) {
+  var text = (markdown ? _withoutItemMark(row) : row).trim();
   if (text.isEmpty) return null;
   final indent = row.startsWith(' ') || row.startsWith('\t');
   var checked = false;
@@ -993,6 +1000,23 @@ ParsedLine? parseLine(String row) {
   }
   return (text: text, indent: indent, checked: checked);
 }
+
+/// [row] without the mark it starts with as a bulleted or numbered item
+/// or a quote of formatted text; as it is when it is none of them.
+String _withoutItemMark(String row) => switch (Markdown.parse(row)) {
+  [
+    MarkdownBlock(
+      kind: MarkdownBlockKind.bullet ||
+          MarkdownBlockKind.numbered ||
+          MarkdownBlockKind.quote,
+      :final contentStart,
+      :final end,
+    ),
+    ...,
+  ] =>
+    row.substring(contentStart, end),
+  _ => row,
+};
 
 /// Writes a new Line of the Note [noteId] in its making [making], inside
 /// a batch, at [date] or now; returns its id.

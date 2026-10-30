@@ -199,6 +199,184 @@
       "checked": true
     }
   ],
+  "markdownRows": [
+    null,
+    null,
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Red",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Lead nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Em space",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Bom",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Trailing",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "✓x",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Two spaces",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "✓ Twice",
+      "indent": false,
+      "checked": true
+    },
+    {
+      "text": "Socks",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Blue",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "Tent",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Pegs",
+      "indent": true,
+      "checked": true
+    },
+    null,
+    null,
+    {
+      "text": "-Knife",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Map",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Big",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "1234567890. Too long",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "12) Paren",
+      "indent": false,
+      "checked": false
+    },
+    null,
+    {
+      "text": "Torch",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Close",
+      "indent": false,
+      "checked": false
+    },
+    null,
+    {
+      "text": "Three spaces",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "> Four spaces",
+      "indent": true,
+      "checked": false
+    },
+    {
+      "text": "- Both",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "> Both",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "# Heading",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "**Bold**",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Nbsp",
+      "indent": false,
+      "checked": false
+    },
+    {
+      "text": "Tab",
+      "indent": false,
+      "checked": false
+    }
+  ],
   "split": [
     "a",
     "b",

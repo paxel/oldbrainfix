@@ -28,6 +28,7 @@ All data is stored on the user's devices.
 
 The documentation, in English and German, is at
 **[paxel.github.io/oldbrainfix](https://paxel.github.io/oldbrainfix/)**.
+The user guide is at [paxel.github.io/oldbrainfix/en/guide](https://paxel.github.io/oldbrainfix/en/guide/).
 
 Work in progress. The domain language is in [CONTEXT.md](CONTEXT.md), the
 decisions in [docs/adr](docs/adr), the plan in the GitHub issues.

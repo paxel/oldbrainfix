@@ -16,6 +16,7 @@ You build the phone app's screens on top of the shared core. Logic that the desk
 - Plain `setState`/`ValueNotifier`, no state-management package. Guard `context` after `await` with `if (!mounted) return;`. Dispose controllers, nodes, timers and subscriptions. No work in `build()`.
 - Widget tests against fakes for platform parts (`test/fake_*.dart`); Kotlin JVM unit tests for Kotlin code.
 - `dart format`; `flutter analyze --fatal-infos` clean.
+- A change to a screen also updates its guide page (`site/en/guide/` and `site/de/guide/`) and its frames: run `tool/guide-frames.sh` and keep the rewritten PNGs under `site/assets/frames/`; CI fails on a stale frame.
 
 ## Shared rules
 

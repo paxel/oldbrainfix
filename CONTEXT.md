@@ -16,7 +16,7 @@ _Avoid_: quick add, record
 
 **Capture Context**:
 What was true when a Note was captured and helps make sense of it days later: time, Named Place or coordinates, source app, the calendar event running, the connected Bluetooth device.
-_Avoid_: metadata (in the UI), tags
+_Avoid_: metadata (in the UI), tags (a Tag is a #word of the text)
 
 **Named Place**:
 A spot the user gave a name ("Home", "Work", "Mum's"). A Note captured near it carries that name in its Capture Context.
@@ -45,6 +45,32 @@ _Avoid_: combine, join, link
 How much a Note matters: unimportant, normal (default) or important.
 _Avoid_: priority, star
 
+**Paste**:
+Capturing what the clipboard holds: on the phone "Paste" on the text capture screen and in the fan of "+", which reads the clipboard only when tapped and fills the capture with its text and with its picture as the Note's photo, both into one Note; on the desktop the capture's Paste button and Ctrl+V in the empty capture window. German: Einfügen.
+_Avoid_: import, clipboard capture
+
+### Text
+
+**Formatted text**:
+A Note's or Section's text kept as Markdown of the app's own subset: bold, italic, strike-through, two heading levels, bulleted and numbered lists one level in, quotes, links, inline code and Tables. A text stays plain until it is first formatted, from the Format bar, by typing Markdown or by a Paste that uses a format, and stays formatted from then on. Transcripts and Photo Texts stay plain. German: Formatierter Text.
+_Avoid_: rich text, styled text
+
+**Format bar**:
+The row of buttons that formats the selection or the word at the cursor, or the lines the selection touches, and puts in a ☐ or a Table: on the phone on the keyboard in the Note editor and in Add to Note, on the desktop above the text field of the Note editor. German: Formatleiste.
+_Avoid_: toolbar, formatting toolbar
+
+**Table**:
+Rows and columns in a Formatted text, written as a GitHub Markdown table: a header row, the first column as headings when it is marked so, and cells of one line of formatting each. It is opened full screen to edit its cells and to put in, move and delete rows and columns. German: Tabelle.
+_Avoid_: spreadsheet, grid
+
+**Status mark**:
+A ☐ (open), ✅ (checked) or ❌ (failed) as the first character of a line of a Note's or Section's text, after any spaces, tabs and one list item's bullet, or at the start of a Table's cell; a tap or click on one in a Note's text offers the other two states, while those of a Section show but cannot be changed. It is a character of the text and nothing is stored beside it, so in a Shared Area only the Note's author and the Managers change it. German: Statuszeichen.
+_Avoid_: checkbox, tick (a Line of a Checklist has the checkbox)
+
+**Tag**:
+A word with "#" in front in a text, such as "#Garten": letters, digits, "_" and "-", at least one of them a letter. It is drawn highlighted, and a tap or click on it opens the search for it. Nothing is stored for a Tag and there is no list of Tags; it is no Topic and no part of the Capture Context. German: #Wort.
+_Avoid_: label, keyword, hashtag
+
 ### Sorting
 
 **Area**:
@@ -53,7 +79,7 @@ _Avoid_: domain, category, folder
 
 **Topic**:
 The second and last level, inside an Area, e.g. Household/Kitchen, Kids/School. German: Thema.
-_Avoid_: category, subcategory, tag
+_Avoid_: category, subcategory, tag (a Tag is a #word of the text)
 
 **Unsorted**:
 The state of a Note nobody has processed yet. A Note leaves Unsorted when it gets an Area or Topic, spawns a Routine, Reminder or Frog, is made a Tally, a Checklist or a Shopping List, is merged, or is deleted. It becomes Unsorted again when its Area or Topic is deleted and the user sends its Notes back to Unsorted. German: Unsortiert.
@@ -121,7 +147,7 @@ _Avoid_: dashboard, today view, home
 ### Tallies
 
 **Tally**:
-A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, shown as a table and as one chart per field by day, week, month or year. German: Strichliste.
+A Note that records how much of something was done, such as push-ups, pages read or minutes of video: its fields, each a number with a unit, an optional target and a rule for a day with several entries (their sum or the largest), and its entries, listed as rows, newest first, and shown as one chart per field by day, week, month or year. German: Strichliste.
 _Avoid_: tracker, log, workout, exercise, habit
 
 **Entry**:
@@ -169,8 +195,12 @@ A person in a Shared Area who may add and amend Notes, check off Occurrences and
 _Avoid_: guest, viewer
 
 **Sent Item**:
-A single Note with its Routines or Reminders, sent as a file to another Old Brain Fix user outside any Shared Area. The receiver previews and accepts it; the sender may later send an update or a cancellation for it.
-_Avoid_: invite, share, bundle (a bundle is a sync transport)
+A single Note with its Routines or Reminders, sent as a file to another Old Brain Fix user outside any Shared Area. It is sent with "Send to a person". The receiver previews and accepts it; the sender may later send an update or a cancellation for it.
+_Avoid_: invite, share (Share to an app hands a Note to another app), bundle (a bundle is a sync transport)
+
+**Share to an app**:
+Handing a copy of a Note to another app, such as a messenger or mail: its text and its Sections, each under its date, with HTML beside the Markdown of a Formatted text, and its photos and recordings as files. On the phone it gives them to the share sheet; on the desktop "Copy as text" and "Save as Markdown…" put the same on the clipboard or into a file. Nothing comes back from the other app and nothing of it syncs. German: Mit einer App teilen.
+_Avoid_: Sent Item and "Send to a person" (they send a Note to another Old Brain Fix user), Shared Area, export
 
 **Profile**:
 A person as the app shows them: a name and a picture, under an id of their own. Each person has one Profile for all of their Devices. German: Profil.
@@ -197,7 +227,7 @@ Two versions of the same user-edited field written on different Devices without 
 _Avoid_: clash, merge conflict
 
 **Pending Changes**:
-Changes the user sees as if they were kept, which are kept only once the user accepts them; declining leaves nothing behind. What the user edits in the meantime wins on Accept. Used for an AI Task, an Area offered from afar, a stranger's Sent Item until "Show", and a bundle with a lot in it.
+Changes the user sees as if they were kept, which are kept only once the user accepts them; declining leaves nothing behind. What the user edits in the meantime wins on Accept. Used for an AI Task, an Area offered from afar and a stranger's Sent Item until "Show".
 _Avoid_: draft, staging, preview (a preview shows without keeping anything)
 
 **AI Task**:

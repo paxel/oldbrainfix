@@ -1117,6 +1117,13 @@ void main() {
             );
             await _tap(tester, find.text(t.shareArea));
             expect(find.byType(ShareAreaScreen), findsOneWidget);
+            // The role texts push "Share with…" below the screen's edge.
+            await tester.scrollUntilVisible(
+              find.byKey(const ValueKey('share-afar')),
+              100,
+              scrollable: notesList.last,
+            );
+            await tester.pumpAndSettle();
             expect(find.byKey(const ValueKey('share-afar')), findsOneWidget);
           });
 

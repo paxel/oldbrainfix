@@ -81,6 +81,20 @@ void main() {
       expect(() => lists.make(note.id), throwsStateError);
     });
 
+    test('from a formatted text, the marks of items and quotes go', () {
+      final note = Notes(ann)
+          .capture(
+            '**Groceries**\n- Milk\n  * Eggs\n+ ✓ Bread\n12. Tea\n> Apples',
+            format: TextFormats.markdown,
+          )
+          .id;
+      ShoppingLists(ann).make(note);
+      expect(Notes(ann).byId(note)!.text, '**Groceries**');
+      expect(shown(ann, note), ['Milk', 'Eggs', 'Tea', 'Apples', '~Bread']);
+      // A plain text keeps them as written.
+      expect(shown(ann, shopping(ann, 'Shop\n- Milk')), ['- Milk']);
+    });
+
     test('a Note is at most one of a Tally, a Checklist and a Shopping '
         'List', () {
       final lists = ShoppingLists(ann);

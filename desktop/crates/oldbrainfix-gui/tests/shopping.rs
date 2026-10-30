@@ -363,13 +363,13 @@ fn the_line_menu_renames_sets_the_reappear_time_and_deletes_for_good() -> TestRe
 
     // Deleting asks once, with the menu's words; Cancel keeps it.
     click(&mut harness, "More: Rye bread")?;
-    click(&mut harness, "Delete for good")?;
+    click(&mut harness, "Delete")?;
     assert!(shows(&harness, "Delete this Line?"));
     click(&mut harness, "Cancel")?;
     assert_eq!(list(&harness, &note)?.count(), 2);
     click(&mut harness, "More: Rye bread")?;
-    click(&mut harness, "Delete for good")?;
-    click(&mut harness, "Delete for good")?;
+    click(&mut harness, "Delete")?;
+    click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
     Ok(())
 }

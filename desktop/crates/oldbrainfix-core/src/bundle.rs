@@ -575,6 +575,45 @@ mod tests {
     }
 
     #[test]
+    fn a_bundle_carries_a_checklists_lines_and_checks() -> TestResult {
+        use crate::Checklists;
+        let phone = device(1)?;
+        let desk = device(2)?;
+        meet(&phone, &desk)?;
+        let note = Notes::new(&desk)
+            .capture("Trip\nBath\n  Soap\nTent", None, None)?
+            .id;
+        let lists = Checklists::new(&desk);
+        lists.make(&note)?;
+        let made = lists.by_note(&note)?.ok_or("a Checklist")?;
+        let soap = made.lines.iter().find(|l| l.text == "Soap").ok_or("Soap")?;
+        lists.check(&soap.id)?;
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("list.obfsync");
+        write_bundle_now(&desk, &path, Some(&phone.device_id()?))?.ok_or("a bundle")?;
+        import_bundle(&phone, &path)?;
+        let shown = |store: &Store| -> Result<Vec<(String, bool, bool)>> {
+            let list = Checklists::new(store).by_note(&note)?;
+            Ok(list
+                .map(|l| l.lines)
+                .unwrap_or_default()
+                .iter()
+                .map(|l| (l.text.clone(), l.in_group(), l.checked))
+                .collect())
+        };
+        assert_eq!(
+            shown(&phone)?,
+            [
+                ("Bath".to_string(), false, true),
+                ("Soap".to_string(), true, true),
+                ("Tent".to_string(), false, false),
+            ]
+        );
+        assert_eq!(shown(&phone)?, shown(&desk)?);
+        Ok(())
+    }
+
+    #[test]
     fn a_bundle_leaves_the_shared_folder_to_read_in_full() -> TestResult {
         use crate::folder::{MemoryFolder, folder_sync};
         let phone = device(1)?;

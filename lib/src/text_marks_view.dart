@@ -419,18 +419,28 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
   @override
   MarkSwap? get _onMark => widget.onMark;
 
+  _FoundIn? _found;
+
+  /// What the text holds, found once for each text it shows.
+  _FoundIn get _foundIn {
+    final found = _found;
+    if (found != null && found.text == widget.text) return found;
+    return _found = _FoundIn(widget.text);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.format == TextFormats.markdown) return _formatted(context);
     final text = widget.text;
     final from = widget.start ?? 0;
     final to = widget.end ?? text.length;
+    final found = _foundIn;
     final marks = [
-      for (final mark in TextMarks.find(text))
+      for (final mark in found.marks)
         if (mark.start >= from && mark.end <= to) mark,
     ];
     final tags = [
-      for (final tag in TextTags.find(text))
+      for (final tag in found.tags)
         if (tag.start >= from && tag.end <= to) tag,
     ];
     if (marks.isEmpty && tags.isEmpty) {
@@ -492,12 +502,13 @@ class _MarkedTextState extends State<MarkedText> with _InlineSpans {
     final text = widget.text;
     final from = widget.start ?? 0;
     final to = widget.end ?? text.length;
-    final marks = Markdown.marks(text);
-    final tags = Markdown.tags(text);
+    final found = _foundIn;
+    final marks = found.markdownMarks;
+    final tags = found.markdownTags;
     final base = DefaultTextStyle.of(context).style.merge(widget.style);
     final compact = widget.maxLines != null;
     final lines = <Widget>[];
-    for (final block in Markdown.parse(text)) {
+    for (final block in found.blocks) {
       if (block.end < from || block.start > to) continue;
       final table = block.table;
       if (table == null) {
@@ -726,6 +737,21 @@ TextAlign cellAlign(MarkdownAlign align) => switch (align) {
 /// [line], as [MarkedText] draws them: bold, italic, struck through, code
 /// and links, its status mark a button with [onMark], its tags links to
 /// the search. [marks] and [tags] are those of the whole text.
+/// The marks, tags and Markdown blocks of [text], each read on first
+/// use: kept by [MarkedText] while its text stays the same, so a build
+/// reads none of them again.
+class _FoundIn {
+  final String text;
+
+  _FoundIn(this.text);
+
+  late final marks = TextMarks.find(text);
+  late final tags = TextTags.find(text);
+  late final blocks = Markdown.parse(text);
+  late final markdownMarks = Markdown.marks(text);
+  late final markdownTags = Markdown.tags(text);
+}
+
 class MarkedCell extends StatefulWidget {
   final String text;
   final MarkdownTableCell cell;

@@ -211,6 +211,34 @@ void main() {
     expect(ann.personOverride(benId), isNull);
   });
 
+  testWidgets('a name for me a newer version saved says so and changes '
+      'nothing', (tester) async {
+    ann.setOverrideName(benId, 'Mum');
+    // As a later version on one of Ann's Devices writes it (ADR 0034).
+    ann.append('${OverrideKeys.prefix}$benId', OverrideKeys.version, '2');
+    await page(tester, person());
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('overrideNewer')),
+        matching: find.text(
+          lookupAppLocalizations(const Locale('en')).newerVersionNeeded,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('overrideName')))
+          .readOnly,
+      isTrue,
+    );
+    await tap(tester, find.byKey(const ValueKey('overridePicture')));
+    expect(find.text('Choose a picture'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(ann.personShown(benId).name, 'Mum');
+  });
+
   testWidgets('the name for me is kept when the page is left', (tester) async {
     await page(tester, const SizedBox.shrink());
     final context = tester.element(find.byType(SizedBox));

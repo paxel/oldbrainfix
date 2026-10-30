@@ -867,8 +867,20 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final notes = widget.notes;
     final t = context.t;
     final announcements = AnnouncementsScope.of(context);
-    void announce({required bool untranscribed}) => announcements?.announce(
+    // Taken now: the announcement may come once this page has closed.
+    final navigator = Navigator.of(context, rootNavigator: true);
+    void announce({required bool untranscribed}) => announceFailureWith(
+      announcements,
+      navigator,
       untranscribed ? t.captureShoppingUntranscribed : t.captureShoppingGone,
+      title: t.captureShoppingNotAddedTitle,
+      cause: untranscribed
+          ? t.captureShoppingUntranscribedCause
+          : t.captureShoppingGoneCause,
+      fix: t.captureShoppingKeptFix,
+      details: untranscribed
+          ? 'capture into a Shopping List: a recording got no Transcript'
+          : 'capture into a Shopping List: the list can no longer be added to',
     );
     if (_captured == null) {
       try {

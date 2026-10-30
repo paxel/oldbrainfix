@@ -1978,7 +1978,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get bundleTitle => 'Sync-Paket';
+  String get bundleTitle => 'Bündel';
 
   @override
   String get bundleIntro =>
@@ -1991,10 +1991,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bundleEverything => 'Alles';
 
   @override
-  String get bundleSend => 'Paket senden';
+  String get bundleSend => 'Bündel senden';
 
   @override
-  String get bundleImport => 'Paket importieren';
+  String get bundleImport => 'Bündel importieren';
 
   @override
   String bundleNothingNew(String name) {
@@ -2006,31 +2006,31 @@ class AppLocalizationsDe extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Mit dem Paket kamen $count Änderungen an.',
-      one: 'Mit dem Paket kam 1 Änderung an.',
-      zero: 'Mit dem Paket kam nichts Neues an.',
+      other: 'Mit dem Bündel kamen $count Änderungen an.',
+      one: 'Mit dem Bündel kam 1 Änderung an.',
+      zero: 'Mit dem Bündel kam nichts Neues an.',
     );
     return '$_temp0';
   }
 
   @override
   String get bundlePairFirst =>
-      'Dieses Paket stammt von einem Gerät, das nicht mit diesem gekoppelt ist, darum lässt sich nichts darin lesen. Kopple sie zuerst und importiere es dann noch einmal.';
+      'Dieses Bündel stammt von einem Gerät, das nicht mit diesem gekoppelt ist, darum lässt sich nichts darin lesen. Kopple sie zuerst und importiere es dann noch einmal.';
 
   @override
   String get bundleNotABundle =>
-      'Diese Datei ist kein Sync-Paket, das diese App lesen kann.';
+      'Diese Datei ist kein Bündel, das diese App lesen kann.';
 
   @override
   String get bundleNeedsUpdate =>
-      'Dieses Sync-Paket stammt von einem neueren Old Brain Fix. Old Brain Fix auf diesem Gerät braucht ein Update, um es zu lesen.';
+      'Dieses Bündel stammt von einem neueren Old Brain Fix. Old Brain Fix auf diesem Gerät braucht ein Update, um es zu lesen.';
 
   @override
   String get bundleFailed =>
-      'Das Paket hat nicht geklappt. Nichts ging verloren; versuch es noch einmal.';
+      'Das Bündel hat nicht geklappt. Nichts ging verloren; versuch es noch einmal.';
 
   @override
-  String get bundleNoApp => 'Keine App hier kann das Paket annehmen.';
+  String get bundleNoApp => 'Keine App hier kann das Bündel annehmen.';
 
   @override
   String get shareArea => 'Teilen …';
@@ -2039,7 +2039,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get areaShared => 'Geteilt';
 
   @override
-  String get peopleTitle => 'Personen';
+  String get peopleTitle => 'Menschen';
 
   @override
   String shareTitle(String area) {
@@ -2064,7 +2064,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get roleMemberDetail =>
-      'Notizen anlegen und die eigenen ändern, jede Notiz ergänzen und Routinen und Erinnerungen abhaken.';
+      'Notizen anlegen und die eigenen ändern, jede Notiz ergänzen, Routinen, Erinnerungen und Frösche abhaken und Zeilen von Checklisten und Einkaufslisten hinzufügen und abhaken.';
 
   @override
   String get shareInvite => 'Einladen';
@@ -2104,7 +2104,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get peopleIntro =>
-      'Ein Verwalter darf hier alles. Ein Mitglied darf Notizen anlegen und die eigenen ändern, jede Notiz ergänzen und Routinen und Erinnerungen abhaken.';
+      'Ein Verwalter darf hier alles. Ein Mitglied darf Notizen anlegen und die eigenen ändern, jede Notiz ergänzen, Routinen, Erinnerungen und Frösche abhaken und Zeilen von Checklisten und Einkaufslisten hinzufügen und abhaken.';
 
   @override
   String get onlyManagers =>
@@ -2151,17 +2151,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String sentItemVerified(String code) {
-    return 'Geprüft: Code persönlich verglichen. Code $code';
+    return 'Bestätigt: Code persönlich verglichen. Code $code';
   }
 
   @override
   String sentItemKnown(String code) {
-    return 'Nicht geprüft: hier bekannt, Code noch nicht verglichen. Code $code';
+    return 'Nicht bestätigt: hier bekannt, Code noch nicht verglichen. Code $code';
   }
 
   @override
   String sentItemUnknown(String code) {
-    return 'Nicht geprüft: Dieses Profil ist hier neu. Code $code';
+    return 'Nicht bestätigt: Dieses Profil ist hier neu. Code $code';
   }
 
   @override
@@ -2180,7 +2180,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemVerifiedOnAccept =>
-      'Wird beim Übernehmen als geprüft vermerkt.';
+      'Wird beim Übernehmen als bestätigt vermerkt.';
 
   @override
   String get sentItemCodesDiffered =>
@@ -2699,7 +2699,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profilePeopleEmpty =>
-      'Noch niemand. Hier erscheinen die Personen, die du über ihre Profilkarte hinzufügst, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
+      'Noch niemand. Hier erscheinen die Menschen, die du über ihre Profilkarte hinzufügst, mit denen du einen Bereich teilst oder deren gesendete Notizen du annimmst.';
 
   @override
   String get personFilter => 'Notizen zeigen von…';
@@ -2934,7 +2934,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sentItemStranger =>
-      'Eine unbekannte Person: nicht unter deinen Personen.';
+      'Eine unbekannte Person: nicht unter „Menschen“.';
 
   @override
   String get sentItemHidden =>
@@ -3038,7 +3038,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get cardRefused =>
-      'Diese Karte nennt eine Person unter Personen, stammt aber nicht von ihr.';
+      'Diese Karte nennt eine Person unter „Menschen“, stammt aber nicht von ihr.';
 
   @override
   String get personSendBack => 'Deins zurückschicken';
@@ -3053,14 +3053,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get shareAfarIntro =>
-      'Teile ihn mit einer Person unter „Personen“. Sie bekommt eine Datei über einen beliebigen Messenger und nimmt sie an oder lehnt sie ab.';
+      'Teile ihn mit einer Person unter „Menschen“. Sie bekommt eine Datei über einen beliebigen Messenger und nimmt sie an oder lehnt sie ab.';
 
   @override
   String get shareAfarPick => 'Teilen mit…';
 
   @override
   String get shareAfarNobody =>
-      'Noch kann niemand unter „Personen“ ihn bekommen. Füge die Person zuerst über ihre Profilkarte hinzu.';
+      'Noch kann niemand unter „Menschen“ ihn bekommen. Füge die Person zuerst über ihre Profilkarte hinzu.';
 
   @override
   String shareWithTitle(String area) {
@@ -3308,7 +3308,7 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get shoppingDeleteForGood => 'Endgültig löschen';
+  String get shoppingDeleteForGood => 'Löschen';
 
   @override
   String get tallyHeading => 'Strichliste';
@@ -3643,6 +3643,22 @@ class AppLocalizationsDe extends AppLocalizations {
       'Als Notiz behalten: Zu dieser Einkaufsliste lässt sich nichts mehr hinzufügen.';
 
   @override
+  String get captureShoppingNotAddedTitle =>
+      'Nicht zur Einkaufsliste hinzugefügt';
+
+  @override
+  String get captureShoppingUntranscribedCause =>
+      'Whisper konnte kein Transkript der Aufnahme schreiben.';
+
+  @override
+  String get captureShoppingGoneCause =>
+      'Die Einkaufsliste wurde inzwischen gelöscht oder wieder eine einfache Notiz, hier oder auf einem anderen Gerät.';
+
+  @override
+  String get captureShoppingKeptFix =>
+      'Die Notiz behält alles: Trag ihre Zeilen von Hand in eine Einkaufsliste ein.';
+
+  @override
   String get noteBeingCaptured => 'Die Notiz, die gerade erfasst wird';
 
   @override
@@ -3748,7 +3764,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get blockedFix =>
-      'Um anzunehmen, was die Person sendet, heb auf ihrem Profil unter Personen die Blockierung auf und lass es dir dann noch einmal senden.';
+      'Um anzunehmen, was die Person sendet, heb auf ihrem Profil unter „Menschen“ die Blockierung auf und lass es dir dann noch einmal senden.';
 
   @override
   String get hostShareDone => 'Teilen abgeschlossen.';
@@ -3931,32 +3947,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get bundleNothingToSend => 'Es gibt nichts Neues zu senden.';
 
   @override
-  String get bundleNotSent => 'Das Paket wurde nicht gesendet.';
+  String get bundleNotSent => 'Das Bündel wurde nicht gesendet.';
 
   @override
-  String get bundleNotSentTitle => 'Paket nicht gesendet';
+  String get bundleNotSentTitle => 'Bündel nicht gesendet';
 
   @override
   String get bundleNotWrittenCause =>
-      'Die Paketdatei konnte nicht geschrieben werden.';
+      'Die Datei des Bündels konnte nicht geschrieben werden.';
 
   @override
   String get bundleNoAppFix =>
       'Installiere einen Messenger oder eine Mail-App oder wähle einen geteilten Ordner und sende es dann noch einmal.';
 
   @override
-  String get bundleNotImported => 'Das Paket wurde nicht importiert.';
+  String get bundleNotImported => 'Das Bündel wurde nicht importiert.';
 
   @override
-  String get bundleNotImportedTitle => 'Paket nicht importiert';
+  String get bundleNotImportedTitle => 'Bündel nicht importiert';
 
   @override
   String get bundleAskAgainFix =>
-      'Lass dir das Paket noch einmal senden oder importiere eine andere Datei.';
+      'Lass dir das Bündel noch einmal senden oder importiere eine andere Datei.';
 
   @override
   String get bundleNeedsUpdateCause =>
-      'Dieses Paket kommt von einem neueren Old Brain Fix.';
+      'Dieses Bündel kommt von einem neueren Old Brain Fix.';
 
   @override
   String get bundleUpdateFix =>
@@ -3964,7 +3980,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bundleNotReadCause =>
-      'Das Paket konnte nicht bis zum Ende gelesen werden.';
+      'Das Bündel konnte nicht bis zum Ende gelesen werden.';
 
   @override
   String get bundleImportAgainFix =>
@@ -3972,14 +3988,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get bundlePairFirstCause =>
-      'Dieses Paket kommt von einem Gerät, mit dem dieses nicht gekoppelt ist, deshalb lässt sich nichts darin lesen.';
+      'Dieses Bündel kommt von einem Gerät, mit dem dieses nicht gekoppelt ist, deshalb lässt sich nichts darin lesen.';
 
   @override
   String get bundlePairFirstFix =>
       'Kopple die beiden Geräte zuerst und importiere es dann noch einmal.';
 
   @override
-  String get bundleImported => 'Paket importiert.';
+  String get bundleImported => 'Bündel importiert.';
 
   @override
   String get sentItemNotSent => 'Die Notiz wurde nicht gesendet.';

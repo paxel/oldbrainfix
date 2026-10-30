@@ -29,7 +29,7 @@ typedef Join = Future<SyncResult> Function(
   required String name,
 });
 
-/// Sync, inside Settings (UI laws): joins the Device the pair code
+/// Sync, behind the Profile picture (UI laws): joins the Device the pair code
 /// names, scanned from a photo of its screen or typed in, or shows this
 /// Device's code for the other to join ([HostScreen]), leads to the
 /// Conflicts, and lists the paired Devices with when they last synced,

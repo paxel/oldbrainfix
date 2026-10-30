@@ -550,6 +550,19 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   bool get _marks => widget.marks && !widget.readOnly;
 
+  String? _blocksText;
+  List<MarkdownBlock> _blocksOf = const [];
+
+  /// The Markdown blocks of [text], parsed once for each text: a move of
+  /// the cursor alone reads the ones it had.
+  List<MarkdownBlock> _blocks(String text) {
+    if (text != _blocksText) {
+      _blocksOf = Markdown.parse(text);
+      _blocksText = text;
+    }
+    return _blocksOf;
+  }
+
   /// The status marks of the text: in a formatted one also those at the
   /// start of a table's cell.
   List<MarkdownMark> _marksOf(String text) => _formatting?.markdown ?? false
@@ -857,7 +870,11 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     final t = context.t;
     final controller = _formatting;
     final value = widget.controller.value;
-    final at = _FormatsAt.of(value, markdown: controller?.markdown ?? false);
+    final at = _FormatsAt.of(
+      value,
+      markdown: controller?.markdown ?? false,
+      blocks: _blocks,
+    );
     void toggle(MarkdownSpanKind kind) =>
         _format((text, start, end) => Markdown.toggle(text, start, end, kind));
     void line(MarkdownBlockKind kind) => _format(
@@ -1221,7 +1238,11 @@ class _FormatsAt {
 
   static const none = _FormatsAt(MarkdownBlockKind.paragraph, {}, null);
 
-  static _FormatsAt of(TextEditingValue value, {required bool markdown}) {
+  static _FormatsAt of(
+    TextEditingValue value, {
+    required bool markdown,
+    required List<MarkdownBlock> Function(String text) blocks,
+  }) {
     final text = value.text;
     if (!markdown) return none;
     final selection = value.selection;
@@ -1233,10 +1254,10 @@ class _FormatsAt {
       start,
       text.length,
     );
-    final blocks = Markdown.parse(text);
+    final parsed = blocks(text);
     final line = TextMarks.lineAt(text, start);
-    if (line >= blocks.length) return none;
-    final block = blocks[line];
+    if (line >= parsed.length) return none;
+    final block = parsed[line];
     final spans = <MarkdownSpanKind>{};
     String? url;
     void walk(List<MarkdownSpan> parts) {

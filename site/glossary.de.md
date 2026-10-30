@@ -14,7 +14,7 @@ _Avoid_: Schnell hinzufügen, Aufnehmen
 
 **Erfassungskontext** [Capture Context]:
 Was beim Erfassen einer Notiz galt und ihr Tage später Sinn gibt: die Zeit, der benannte Ort oder die Koordinaten, die App, aus der geteilt wurde, der laufende Kalendertermin, das verbundene Bluetooth-Gerät.
-_Avoid_: Metadaten (in der App), Schlagwörter
+_Avoid_: Metadaten (in der App), Schlagwörter (ein #Wort ist ein Wort des Textes)
 
 **Benannter Ort** [Named Place]:
 Ein Ort, dem du einen Namen gegeben hast ("Zuhause", "Arbeit", "Bei Mama"). Eine Notiz, die in seiner Nähe erfasst wird, trägt diesen Namen in ihrem Erfassungskontext.
@@ -43,6 +43,32 @@ _Avoid_: Kombinieren, Verbinden, Verknüpfen
 Wie viel eine Notiz zählt: unwichtig, normal (Standard) oder wichtig.
 _Avoid_: Priorität, Stern
 
+**Einfügen** [Paste]:
+Erfassen, was in der Zwischenablage liegt: auf dem Handy „Einfügen“ auf dem Text-Erfassen-Bildschirm und im Fächer von „+“, das die Zwischenablage erst beim Tippen liest und das Erfassen mit ihrem Text und ihrem Bild als Foto der Notiz füllt, beides in eine Notiz; am Computer der Knopf Einfügen des Erfassens und Strg+V im leeren Erfassen-Fenster.
+_Avoid_: Importieren, Aus der Zwischenablage erfassen
+
+## Text
+
+**Formatierter Text** [Formatted text]:
+Der Text einer Notiz oder eines Abschnitts, als Markdown in der eigenen Auswahl der App gespeichert: fett, kursiv, durchgestrichen, zwei Überschriftenebenen, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate, Links, Code im Text und Tabellen. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, über die Formatleiste, durch getipptes Markdown oder durch Einfügen eines Texts, der ein Format verwendet, und bleibt von da an formatiert. Transkripte und Fototexte bleiben unformatiert.
+_Avoid_: Rich Text, gestalteter Text
+
+**Formatleiste** [Format bar]:
+Die Reihe von Tasten, die die Auswahl oder das Wort am Cursor formatiert, oder die Zeilen, die die Auswahl berührt, und ein ☐ oder eine Tabelle einsetzt: auf dem Handy auf der Tastatur im Notiz-Editor und in Zur Notiz hinzufügen, am Computer über dem Textfeld des Notiz-Editors.
+_Avoid_: Werkzeugleiste, Symbolleiste
+
+**Tabelle** [Table]:
+Reihen und Spalten in einem formatierten Text, geschrieben als Markdown-Tabelle wie bei GitHub: eine Kopfreihe, die erste Spalte als Überschriften, wenn sie so markiert ist, und Zellen mit je einer Zeile Formatierung. Sie wird im Vollbild geöffnet, um ihre Zellen zu bearbeiten und Reihen und Spalten einzufügen, zu verschieben und zu löschen.
+_Avoid_: Tabellenkalkulation, Raster
+
+**Statuszeichen** [Status mark]:
+Ein ☐ (offen), ✅ (abgehakt) oder ❌ (gescheitert) als erstes Zeichen einer Zeile im Text einer Notiz oder eines Abschnitts, nach beliebigen Leerzeichen, Tabs und dem Aufzählungszeichen eines Listenpunkts, oder am Anfang einer Zelle einer Tabelle; ein Tippen oder Klicken auf eines im Text einer Notiz bietet die beiden anderen Zustände an, die eines Abschnitts werden gezeigt, lassen sich aber nicht ändern. Es ist ein Zeichen des Textes, und daneben wird nichts gespeichert, darum ändern es in einem geteilten Bereich nur der Verfasser der Notiz und die Verwalter.
+_Avoid_: Kästchen, Haken (eine Zeile einer Checkliste hat das Kästchen)
+
+**#Wort** [Tag]:
+Ein Wort mit „#“ davor in einem Text, etwa „#Garten“: Buchstaben, Ziffern, „_“ und „-“, mindestens eines davon ein Buchstabe. Es wird hervorgehoben, und ein Tippen oder Klicken darauf öffnet die Suche danach. Für ein #Wort wird nichts gespeichert, und es gibt keine Liste von #Wörtern; es ist kein Thema und kein Teil des Erfassungskontexts.
+_Avoid_: Etikett, Schlagwort, Hashtag
+
 ## Sortieren
 
 **Bereich** [Area]:
@@ -51,7 +77,7 @@ _Avoid_: Domäne, Kategorie, Ordner
 
 **Thema** [Topic]:
 Die zweite und letzte Ebene, innerhalb eines Bereichs, etwa Haushalt/Küche, Kinder/Schule.
-_Avoid_: Kategorie, Unterkategorie, Schlagwort
+_Avoid_: Kategorie, Unterkategorie, Schlagwort (ein #Wort ist ein Wort des Textes)
 
 **Unsortiert** [Unsorted]:
 Der Zustand einer Notiz, um die sich noch niemand gekümmert hat. Eine Notiz verlässt Unsortiert, wenn sie einen Bereich oder ein Thema bekommt, eine Routine, Erinnerung oder einen Frosch hervorbringt, zur Strichliste, Checkliste oder Einkaufsliste gemacht, zusammengeführt oder gelöscht wird. Sie wird wieder unsortiert, wenn ihr Bereich oder Thema gelöscht wird und du seine Notizen nach Unsortiert zurückschickst.
@@ -119,7 +145,7 @@ _Avoid_: Dashboard, Tagesansicht, Startseite
 ## Strichlisten
 
 **Strichliste** [Tally]:
-Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihre Felder, jedes eine Zahl mit Einheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, gezeigt als Tabelle und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr.
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihre Felder, jedes eine Zahl mit Einheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt.
 _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 
 **Eintrag** [Entry]:
@@ -167,8 +193,12 @@ Eine Person in einem geteilten Bereich, die Notizen hinzufügen und ergänzen, F
 _Avoid_: Gast, Betrachter
 
 **Gesendete Notiz** [Sent Item]:
-Eine einzelne Notiz mit ihren Routinen oder Erinnerungen, als Datei an einen anderen Menschen mit Old Brain Fix geschickt, außerhalb jedes geteilten Bereichs. Wer sie bekommt, sieht sie vorher an und nimmt sie an; wer sie geschickt hat, kann später eine Aktualisierung oder eine Absage nachschicken.
-_Avoid_: Einladung, Teilen, Paket (ein Paket ist ein Weg zum Abgleichen)
+Eine einzelne Notiz mit ihren Routinen oder Erinnerungen, als Datei an einen anderen Menschen mit Old Brain Fix geschickt, außerhalb jedes geteilten Bereichs, mit „An eine Person senden“. Wer sie bekommt, sieht sie vorher an und nimmt sie an; wer sie geschickt hat, kann später eine Aktualisierung oder eine Absage nachschicken.
+_Avoid_: Einladung, Teilen (Mit einer App teilen gibt eine Notiz an eine andere App), Bündel (ein Bündel ist ein Weg zum Abgleichen)
+
+**Mit einer App teilen** [Share to an app]:
+Eine Kopie einer Notiz an eine andere App geben, etwa einen Messenger oder die Mail: ihren Text und ihre Abschnitte, jeden unter seinem Datum, mit HTML neben dem Markdown eines formatierten Texts, und ihre Fotos und Aufnahmen als Dateien. Auf dem Handy bekommt sie das Teilen-Menü; am Computer legen „Als Text kopieren“ und „Als Markdown speichern …“ dasselbe in die Zwischenablage oder in eine Datei. Von der anderen App kommt nichts zurück, und nichts davon wird abgeglichen.
+_Avoid_: Gesendete Notiz und „An eine Person senden“ (damit geht eine Notiz an einen anderen Menschen mit Old Brain Fix), Geteilter Bereich, Exportieren
 
 **Profil** [Profile]:
 Ein Mensch, wie die App ihn zeigt: ein Name und ein Bild, unter einer eigenen Kennung. Jeder Mensch hat ein Profil für alle seine Geräte.
@@ -195,7 +225,7 @@ Zwei Fassungen desselben von Hand bearbeiteten Feldes, auf verschiedenen Geräte
 _Avoid_: Zusammenstoß, Merge-Konflikt
 
 **Ausstehende Änderungen** [Pending Changes]:
-Änderungen, die du siehst, als wären sie behalten, die aber erst behalten werden, wenn du sie annimmst; lehnst du ab, bleibt nichts zurück. Was du in der Zwischenzeit bearbeitest, gewinnt beim Annehmen. Gilt für eine KI-Aufgabe, einen aus der Ferne angebotenen Bereich, die gesendete Notiz einer fremden Person bis „Zeigen“ und ein Bündel mit viel darin.
+Änderungen, die du siehst, als wären sie behalten, die aber erst behalten werden, wenn du sie annimmst; lehnst du ab, bleibt nichts zurück. Was du in der Zwischenzeit bearbeitest, gewinnt beim Annehmen. Gilt für eine KI-Aufgabe, einen aus der Ferne angebotenen Bereich und die gesendete Notiz einer fremden Person bis „Zeigen“.
 _Avoid_: Entwurf, Zwischenstand, Vorschau (eine Vorschau zeigt, ohne etwas zu behalten)
 
 **KI-Aufgabe** [AI Task]:

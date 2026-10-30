@@ -125,7 +125,7 @@
     },
     {
       "id": "note:00000000000000000000000000000006",
-      "text": "**Packing**\n- socks\n  - wool",
+      "text": "**Packing**\nsocks\n  wool",
       "textFormat": "markdown",
       "textVersion": 1,
       "textEditable": true,
@@ -246,10 +246,10 @@
       "text": "| Item | Qty |\n| :-- | --: |\n| **Milk** | 3 \\| 4 |"
     },
     "note:00000000000000000000000000000006": {
-      "html": "<p><strong>Packing</strong></p>\n<ul><li>socks<ul><li>wool</li></ul></li></ul>\n",
+      "html": "<p><strong>Packing</strong><br>socks<br>  wool</p>\n",
       "photos": [],
       "recordings": [],
-      "text": "**Packing**\n- socks\n  - wool"
+      "text": "**Packing**\nsocks\n  wool"
     },
     "note:00000000000000000000000000000004": {
       "html": "<ul><li>eggs</li><li><del>bread</del></li></ul>\n",

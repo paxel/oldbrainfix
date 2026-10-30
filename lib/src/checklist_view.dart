@@ -631,9 +631,9 @@ class _LineRenameDialogState extends State<LineRenameDialog> {
   }
 }
 
-/// Asks once whether a Line goes, with [verb] (Delete when null) on the
-/// button in the error colour.
-Future<bool> confirmLineDelete(BuildContext context, {String? verb}) async {
+/// Asks once whether a Line goes, with Delete on the button in the
+/// error colour.
+Future<bool> confirmLineDelete(BuildContext context) async {
   final sure = await showDialog<bool>(
     context: context,
     builder: (context) {
@@ -651,7 +651,7 @@ Future<bool> confirmLineDelete(BuildContext context, {String? verb}) async {
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(verb ?? t.delete),
+            child: Text(t.delete),
           ),
         ],
       );

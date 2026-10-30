@@ -98,6 +98,28 @@ void main() {
     expect(phone.heldBy(desk.deviceId), isEmpty);
   });
 
+  test("a bundle carries a Checklist's Lines and checks", () async {
+    final clock = ticking();
+    final phone = device(clock, 'Ada');
+    final desk = device(clock, 'Ada');
+    exchange(phone, desk);
+    final note = Notes(desk).capture('Trip\nBath\n  Soap\nTent').id;
+    final lists = Checklists(desk);
+    lists.make(note);
+    lists.check(
+      lists.byNote(note)!.lines.firstWhere((l) => l.text == 'Soap').id,
+    );
+    final file = path();
+    expect(await writeBundle(desk, file, forDevice: phone.deviceId), isNotNull);
+    await importBundle(phone, file);
+    List<String> shown(Store store) => [
+      for (final l in Checklists(store).byNote(note)?.lines ?? const <Line>[])
+        '${l.inGroup ? '  ' : ''}${l.checked ? '[x] ' : ''}${l.text}',
+    ];
+    expect(shown(phone), ['[x] Bath', '  [x] Soap', 'Tent']);
+    expect(shown(phone), shown(desk));
+  });
+
   test('a Device never paired reads nothing and is told to pair', () async {
     final clock = ticking();
     final desk = device(clock, 'Ada');

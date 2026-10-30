@@ -3,12 +3,26 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import 'l10n.dart';
 import 'look.dart';
+import 'question_mark_background.dart';
 
 /// What runs in place of the app when this Device's database was saved
 /// by a newer version (ADR 0034): one screen that says so, and nothing
 /// else, no Capture among it. The database stays as it was.
-class StoreNeedsUpdateApp extends StatelessWidget {
+class StoreNeedsUpdateApp extends StatefulWidget {
   const StoreNeedsUpdateApp({super.key});
+
+  @override
+  State<StoreNeedsUpdateApp> createState() => _StoreNeedsUpdateAppState();
+}
+
+class _StoreNeedsUpdateAppState extends State<StoreNeedsUpdateApp> {
+  final _scroll = ParallaxScroll();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -17,6 +31,11 @@ class StoreNeedsUpdateApp extends StatelessWidget {
     supportedLocales: AppLocalizations.supportedLocales,
     theme: lookTheme(Brightness.light),
     darkTheme: lookTheme(Brightness.dark),
+    navigatorObservers: [_scroll],
+    builder: (context, child) => QuestionMarkBackground(
+      scroll: _scroll,
+      child: child ?? const SizedBox.shrink(),
+    ),
     home: const StoreNeedsUpdateScreen(),
   );
 }

@@ -14,13 +14,14 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, Utc};
 
 use crate::entry::{Entry, dart_iso, parse_time};
+use crate::markdown::BlockKind;
 use crate::notes::{Note, Notes, keys as note_keys};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{Day, Occurrence, Schedule, WallClock};
 use crate::sent::keys as sent_keys;
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
-use crate::text_format::{StoredText, VERSION};
+use crate::text_format::{self, StoredText, VERSION};
 use crate::transcript_prompts::dart_trim;
 use crate::{Error, Result};
 
@@ -263,7 +264,19 @@ pub fn split_lines(text: &str) -> Vec<String> {
 /// under the line above when it starts with a space or a tab, checked
 /// when its text starts with "✓ ".
 pub fn parse_line(row: &str) -> Option<ParsedLine> {
-    let mut text = dart_trim(row);
+    parse_line_in(row, false)
+}
+
+/// [`parse_line`] of a text in the format `markdown` says, as the Dart
+/// core's `parseLine`: in a formatted text, the mark of a bulleted or
+/// numbered item or a quote goes first, so "- milk", "1. milk" and
+/// "> milk" become "milk", and "  - milk" goes under the line above.
+pub fn parse_line_in(row: &str, markdown: bool) -> Option<ParsedLine> {
+    let mut text = dart_trim(if markdown {
+        without_item_mark(row)
+    } else {
+        row
+    });
     if text.is_empty() {
         return None;
     }
@@ -281,6 +294,22 @@ pub fn parse_line(row: &str) -> Option<ParsedLine> {
         indent,
         checked,
     })
+}
+
+/// `row` without the mark it starts with as a bulleted or numbered item
+/// or a quote of formatted text; as it is when it is none of them.
+fn without_item_mark(row: &str) -> &str {
+    match crate::markdown::parse(row).first() {
+        Some(block)
+            if matches!(
+                block.kind,
+                BlockKind::Bullet | BlockKind::Numbered | BlockKind::Quote
+            ) =>
+        {
+            row.get(block.content_start..block.end).unwrap_or(row)
+        }
+        _ => row,
+    }
 }
 
 /// A Line as [`Checklists`] reads it from its fields.
@@ -703,8 +732,9 @@ impl<'a> Checklists<'a> {
     /// Makes the Note `note_id` a Checklist: its first line stays its
     /// text, every other line not blank becomes a Line, under the line
     /// above when it starts with a space or a tab, checked when it starts
-    /// with "✓ ". Takes it out of Unsorted, as a Tally does. The text
-    /// keeps its format.
+    /// with "✓ ", in a formatted text without the mark of an item or a
+    /// quote ([`parse_line_in`]). Takes it out of Unsorted, as a Tally
+    /// does. The text keeps its format.
     pub fn make(&self, note_id: &str) -> Result<()> {
         let note = Notes::new(self.store).by_id(note_id)?;
         let Some(note) = note else {
@@ -719,7 +749,12 @@ impl<'a> Checklists<'a> {
         }
         let rows = split_lines(&note.text);
         let title = dart_trim(rows.first().map(String::as_str).unwrap_or(""));
-        let parsed: Vec<ParsedLine> = rows.iter().skip(1).filter_map(|r| parse_line(r)).collect();
+        let markdown = note.text_format == text_format::MARKDOWN;
+        let parsed: Vec<ParsedLine> = rows
+            .iter()
+            .skip(1)
+            .filter_map(|r| parse_line_in(r, markdown))
+            .collect();
         let making = self.store.new_id()?;
         self.store.batch(|| {
             let s = self.store;
@@ -1539,6 +1574,39 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn from_a_formatted_text_the_marks_of_items_and_quotes_go() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let note = Notes::new(&ann).capture_as(
+            "# Packing\n- Socks\n  - Blue\n* Tent\n\t+ ✓ Pegs\n1. Map\n\
+             > Torch\n- \n**Rope**\n## Later\n-Knife",
+            text_format::MARKDOWN,
+            None,
+            None,
+        )?;
+        Checklists::new(&ann).make(&note.id)?;
+        let made = Notes::new(&ann).by_id(&note.id)?.ok_or("the Note")?;
+        assert_eq!(made.text, "# Packing");
+        assert_eq!(
+            shown(&ann, &note.id)?,
+            [
+                "Socks",
+                "  Blue",
+                "[x] Tent",
+                "  [x] Pegs",
+                "Map",
+                "Torch",
+                "**Rope**",
+                "## Later",
+                "-Knife"
+            ]
+        );
+        // A plain text keeps them as written.
+        let plain = checklist(&ann, "Packing\n- Socks\n> Torch", None)?;
+        assert_eq!(shown(&ann, &plain)?, ["- Socks", "> Torch"]);
+        Ok(())
+    }
+
+    #[test]
     fn a_note_is_at_most_one_of_a_tally_and_a_checklist() -> TestResult {
         let ann = device(1, "Ann")?;
         let gym = Notes::new(&ann).capture("Gym\nPush-ups", None, None)?.id;
@@ -1946,6 +2014,105 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn lines_come_in_format_2_only_and_a_file_in_format_2_carries_them() -> TestResult {
+        use crate::sent::OpenError;
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let note = checklist(&ann, "Trip\nBath", None)?;
+        let to = ben
+            .own_key_record()?
+            .verified_box_key()
+            .ok_or("Ben's X25519 key")?;
+        let mut random = |n: usize| -> Result<Vec<u8>> { Ok(vec![7; n]) };
+        let key = ann.signing_key()?;
+        let item = ann.sent_item_of(&note, false)?;
+        let plain = Notes::new(&ann).capture("Plain", None, None)?.id;
+        let unlisted = ann.sent_item_of(&plain, false)?;
+        // The signature covers the item, not the format beside it.
+        let refused = |file: Vec<u8>, format: Option<i64>| -> TestResult {
+            let mut outer: serde_json::Value = serde_json::from_slice(&file)?;
+            let map = outer.as_object_mut().ok_or("an object")?;
+            match format {
+                Some(format) => map.insert("format".into(), format.into()),
+                None => map.remove("format"),
+            };
+            let file = serde_json::to_vec(&outer)?;
+            assert_eq!(
+                ben.open_sent_item(&file)?.err(),
+                Some(OpenError::NotASentItem)
+            );
+            Ok(())
+        };
+        refused(crate::sent::encode(&item, &key, &[], &mut random)?, None)?;
+        refused(
+            crate::sent::encode(&unlisted, &key, &[], &mut random)?,
+            Some(2),
+        )?;
+        // Encrypted, the outside says it too.
+        refused(crate::sent::encode(&item, &key, &[to], &mut random)?, None)?;
+        Ok(())
+    }
+
+    #[test]
+    fn of_two_lines_with_one_id_the_first_counts() -> TestResult {
+        use crate::sent::SentLine;
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let note = checklist(&ann, "Trip\nBath\nTent", None)?;
+        let mut random = |n: usize| -> Result<Vec<u8>> { Ok(vec![7; n]) };
+        let key = ann.signing_key()?;
+        let mut item = ann.sent_item_of(&note, false)?;
+        let lines = item.lines.clone().ok_or("Lines")?;
+        let line = |id: &str, text: &str| SentLine {
+            id: id.into(),
+            text: text.into(),
+            indent: false,
+            checked: true,
+        };
+        item.lines = Some(vec![
+            lines[0].clone(),
+            line(&lines[0].id, "Soap"),
+            lines[1].clone(),
+        ]);
+        let file = crate::sent::encode(&item, &key, &[], &mut random)?;
+        let opened = ben.open_sent_item(&file)?.map_err(|_| "a Sent Item")?;
+        let texts: Vec<&str> = opened
+            .item
+            .lines
+            .iter()
+            .flatten()
+            .map(|l| l.text.as_str())
+            .collect();
+        assert_eq!(texts, ["Bath", "Tent"]);
+        let got = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        assert_eq!(shown(&ben, &got)?, ["Bath", "Tent"]);
+        // An update the same: the Line is there once.
+        item.version += 1;
+        item.lines = Some(vec![
+            lines[0].clone(),
+            lines[1].clone(),
+            line("line:new", "Map"),
+            line("line:new", "Rope"),
+        ]);
+        let file = crate::sent::encode(&item, &key, &[], &mut random)?;
+        let update = ben.open_sent_item(&file)?.map_err(|_| "a Sent Item")?;
+        let added: Vec<String> = update
+            .changes
+            .as_ref()
+            .ok_or("changes")?
+            .lines_added
+            .iter()
+            .map(|l| l.text.clone())
+            .collect();
+        assert_eq!(added, ["Map"]);
+        ben.accept_sent_item(&update.item, false)?;
+        assert_eq!(shown(&ben, &got)?, ["Bath", "Tent", "[x] Map"]);
+        Ok(())
+    }
+
+    #[test]
     fn lines_of_text_and_line_breaks_read_as_the_dart_core_reads_them() {
         assert_eq!(
             split_lines("a\r\nb\rc\n\nd\r\r\n"),
@@ -1965,6 +2132,18 @@ pub(crate) mod tests {
         assert_eq!(parse_line("  ✓ Pegs"), row("Pegs", true, true));
         assert_eq!(parse_line("✓ "), row("✓", false, false));
         assert_eq!(parse_line("✓x"), row("✓x", false, false));
+        assert_eq!(parse_line("- Socks"), row("- Socks", false, false));
+        assert_eq!(parse_line_in("- Socks", true), row("Socks", false, false));
+        assert_eq!(parse_line_in("  * Blue", true), row("Blue", true, false));
+        assert_eq!(parse_line_in("\t+ ✓ Pegs", true), row("Pegs", true, true));
+        assert_eq!(parse_line_in("12. Map", true), row("Map", false, false));
+        assert_eq!(parse_line_in("> Torch", true), row("Torch", false, false));
+        assert_eq!(parse_line_in("- ", true), None);
+        assert_eq!(
+            parse_line_in("## Later", true),
+            row("## Later", false, false)
+        );
+        assert_eq!(parse_line_in("-Knife", true), row("-Knife", false, false));
         assert_eq!(line_text("a\r\n\nb").ok().as_deref(), Some("a b"));
     }
 

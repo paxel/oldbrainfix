@@ -11,7 +11,7 @@
 //! schedules of its Routines and Reminders and the Lines of its
 //! Checklist; never its Capture Context, photos or voice recordings.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -60,6 +60,12 @@ fn in_format(json: &Value) -> bool {
 fn later_format(json: &Value) -> bool {
     json.get("format")
         .is_some_and(|format| !matches!(format.as_i64(), Some(FORMAT | LIST_FORMAT)))
+}
+
+/// Whether `json` says it is in [`LIST_FORMAT`], the format of a
+/// Checklist's file.
+fn listed(json: &Value) -> bool {
+    json.get("format").and_then(Value::as_i64) == Some(LIST_FORMAT)
 }
 
 /// A file larger than this is no Sent Item: it holds only texts.
@@ -306,7 +312,8 @@ impl SentItem {
     }
 }
 
-/// The Lines `json` holds; `None` when they are no Lines.
+/// The Lines `json` holds; `None` when they are no Lines. Of two with
+/// one id, the first counts.
 fn sent_lines(json: &Value) -> Option<Vec<SentLine>> {
     let flag = |l: &Value, key: &str| match l.get(key) {
         None | Some(Value::Null) => Some(false),
@@ -314,13 +321,17 @@ fn sent_lines(json: &Value) -> Option<Vec<SentLine>> {
         Some(_) => None,
     };
     let mut out = Vec::new();
+    let mut ids = HashSet::new();
     for l in json.as_array()? {
-        out.push(SentLine {
+        let line = SentLine {
             id: l.get("id")?.as_str()?.to_string(),
             text: l.get("text")?.as_str()?.to_string(),
             indent: flag(l, "indent")?,
             checked: flag(l, "checked")?,
-        });
+        };
+        if ids.insert(line.id.clone()) {
+            out.push(line);
+        }
     }
     Some(out)
 }
@@ -1555,6 +1566,12 @@ impl Store {
         let Some(item) = SentItem::parse(payload) else {
             return Ok(Err(OpenError::NotASentItem));
         };
+        // Lines come in format 2 only, and a file in format 2 carries
+        // them (ADR 0030).
+        let lined = item.lines.is_some();
+        if lined != listed(&signed) || (encrypted && lined != listed(&outer)) {
+            return Ok(Err(OpenError::NotASentItem));
+        }
         if !item.from.valid()
             || !verify_signature(&item.from.public_key, &signed_bytes(payload), Some(sig))
         {

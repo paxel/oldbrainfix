@@ -16,6 +16,7 @@ You build the desktop app's screens (egui/eframe 0.35) on top of the Rust core. 
 - Test with egui_kittest (`desktop/crates/oldbrainfix-gui/tests/`). The sandbox has no GPU; screenshot tests stay `#[ignore]`.
 - Code for Windows and macOS must keep compiling; say in the report what was only type-checked.
 - No `unwrap()`/`expect()` outside tests; `cargo fmt --all` and clippy `-D warnings` clean.
+- A change to a screen also updates its guide page (`site/en/guide/` and `site/de/guide/`) and its frames: run `tool/guide-frames.sh` and keep the rewritten PNGs under `site/assets/frames/`; CI fails on a stale frame.
 
 ## Shared rules
 

@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 
 use crate::checklists::{
-    Checklists, NewLine, keys as checklist_keys, line_text, order, parse_line, parse_list_kind,
+    Checklists, NewLine, keys as checklist_keys, line_text, order, parse_line_in, parse_list_kind,
     split_lines, write_line,
 };
 use crate::entry::{Entry, dart_iso, parse_time};
@@ -21,7 +21,7 @@ use crate::notes::{Note, Notes, keys as note_keys};
 use crate::schedule::{Day, WallClock};
 use crate::store::{Fields, Store, utf16_cmp};
 use crate::tallies::Tallies;
-use crate::text_format::{StoredText, VERSION};
+use crate::text_format::{self, StoredText, VERSION};
 use crate::transcript_prompts::{dart_trim, lower};
 use crate::{Error, Result};
 
@@ -521,8 +521,9 @@ impl<'a> ShoppingLists<'a> {
 
     /// Makes the Note `note_id` a Shopping List: its first line stays its
     /// text, every other line not blank becomes a Line, indented or not,
-    /// struck when it starts with "✓ ". Every Line comes in at one moment,
-    /// so they show in the order of the text. Takes it out of Unsorted, as
+    /// struck when it starts with "✓ ", in a formatted text without the
+    /// mark of an item or a quote ([`parse_line_in`]). Every Line comes in
+    /// at one moment, so they show in the order of the text. Takes it out of Unsorted, as
     /// a Checklist does. The text keeps its format.
     pub fn make(&self, note_id: &str) -> Result<()> {
         let refused = || Error::Invalid(format!("{note_id} may not be made a Shopping List here"));
@@ -532,7 +533,12 @@ impl<'a> ShoppingLists<'a> {
         }
         let rows = split_lines(&note.text);
         let title = dart_trim(rows.first().map(String::as_str).unwrap_or(""));
-        let parsed: Vec<_> = rows.iter().skip(1).filter_map(|r| parse_line(r)).collect();
+        let markdown = note.text_format == text_format::MARKDOWN;
+        let parsed: Vec<_> = rows
+            .iter()
+            .skip(1)
+            .filter_map(|r| parse_line_in(r, markdown))
+            .collect();
         let making = self.store.new_id()?;
         self.store.batch(|| {
             let s = self.store;
@@ -1030,6 +1036,31 @@ mod tests {
         assert!(Checklists::new(&ann).by_note(&note.id)?.is_none());
         assert!(!lists.may_make(&note.id)?);
         assert!(lists.make(&note.id).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn from_a_formatted_text_the_marks_of_items_and_quotes_go() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = Notes::new(&ann).capture_as(
+            "**Groceries**\n- Milk\n  * Eggs\n+ ✓ Bread\n12. Tea\n> Apples",
+            text_format::MARKDOWN,
+            None,
+            None,
+        )?;
+        let lists = ShoppingLists::new(&ann);
+        lists.make(&note.id)?;
+        let made = Notes::new(&ann).by_id(&note.id)?.ok_or("the Note")?;
+        assert_eq!(made.text, "**Groceries**");
+        assert_eq!(
+            shown(&ann, &note.id)?,
+            ["Milk", "Eggs", "Tea", "Apples", "~Bread"]
+        );
+        // A plain text keeps them as written.
+        let plain = Notes::new(&ann).capture("Shop\n- Milk", None, None)?.id;
+        lists.make(&plain)?;
+        assert_eq!(shown(&ann, &plain)?, ["- Milk"]);
         Ok(())
     }
 

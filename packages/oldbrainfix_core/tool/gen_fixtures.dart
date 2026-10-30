@@ -1387,6 +1387,34 @@ const _rows = [
   '✓ ✓ Twice',
 ];
 
+/// Lines of a formatted text as they become Lines: without the mark of
+/// an item or a quote.
+const _markdownRows = [
+  '- Socks',
+  '  - Blue',
+  '* Tent',
+  '\t+ ✓ Pegs',
+  '+',
+  '- ',
+  '-Knife',
+  '1. Map',
+  '123456789. Big',
+  '1234567890. Too long',
+  '12) Paren',
+  '1.',
+  '> Torch',
+  '>Close',
+  '>',
+  '   > Three spaces',
+  '    > Four spaces',
+  '> - Both',
+  '- > Both',
+  '# Heading',
+  '**Bold**',
+  '- \u00a0Nbsp',
+  '-\tTab',
+];
+
 /// Each Checklist of [store] with its Lines, the one-pass read of them
 /// all, which Notes may become one, what each goes back to as a plain
 /// Note, and how lines of text and keys are read and made.
@@ -1423,6 +1451,13 @@ Map<String, Object?> _checklists(Store store) {
     'rows': [
       for (final row in _rows)
         switch (parseLine(row)) {
+          null => null,
+          final l => {'text': l.text, 'indent': l.indent, 'checked': l.checked},
+        },
+    ],
+    'markdownRows': [
+      for (final row in [..._rows, ..._markdownRows])
+        switch (parseLine(row, markdown: true)) {
           null => null,
           final l => {'text': l.text, 'indent': l.indent, 'checked': l.checked},
         },

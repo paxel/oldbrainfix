@@ -283,7 +283,7 @@ void main() {
         '1 week',
         '2 weeks',
         '4 weeks',
-        'Delete for good',
+        'Delete',
       ]) {
         expect(find.text(label), findsOneWidget);
       }

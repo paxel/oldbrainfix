@@ -69,7 +69,7 @@ Future<void> shareNoteToApp(
           );
           return;
         }
-        File(path).writeAsBytesSync(bytes, flush: true);
+        await File(path).writeAsBytes(bytes, flush: true);
         shared.add((path: path, type: type));
       }
     }

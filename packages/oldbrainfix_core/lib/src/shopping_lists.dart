@@ -316,7 +316,8 @@ class ShoppingLists {
 
   /// Makes the Note [noteId] a Shopping List: its first line stays its
   /// text, every other line not blank becomes a Line, indented or not,
-  /// struck when it starts with "✓ ". Every Line comes in at one moment,
+  /// struck when it starts with "✓ ", in a formatted text without the
+  /// mark of an item or a quote ([parseLine]). Every Line comes in at one moment,
   /// so they show in the order of the text. Takes it out of Unsorted, as
   /// a Checklist does. The text keeps its format.
   void make(String noteId) {
@@ -326,7 +327,10 @@ class ShoppingLists {
     }
     final rows = splitLines(note.text);
     final title = rows.first.trim();
-    final parsed = [for (final row in rows.skip(1)) ?parseLine(row)];
+    final markdown = note.textFormat == TextFormats.markdown;
+    final parsed = [
+      for (final row in rows.skip(1)) ?parseLine(row, markdown: markdown),
+    ];
     final making = Store.newId();
     store.batch(() {
       store.append(noteId, ChecklistKeys.kind, ShoppingKeys.kindOf(making));

@@ -306,11 +306,7 @@ class _ShoppingSectionState extends State<ShoppingSection>
             ),
           ),
         const PopupMenuDivider(),
-        item(
-          _ShopStep.delete,
-          Icons.delete_forever_outlined,
-          t.shoppingDeleteForGood,
-        ),
+        item(_ShopStep.delete, Icons.delete_outline, t.delete),
       ],
     );
     if (picked == null || !mounted) return;
@@ -330,9 +326,8 @@ class _ShoppingSectionState extends State<ShoppingSection>
         if (!_shows(id)) return;
         _lists.rename(id, named);
       case _ShopStep.delete:
-        if (!await confirmLineDelete(context, verb: t.shoppingDeleteForGood)) {
-          return;
-        }
+        // Into the trash, as a Checklist's Line goes (ADR 0030).
+        if (!await confirmLineDelete(context)) return;
         if (!mounted || !_shows(id)) return;
         _lists.delete(id);
     }

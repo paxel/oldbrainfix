@@ -294,6 +294,32 @@ void main() {
     expect(notes.trashed(), isEmpty);
   });
 
+  testWidgets('a list made a plain Note meanwhile leaves a Note, announced '
+      'at the top, whose tap says why and what to do', (tester) async {
+    final groceries = shopping('Groceries');
+    await start(tester);
+    await openTextCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Rice');
+    await pick(tester, groceries);
+    // Made a plain Note again meanwhile, on another Device say.
+    lists.toPlain(groceries, deviceWallClock);
+    await tap(tester, save);
+
+    final kept = notes.all().singleWhere((n) => n.id != groceries);
+    expect(kept.text, 'Rice');
+    const announced =
+        'Kept as a Note: that Shopping List can no longer be added to.';
+    expect(find.text(announced), findsOneWidget);
+    await tester.tap(find.text(announced));
+    await tester.pumpAndSettle();
+    expect(find.text('Not added to the Shopping List'), findsOneWidget);
+    expect(
+      find.textContaining('The Shopping List was deleted'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('The Note keeps all of it'), findsOneWidget);
+  });
+
   group('A voice capture', () {
     Future<void> record(WidgetTester tester) async {
       await tap(tester, find.byKey(const ValueKey('captureVoice')));
@@ -372,6 +398,22 @@ void main() {
         ),
         findsOneWidget,
       );
+      // Its tap says why and what to do (UI laws, "Announcements").
+      await tester.tap(
+        find.text(
+          'Kept as a Note: its recording could not be transcribed for the '
+          'Shopping List.',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Not added to the Shopping List'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'Whisper could not write a Transcript of the recording.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('The Note keeps all of it'), findsOneWidget);
     });
 
     testWidgets('is not offered a list without a speech model', (tester) async {

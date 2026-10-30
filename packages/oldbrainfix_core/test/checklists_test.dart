@@ -78,6 +78,33 @@ void main() {
       expect(Checklists(ann).byNote(lone)!.allChecked, isTrue);
     });
 
+    test('from a formatted text, the marks of items and quotes go; one '
+        'indented goes under the line above', () {
+      final note = Notes(ann)
+          .capture(
+            '# Packing\n- Socks\n  - Blue\n* Tent\n\t+ ✓ Pegs\n1. Map\n'
+            '> Torch\n- \n**Rope**\n## Later\n-Knife',
+            format: TextFormats.markdown,
+          )
+          .id;
+      Checklists(ann).make(note);
+      expect(Notes(ann).byId(note)!.text, '# Packing');
+      expect(shown(ann, note), [
+        'Socks',
+        '  Blue',
+        '[x] Tent',
+        '  [x] Pegs',
+        'Map',
+        'Torch',
+        '**Rope**',
+        '## Later',
+        '-Knife',
+      ]);
+      // A plain text keeps them as written.
+      final plain = checklist(ann, 'Packing\n- Socks\n> Torch');
+      expect(shown(ann, plain), ['- Socks', '> Torch']);
+    });
+
     test('a Note is at most one of a Tally and a Checklist', () {
       final gym = Notes(ann).capture('Gym\nPush-ups').id;
       Tallies(ann).addField(gym, name: 'Push-ups');
@@ -565,6 +592,80 @@ void main() {
       acceptSentItem(ben, plain.item);
       expect(shown(ben, got), ['Bread']);
       expect(Notes(ben).byId(got)!.text, 'Shop\nOat milk\nTea\n  Rice');
+    });
+
+    test('Lines come in format 2 only, and a file in format 2 carries '
+        'them', () {
+      final note = checklist(ann, 'Trip\nBath');
+      // The signature covers the item, not the format beside it.
+      Map<String, Object?> outer(List<int> file) =>
+          jsonDecode(utf8.decode(file)) as Map<String, Object?>;
+      List<int> encode(Map<String, Object?> json) =>
+          utf8.encode(jsonEncode(json));
+      final listed = outer(sendNote(ann, note))..remove('format');
+      expect(
+        () => openSentItem(ben, encode(listed)),
+        throwsA(isA<NotASentItem>()),
+      );
+      final plain = Notes(ann).capture('Plain').id;
+      final unlisted = outer(sendNote(ann, plain))
+        ..['format'] = sentItemListFormat;
+      expect(
+        () => openSentItem(ben, encode(unlisted)),
+        throwsA(isA<NotASentItem>()),
+      );
+      // Encrypted, the outside says it too.
+      final sealed = outer(
+        sendNote(
+          ann,
+          note,
+          to: Recipient(
+            id: 'ben',
+            name: 'Ben',
+            keys: [ben.ownKeyRecord.boxKey!],
+          ),
+        ),
+      )..remove('format');
+      expect(
+        () => openSentItem(ben, encode(sealed)),
+        throwsA(isA<NotASentItem>()),
+      );
+    });
+
+    test('of two Lines with one id, the first counts', () {
+      final note = checklist(ann, 'Trip\nBath\nTent');
+      final sent = sentItemOf(ann, note);
+      final [bath, tent] = sent.lines!;
+      final item = SentItem(
+        id: sent.id,
+        version: sent.version,
+        from: sent.from,
+        profile: sent.profile,
+        text: sent.text,
+        lines: [bath, SentLine(bath.id, 'Soap', checked: true), tent],
+      );
+      final opened = openSentItem(ben, encodeSentItem(item, ann.signingKey));
+      expect([for (final l in opened.item.lines!) l.text], ['Bath', 'Tent']);
+      final got = acceptSentItem(ben, opened.item)!;
+      expect(shown(ben, got), ['Bath', 'Tent']);
+      // An update the same: the Line is there once.
+      final again = SentItem(
+        id: sent.id,
+        version: sent.version + 1,
+        from: sent.from,
+        profile: sent.profile,
+        text: sent.text,
+        lines: [
+          bath,
+          tent,
+          const SentLine('line:new', 'Map'),
+          const SentLine('line:new', 'Rope'),
+        ],
+      );
+      final update = openSentItem(ben, encodeSentItem(again, ann.signingKey));
+      expect(update.changes!.linesAdded.map((l) => l.text), ['Map']);
+      acceptSentItem(ben, update.item);
+      expect(shown(ben, got), ['Bath', 'Tent', 'Map']);
     });
 
     test('the receiver\'s Note goes plain with the sender\'s', () {

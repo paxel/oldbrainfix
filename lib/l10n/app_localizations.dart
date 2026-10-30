@@ -3293,7 +3293,7 @@ abstract class AppLocalizations {
   /// No description provided for @roleMemberDetail.
   ///
   /// In en, this message translates to:
-  /// **'Add Notes and change their own, add to any Note and check off Routines and Reminders.'**
+  /// **'Add Notes and change their own, add to any Note, check off Routines, Reminders and Frogs, and add and check Lines of Checklists and Shopping Lists.'**
   String get roleMemberDetail;
 
   /// No description provided for @shareInvite.
@@ -3353,7 +3353,7 @@ abstract class AppLocalizations {
   /// No description provided for @peopleIntro.
   ///
   /// In en, this message translates to:
-  /// **'A Manager may do everything here. A Member may add Notes and change their own, add to any Note and check off Routines and Reminders.'**
+  /// **'A Manager may do everything here. A Member may add Notes and change their own, add to any Note, check off Routines, Reminders and Frogs, and add and check Lines of Checklists and Shopping Lists.'**
   String get peopleIntro;
 
   /// No description provided for @onlyManagers.
@@ -5282,10 +5282,10 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 week} other{{count} weeks}}'**
   String shoppingWeeks(int count);
 
-  /// Removes a Line from a Shopping List, so it never comes back.
+  /// On the desktop, in a Shopping List Line's menu and on its confirm button: moves the Line to the trash, as a Checklist's Delete does (ADR 0030). The phone uses delete.
   ///
   /// In en, this message translates to:
-  /// **'Delete for good'**
+  /// **'Delete'**
   String get shoppingDeleteForGood;
 
   /// No description provided for @tallyHeading.
@@ -5845,6 +5845,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Kept as a Note: that Shopping List can no longer be added to.'**
   String get captureShoppingGone;
+
+  /// Title of the dialog behind captureShoppingUntranscribed and captureShoppingGone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not added to the Shopping List'**
+  String get captureShoppingNotAddedTitle;
+
+  /// Cause in the dialog behind captureShoppingUntranscribed (CONTEXT.md: Transcript).
+  ///
+  /// In en, this message translates to:
+  /// **'Whisper could not write a Transcript of the recording.'**
+  String get captureShoppingUntranscribedCause;
+
+  /// Cause in the dialog behind captureShoppingGone.
+  ///
+  /// In en, this message translates to:
+  /// **'The Shopping List was deleted or made a plain Note meanwhile, here or on another Device.'**
+  String get captureShoppingGoneCause;
+
+  /// Fix in the dialog behind captureShoppingUntranscribed and captureShoppingGone: nothing is lost.
+  ///
+  /// In en, this message translates to:
+  /// **'The Note keeps all of it: add its lines to a Shopping List by hand.'**
+  String get captureShoppingKeptFix;
 
   /// In the Routine editor opened from a capture screen, for a Note without text yet.
   ///

@@ -2047,7 +2047,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roleMemberDetail =>
-      'Add Notes and change their own, add to any Note and check off Routines and Reminders.';
+      'Add Notes and change their own, add to any Note, check off Routines, Reminders and Frogs, and add and check Lines of Checklists and Shopping Lists.';
 
   @override
   String get shareInvite => 'Invite';
@@ -2087,7 +2087,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get peopleIntro =>
-      'A Manager may do everything here. A Member may add Notes and change their own, add to any Note and check off Routines and Reminders.';
+      'A Manager may do everything here. A Member may add Notes and change their own, add to any Note, check off Routines, Reminders and Frogs, and add and check Lines of Checklists and Shopping Lists.';
 
   @override
   String get onlyManagers => 'Only a Manager of this Area can change this.';
@@ -3272,7 +3272,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get shoppingDeleteForGood => 'Delete for good';
+  String get shoppingDeleteForGood => 'Delete';
 
   @override
   String get tallyHeading => 'Tally';
@@ -3604,6 +3604,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get captureShoppingGone =>
       'Kept as a Note: that Shopping List can no longer be added to.';
+
+  @override
+  String get captureShoppingNotAddedTitle => 'Not added to the Shopping List';
+
+  @override
+  String get captureShoppingUntranscribedCause =>
+      'Whisper could not write a Transcript of the recording.';
+
+  @override
+  String get captureShoppingGoneCause =>
+      'The Shopping List was deleted or made a plain Note meanwhile, here or on another Device.';
+
+  @override
+  String get captureShoppingKeptFix =>
+      'The Note keeps all of it: add its lines to a Shopping List by hand.';
 
   @override
   String get noteBeingCaptured => 'The Note being captured';

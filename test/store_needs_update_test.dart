@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/l10n/app_localizations.dart';
+import 'package:oldbrainfix/src/question_mark_background.dart';
 import 'package:oldbrainfix/src/store_needs_update_screen.dart';
 
 /// A database a newer version of the app saved is not opened: one screen
@@ -25,6 +26,13 @@ void main() {
     expect(find.byType(ButtonStyleButton), findsNothing);
     expect(find.byType(IconButton), findsNothing);
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('the screen stands on the question-mark ground like every '
+      'page', (tester) async {
+    await tester.pumpWidget(const StoreNeedsUpdateApp());
+    await tester.pumpAndSettle();
+    expect(find.byType(QuestionMarkBackground), findsOneWidget);
   });
 
   test('it is in German too', () {
