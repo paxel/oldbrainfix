@@ -416,28 +416,6 @@ void main() {
       expect(ann.mayManage(h.area), isTrue);
     });
 
-    test('a Member changes the status marks of their own Notes only, as '
-        'any text (ADR 0031)', () {
-      final h = household(AreaRole.member);
-      Notes(ann).edit(h.note, 'Buy milk\n☐ oat');
-      exchange(ben, ann);
-      final own = Notes(ben).capture('Bread\n☐ rye', place: h.topic);
-      expect(ben.mayChange(h.note), isFalse);
-      for (final (id, text) in [
-        (h.note, Notes(ben).byId(h.note)!.text),
-        (own.id, own.text),
-      ]) {
-        final swapped = TextMarks.swap(text, 1, TextMark.checked);
-        expect(swapped, isNotNull);
-        Notes(ben).edit(id, swapped ?? text);
-      }
-      exchange(ben, ann);
-      for (final store in [ann, ben]) {
-        expect(Notes(store).byId(h.note)!.shownText, 'Buy milk\n☐ oat');
-        expect(Notes(store).byId(own.id)!.shownText, 'Bread\n✅ rye');
-      }
-    });
-
     test('a tick another person\'s Device wrote on a Note in no Shared '
         'Area counts for nothing (ADR 0035)', () {
       final h = household(AreaRole.member);

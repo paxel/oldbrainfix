@@ -6854,18 +6854,6 @@ abstract class AppLocalizations {
   /// **'Failed'**
   String get textMarkFailed;
 
-  /// Screen reader hint of a status mark that can be tapped: it opens Check, Fail and Open.
-  ///
-  /// In en, this message translates to:
-  /// **'change the mark'**
-  String get textMarkChange;
-
-  /// Screen reader label of the button in the line above the keyboard that puts an open mark at the start of the cursor's line.
-  ///
-  /// In en, this message translates to:
-  /// **'Put ☐ at the start of the line'**
-  String get textMarkInsert;
-
   /// Label of the button in the bar above the keyboard that puts an open box ☐ in at the cursor, also in the middle of a word.
   ///
   /// In en, this message translates to:

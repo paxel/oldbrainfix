@@ -64,7 +64,6 @@ pub mod tallies;
 pub mod tally_units;
 pub mod text_boxes;
 pub mod text_format;
-pub mod text_marks;
 pub mod text_tags;
 pub mod transcript_prompts;
 
@@ -109,7 +108,6 @@ pub use tallies::{Tallies, Tally, TallyBucket, TallyEntry, TallyField, TallyPeri
 pub use tally_units::{TallyRule, UnitKind, UnitSystem};
 pub use text_boxes::{BoxState, BoxTick, FoundBox, ShownBox, ShownText};
 pub use text_format::StoredText;
-pub use text_marks::{MarkedLine, TextMark};
 pub use text_tags::FoundTag;
 pub use transcript_prompts::TranscriptPrompts;
 

@@ -129,6 +129,18 @@ void main() {
       expect(read.editable, isTrue);
       expect(read.visible, 'Héading\r\nmilk 🧠\nx\\y');
     });
+
+    test('the line of an offset counts every line break once', () {
+      const text = 'a\r\nb\rc\nd';
+      expect(
+        [for (var i = 0; i <= text.length; i++) Markdown.lineAt(text, i)],
+        [0, 0, 0, 1, 1, 2, 2, 3, 3],
+      );
+      expect(Markdown.lineAt('a\nb', -1), 0);
+      expect(Markdown.lineAt('a\nb', 99), 1);
+      expect(Markdown.lineAt('', 0), 0);
+      expect(Markdown.lineAt('a\n', 2), 1);
+    });
   });
 
   group('escaping', () {
@@ -180,7 +192,7 @@ void main() {
     });
   });
 
-  group('tags and status marks', () {
+  group('tags and boxes', () {
     test('a tag in code or in a link\'s destination is no tag', () {
       const text = '#a `#b` [#c](https://x.org/#d) #e\n# Heading #f';
       expect(
@@ -191,12 +203,8 @@ void main() {
       expect(TextTags.find(text), hasLength(5));
     });
 
-    test('a status mark at the start of an item still counts', () {
+    test('a box at the start of an item reads as its glyph', () {
       const text = '- ☐ milk\n* ✅ **eggs**';
-      expect(
-        [for (final m in TextMarks.find(text)) m.mark],
-        [TextMark.open, TextMark.checked],
-      );
       expect(Markdown.plain(text), '☐ milk\n✅ eggs');
     });
   });
@@ -572,42 +580,6 @@ void main() {
       expect(
         [for (final t in Markdown.tags('#a | `#b`\n-|-\n#c | d')) t.tag],
         ['#a', '#c'],
-      );
-    });
-
-    test('a status mark at the start of a cell counts and changes', () {
-      const text = '☐ x\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n❌ c | d';
-      final marks = Markdown.marks(text);
-      expect(
-        [for (final m in marks) (m.line, m.column, m.mark)],
-        [
-          (0, null, TextMark.open),
-          (1, 0, TextMark.open),
-          (1, 1, TextMark.checked),
-          (3, 0, TextMark.failed),
-        ],
-      );
-      expect(text.substring(marks[2].start, marks[2].end), '✅️');
-      expect(Markdown.swapMark(text, 1, TextMark.checked, column: 1), isNull);
-      expect(
-        Markdown.swapMark(text, 1, TextMark.failed, column: 1),
-        '☐ x\n| ☐ milk | ❌ 2 | a ❌ |\n|-|-|-|\n❌ c | d',
-      );
-      expect(
-        Markdown.swapMark(text, 3, TextMark.open, column: 0),
-        '☐ x\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n☐ c | d',
-      );
-      expect(Markdown.swapMark(text, 3, TextMark.open), isNull);
-      expect(Markdown.swapMark(text, 1, TextMark.open, column: 2), isNull);
-      expect(
-        Markdown.swapMark(text, 0, TextMark.checked),
-        TextMarks.swap(text, 0, TextMark.checked),
-      );
-      // Outside tables they are the marks of the lines.
-      const lines = '- ☐ a\n* ✅ b\nc ☐\n  ❌ d';
-      expect(
-        [for (final m in Markdown.marks(lines)) (m.line, m.mark, m.start)],
-        [for (final m in TextMarks.find(lines)) (m.line, m.mark, m.start)],
       );
     });
 

@@ -5273,61 +5273,6 @@ fn transcripts_are_guarded_as_the_dart_core_guards_them() -> TestResult {
     Ok(())
 }
 
-// --------------------------------------------------------- Status marks
-
-#[test]
-fn status_marks_are_found_and_changed_as_the_dart_core_does() -> TestResult {
-    use oldbrainfix_core::TextMark;
-    use oldbrainfix_core::checklists::split_lines;
-    use oldbrainfix_core::text_marks::{find, insert_open, line_at, swap};
-    let fixture = read_json(&fixtures().join("text_marks.json"))?;
-    let cases = fixture["cases"].as_array().ok_or("cases")?;
-    assert!(cases.len() >= 10);
-    for case in cases {
-        let text = case["text"].as_str().ok_or("text")?;
-        let lines = split_lines(text).len();
-        let marks: Vec<Value> = find(text)
-            .iter()
-            .map(|m| {
-                json!({
-                    "line": m.line,
-                    "mark": m.mark.name(),
-                    "written": text.get(m.start..m.end),
-                })
-            })
-            .collect();
-        let swaps: Vec<Value> = (0..=lines)
-            .map(|line| {
-                let mut to = serde_json::Map::new();
-                for mark in TextMark::ALL {
-                    to.insert(mark.name().into(), json!(swap(text, line, mark)));
-                }
-                Value::Object(to)
-            })
-            .collect();
-        let inserts: Vec<Value> = (0..=lines)
-            .map(|line| json!(insert_open(text, line)))
-            .collect();
-        // Every offset at a character boundary, the end included: the
-        // generator's code points.
-        let at: Vec<usize> = text
-            .char_indices()
-            .map(|(i, _)| i)
-            .chain([text.len()])
-            .map(|i| line_at(text, i))
-            .collect();
-        let ours = json!({
-            "inserts": inserts,
-            "lineAt": at,
-            "marks": marks,
-            "swaps": swaps,
-            "text": text,
-        });
-        assert_eq!(&ours, case, "{text:?}");
-    }
-    Ok(())
-}
-
 // ----------------------------------------------------------------- Tags
 
 #[test]
@@ -5431,7 +5376,6 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     use oldbrainfix_core::markdown::{
         self, BlockKind, Change, SpanKind, indent, link, may_open, table, toggle, toggle_line,
     };
-    use oldbrainfix_core::text_marks::TextMark;
     let fixture = read_json(&fixtures().join("markdown.json"))?;
     let cases = fixture["cases"].as_array().ok_or("cases")?;
     assert!(cases.len() >= 15);
@@ -5471,18 +5415,6 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
                 block
             })
             .collect();
-        let marks: Vec<Value> = markdown::marks(text)
-            .iter()
-            .map(|m| {
-                json!({
-                    "column": m.column,
-                    "end": points(m.end),
-                    "line": m.line,
-                    "mark": m.mark.name(),
-                    "start": points(m.start),
-                })
-            })
-            .collect();
         let tables: Vec<Value> = table::all(text)
             .iter()
             .map(|t| markdown_table(text, t))
@@ -5490,6 +5422,10 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
         let tags: Vec<Value> = markdown::tags(text)
             .iter()
             .map(|t| json!({"end": points(t.end), "start": points(t.start), "tag": t.tag}))
+            .collect();
+        let lines: Vec<usize> = every(text)
+            .into_iter()
+            .map(|at| markdown::line_at(text, at))
             .collect();
         let shortcuts: Vec<usize> = every(text)
             .into_iter()
@@ -5508,7 +5444,7 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
             "blocks": blocks,
             "escaped": markdown::escape(text),
             "html": markdown::html(text),
-            "marks": marks,
+            "lines": lines,
             "plain": markdown::plain(text),
             "shortcuts": shortcuts,
             "tables": tables,
@@ -5581,22 +5517,6 @@ fn formatted_text_is_read_and_edited_as_the_dart_core_does() -> TestResult {
     }
     for (url, opens) in fixture["mayOpen"].as_object().ok_or("mayOpen")? {
         assert_eq!(Some(may_open(url)), opens.as_bool(), "{url:?}");
-    }
-    let swaps = &fixture["swaps"];
-    let marked = swaps["text"].as_str().ok_or("text")?;
-    let cases = swaps["cases"].as_array().ok_or("cases")?;
-    assert!(cases.len() >= 5);
-    for case in cases {
-        let to = match case["to"].as_str().ok_or("to")? {
-            "open" => TextMark::Open,
-            "checked" => TextMark::Checked,
-            "failed" => TextMark::Failed,
-            mark => return Err(format!("a mark: {mark}").into()),
-        };
-        let line = case["line"].as_u64().ok_or("line")? as usize;
-        let column = case["column"].as_u64().map(|c| c as usize);
-        let got = markdown::swap_mark(marked, line, column, to);
-        assert_eq!(json!(got), case["result"], "{case}");
     }
     Ok(())
 }

@@ -6074,69 +6074,6 @@ String _shownName(Map<String, String> starters, String? slug, String name) {
   return starters[slug] ?? name;
 }
 
-/// Status marks in texts (ADR 0031): for each text the marks found,
-/// each as written, every line's mark swapped to each state, ☐ put at
-/// the start of every line, one line past the last among them, and the
-/// line of every offset counted in code points, so that the cores'
-/// UTF-16 and UTF-8 offsets compare.
-Map<String, Object?> _textMarks() {
-  const texts = [
-    '',
-    '☐ Buy milk',
-    'Release notes\n✅ v2 supported at customer\n❌ v1\n☐ v3',
-    'v2 supported at customer: ✅\nx ❌ y',
-    '  ☐ indented\n\t✅ tabbed\n \t ❌ mixed',
-    '- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n'
-        '1. ☐ numbered\n> ☐ quoted',
-    '✅️ with selector\n❌︎ text style\n☐️️ two\n'
-        '️☐ selector first',
-    '✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n✅done',
-    'line\r\n☐ crlf\r❌ cr\n\n✅\r\n',
-    '😀 ☐ after an emoji\n🧠\n☐ after an astral line\ntrailing\n',
-    '☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom',
-    '- \n-\n   \n☐\n✅\n❌',
-    'Ünïcode ☐\n  - ✅ Straße\n\t* ☐ 👩‍👧 Familie',
-  ];
-  return {
-    'cases': [for (final text in texts) _textMarksOf(text)],
-  };
-}
-
-/// What [_textMarks] holds for the text [text].
-Map<String, Object?> _textMarksOf(String text) {
-  final lines = splitLines(text).length;
-  final points = text.runes.length;
-  return {
-    'text': text,
-    'marks': [
-      for (final m in TextMarks.find(text))
-        {
-          'line': m.line,
-          'mark': m.mark.name,
-          'written': text.substring(m.start, m.end),
-        },
-    ],
-    'swaps': [
-      for (var line = 0; line <= lines; line++)
-        {
-          for (final to in TextMark.values)
-            to.name: TextMarks.swap(text, line, to),
-        },
-    ],
-    'inserts': [
-      for (var line = 0; line <= lines; line++)
-        TextMarks.insertOpen(text, line),
-    ],
-    'lineAt': [
-      for (var point = 0; point <= points; point++)
-        TextMarks.lineAt(
-          text,
-          String.fromCharCodes(text.runes.take(point)).length,
-        ),
-    ],
-  };
-}
-
 /// Boxes in texts (ADR 0035): for each text the boxes found, each text
 /// as saved, plain and formatted, with ids from the counted entity ids,
 /// the boxes found in the plain one, as it shows and as a Sent Item
@@ -6333,9 +6270,6 @@ Map<String, Object?> _textTags() {
 /// counted in code points, so that the cores' UTF-16 and UTF-8 offsets
 /// compare.
 Map<String, Object?> _markdown() {
-  const marked =
-      '<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n'
-      '❌ c | d\n☐\u200d x |\n# ☐ end';
   const texts = [
     '',
     'plain words, nothing more',
@@ -6366,7 +6300,8 @@ Map<String, Object?> _markdown() {
         '\n'
         r'a \\| b | c\|',
     'a\r\n|-\r\nb\r\n\r\n|x|\n|---|\n||\n|',
-    marked,
+    '<!-- first column headings -->\n| ☐ milk | ✅️ 2 | a ❌ |\n|-|-|-|\n'
+        '❌ c | d\n☐\u200d x |\n# ☐ end',
     'a | b\n|---|\na | b\n- | -\n# a | b\n--|--\na\n---\na | b\n|--|:x:|',
     'a | b\n-|-\nc\n```\ne | f\n-|-\n---\ng | h\n-|-\n    x | y\n'
         'i | j\n-|-\n<!-- x -->\nk | l\n-|-\n* * *',
@@ -6631,23 +6566,6 @@ Map<String, Object?> _markdown() {
       (at) => MarkdownTables.insert(text, at),
     );
   }
-  final swaps = [
-    for (final (line, column, to) in [
-      (1, 1, TextMark.failed),
-      (1, 1, TextMark.checked),
-      (3, 0, TextMark.open),
-      (3, null, TextMark.open),
-      (1, 2, TextMark.open),
-      (5, null, TextMark.checked),
-      (4, 0, TextMark.checked),
-    ])
-      {
-        'column': column,
-        'line': line,
-        'result': Markdown.swapMark(marked, line, to, column: column),
-        'to': to.name,
-      },
-  ];
   return {
     'cases': [
       for (final text in texts)
@@ -6668,15 +6586,9 @@ Map<String, Object?> _markdown() {
           ],
           'escaped': Markdown.escape(text),
           'html': Markdown.html(text),
-          'marks': [
-            for (final m in _checkedMarks(text))
-              {
-                'column': m.column,
-                'end': cp(text, m.end),
-                'line': m.line,
-                'mark': m.mark.name,
-                'start': cp(text, m.start),
-              },
+          'lines': [
+            for (var p = 0; p <= text.runes.length; p++)
+              Markdown.lineAt(text, u16(text, p)),
           ],
           'plain': Markdown.plain(text),
           'shortcuts': [
@@ -6718,32 +6630,7 @@ Map<String, Object?> _markdown() {
       ])
         url: Markdown.mayOpen(url),
     },
-    'swaps': {'cases': swaps, 'text': marked},
   };
-}
-
-/// [Markdown.marks] of [text], checked to be [TextMarks.find]'s on every
-/// line that is no table's.
-List<MarkdownMark> _checkedMarks(String text) {
-  final marks = Markdown.marks(text);
-  final tables = {
-    for (final t in MarkdownTables.all(text))
-      for (var l = t.firstLine; l <= t.lastLine; l++) l,
-  };
-  final lines = [
-    for (final m in marks)
-      if (m.column == null) (m.line, m.mark, m.start, m.end),
-  ];
-  final found = [
-    for (final m in TextMarks.find(text))
-      if (!tables.contains(m.line)) (m.line, m.mark, m.start, m.end),
-  ];
-  if (lines.length != found.length ||
-      [for (var i = 0; i < lines.length; i++) lines[i] == found[i]]
-          .contains(false)) {
-    throw StateError('marks differ from TextMarks.find: $text');
-  }
-  return marks;
 }
 
 /// The lead-ins Whisper gets: name lists as given, and three stores,
@@ -7365,14 +7252,6 @@ Future<void> main(List<String> args) async {
     'list, the app\'s words, the whole German prompt; one, two and three '
     'names alone and amid speech, names of several words, and real '
     'speech naming a place, kept as it is.\n'
-    '- `text_marks.json`: status marks in texts: for each text the marks '
-    'found at the start of its lines, each as written, after spaces, tabs '
-    'and a list item\'s bullet, and those that are none, in the middle of '
-    'a line, after a numbered item, joined into another emoji or another '
-    'box or tick; every line\'s mark swapped to each state, ☐ put at the '
-    'start of every line, one past the last among them, and the line of '
-    'every offset, counted in code points; with variation selectors, '
-    'astral characters and line breaks of every kind.\n'
     '- `text_boxes.json`: boxes in texts: for each text the boxes found, '
     'the text as saved, plain and formatted, with ids from counted entity '
     'ids, as it shows and as a Sent Item carries it with every second box '
@@ -7390,10 +7269,9 @@ Future<void> main(List<String> args) async {
     '- `markdown.json`: formatted text: for each text its lines with their '
     'kind, level, number and parts, as read, what it reads as without its '
     'marks, whether it uses a format, the text escaped, as HTML, its '
-    'status marks, '
-    'those at the start of a table\'s cell included, its tables with their '
-    'rows and cells, its tags but those in code and link destinations, the '
-    'offsets where a typed shortcut ends and the word at every offset; '
+    'tables with their rows and cells, its tags but those in code and link '
+    'destinations, the offsets where a typed shortcut ends, and the line '
+    'and the word at every offset; '
     'bold, italic, strike-through, code, links, headings, quotes, bulleted '
     'and numbered items one level in, tables with ragged rows, escaped '
     'pipes, alignment and the line marking the first column as headings, '
@@ -7403,8 +7281,8 @@ Future<void> main(List<String> args) async {
     'links put on, changed and taken off, every line format on and off, '
     'items in and out, a table\'s cell set, its rows and columns put in, '
     'moved and deleted, its first column marked, a new table put in, with '
-    'the text and the selection they gave; status marks of cells changed; '
-    'and which link destinations may be opened. Offsets are counted in '
+    'the text and the selection they gave; and which link destinations '
+    'may be opened. Offsets are counted in '
     'code points.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
@@ -7566,10 +7444,6 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/transcript_prompts.json'),
     '${_json.convert(_transcriptPrompts())}\n',
-  );
-  _write(
-    File('${root.path}/text_marks.json'),
-    '${_json.convert(_textMarks())}\n',
   );
   _write(
     File('${root.path}/text_boxes.json'),

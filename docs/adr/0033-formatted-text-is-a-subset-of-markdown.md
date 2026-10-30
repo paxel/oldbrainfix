@@ -42,13 +42,13 @@ The table editor reads a cell as written, `\|` as `|`, and writes it with each `
 
 ### Reading
 
-A table's rows read as their cells that show something, a space between them; its delimiter row and comment line go with their line break. Search, previews and alarms see that. A status mark (ADR 0031) counts at the start of a table's cell, as at the start of a line, and is changed in place (`Markdown.marks`, `Markdown.swapMark`); on a line that is no table's the marks are those of ADR 0031. A line format leaves a table's lines as they are. `Markdown.escape` writes every `|` as `\|`, so an escaped text has no table.
+A table's rows read as their cells that show something, a space between them; its delimiter row and comment line go with their line break. Search, previews and alarms see that. A Box (ADR 0035, which replaced the status marks of ADR 0031) counts in a table's cell as anywhere else in the text. A line format leaves a table's lines as they are. `Markdown.escape` writes every `|` as `\|`, so an escaped text has no table.
 
-## Visible text, tags and status marks
+## Visible text, tags and Boxes
 
 The visible text is the text without its marks, its line breaks as they are (`Markdown.plain`, `TextFormats.visible`). Search looks in it for a formatted text, so "bold" finds "**bold**" and "**" finds no marks; a plain text is searched as written. Alarms and other previews the cores make show it too.
 
-Tags (ADR 0032) and status marks (ADR 0031) are found in the source as before, so "- ☐ milk" counts. In a formatted text, a `#word` inside code or inside a link's destination is no tag (`Markdown.tags`).
+Tags (ADR 0032) and Boxes (ADR 0035, which replaced the status marks of ADR 0031) are found in the source as before, so "- ☐ milk" counts. In a formatted text, a `#word` inside code or inside a link's destination is no tag (`Markdown.tags`).
 
 ## Links
 

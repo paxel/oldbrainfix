@@ -41,7 +41,6 @@
 /// line of one a [MarkdownBlockKind.table] block.
 library;
 
-import 'text_marks.dart';
 import 'text_tags.dart';
 
 part 'markdown_table.dart';
@@ -110,7 +109,7 @@ class MarkdownSpan {
 }
 
 /// A line of a formatted text: its [kind], the [line] it is, counted as
-/// `TextMarks.lineAt` counts lines, where it lies in the text from
+/// [Markdown.lineAt] counts lines, where it lies in the text from
 /// [start] to [end] without its line break, and where its content begins
 /// after the mark, [contentStart]. Offsets are UTF-16 code units.
 ///
@@ -156,18 +155,6 @@ class MarkdownBlock {
     _ => spans.map((s) => s.visible).join(),
   };
 }
-
-/// A status mark found in a formatted text: as `TextMarks.find` finds
-/// it at the start of a line, [column] null, or at the start of the cell
-/// in [column] of a table's row on the line [line]. Offsets are UTF-16
-/// code units, a variation selector after the mark included.
-typedef MarkdownMark = ({
-  int line,
-  int? column,
-  TextMark mark,
-  int start,
-  int end,
-});
 
 /// A text after an edit and the selection in it, in UTF-16 code units;
 /// [start] and [end] are equal for a cursor.
@@ -487,64 +474,6 @@ abstract final class Markdown {
     ];
   }
 
-  /// Deprecated: replaced by the boxes of `text_boxes.dart` (ADR 0035);
-  /// kept only until the apps have switched over.
-  ///
-  /// Every status mark of [text], top line first and left to right: those
-  /// `TextMarks.find` finds on a line that is no table's, and one at the
-  /// start of a cell of a table's row.
-  static List<MarkdownMark> marks(String text) {
-    final blocks = parse(text);
-    final marks = <MarkdownMark>[];
-    for (final m in TextMarks.find(text)) {
-      if (blocks[m.line].table != null) continue;
-      marks.add((
-        line: m.line,
-        column: null,
-        mark: m.mark,
-        start: m.start,
-        end: m.end,
-      ));
-    }
-    for (final block in blocks) {
-      final (table, row) = (block.table, block.row);
-      if (table == null || row == null) continue;
-      for (final (column, cell) in table.rows[row].cells.indexed) {
-        if (_cellMark(text, cell.start, cell.end) case (
-          final mark,
-          final start,
-          final end,
-        )) {
-          marks.add((
-            line: block.line,
-            column: column,
-            mark: mark,
-            start: start,
-            end: end,
-          ));
-        }
-      }
-    }
-    marks.sort((a, b) => a.start.compareTo(b.start));
-    return marks;
-  }
-
-  /// Deprecated: replaced by the boxes of `text_boxes.dart` (ADR 0035);
-  /// kept only until the apps have switched over.
-  ///
-  /// [text] with the status mark [marks] finds on the line [line], in the
-  /// cell in [column] of a table's row or, [column] null, at the line's
-  /// start, changed to [to], everything else as it was. Null when there
-  /// is nothing to change: no such mark, or it is [to] already.
-  static String? swapMark(String text, int line, TextMark to, {int? column}) {
-    for (final m in marks(text)) {
-      if (m.line != line || m.column != column) continue;
-      if (m.mark == to) return null;
-      return text.replaceRange(m.start, m.end, to.glyph);
-    }
-    return null;
-  }
-
   /// Whether a link to [url] may be opened: a web address, `http://` or
   /// `https://`, or an e-mail address, `mailto:`, in any case of ASCII
   /// letters. A text may come from another person's Device, so nothing
@@ -634,7 +563,7 @@ abstract final class Markdown {
     final (s, e) = _ordered(text, start, end);
     final blocks = parse(text);
     if (s == e) {
-      final block = blocks[TextMarks.lineAt(text, s)];
+      final block = blocks[lineAt(text, s)];
       final inside = _deepest(
         block.spans,
         kind,
@@ -684,7 +613,7 @@ abstract final class Markdown {
   /// written %-encoded, `(`, `)` and `\` escaped.
   static MarkdownChange link(String text, int start, int end, String url) {
     var (s, e) = _ordered(text, start, end);
-    final block = parse(text)[TextMarks.lineAt(text, s)];
+    final block = parse(text)[lineAt(text, s)];
     if (e > block.end) e = block.end;
     final address = _trimmedUrl(url);
     final destination = _destination(address);
@@ -823,7 +752,7 @@ abstract final class Markdown {
   /// when one is typed.
   static bool shortcutAt(String text, int cursor) {
     final at = cursor.clamp(0, text.length);
-    final block = parse(text)[TextMarks.lineAt(text, at)];
+    final block = parse(text)[lineAt(text, at)];
     if (block.kind != MarkdownBlockKind.paragraph &&
         at == block.contentStart &&
         at > block.start &&
@@ -835,24 +764,6 @@ abstract final class Markdown {
           (s.kind != MarkdownSpanKind.text && s.end == at) || ends(s.children),
     );
     return ends(block.spans);
-  }
-
-  /// The status mark at the start of a table's cell from [start] to
-  /// [end], as `TextMarks` reads one at the start of a line, or null.
-  static (TextMark, int, int)? _cellMark(String text, int start, int end) {
-    if (start >= end) return null;
-    final c = text.codeUnitAt(start);
-    for (final mark in TextMark.values) {
-      if (mark.glyph.codeUnitAt(0) != c) continue;
-      var stop = start + 1;
-      if (stop < end) {
-        final next = text.codeUnitAt(stop);
-        if (next == 0xFE0E || next == 0xFE0F) stop++;
-      }
-      if (stop < end && text.codeUnitAt(stop) == 0x200D) return null;
-      return (mark, start, stop);
-    }
-    return null;
   }
 
   static const _inline = {
@@ -876,7 +787,27 @@ abstract final class Markdown {
   static final _alphabetic = RegExp(r'^\p{Alphabetic}$', unicode: true);
   static final _number = RegExp(r'^\p{N}$', unicode: true);
 
-  /// The lines of [text] as offsets, as `TextMarks` splits them.
+  /// The line the UTF-16 offset [offset] of [text] lies on, as [parse]
+  /// counts lines: a cursor between the `\r` and the `\n` of a line
+  /// break is still on the line before. An offset outside the text is
+  /// taken as its start or its end.
+  static int lineAt(String text, int offset) {
+    final stop = offset.clamp(0, text.length);
+    var line = 0;
+    for (var i = 0; i < stop; i++) {
+      final c = text.codeUnitAt(i);
+      if (c == _cr && i + 1 < text.length && text.codeUnitAt(i + 1) == _lf) {
+        if (i + 1 < stop) line++;
+        i++;
+      } else if (c == _lf || c == _cr) {
+        line++;
+      }
+    }
+    return line;
+  }
+
+  /// The lines of [text] as offsets, from the first character to the
+  /// line break: split at `\n`, `\r\n` and a lone `\r`.
   static List<(int, int)> _lines(String text) {
     final lines = <(int, int)>[];
     var start = 0;
@@ -1086,8 +1017,8 @@ abstract final class Markdown {
     int s,
     int e,
   ) {
-    final first = TextMarks.lineAt(text, s);
-    var last = TextMarks.lineAt(text, e);
+    final first = lineAt(text, s);
+    var last = lineAt(text, e);
     if (last > first && e == blocks[last].start) last--;
     return (first, last);
   }

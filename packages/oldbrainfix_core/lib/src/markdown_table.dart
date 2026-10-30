@@ -112,7 +112,7 @@ abstract final class MarkdownTables {
   /// The table the line of the UTF-16 offset [offset] belongs to, or
   /// null.
   static MarkdownTable? at(String text, int offset) =>
-      Markdown.parse(text)[TextMarks.lineAt(text, offset)].table;
+      Markdown.parse(text)[Markdown.lineAt(text, offset)].table;
 
   /// What the table editor edits of the cell in [row] and [column] of the
   /// table at [at]: its content as written, `\|` read as `|`. Null when
@@ -247,7 +247,7 @@ abstract final class MarkdownTables {
   static MarkdownChange insert(String text, int at) {
     final offset = at.clamp(0, text.length);
     final blocks = Markdown.parse(text);
-    final block = blocks[TextMarks.lineAt(text, offset)];
+    final block = blocks[Markdown.lineAt(text, offset)];
     final br = _firstBreak(text);
     final table = _Grid(
       [

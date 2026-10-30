@@ -4249,12 +4249,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get textMarkFailed => 'Gescheitert';
 
   @override
-  String get textMarkChange => 'Zeichen ändern';
-
-  @override
-  String get textMarkInsert => '☐ an den Anfang der Zeile setzen';
-
-  @override
   String get boxInsert => '☐ einfügen';
 
   @override

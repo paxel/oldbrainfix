@@ -4192,12 +4192,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get textMarkFailed => 'Failed';
 
   @override
-  String get textMarkChange => 'change the mark';
-
-  @override
-  String get textMarkInsert => 'Put ☐ at the start of the line';
-
-  @override
   String get boxInsert => 'Put in ☐';
 
   @override

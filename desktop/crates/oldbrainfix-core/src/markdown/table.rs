@@ -13,8 +13,7 @@
 
 use std::sync::Arc;
 
-use super::{Block, BlockKind, Change, Inline, Span, blank, floor, skip_blank, slice};
-use crate::text_marks::line_at;
+use super::{Block, BlockKind, Change, Inline, Span, blank, floor, line_at, skip_blank, slice};
 
 /// The line right before a header row that marks the first column of
 /// its table as headings. GFM has no such flag; a comment shows nowhere

@@ -50,7 +50,7 @@ A Sent Item carries each text with every Box in the bare glyph of its state now,
 
 - No migration: no text with a Box or a status mark was ever shipped.
 - A text with Boxes on a Device of 0.1.x shows the glyphs and, on the desktop, replacement glyphs for the ids; its edits there keep the ids.
-- The API for the line-start marks (`TextMarks`, `Markdown.marks`/`swapMark`, `text_marks`, `markdown::marks`/`swap_mark`) stays until the apps have switched, then it is removed.
+- The API for the line-start marks (`TextMarks`, `Markdown.marks`/`swapMark`, `text_marks`, `markdown::marks`/`swap_mark`) and its fixture `text_marks.json` are removed, both apps having switched to Boxes; the line of an offset is `Markdown.lineAt`/`markdown::line_at`.
 - The fixtures `text_boxes.json` and the `boxes` scenario with its `boxes.json` compare both cores.
 
 ## Changes to earlier decisions

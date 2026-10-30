@@ -1135,8 +1135,6 @@
   "textMarkOpen": "Offen",
   "textMarkChecked": "Abgehakt",
   "textMarkFailed": "Gescheitert",
-  "textMarkChange": "Zeichen ändern",
-  "textMarkInsert": "☐ an den Anfang der Zeile setzen",
   "boxInsert": "☐ einfügen",
   "boxChange": "Statuskästchen ändern",
   "boxShowTicks": "Ticks zeigen",

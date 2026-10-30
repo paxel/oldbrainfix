@@ -45,7 +45,6 @@ pub mod table;
 
 use std::sync::Arc;
 
-use crate::text_marks::{self, TextMark, line_at};
 use crate::text_tags::{self, FoundTag};
 use crate::{Error, Result};
 use table::Table;
@@ -201,19 +200,6 @@ impl Block {
             _ => self.spans.iter().map(Span::visible).collect(),
         }
     }
-}
-
-/// A status mark found in a formatted text: as [`text_marks::find`]
-/// finds it at the start of a line, `column` `None`, or at the start of
-/// the cell in `column` of a table's row on the line `line`. Offsets are
-/// bytes, a variation selector after the mark included.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Mark {
-    pub line: usize,
-    pub column: Option<usize>,
-    pub mark: TextMark,
-    pub start: usize,
-    pub end: usize,
 }
 
 /// A text after an edit and the selection in it, in bytes; `start` and
@@ -569,86 +555,6 @@ pub fn tags(text: &str) -> Vec<FoundTag> {
         .collect()
 }
 
-/// Deprecated: replaced by the boxes of [`crate::text_boxes`] (ADR
-/// 0035); kept only until the apps have switched over.
-///
-/// Every status mark of `text`, top line first and left to right: those
-/// [`text_marks::find`] finds on a line that is no table's, and one at
-/// the start of a cell of a table's row.
-pub fn marks(text: &str) -> Vec<Mark> {
-    let blocks = parse(text);
-    let mut marks: Vec<Mark> = text_marks::find(text)
-        .into_iter()
-        .filter(|m| blocks.get(m.line).is_some_and(|b| b.table.is_none()))
-        .map(|m| Mark {
-            line: m.line,
-            column: None,
-            mark: m.mark,
-            start: m.start,
-            end: m.end,
-        })
-        .collect();
-    for block in &blocks {
-        let (Some(table), Some(row)) = (&block.table, block.row) else {
-            continue;
-        };
-        let Some(row) = table.rows.get(row) else {
-            continue;
-        };
-        for (column, cell) in row.cells.iter().enumerate() {
-            if let Some((mark, start, end)) = cell_mark(text, cell.start, cell.end) {
-                marks.push(Mark {
-                    line: block.line,
-                    column: Some(column),
-                    mark,
-                    start,
-                    end,
-                });
-            }
-        }
-    }
-    marks.sort_by_key(|m| m.start);
-    marks
-}
-
-/// Deprecated: replaced by the boxes of [`crate::text_boxes`] (ADR
-/// 0035); kept only until the apps have switched over.
-///
-/// `text` with the status mark [`marks`] finds on the line `line`, in the
-/// cell in `column` of a table's row or, `column` `None`, at the line's
-/// start, changed to `to`, everything else as it was. `None` when there
-/// is nothing to change: no such mark, or it is `to` already.
-pub fn swap_mark(text: &str, line: usize, column: Option<usize>, to: TextMark) -> Option<String> {
-    let found = marks(text)
-        .into_iter()
-        .find(|m| m.line == line && m.column == column)?;
-    if found.mark == to {
-        return None;
-    }
-    Some(format!(
-        "{}{}{}",
-        text.get(..found.start)?,
-        to.glyph(),
-        text.get(found.end..)?
-    ))
-}
-
-/// The status mark at the start of a table's cell `start..end`, as
-/// [`text_marks`] reads one at the start of a line.
-fn cell_mark(text: &str, start: usize, end: usize) -> Option<(TextMark, usize, usize)> {
-    let rest = text.get(start..end)?;
-    let (mark, after) = TextMark::ALL
-        .into_iter()
-        .find_map(|m| rest.strip_prefix(m.glyph()).map(|after| (m, after)))?;
-    let after = after
-        .strip_prefix(['\u{FE0E}', '\u{FE0F}'])
-        .unwrap_or(after);
-    if after.starts_with('\u{200D}') {
-        return None;
-    }
-    Some((mark, start, end - after.len()))
-}
-
 /// Whether a link to `url` may be opened: a web address, `http://` or
 /// `https://`, or an e-mail address, `mailto:`, in any case of ASCII
 /// letters. A text may come from another person's Device, so nothing
@@ -993,7 +899,33 @@ fn ordered(text: &str, start: usize, end: usize) -> (usize, usize) {
     if a <= b { (a, b) } else { (b, a) }
 }
 
-/// The lines of `text` as offsets, as `text_marks` splits them.
+/// The line the byte offset `offset` of `text` lies on, as [`parse`]
+/// counts lines: a cursor between the `\r` and the `\n` of a line break
+/// is still on the line before. An offset past the text is taken as its
+/// end.
+pub fn line_at(text: &str, offset: usize) -> usize {
+    let bytes = text.as_bytes();
+    let stop = offset.min(bytes.len());
+    let mut line = 0;
+    let mut i = 0;
+    while i < stop {
+        match bytes[i] {
+            b'\r' if bytes.get(i + 1) == Some(&b'\n') => {
+                if i + 1 < stop {
+                    line += 1;
+                }
+                i += 1;
+            }
+            b'\n' | b'\r' => line += 1,
+            _ => {}
+        }
+        i += 1;
+    }
+    line
+}
+
+/// The lines of `text` as offsets, from the first character to the line
+/// break: split at `\n`, `\r\n` and a lone `\r`.
 fn lines(text: &str) -> Vec<(usize, usize)> {
     let bytes = text.as_bytes();
     let mut lines = Vec::new();
@@ -1745,6 +1677,22 @@ mod tests {
 
     fn line(text: &str) -> String {
         tree(&parse(text)[0].spans)
+    }
+
+    #[test]
+    fn the_line_of_an_offset_counts_every_line_break_once() {
+        let text = "a\r\nb\rc\nd";
+        assert_eq!(
+            (0..=text.len())
+                .map(|i| line_at(text, i))
+                .collect::<Vec<_>>(),
+            [0, 0, 0, 1, 1, 2, 2, 3, 3]
+        );
+        assert_eq!(line_at("a\nb", 99), 1);
+        assert_eq!(line_at("", 0), 0);
+        assert_eq!(line_at("a\n", 2), 1);
+        // An offset inside a character is taken as it comes.
+        assert_eq!(line_at("☐\n☐", 1), 0);
     }
 
     #[test]
