@@ -1,0 +1,209 @@
+<!-- page: title="Die Desktop-App" track="guide" order=8 summary="Old Brain Fix unter Linux, Windows und macOS: das Fenster und seine Tasten, der Infobereich und der Start beim Anmelden, das Erfassen-Fenster, das Tastenkürzel und oldbrainfix capture, Ziehen und Ablegen, Benachrichtigungen, der Abgleich mit dem Handy und die KI-Aufgabe." -->
+<p class="lede">
+  Die Desktop-App läuft unter Linux, Windows und macOS und hat dieselben Notizen, Bereiche und
+  Routinen wie das Handy, sobald beide gekoppelt sind. Sie ist ein Fenster mit drei Spalten, bedient
+  mit Maus und Tastatur, mit einem Erfassen-Fenster und einer Befehlszeile, um von überall zu
+  erfassen. Die Einstellungen gehören zu diesem Computer und werden nie abgeglichen.
+</p>
+
+<h2>Installieren und erster Start</h2>
+<p>
+  Die App wird mit Homebrew, Scoop, einem .deb, einer Flatpak-Datei, einem AppImage, einem
+  Disk-Image oder einer Zip-Datei installiert; siehe <a href="../reference/install.html">Installieren</a>.
+  Unter Linux schreibt oder erneuert jeder Start außerhalb des Flatpaks den Eintrag der App im
+  Anwendungsmenü und ihr Symbol.
+</p>
+<p>
+  Der erste Start bietet dieselben drei Wahlmöglichkeiten wie das Handy: <strong>Neu bei Old Brain
+  Fix</strong> mit der Startauswahl, <strong>Ein Gerät von mir hinzufügen</strong> und <strong>Aus
+  einer Sicherung wiederherstellen</strong> (siehe <a href="getting-started.html#auf-dem-desktop">Erste
+  Schritte</a>). Das Profil übernimmt Namen und Bild deiner Anmeldung am Computer, sonst den Namen
+  des Computers. Der Desktop fragt weder nach dem Sprachmodell noch nach dem Zugriff für Alarme.
+</p>
+
+<h2>Das Fenster</h2>
+<p>
+  Das Fenster hat drei Spalten; die Grenzen zwischen ihnen lassen sich ziehen.
+</p>
+<ul>
+  <li><strong>Links</strong>: Agenda, Alle Notizen und Unsortiert, dann „Bereiche“ mit einem „+“ für einen neuen Bereich, jeder Bereich mit seinen Themen darunter, und der Papierkorb. Ein Rechtsklick auf einen Bereich öffnet Neues Thema, Umbenennen, Farbe und Symbol, Teilen …, Personen, wenn er geteilt ist, und Löschen, soweit du den Bereich verwaltest; ein Rechtsklick auf ein Thema öffnet Umbenennen und Löschen.</li>
+  <li><strong>Mitte</strong>: was links ausgewählt ist. Die Agenda und jede Liste von Notizen außer dem Papierkorb haben oben das Erfassungsfeld (siehe <a href="capture-and-sort.html#auf-dem-desktop">Erfassen und sortieren</a>). Alle Notizen, ein Bereich und ein Thema haben ein Suchfeld; jede Liste von Notizen außer dem Papierkorb hat einen Schalter zwischen vollen und kompakten Karten und einen Filter nach Person. Die Überschrift eines Bereichs hat ein „+“ für ein neues Thema.</li>
+  <li><strong>Rechts</strong>: der Editor der Notiz oder Fälligkeit, die in der Mitte geöffnet wurde.</li>
+</ul>
+<p>
+  In einer Liste von Notizen klappt ein Klick eine kompakte Karte auf; ein Doppelklick oder der
+  Stift öffnet die Notiz im Editor. Ein Rechtsklick auf eine Karte oder ihr ⋮ öffnet
+  <strong>Bearbeiten</strong>, die Einträge für Checkliste und Einkaufsliste (siehe
+  <a href="lists-tallies-sessions-frogs.html#auf-dem-desktop">Listen, Strichlisten, Einheiten und
+  Frösche</a>), <strong>An eine Person senden</strong>, <strong>Als Text kopieren</strong> und
+  <strong>Als Markdown speichern …</strong>. Eine Karte, die auf einen Bereich oder ein Thema in der
+  linken Spalte gezogen wird, wird dort abgelegt; Notizen im Papierkorb lassen sich nicht ziehen.
+</p>
+<p>
+  Die Leiste der Agenda enthält Alle Routinen und Erinnerungen, Neue Routine oder Erinnerung und das
+  Profilbild. Das Profilbild führt zur Profilseite und von dort weiter zu den
+  <strong>Einstellungen</strong> und zu <strong>Mit einem anderen Gerät synchronisieren</strong>.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/de/light/window.png" alt="Das Desktop-Fenster: links Bereiche und Themen, in der Mitte die Notizen des Haushalts, rechts die Notiz zum Küchenhahn aus Reparaturen im Editor" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/de/dark/window.png" alt="Das Desktop-Fenster: links Bereiche und Themen, in der Mitte die Notizen des Haushalts, rechts die Notiz zum Küchenhahn aus Reparaturen im Editor" width="1280" height="800" loading="lazy">
+  <figcaption>Das Fenster mit den Notizen eines Bereichs und einer Notiz im Editor.</figcaption>
+</figure>
+
+<h2>Tasten statt Wischen</h2>
+<p>
+  Wo das Handy mit einer Wischgeste zurückgeht, nimmt der Desktop Tasten und die Seitentasten der
+  Maus. Alt+Links und Alt+Rechts ruhen, solange der Cursor in einem Textfeld steht; die Maustasten
+  wirken immer.
+</p>
+<ul>
+  <li><strong>Alt+Links oder die Zurück-Taste der Maus</strong>: eine Ebene höher. Ein Thema führt zu seinem Bereich; ein Bereich, Unsortiert und der Papierkorb führen zu Alle Notizen; die Profilseite, die Frösche und Alle Routinen und Erinnerungen führen zur Agenda; die Einstellungen und „Synchronisieren“ führen zur Profilseite. Ein Foto oder eine Tabelle im Vollbild schließt.</li>
+  <li><strong>Alt+Rechts oder die Vorwärts-Taste der Maus</strong>: in den zuletzt ausgewählten Bereich, oder aus einem Bereich in sein zuletzt ausgewähltes Thema.</li>
+  <li><strong>Strg+Enter</strong> (Cmd+Enter unter macOS): speichert die Notiz des Erfassungsfelds, speichert den Text, der im Notiz-Editor bearbeitet wird, und fügt die getippte Zeile einer Checkliste oder Einkaufsliste hinzu. Enter allein beginnt eine neue Zeile.</li>
+  <li><strong>Strg+B und Strg+I</strong> (Cmd unter macOS): fett und kursiv, während der Text der Notiz bearbeitet wird.</li>
+  <li><strong>Strg+V</strong> (Cmd+V unter macOS) im leeren Erfassungsfeld: nimmt den Text der Zwischenablage ins Feld und ihr Bild als Foto in die Notiz.</li>
+  <li><strong>Enter</strong> in einem einzeiligen Feld eines Dialogs, etwa einem Namen oder der Adresse eines Links, übernimmt es.</li>
+  <li><strong>Esc</strong> schließt einen Dialog, ebenso ein Klick daneben, und schließt ein Foto oder eine Tabelle im Vollbild. In einer Tabellenzelle gehen Tab und Umschalt+Tab zur nächsten und zur vorigen Zelle (siehe <a href="formatted-text-transcripts-photo-texts.html#auf-dem-desktop">Formatierter Text</a>).</li>
+</ul>
+
+<h2>Der Infobereich und der Start beim Anmelden</h2>
+<p>
+  Unter Linux zeigt die App ein Symbol im Infobereich, wo die Arbeitsumgebung einen hat: KDE, Xfce,
+  Cinnamon und GNOME mit der Erweiterung AppIndicator. Ein Klick auf das Symbol öffnet das Fenster;
+  sein Menü enthält <strong>Old Brain Fix öffnen</strong>, <strong>Notiz erfassen</strong> und
+  <strong>Beenden</strong>. Schließt du das Fenster, läuft die App im Infobereich weiter, mit ihren
+  Benachrichtigungen, ihrem Tastenkürzel, dem Abgleich mit gekoppelten Geräten und der wöchentlichen
+  Sicherung; <strong>Beenden</strong> beendet sie.
+</p>
+<p>
+  Windows und macOS haben kein Symbol im Infobereich, ebenso wenig Linux ohne Infobereich. Dort
+  beendet das Schließen des Fensters die App, und mit ihr die Benachrichtigungen und das
+  Tastenkürzel, bis sie wieder gestartet wird.
+</p>
+<p>
+  Einstellungen, „Dieser Computer“, <strong>Beim Anmelden starten</strong> ist an, solange es nicht
+  abgeschaltet wird. Es schreibt unter Linux einen Autostart-Eintrag (im Flatpak über das
+  Hintergrund-Portal der Arbeitsumgebung), unter macOS einen LaunchAgent und unter Windows einen
+  Run-Eintrag für deinen Benutzer. Unter Linux mit Infobereich startet die App beim Anmelden ohne
+  Fenster in den Infobereich; unter Windows, unter macOS und unter Linux ohne Infobereich öffnet sie
+  das Fenster.
+</p>
+<p>
+  Die App läuft einmal pro Benutzer. Ein zweiter Start, aus dem Menü oder per Befehl, gibt seinen
+  Wunsch an die laufende App weiter: Ihr Fenster öffnet sich, oder ihr Erfassen-Fenster.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/de/light/settings.png" alt="Die Einstellungen am Desktop: Benachrichtigungen auf diesem Computer und Beim Anmelden starten, der KI-Port, Über Old Brain Fix, Schnell erfassen mit dem Tastenkürzel Ctrl+Alt+N und die Alarme" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/de/dark/settings.png" alt="Die Einstellungen am Desktop: Benachrichtigungen auf diesem Computer und Beim Anmelden starten, der KI-Port, Über Old Brain Fix, Schnell erfassen mit dem Tastenkürzel Ctrl+Alt+N und die Alarme" width="1280" height="800" loading="lazy">
+  <figcaption>Die Einstellungen dieses Computers.</figcaption>
+</figure>
+
+<h2>Das Erfassen-Fenster und sein Tastenkürzel</h2>
+<p>
+  Das Tastenkürzel, Strg+Alt+N, solange nicht geändert, öffnet das Fenster „Notiz erfassen“ über
+  allen anderen Fenstern, auch während die App ohne ihr Fenster im Infobereich läuft.
+  <strong>Notiz erfassen</strong> im Infobereich und der Befehl <code>oldbrainfix capture</code>
+  öffnen es ebenfalls. Es nimmt Text, eine Sprachaufnahme und die Zwischenablage, bietet dieselbe
+  Aktionszeile wie das Erfassungsfeld und fragt nie etwas: Enter speichert die Notiz mit einem
+  Stupser in 1 Std., und Esc behält Getipptes genauso (siehe
+  <a href="capture-and-sort.html#das-tastenkuerzel-und-das-erfassen-fenster">Erfassen und
+  sortieren</a>).
+</p>
+<ul>
+  <li>Das Tastenkürzel stellst du in den Einstellungen unter „Schnell erfassen“ im Feld „Tastenkürzel“ ein: Strg, Alt oder Super, wahlweise Umschalt, und ein Buchstabe, eine Ziffer, F1 bis F12 oder die Leertaste, etwa Super+Shift+F5.</li>
+  <li>Unter X11, Windows und macOS belegt die App die Taste selbst; unter Wayland verwaltet die Arbeitsumgebung sie, fragt einmal nach und lässt sie dich in ihren eigenen Tastatureinstellungen ändern. Die Zeile unter dem Feld sagt, wenn die Taste belegt oder kein Tastenkürzel möglich ist.</li>
+  <li>Die Taste wirkt, solange die App läuft: unter Linux auch aus dem Infobereich, unter Windows und macOS nur, solange das Fenster oder das Erfassen-Fenster offen ist.</li>
+  <li>Unter Wayland entscheidet die Arbeitsumgebung, ob das Erfassen-Fenster über anderen Fenstern bleibt und wohin die Tastatur geht, wenn es schließt.</li>
+</ul>
+
+<h2>Die Befehlszeile</h2>
+<ul>
+  <li><code>oldbrainfix</code> öffnet das Fenster.</li>
+  <li><code>oldbrainfix capture</code> öffnet das Erfassen-Fenster.</li>
+  <li><code>oldbrainfix capture Milch kaufen</code> behält „Milch kaufen“ als unsortierte Notiz mit einem Stupser in 1 Std., ohne Fenster. Nach <code>--</code> ist jedes Wort Text, auch eines, das mit „-“ beginnt.</li>
+  <li><code>oldbrainfix capture -</code> behält, was über die Standardeingabe kommt.</li>
+  <li><code>oldbrainfix import DATEI</code> importiert ein Bündel und gibt aus, was hereinkam.</li>
+  <li><code>oldbrainfix open DATEI</code> zeigt eine gesendete Notiz im Fenster, zum Annehmen oder Ablehnen.</li>
+  <li><code>oldbrainfix --help</code> gibt die Bedienung aus.</li>
+</ul>
+<p>
+  Ein Erfassen oder ein Import geht über die laufende App, die den Stupser sofort plant; läuft
+  keine, schreibt der Befehl die Notiz selbst, und der Stupser kommt, sobald die App läuft. Ein
+  gelungenes Erfassen gibt nichts aus. Der Rückgabewert ist 0, wenn es geklappt hat, 1, wenn die
+  Notiz nicht behalten oder das Bündel nicht importiert werden konnte, und 2 bei falschen Argumenten
+  oder wenn nichts zu erfassen war. Starter, Tastenkürzel-Programme und Makro-Tastaturen können
+  diese Befehle ausführen, auch wo die Arbeitsumgebung kein Tastenkürzel anbietet.
+</p>
+
+<h2>Ziehen und Ablegen</h2>
+<ul>
+  <li>Bilder und Tondateien, die auf das Fenster gezogen werden, warten unter dem Erfassungsfeld, ein Bild als Zeile „Foto“ und eine Tondatei als Zeile „Sprachaufnahme“, und werden mit dem Getippten als eine Notiz gespeichert. Tondateien sind Ogg, Opus, M4A, MP3, WAV und AAC. Eine Aufnahme, die sich nicht transkribieren lässt, bleibt trotzdem erhalten, und eine Zeile oben im Fenster sagt es, sobald die Notiz gespeichert ist. Andere Dateien bleiben unbeachtet.</li>
+  <li>Ein Bündel (<code>.obfsync</code>), das auf das Fenster gezogen wird, wird importiert; eine gesendete Notiz (<code>.oldbrain</code>) wird zum Annehmen oder Ablehnen gezeigt.</li>
+  <li>Die Karte einer Notiz, die auf einen Bereich oder ein Thema in der linken Spalte gezogen wird, wird dort abgelegt.</li>
+</ul>
+
+<h2>Benachrichtigungen</h2>
+<p>
+  Die Alarme der Routinen und Erinnerungen, der Stupser, der Änderungs-Stupser und „Verpasst,
+  während Old Brain Fix nicht lief“ kommen als Benachrichtigungen des Systems, solange die App
+  läuft. Der Schalter „Benachrichtigungen auf diesem Computer“ in den Einstellungen schaltet sie ab.
+  Ein Klick auf eine Benachrichtigung öffnet das Fenster: beim Stupser bei „Unsortiert“; beim
+  Änderungs-Stupser einen Speichern-Dialog für jeden wartenden Menschen.
+</p>
+<ul>
+  <li><strong>Linux</strong>: Ein Alarm bietet Erledigt, 10 Min., 30 Min., 1 Std. und „Old Brain Fix öffnen“; der Stupser bietet 10 Min., 30 Min., 1 Std. und „Old Brain Fix öffnen“; der Änderungs-Stupser bietet Senden. Eine erneut gezeigte Benachrichtigung ersetzt die vorige, und die Benachrichtigung eines Alarms schließt, sobald seine Fälligkeit erledigt ist, auch auf einem anderen Gerät.</li>
+  <li><strong>Windows</strong>: dieselben Knöpfe. Jede Benachrichtigung wird neu gezeigt, und die App schließt sie nicht, wenn ihre Fälligkeit erledigt ist.</li>
+  <li><strong>macOS</strong>: keine Knöpfe; ein Klick auf die Benachrichtigung öffnet das Fenster.</li>
+</ul>
+<p>
+  Die App spielt den Alarmton selbst ab, und ein eskalierter Alarm macht die Benachrichtigung
+  dringend; einen Vollbild-Alarm gibt es nicht (siehe
+  <a href="routines-and-agenda.html#auf-dem-desktop">Routinen, Erinnerungen und die Agenda</a>).
+</p>
+
+<h2>Das Sprachmodell und Fototexte</h2>
+<p>
+  Transkripte brauchen das Sprachmodell, das unter Einstellungen, <strong>Sprachmodell</strong>
+  gewählt und heruntergeladen oder aus einer eigenen Datei genommen wird, wie auf dem Handy.
+  Aufnahmen ohne Transkript, auch solche vom Handy, die dort nicht transkribiert wurden, folgen,
+  sobald es da ist. Fototexte brauchen keinen Download: Die Texterkennung ist Teil der App. Beides
+  läuft auf diesem Computer, eine Aufnahme oder ein Foto nach dem anderen, solange die App läuft
+  (siehe <a href="formatted-text-transcripts-photo-texts.html">Formatierter Text, Transkripte und
+  Fototexte</a>).
+</p>
+
+<h2>Abgleich mit dem Handy</h2>
+<p>
+  <strong>Mit einem anderen Gerät synchronisieren</strong> auf der Profilseite öffnet
+  „Synchronisieren“. Es zeigt den Code dieses Computers, als QR-Code und als Text mit seiner PIN,
+  damit das Handy ihn scannt; nach einem Handy, das noch nicht gekoppelt ist, wird erst gefragt,
+  <strong>Vertrauen</strong> oder <strong>Ablehnen</strong>. Einen Code, den das Handy zeigt, tippst
+  oder fügst du unter <strong>Kopplungscode</strong> ein und trittst mit <strong>Mit diesem Code
+  synchronisieren</strong> bei. Gekoppelte Geräte im selben Netz gleichen sich danach von selbst ab,
+  solange die App läuft, auch im Infobereich; der geteilte Ordner wird alle halbe Minute abgeglichen.
+  Zum Koppeln, zum geteilten Ordner, zu Bündeln und Konflikten siehe
+  <a href="sharing-and-sync.html#koppeln">Teilen und abgleichen</a>.
+</p>
+
+<h2>Die KI-Aufgabe</h2>
+<p>
+  Nur der Desktop hat den KI-Port. Einstellungen, <strong>KI-Port öffnen</strong> lässt ein
+  KI-Modell deiner Wahl für eine Aufgabe an deinen Notizen arbeiten, erreichbar nur von diesem
+  Computer mit seinem Token. Der Abgleich wartet, solange der Port offen ist und bis zur Prüfung.
+  <strong>Fertig, prüfen</strong> schließt den Port und listet jede Änderung mit Vorher und
+  Nachher auf, um sie als Ganzes anzunehmen oder abzulehnen (siehe
+  <a href="sharing-and-sync.html#die-ki-aufgabe">Die KI-Aufgabe</a>).
+</p>
+
+<h2>Was der Desktop nicht hat</h2>
+<ul>
+  <li>Die App-Sperre und die Bereichssperren.</li>
+  <li>Die Seite Kalender und Termine aus dem Kalender auf der Agenda.</li>
+  <li>Den Verlauf einer Routine, Serien und die Einhaltung.</li>
+  <li>Den Vollbild-Alarm.</li>
+  <li>Die Google-Sicherung.</li>
+  <li>Fotos von einer Kamera: Fotos kommen aus einer Datei, aus der Zwischenablage oder durch Ablegen.</li>
+  <li>Einen vollen Erfassungskontext: Eine am Desktop erfasste Notiz behält nur ihre Zeit, ohne den Ort, die Quell-App, den Kalendertermin oder das Bluetooth-Gerät, und es gibt keine benannten Orte zu verwalten. Der Erfassungskontext einer Notiz vom Handy erscheint vollständig.</li>
+</ul>

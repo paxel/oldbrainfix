@@ -395,6 +395,26 @@ fn guide_frames() -> TestResult {
                 })
             })?;
             problems.extend(match_frame(&mut harness, &frame("ai-review"))?);
+            // The window's three panes: the Household's Notes, the
+            // kitchen tap's, filed into Repairs, open in the editor.
+            let mut tap = String::new();
+            let mut harness = window_with(texts, language, theme, |_, ids| {
+                tap = ids[0].clone();
+                Ok(())
+            })?;
+            let household = Places::new(harness.state().store())
+                .areas()?
+                .into_iter()
+                .find(|a| a.name == texts.household)
+                .ok_or("the Household Area")?;
+            harness.state_mut().select(Selection::Place(household.id));
+            harness.state_mut().select_note(&tap);
+            problems.extend(match_frame(&mut harness, &frame("window"))?);
+            // The Settings with this computer's switches, the AI port
+            // and the hotkey.
+            let mut harness = window(texts, language, theme)?;
+            harness.state_mut().select(Selection::Settings);
+            problems.extend(match_frame(&mut harness, &frame("settings"))?);
         }
     }
     assert!(

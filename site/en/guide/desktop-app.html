@@ -1,0 +1,197 @@
+<!-- page: title="The desktop app" track="guide" order=8 summary="Old Brain Fix on Linux, Windows and macOS: the window and its keys, the tray and the start at login, the capture popup, the hotkey and oldbrainfix capture, drag and drop, notifications, sync with the phone and the AI Task." -->
+<p class="lede">
+  The desktop app runs on Linux, Windows and macOS and holds the same Notes, Areas and Routines as
+  the phone once the two are paired. It is a window with three panes, worked with the mouse and the
+  keyboard, with a capture popup and a command line for capturing from anywhere. Settings belong to
+  this computer and are never synced.
+</p>
+
+<h2>Install and first start</h2>
+<p>
+  The app is installed with Homebrew, Scoop, a .deb, a Flatpak file, an AppImage, a disk image or a
+  zip file; see <a href="../reference/install.html">Install</a>. On Linux, outside the Flatpak,
+  every start writes or refreshes the app's entry in the application menu and its icon.
+</p>
+<p>
+  The first start offers the same three choices as the phone: <strong>New to Old Brain
+  Fix</strong> with the Starter Set, <strong>Add a Device of mine</strong> and <strong>Restore from
+  a Backup</strong> (see <a href="getting-started.html#on-the-desktop">Getting started</a>). The
+  Profile takes the name and picture of your login on the computer, or else the computer's name. The desktop asks neither for the
+  speech model nor for alarm access.
+</p>
+
+<h2>The window</h2>
+<p>
+  The window has three panes; the borders between them can be dragged.
+</p>
+<ul>
+  <li><strong>Left</strong>: Agenda, All Notes and Unsorted, then "Areas" with a "+" for a new Area, each Area with its Topics below it, and the Trash. A right-click on an Area opens New Topic, Rename, Colour and icon, Share…, People when it is shared, and Delete, as far as you manage the Area; a right-click on a Topic opens Rename and Delete.</li>
+  <li><strong>Middle</strong>: what is selected on the left. The Agenda and every list of Notes except the Trash have the capture field on top (see <a href="capture-and-sort.html#on-the-desktop">Capture and sort</a>). All Notes, an Area and a Topic have a search field; every list of Notes except the Trash has a switch between full and compact cards and a filter by person. An Area's heading has a "+" for a new Topic.</li>
+  <li><strong>Right</strong>: the editor of the Note or Occurrence opened in the middle.</li>
+</ul>
+<p>
+  In a list of Notes, a click unfolds a compact card; a double-click or the pencil opens the Note in
+  the editor. A right-click on a card or its ⋮ opens <strong>Edit</strong>, the Checklist and Shopping List entries
+  (see <a href="lists-tallies-sessions-frogs.html#on-the-desktop">Lists, Tallies, Sessions and Frogs</a>),
+  <strong>Send to a person</strong>, <strong>Copy as text</strong> and <strong>Save as Markdown…</strong>. A card
+  dragged onto an Area or Topic in the left pane is filed there; Notes in the Trash are not
+  dragged.
+</p>
+<p>
+  The Agenda's bar holds All Routines and Reminders, New Routine or Reminder and the Profile
+  picture. The Profile picture leads to the Profile page, which leads on to
+  <strong>Settings</strong> and to <strong>Sync with another Device</strong>.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/window.png" alt="The desktop window: Areas and Topics on the left, the Household's Notes in the middle, the kitchen tap Note from Repairs open in the editor on the right" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/window.png" alt="The desktop window: Areas and Topics on the left, the Household's Notes in the middle, the kitchen tap Note from Repairs open in the editor on the right" width="1280" height="800" loading="lazy">
+  <figcaption>The window with an Area's Notes and one Note in the editor.</figcaption>
+</figure>
+
+<h2>Keys instead of swipes</h2>
+<p>
+  Where the phone goes back with a swipe, the desktop uses keys and the mouse's side buttons. Alt+Left
+  and Alt+Right rest while the cursor is in a text field; the mouse buttons always work.
+</p>
+<ul>
+  <li><strong>Alt+Left or the mouse's back button</strong>: one level up. A Topic goes to its Area; an Area, Unsorted and the Trash go to All Notes; the Profile page, Frogs and All Routines and Reminders go to the Agenda; Settings and Sync go to the Profile page. A photo or table shown full screen closes.</li>
+  <li><strong>Alt+Right or the mouse's forward button</strong>: into the Area selected last, or from an Area into its Topic selected last.</li>
+  <li><strong>Ctrl+Enter</strong> (Cmd+Enter on macOS): saves the capture field's Note, saves the text being edited in the Note editor, and adds the typed Line to a Checklist or Shopping List. Enter alone starts a new line.</li>
+  <li><strong>Ctrl+B and Ctrl+I</strong> (Cmd on macOS): bold and italic while the Note's text is edited.</li>
+  <li><strong>Ctrl+V</strong> (Cmd+V on macOS) in the empty capture field: takes the clipboard's text into the field and its picture into the Note as its photo.</li>
+  <li><strong>Enter</strong> in a one-line field of a dialog, such as a name or a link's address, takes it.</li>
+  <li><strong>Esc</strong> closes a dialog, as does a click beside it, and closes a photo or table shown full screen. In a table cell, Tab and Shift+Tab move to the next and the previous cell (see <a href="formatted-text-transcripts-photo-texts.html#on-the-desktop">Formatted text</a>).</li>
+</ul>
+
+<h2>The tray and starting at login</h2>
+<p>
+  On Linux the app shows an icon in the tray, where the desktop has one: KDE, Xfce, Cinnamon, and
+  GNOME with the AppIndicator extension. A click on the icon opens the window; its menu holds
+  <strong>Open Old Brain Fix</strong>, <strong>Capture a Note</strong> and <strong>Quit</strong>.
+  Closing the window leaves the app running in the tray, with its notifications, its hotkey, the
+  sync with paired Devices and the weekly Backup; <strong>Quit</strong> ends it.
+</p>
+<p>
+  Windows and macOS have no tray icon, nor has Linux without a tray. There, closing the window ends
+  the app, and with it the notifications and the hotkey, until it is started again.
+</p>
+<p>
+  Settings, "This computer", <strong>Start at login</strong> is on unless switched off. It writes
+  an autostart entry on Linux (inside the Flatpak through the desktop's Background portal), a
+  LaunchAgent on macOS and a Run entry for your user on Windows. On Linux with a tray the login start
+  goes into the tray without a window; on Windows, on macOS and on Linux without a tray it opens the
+  window.
+</p>
+<p>
+  The app runs once per user. A second start, from the menu or a command, hands its wish to the
+  running app: its window opens, or its capture popup.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/settings.png" alt="The desktop Settings: Notifications on this computer and Start at login, the AI port, About Old Brain Fix, Quick capture with the hotkey Ctrl+Alt+N, and the Alarms" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/settings.png" alt="The desktop Settings: Notifications on this computer and Start at login, the AI port, About Old Brain Fix, Quick capture with the hotkey Ctrl+Alt+N, and the Alarms" width="1280" height="800" loading="lazy">
+  <figcaption>The Settings of this computer.</figcaption>
+</figure>
+
+<h2>The capture popup and its hotkey</h2>
+<p>
+  The hotkey, Ctrl+Alt+N unless changed, opens the popup "Capture a Note" over all other windows,
+  also while the app runs in the tray without its window. The tray's <strong>Capture a Note</strong> and the command
+  <code>oldbrainfix capture</code> open it too. It takes text, a voice recording and the clipboard,
+  offers the same action row as the capture field, and never asks anything: Enter saves the Note
+  with a Nudge in 1 h, and Esc keeps what is typed the same way (see
+  <a href="capture-and-sort.html#the-hotkey-and-the-popup">Capture and sort</a>).
+</p>
+<ul>
+  <li>The hotkey is set in Settings under "Quick capture", in the field "Hotkey": Ctrl, Alt or Super, maybe Shift, and a letter, a digit, F1 to F12 or Space, such as Super+Shift+F5.</li>
+  <li>On X11, Windows and macOS the app takes the key itself; on Wayland the desktop manages it, asks once and lets you change it in its own keyboard settings. The line under the field says when the key is taken or no hotkey is possible.</li>
+  <li>The key works while the app runs: on Linux also from the tray, on Windows and macOS only while the window or the popup is open.</li>
+  <li>On Wayland the desktop decides whether the popup stays above other windows and where the keyboard goes once it closes.</li>
+</ul>
+
+<h2>The command line</h2>
+<ul>
+  <li><code>oldbrainfix</code> opens the window.</li>
+  <li><code>oldbrainfix capture</code> opens the capture popup.</li>
+  <li><code>oldbrainfix capture buy milk</code> keeps "buy milk" as an Unsorted Note with a Nudge in 1 h, without a window. After <code>--</code> every word is text, also one that starts with "-".</li>
+  <li><code>oldbrainfix capture -</code> keeps what comes in on standard input.</li>
+  <li><code>oldbrainfix import FILE</code> imports a sync bundle and prints what came in.</li>
+  <li><code>oldbrainfix open FILE</code> shows a Sent Item in the window, to accept or decline.</li>
+  <li><code>oldbrainfix --help</code> prints the usage.</li>
+</ul>
+<p>
+  A capture or an import goes through the running app, which plans the Nudge at once; when none
+  runs, the command writes the Note itself, and the Nudge comes once the app runs. A capture that
+  worked prints nothing. The exit code is 0 when it worked, 1 when the Note could not be kept or the
+  bundle imported, and 2 for wrong arguments or nothing to capture. Launchers, key-binding tools and
+  macro pads can run these commands, also where the desktop offers no hotkey.
+</p>
+
+<h2>Drag and drop</h2>
+<ul>
+  <li>Pictures and sound files dropped onto the window wait under the capture field, a picture as a "Photo" line and a sound file as a "Voice recording" line, and are saved with what is typed as one Note. Sound files are Ogg, Opus, M4A, MP3, WAV and AAC. A recording that cannot be transcribed is kept all the same, and a line at the top of the window says so once the Note is saved. Other files are left alone.</li>
+  <li>A sync bundle (<code>.obfsync</code>) dropped onto the window is imported; a Sent Item (<code>.oldbrain</code>) is shown to accept or decline.</li>
+  <li>A Note's card dragged onto an Area or Topic in the left pane is filed there.</li>
+</ul>
+
+<h2>Notifications</h2>
+<p>
+  The alarms of Routines and Reminders, the Nudge, the Changes Nudge and "Missed while Old Brain
+  Fix was not running" come as the system's notifications, for as long as the app runs. The switch
+  "Notifications on this computer" in Settings turns them off. A click on a notification opens the
+  window: on Unsorted for the Nudge; for the Changes Nudge, a save dialog for each person waiting.
+</p>
+<ul>
+  <li><strong>Linux</strong>: an alarm offers Done, 10 min, 30 min, 1 h and "Open Old Brain Fix"; the Nudge offers 10 min, 30 min, 1 h and "Open Old Brain Fix"; the Changes Nudge offers Send. A notification shown again replaces the one before, and an alarm's notification closes once its Occurrence is Done, also on another Device.</li>
+  <li><strong>Windows</strong>: the same buttons. Each notification is shown anew, and the app does not close it once its Occurrence is Done.</li>
+  <li><strong>macOS</strong>: no buttons; a click on the notification opens the window.</li>
+</ul>
+<p>
+  The app plays the alarm sound itself, and an escalated alarm turns the notification urgent; there
+  is no full-screen alarm (see <a href="routines-and-agenda.html#on-the-desktop">Routines,
+  Reminders and the Agenda</a>).
+</p>
+
+<h2>The speech model and Photo Texts</h2>
+<p>
+  Transcripts need the speech model, chosen and downloaded under Settings, <strong>Speech
+  model</strong>, or taken from a file of your own, as on the phone. Recordings without a Transcript,
+  also those from the phone that were not transcribed there, follow once it is in place. Photo Texts need
+  no download: the text recognition is part of the app. Both run on this computer, one recording or
+  photo at a time, while the app runs (see
+  <a href="formatted-text-transcripts-photo-texts.html">Formatted text, Transcripts and Photo
+  Texts</a>).
+</p>
+
+<h2>Sync with the phone</h2>
+<p>
+  The Profile page's <strong>Sync with another Device</strong> opens Sync. It shows this computer's
+  code, as a QR code and as text with its PIN, for the phone to scan; a phone that is not paired yet
+  is asked about first, <strong>Trust</strong> or <strong>Refuse</strong>. A code the phone shows
+  is typed or pasted into <strong>Pair code</strong> and joined with <strong>Sync with this
+  code</strong>. Paired Devices on the same network then sync on their own for as long as the app
+  runs, also in the tray; the shared folder syncs every half minute. See
+  <a href="sharing-and-sync.html#pairing">Sharing and sync</a> for pairing, the shared folder,
+  bundles and Conflicts.
+</p>
+
+<h2>The AI Task</h2>
+<p>
+  Only the desktop has the AI port. Settings, <strong>Open the AI port</strong> lets an AI model of
+  your choice work on your Notes for one task, reachable only from this computer with its token.
+  Sync waits while the port is open and until the review. <strong>Done, review</strong> closes the
+  port and lists every change with its before and after, to accept or reject as a whole (see
+  <a href="sharing-and-sync.html#the-ai-task">The AI Task</a>).
+</p>
+
+<h2>What the desktop does not have</h2>
+<ul>
+  <li>The App Lock and Area Locks.</li>
+  <li>The Calendar page and appointments from the calendar on the Agenda.</li>
+  <li>A Routine's History, Streaks and Adherence.</li>
+  <li>The full-screen alarm.</li>
+  <li>The Google backup.</li>
+  <li>Photos from a camera: photos come from a file, the clipboard or a drop.</li>
+  <li>A full Capture Context: a Note captured on the desktop keeps only its time, without the place, the source app, the calendar event or the Bluetooth device, and there are no Named Places to manage. The Capture Context of a Note from the phone shows in full.</li>
+</ul>
