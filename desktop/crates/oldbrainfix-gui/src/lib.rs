@@ -52,6 +52,7 @@ pub mod session_view;
 pub mod share_note;
 pub mod shopping_view;
 pub mod speech;
+pub mod starter_set_view;
 pub mod store_needs_update;
 pub mod sync_view;
 pub mod table_view;

@@ -327,7 +327,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get locationExplainBody =>
-      'Old Brain Fix kann notieren, wo du bist, wenn du eine Notiz erfasst – damit „mehr soße kaufn“ auch Tage später noch Sinn ergibt. Gib deinen Orten eigene Namen wie Zuhause oder Arbeit, dann steht bei einer Notiz „Zuhause“ statt Koordinaten. Dein Standort bleibt auf diesem Handy und wird nirgendwohin gesendet.';
+      'Old Brain Fix kann notieren, wo du bist, wenn du eine Notiz erfasst – damit „mehr soße kaufn“ auch Tage später noch Sinn ergibt. Gib deinen Orten eigene Namen wie Zuhause oder Arbeit, dann steht bei einer Notiz „Zuhause“ statt Koordinaten. Der Ort geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
   String get notNow => 'Jetzt nicht';
@@ -989,14 +989,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get calendarExplainBody =>
-      'Old Brain Fix kann notieren, welcher Termin in deinem Kalender gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+      'Old Brain Fix kann notieren, welcher Termin in deinem Kalender gerade läuft, wenn du eine Notiz erfasst – dann steht dort auch Tage später noch „während: Zahnarzt“. Dein Kalender wird nur in diesem Moment gelesen. Der Termin geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
   String get bluetoothExplainTitle => 'Merken, was verbunden war?';
 
   @override
   String get bluetoothExplainBody =>
-      'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+      'Old Brain Fix kann notieren, welches Bluetooth-Gerät verbunden ist, wenn du eine Notiz erfasst, etwa dein Auto oder deine Kopfhörer. Android nennt das „Geräte in der Nähe“; Old Brain Fix liest nur die Namen verbundener Geräte und sucht nie nach anderen. Der Name geht nur dorthin, wohin seine Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
   String get bluetoothNotAllowed =>
@@ -1043,7 +1043,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get microphoneExplainBody =>
-      'Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme bleibt in der Notiz auf deinen eigenen Geräten und wird nirgendwohin sonst gesendet.';
+      'Sprachnotizen nehmen auf, was du sagst – so bleibt ein Gedanke erhalten, bevor er weg ist. Old Brain Fix nutzt das Mikrofon nur, während du aufnimmst. Die Aufnahme geht nur dorthin, wohin ihre Notiz geht: auf deine eigenen Geräte und zu den Menschen eines geteilten Bereichs, in dem du die Notiz ablegst. Sonst zu niemandem.';
 
   @override
   String get microphoneMissing => 'Sprachnotizen brauchen das Mikrofon.';

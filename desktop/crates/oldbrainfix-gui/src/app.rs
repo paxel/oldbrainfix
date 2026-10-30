@@ -27,12 +27,13 @@
 //! saved with the Note by the Nudge times or Save (UI laws, "Capture").
 //! Once something is typed, the Note card's buttons show above them;
 //! what they set up shows at the top of the field and is saved with the
-//! Note, all of it or nothing (#113). A picture pasted from the clipboard
-//! becomes a photo Note, with what is typed; pictures and sound files
-//! chosen with "From file…" or dropped onto the window (where the system
-//! hands drops over: not on Wayland) become one Note with their photos
-//! and voice recordings, as a share does on the phone, and a sound file
-//! that cannot be transcribed here is kept and announced; a sync bundle
+//! Note, all of it or nothing (#113). A picture pasted from the clipboard,
+//! and pictures and sound files chosen with "From file…" or dropped onto
+//! the window (where the system hands drops over: not on Wayland), wait
+//! on the field as its photos and voice recordings and are saved with
+//! what is typed into one Note, as a share does on the phone; a sound
+//! file that cannot be transcribed here is kept and announced once the
+//! Note is saved; a sync bundle
 //! dropped there is imported, what came in announced at the top; a
 //! Sent Item dropped there, opened or handed over by `oldbrainfix open`
 //! shows its preview to accept or decline, a stranger's hidden until
@@ -119,6 +120,7 @@ use crate::session_view::{self, PicksShown, SessionAction, SessionPart};
 use crate::share_note;
 use crate::shopping_view::{self, ShopStep, ShoppingAction, ShoppingShown};
 use crate::speech::SpeechModel;
+use crate::starter_set_view;
 use crate::sync_view::{
     JoinFailure, Joiner, SyncAction, SyncHost, bundle_import_why, bundle_result_text, device_name,
     import_bundle_result, offer_refusal, update_notice_text,
@@ -693,14 +695,12 @@ enum Action {
     /// Plays recordings at this speed from now on, the one playing
     /// included, and keeps it on this Device.
     Speed(f64),
-    /// Keeps this picture pasted as a photo Note, with what is typed.
-    PastedPhoto(Vec<u8>),
-    /// Asks the system's dialog for pictures and sound files and makes
-    /// them into a Note.
+    /// Asks the system's dialog for pictures and sound files and holds
+    /// them on the capture field.
     PickFiles,
-    /// Makes these files, by name and content, into one Note with what
-    /// is typed: the pictures as photos, the sound files as voice
-    /// recordings; anything else is left alone.
+    /// Holds these files, by name and content, on the capture field for
+    /// one Note with what is typed: the pictures as photos, the sound
+    /// files as voice recordings; anything else is left alone.
     Files(Vec<(String, Vec<u8>)>),
     /// Shows why the recordings announced could not be transcribed.
     ShowUntranscribable,
@@ -1051,6 +1051,12 @@ pub struct App {
     /// The recordings that ended, held on the capture field until its
     /// Note is saved.
     recorded: Vec<Vec<u8>>,
+    /// The pictures pasted, chosen or dropped, held on the capture field
+    /// until its Note is saved.
+    held_photos: Vec<Vec<u8>>,
+    /// Why recordings held from files cannot be transcribed here, said
+    /// once their Note is saved.
+    held_problems: Vec<(oldbrainfix_whisper::Problem, String)>,
     clipboard: Option<Box<dyn Clipboard>>,
     /// Whether the last Paste found nothing, said in grey above the
     /// capture field until something is pasted or typed (#130).
@@ -1086,6 +1092,9 @@ pub struct App {
     /// Tells the folder thread to sync now; without one, the window
     /// syncs itself.
     folder_wanted: Option<Arc<AtomicBool>>,
+    /// Raised by a click on the Nudge: Unsorted is to show, as the
+    /// phone's Nudge screen.
+    unsorted_wanted: Option<Arc<AtomicBool>>,
     /// Raised by a click on the Changes Nudge: the bundles of the people
     /// waiting are to be saved (#109).
     changes_wanted: Option<Arc<AtomicBool>>,
@@ -1329,6 +1338,8 @@ impl App {
             playing: None,
             speed,
             recorded: Vec::new(),
+            held_photos: Vec::new(),
+            held_problems: Vec::new(),
             clipboard: None,
             paste_empty: false,
             paste_held: false,
@@ -1346,6 +1357,7 @@ impl App {
             arrived: 0,
             folder_picker: Box::new(|title| rfd::FileDialog::new().set_title(title).pick_folder()),
             folder_wanted: None,
+            unsorted_wanted: None,
             changes_wanted: None,
             bundle_saver: Box::new(|title, name| {
                 bundle_dialog(title).set_file_name(name).save_file()
@@ -1557,7 +1569,22 @@ impl App {
     fn welcome_action(&mut self, asked: WelcomeAction) -> oldbrainfix_core::Result<()> {
         let t = self.t;
         match asked {
-            WelcomeAction::New => self.welcomed()?,
+            WelcomeAction::New => {
+                if let Some(welcome) = &mut self.welcome {
+                    welcome.starter = Some(starter_set_view::all());
+                }
+                self.notice = None;
+            }
+            WelcomeAction::Plant => {
+                let picked = self
+                    .welcome
+                    .as_ref()
+                    .and_then(|w| w.starter.clone())
+                    .unwrap_or_default();
+                let picked: Vec<&str> = picked.iter().map(String::as_str).collect();
+                Places::new(&self.store).plant_starter_set(&picked)?;
+                self.welcomed()?;
+            }
             WelcomeAction::AddDevice => {
                 if let Some(welcome) = &mut self.welcome {
                     welcome.adding = true;
@@ -1660,7 +1687,8 @@ impl App {
         Ok(())
     }
 
-    /// The first start's view is answered: new, restored or synced. Only
+    /// The first start's view is answered: new with the Starter Set
+    /// planted, restored or synced. Only
     /// now is the own Profile made with this computer's defaults, so a
     /// Device being added takes the one its other Devices hold (ADR
     /// 0017); one that came with a restore or a sync stays as it is.
@@ -2486,6 +2514,12 @@ impl App {
         self.folder_wanted = Some(wanted);
     }
 
+    /// Shows Unsorted, what the phone's Nudge screen shows, whenever a
+    /// click on the Nudge raised `wanted`.
+    pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
+        self.unsorted_wanted = Some(wanted);
+    }
+
     /// Saves the bundles of the people the Changes Nudge covers whenever
     /// a click on it raised `wanted` (#109).
     pub fn set_changes_wanted(&mut self, wanted: Arc<AtomicBool>) {
@@ -2741,7 +2775,7 @@ impl App {
     /// capture field's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the selected Note's edited text.
     pub fn flush(&mut self) {
-        if !self.capture.trim().is_empty() || self.recording() || !self.recorded.is_empty() {
+        if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
         self.apply(Action::SaveText);
@@ -3554,9 +3588,6 @@ impl App {
                 }
                 DeviceSettings::new(&self.store).set_playback_speed(speed)?;
             }
-            Action::PastedPhoto(photo) => {
-                self.capture_note(Notes::default_nudge(), &[photo], &[])?;
-            }
             Action::PickFiles => {
                 let files = (self.files_picker)(self.t.from_file_title())
                     .into_iter()
@@ -3565,9 +3596,9 @@ impl App {
                         Some((file_name(&path), bytes))
                     })
                     .collect();
-                self.capture_files(files)?;
+                self.hold_files(files);
             }
-            Action::Files(files) => self.capture_files(files)?,
+            Action::Files(files) => self.hold_files(files),
             Action::ShowUntranscribable => {
                 let failed = std::mem::take(&mut self.untranscribable);
                 if let Some((first, _)) = failed.first() {
@@ -4856,7 +4887,11 @@ impl App {
         recordings: &[Vec<u8>],
     ) -> oldbrainfix_core::Result<()> {
         let place = self.capture_place();
-        // The recordings held on the field go into the same Note.
+        // The photos and recordings held on the field go into the same
+        // Note.
+        let mut photos = photos.to_vec();
+        photos.extend(self.held_photos.iter().cloned());
+        let photos = photos.as_slice();
         let mut recordings = recordings.to_vec();
         recordings.extend(self.recorded.iter().cloned());
         // Without a Transcript to come, a recording keeps it a Note, as
@@ -4909,6 +4944,9 @@ impl App {
         // Only once all of it is written: a failed save keeps it here.
         self.capture.clear();
         self.recorded.clear();
+        self.held_photos.clear();
+        // Added to what still waits to be clicked, so none goes unsaid.
+        self.untranscribable.append(&mut self.held_problems);
         self.capture_choices = CaptureChoices::default();
         self.save_text()?;
         if let Some(note) = shown {
@@ -4921,9 +4959,9 @@ impl App {
 
     /// Pastes into the capture field `id` (#130): the clipboard's text,
     /// or `text` when Ctrl+V brought it, at its cursor, and its picture
-    /// kept at once as a photo Note with what is typed, as files are;
-    /// with neither, the grey line says so.
-    fn paste(&mut self, ui: &Ui, id: Id, text: Option<String>, actions: &mut Vec<Action>) {
+    /// held for the Note, as files are; with neither, the grey line says
+    /// so.
+    fn paste(&mut self, ui: &Ui, id: Id, text: Option<String>) {
         let Some(clipboard) = self.clipboard.as_deref_mut() else {
             return;
         };
@@ -4933,8 +4971,20 @@ impl App {
             paste::insert(ui, id, &mut self.capture, text);
         }
         if let Some(photo) = pasted.photo {
-            actions.push(Action::PastedPhoto(photo));
+            self.hold_photo(photo);
         }
+    }
+
+    /// Holds `photo` on the capture field for its Note. No Line holds a
+    /// photo, so a Shopping List picked is dropped (UI laws, "Capture").
+    fn hold_photo(&mut self, photo: Vec<u8>) {
+        self.held_photos.push(photo);
+        self.capture_choices.shopping = None;
+    }
+
+    /// Whether photos or recordings wait on the capture field.
+    fn holds_media(&self) -> bool {
+        !self.recorded.is_empty() || !self.held_photos.is_empty()
     }
 
     /// Whether a recording captured now gets its Transcript here: with
@@ -4944,10 +4994,10 @@ impl App {
     }
 
     /// The Shopping Lists the Note being captured can go into: none while
-    /// it holds a recording that gets no Transcript here.
+    /// it holds a photo or a recording that gets no Transcript here.
     fn capture_lists(&self) -> &[ListTitle] {
         let voice = self.recording() || !self.recorded.is_empty();
-        if voice && !self.transcribes() {
+        if (voice && !self.transcribes()) || !self.held_photos.is_empty() {
             return &[];
         }
         &self.view.capture_lists
@@ -4998,32 +5048,25 @@ impl App {
         Ok(())
     }
 
-    /// Makes `files`, by name and content, into one Note with the capture
-    /// field's text, as a share does on the phone: the pictures as
+    /// Holds `files`, by name and content, on the capture field for one
+    /// Note with its text, as a share does on the phone: the pictures as
     /// photos, the sound files as voice recordings, each kept even when
-    /// it cannot be transcribed here, which is announced at the top.
-    /// Anything else is left alone; nothing when nothing is left.
-    fn capture_files(&mut self, files: Vec<(String, Vec<u8>)>) -> oldbrainfix_core::Result<()> {
-        let (mut photos, mut recordings, mut failed) = (Vec::new(), Vec::new(), Vec::new());
+    /// it cannot be transcribed here, which is announced at the top once
+    /// the Note is saved. Anything else is left alone.
+    fn hold_files(&mut self, files: Vec<(String, Vec<u8>)>) {
         for (name, bytes) in files {
             match from_file(&name, &bytes) {
-                Some(FromFile::Photo(photo)) => photos.push(photo),
+                Some(FromFile::Photo(photo)) => self.hold_photo(photo),
                 Some(FromFile::Recording { bytes, problem }) => {
                     if let Some(problem) = problem {
-                        failed.push((problem, problem_line(problem, &name)));
+                        self.held_problems
+                            .push((problem, problem_line(problem, &name)));
                     }
-                    recordings.push(bytes);
+                    self.recorded.push(bytes);
                 }
                 None => {}
             }
         }
-        if photos.is_empty() && recordings.is_empty() {
-            return Ok(());
-        }
-        self.capture_note(Notes::default_nudge(), &photos, &recordings)?;
-        // Added to what still waits to be clicked, so none goes unsaid.
-        self.untranscribable.extend(failed);
-        Ok(())
     }
 
     /// The Notes the Note `selected` can be merged into that the core's
@@ -5211,8 +5254,9 @@ impl App {
         })
     }
 
-    /// The first start's view instead of the panes: the three choices, a
-    /// Backup being restored, or a Device of one's own being added with
+    /// The first start's view instead of the panes: the three choices,
+    /// the Starter Set, a Backup being restored, or a Device of one's own
+    /// being added with
     /// the Sync view's ways to pair. Back, as key or mouse button, goes
     /// to the choices.
     fn welcome_view(&mut self, ui: &mut Ui, tones: Tones, actions: Vec<Action>) {
@@ -5440,6 +5484,14 @@ impl App {
         {
             actions.extend(handed.drain(..).map(Action::OpenFile));
             // Nothing else stirs the window: what it opened shows at once.
+            ui.ctx().request_repaint();
+        }
+        if self
+            .unsorted_wanted
+            .as_ref()
+            .is_some_and(|wanted| wanted.swap(false, Ordering::SeqCst))
+        {
+            actions.push(Action::Select(Selection::Unsorted));
             ui.ctx().request_repaint();
         }
         if self
@@ -5842,7 +5894,7 @@ impl App {
         embossed(ui, tones, false, None, |ui| {
             let focused = ui.memory(|m| m.has_focus(id));
             if focused
-                && (!self.capture.trim().is_empty() || !self.recorded.is_empty())
+                && (!self.capture.trim().is_empty() || self.holds_media())
                 && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
             {
                 actions.push(Action::Capture(Notes::default_nudge()));
@@ -5859,7 +5911,7 @@ impl App {
                 && recording.is_none()
                 && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
             {
-                self.paste(ui, id, text, actions);
+                self.paste(ui, id, text);
             }
             if self.paste_empty {
                 paste::empty_line(ui, &t);
@@ -5877,11 +5929,18 @@ impl App {
             if field.changed() {
                 self.paste_empty = false;
             }
-            // A stopped recording stays here until the Note is saved.
+            // A stopped recording, a picture pasted and the files chosen
+            // or dropped stay here until the Note is saved.
             for _ in &self.recorded {
                 ui.horizontal(|ui| {
                     icons::show(ui, icons::MIC, 18.0, text);
                     ui.label(RichText::new(t.voice_recording()).color(text));
+                });
+            }
+            for _ in &self.held_photos {
+                ui.horizontal(|ui| {
+                    icons::show(ui, icons::PHOTO, 18.0, text);
+                    ui.label(RichText::new(t.photo()).color(text));
                 });
             }
             if has_recorder {
@@ -5893,7 +5952,7 @@ impl App {
             }
             if has_clipboard && recording.is_none() {
                 if paste::button(ui, &t) {
-                    self.paste(ui, id, None, actions);
+                    self.paste(ui, id, None);
                 }
                 ui.label(RichText::new(t.photos_hint()).small().color(weak));
             }
@@ -5909,7 +5968,7 @@ impl App {
                 });
                 ui.label(RichText::new(t.from_file_hint()).small().color(weak));
             }
-            if self.capture.trim().is_empty() && recording.is_none() && self.recorded.is_empty() {
+            if self.capture.trim().is_empty() && recording.is_none() && !self.holds_media() {
                 return;
             }
             ui.add_space(4.0);

@@ -1,5 +1,6 @@
 //! Notes made from files in the window: "From file…" with the dialog
-//! handed in and files dropped onto the window, driven headless by
+//! handed in and files dropped onto the window, held on the capture
+//! field until it is saved with Save or on leaving, driven headless by
 //! egui_kittest over an empty store with its clock held still. The
 //! pictures are made here; the sound file is the phone's test voice
 //! message, an Ogg Opus file as messengers send. The system's dialog and
@@ -85,6 +86,12 @@ fn from_file_makes_one_note_of_a_picture_and_a_voice_message() -> TestResult {
     harness.run();
     harness.get_by_label("From file…").click();
     harness.run();
+    // Held on the field with what is typed, nothing saved yet.
+    assert!(notes(&store)?.is_empty());
+    assert!(shows(&harness, "Photo"));
+    assert!(shows(&harness, "Voice recording"));
+    harness.get_by_label("30 min").click();
+    harness.run();
     let notes = notes(&store)?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].text, "From Ben");
@@ -107,6 +114,9 @@ fn closing_the_dialog_without_a_file_changes_nothing() -> TestResult {
     let mut harness = window(store.clone(), "en", Vec::new());
     harness.get_by_label("From file…").click();
     harness.run();
+    assert!(notes(&store)?.is_empty());
+    // Nothing held, nothing typed: leaving saves nothing.
+    harness.state_mut().flush();
     assert!(notes(&store)?.is_empty());
     Ok(())
 }
@@ -155,6 +165,10 @@ fn a_dropped_voice_message_becomes_a_voice_note_and_is_transcribed() -> TestResu
         ..Default::default()
     }];
     harness.run();
+    assert!(notes(&store)?.is_empty());
+    assert!(shows(&harness, "Voice recording"));
+    harness.get_by_label("1 h").click();
+    harness.run();
     let notes_now = notes(&store)?;
     assert_eq!(notes_now.len(), 1);
     assert!(notes_now[0].photos.is_empty());
@@ -192,6 +206,14 @@ fn a_dropped_sound_file_that_does_not_decode_is_kept_and_says_why() -> TestResul
             ..Default::default()
         },
     ];
+    harness.run();
+    // Said once the Note is saved, not while it is held.
+    assert!(notes(&store)?.is_empty());
+    assert!(!shows(
+        &harness,
+        "A recording from a file cannot be transcribed."
+    ));
+    harness.state_mut().flush();
     harness.run();
     let notes = notes(&store)?;
     assert_eq!(notes.len(), 1);
@@ -233,6 +255,9 @@ fn from_file_and_its_announcement_speak_german() -> TestResult {
     let mut harness = window(store.clone(), "de", vec![broken]);
     assert!(shows(&harness, "Aus Datei…"));
     harness.get_by_label("Aus Datei…").click();
+    harness.run();
+    assert!(notes(&store)?.is_empty());
+    harness.get_by_label("1 Std.").click();
     harness.run();
     assert_eq!(notes(&store)?.len(), 1);
     harness

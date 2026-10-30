@@ -1,6 +1,7 @@
 //! The first start driven headless (#106): its view asks whether the user
 //! is new, adds a Device of their own or restores a Backup, and makes no
-//! Profile before the answer. "Add a Device of mine" pairs either way
+//! Profile before the answer. "New to Old Brain Fix" offers the Starter
+//! Set and plants what is left ticked. "Add a Device of mine" pairs either way
 //! round over the loopback and syncs, taking the other Device's Profile
 //! and Notes and skipping the setup: no Starter Set, and the Profile is
 //! the other Device's, not one from this Device's defaults; a refusal, a failed join, Cancel and
@@ -147,6 +148,66 @@ fn the_three_choices_show_and_no_profile_is_made_before_one() -> TestResult {
     let harness = first_start()?;
     assert!(shows(&harness, "Welcome to Old Brain Fix"));
     untouched(&harness)
+}
+
+#[test]
+fn new_to_old_brain_fix_plants_what_is_left_ticked_of_the_starter_set() -> TestResult {
+    let mut harness = first_start()?;
+    click(&mut harness, "New to Old Brain Fix");
+    // The Starter Set, every Area and Topic ticked; nothing answered yet.
+    assert!(harness.state().welcoming());
+    assert!(shows(&harness, "Pick your Areas"));
+    assert!(shows(&harness, "Household") && shows(&harness, "Medication"));
+    assert!(own_name(harness.state().store())?.is_none());
+    // Unticking an Area takes its Topics; a Topic ticked again brings
+    // its Area back.
+    click(&mut harness, "Car");
+    click(&mut harness, "Work");
+    click(&mut harness, "Meetings");
+    click(&mut harness, "Garden");
+    click(&mut harness, "Start");
+    assert!(!harness.state().welcoming());
+    let desk = harness.state().store();
+    assert_eq!(own_name(desk)?.as_deref(), Some("Desk"));
+    assert!(!restore_due(desk)?);
+    let places = Places::new(desk);
+    let mut kept: Vec<(String, Vec<String>)> = Vec::new();
+    for area in places.areas()? {
+        let mut topics: Vec<String> = places
+            .topics(&area.id)?
+            .into_iter()
+            .map(|t| t.name)
+            .collect();
+        topics.sort();
+        kept.push((area.name, topics));
+    }
+    kept.sort();
+    let names = |list: &[&str]| list.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        kept,
+        [
+            ("Health".to_string(), names(&["Doctor", "Medication"])),
+            ("Household".to_string(), names(&["Cleaning", "Kitchen"])),
+            ("Work".to_string(), names(&["Meetings"])),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn cancel_and_back_leave_the_starter_set_for_the_choices() -> TestResult {
+    let mut harness = first_start()?;
+    click(&mut harness, "New to Old Brain Fix");
+    assert!(shows(&harness, "Pick your Areas"));
+    click(&mut harness, "Cancel");
+    untouched(&harness)?;
+    click(&mut harness, "New to Old Brain Fix");
+    harness.key_press_modifiers(egui::Modifiers::ALT, egui::Key::ArrowLeft);
+    harness.step();
+    harness.step();
+    untouched(&harness)?;
+    assert!(Places::new(harness.state().store()).areas()?.is_empty());
+    Ok(())
 }
 
 #[test]

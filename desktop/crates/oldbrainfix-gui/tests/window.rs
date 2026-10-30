@@ -3,6 +3,8 @@
 //! selected Note on the right, and everything the user changes there.
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use chrono::Duration;
 use egui::accesskit::Role;
@@ -262,6 +264,32 @@ fn every_importance_draws_and_an_empty_store_says_so() -> TestResult {
     harness.get_by_label("Trash").click();
     harness.run();
     assert!(shows(&harness, "The trash is empty."));
+    Ok(())
+}
+
+/// A click on the Nudge's notification opens the window on Unsorted, as
+/// it opens the phone's Nudge screen (UI laws, "Alarms and
+/// notifications").
+#[test]
+fn a_click_on_the_nudge_shows_unsorted() -> TestResult {
+    let wanted = Arc::new(AtomicBool::new(false));
+    let mut app = App::new(store("notes")?, "en");
+    app.set_unsorted_wanted(wanted.clone());
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 1200.0))
+        .build_ui_state(
+            |ui, app: &mut App| {
+                App::install(ui.ctx());
+                app.show(ui);
+            },
+            app,
+        );
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Agenda);
+    wanted.store(true, Ordering::SeqCst);
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Unsorted);
+    assert!(!wanted.load(Ordering::SeqCst));
     Ok(())
 }
 

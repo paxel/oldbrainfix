@@ -671,7 +671,7 @@ abstract class AppLocalizations {
   /// No description provided for @locationExplainBody.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. Your location stays on this phone and is never sent anywhere.'**
+  /// **'Old Brain Fix can note where you are when you capture a Note, so “nees mor sauce” still makes sense days later. Name your own places, like Home or Work, and a Note says “Home” instead of coordinates. The place goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
   String get locationExplainBody;
 
   /// No description provided for @notNow.
@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @calendarExplainBody.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix can note the calendar event running when you capture a Note, so it says “during: Dentist” days later. It reads your calendar only at that moment. The event stays in the Note on your own devices and is never sent anywhere else.'**
+  /// **'Old Brain Fix can note the calendar event running when you capture a Note, so it says “during: Dentist” days later. It reads your calendar only at that moment. The event goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
   String get calendarExplainBody;
 
   /// No description provided for @bluetoothExplainTitle.
@@ -1607,7 +1607,7 @@ abstract class AppLocalizations {
   /// No description provided for @bluetoothExplainBody.
   ///
   /// In en, this message translates to:
-  /// **'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name stays in the Note on your own devices and is never sent anywhere else.'**
+  /// **'Old Brain Fix can note the Bluetooth device connected when you capture a Note, like your car or your headphones. Android calls this “Nearby devices”; Old Brain Fix only reads the names of connected devices and never searches for others. The name goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
   String get bluetoothExplainBody;
 
   /// No description provided for @bluetoothNotAllowed.
@@ -1685,7 +1685,7 @@ abstract class AppLocalizations {
   /// No description provided for @microphoneExplainBody.
   ///
   /// In en, this message translates to:
-  /// **'Voice Notes record what you say, so a thought is kept before it is gone. Old Brain Fix uses the microphone only while you record. The recording stays in the Note on your own devices and is never sent anywhere else.'**
+  /// **'Voice Notes record what you say, so a thought is kept before it is gone. Old Brain Fix uses the microphone only while you record. The recording goes only where its Note goes: to your own Devices, and to the people of a Shared Area you file the Note in. Never to anyone else.'**
   String get microphoneExplainBody;
 
   /// No description provided for @microphoneMissing.

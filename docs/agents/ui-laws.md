@@ -78,8 +78,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   announcement, when it holds neither. The clipboard is read only on
   that tap, never on opening or in the background. The text capture
   screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
-  quick entry point (widget, tile, shortcut, hardware button) opens its
-  capture screen directly, with no fan and no screen in between.
+  quick entry point (widget, tile, shortcut, also when the phone's key
+  or gesture settings or a button-mapper app start it; no code reads a
+  key) opens its capture screen directly, with no fan and no screen in between.
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
@@ -91,7 +92,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   with that Nudge time, so the radio-button law does not apply to them.
 - **Above them sits the Note card's action row**, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile, shortcut,
-  hardware button): File into…, Routine, Reminder, Frog or Session, and
+  also one a phone key or gesture starts): File into…, Routine, Reminder, Frog or Session, and
   ⋮ with the Importance, Make it a Tally and Add to a Shopping List.
   Each opens its usual page and comes back to the capture screen with
   the choice shown at the top ("→ Household"), not saved yet; the user

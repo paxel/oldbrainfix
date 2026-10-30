@@ -567,7 +567,7 @@ fn a_strangers_sent_item_waits_hidden_behind_the_agenda_line() -> TestResult {
     assert!(shows(&harness, "An unknown person: not among your People."));
     assert!(shows(
         &harness,
-        "What they sent stays hidden until you tap Show."
+        "What they sent stays hidden until you click Show."
     ));
     assert!(!shows(&harness, "Blood test"));
     assert!(!shows(&harness, "08:15"));

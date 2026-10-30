@@ -9,7 +9,7 @@ Alles, was du erfasst hast: Text, eine Sprachaufnahme, ein Foto oder etwas, das 
 _Avoid_: Eintrag, Memo, Element, Karte (eine Karte ist nur, wie eine Notiz gezeichnet wird)
 
 **Erfassen** [Capture]:
-Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widget, eine Kachel, eine Verknüpfung, eine Hardwaretaste, das Tastenkürzel am Computer. Erfassen fragt nie nach Sortieren oder Entsperren.
+Eine Notiz über einen der schnellen Einstiege anlegen: den "+"-Knopf, ein Widget, eine Kachel, eine Verknüpfung (die auch die Tasten- oder Gesteneinstellungen des Handys oder eine Tastenbelegungs-App starten können; die App selbst liest keine Taste), das Tastenkürzel am Computer. Erfassen fragt nie nach Sortieren oder Entsperren.
 _Avoid_: Schnell hinzufügen, Aufnehmen
 
 **Erfassungskontext** [Capture Context]:

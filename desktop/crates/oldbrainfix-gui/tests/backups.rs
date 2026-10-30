@@ -369,8 +369,12 @@ fn the_first_start_restores_with_the_recovery_key_or_starts_new() -> TestResult 
     assert!(harness.state().welcoming());
     assert!(own_name(&harness)?.is_none());
 
-    // New: the view goes and stays gone; only now is the Profile made.
+    // New, then Start on the Starter Set: the view goes and stays gone;
+    // only now is the Profile made.
     click(&mut harness, "New to Old Brain Fix");
+    assert!(harness.state().welcoming());
+    assert!(own_name(&harness)?.is_none());
+    click(&mut harness, "Start");
     assert!(!harness.state().welcoming());
     assert_eq!(own_name(&harness)?.as_deref(), Some("Desk"));
     harness.state_mut().offer_restore();

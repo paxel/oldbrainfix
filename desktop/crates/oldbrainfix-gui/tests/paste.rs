@@ -1,7 +1,8 @@
 //! Paste in the capture (#130), in the window and the capture popup,
 //! driven headless by egui_kittest with a fake clipboard: the Paste
 //! button and Ctrl+V in the empty field take the clipboard's text into
-//! the field and its picture into the Note; a clipboard with neither
+//! the field and its picture onto it, both saved together into one Note
+//! with Save or on leaving, nothing before; a clipboard with neither
 //! leaves a grey line, no announcement. The real clipboard is
 //! device-only.
 
@@ -145,6 +146,12 @@ fn paste_with_text_and_a_picture_keeps_both_in_one_note() -> TestResult {
     let mut harness = window(store.clone(), &board);
     harness.get_by_label(t().paste()).click();
     harness.run();
+    // Held on the field until it is saved (UI laws, "Capture").
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert_eq!(typed(&harness).as_deref(), Some("Parking spot"));
+    assert!(shows(&harness, t().photo()));
+    harness.get_by_label(t().snooze60()).click();
+    harness.run();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].text, "Parking spot");
@@ -226,6 +233,10 @@ fn ctrl_v_in_the_empty_field_takes_a_picture_alone() -> TestResult {
     let mut harness = window(store.clone(), &board);
     focus(&mut harness);
     ctrl_v_released(&mut harness);
+    assert!(Notes::new(&store).all()?.is_empty());
+    assert!(shows(&harness, t().photo()));
+    // Leaving saves it, as the window closing does.
+    harness.state_mut().flush();
     let notes = Notes::new(&store).all()?;
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].photos.len(), 1);

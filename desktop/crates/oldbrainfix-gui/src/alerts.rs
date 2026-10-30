@@ -8,8 +8,10 @@
 //! Changes Nudge's once nobody waits. What became Missed while the app
 //! was not running is told in one Catch-up Notification, never rung
 //! late. Done and the snoozes tapped on a notification come back as
-//! [`Tap`]s and are applied to the log; a click on the Changes Nudge asks
-//! the window to send each person waiting their bundle (#109). Quiet
+//! [`Tap`]s and are applied to the log; a click on the Nudge opens the
+//! window on Unsorted, as the phone's Nudge screen, and a click on the
+//! Changes Nudge asks the window to send each person waiting their
+//! bundle (#109). Quiet
 //! Hours only hold back the Nudge and the Changes Nudge; with alerts off
 //! on this Device nothing shows (ADR 0008).
 
@@ -176,6 +178,8 @@ pub struct Alerts {
     changed: Arc<AtomicU64>,
     /// Asked for by a click on a notification: the window is to open.
     pub open_requested: bool,
+    /// Raised by a click on the Nudge: the window is to show Unsorted.
+    unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge: the window is to send each
     /// person waiting their bundle.
     changes_wanted: Arc<AtomicBool>,
@@ -193,6 +197,7 @@ impl Alerts {
             shown: BTreeSet::new(),
             changed,
             open_requested: false,
+            unsorted_wanted: Arc::new(AtomicBool::new(false)),
             changes_wanted: Arc::new(AtomicBool::new(false)),
             ringer: None,
         }
@@ -202,6 +207,12 @@ impl Alerts {
     /// `ringer`.
     pub fn set_ringer(&mut self, ringer: Box<dyn Ringer>) {
         self.ringer = Some(ringer);
+    }
+
+    /// Raises `wanted` when the Nudge is clicked, for the window to show
+    /// Unsorted ([`crate::App::set_unsorted_wanted`]).
+    pub fn set_unsorted_wanted(&mut self, wanted: Arc<AtomicBool>) {
+        self.unsorted_wanted = wanted;
     }
 
     /// Raises `wanted` when the Changes Nudge is clicked, for the window
@@ -217,6 +228,9 @@ impl Alerts {
             // dialog cancelled keeps it for that person.
             if tap.key == CHANGES_KEY {
                 self.changes_wanted.store(true, Ordering::SeqCst);
+            }
+            if tap.key == NUDGE_KEY {
+                self.unsorted_wanted.store(true, Ordering::SeqCst);
             }
             self.open_requested = true;
             return Ok(());

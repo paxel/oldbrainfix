@@ -2,7 +2,11 @@
 //! notification service through notify-rust outside tests, a recorder
 //! inside. On Linux a notification offers its buttons (Done, the
 //! snoozes, Open), shows again in place of the one with the same key,
-//! and is closed once its Occurrence is Done; elsewhere it only shows.
+//! and is closed once its Occurrence is Done. A Windows toast offers the
+//! same buttons but is neither replaced nor closed: notify-rust shows
+//! each one anew and closes none. On macOS a click on it is heard, but
+//! it offers no buttons: notify-rust puts more than one under a menu
+//! titled "Options" in English only.
 
 use std::sync::{Arc, Mutex};
 
@@ -15,7 +19,6 @@ pub const ALARM_SOUND: &str = "alarm-clock-elapsed";
 /// The platform notification service; what is tapped on a notification
 /// goes to `taps`.
 pub struct DesktopNotifier {
-    #[cfg_attr(not(all(unix, not(target_os = "macos"))), allow(dead_code))]
     taps: std::sync::mpsc::Sender<crate::alerts::Event>,
     /// The id the notification service gave each key's notification,
     /// and whether a thread still waits for its buttons. One shown again
@@ -112,18 +115,51 @@ impl Notifier for DesktopNotifier {
 #[cfg(not(all(unix, not(target_os = "macos"))))]
 impl Notifier for DesktopNotifier {
     fn show(&mut self, notice: &Notice) {
+        use notify_rust::NotificationResponse;
         let mut n = notify_rust::Notification::new();
         n.summary(&notice.title)
             .body(&notice.body)
             .appname(oldbrainfix_core::APP_NAME);
+        if cfg!(target_os = "windows") {
+            for (id, label) in &notice.actions {
+                n.action(id, label);
+            }
+        }
         // Without a sound name a toast and a macOS notification stay
         // silent, as a `silent` notice is to.
         if notice.urgent {
             n.sound_name("Default");
         }
-        if let Err(e) = n.show() {
-            eprintln!("oldbrainfix: notification: {e}");
-        }
+        // A toast is shown here; a macOS notification only once its
+        // handle waits, on this thread, for a click or a button.
+        let handle = match n.show() {
+            Ok(handle) => handle,
+            Err(e) => {
+                eprintln!("oldbrainfix: notification: {e}");
+                return;
+            }
+        };
+        let taps = self.taps.clone();
+        let key = notice.key.clone();
+        std::thread::spawn(move || {
+            let waited = handle.wait_for_response(|response: &NotificationResponse| {
+                // A click on the notification itself is Open.
+                let action = match response {
+                    NotificationResponse::Default => crate::alerts::OPEN.to_string(),
+                    NotificationResponse::Action(id) => id.clone(),
+                    _ => return,
+                };
+                let tap = crate::alerts::Tap {
+                    key,
+                    action,
+                    at: chrono::Utc::now(),
+                };
+                drop(taps.send(crate::alerts::Event::Tap(tap)));
+            });
+            if let Err(e) = waited {
+                eprintln!("oldbrainfix: notification: {e}");
+            }
+        });
     }
 
     fn close(&mut self, _key: &str) {}

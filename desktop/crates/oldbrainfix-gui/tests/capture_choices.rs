@@ -383,3 +383,20 @@ fn a_write_failing_in_the_window_leaves_nothing_written() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn file_into_without_areas_says_how_the_desktop_makes_one() -> TestResult {
+    let now = parse_time("2026-10-26T09:00:00.000Z")?;
+    let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([4; 32])))?;
+    OwnProfile::new(&store).apply_defaults("Desk", None)?;
+    let store = Arc::new(store);
+    let mut harness = window(&store);
+    type_in_window(&mut harness, "Water the plants");
+    click(&mut harness, "File into…");
+    assert!(shows(
+        &harness,
+        "No Areas yet. Click the + beside Areas on the left to make one."
+    ));
+    assert!(harness.query_all_by_label_contains("Tap").next().is_none());
+    Ok(())
+}

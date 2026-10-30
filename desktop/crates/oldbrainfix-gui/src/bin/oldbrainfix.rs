@@ -190,6 +190,8 @@ struct Shell {
     reader: Enricher,
     speech: SpeechModel,
     folder_wanted: Arc<AtomicBool>,
+    /// Raised by a click on the Nudge, for the window to show Unsorted.
+    unsorted_wanted: Arc<AtomicBool>,
     /// Raised by a click on the Changes Nudge, for the window to save the
     /// bundles.
     changes_wanted: Arc<AtomicBool>,
@@ -232,6 +234,7 @@ impl Shell {
         app.watch_changes(self.changes.clone());
         app.set_wake(self.events.clone());
         app.set_folder_wanted(self.folder_wanted.clone());
+        app.set_unsorted_wanted(self.unsorted_wanted.clone());
         app.set_changes_wanted(self.changes_wanted.clone());
         app.set_handed_files(self.handed.clone());
         app.set_autostart(self.autostart.clone());
@@ -463,11 +466,13 @@ fn run() -> Result<i32, String> {
     // The alarm layer, on its own thread for as long as the app runs.
     let (events_tx, events_rx) = std::sync::mpsc::channel::<Event>();
     let changes = Arc::new(AtomicU64::new(0));
+    let unsorted_wanted = Arc::new(AtomicBool::new(false));
     let changes_wanted = Arc::new(AtomicBool::new(false));
     {
         let store = store.clone();
         let notifier = DesktopNotifier::new(events_tx.clone());
         let mut alerts = Alerts::new(Box::new(notifier), t, changes.clone());
+        alerts.set_unsorted_wanted(unsorted_wanted.clone());
         alerts.set_changes_wanted(changes_wanted.clone());
         alerts.set_ringer(Box::new(SpeakerRinger::new()));
         let open = command_tx.clone();
@@ -665,6 +670,7 @@ fn run() -> Result<i32, String> {
         reader,
         speech,
         folder_wanted,
+        unsorted_wanted,
         changes_wanted,
         handed,
     };

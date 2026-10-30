@@ -3,9 +3,11 @@
 //! up on another of the user's Devices, the backup key belonging to the
 //! Profile; saves the Recovery Sheet, picks the folder, switches the
 //! weekly Backup and writes one now; and the first start's view that
-//! asks whether the user is new, adds a Device of their own or restores
-//! a Backup into the empty log with the passphrase or the recovery key.
+//! asks whether the user is new, then offers the Starter Set, adds a
+//! Device of their own or restores a Backup into the empty log with the
+//! passphrase or the recovery key.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use egui::{Id, RichText, TextEdit, Ui};
@@ -227,8 +229,10 @@ pub fn sheet(t: &L10n, store: &Store, wall: &Wall) -> Option<Vec<u8>> {
 /// What the user asked for on the first start's view.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WelcomeAction {
-    /// New to Old Brain Fix: start with an empty log.
+    /// New to Old Brain Fix: the Starter Set shows.
     New,
+    /// Plant what is left ticked of the Starter Set and start.
+    Plant,
     /// Add a Device of one's own: pair with it and sync.
     AddDevice,
     /// Choose the Backup file with the system's dialog.
@@ -241,11 +245,13 @@ pub enum WelcomeAction {
     Back,
 }
 
-/// The first start's view: the three choices, or adding a Device of
-/// one's own, or the Backup file chosen, with its header, and what was
-/// typed to open it.
+/// The first start's view: the three choices, or the Starter Set for
+/// someone new, or adding a Device of one's own, or the Backup file
+/// chosen, with its header, and what was typed to open it.
 #[derive(Debug, Clone, Default)]
 pub struct Welcome {
+    /// The Starter Set's slugs ticked, while it shows.
+    pub starter: Option<BTreeSet<String>>,
     /// Whether a Device of one's own is being added.
     pub adding: bool,
     pub file: Option<(PathBuf, Header)>,
@@ -259,7 +265,7 @@ pub struct Welcome {
 impl Welcome {
     /// Whether the view shows the three choices.
     pub fn choosing(&self) -> bool {
-        !self.adding && self.file.is_none()
+        self.starter.is_none() && !self.adding && self.file.is_none()
     }
 }
 
@@ -285,6 +291,10 @@ pub fn welcome(
     state: &mut Welcome,
     actions: &mut Vec<WelcomeAction>,
 ) {
+    if let Some(picked) = &mut state.starter {
+        crate::starter_set_view::starter_set(ui, t, picked, actions);
+        return;
+    }
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let Some((_, header)) = &state.file else {

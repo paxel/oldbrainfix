@@ -67,10 +67,10 @@
   "cliFailed": "Die Notiz ließ sich nicht behalten: {detail}",
   "speechModelIntro": "Sprachnotizen bekommen ein Transkript, das du lesen und durchsuchen kannst. Whisper schreibt es auf diesem Computer, auf Deutsch oder Englisch, mit einem Sprachmodell, das es einmal braucht. Die Aufnahme bleibt immer erhalten.",
   "speechModelReady": "Das Sprachmodell ist bereit. Sprachnotizen werden auf diesem Computer transkribiert.",
-  "photosHint": "Eingefügter Text kommt ins Feld; ein eingefügtes Bild wird mit dem Getippten zu einer Fotonotiz.",
+  "photosHint": "Eingefügter Text kommt ins Feld; ein eingefügtes Bild wartet darunter und wird mit dem Getippten als Foto der Notiz gespeichert.",
   "fromFile": "Aus Datei…",
   "fromFileTitle": "Bilder oder Tondateien wählen",
-  "fromFileHint": "Hier gewählte oder auf das Fenster gezogene Bilder und Tondateien werden mit dem Getippten zu einer Notiz.",
+  "fromFileHint": "Hier gewählte oder auf das Fenster gezogene Bilder und Tondateien warten unter dem Feld und werden mit dem Getippten als eine Notiz gespeichert.",
   "fileRecordingFailed": "{count, plural, =1{Eine Aufnahme aus einer Datei kann nicht transkribiert werden.} other{Aufnahmen aus Dateien können nicht transkribiert werden.}}",
   "fileRecordingUnreadable": "In der Datei ist kein Ton zu finden: Sie ist keine Tondatei oder beschädigt.",
   "fileRecordingUnsupported": "Dieser Computer kann das Format der Datei nicht lesen.",
@@ -214,5 +214,10 @@
   "bundleNotSaved": "Das Paket wurde nicht gespeichert.",
   "bundleNotSavedTitle": "Paket nicht gespeichert",
   "syncHostFailedCause": "Dieser Computer konnte keine Synchronisierung anbieten.",
-  "syncHostFailedFix": "Nichts ging verloren; verlass diese Seite und öffne sie noch einmal."
+  "syncHostFailedFix": "Nichts ging verloren; verlass diese Seite und öffne sie noch einmal.",
+  "noAreasYet": "Noch keine Bereiche. Klicke links neben „Bereiche“ auf +, um einen anzulegen.",
+  "nothingToday": "Heute steht nichts an. Schreib einen Gedanken in das Feld oben, um ihn festzuhalten.",
+  "aboutTagline": "Einen Gedanken in Sekunden festhalten. Erinnert werden, bis er einsortiert oder erledigt ist.",
+  "conflictsIntro": "Zwei Geräte haben dasselbe geändert, bevor sie sich synchronisiert haben. Klicke auf die Fassung, die bleibt; bis dahin wird die neuere gezeigt.",
+  "sentItemHidden": "Was sie gesendet hat, bleibt verborgen, bis du auf „Zeigen“ klickst."
 }

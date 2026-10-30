@@ -306,6 +306,49 @@ fn the_nudge_waits_out_quiet_hours_and_alerts_off_shows_nothing() -> TestResult 
 }
 
 #[test]
+fn a_click_on_the_nudge_opens_unsorted_and_its_snoozes_do_not() -> TestResult {
+    let (store, clock) = store()?;
+    let record = RecordingNotifier::default();
+    let mut alerts = alerts(&record);
+    let wanted = Arc::new(AtomicBool::new(false));
+    alerts.set_unsorted_wanted(wanted.clone());
+    clock.set("2026-10-27T07:00:10.000Z")?;
+    alerts.tick(&store, &berlin)?;
+    let record_now = record.take();
+    let nudge = shown(&record_now)
+        .into_iter()
+        .find(|n| n.key == NUDGE_KEY)
+        .cloned()
+        .ok_or("the Nudge")?;
+    let ids: Vec<&str> = nudge.actions.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids, ["snooze10", "snooze30", "snooze60", OPEN]);
+    // A snooze waits without opening anything.
+    let at = clock.set("2026-10-27T07:01:00.000Z")?;
+    alerts.apply(
+        &store,
+        &Tap {
+            key: NUDGE_KEY.into(),
+            action: SNOOZE_10.into(),
+            at,
+        },
+    )?;
+    assert!(!wanted.load(Ordering::SeqCst));
+    assert!(!alerts.open_requested);
+    // The click opens the window on Unsorted.
+    alerts.apply(
+        &store,
+        &Tap {
+            key: NUDGE_KEY.into(),
+            action: OPEN.into(),
+            at,
+        },
+    )?;
+    assert!(wanted.load(Ordering::SeqCst));
+    assert!(alerts.open_requested);
+    Ok(())
+}
+
+#[test]
 fn what_was_missed_while_not_running_is_told_once() -> TestResult {
     let (store, clock) = store()?;
     let record = RecordingNotifier::default();

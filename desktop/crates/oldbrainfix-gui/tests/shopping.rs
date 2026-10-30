@@ -616,7 +616,7 @@ fn agenda(
 }
 
 /// The Agenda's message for a day with nothing due.
-const NOTHING_TODAY: &str = "Nothing due today. Tap + to capture a thought.";
+const NOTHING_TODAY: &str = "Nothing due today. Type a thought into the field above to capture it.";
 
 #[test]
 fn by_default_the_agenda_has_a_row_per_list_with_the_lines_back_today() -> TestResult {

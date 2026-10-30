@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/look.dart';
 import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/photo_views.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
@@ -113,6 +114,26 @@ void main() {
       findsOneWidget,
     );
   });
+
+  for (final brightness in Brightness.values) {
+    testWidgets('Photo, Voice, Gallery and Paste stand out from the '
+        '$brightness ground (ratio >= 3)', (tester) async {
+      store.themeChoice = brightness == Brightness.dark
+          ? ThemeChoice.dark
+          : ThemeChoice.light;
+      await openCapture(tester);
+      final tones = LookTones.of(brightness);
+      for (final button in [photo, mic, gallery, paste]) {
+        final fill = tester
+            .widget<Material>(
+              find.descendant(of: button, matching: find.byType(Material)),
+            )
+            .color!;
+        expect(contrast(fill, tones.background), greaterThanOrEqualTo(3));
+        expect(contrast(fill, tones.mark), greaterThanOrEqualTo(3));
+      }
+    });
+  }
 
   testWidgets('the top bar holds neither camera nor microphone', (
     tester,
@@ -339,4 +360,10 @@ void main() {
     await tap(tester, stop);
     expect(Notes(store).all().single.recordings, hasLength(1));
   });
+}
+
+/// WCAG contrast ratio of two colours.
+double contrast(Color a, Color b) {
+  final la = a.computeLuminance(), lb = b.computeLuminance();
+  return (la > lb ? la + 0.05 : lb + 0.05) / (la > lb ? lb + 0.05 : la + 0.05);
 }

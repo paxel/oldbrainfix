@@ -1216,13 +1216,15 @@ class _CaptureScreenState extends State<CaptureScreen> {
     );
   }
 
-  /// One big capture button: the icon above the label.
+  /// One big capture button: the icon above the label. In the theme's
+  /// full accent, as the "+": a pale tonal fill melts into the light
+  /// teal ground (UI laws, "Look").
   Widget _captureButton({
     required Key key,
     required VoidCallback onPressed,
     required IconData icon,
     required String label,
-  }) => FilledButton.tonal(
+  }) => FilledButton(
     key: key,
     onPressed: onPressed,
     style: _bigButton,

@@ -11,7 +11,7 @@ Anything the user captured: text, a voice recording, a photo, or something share
 _Avoid_: entry (that is a Tally's), memo, item, card (a card is only how a Note is drawn; a Profile card is a person's)
 
 **Capture**:
-The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut, a hardware button, the desktop hotkey). Capturing never asks for sorting or unlocking.
+The act of creating a Note through one of the quick entry points (the "+" button, a widget, a tile, a shortcut (which the phone's own key or gesture settings or a button-mapper app can also start; the app reads no key itself), the desktop hotkey). Capturing never asks for sorting or unlocking.
 _Avoid_: quick add, record
 
 **Capture Context**:
