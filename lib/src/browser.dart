@@ -658,6 +658,7 @@ List<Widget> diaryCards(
           sections: () => sectionsOf(note),
           checklist: (read: () => checklistOf(note), lists: lists),
           shopping: (read: () => shoppingOf(note), lists: shopping),
+          onMark: markEdit(notes, placed, onChanged),
           // A full Note has nothing to unfold (#114).
           onTap: !compact || unfolded.contains(note.id) || onUnfold == null
               ? null

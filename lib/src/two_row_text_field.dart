@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
+import 'text_marks_view.dart';
 
 /// The offset of the grapheme boundary after [offset] in [text]; the end
 /// when there is none. An emoji or a letter with its accents is one step.
@@ -66,6 +68,11 @@ int wordEdgeNear(String text, int offset) {
 /// Both rows share [controller]; the top row stays the one with focus, so
 /// the keyboard's suggestions, autocorrect, swipe typing and voice input
 /// work as in any text field.
+///
+/// With [marks], in either form, a tap on a ☐, ✅ or ❌ at the start of a
+/// line opens Check, Fail and Open at the finger and changes it in the
+/// text, and the bottom row has a button that puts ☐ at the start of the
+/// cursor's line (ADR 0031); a [readOnly] field has neither.
 class TwoRowTextField extends StatefulWidget {
   /// The height of the bottom row.
   static const rowHeight = 56.0;
@@ -87,6 +94,7 @@ class TwoRowTextField extends StatefulWidget {
   final bool autofocus;
   final TextStyle? style;
   final InputDecoration decoration;
+  final bool marks;
 
   const TwoRowTextField({
     super.key,
@@ -96,6 +104,7 @@ class TwoRowTextField extends StatefulWidget {
     this.autofocus = false,
     this.style,
     this.decoration = const InputDecoration(),
+    this.marks = false,
   });
 
   @override
@@ -132,6 +141,9 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
 
   Timer? _repeat;
   Duration _repeatPause = TwoRowTextField.firstRepeat;
+
+  /// Where the finger last went down on the plain field, for its tap.
+  Offset? _down;
 
   @override
   void initState() {
@@ -354,6 +366,83 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
     }
   }
 
+  bool get _marks => widget.marks && !widget.readOnly;
+
+  /// Opens the menu of the status mark at [at] (global), if there is one
+  /// at the start of a line there; whether there was.
+  bool _tappedMark(Offset at) {
+    if (!_marks) return false;
+    final editable = _editable()?.renderEditable;
+    if (editable == null) return false;
+    final local = editable.globalToLocal(at);
+    for (final mark in TextMarks.find(widget.controller.text)) {
+      final boxes = editable.getBoxesForSelection(
+        TextSelection(baseOffset: mark.start, extentOffset: mark.end),
+      );
+      if (boxes.any((box) => box.toRect().inflate(4).contains(local))) {
+        unawaited(_changeMark(mark, at));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Changes [mark] to the state picked in its menu at [at]; the cursor
+  /// keeps its place in the text around it.
+  Future<void> _changeMark(MarkedLine mark, Offset at) async {
+    final to = await pickTextMark(context, at, mark.mark);
+    if (to == null || !mounted) return;
+    final value = widget.controller.value;
+    final text = value.text;
+    final swapped = TextMarks.swap(text, mark.line, to);
+    if (swapped == null) return;
+    // Typing while the menu was open cannot happen; a sync can.
+    final now = TextMarks.find(text).where((m) => m.line == mark.line);
+    final end = now.isEmpty ? mark.end : now.first.end;
+    _replace(value, swapped, end);
+  }
+
+  /// Puts ☐ at the start of the cursor's line, after its spaces, tabs
+  /// and bullet; the cursor stays on what it was at.
+  void _insertMark() {
+    final value = widget.controller.value;
+    final text = value.text;
+    final at = value.selection.isValid
+        ? value.selection.baseOffset
+        : text.length;
+    final next = TextMarks.insertOpen(text, TextMarks.lineAt(text, at));
+    if (next == null) return;
+    var from = 0;
+    while (from < text.length && text[from] == next[from]) {
+      from++;
+    }
+    _replace(value, next, from);
+  }
+
+  /// Writes [next] into the field as typing would, the selection's ends
+  /// at or after [from] moved by what the text grew.
+  void _replace(TextEditingValue value, String next, int from) {
+    final grew = next.length - value.text.length;
+    final selection = value.selection.isValid
+        ? value.selection
+        : TextSelection.collapsed(offset: value.text.length);
+    int moved(int offset) =>
+        (offset >= from ? offset + grew : offset).clamp(0, next.length);
+    final changed = TextEditingValue(
+      text: next,
+      selection: selection.copyWith(
+        baseOffset: moved(selection.baseOffset),
+        extentOffset: moved(selection.extentOffset),
+      ),
+    );
+    final editable = _editable();
+    if (editable == null) {
+      widget.controller.value = changed;
+      return;
+    }
+    editable.userUpdateTextEditingValue(changed, SelectionChangedCause.toolbar);
+  }
+
   /// The system's menu, with Delete added for a selection.
   Widget _menu(BuildContext context, EditableTextState editable) {
     final value = editable.textEditingValue;
@@ -381,7 +470,8 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
   @override
   Widget build(BuildContext context) {
     if (!widget.twoRows) {
-      return TextField(
+      final field = TextField(
+        key: _field,
         controller: widget.controller,
         readOnly: widget.readOnly,
         autofocus: widget.autofocus,
@@ -389,6 +479,17 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
         textCapitalization: TextCapitalization.sentences,
         style: widget.style,
         decoration: widget.decoration,
+        onTap: _marks
+            ? () {
+                if (_down case final at?) _tappedMark(at);
+              }
+            : null,
+      );
+      if (!_marks) return field;
+      // The field tells its tap, not where it was.
+      return Listener(
+        onPointerDown: (event) => _down = event.position,
+        child: field,
       );
     }
     final field = TextField(
@@ -464,6 +565,12 @@ class _TwoRowTextFieldState extends State<TwoRowTextField>
                     ),
                   ),
                 ),
+                if (_marks)
+                  _InsertMarkButton(
+                    key: const ValueKey('two-row-insert-mark'),
+                    label: t.textMarkInsert,
+                    onTap: _insertMark,
+                  ),
                 _StepButton(
                   key: const ValueKey('two-row-forward'),
                   icon: Icons.arrow_right,
@@ -491,6 +598,8 @@ class _TopRowGestures extends TextSelectionGestureDetectorBuilder {
 
   @override
   void onSingleTapUp(TapDragUpDetails details) {
+    // A status mark opens its menu; the cursor stays where it was.
+    if (_field._tappedMark(details.globalPosition)) return;
     super.onSingleTapUp(details);
     _field._tapped();
   }
@@ -600,6 +709,40 @@ class _StepButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The button that puts ☐ at the start of the cursor's line; it never
+/// takes the focus.
+class _InsertMarkButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _InsertMarkButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: label,
+    onTap: onTap,
+    excludeSemantics: true,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
+        width: 48,
+        height: double.infinity,
+        child: Icon(
+          Icons.check_box_outline_blank,
+          size: 28,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    ),
+  );
 }
 
 /// The text around the cursor on one line, the cursor in the middle and

@@ -2196,5 +2196,21 @@
   "shoppingRowOpen": "{list}: {count} open",
   "@shoppingRowOpen": {"description": "An Agenda row of a Shopping List: its title and how many of its Lines are not struck through, such as 'Groceries: 5 open'.", "placeholders": {"list": {"type": "String"}, "count": {"type": "int"}}},
   "maskedShoppingList": "Private Shopping List",
-  "@maskedShoppingList": {"description": "A Shopping List from a locked Area set to Masked, on the Agenda."}
+  "@maskedShoppingList": {"description": "A Shopping List from a locked Area set to Masked, on the Agenda."},
+  "textMarkCheck": "Check",
+  "@textMarkCheck": {"description": "Menu entry at a status mark at the start of a line of a Note's text: changes it to ✅."},
+  "textMarkFail": "Fail",
+  "@textMarkFail": {"description": "Menu entry at a status mark: changes it to ❌, failed or not to be done."},
+  "textMarkReopen": "Open",
+  "@textMarkReopen": {"description": "Menu entry at a status mark: changes it back to ☐, not done yet."},
+  "textMarkOpen": "Open",
+  "@textMarkOpen": {"description": "Screen reader label of a ☐ at the start of a line of a text: not done yet."},
+  "textMarkChecked": "Checked",
+  "@textMarkChecked": {"description": "Screen reader label of a ✅ at the start of a line of a text."},
+  "textMarkFailed": "Failed",
+  "@textMarkFailed": {"description": "Screen reader label of a ❌ at the start of a line of a text."},
+  "textMarkChange": "change the mark",
+  "@textMarkChange": {"description": "Screen reader hint of a status mark that can be tapped: it opens Check, Fail and Open."},
+  "textMarkInsert": "Put ☐ at the start of the line",
+  "@textMarkInsert": {"description": "Screen reader label of the button in the line above the keyboard that puts an open mark at the start of the cursor's line."}
 }

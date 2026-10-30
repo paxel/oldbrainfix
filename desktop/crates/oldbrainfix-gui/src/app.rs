@@ -77,7 +77,7 @@ use oldbrainfix_core::{
     Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
     PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
     Section, Sessions, ShoppingAgenda, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies,
-    Topic, UnitSystem, bundle,
+    TextMark, Topic, UnitSystem, bundle, text_marks,
 };
 
 use crate::about_view;
@@ -121,6 +121,7 @@ use crate::sync_view::{
 use crate::tally_view::{
     self, EntryForm, FieldForm, FormIntent, TallyAction, TallyForm, TallyLook, TallyShown,
 };
+use crate::text_marks_view::{self, MarkSpot};
 use crate::theme::{self, AREA_PALETTE, Tones};
 
 /// What the middle pane shows.
@@ -311,6 +312,10 @@ struct View {
     /// pass for the cards, each with whether this Device may check its
     /// Lines (#122).
     shopping_lists: BTreeMap<String, (ShoppingList, bool)>,
+    /// The Notes listed whose status marks this Device may change on
+    /// their cards (#125): its to change, not in the trash, in a format
+    /// known here.
+    marks: HashSet<String>,
     /// Whether the list shows its Notes compact, by their first line,
     /// as this Device keeps it for that list (#114).
     compact: bool,
@@ -737,6 +742,13 @@ enum Action {
     /// Something asked of a Shopping List, on a card or in the editor
     /// (#122).
     Shopping(ShoppingAction),
+    /// Changes the status mark at the start of the line `line` of the
+    /// Note's text to `to`, on a card (#125).
+    Mark {
+        note: String,
+        line: usize,
+        to: TextMark,
+    },
     /// Gives the Line the dialog renames its new text.
     RenameLine,
     /// Deletes the Line the dialog asks about.
@@ -2814,6 +2826,13 @@ impl App {
                 shopping_lists.insert(id, (list, checks));
             }
         }
+        let mut marks = HashSet::new();
+        for p in &placed {
+            let note = &p.note;
+            if !note.is_trashed() && note.text_editable && store.may_change(&note.id)? {
+                marks.insert(note.id.clone());
+            }
+        }
         let is_area = matches!(&self.selection, Selection::Place(id) if areas.iter().any(|(a, _)| a.id == *id));
         let compact = match cards_key(&self.selection, &self.people, is_area) {
             Some(key) => {
@@ -3134,6 +3153,7 @@ impl App {
             sections,
             checklists,
             shopping_lists,
+            marks,
             compact,
             detail,
             capture_spawns: capture_choices::may_spawn(
@@ -3639,6 +3659,7 @@ impl App {
             }
             Action::Checklist(asked) => self.checklist_action(asked)?,
             Action::Shopping(asked) => self.shopping_action(asked)?,
+            Action::Mark { note, line, to } => self.change_mark(&note, line, to)?,
             Action::RenameLine => {
                 if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
                     && let Some(named) = checklist_view::renamed(&text)
@@ -4292,6 +4313,38 @@ impl App {
             }
         }
         if shown && let Some(now) = Notes::new(&self.store).by_id(note)? {
+            self.text = now.text;
+        }
+        Ok(())
+    }
+
+    /// Changes the status mark of the line `line` of the Note `note`'s
+    /// text to `to` (#125, ADR 0031), an edit of its text like any other,
+    /// where this Device may change it as it is stored now. On the Note
+    /// shown, what is typed into its text goes in first, and the field
+    /// then holds the text it has now.
+    fn change_mark(
+        &mut self,
+        note: &str,
+        line: usize,
+        to: TextMark,
+    ) -> oldbrainfix_core::Result<()> {
+        let shown = self.text_of.as_deref() == Some(note);
+        if shown {
+            self.save_text()?;
+        }
+        let notes = Notes::new(&self.store);
+        let Some(now) = notes.by_id(note)? else {
+            return Ok(());
+        };
+        if now.is_trashed() || !now.text_editable || !self.store.may_change(note)? {
+            return Ok(());
+        }
+        let Some(swapped) = text_marks::swap(&now.text, line, to) else {
+            return Ok(());
+        };
+        notes.edit(note, &swapped)?;
+        if shown && let Some(now) = notes.by_id(note)? {
             self.text = now.text;
         }
         Ok(())
@@ -5599,6 +5652,7 @@ impl App {
                         checklist: self.view.checklists.get(id).map(|(l, c)| (l, *c)),
                         shopping: self.view.shopping_lists.get(id).map(|(l, c)| (l, *c)),
                         menu: self.card_menu.as_ref(),
+                        marks: self.view.marks.contains(id),
                     };
                     let clicks = note_card(
                         ui,
@@ -5617,6 +5671,9 @@ impl App {
                     }
                     if let Some(picked) = clicks.picked {
                         actions.push(picked);
+                    } else if let Some((line, to)) = clicks.mark {
+                        let note = id.clone();
+                        actions.push(Action::Mark { note, line, to });
                     } else if let Some((line, checked)) = clicks.check {
                         if self.view.shopping_lists.contains_key(id) {
                             actions.push(Action::Shopping(ShoppingAction::Check(line, checked)));
@@ -5807,7 +5864,22 @@ impl App {
                         ui.label(RichText::new(t.text_newer_format()).color(weak));
                     }
                     if trashed || !may.changes || !note.text_editable {
-                        ui.label(RichText::new(&note.text).size(18.0).color(text));
+                        // Its marks show, to read (#125).
+                        let all = (0, note.text.len());
+                        let spots = text_marks_view::marked_label(
+                            ui,
+                            &note.text,
+                            all,
+                            (Some(18.0), text),
+                            false,
+                        );
+                        text_marks_view::mark_clicks(
+                            ui,
+                            &t,
+                            Id::new(("text", &note.id)),
+                            &spots,
+                            false,
+                        );
                         return;
                     }
                     let id = Id::new("note text");
@@ -5816,25 +5888,47 @@ impl App {
                     {
                         actions.push(Action::SaveText);
                     }
-                    let field = ui.add(
-                        TextEdit::multiline(edited)
-                            .id(id)
-                            .text_color(text)
-                            .font(FontId::proportional(18.0))
-                            .desired_rows(1)
-                            .desired_width(f32::INFINITY)
-                            .frame(Frame::NONE),
+                    let output = TextEdit::multiline(edited)
+                        .id(id)
+                        .text_color(text)
+                        .font(FontId::proportional(18.0))
+                        .desired_rows(1)
+                        .desired_width(f32::INFINITY)
+                        .frame(Frame::NONE)
+                        .show(ui);
+                    if output.response.response.lost_focus() {
+                        actions.push(Action::SaveText);
+                    }
+                    // A click on a mark at the start of a line changes it in
+                    // the field, saved at once (#125).
+                    let typed = output.galley.text();
+                    let spots = text_marks_view::spots(
+                        &output.galley,
+                        output.galley_pos,
+                        typed,
+                        (0, typed.len()),
                     );
-                    if field.lost_focus() {
-                        actions.push(Action::SaveText);
-                    }
-                    let changed = edited.trim();
-                    if !changed.is_empty()
-                        && changed != note.text
-                        && ui.button(RichText::new(t.save()).color(text)).clicked()
+                    let marked = Id::new(("field", &note.id));
+                    if let Some((line, to)) =
+                        text_marks_view::mark_clicks(ui, &t, marked, &spots, true)
+                        && let Some(swapped) = text_marks::swap(edited, line, to)
                     {
+                        *edited = swapped;
                         actions.push(Action::SaveText);
                     }
+                    ui.horizontal(|ui| {
+                        let insert = RichText::new(t.text_mark_insert()).color(text);
+                        if ui.button(insert).clicked() {
+                            insert_open_mark(ui, id, edited);
+                        }
+                        let changed = edited.trim();
+                        if !changed.is_empty()
+                            && changed != note.text
+                            && ui.button(RichText::new(t.save()).color(text)).clicked()
+                        {
+                            actions.push(Action::SaveText);
+                        }
+                    });
                 });
                 // Under the text field, as the Lines are under the text on
                 // a card; nothing while the Note is no Checklist.
@@ -5944,7 +6038,14 @@ impl App {
                             ui.label(RichText::new(t.text_newer_format()).color(weak));
                         }
                         if !section.text.is_empty() {
-                            ui.label(RichText::new(&section.text).color(text));
+                            // Its marks show; a Section's text has no edit
+                            // (ADR 0031).
+                            let all = (0, section.text.len());
+                            let shown = (None, text);
+                            let spots =
+                                text_marks_view::marked_label(ui, &section.text, all, shown, false);
+                            let of = Id::new(("text", &section.id));
+                            text_marks_view::mark_clicks(ui, &t, of, &spots, false);
                         }
                         let media = Media {
                             id: &section.id,
@@ -9503,6 +9604,9 @@ struct CardLook<'a> {
     checklist: Option<(&'a Checklist, bool)>,
     shopping: Option<(&'a ShoppingList, bool)>,
     menu: Option<&'a CardMenu>,
+    /// Whether this Device may change the status marks of its text
+    /// (#125).
+    marks: bool,
 }
 
 /// What can be clicked on a card: the card, the author's picture on
@@ -9515,6 +9619,9 @@ struct CardClicks {
     edit: egui::Response,
     photo: Option<String>,
     check: Option<(String, bool)>,
+    /// The line of the Note's text whose status mark was changed and to
+    /// what (#125).
+    mark: Option<(usize, TextMark)>,
     menu_opened: bool,
     picked: Option<Action>,
 }
@@ -9583,6 +9690,39 @@ impl<'a> Part<'a> {
     }
 }
 
+/// Puts "☐ " at the start of the line of the text field `id` its cursor
+/// is on, after its spaces, tabs and bullet (#125, ADR 0031), and moves
+/// the cursor with the text after it; nothing on a line with a mark.
+/// The field then has the keyboard again, to type on.
+fn insert_open_mark(ui: &Ui, id: Id, edited: &mut String) {
+    let mut state = egui::widgets::text_edit::TextEditState::load(ui.ctx(), id).unwrap_or_default();
+    // A field never typed into has its cursor at the start.
+    let cursor = state
+        .cursor
+        .char_range()
+        .map_or(0, |range| range.primary.index.0);
+    let byte = edited
+        .char_indices()
+        .nth(cursor)
+        .map_or(edited.len(), |(b, _)| b);
+    let Some(inserted) = text_marks::insert_open(edited, text_marks::line_at(edited, byte)) else {
+        return;
+    };
+    let at = edited
+        .chars()
+        .zip(inserted.chars())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let moved = if cursor >= at { cursor + 2 } else { cursor };
+    *edited = inserted;
+    let cursor = egui::text::CCursor::new(moved);
+    state
+        .cursor
+        .set_char_range(Some(egui::text::CCursorRange::one(cursor)));
+    state.store(ui.ctx(), id);
+    ui.memory_mut(|m| m.request_focus(id));
+}
+
 /// The text, photos and recordings of a Note or Section in full on a
 /// card (#114), with their Transcripts and Photo Texts; the photos shown
 /// with where they lie.
@@ -9591,11 +9731,9 @@ fn whole(
     t: &L10n,
     part: Part,
     (cache, store, transcribing): ShownMedia,
+    marks: &mut Vec<MarkSpot>,
 ) -> Vec<(String, egui::Rect)> {
-    if !part.text.is_empty() {
-        let text = ui.visuals().text_color();
-        ui.label(RichText::new(part.text).size(16.0).color(text));
-    }
+    card_text(ui, part.text, marks);
     media_view::whole_media(
         ui,
         t,
@@ -9604,6 +9742,22 @@ fn whole(
         part.recordings,
         transcribing,
     )
+}
+
+/// The whole text `text` of a Note or Section on a full card, where its
+/// status marks lie added to `marks` (#125).
+fn card_text(ui: &mut Ui, text: &str, marks: &mut Vec<MarkSpot>) {
+    if !text.is_empty() {
+        let colour = ui.visuals().text_color();
+        let shown = (0, text.len());
+        marks.extend(text_marks_view::marked_label(
+            ui,
+            text,
+            shown,
+            (Some(16.0), colour),
+            false,
+        ));
+    }
 }
 
 /// The photo cache, the store the photos are read from and the
@@ -9642,10 +9796,12 @@ fn note_card(
     let mut author_rect = None;
     let mut edit_rect = egui::Rect::NOTHING;
     let mut more_rect = None;
-    // The photos shown in full, where they lie, and the checkboxes of
-    // its Lines.
+    // The photos shown in full, where they lie, the checkboxes of its
+    // Lines and the status marks of its text and of its Sections'.
     let mut shown = Vec::new();
     let mut boxes = Vec::new();
+    let mut marks = Vec::new();
+    let mut section_marks: Vec<(&str, Vec<MarkSpot>)> = Vec::new();
     let CardMedia {
         photos,
         pictures,
@@ -9747,10 +9903,7 @@ fn note_card(
                     };
                     if let Some(lines) = lines {
                         // Its Lines right under its text.
-                        if !part.text.is_empty() {
-                            let text = ui.visuals().text_color();
-                            ui.label(RichText::new(part.text).size(16.0).color(text));
-                        }
+                        card_text(ui, part.text, &mut marks);
                         boxes = checklist_view::card_lines(ui, tones, &lines);
                         shown.extend(media_view::whole_media(
                             ui,
@@ -9761,20 +9914,25 @@ fn note_card(
                             transcribing,
                         ));
                     } else {
-                        shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
+                        let media = (&mut *photos, store, transcribing);
+                        shown.extend(whole(ui, t, part, media, &mut marks));
                     }
                     for section in look.sections {
                         ui.separator();
                         capture_context(ui, t, section.captured, &section.context);
                         let part = Part::of_section(section);
-                        shown.extend(whole(ui, t, part, (&mut *photos, store, transcribing)));
+                        let mut spots = Vec::new();
+                        let media = (&mut *photos, store, transcribing);
+                        shown.extend(whole(ui, t, part, media, &mut spots));
+                        section_marks.push((section.id.as_str(), spots));
                     }
                 });
                 return;
             }
             // A photo Note may have no words.
-            if let Some(first) = note.text.trim().lines().next() {
-                ui.add(egui::Label::new(RichText::new(first).size(16.0).color(text)).truncate());
+            if let Some(line) = first_line(&note.text) {
+                let shown = (Some(16.0), text);
+                marks = text_marks_view::marked_label(ui, &note.text, line, shown, true);
             }
             if let Some((list, _)) = look.checklist {
                 checklist_view::card_count(ui, t, list);
@@ -9908,15 +10066,31 @@ fn note_card(
     let checks = look.checklist.is_some_and(|(_, checks)| checks)
         || look.shopping.is_some_and(|(_, checks)| checks);
     let check = checklist_view::card_checks(ui, tones, &note.id, &boxes, checks);
+    // Sections have no edit of their text: their marks only show.
+    let mark = text_marks_view::mark_clicks(ui, t, Id::new(("card", &note.id)), &marks, look.marks);
+    for (id, spots) in &section_marks {
+        text_marks_view::mark_clicks(ui, t, Id::new(("card", *id)), spots, false);
+    }
     CardClicks {
         card: resp.on_hover_cursor(egui::CursorIcon::PointingHand),
         author,
         edit: edit.on_hover_text(t.edit()),
         photo,
         check,
+        mark,
         menu_opened,
         picked,
     }
+}
+
+/// Where the first line of `text` that a compact card shows lies in it,
+/// in bytes: the text's first line with words, none for a text without
+/// any.
+fn first_line(text: &str) -> Option<(usize, usize)> {
+    let start = text.len() - text.trim_start().len();
+    let rest = text.get(start..)?;
+    let line = rest.trim_end().lines().next()?;
+    Some((start, start + line.len()))
 }
 
 #[cfg(test)]

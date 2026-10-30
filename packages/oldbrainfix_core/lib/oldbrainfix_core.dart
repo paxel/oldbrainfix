@@ -48,4 +48,5 @@ export 'src/sync.dart';
 export 'src/tallies.dart';
 export 'src/tally_units.dart';
 export 'src/text_format.dart';
+export 'src/text_marks.dart';
 export 'src/transcript_prompts.dart';

@@ -4109,4 +4109,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get maskedShoppingList => 'Private Shopping List';
+
+  @override
+  String get textMarkCheck => 'Check';
+
+  @override
+  String get textMarkFail => 'Fail';
+
+  @override
+  String get textMarkReopen => 'Open';
+
+  @override
+  String get textMarkOpen => 'Open';
+
+  @override
+  String get textMarkChecked => 'Checked';
+
+  @override
+  String get textMarkFailed => 'Failed';
+
+  @override
+  String get textMarkChange => 'change the mark';
+
+  @override
+  String get textMarkInsert => 'Put ☐ at the start of the line';
 }

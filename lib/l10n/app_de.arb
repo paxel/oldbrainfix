@@ -1111,5 +1111,13 @@
   "shoppingAgendaOff": "Gar nicht",
   "shoppingRowBack": "{list}: {count} wieder da",
   "shoppingRowOpen": "{list}: {count} offen",
-  "maskedShoppingList": "Private Einkaufsliste"
+  "maskedShoppingList": "Private Einkaufsliste",
+  "textMarkCheck": "Abhaken",
+  "textMarkFail": "Als gescheitert markieren",
+  "textMarkReopen": "Wieder öffnen",
+  "textMarkOpen": "Offen",
+  "textMarkChecked": "Abgehakt",
+  "textMarkFailed": "Gescheitert",
+  "textMarkChange": "Zeichen ändern",
+  "textMarkInsert": "☐ an den Anfang der Zeile setzen"
 }

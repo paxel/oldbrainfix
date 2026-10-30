@@ -4314,6 +4314,61 @@ fn transcripts_are_guarded_as_the_dart_core_guards_them() -> TestResult {
     Ok(())
 }
 
+// --------------------------------------------------------- Status marks
+
+#[test]
+fn status_marks_are_found_and_changed_as_the_dart_core_does() -> TestResult {
+    use oldbrainfix_core::TextMark;
+    use oldbrainfix_core::checklists::split_lines;
+    use oldbrainfix_core::text_marks::{find, insert_open, line_at, swap};
+    let fixture = read_json(&fixtures().join("text_marks.json"))?;
+    let cases = fixture["cases"].as_array().ok_or("cases")?;
+    assert!(cases.len() >= 10);
+    for case in cases {
+        let text = case["text"].as_str().ok_or("text")?;
+        let lines = split_lines(text).len();
+        let marks: Vec<Value> = find(text)
+            .iter()
+            .map(|m| {
+                json!({
+                    "line": m.line,
+                    "mark": m.mark.name(),
+                    "written": text.get(m.start..m.end),
+                })
+            })
+            .collect();
+        let swaps: Vec<Value> = (0..=lines)
+            .map(|line| {
+                let mut to = serde_json::Map::new();
+                for mark in TextMark::ALL {
+                    to.insert(mark.name().into(), json!(swap(text, line, mark)));
+                }
+                Value::Object(to)
+            })
+            .collect();
+        let inserts: Vec<Value> = (0..=lines)
+            .map(|line| json!(insert_open(text, line)))
+            .collect();
+        // Every offset at a character boundary, the end included: the
+        // generator's code points.
+        let at: Vec<usize> = text
+            .char_indices()
+            .map(|(i, _)| i)
+            .chain([text.len()])
+            .map(|i| line_at(text, i))
+            .collect();
+        let ours = json!({
+            "inserts": inserts,
+            "lineAt": at,
+            "marks": marks,
+            "swaps": swaps,
+            "text": text,
+        });
+        assert_eq!(&ours, case, "{text:?}");
+    }
+    Ok(())
+}
+
 // ------------------------------------------------------ Pending Changes
 
 #[test]

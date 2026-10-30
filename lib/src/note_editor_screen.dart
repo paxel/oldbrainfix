@@ -317,6 +317,34 @@ NoteActions noteActions(
   );
 }
 
+/// What a tap on a status mark of [placed]'s card changes (ADR 0031):
+/// the mark of that line of the Note's text as it is stored now, written
+/// as an edit of the text; null where this Device may not change the
+/// text (ADR 0013, ADR 0018), so the marks stay plain characters.
+/// [changed] runs after the edit.
+void Function(int line, TextMark to)? markEdit(
+  Notes notes,
+  PlacedNote placed,
+  VoidCallback changed,
+) {
+  if (!placed.changes || !placed.note.textEditable) return null;
+  final id = placed.note.id;
+  return (line, to) {
+    // A sync while the menu was open may have changed it.
+    final note = notes.byId(id);
+    if (note == null ||
+        !note.textEditable ||
+        !notes.store.mayChange(id) ||
+        note.isTrashed) {
+      return;
+    }
+    final swapped = TextMarks.swap(note.text, line, to);
+    if (swapped == null) return;
+    notes.edit(id, swapped);
+    changed();
+  };
+}
+
 /// Everything about one Note: its text, fixed in place and saved on
 /// leaving, its photos at full width, each opening full screen when
 /// tapped and with its Photo Text under it, a play button per voice
@@ -908,6 +936,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   controller: _text,
                   twoRows: _twoRows,
                   readOnly: !changes || !note.textEditable,
+                  // Its status marks change as its text (ADR 0031).
+                  marks: true,
                   style: Theme.of(context).textTheme.bodyLarge,
                   decoration: const InputDecoration(
                     filled: false,

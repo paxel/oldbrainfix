@@ -14,6 +14,7 @@ import 'place_names.dart';
 import 'profile.dart';
 import 'shopping_list_view.dart';
 import 'speech_platform.dart';
+import 'text_marks_view.dart';
 import 'voice_platform.dart';
 
 /// What a Note's card spawns from it: "Routine, Reminder, Frog or
@@ -249,6 +250,12 @@ class NoteCard extends StatelessWidget {
   /// how many are open on a compact one (#122); nothing when null.
   final NoteShoppingList? shopping;
 
+  /// Changes the status mark of a line of the Note's text to the state
+  /// picked (ADR 0031): each ☐, ✅ or ❌ at the start of a line opens Check,
+  /// Fail and Open at the finger; they are plain characters when null, as
+  /// in a Section's text, which has no edit.
+  final void Function(int line, TextMark to)? onMark;
+
   /// How much faded an unimportant card is drawn.
   static const unimportantOpacity = 0.55;
 
@@ -278,7 +285,19 @@ class NoteCard extends StatelessWidget {
     this.footer,
     this.checklist,
     this.shopping,
+    this.onMark,
   });
+
+  /// Where the first line with words of [text] starts and ends, without
+  /// the spaces around it, as a compact card shows it.
+  static (int, int) firstLine(String text) {
+    final start = text.length - text.trimLeft().length;
+    var end = start;
+    while (end < text.length && text[end] != '\n' && text[end] != '\r') {
+      end++;
+    }
+    return (start, start + text.substring(start, end).trimRight().length);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -426,17 +445,22 @@ class NoteCard extends StatelessWidget {
                         when: when,
                         sections: sections,
                         list: lists(true),
+                        onMark: onMark,
                       )
                     else ...[
                       // A photo Note may have no words.
                       if (note.text.isNotEmpty)
-                        Text(
-                          note.text.trim().split('\n').first,
-                          key: const ValueKey('note-first-line'),
-                          style: text.bodyLarge,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        if (firstLine(note.text) case (final start, final end))
+                          MarkedText(
+                            note.text,
+                            key: const ValueKey('note-first-line'),
+                            start: start,
+                            end: end,
+                            style: text.bodyLarge,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            onMark: onMark,
+                          ),
                       ?lists(false),
                       if (note.photos.isNotEmpty) ...[
                         if (note.text.isNotEmpty) const SizedBox(height: 8),
@@ -934,11 +958,15 @@ class _FullNote extends StatefulWidget {
   /// The Note's Checklist, under its text.
   final Widget? list;
 
+  /// Changes a status mark of the Note's text; never one of a Section's.
+  final void Function(int line, TextMark to)? onMark;
+
   const _FullNote({
     required this.note,
     required this.when,
     this.sections,
     this.list,
+    this.onMark,
   });
 
   @override
@@ -982,6 +1010,7 @@ class _FullNoteState extends State<_FullNote> {
           transcripts: note.transcripts,
           removedRecordings: note.removedRecordings,
           list: widget.list,
+          onMark: widget.onMark,
         ),
         for (final section in _sections)
           Column(
@@ -1026,6 +1055,9 @@ class _Whole extends StatelessWidget {
   /// A Checklist's Lines, right under the text.
   final Widget? list;
 
+  /// Changes a status mark of the text; plain characters when null.
+  final void Function(int line, TextMark to)? onMark;
+
   const _Whole({
     required this.id,
     required this.text,
@@ -1036,6 +1068,7 @@ class _Whole extends StatelessWidget {
     required this.transcripts,
     required this.removedRecordings,
     this.list,
+    this.onMark,
   });
 
   @override
@@ -1044,13 +1077,14 @@ class _Whole extends StatelessWidget {
     final list = this.list;
     final parts = <Widget>[
       // A photo Note may have no words.
-      if (text.isNotEmpty && list == null) Text(text, style: style),
+      if (text.isNotEmpty && list == null)
+        MarkedText(text, style: style, onMark: onMark),
       // It keeps its own space: it is nothing on a Note that is none.
       if (list != null)
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (text.isNotEmpty) Text(text, style: style),
+            if (text.isNotEmpty) MarkedText(text, style: style, onMark: onMark),
             list,
           ],
         ),

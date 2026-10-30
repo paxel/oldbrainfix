@@ -6715,6 +6715,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Private Shopping List'**
   String get maskedShoppingList;
+
+  /// Menu entry at a status mark at the start of a line of a Note's text: changes it to ✅.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get textMarkCheck;
+
+  /// Menu entry at a status mark: changes it to ❌, failed or not to be done.
+  ///
+  /// In en, this message translates to:
+  /// **'Fail'**
+  String get textMarkFail;
+
+  /// Menu entry at a status mark: changes it back to ☐, not done yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get textMarkReopen;
+
+  /// Screen reader label of a ☐ at the start of a line of a text: not done yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get textMarkOpen;
+
+  /// Screen reader label of a ✅ at the start of a line of a text.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked'**
+  String get textMarkChecked;
+
+  /// Screen reader label of a ❌ at the start of a line of a text.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get textMarkFailed;
+
+  /// Screen reader hint of a status mark that can be tapped: it opens Check, Fail and Open.
+  ///
+  /// In en, this message translates to:
+  /// **'change the mark'**
+  String get textMarkChange;
+
+  /// Screen reader label of the button in the line above the keyboard that puts an open mark at the start of the cursor's line.
+  ///
+  /// In en, this message translates to:
+  /// **'Put ☐ at the start of the line'**
+  String get textMarkInsert;
 }
 
 class _AppLocalizationsDelegate

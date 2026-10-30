@@ -50,6 +50,7 @@ pub mod shopping_view;
 pub mod speech;
 pub mod sync_view;
 pub mod tally_view;
+pub mod text_marks_view;
 pub mod theme;
 pub mod tray;
 

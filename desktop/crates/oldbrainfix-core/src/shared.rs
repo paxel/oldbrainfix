@@ -1225,6 +1225,43 @@ mod tests {
     }
 
     #[test]
+    fn a_member_changes_the_status_marks_of_their_own_notes_only() -> TestResult {
+        use crate::text_marks::{TextMark, swap};
+        let ann = device(1)?;
+        let ben = device(2)?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let milk = Notes::new(&ann).capture("Buy milk\n☐ oat", Some(&house.id), None)?;
+        let area = ann.share(&house.id)?;
+        let invite = Invite {
+            area: area.clone(),
+            role: AreaRole::Member,
+        };
+        let request = sync_request_as(
+            &ben,
+            &ann.version_vector()?,
+            "P",
+            &ann.device_id()?,
+            "",
+            Joining::Invited,
+        )?;
+        let (answer, _) =
+            answer_sync_inviting(&ann, &request, "D", Some(&invite))?.ok_or("an answer")?;
+        apply_answer_as(&ben, &answer, true, None)?;
+        let own = Notes::new(&ben).capture("Bread\n☐ rye", Some(&area), None)?;
+        assert!(!ben.may_change(&milk.id)?);
+        for (id, text) in [(&milk.id, &milk.text), (&own.id, &own.text)] {
+            let swapped = swap(text, 1, TextMark::Checked).ok_or("a mark")?;
+            Notes::new(&ben).edit(id, &swapped)?;
+        }
+        let text = |id: &str| -> Result<Option<String>> {
+            Ok(Notes::new(&ben).by_id(id)?.map(|n| n.text))
+        };
+        assert_eq!(text(&milk.id)?, Some("Buy milk\n☐ oat".into()));
+        assert_eq!(text(&own.id)?, Some("Bread\n✅ rye".into()));
+        Ok(())
+    }
+
+    #[test]
     fn an_own_device_is_not_invited() -> TestResult {
         let ann = device(1)?;
         let laptop = device(3)?;

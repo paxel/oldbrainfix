@@ -5153,6 +5153,69 @@ String _shownName(Map<String, String> starters, String? slug, String name) {
   return starters[slug] ?? name;
 }
 
+/// Status marks in texts (ADR 0031): for each text the marks found,
+/// each as written, every line's mark swapped to each state, ☐ put at
+/// the start of every line, one line past the last among them, and the
+/// line of every offset counted in code points, so that the cores'
+/// UTF-16 and UTF-8 offsets compare.
+Map<String, Object?> _textMarks() {
+  const texts = [
+    '',
+    '☐ Buy milk',
+    'Release notes\n✅ v2 supported at customer\n❌ v1\n☐ v3',
+    'v2 supported at customer: ✅\nx ❌ y',
+    '  ☐ indented\n\t✅ tabbed\n \t ❌ mixed',
+    '- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n'
+        '1. ☐ numbered\n> ☐ quoted',
+    '✅️ with selector\n❌︎ text style\n☐️️ two\n'
+        '️☐ selector first',
+    '✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n✅done',
+    'line\r\n☐ crlf\r❌ cr\n\n✅\r\n',
+    '😀 ☐ after an emoji\n🧠\n☐ after an astral line\ntrailing\n',
+    '☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom',
+    '- \n-\n   \n☐\n✅\n❌',
+    'Ünïcode ☐\n  - ✅ Straße\n\t* ☐ 👩‍👧 Familie',
+  ];
+  return {
+    'cases': [for (final text in texts) _textMarksOf(text)],
+  };
+}
+
+/// What [_textMarks] holds for the text [text].
+Map<String, Object?> _textMarksOf(String text) {
+  final lines = splitLines(text).length;
+  final points = text.runes.length;
+  return {
+    'text': text,
+    'marks': [
+      for (final m in TextMarks.find(text))
+        {
+          'line': m.line,
+          'mark': m.mark.name,
+          'written': text.substring(m.start, m.end),
+        },
+    ],
+    'swaps': [
+      for (var line = 0; line <= lines; line++)
+        {
+          for (final to in TextMark.values)
+            to.name: TextMarks.swap(text, line, to),
+        },
+    ],
+    'inserts': [
+      for (var line = 0; line <= lines; line++)
+        TextMarks.insertOpen(text, line),
+    ],
+    'lineAt': [
+      for (var point = 0; point <= points; point++)
+        TextMarks.lineAt(
+          text,
+          String.fromCharCodes(text.runes.take(point)).length,
+        ),
+    ],
+  };
+}
+
 /// The lead-ins Whisper gets: name lists as given, and three stores,
 /// each seen in English and German: one with the Starter Set, one with
 /// names too long to all fit, one with more names than are listed. Then
@@ -5744,6 +5807,14 @@ Future<void> main(List<String> args) async {
     'list, the app\'s words, the whole German prompt; one, two and three '
     'names alone and amid speech, names of several words, and real '
     'speech naming a place, kept as it is.\n'
+    '- `text_marks.json`: status marks in texts: for each text the marks '
+    'found at the start of its lines, each as written, after spaces, tabs '
+    'and a list item\'s bullet, and those that are none, in the middle of '
+    'a line, after a numbered item, joined into another emoji or another '
+    'box or tick; every line\'s mark swapped to each state, ☐ put at the '
+    'start of every line, one past the last among them, and the line of '
+    'every offset, counted in code points; with variation selectors, '
+    'astral characters and line breaks of every kind.\n'
     '- `folder/`: two Devices that met once, so the joiner holds the '
     'host\'s keys; the host wrote more since, a new Area among it, and '
     'synced through the shared folder: both logs with their blobs and the '
@@ -5904,6 +5975,10 @@ Future<void> main(List<String> args) async {
   _write(
     File('${root.path}/transcript_prompts.json'),
     '${_json.convert(_transcriptPrompts())}\n',
+  );
+  _write(
+    File('${root.path}/text_marks.json'),
+    '${_json.convert(_textMarks())}\n',
   );
   _sync(root);
   _conflictsFixture(root);

@@ -1,0 +1,1132 @@
+{
+  "cases": [
+    {
+      "text": "",
+      "marks": [],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ ",
+        null
+      ],
+      "lineAt": [
+        0
+      ]
+    },
+    {
+      "text": "☐ Buy milk",
+      "marks": [
+        {
+          "line": 0,
+          "mark": "open",
+          "written": "☐"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": "✅ Buy milk",
+          "failed": "❌ Buy milk"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "Release notes\n✅ v2 supported at customer\n❌ v1\n☐ v3",
+      "marks": [
+        {
+          "line": 1,
+          "mark": "checked",
+          "written": "✅"
+        },
+        {
+          "line": 2,
+          "mark": "failed",
+          "written": "❌"
+        },
+        {
+          "line": 3,
+          "mark": "open",
+          "written": "☐"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": "Release notes\n☐ v2 supported at customer\n❌ v1\n☐ v3",
+          "checked": null,
+          "failed": "Release notes\n❌ v2 supported at customer\n❌ v1\n☐ v3"
+        },
+        {
+          "open": "Release notes\n✅ v2 supported at customer\n☐ v1\n☐ v3",
+          "checked": "Release notes\n✅ v2 supported at customer\n✅ v1\n☐ v3",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "Release notes\n✅ v2 supported at customer\n❌ v1\n✅ v3",
+          "failed": "Release notes\n✅ v2 supported at customer\n❌ v1\n❌ v3"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ Release notes\n✅ v2 supported at customer\n❌ v1\n☐ v3",
+        null,
+        null,
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "text": "v2 supported at customer: ✅\nx ❌ y",
+      "marks": [],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ v2 supported at customer: ✅\nx ❌ y",
+        "v2 supported at customer: ✅\n☐ x ❌ y",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "text": "  ☐ indented\n\t✅ tabbed\n \t ❌ mixed",
+      "marks": [
+        {
+          "line": 0,
+          "mark": "open",
+          "written": "☐"
+        },
+        {
+          "line": 1,
+          "mark": "checked",
+          "written": "✅"
+        },
+        {
+          "line": 2,
+          "mark": "failed",
+          "written": "❌"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": "  ✅ indented\n\t✅ tabbed\n \t ❌ mixed",
+          "failed": "  ❌ indented\n\t✅ tabbed\n \t ❌ mixed"
+        },
+        {
+          "open": "  ☐ indented\n\t☐ tabbed\n \t ❌ mixed",
+          "checked": null,
+          "failed": "  ☐ indented\n\t❌ tabbed\n \t ❌ mixed"
+        },
+        {
+          "open": "  ☐ indented\n\t✅ tabbed\n \t ☐ mixed",
+          "checked": "  ☐ indented\n\t✅ tabbed\n \t ✅ mixed",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    {
+      "text": "- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+      "marks": [
+        {
+          "line": 0,
+          "mark": "open",
+          "written": "☐"
+        },
+        {
+          "line": 1,
+          "mark": "checked",
+          "written": "✅"
+        },
+        {
+          "line": 2,
+          "mark": "failed",
+          "written": "❌"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": "- ✅ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+          "failed": "- ❌ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted"
+        },
+        {
+          "open": "- ☐ list item\n* ☐ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+          "checked": null,
+          "failed": "- ☐ list item\n* ❌ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted"
+        },
+        {
+          "open": "- ☐ list item\n* ✅ star\n+\t☐ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+          "checked": "- ☐ list item\n* ✅ star\n+\t✅ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        null,
+        null,
+        null,
+        "- ☐ list item\n* ✅ star\n+\t❌ plus\n☐ -☐ no space\n- - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+        "- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- ☐ - ☐ twice\n1. ☐ numbered\n> ☐ quoted",
+        "- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n☐ 1. ☐ numbered\n> ☐ quoted",
+        "- ☐ list item\n* ✅ star\n+\t❌ plus\n-☐ no space\n- - ☐ twice\n1. ☐ numbered\n☐ > ☐ quoted",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "text": "✅️ with selector\n❌︎ text style\n☐️️ two\n️☐ selector first",
+      "marks": [
+        {
+          "line": 0,
+          "mark": "checked",
+          "written": "✅️"
+        },
+        {
+          "line": 1,
+          "mark": "failed",
+          "written": "❌︎"
+        },
+        {
+          "line": 2,
+          "mark": "open",
+          "written": "☐️"
+        }
+      ],
+      "swaps": [
+        {
+          "open": "☐ with selector\n❌︎ text style\n☐️️ two\n️☐ selector first",
+          "checked": null,
+          "failed": "❌ with selector\n❌︎ text style\n☐️️ two\n️☐ selector first"
+        },
+        {
+          "open": "✅️ with selector\n☐ text style\n☐️️ two\n️☐ selector first",
+          "checked": "✅️ with selector\n✅ text style\n☐️️ two\n️☐ selector first",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "✅️ with selector\n❌︎ text style\n✅️ two\n️☐ selector first",
+          "failed": "✅️ with selector\n❌︎ text style\n❌️ two\n️☐ selector first"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        null,
+        null,
+        null,
+        "✅️ with selector\n❌︎ text style\n☐️️ two\n☐ ️☐ selector first",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "text": "✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n✅done",
+      "marks": [
+        {
+          "line": 2,
+          "mark": "open",
+          "written": "☐"
+        },
+        {
+          "line": 3,
+          "mark": "checked",
+          "written": "✅"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "✅‍🔥 joined\n✅️‍🔥 joined too\n✅x\n✅done",
+          "failed": "✅‍🔥 joined\n✅️‍🔥 joined too\n❌x\n✅done"
+        },
+        {
+          "open": "✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n☐done",
+          "checked": null,
+          "failed": "✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n❌done"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ ✅‍🔥 joined\n✅️‍🔥 joined too\n☐x\n✅done",
+        "✅‍🔥 joined\n☐ ✅️‍🔥 joined too\n☐x\n✅done",
+        null,
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
+      ]
+    },
+    {
+      "text": "line\r\n☐ crlf\r❌ cr\n\n✅\r\n",
+      "marks": [
+        {
+          "line": 1,
+          "mark": "open",
+          "written": "☐"
+        },
+        {
+          "line": 2,
+          "mark": "failed",
+          "written": "❌"
+        },
+        {
+          "line": 4,
+          "mark": "checked",
+          "written": "✅"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "line\r\n✅ crlf\r❌ cr\n\n✅\r\n",
+          "failed": "line\r\n❌ crlf\r❌ cr\n\n✅\r\n"
+        },
+        {
+          "open": "line\r\n☐ crlf\r☐ cr\n\n✅\r\n",
+          "checked": "line\r\n☐ crlf\r✅ cr\n\n✅\r\n",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": "line\r\n☐ crlf\r❌ cr\n\n☐\r\n",
+          "checked": null,
+          "failed": "line\r\n☐ crlf\r❌ cr\n\n❌\r\n"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ line\r\n☐ crlf\r❌ cr\n\n✅\r\n",
+        null,
+        null,
+        "line\r\n☐ crlf\r❌ cr\n☐ \n✅\r\n",
+        null,
+        "line\r\n☐ crlf\r❌ cr\n\n✅\r\n☐ ",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        4,
+        4,
+        4,
+        5
+      ]
+    },
+    {
+      "text": "😀 ☐ after an emoji\n🧠\n☐ after an astral line\ntrailing\n",
+      "marks": [
+        {
+          "line": 2,
+          "mark": "open",
+          "written": "☐"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "😀 ☐ after an emoji\n🧠\n✅ after an astral line\ntrailing\n",
+          "failed": "😀 ☐ after an emoji\n🧠\n❌ after an astral line\ntrailing\n"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ 😀 ☐ after an emoji\n🧠\n☐ after an astral line\ntrailing\n",
+        "😀 ☐ after an emoji\n☐ 🧠\n☐ after an astral line\ntrailing\n",
+        null,
+        "😀 ☐ after an emoji\n🧠\n☐ after an astral line\n☐ trailing\n",
+        "😀 ☐ after an emoji\n🧠\n☐ after an astral line\ntrailing\n☐ ",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        4
+      ]
+    },
+    {
+      "text": "☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom",
+      "marks": [],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ ☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☐ ☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☒ b\n☐ ✔ c\n✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☒ b\n✔ c\n☐ ✓ d\n❎ e\n ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☒ b\n✔ c\n✓ d\n☐ ❎ e\n ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n☐  ☐ nbsp\n﻿☐ bom",
+        "☑ a\n☒ b\n✔ c\n✓ d\n❎ e\n ☐ nbsp\n☐ ﻿☐ bom",
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ]
+    },
+    {
+      "text": "- \n-\n   \n☐\n✅\n❌",
+      "marks": [
+        {
+          "line": 3,
+          "mark": "open",
+          "written": "☐"
+        },
+        {
+          "line": 4,
+          "mark": "checked",
+          "written": "✅"
+        },
+        {
+          "line": 5,
+          "mark": "failed",
+          "written": "❌"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": "- \n-\n   \n✅\n✅\n❌",
+          "failed": "- \n-\n   \n❌\n✅\n❌"
+        },
+        {
+          "open": "- \n-\n   \n☐\n☐\n❌",
+          "checked": null,
+          "failed": "- \n-\n   \n☐\n❌\n❌"
+        },
+        {
+          "open": "- \n-\n   \n☐\n✅\n☐",
+          "checked": "- \n-\n   \n☐\n✅\n✅",
+          "failed": null
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "- ☐ \n-\n   \n☐\n✅\n❌",
+        "- \n☐ -\n   \n☐\n✅\n❌",
+        "- \n-\n   ☐ \n☐\n✅\n❌",
+        null,
+        null,
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5
+      ]
+    },
+    {
+      "text": "Ünïcode ☐\n  - ✅ Straße\n\t* ☐ 👩‍👧 Familie",
+      "marks": [
+        {
+          "line": 1,
+          "mark": "checked",
+          "written": "✅"
+        },
+        {
+          "line": 2,
+          "mark": "open",
+          "written": "☐"
+        }
+      ],
+      "swaps": [
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        },
+        {
+          "open": "Ünïcode ☐\n  - ☐ Straße\n\t* ☐ 👩‍👧 Familie",
+          "checked": null,
+          "failed": "Ünïcode ☐\n  - ❌ Straße\n\t* ☐ 👩‍👧 Familie"
+        },
+        {
+          "open": null,
+          "checked": "Ünïcode ☐\n  - ✅ Straße\n\t* ✅ 👩‍👧 Familie",
+          "failed": "Ünïcode ☐\n  - ✅ Straße\n\t* ❌ 👩‍👧 Familie"
+        },
+        {
+          "open": null,
+          "checked": null,
+          "failed": null
+        }
+      ],
+      "inserts": [
+        "☐ Ünïcode ☐\n  - ✅ Straße\n\t* ☐ 👩‍👧 Familie",
+        null,
+        null,
+        null
+      ],
+      "lineAt": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    }
+  ]
+}
