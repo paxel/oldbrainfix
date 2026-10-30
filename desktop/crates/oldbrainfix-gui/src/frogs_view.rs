@@ -132,6 +132,8 @@ pub fn frog_row(
                 open.context_menu(|ui| {
                     if ui.button(RichText::new(t.delete()).color(text)).clicked() {
                         actions.push(FrogAction::AskDelete(frog.id.clone()));
+                        // Also a pick by keyboard or screen reader.
+                        ui.close();
                     }
                 });
             }

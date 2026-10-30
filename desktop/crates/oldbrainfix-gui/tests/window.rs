@@ -782,6 +782,29 @@ fn areas_and_topics_are_made_renamed_and_given_a_look() -> TestResult {
 }
 
 #[test]
+fn a_pick_by_keyboard_or_screen_reader_closes_the_menus_of_areas_and_topics() -> TestResult {
+    let mut harness = harness("places", "en")?;
+    harness
+        .get_by_role_and_label(Role::Button, "Household")
+        .click_secondary();
+    harness.run();
+    assert!(shows(&harness, "Colour and icon"));
+    harness.get_by_label("New Topic").click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, "Colour and icon"));
+    harness.get_by_label("Cancel").click();
+    harness.run();
+    harness
+        .get_by_role_and_label(Role::Button, "Garden")
+        .click_secondary();
+    harness.run();
+    harness.get_by_label("Rename").click_accesskit();
+    harness.run();
+    assert!(!shows(&harness, "Delete"));
+    Ok(())
+}
+
+#[test]
 fn deleting_a_place_asks_where_its_notes_go() -> TestResult {
     let mut harness = harness("places", "en")?;
     // An empty Topic just goes.

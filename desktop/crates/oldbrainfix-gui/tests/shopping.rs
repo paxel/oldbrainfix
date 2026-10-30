@@ -579,6 +579,51 @@ fn two_renames_apart_are_a_conflict_on_a_line_of_a_shopping_list() -> TestResult
     Ok(())
 }
 
+fn drop_file(harness: &mut Harness<'_, App>, path: &std::path::Path) {
+    harness.input_mut().dropped_files = vec![egui::DroppedFile {
+        path: Some(path.to_path_buf()),
+        ..Default::default()
+    }];
+    harness.run();
+}
+
+#[test]
+fn an_update_that_makes_a_shopping_list_says_so_and_shows_each_reappear_time() -> TestResult {
+    let (ann, _) = device(4, "Ann")?;
+    let note = Notes::new(&ann).capture(SHOPPING, None, None)?;
+    let dir = tempfile::tempdir()?;
+    let first = dir.path().join("first.oldbrain");
+    std::fs::write(&first, ann.send_note(&note.id, None, false)?)?;
+    let (desk, _) = device(1, "Ada")?;
+    let desk = Arc::new(desk);
+    let mut harness = window(&desk, None);
+    drop_file(&mut harness, &first);
+    click(&mut harness, "Show")?;
+    click(&mut harness, "Accept")?;
+    assert!(!harness.state().previewing());
+
+    let lists = ShoppingLists::new(&ann);
+    lists.make(&note.id)?;
+    lists.set_reappear(&line_id(&ann, &note.id, "Bread")?, Reappear::Once)?;
+    let update = dir.path().join("update.oldbrain");
+    std::fs::write(&update, ann.send_note(&note.id, None, false)?)?;
+    drop_file(&mut harness, &update);
+    assert!(harness.state().previewing());
+    assert!(shows(&harness, "It becomes a Shopping List."));
+    // Its Lines, each with the reappear time it comes with.
+    for line in ["Milk", "Bread", "Apples"] {
+        assert!(!boxes(&harness, line).is_empty(), "{line}");
+    }
+    assert!(shows_part(&harness, "Reappear time: Once"));
+    assert_eq!(
+        harness
+            .query_all_by_label_contains("Reappear time: 1 week")
+            .count(),
+        2
+    );
+    Ok(())
+}
+
 #[test]
 fn the_reappear_time_reads_in_both_languages() {
     use oldbrainfix_gui::shopping_view::reappear_label;

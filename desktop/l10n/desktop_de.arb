@@ -219,5 +219,7 @@
   "nothingToday": "Heute steht nichts an. Schreib einen Gedanken in das Feld oben, um ihn festzuhalten.",
   "aboutTagline": "Einen Gedanken in Sekunden festhalten. Erinnert werden, bis er einsortiert oder erledigt ist.",
   "conflictsIntro": "Zwei Geräte haben dasselbe geändert, bevor sie sich synchronisiert haben. Klicke auf die Fassung, die bleibt; bis dahin wird die neuere gezeigt.",
-  "sentItemHidden": "Was sie gesendet hat, bleibt verborgen, bis du auf „Zeigen“ klickst."
+  "sentItemHidden": "Was sie gesendet hat, bleibt verborgen, bis du auf „Zeigen“ klickst.",
+  "captureFieldName": "Erfassen",
+  "noteTextFieldName": "Text der Notiz"
 }

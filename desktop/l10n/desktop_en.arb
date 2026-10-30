@@ -392,5 +392,9 @@
   "conflictsIntro": "Two Devices changed the same thing before they synced. Click the version that stays; until then the newer one shows.",
   "@conflictsIntro": {"description": "Desktop wording of the phone's text."},
   "sentItemHidden": "What they sent stays hidden until you click Show.",
-  "@sentItemHidden": {"description": "Desktop wording of the phone's text."}
+  "@sentItemHidden": {"description": "Desktop wording of the phone's text."},
+  "captureFieldName": "Capture",
+  "@captureFieldName": {"description": "What a screen reader calls the desktop's capture field, in the window and the capture popup, once it holds text."},
+  "noteTextFieldName": "Note text",
+  "@noteTextFieldName": {"description": "What a screen reader calls the text field of the desktop's Note editor."}
 }

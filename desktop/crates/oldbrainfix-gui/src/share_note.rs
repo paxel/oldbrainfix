@@ -2,13 +2,14 @@
 //! `share_note.dart` hands it to the share sheet: "Copy as text" puts the
 //! Note's share text on the clipboard, with HTML beside formatted text,
 //! and "Save as Markdown…" writes it as a Markdown file with the photos
-//! and recordings this Device holds beside it, linked by their names.
-//! What goes along is the core's
+//! and recordings this Device holds in a folder of its own beside it,
+//! named as the file is, linked from the file by their place in it. What
+//! goes along is the core's
 //! ([`note_share`](oldbrainfix_core::share::note_share)).
 //!
-//! The Markdown file holds the share text as it is, the Markdown source
-//! of formatted text and plain text as written, so it reads the same in
-//! a text editor as on the clipboard.
+//! The Markdown file holds the Markdown source of formatted text as it
+//! is, and plain text and the Sections' dates escaped, so they read as
+//! written in any Markdown viewer.
 
 use std::path::Path;
 
@@ -64,19 +65,21 @@ pub struct Beside {
     pub photo: bool,
 }
 
-/// The Markdown file of `text` with `files` beside it: the text, then
-/// each file on a paragraph of its own, a photo as an image and a
-/// recording as a link, both by its name.
-pub fn markdown(text: &str, files: &[Beside]) -> String {
+/// The Markdown file of `text` with `files` in the folder `folder`
+/// beside it: the text, then each file on a paragraph of its own, a photo
+/// as an image and a recording as a link, both named by its name and
+/// pointing at it in the folder.
+pub fn markdown(text: &str, folder: &str, files: &[Beside]) -> String {
     let mut parts: Vec<String> = Vec::new();
     if !text.is_empty() {
         parts.push(text.to_string());
     }
     for file in files {
+        let link = link_to(&format!("{folder}/{}", file.name));
         parts.push(if file.photo {
-            format!("![{0}]({0})", file.name)
+            format!("![{}]({link})", file.name)
         } else {
-            format!("[{0}]({0})", file.name)
+            format!("[{}]({link})", file.name)
         });
     }
     let mut out = parts.join("\n\n");
@@ -86,26 +89,45 @@ pub fn markdown(text: &str, files: &[Beside]) -> String {
     out
 }
 
+/// `path` as a link in Markdown points at it: each ASCII character but
+/// letters, digits and `-._~/` as `%` and its hex, so spaces and
+/// brackets in a folder's name keep the link whole.
+fn link_to(path: &str) -> String {
+    let mut out = String::new();
+    for c in path.chars() {
+        if !c.is_ascii() || c.is_ascii_alphanumeric() || "-._~/".contains(c) {
+            out.push(c);
+        } else {
+            out.push_str(&format!("%{:02X}", u32::from(c)));
+        }
+    }
+    out
+}
+
 /// Whether saving `share` writes anything: it has words, or any of its
-/// photos and recordings is on this Device.
+/// photos and recordings is on this Device, which is asked without
+/// reading them.
 pub fn has_anything(share: &NoteShare, notes: &Notes) -> bool {
     !share.text.is_empty()
-        || share.photos.iter().any(|h| notes.photo_bytes(h).is_some())
-        || share
-            .recordings
-            .iter()
-            .any(|h| notes.recording_bytes(h).is_some())
+        || share.photos.iter().any(|h| notes.has_photo(h))
+        || share.recordings.iter().any(|h| notes.has_recording(h))
 }
 
 /// Writes `share` as the Markdown file `path`, its photos and then its
-/// recordings that `notes` holds beside it, each named by its hash as
-/// the phone names them (`photo-<12 hex>.jpg`, `recording-<12 hex>.wav`):
-/// the same bytes under the same name, so writing one again changes
-/// nothing. The files go first, so a link never points at nothing.
-/// `Ok(false)` when there is nothing to write: no words and none of its
-/// photos and recordings here.
+/// recordings that `notes` holds in a folder beside it named as the file
+/// without `.md`, so the files of two Notes never mix. Each is named by
+/// its hash as the phone names them (`photo-<12 hex>.jpg`,
+/// `recording-<12 hex>.wav`): the same bytes under the same name, so
+/// writing one again changes nothing. The files go first, so a link
+/// never points at nothing; without any, there is no folder. `Ok(false)`
+/// when there is nothing to write: no words and none of its photos and
+/// recordings here.
 pub fn save_markdown(path: &Path, share: &NoteShare, notes: &Notes) -> std::io::Result<bool> {
-    let folder = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let stem = path
+        .file_stem()
+        .map_or_else(|| "note".to_string(), |s| s.to_string_lossy().into_owned());
+    let folder = parent.join(&stem);
     let mut files = Vec::new();
     for hash in &share.photos {
         // One not on this Device yet stays behind; the rest goes.
@@ -139,11 +161,14 @@ pub fn save_markdown(path: &Path, share: &NoteShare, notes: &Notes) -> std::io::
     if share.text.is_empty() && files.is_empty() {
         return Ok(false);
     }
+    if !files.is_empty() {
+        std::fs::create_dir_all(&folder)?;
+    }
     for (file, bytes) in &files {
         std::fs::write(folder.join(&file.name), bytes)?;
     }
     let beside: Vec<Beside> = files.into_iter().map(|(file, _)| file).collect();
-    std::fs::write(path, markdown(&share.text, &beside))?;
+    std::fs::write(path, markdown(&share.markdown, &stem, &beside))?;
     Ok(true)
 }
 
@@ -183,12 +208,12 @@ mod tests {
             },
         ];
         assert_eq!(
-            markdown("**Milk**", &files),
-            "**Milk**\n\n![photo-abc.jpg](photo-abc.jpg)\n\n[recording-def.wav](recording-def.wav)\n"
+            markdown("**Milk**", "Milk", &files),
+            "**Milk**\n\n![photo-abc.jpg](Milk/photo-abc.jpg)\n\n[recording-def.wav](Milk/recording-def.wav)\n"
         );
         assert_eq!(
-            markdown("", &files[1..]),
-            "[recording-def.wav](recording-def.wav)\n"
+            markdown("", "Milk (2) ä", &files[1..]),
+            "[recording-def.wav](Milk%20%282%29%20ä/recording-def.wav)\n"
         );
         assert_eq!(short("0123456789abcdef"), "0123456789ab");
         assert_eq!(short("abc"), "abc");

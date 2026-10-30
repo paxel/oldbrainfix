@@ -3,7 +3,8 @@
 //! and checking one off hides the other for the day; its heading opens
 //! the Frog view with the folded "Done" section, closed until opened; a
 //! right-click deletes a Frog after one question and the trash restores
-//! it; the Note editor makes one. Which two Frogs show depends on the
+//! it; the Note editor makes one; the row "Frogs" on the left opens the
+//! Frog view too. Which two Frogs show depends on the
 //! rotation, so the tests count them rather than name them.
 
 use std::sync::Arc;
@@ -219,6 +220,27 @@ fn the_heading_opens_the_frog_view_with_the_done_fold_closed() -> TestResult {
 }
 
 #[test]
+fn the_frogs_row_on_the_left_opens_the_frog_view_from_anywhere() -> TestResult {
+    let store = device()?;
+    let t = L10n::new("en");
+    let mut harness = window(&store, "en");
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    // Beside Agenda, All Notes and Unsorted.
+    let row = |h: &Harness<'_, App>, label: &str| {
+        h.get_by_role_and_label(Role::Button, label).rect().top()
+    };
+    assert!(row(&harness, t.unsorted()) < row(&harness, t.frogs_title()));
+    harness
+        .get_by_role_and_label(Role::Button, t.frogs_title())
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selection(), &Selection::Frogs);
+    assert_eq!(shown(&harness).len(), 3);
+    Ok(())
+}
+
+#[test]
 fn a_right_click_deletes_a_frog_after_one_question_and_the_trash_restores_it() -> TestResult {
     let store = device()?;
     let t = L10n::new("en");
@@ -230,9 +252,12 @@ fn a_right_click_deletes_a_frog_after_one_question_and_the_trash_restores_it() -
         .get_by_role_and_label(Role::Button, JOBS[0])
         .click_secondary();
     harness.run();
-    harness.get_by_label(t.delete()).click();
+    // Picked as a screen reader or the keyboard does, which no pointer
+    // click closes: the menu closes all the same.
+    harness.get_by_label(t.delete()).click_accesskit();
     harness.run();
     assert!(shows(harness, t.delete_frog_question()));
+    assert_eq!(harness.query_all_by_label(t.delete()).count(), 1);
     click(harness, t.delete())?;
     assert!(!shows(harness, t.delete_frog_question()));
     let frogs = Frogs::new(&store);

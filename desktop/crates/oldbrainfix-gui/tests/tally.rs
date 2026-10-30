@@ -333,10 +333,14 @@ fn deleting_an_entry_asks_once_and_removed_entries_bring_it_back() -> TestResult
     let entry = tallies.add(&note, &BTreeMap::from([(pages, 12.0)]), "Book", None)?;
     let mut harness = window(&store, Some(&note));
     assert!(!shows(&harness, "Removed entries"));
+    let edits = |h: &Harness<'_, App>| h.query_all_by_label("Edit").count();
+    let before = edits(&harness);
     entry_row(&harness, "Book").click_secondary();
     harness.run();
-    assert!(shows(&harness, "Edit"));
+    assert_eq!(edits(&harness), before + 1);
+    // Picked as a screen reader does, the menu closes all the same.
     click(&mut harness, "Delete")?;
+    assert_eq!(edits(&harness), before);
     assert!(shows(
         &harness,
         "Delete this entry? It can be restored under \"Removed entries\"."

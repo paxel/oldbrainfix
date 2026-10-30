@@ -314,8 +314,9 @@ fn share_in_an_occurrences_menu_saves_its_routine_as_a_series_or_its_reminder() 
     // The row's ⋮.
     harness.get_by_label("More for Course").click();
     harness.run();
-    harness.get_by_label("Share").click();
+    harness.get_by_label("Share").click_accesskit();
     harness.run();
+    assert!(harness.query_by_label("Share").is_none());
     assert!(shows(&harness, "The calendar file is saved."));
     let written = std::fs::read_to_string(&saved)?;
     assert_eq!(written, series);
@@ -323,11 +324,13 @@ fn share_in_an_occurrences_menu_saves_its_routine_as_a_series_or_its_reminder() 
     assert!(written.contains("UNTIL=20261216"), "{written}");
     assert!(!written.contains("Dentist"));
 
-    // A right-click on the row opens the same menu.
+    // A right-click on the row opens the same menu, which a pick by a
+    // screen reader or the keyboard closes too.
     harness.get_by_label("Dentist").click_secondary();
     harness.run();
-    harness.get_by_label("Share").click();
+    harness.get_by_label("Share").click_accesskit();
     harness.run();
+    assert!(harness.query_by_label("Share").is_none());
     let written = std::fs::read_to_string(&saved)?;
     assert_eq!(written, reminder);
     assert_eq!(written.matches("BEGIN:VEVENT").count(), 1);

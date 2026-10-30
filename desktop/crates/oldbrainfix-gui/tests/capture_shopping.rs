@@ -4,9 +4,11 @@
 //! the top alone and the other choices come back when it is dropped;
 //! saving makes each line a Line, a name the list has bringing its Line
 //! back, and keeps no Note; a recording's Transcript gives its lines once
-//! it is there, and without one the Note stays, announced at the top; a
-//! photo keeps it a Note; and it is not offered without a list nor with
-//! a recording that gets no Transcript here.
+//! it is there, and without one the Note stays, announced at the top as
+//! a job done, not a failure; a photo keeps it a Note, a photo pasted in
+//! the popup as in the window dropping the list picked; and it is not
+//! offered without a list, while a photo is held, nor with a recording
+//! that gets no Transcript here.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -392,10 +394,50 @@ fn a_recording_without_a_transcriber_keeps_the_popups_capture_a_note_as_said() -
     // Kept with its recording and said at the top, the popup still open.
     assert!(!harness.state().closed);
     assert!(shows(&harness, t().capture_shopping_untranscribed()));
+    // As the window says it: what happened, the full text and Close, no
+    // failure's Report.
+    harness
+        .get_by_label(t().capture_shopping_untranscribed())
+        .click();
+    harness.run();
+    assert!(shows(
+        &harness,
+        &format!("shopping list {list}: no speech model to transcribe with")
+    ));
+    assert!(!shows(&harness, t().report()));
+    click(&mut harness, t().close());
+    assert!(!shows(&harness, t().capture_shopping_untranscribed()));
     let kept = others(&store, &list)?;
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].text, "Bread");
     assert_eq!(kept[0].recordings.len(), 1);
+    assert_eq!(lines(&store, &list)?, ["Milk"]);
+    Ok(())
+}
+
+#[test]
+fn a_photo_pasted_in_the_popup_drops_the_list_and_none_is_offered_while_held() -> TestResult {
+    let (store, _, list) = store()?;
+    let mut harness = popup(&store);
+    harness.state_mut().popup.set_clipboard(Box::new(Pictures));
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("Bread");
+    harness.run();
+    pick(&mut harness, "Groceries");
+    assert!(shows(&harness, &t().capture_choice_shopping("Groceries")));
+    click(&mut harness, t().paste());
+    // No Line holds a photo: the list goes, and none is offered.
+    assert_eq!(harness.state().popup.choices().shopping, None);
+    assert!(!shows(&harness, &t().capture_choice_shopping("Groceries")));
+    click(&mut harness, "More");
+    assert!(shows(&harness, "Important"));
+    assert!(!shows(&harness, t().add_to_shopping_list()));
+    // Left, it keeps the Note with its photo.
+    assert_eq!(harness.state_mut().popup.leave(), Outcome::Closed);
+    let kept = others(&store, &list)?;
+    assert_eq!(kept.len(), 1);
+    assert_eq!(kept[0].text, "Bread");
+    assert_eq!(kept[0].photos.len(), 1);
     assert_eq!(lines(&store, &list)?, ["Milk"]);
     Ok(())
 }

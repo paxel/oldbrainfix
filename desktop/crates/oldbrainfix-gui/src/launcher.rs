@@ -115,7 +115,7 @@ fn desktop_entry(exec: &Path) -> String {
     format!(
         "[Desktop Entry]\n\
          Name={APP_NAME}\n\
-         Comment=Capture a thought in one tap. Get nagged until it is sorted or done.\n\
+         Comment=Capture a thought in seconds. Get nagged until it is sorted or done.\n\
          TryExec={exec_str}\n\
          Exec={}\n\
          Icon={ICON_NAME}\n\

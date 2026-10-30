@@ -112,7 +112,6 @@
   "agendaToday": "Heute",
   "agendaTomorrow": "Morgen",
   "nothingToday": "Heute steht nichts an. Tippe auf +, um einen Gedanken festzuhalten.",
-  "nothingTomorrow": "Morgen steht nichts an.",
   "agendaDay": "{day}",
   "@agendaDay": {
     "placeholders": {

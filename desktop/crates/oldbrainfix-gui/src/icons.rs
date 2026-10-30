@@ -73,12 +73,13 @@ pub const EXPORT: char = '\u{f05d}';
 /// the Agenda (#123).
 pub const SHOPPING_CART: char = '\u{f37f}';
 /// The format bar's, as the phone's (#127): `format_bold`,
-/// `format_italic`, `format_strikethrough`, `format_list_numbered`,
-/// `format_quote`, `link`, `code`, `format_indent_increase` and
-/// `format_indent_decrease`; the bulleted list is [`ALL_ROUTINES`].
+/// `format_italic`, `format_strikethrough`, `format_list_bulleted`,
+/// `format_list_numbered`, `format_quote`, `link`, `code`,
+/// `format_indent_increase` and `format_indent_decrease`.
 pub const FORMAT_BOLD: char = '\u{e2af}';
 pub const FORMAT_ITALIC: char = '\u{e2b6}';
 pub const FORMAT_STRIKE: char = '\u{e2bf}';
+pub const FORMAT_BULLETS: char = '\u{e2b8}';
 pub const FORMAT_NUMBERS: char = '\u{e2b9}';
 pub const FORMAT_QUOTE: char = '\u{e2bc}';
 pub const LINK: char = '\u{e380}';
@@ -89,6 +90,9 @@ pub const OUTDENT: char = '\u{e2b4}';
 /// `table_chart_outlined`, and `arrow_back` to leave it.
 pub const TABLE: char = '\u{f41d}';
 pub const ARROW_BACK: char = '\u{e092}';
+/// The frog that marks Frogs, from the emoji font, as there is none
+/// among the Material icons ([`crate::frogs_view::FROG`]).
+pub const FROG: char = '\u{1F438}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {
@@ -125,9 +129,21 @@ pub fn fonts() -> egui::FontDefinitions {
     fonts
 }
 
-/// Paints `icon` centred in `rect`. Nothing before the fonts are bound
-/// (the very first pass).
+/// Paints `icon` centred in `rect`: a Material icon, nothing before the
+/// fonts are bound (the very first pass), or one of the text's fonts,
+/// as the frog, when it lies outside the Private Use Area.
 pub fn paint(painter: &Painter, rect: Rect, icon: char, color: Color32) {
+    if !('\u{e000}'..='\u{f8ff}').contains(&icon) {
+        let size = rect.height() * 0.9;
+        painter.text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            icon,
+            FontId::proportional(size),
+            color,
+        );
+        return;
+    }
     let bound = painter
         .ctx()
         .fonts(|f| f.families().contains(&FontFamily::Name(FAMILY.into())));

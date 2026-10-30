@@ -34,6 +34,7 @@ use oldbrainfix_core::{
 use crate::app::{check, embossed, icon_button};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::shopping_view;
 use crate::theme::Tones;
 
 /// A Line as it is drawn: its id, its text, whether it is in the group
@@ -59,13 +60,17 @@ impl ShownLine {
         }
     }
 
-    fn of_sent(line: &SentLine) -> ShownLine {
+    /// A Line of a Sent Item, a Shopping List's with its reappear time
+    /// under it, as the phone's preview shows it.
+    fn of_sent(t: &L10n, line: &SentLine) -> ShownLine {
         ShownLine {
             id: line.id.clone(),
             text: line.text.clone(),
             in_group: line.indent,
             checked: line.checked,
-            below: None,
+            below: line
+                .reappear
+                .map(|r| t.sent_item_line_reappear(&shopping_view::reappear_label(t, r))),
         }
     }
 }
@@ -76,8 +81,11 @@ pub fn shown_lines(list: &Checklist) -> Vec<ShownLine> {
 }
 
 /// The Lines of a Sent Item as they are drawn.
-pub fn sent_lines(lines: &[SentLine]) -> Vec<ShownLine> {
-    lines.iter().map(ShownLine::of_sent).collect()
+pub fn sent_lines(t: &L10n, lines: &[SentLine]) -> Vec<ShownLine> {
+    lines
+        .iter()
+        .map(|line| ShownLine::of_sent(t, line))
+        .collect()
 }
 
 /// What the menu of a Line does.
@@ -714,7 +722,7 @@ pub fn preview(ui: &mut Ui, (t, tones): (&L10n, Tones), lines_sent: &[SentLine])
     lines(
         ui,
         (t, tones),
-        &sent_lines(lines_sent),
+        &sent_lines(t, lines_sent),
         (false, None),
         None,
         &mut ignored,

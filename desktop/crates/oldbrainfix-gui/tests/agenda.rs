@@ -169,9 +169,8 @@ fn the_agenda_shows_the_week_each_later_day_under_its_weekday_and_date() -> Test
         assert!(top(&harness, pair[0]) < top(&harness, pair[1]), "{pair:?}");
     }
     assert!(!shows(&harness, "Wednesday, 4 Nov"));
-    // Every day shows; an empty one after tomorrow says so.
-    assert!(shows(&harness, "Nothing due tomorrow."));
-    assert_eq!(harness.query_all_by_label("Nothing planned").count(), 4);
+    // Every day shows; an empty one after today says so, tomorrow too.
+    assert_eq!(harness.query_all_by_label("Nothing planned").count(), 5);
     let dentist = top(&harness, "Done: 09:00 Dentist");
     assert!(top(&harness, "Monday, 2 Nov") < dentist);
     assert!(dentist < top(&harness, "Tuesday, 3 Nov"));
@@ -191,7 +190,8 @@ fn the_weeks_days_read_in_german() -> TestResult {
     for label in ["Freitag, 30. Okt.", "Sonntag, 1. Nov.", "Montag, 2. Nov."] {
         assert!(shows(&harness, label), "{label}");
     }
-    assert_eq!(harness.query_all_by_label("Nichts geplant").count(), 4);
+    // Tomorrow and the four empty days after it.
+    assert_eq!(harness.query_all_by_label("Nichts geplant").count(), 5);
     Ok(())
 }
 

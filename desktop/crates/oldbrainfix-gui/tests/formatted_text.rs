@@ -3,7 +3,8 @@
 //! editor, a link opens only to a web or e-mail address, a click on the
 //! text edits its Markdown, and the format bar, Ctrl+B, a shortcut typed
 //! and a paste with a format make a plain text a formatted one, kept at
-//! once.
+//! once. "Add to Note" has the format bar too, without ☐, and the text
+//! fields have names a screen reader says once they hold text.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -85,6 +86,38 @@ fn click(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
         .click_accesskit();
     harness.run();
     Ok(())
+}
+
+/// Clicks the format bar's button `label` of the Note's text, the first
+/// bar, as the Amend field's has the same buttons.
+fn format(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::Button, label)
+        .next()
+        .ok_or(format!("{label:?}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
+/// Clicks the Amend field's format button `label`, the second bar's.
+fn amend_format(harness: &mut Harness<'_, App>, label: &str) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::Button, label)
+        .nth(1)
+        .ok_or(format!("{label:?} of Add to Note"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
+/// What the Amend field holds: the field without a name, as its hint
+/// goes once it holds text, and the capture field and the Note's are
+/// named.
+fn amend_field(harness: &Harness<'_, App>) -> Option<String> {
+    harness
+        .query_by(|n| n.role() == Role::MultilineTextInput && n.label().is_none())
+        .and_then(|n| n.value())
 }
 
 /// Whether a text field holds `text`: the editor's, as the Amend field
@@ -195,14 +228,14 @@ fn the_format_bar_makes_a_plain_text_formatted_at_once() -> TestResult {
     let mut harness = editor(&store, &note);
     // A field never typed into has its cursor at the start: the first
     // word.
-    click(&mut harness, "Bold")?;
+    format(&mut harness, "Bold")?;
     assert_eq!(
         stored(&store, &note)?,
         ("**buy** milk".into(), MARKDOWN.into())
     );
     assert!(field(&harness, "**buy** milk"));
     // The line's format too, on the formatted text.
-    click(&mut harness, "Bulleted list")?;
+    format(&mut harness, "Bulleted list")?;
     assert!(field(&harness, "- **buy** milk"));
     Ok(())
 }
@@ -263,7 +296,7 @@ fn a_plain_paste_keeps_a_plain_text_plain() -> TestResult {
 fn a_link_gets_the_address_typed() -> TestResult {
     let (store, note) = with_note("docs here", "plain")?;
     let mut harness = editor(&store, &note);
-    click(&mut harness, "Link")?;
+    format(&mut harness, "Link")?;
     // The dialog's field has the keyboard.
     harness.event(egui::Event::Text("example.org".into()));
     harness.run();
@@ -272,5 +305,89 @@ fn a_link_gets_the_address_typed() -> TestResult {
         stored(&store, &note)?,
         ("[docs](https://example.org) here".into(), MARKDOWN.into())
     );
+    Ok(())
+}
+
+#[test]
+fn add_to_note_has_the_format_bar_without_the_mark() -> TestResult {
+    let (store, note) = with_note("Shop", "plain")?;
+    let mut harness = editor(&store, &note);
+    // ☐ only over the Note's text, the rest over both fields.
+    assert_eq!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "Put ☐ at the start of the line")
+            .count(),
+        1
+    );
+    assert_eq!(
+        harness
+            .query_all_by_role_and_label(Role::Button, "Bulleted list")
+            .count(),
+        2
+    );
+    harness
+        .get_by(|n| n.placeholder() == Some("What's new?"))
+        .click();
+    harness.run();
+    harness.get_by(|n| n.is_focused()).type_text("milk");
+    harness.run();
+    amend_format(&mut harness, "Bold")?;
+    assert_eq!(amend_field(&harness).as_deref(), Some("**milk**"));
+    // The Note's text is left as it is.
+    assert_eq!(stored(&store, &note)?, ("Shop".into(), "plain".into()));
+    // A link goes on the field's text too.
+    amend_format(&mut harness, "Link")?;
+    harness.event(egui::Event::Text("example.org".into()));
+    harness.run();
+    click(&mut harness, "Set link")?;
+    let added = amend_field(&harness).ok_or("the Amend field")?;
+    assert!(added.contains("milk](https://example.org)"), "{added}");
+    click(&mut harness, "Add to Note")?;
+    let sections = Notes::new(&store).sections(&note)?;
+    assert_eq!(sections.len(), 1);
+    assert_eq!(sections[0].text, added);
+    assert_eq!(sections[0].text_format, MARKDOWN);
+    assert_eq!(amend_field(&harness).as_deref(), Some(""));
+    Ok(())
+}
+
+#[test]
+fn a_table_of_add_to_note_is_edited_full_screen_and_goes_back_into_the_field() -> TestResult {
+    let (store, note) = with_note("Shop", "plain")?;
+    let mut harness = editor(&store, &note);
+    amend_format(&mut harness, "Table")?;
+    assert!(harness.state().shown_table().is_some());
+    harness.event(egui::Event::Text("Item".into()));
+    harness.run();
+    harness.key_press(Key::Enter);
+    harness.run();
+    // Its arrow back, "Close", leaves it.
+    harness
+        .query_all_by_role_and_label(Role::Button, "Close")
+        .next()
+        .ok_or("the arrow back")?
+        .click_accesskit();
+    harness.run();
+    assert!(harness.state().shown_table().is_none());
+    let added = amend_field(&harness).ok_or("the Amend field")?;
+    assert!(added.starts_with("| Item |  |\n| --- | --- |"), "{added}");
+    // Nothing of it in the Note until it is added.
+    assert_eq!(stored(&store, &note)?, ("Shop".into(), "plain".into()));
+    assert!(Notes::new(&store).sections(&note)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn the_text_fields_have_a_name_once_they_hold_text() -> TestResult {
+    let (store, note) = with_note("buy milk", "plain")?;
+    let harness = editor(&store, &note);
+    let named = |name: &'static str| {
+        harness
+            .query_all_by_role_and_label(Role::MultilineTextInput, name)
+            .filter_map(|n| n.value())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(named("Note text"), ["buy milk"]);
+    assert_eq!(named("Capture"), [""]);
     Ok(())
 }

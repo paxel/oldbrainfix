@@ -91,7 +91,7 @@ use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
 use crate::backups;
-use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Opens};
+use crate::capture_choices::{self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens};
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_sync;
@@ -437,6 +437,8 @@ enum Dialog {
         start: usize,
         end: usize,
         linked: bool,
+        /// Whether it goes on the Amend field's text.
+        amend: bool,
     },
     /// Naming a new Area, or a new Topic of the Area `area`.
     NewPlace {
@@ -717,15 +719,20 @@ enum Action {
     /// (#127, ADR 0033).
     FormatText,
     /// Asks for the address of a link on the bytes `start..end` of the
-    /// edited text, `url` the link's there is one already.
+    /// edited text, or of the Amend field's with `amend`, `url` the
+    /// link's there is one already.
     AskLink {
         start: usize,
         end: usize,
         url: Option<String>,
+        amend: bool,
     },
-    /// Puts the link asked for on the edited text.
+    /// Puts the link asked for on the text it was asked for.
     SetLink,
     Amend,
+    /// Opens the table of the Amend field's text at this byte full
+    /// screen, putting a new one in there when there is none.
+    AmendTable(usize),
     Importance(Importance),
     File {
         note: String,
@@ -992,6 +999,9 @@ pub struct App {
     viewer: Option<Viewer>,
     /// The table shown full screen over the window, while one is (#128).
     table: Option<TableView>,
+    /// Whether that table is in the Amend field's text, which it is
+    /// written back into, instead of a Note's.
+    table_amends: bool,
     trail: Trail,
     /// The capture field's text, and what was set up for its Note, not
     /// written yet (#113).
@@ -1007,8 +1017,12 @@ pub struct App {
     /// selection `text_select` in bytes when there is one.
     text_focus: bool,
     text_select: Option<(usize, usize)>,
-    /// The text of the Section being added.
+    /// The text of the Section being added, and whether its field is to
+    /// take the keyboard, once, with the selection `amend_select` in
+    /// bytes when there is one.
     amend: String,
+    amend_focus: bool,
+    amend_select: Option<(usize, usize)>,
     dialog: Option<Dialog>,
     /// Whether the dialog's text field is to take the keyboard, once, as
     /// it opens.
@@ -1308,6 +1322,7 @@ impl App {
             unfolded_of: None,
             viewer: None,
             table: None,
+            table_amends: false,
             trail: Trail::default(),
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
@@ -1317,6 +1332,8 @@ impl App {
             text_focus: false,
             text_select: None,
             amend: String::new(),
+            amend_focus: false,
+            amend_select: None,
             dialog: None,
             focus: false,
             editor: None,
@@ -2876,6 +2893,8 @@ impl App {
             self.text_focus = false;
             self.text_select = None;
             self.amend.clear();
+            self.amend_focus = false;
+            self.amend_select = None;
             self.line_text.clear();
         }
         self.kick();
@@ -3669,17 +3688,38 @@ impl App {
             }
             Action::SaveText => self.save_text()?,
             Action::FormatText => self.save_formatted()?,
-            Action::AskLink { start, end, url } => {
+            Action::AskLink {
+                start,
+                end,
+                url,
+                amend,
+            } => {
                 self.dialog = Some(Dialog::Link {
                     linked: url.is_some(),
                     address: url.unwrap_or_default(),
                     start,
                     end,
+                    amend,
                 });
                 self.focus = true;
             }
             Action::SetLink => {
                 if let Some(Dialog::Link {
+                    address,
+                    start,
+                    end,
+                    amend: true,
+                    ..
+                }) = &self.dialog
+                {
+                    // Into the Amend field, kept with the Section.
+                    let url = format_bar::address(address);
+                    let linked = markdown::link(&self.amend, *start, *end, &url);
+                    self.amend = linked.text;
+                    self.amend_select = Some((linked.start, linked.end));
+                    self.amend_focus = true;
+                    self.dialog = None;
+                } else if let Some(Dialog::Link {
                     address,
                     start,
                     end,
@@ -3704,6 +3744,31 @@ impl App {
                 };
                 notes.amend_as(&selected, &self.amend, format)?;
                 self.amend.clear();
+            }
+            Action::AmendTable(at) => {
+                let opening = match markdown::table::at(&self.amend, at) {
+                    Some(table) => Opening {
+                        note: Some(selected),
+                        text: self.amend.clone(),
+                        at: table.start,
+                        cell: None,
+                        tags: true,
+                    },
+                    None => {
+                        let change = markdown::table::insert(&self.amend, at);
+                        self.amend = change.text;
+                        Opening {
+                            note: Some(selected),
+                            text: self.amend.clone(),
+                            at: change.start,
+                            cell: Some((0, 0)),
+                            tags: true,
+                        }
+                    }
+                };
+                // Edited there, it is written back into the field.
+                self.table = Some(TableView::new(opening));
+                self.table_amends = true;
             }
             Action::Importance(importance) => notes.set_importance(&selected, importance)?,
             Action::File { note, place } => {
@@ -4677,6 +4742,7 @@ impl App {
     /// is stored now; what is typed into the Note shown goes in first, and
     /// the view holds the text as stored, at the same table.
     fn open_table(&mut self, mut opening: Opening) -> oldbrainfix_core::Result<()> {
+        self.table_amends = false;
         if let Some(note) = opening.note.take() {
             if self.text_of.as_deref() == Some(note.as_str()) {
                 self.save_text()?;
@@ -4712,6 +4778,10 @@ impl App {
                     self.write_table(&text)?;
                 }
                 self.table = None;
+                // The Amend field has the keyboard again.
+                if std::mem::take(&mut self.table_amends) {
+                    self.amend_focus = true;
+                }
             }
             table_view::Asked::SearchFor(tag) => {
                 self.table_asked(table_view::Asked::Close)?;
@@ -4726,6 +4796,12 @@ impl App {
     /// stored now; a text left blank is not kept. The Note shown then
     /// holds it in its field.
     fn write_table(&mut self, text: &str) -> oldbrainfix_core::Result<()> {
+        // A table of the Amend field goes back into it, kept with the
+        // Section.
+        if self.table_amends && self.table.is_some() {
+            self.amend = text.to_string();
+            return Ok(());
+        }
         let Some(note) = self
             .table
             .as_ref()
@@ -4894,52 +4970,28 @@ impl App {
         let photos = photos.as_slice();
         let mut recordings = recordings.to_vec();
         recordings.extend(self.recorded.iter().cloned());
-        // Without a Transcript to come, a recording keeps it a Note, as
-        // said once it is saved.
-        let picked = self.capture_choices.shopping.clone();
-        // A photo keeps it a Note anyway.
-        let untranscribed =
-            picked.is_some() && photos.is_empty() && !recordings.is_empty() && !self.transcribes();
-        let mut choices = self.capture_choices.clone();
-        if untranscribed {
-            choices.shopping = None;
-        }
-        let list = choices.shopping.clone();
-        let captured = capture_choices::capture(
-            &self.store,
+        let held = Held {
+            photos,
+            recordings: &recordings,
+            transcribes: self.transcribes(),
+        };
+        let (captured, said) = capture_choices::save(
+            (&self.store, &self.wall),
             &self.capture,
             place.as_deref(),
             nudge_in,
-            (photos, &recordings),
-            (&choices, &*self.wall),
+            held,
+            &self.capture_choices,
+            (self.transcriber.as_ref(), self.t),
         )?;
+        // Kept as a Note instead of going into the list: said at the top.
+        if let Some((said, details)) = said {
+            self.announce_done(said, details);
+        }
         let shown = match captured {
             Captured::Nothing => return Ok(()),
-            Captured::Note(note) => {
-                if untranscribed {
-                    let t = self.t;
-                    let list = picked.as_deref().unwrap_or("");
-                    let details =
-                        format!("shopping list {list}: no speech model to transcribe with");
-                    self.announce_done(t.capture_shopping_untranscribed(), details);
-                }
-                Some(note)
-            }
-            Captured::Poured => None,
-            Captured::Waiting(note) => {
-                if let (Some(transcriber), Some(list)) = (&self.transcriber, &list) {
-                    let held = (self.store.clone(), self.wall.clone());
-                    capture_choices::pour_later(transcriber, held, self.t, &note.id, list);
-                }
-                None
-            }
-            Captured::Kept(note) => {
-                let t = self.t;
-                let list = list.as_deref().unwrap_or("");
-                let details = format!("shopping list {list}: it can no longer be added to");
-                self.announce_done(t.capture_shopping_gone(), details);
-                Some(note)
-            }
+            Captured::Note(note) | Captured::Kept(note) => Some(note),
+            Captured::Poured | Captured::Waiting(_) => None,
         };
         // Only once all of it is written: a failed save keeps it here.
         self.capture.clear();
@@ -4978,8 +5030,7 @@ impl App {
     /// Holds `photo` on the capture field for its Note. No Line holds a
     /// photo, so a Shopping List picked is dropped (UI laws, "Capture").
     fn hold_photo(&mut self, photo: Vec<u8>) {
-        self.held_photos.push(photo);
-        self.capture_choices.shopping = None;
+        capture_choices::hold_photo(&mut self.held_photos, &mut self.capture_choices, photo);
     }
 
     /// Whether photos or recordings wait on the capture field.
@@ -4997,10 +5048,8 @@ impl App {
     /// it holds a photo or a recording that gets no Transcript here.
     fn capture_lists(&self) -> &[ListTitle] {
         let voice = self.recording() || !self.recorded.is_empty();
-        if (voice && !self.transcribes()) || !self.held_photos.is_empty() {
-            return &[];
-        }
-        &self.view.capture_lists
+        let photo = !self.held_photos.is_empty();
+        capture_choices::shopping_offer(&self.view.capture_lists, photo, voice, self.transcribes())
     }
 
     /// Where the Note being captured goes: the Area or Topic picked with
@@ -5736,6 +5785,7 @@ impl App {
                     (Selection::Agenda, icons::AGENDA, t.agenda_title()),
                     (Selection::All, icons::ALL_NOTES, t.all_notes_title()),
                     (Selection::Unsorted, icons::UNSORTED, t.unsorted()),
+                    (Selection::Frogs, icons::FROG, t.frogs_title()),
                 ];
                 for (selection, icon, label) in rows {
                     let on = self.selection == selection;
@@ -5800,6 +5850,8 @@ impl App {
                         for (label, action) in items {
                             if ui.button(RichText::new(label).color(text)).clicked() {
                                 actions.push(action);
+                                // Also a pick by keyboard or screen reader.
+                                ui.close();
                             }
                         }
                     });
@@ -5818,6 +5870,7 @@ impl App {
                             for (label, action) in items {
                                 if ui.button(RichText::new(label).color(text)).clicked() {
                                     actions.push(action);
+                                    ui.close();
                                 }
                             }
                         });
@@ -5926,6 +5979,7 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            name_field(ui, &field, t.capture_field_name());
             if field.changed() {
                 self.paste_empty = false;
             }
@@ -6352,6 +6406,8 @@ impl App {
         let focus = &mut self.text_focus;
         let select = &mut self.text_select;
         let amend = &mut self.amend;
+        let amend_focus = &mut self.amend_focus;
+        let amend_select = &mut self.amend_select;
         let cache = &mut self.photos;
         let store = &self.store;
         let playing = self.playing.as_deref();
@@ -6423,7 +6479,8 @@ impl App {
                     // Ctrl+I as its bold and italic while typing.
                     let selected = format_bar::selection(ui, id, edited);
                     let at = format_bar::At::of(edited, selected, formatted);
-                    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent));
+                    let mut picked =
+                        format_bar::bar(ui, &t, &at, (text, tones.accent), &Format::ALL);
                     if focused {
                         ui.input_mut(|i| {
                             if i.consume_key(Modifiers::COMMAND, Key::B) {
@@ -6533,6 +6590,7 @@ impl App {
                             .desired_width(f32::INFINITY)
                             .frame(Frame::NONE)
                             .show(ui);
+                        name_field(ui, &output.response.response, t.note_text_field_name());
                         // A click on the bar keeps the field being edited.
                         if output.response.response.lost_focus() && picked.is_none() {
                             *editing = false;
@@ -6607,6 +6665,7 @@ impl App {
                                 start: selected.0,
                                 end: selected.1,
                                 url: at.url.clone(),
+                                amend: false,
                             });
                         }
                         Some(format) => {
@@ -6879,15 +6938,57 @@ impl App {
                     return;
                 }
                 embossed(ui, tones, false, None, |ui| {
+                    // The format bar goes with the field (UI laws), as on
+                    // the phone's "Add to Note": without ☐, which the
+                    // Note's text puts in.
+                    let id = Id::new("amend");
+                    let focused = ui.memory(|m| m.has_focus(id));
+                    let selected = format_bar::selection(ui, id, amend);
+                    let at = format_bar::At::of(amend, selected, markdown::uses(amend));
+                    let formats = &Format::ALL[1..];
+                    let mut picked = format_bar::bar(ui, &t, &at, (text, tones.accent), formats);
+                    if focused {
+                        ui.input_mut(|i| {
+                            if i.consume_key(Modifiers::COMMAND, Key::B) {
+                                picked = Some(Format::Bold);
+                            } else if i.consume_key(Modifiers::COMMAND, Key::I) {
+                                picked = Some(Format::Italic);
+                            }
+                        });
+                    }
+                    if std::mem::take(amend_focus) {
+                        match amend_select.take() {
+                            Some(range) => format_bar::select(ui, id, amend, range),
+                            None => ui.memory_mut(|m| m.request_focus(id)),
+                        }
+                    }
                     ui.add(
                         TextEdit::multiline(amend)
-                            .id(Id::new("amend"))
+                            .id(id)
                             .hint_text(t.amend_hint())
                             .text_color(text)
                             .desired_rows(1)
                             .desired_width(f32::INFINITY)
                             .frame(Frame::NONE),
                     );
+                    match picked {
+                        Some(Format::Table) => actions.push(Action::AmendTable(selected.0)),
+                        Some(Format::Link) => actions.push(Action::AskLink {
+                            start: selected.0,
+                            end: selected.1,
+                            url: at.url.clone(),
+                            amend: true,
+                        }),
+                        Some(format) => match format_bar::change(format, amend, selected) {
+                            Some(changed) => {
+                                *amend = changed.text;
+                                let range = (changed.start, changed.end);
+                                format_bar::select(ui, id, amend, range);
+                            }
+                            None => ui.memory_mut(|m| m.request_focus(id)),
+                        },
+                        None => {}
+                    }
                     let ready = !amend.trim().is_empty();
                     ui.horizontal_wrapped(|ui| {
                         let add = ui.add_enabled(
@@ -7296,10 +7397,7 @@ impl App {
                         title: heading,
                         details,
                     } => {
-                        title(ui, heading);
-                        let text = ui.visuals().text_color();
-                        ui.label(RichText::new(details.as_str()).color(text));
-                        if ui.button(RichText::new(t.close()).color(text)).clicked() {
+                        if done_form(ui, &t, heading, details) {
                             actions.push(Action::CloseDialog);
                         }
                     }
@@ -7478,9 +7576,10 @@ impl App {
                             .size(16.0)
                             .color(text),
                     );
+                    // Only today's empty day tells how to capture.
                     if agenda.tomorrow.is_empty() {
                         ui.label(
-                            RichText::new(t.nothing_tomorrow())
+                            RichText::new(t.nothing_planned())
                                 .color(ui.visuals().weak_text_color()),
                         );
                     }
@@ -7681,8 +7780,10 @@ impl App {
     /// too (#90).
     fn close_dialog(&mut self) -> oldbrainfix_core::Result<()> {
         // The link not set: the field has the keyboard again.
-        if matches!(self.dialog, Some(Dialog::Link { .. })) {
-            self.text_focus = true;
+        match self.dialog {
+            Some(Dialog::Link { amend: true, .. }) => self.amend_focus = true,
+            Some(Dialog::Link { .. }) => self.text_focus = true,
+            _ => {}
         }
         let behind = self.dialog_behind.take();
         if let Some(Dialog::Person { id, name, .. }) = self.dialog.take() {
@@ -8418,6 +8519,13 @@ pub(crate) fn icon_button(ui: &mut Ui, icon: char, label: &str, colour: Color32)
     resp.on_hover_text(label)
 }
 
+/// Gives the text field `field` the name a screen reader says for it,
+/// which its hint no longer gives once it holds text.
+pub(crate) fn name_field(ui: &Ui, field: &egui::Response, name: &str) {
+    ui.ctx()
+        .accesskit_node_builder(field.id, |node| node.set_label(name));
+}
+
 /// The heading of a dialog.
 fn title(ui: &mut Ui, title: &str) {
     let text = ui.visuals().text_color();
@@ -8486,6 +8594,15 @@ pub(crate) fn failure_form(
         }
     });
     closed
+}
+
+/// What a job announced at the top did (UI laws, "Announcements"):
+/// `heading` over the full `details`, and Close. Whether it was closed.
+pub(crate) fn done_form(ui: &mut Ui, t: &L10n, heading: &str, details: &str) -> bool {
+    title(ui, heading);
+    let text = ui.visuals().text_color();
+    ui.label(RichText::new(details).color(text));
+    ui.button(RichText::new(t.close()).color(text)).clicked()
 }
 
 /// A `mailto:` link to [`REPORT_MAIL`] carrying `details` and this
@@ -9256,6 +9373,9 @@ fn sent_item_form(
                 if changes.makes_checklist {
                     line(t.sent_item_makes_checklist().to_string());
                 }
+                if changes.makes_shopping_list {
+                    line(t.sent_item_makes_shopping_list().to_string());
+                }
                 if changes.makes_plain {
                     line(t.sent_item_makes_plain().to_string());
                 }
@@ -9313,7 +9433,8 @@ fn sent_item_form(
             if !full {
                 return;
             }
-            // The Lines of a Checklist, to look at, not to check.
+            // The Lines of a Checklist or a Shopping List, to look at,
+            // not to check; a Shopping List's with its reappear time.
             if let Some(lines) = &item.lines {
                 checklist_view::preview(ui, (t, tones), lines);
             }
@@ -10070,7 +10191,13 @@ fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<
 /// phone's menu leads to too. Whether Share was clicked.
 fn occurrence_menu(ui: &mut Ui, t: &L10n) -> bool {
     let text = ui.visuals().text_color();
-    ui.button(RichText::new(t.share()).color(text)).clicked()
+    let share = ui.button(RichText::new(t.share()).color(text)).clicked();
+    // A pick closes the menu, also one by keyboard or screen reader,
+    // which no pointer click closes.
+    if share {
+        ui.close();
+    }
+    share
 }
 
 /// How many Missed Occurrences of one Routine show to check off.

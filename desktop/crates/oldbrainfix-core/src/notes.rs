@@ -500,6 +500,11 @@ impl<'a> Notes<'a> {
         self.store.photo(hash)
     }
 
+    /// Whether the photo `hash` is on this Device, without reading it.
+    pub fn has_photo(&self, hash: &str) -> bool {
+        self.store.has_blob("photo", hash)
+    }
+
     /// Adds the voice recording `bytes` to the Note `note_id`; returns
     /// the hash it is kept under.
     pub fn add_recording(&self, note_id: &str, bytes: &[u8]) -> Result<String> {
@@ -514,6 +519,12 @@ impl<'a> Notes<'a> {
     /// not on this Device (yet).
     pub fn recording_bytes(&self, hash: &str) -> Option<Vec<u8>> {
         self.store.audio(hash)
+    }
+
+    /// Whether the voice recording `hash` is on this Device, without
+    /// reading it.
+    pub fn has_recording(&self, hash: &str) -> bool {
+        self.store.has_blob("audio", hash)
     }
 
     /// Keeps `text`, trimmed, as the Transcript of the voice recording

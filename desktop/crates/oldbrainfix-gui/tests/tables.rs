@@ -231,7 +231,13 @@ fn the_first_columns_menu_marks_it_as_headings() -> TestResult {
 fn the_format_bar_puts_a_new_table_in_and_edits_its_first_cell() -> TestResult {
     let (store, note) = with_note("Shop", "plain")?;
     let mut harness = editor(&store, &note);
-    press(&mut harness, "Table")?;
+    // The Note's bar, the first; "Add to Note" has one too.
+    harness
+        .query_all_by_role_and_label(Role::Button, "Table")
+        .next()
+        .ok_or("Table")?
+        .click_accesskit();
+    harness.run();
     let new = "|  |  |\n| --- | --- |\n|  |  |";
     // A field never typed into has its cursor at the start: before it.
     assert_eq!(

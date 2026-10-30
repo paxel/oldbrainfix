@@ -555,6 +555,16 @@ impl Store {
         self.audio.get(hash)
     }
 
+    /// Whether the bytes of the `kind` (`photo` or `audio`) blob `hash`
+    /// are here, without reading them.
+    pub fn has_blob(&self, kind: &str, hash: &str) -> bool {
+        match kind {
+            "photo" => self.photos.has(hash),
+            "audio" => self.audio.has(hash),
+            _ => false,
+        }
+    }
+
     /// The bytes of the `kind` (`photo` or `audio`) blob `hash`.
     pub fn blob(&self, kind: &str, hash: &str) -> Option<Vec<u8>> {
         match kind {
@@ -1889,6 +1899,8 @@ pub(crate) mod tests {
         );
         assert_eq!(store.photo(&photo).as_deref(), Some(&b"not a jpeg"[..]));
         assert_eq!(store.audio(&photo), None);
+        assert!(store.has_blob("photo", &photo) && store.has_blob("audio", &audio));
+        assert!(!store.has_blob("audio", &photo) && !store.has_blob("photo", "../x"));
         assert!(store.all_entries()?.is_empty());
         Ok(())
     }

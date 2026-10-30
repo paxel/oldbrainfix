@@ -770,12 +770,6 @@ abstract class AppLocalizations {
   /// **'Nothing due today. Tap + to capture a thought.'**
   String get nothingToday;
 
-  /// No description provided for @nothingTomorrow.
-  ///
-  /// In en, this message translates to:
-  /// **'Nothing due tomorrow.'**
-  String get nothingTomorrow;
-
   /// Heading of a day on the Agenda after tomorrow: its weekday and date, as in "Thursday, 29 Oct".
   ///
   /// In en, this message translates to:

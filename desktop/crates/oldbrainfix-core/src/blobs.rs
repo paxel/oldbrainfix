@@ -20,6 +20,11 @@ pub trait Blobs: Send + Sync {
     /// The bytes under `hash`, or `None` when they are not here (yet).
     fn get(&self, hash: &str) -> Option<Vec<u8>>;
 
+    /// Whether the bytes under `hash` are here, without reading them.
+    fn has(&self, hash: &str) -> bool {
+        self.get(hash).is_some()
+    }
+
     /// Lets go of the bytes under `hash`; returns whether they were here.
     fn remove(&self, hash: &str) -> Result<bool>;
 }
@@ -79,6 +84,10 @@ impl Blobs for FileBlobs {
         std::fs::read(self.file(hash)?).ok()
     }
 
+    fn has(&self, hash: &str) -> bool {
+        self.file(hash).is_some_and(|file| file.is_file())
+    }
+
     fn remove(&self, hash: &str) -> Result<bool> {
         let Some(file) = self.file(hash) else {
             return Ok(false);
@@ -108,6 +117,10 @@ impl Blobs for MemoryBlobs {
 
     fn get(&self, hash: &str) -> Option<Vec<u8>> {
         self.held.lock().get(hash).cloned()
+    }
+
+    fn has(&self, hash: &str) -> bool {
+        self.held.lock().contains_key(hash)
     }
 
     fn remove(&self, hash: &str) -> Result<bool> {
@@ -152,9 +165,11 @@ mod tests {
             .map(|e| e.map(|e| e.file_name()))
             .collect::<std::io::Result<_>>()?;
         assert_eq!(names, vec![std::ffi::OsString::from(HASH)]);
+        assert!(blobs.has(HASH) && !blobs.has("../kept"));
         assert!(blobs.remove(HASH)?);
         assert!(!blobs.remove(HASH)?);
         assert_eq!(blobs.get(HASH), None);
+        assert!(!blobs.has(HASH));
         Ok(())
     }
 
@@ -165,6 +180,7 @@ mod tests {
         blobs.put(HASH, b"second")?;
         assert_eq!(blobs.get(HASH).as_deref(), Some(&b"first"[..]));
         assert_eq!(blobs.get("other"), None);
+        assert!(blobs.has(HASH) && !blobs.has("other"));
         assert!(blobs.remove(HASH)?);
         assert_eq!(blobs.get(HASH), None);
         Ok(())

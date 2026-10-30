@@ -6,7 +6,9 @@
 //! without either is left out. When any of these texts is formatted,
 //! `text` holds them as written, the Markdown source among them, and
 //! `html` the whole as HTML ([`markdown::html`]), the plain texts and the
-//! dates in it as they read; else `html` is `None`. `photos` and
+//! dates in it as they read; else `html` is `None`. `markdown` holds
+//! the same as Markdown, the plain texts and the dates escaped so they
+//! read as written (the desktop's "Save as Markdown…"). `photos` and
 //! `recordings` are the hashes of the Note's and then its Sections'
 //! photos and recordings, each once, for the app to hand along as files.
 
@@ -23,6 +25,7 @@ use crate::text_format;
 pub struct NoteShare {
     pub text: String,
     pub html: Option<String>,
+    pub markdown: String,
     pub photos: Vec<String>,
     pub recordings: Vec<String>,
 }
@@ -98,9 +101,11 @@ pub fn note_share(
         }
         out
     };
+    let source = source.join("\n\n");
     NoteShare {
         text: written.join("\n\n"),
-        html: formatted.then(|| markdown::html(&source.join("\n\n"))),
+        html: formatted.then(|| markdown::html(&source)),
+        markdown: source,
         photos: once(
             std::iter::once(&note.photos)
                 .chain(sections.iter().map(|s| &s.photos))
@@ -194,6 +199,13 @@ mod tests {
                 format!("<p><strong>Milk</strong> <em>now</em></p>\n<p>{at}<br>2*3*4 # x</p>\n")
                     .as_str()
             )
+        );
+        // Saved as Markdown, the plain Section reads as written.
+        let plain = markdown::escape("2*3*4 # x");
+        assert!(plain.contains("2\\*3\\*4"), "{plain}");
+        assert_eq!(
+            share.markdown,
+            format!("**Milk** *now*\n\n{}\n{plain}", markdown::escape(&at))
         );
         Ok(())
     }

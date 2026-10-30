@@ -494,11 +494,15 @@ fn entry_row(
         actions.push(TallyAction::EditEntry(entry.id.clone()));
     }
     open.context_menu(|ui| {
+        // A pick closes the menu, also one by keyboard or screen reader,
+        // which no pointer click closes.
         if ui.button(RichText::new(t.edit()).color(text)).clicked() {
             actions.push(TallyAction::EditEntry(entry.id.clone()));
+            ui.close();
         }
         if ui.button(RichText::new(t.delete()).color(text)).clicked() {
             actions.push(TallyAction::AskDelete(entry.id.clone()));
+            ui.close();
         }
     });
 }

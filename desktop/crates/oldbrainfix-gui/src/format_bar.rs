@@ -2,7 +2,8 @@
 //! phone's buttons: ☐ at the start of the line, bold, italic,
 //! strike-through, the two headings, bulleted and numbered items, a
 //! quote, a link, code, an item one level in and out, and a table (#128),
-//! which the window puts in or opens. Each works on the selection of the
+//! which the window puts in or opens. The Amend field has the bar too,
+//! without ☐, as the phone's "Add to Note". Each works on the selection of the
 //! edit field, or on the word at its cursor, with the core's helpers; a
 //! button whose format holds there shows it. The
 //! bar sits above the field and never keeps the keyboard: the field has
@@ -84,7 +85,7 @@ impl Format {
             Format::Strike => Ok(icons::FORMAT_STRIKE),
             Format::Heading1 => Err("H1"),
             Format::Heading2 => Err("H2"),
-            Format::Bullets => Ok(icons::ALL_ROUTINES),
+            Format::Bullets => Ok(icons::FORMAT_BULLETS),
             Format::Numbers => Ok(icons::FORMAT_NUMBERS),
             Format::Quote => Ok(icons::FORMAT_QUOTE),
             Format::Link => Ok(icons::LINK),
@@ -253,13 +254,19 @@ pub fn select(ui: &Ui, id: Id, text: &str, (start, end): (usize, usize)) {
     ui.memory_mut(|m| m.request_focus(id));
 }
 
-/// Draws the bar, each button showing whether its format holds `at`;
-/// gives the button clicked.
-pub fn bar(ui: &mut Ui, t: &L10n, at: &At, (colour, accent): (Color32, Color32)) -> Option<Format> {
+/// Draws the bar of the buttons `formats`, each showing whether its
+/// format holds `at`; gives the button clicked.
+pub fn bar(
+    ui: &mut Ui,
+    t: &L10n,
+    at: &At,
+    (colour, accent): (Color32, Color32),
+    formats: &[Format],
+) -> Option<Format> {
     let mut picked = None;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
-        for format in Format::ALL {
+        for &format in formats {
             if button(ui, t, format, at.holds(format), (colour, accent)).clicked() {
                 picked = Some(format);
             }

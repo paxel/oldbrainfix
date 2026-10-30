@@ -3,8 +3,8 @@
 //! Markdown…". Copying puts the Note's text and its Sections on the
 //! clipboard, with HTML beside formatted text, or plain text through the
 //! window's clipboard when the system's cannot be reached; saving writes
-//! the Markdown file with its photos and recordings beside it, linked by
-//! the phone's names. Copied and saved say nothing; a Note without words
+//! the Markdown file, plain text escaped, with its photos and recordings
+//! in a folder of its own beside it, under the phone's names. Copied and saved say nothing; a Note without words
 //! to copy is announced.
 
 use std::cell::RefCell;
@@ -170,41 +170,66 @@ fn a_note_without_words_is_not_copied_and_says_why() -> TestResult {
 }
 
 #[test]
-fn the_card_saves_markdown_with_its_photos_and_recordings_beside_it() -> TestResult {
+fn the_card_saves_markdown_with_its_photos_and_recordings_in_a_folder_of_its_own() -> TestResult {
     let store = store()?;
     let photo = png()?;
     let voice = media::wav(&[0.0; 160]);
-    let note = Notes::new(&store).capture_with(
-        "Milk, eggs",
+    let notes = Notes::new(&store);
+    let note = notes.capture_with(
+        "Milk *2*, eggs",
         None,
         None,
         std::slice::from_ref(&photo),
         std::slice::from_ref(&voice),
     )?;
+    let other = image::RgbImage::from_pixel(4, 4, image::Rgb([200, 20, 20]));
+    let mut bread_photo = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(other).write_to(&mut bread_photo, image::ImageFormat::Png)?;
+    let bread_photo = bread_photo.into_inner();
+    let bread = notes.capture_with("Bread", None, None, std::slice::from_ref(&bread_photo), &[])?;
     let dir = tempfile::tempdir()?;
-    let target = dir.path().join("Shopping");
+    let targets = Rc::new(RefCell::new(vec![
+        dir.path().join("Bakery"),
+        dir.path().join("Shopping"),
+    ]));
     let asked: Rc<RefCell<Vec<String>>> = Rc::default();
     let mut app = App::new(store, "en");
     {
         let asked = asked.clone();
-        let target = target.clone();
+        let targets = targets.clone();
         app.set_markdown_saver(Box::new(move |_, name| {
             asked.borrow_mut().push(name.to_string());
-            Some(target.clone())
+            targets.borrow_mut().pop()
         }));
     }
     app.select(Selection::All);
     let mut harness = window(app);
-    pick(&mut harness, "Milk, eggs", "Save as Markdown…")?;
-    assert_eq!(asked.borrow().as_slice(), ["Milk eggs.md"]);
+    pick(&mut harness, "Milk *2*, eggs", "Save as Markdown…")?;
+    pick(&mut harness, "Bread", "Save as Markdown…")?;
+    assert_eq!(asked.borrow().as_slice(), ["Milk 2 eggs.md", "Bread.md"]);
+    // Each Note's files in the folder named as its file, beside it.
     let photo_name = format!("photo-{}.png", &note.photos[0][..12]);
     let voice_name = format!("recording-{}.wav", &note.recordings[0][..12]);
-    assert_eq!(std::fs::read(dir.path().join(&photo_name))?, photo);
-    assert_eq!(std::fs::read(dir.path().join(&voice_name))?, voice);
+    let shopping = dir.path().join("Shopping");
+    assert_eq!(std::fs::read(shopping.join(&photo_name))?, photo);
+    assert_eq!(std::fs::read(shopping.join(&voice_name))?, voice);
     let written = std::fs::read_to_string(dir.path().join("Shopping.md"))?;
+    // The plain text is escaped, so it reads as written.
     assert_eq!(
         written,
-        format!("Milk, eggs\n\n![{photo_name}]({photo_name})\n\n[{voice_name}]({voice_name})\n")
+        format!(
+            "Milk \\*2\\*, eggs\n\n![{photo_name}](Shopping/{photo_name})\n\n[{voice_name}](Shopping/{voice_name})\n"
+        )
+    );
+    let bread_name = format!("photo-{}.png", &bread.photos[0][..12]);
+    let bakery: Vec<_> = std::fs::read_dir(dir.path().join("Bakery"))?
+        .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect::<std::io::Result<_>>()?;
+    assert_eq!(bakery, vec![bread_name.clone()]);
+    let written = std::fs::read_to_string(dir.path().join("Bakery.md"))?;
+    assert_eq!(
+        written,
+        format!("Bread\n\n![{bread_name}](Bakery/{bread_name})\n")
     );
     assert_eq!(harness.state().notice(), None);
     Ok(())

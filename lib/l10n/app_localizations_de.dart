@@ -387,9 +387,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Heute steht nichts an. Tippe auf +, um einen Gedanken festzuhalten.';
 
   @override
-  String get nothingTomorrow => 'Morgen steht nichts an.';
-
-  @override
   String agendaDay(DateTime day) {
     final intl.DateFormat dayDateFormat = intl.DateFormat(
       'EEEE, d. MMM',

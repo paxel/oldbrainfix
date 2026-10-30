@@ -55,7 +55,7 @@ Maintainer: paxel <taum@tuta.io>
 Depends: libc6, libgcc-s1, libstdc++6, libxkbcommon0, libasound2t64 | libasound2
 Homepage: https://github.com/paxel/oldbrainfix
 Description: Memory aid for forgetful minds
- Old Brain Fix captures a thought in one tap and nags until it is
+ Old Brain Fix captures a thought in seconds and nags until it is
  sorted or done: Notes, Routines and Reminders, kept on this machine
  and synced with the phone over the home network or a shared folder,
  with no server and no account.

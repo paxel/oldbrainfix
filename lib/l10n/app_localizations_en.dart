@@ -383,9 +383,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nothingToday => 'Nothing due today. Tap + to capture a thought.';
 
   @override
-  String get nothingTomorrow => 'Nothing due tomorrow.';
-
-  @override
   String agendaDay(DateTime day) {
     final intl.DateFormat dayDateFormat = intl.DateFormat(
       'EEEE, d MMM',

@@ -18,7 +18,10 @@
 //! transcribes only what is written, such a capture is written Unsorted
 //! with nothing else and goes into the list once the Transcripts are
 //! there ([`pour_later`]); without one it stays a Note, announced at the
-//! top. No Line holds a photo, so a photo keeps it a Note.
+//! top. No Line holds a photo: a photo held drops the list picked, and
+//! no list is offered while one is ([`shopping_offer`], [`hold_photo`]).
+//! The popup and the window both save through [`save`], so the two
+//! cannot tell this apart.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -338,6 +341,103 @@ pub fn capture(
     Ok(Captured::Waiting(note))
 }
 
+/// The full text behind "kept as a Note": the Shopping List `list` can
+/// no longer be added to.
+fn gone_details(list: &str) -> String {
+    format!("shopping list {list}: it can no longer be added to")
+}
+
+/// The full text behind "kept as a Note": the recording for the Shopping
+/// List `list` gets no Transcript here.
+fn untranscribed_details(list: &str) -> String {
+    format!("shopping list {list}: no speech model to transcribe with")
+}
+
+/// What is held with the text being captured: the photos and the
+/// recordings, and whether a recording gets its Transcript here.
+#[derive(Debug, Clone, Copy)]
+pub struct Held<'a> {
+    pub photos: &'a [Vec<u8>],
+    pub recordings: &'a [Vec<u8>],
+    pub transcribes: bool,
+}
+
+/// Saves a capture as the popup and the window do: [`capture`] of `text`
+/// with what is `held` and `choices`, a recording without a Transcript to
+/// come keeping it a Note. A Note waiting for its Transcripts goes into
+/// the Shopping List through `transcriber` once they are there. With it,
+/// what to announce at the top when the capture was kept as a Note
+/// instead of going into the list picked.
+pub fn save(
+    (store, wall): (&Arc<Store>, &Wall),
+    text: &str,
+    place: Option<&str>,
+    nudge_in: Duration,
+    held: Held<'_>,
+    choices: &CaptureChoices,
+    (transcriber, t): (Option<&Enricher>, L10n),
+) -> oldbrainfix_core::Result<(Captured, Option<Said>)> {
+    let picked = choices.shopping.as_deref();
+    // Without a Transcript to come, a recording keeps it a Note, as said
+    // once it is saved; a photo keeps it a Note anyway.
+    let untranscribed = picked.is_some()
+        && held.photos.is_empty()
+        && !held.recordings.is_empty()
+        && !held.transcribes;
+    let mut writing = choices.clone();
+    if untranscribed {
+        writing.shopping = None;
+    }
+    let captured = capture(
+        store,
+        text,
+        place,
+        nudge_in,
+        (held.photos, held.recordings),
+        (&writing, &**wall),
+    )?;
+    let list = picked.unwrap_or("");
+    let said = match &captured {
+        Captured::Waiting(note) => {
+            if let (Some(transcriber), Some(list)) = (transcriber, &writing.shopping) {
+                let kept = (store.clone(), wall.clone());
+                pour_later(transcriber, kept, t, &note.id, list);
+            }
+            None
+        }
+        Captured::Kept(_) => Some((t.capture_shopping_gone(), gone_details(list))),
+        Captured::Note(_) if untranscribed => Some((
+            t.capture_shopping_untranscribed(),
+            untranscribed_details(list),
+        )),
+        _ => None,
+    };
+    Ok((captured, said))
+}
+
+/// Holds `photo` with the `photos` of the Note being captured. No Line
+/// holds a photo, so the Shopping List picked in `choices` is dropped
+/// (UI laws, "Capture").
+pub fn hold_photo(photos: &mut Vec<Vec<u8>>, choices: &mut CaptureChoices, photo: Vec<u8>) {
+    photos.push(photo);
+    choices.shopping = None;
+}
+
+/// The Shopping Lists among `lists` a capture can go into: none while it
+/// holds a photo (`photo_held`), nor while it holds voice that gets no
+/// Transcript here.
+pub fn shopping_offer(
+    lists: &[ListTitle],
+    photo_held: bool,
+    voice: bool,
+    transcribes: bool,
+) -> &[ListTitle] {
+    if photo_held || (voice && !transcribes) {
+        return &[];
+    }
+    lists
+}
+
 /// Makes the text of the Note `note`, just captured, a formatted text
 /// when it was typed or pasted with a format (#127, ADR 0033).
 fn formatted(store: &Store, note: &Note) -> oldbrainfix_core::Result<()> {
@@ -412,10 +512,7 @@ pub fn pour_later(
                 return stays.then_some((t.capture_shopping_untranscribed(), details));
             }
             match pour(&store, &note, &list, &*wall) {
-                Ok(Some(false)) => Some((
-                    t.capture_shopping_gone(),
-                    format!("shopping list {list}: it can no longer be added to"),
-                )),
+                Ok(Some(false)) => Some((t.capture_shopping_gone(), gone_details(&list))),
                 Ok(_) => None,
                 Err(e) => Some((t.action_failed(), e.to_string())),
             }

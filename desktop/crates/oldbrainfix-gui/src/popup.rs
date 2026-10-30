@@ -28,7 +28,9 @@
 //! Its Paste button, and Ctrl+V in the empty field, take the clipboard's
 //! text into the field and its picture into the Note, held as a
 //! recording is and saved with the rest; a clipboard with neither leaves
-//! a grey line above the field (#130). The field has one line: a pasted
+//! a grey line above the field (#130). No Line holds a picture: one
+//! pasted drops a Shopping List picked, and none is offered while it is
+//! held, as in the window. The field has one line: a pasted
 //! text keeps its line breaks in the Note all the same.
 //!
 //! Closing the popup gives the keyboard back to the window that had it
@@ -48,8 +50,8 @@ use oldbrainfix_core::{
     APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic, markdown, text_format,
 };
 
-use crate::app::{Wall, failure_form, local_wall, region_of};
-use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Opens};
+use crate::app::{Wall, done_form, failure_form, local_wall, name_field, region_of};
+use crate::capture_choices::{self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens};
 use crate::cli::note_text;
 use crate::enrich::Enricher;
 use crate::icons;
@@ -108,11 +110,12 @@ enum PageAsk {
     Tally(FormIntent),
 }
 
-/// A failure announced at the top of the popup: what it says, why, and
-/// the full text.
+/// What is announced at the top of the popup: what it says, why for a
+/// failure (`None` for a job that finished another way than asked, as
+/// the window's announcements), and the full text.
 struct Failure {
     said: &'static str,
-    cause: &'static str,
+    cause: Option<&'static str>,
     details: String,
 }
 
@@ -121,7 +124,7 @@ impl Failure {
     fn of(t: &L10n, error: &oldbrainfix_core::Error) -> Failure {
         Failure {
             said: t.action_failed(),
-            cause: t.action_failed_cause(),
+            cause: Some(t.action_failed_cause()),
             details: error.to_string(),
         }
     }
@@ -229,14 +232,12 @@ impl CapturePopup {
             .is_some_and(|(_, speech)| speech.as_ref().is_none_or(|s| s.current().is_some()))
     }
 
-    /// The Shopping Lists the lines can go into: none while a recording
-    /// gets no Transcript here.
+    /// The Shopping Lists the lines can go into: none while a photo is
+    /// held or a recording gets no Transcript here.
     fn offered_lists(&self) -> &[ListTitle] {
         let voice = self.recording() || !self.recorded.is_empty();
-        if voice && !self.transcribes() {
-            return &[];
-        }
-        &self.lists
+        let photo = !self.photos.is_empty();
+        capture_choices::shopping_offer(&self.lists, photo, voice, self.transcribes())
     }
 
     /// Whether a voice recording runs.
@@ -288,7 +289,11 @@ impl CapturePopup {
         let Some(failure) = &self.error else {
             return;
         };
-        let colour = ui.visuals().error_fg_color;
+        let colour = if failure.cause.is_some() {
+            ui.visuals().error_fg_color
+        } else {
+            ui.visuals().text_color()
+        };
         let label =
             egui::Label::new(RichText::new(failure.said).color(colour)).sense(egui::Sense::click());
         if ui.add(label).clicked() {
@@ -310,13 +315,16 @@ impl CapturePopup {
         let mut closed = false;
         let modal = egui::Modal::new(Id::new("popup failure")).show(ctx, |ui| {
             ui.set_width(360.0);
-            closed = failure_form(
-                ui,
-                &t,
-                t.action_failed_title(),
-                (failure.cause, t.action_failed_fix()),
-                &failure.details,
-            );
+            closed = match failure.cause {
+                Some(cause) => failure_form(
+                    ui,
+                    &t,
+                    t.action_failed_title(),
+                    (cause, t.action_failed_fix()),
+                    &failure.details,
+                ),
+                None => done_form(ui, &t, failure.said, &failure.details),
+            };
         });
         if closed || modal.should_close() {
             self.failure_open = false;
@@ -383,30 +391,24 @@ impl CapturePopup {
         {
             self.recorded.push(bytes);
         }
-        // Without a Transcript to come, a recording keeps it a Note, as
-        // said once it is saved.
-        let picked = self.choices.shopping.clone();
-        // A photo keeps it a Note anyway.
-        let untranscribed = picked.is_some()
-            && self.photos.is_empty()
-            && !self.recorded.is_empty()
-            && !self.transcribes();
-        let mut choices = self.choices.clone();
-        if untranscribed {
-            choices.shopping = None;
-        }
-        let list = choices.shopping.clone();
-        let saved = capture_choices::capture(
-            &self.store,
+        let held = Held {
+            photos: &self.photos,
+            recordings: &self.recorded,
+            transcribes: self.transcribes(),
+        };
+        let transcriber = self.transcriber.as_ref().map(|(enricher, _)| enricher);
+        let saved = capture_choices::save(
+            (&self.store, &self.wall),
             &self.text,
             self.choices.place.as_deref(),
             nudge_in,
-            (&self.photos, &self.recorded),
-            (&choices, &*self.wall),
+            held,
+            &self.choices,
+            (transcriber, self.t),
         );
         match saved {
             // Only once all of it is written: a failed save keeps it here.
-            Ok(saved) => {
+            Ok((saved, said)) => {
                 self.text.clear();
                 self.recorded.clear();
                 self.photos.clear();
@@ -414,36 +416,17 @@ impl CapturePopup {
                 self.error = None;
                 self.choices = CaptureChoices::default();
                 self.page = None;
-                if let (Captured::Waiting(note), Some((transcriber, _)), Some(list)) =
-                    (&saved, &self.transcriber, &list)
-                {
-                    let held = (self.store.clone(), self.wall.clone());
-                    capture_choices::pour_later(transcriber, held, self.t, &note.id, list);
-                }
                 if !matches!(saved, Captured::Nothing)
                     && let Some(saved) = &self.saved
                 {
                     saved();
                 }
                 // Kept as a Note instead: said here, as the popup is all
-                // there is to say it.
-                let t = self.t;
-                let list = picked.as_deref().unwrap_or("");
-                let said = match saved {
-                    Captured::Kept(_) => Some((
-                        t.capture_shopping_gone(),
-                        format!("shopping list {list}: it can no longer be added to"),
-                    )),
-                    Captured::Note(_) if untranscribed => Some((
-                        t.capture_shopping_untranscribed(),
-                        format!("shopping list {list}: no speech model to transcribe with"),
-                    )),
-                    _ => None,
-                };
+                // there is to say it, the window's way.
                 if let Some((said, details)) = said {
                     self.error = Some(Failure {
                         said,
-                        cause: said,
+                        cause: None,
                         details,
                     });
                     self.read_places();
@@ -558,6 +541,7 @@ impl CapturePopup {
                         .font(FontId::proportional(18.0))
                         .desired_width(f32::INFINITY),
                 );
+                name_field(ui, &field, t.capture_field_name());
                 if field.changed() {
                     self.paste_empty = false;
                 }
@@ -643,7 +627,7 @@ impl CapturePopup {
             } else {
                 self.error = Some(Failure {
                     said: t.microphone_missing(),
-                    cause: t.microphone_missing(),
+                    cause: Some(t.microphone_missing()),
                     details: "record: no microphone".into(),
                 });
             }
@@ -673,7 +657,7 @@ impl CapturePopup {
             paste::insert(ui, id, &mut self.text, text);
         }
         if let Some(photo) = pasted.photo {
-            self.photos.push(photo);
+            capture_choices::hold_photo(&mut self.photos, &mut self.choices, photo);
         }
     }
 
