@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
@@ -177,6 +178,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "take" -> takePhoto(result)
                     "pick" -> pickPhotos(result)
+                    "paste" -> paste(result)
                     "shared" -> inBackground(result) { Shares.take() }
                     else -> result.notImplemented()
                 }
@@ -567,6 +569,32 @@ class MainActivity : FlutterActivity() {
         }
         photoAnswer?.success(null)
         photoAnswer = result
+    }
+
+    /**
+     * Reads the clipboard for Paste in Capture, only when it was tapped:
+     * its text and its pictures, made into photos as the gallery's are.
+     * The clip is read here, while the app has the focus; its pictures
+     * are read and decoded off the main thread.
+     */
+    private fun paste(result: MethodChannel.Result) {
+        val clip = runCatching { getSystemService(ClipboardManager::class.java)?.primaryClip }
+            .getOrNull()
+        val items = clip?.let { (0 until it.itemCount).map(it::getItemAt) }.orEmpty()
+        inBackground(result) {
+            val (text, pictures) = Clipboards.taken(
+                items.map { item ->
+                    val type = item.uri?.let { runCatching { contentResolver.getType(it) }.getOrNull() }
+                    Clipboards.Item(item.text, item.uri, type)
+                },
+            )
+            mapOf(
+                "text" to text,
+                "photos" to pictures.mapNotNull { uri ->
+                    Photos.normalize { contentResolver.openInputStream(uri) }
+                },
+            )
+        }
     }
 
     /**

@@ -533,6 +533,7 @@ fn run() -> Result<i32, String> {
         Rc::new(move || {
             let mut popup = CapturePopup::new(store.clone(), locale);
             popup.set_recorder(Box::new(MicRecorder::default()));
+            popup.set_clipboard(Box::new(SystemClipboard::default()));
             popup.set_transcriber(transcriber.clone(), Some(speech.clone()));
             let saved = saved.clone();
             popup.on_saved(Box::new(move || saved()));

@@ -25,6 +25,12 @@
 //! The Nudge times, Save, Enter, Esc and closing end a recording still
 //! running and keep it as well, so a recording is never lost.
 //!
+//! Its Paste button, and Ctrl+V in the empty field, take the clipboard's
+//! text into the field and its picture into the Note, held as a
+//! recording is and saved with the rest; a clipboard with neither leaves
+//! a grey line above the field (#130). The field has one line: a pasted
+//! text keeps its line breaks in the Note all the same.
+//!
 //! Closing the popup gives the keyboard back to the window that had it
 //! where the system does so for a closed window: on X11, Windows and
 //! macOS mostly. On Wayland the compositor decides that, and whether the
@@ -48,8 +54,9 @@ use crate::cli::note_text;
 use crate::enrich::Enricher;
 use crate::icons;
 use crate::l10n::L10n;
-use crate::media::Recorder;
+use crate::media::{Clipboard, Recorder};
 use crate::media_view::{self, Voice};
+use crate::paste;
 use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
 use crate::speech::SpeechModel;
@@ -136,6 +143,14 @@ pub struct CapturePopup {
     recorder: Option<Box<dyn Recorder>>,
     /// The recordings that ended, held until the Note is saved.
     recorded: Vec<Vec<u8>>,
+    clipboard: Option<Box<dyn Clipboard>>,
+    /// The pictures pasted, held until the Note is saved.
+    photos: Vec<Vec<u8>>,
+    /// Whether the last Paste found nothing, said in grey above the
+    /// field until something is pasted or typed.
+    paste_empty: bool,
+    /// Whether Ctrl+V's paste was taken, until its keys are let go.
+    paste_held: bool,
     /// What was set up for the Note, not written yet.
     choices: CaptureChoices,
     /// The Areas with their Topics "File into…" lists, read as the popup
@@ -168,6 +183,10 @@ impl CapturePopup {
             saved: None,
             recorder: None,
             recorded: Vec::new(),
+            clipboard: None,
+            photos: Vec::new(),
+            paste_empty: false,
+            paste_held: false,
             choices: CaptureChoices::default(),
             areas: Vec::new(),
             spawns: true,
@@ -184,6 +203,11 @@ impl CapturePopup {
     /// The microphone voice Notes are recorded with.
     pub fn set_recorder(&mut self, recorder: Box<dyn Recorder>) {
         self.recorder = Some(recorder);
+    }
+
+    /// The clipboard Paste reads.
+    pub fn set_clipboard(&mut self, clipboard: Box<dyn Clipboard>) {
+        self.clipboard = Some(clipboard);
     }
 
     /// The thread making Transcripts and the speech model it needs, for
@@ -362,7 +386,11 @@ impl CapturePopup {
         // Without a Transcript to come, a recording keeps it a Note, as
         // said once it is saved.
         let picked = self.choices.shopping.clone();
-        let untranscribed = picked.is_some() && !self.recorded.is_empty() && !self.transcribes();
+        // A photo keeps it a Note anyway.
+        let untranscribed = picked.is_some()
+            && self.photos.is_empty()
+            && !self.recorded.is_empty()
+            && !self.transcribes();
         let mut choices = self.choices.clone();
         if untranscribed {
             choices.shopping = None;
@@ -373,7 +401,7 @@ impl CapturePopup {
             &self.text,
             self.choices.place.as_deref(),
             nudge_in,
-            (&[], &self.recorded),
+            (&self.photos, &self.recorded),
             (&choices, &*self.wall),
         );
         match saved {
@@ -381,6 +409,8 @@ impl CapturePopup {
             Ok(saved) => {
                 self.text.clear();
                 self.recorded.clear();
+                self.photos.clear();
+                self.paste_empty = false;
                 self.error = None;
                 self.choices = CaptureChoices::default();
                 self.page = None;
@@ -441,8 +471,10 @@ impl CapturePopup {
             .as_ref()
             .filter(|r| r.recording())
             .map(|r| r.elapsed());
-        let typed =
-            note_text(&self.text).is_some() || recording.is_some() || !self.recorded.is_empty();
+        let typed = note_text(&self.text).is_some()
+            || recording.is_some()
+            || !self.recorded.is_empty()
+            || !self.photos.is_empty();
         // Enter on a focused button is that button's.
         let in_field = ui.memory(|m| m.has_focus(id));
         let typing = ui.ctx().text_edit_focused();
@@ -488,6 +520,8 @@ impl CapturePopup {
         let mut asked = None;
         let held = self.recorded.len();
         let has_recorder = self.recorder.is_some();
+        let has_clipboard = self.clipboard.is_some();
+        let mut pasting = false;
         let sorted = self.choices.sorted(self.choices.place.as_deref());
         let place_chip = self.choices.place.as_ref().and_then(|place| {
             capture_choices::place_name(&t, &self.areas, place).map(|name| (name, true))
@@ -504,6 +538,18 @@ impl CapturePopup {
                 if let Some(chip) = capture_choices::chips(ui, &t, &self.choices, shown) {
                     asked = Some(chip);
                 }
+                // Ctrl+V in the empty field takes text and picture alike,
+                // before the field takes the text alone.
+                let blank = self.text.trim().is_empty();
+                if has_clipboard
+                    && recording.is_none()
+                    && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
+                {
+                    self.paste(ui, id, text);
+                }
+                if self.paste_empty {
+                    paste::empty_line(ui, &t);
+                }
                 let field = ui.add(
                     TextEdit::singleline(&mut self.text)
                         .id(id)
@@ -512,6 +558,9 @@ impl CapturePopup {
                         .font(FontId::proportional(18.0))
                         .desired_width(f32::INFINITY),
                 );
+                if field.changed() {
+                    self.paste_empty = false;
+                }
                 // The keyboard types into the field unless Tab took it on.
                 if ui.memory(|m| m.focused().is_none()) {
                     field.request_focus();
@@ -526,13 +575,24 @@ impl CapturePopup {
                         ui.label(RichText::new(t.voice_recording()).color(text));
                     });
                 }
-                if has_recorder {
-                    match media_view::voice_button(ui, &t, recording) {
-                        Some(Voice::Record) => record = true,
-                        Some(Voice::Stop) => stop = true,
-                        None => {}
-                    }
+                for _ in &self.photos {
+                    ui.horizontal(|ui| {
+                        icons::show(ui, icons::PHOTO, 18.0, text);
+                        ui.label(RichText::new(t.photo()).color(text));
+                    });
                 }
+                ui.horizontal(|ui| {
+                    if has_recorder {
+                        match media_view::voice_button(ui, &t, recording) {
+                            Some(Voice::Record) => record = true,
+                            Some(Voice::Stop) => stop = true,
+                            None => {}
+                        }
+                    }
+                    if has_clipboard && recording.is_none() && paste::button(ui, &t) {
+                        pasting = true;
+                    }
+                });
                 ui.add_space(4.0);
                 let offer = (self.areas.as_slice(), self.spawns, lists.as_slice());
                 if let Some(button) = capture_choices::action_row(ui, &t, &self.choices, offer) {
@@ -588,12 +648,32 @@ impl CapturePopup {
                 });
             }
         }
+        if pasting {
+            self.paste(ui, id, None);
+        }
         if let Some(asked) = asked {
             self.ask(ui.ctx(), asked);
         }
         match picked {
             Some(nudge_in) => self.save(nudge_in),
             None => Outcome::Open,
+        }
+    }
+
+    /// Pastes into the field `id`: the clipboard's text, or `text` when
+    /// Ctrl+V brought it, at its cursor, and its picture held for the
+    /// Note; with neither, the grey line says so.
+    fn paste(&mut self, ui: &Ui, id: Id, text: Option<String>) {
+        let Some(clipboard) = self.clipboard.as_deref_mut() else {
+            return;
+        };
+        let pasted = paste::take(clipboard, text);
+        self.paste_empty = pasted.is_empty();
+        if let Some(text) = &pasted.text {
+            paste::insert(ui, id, &mut self.text, text);
+        }
+        if let Some(photo) = pasted.photo {
+            self.photos.push(photo);
         }
     }
 

@@ -107,6 +107,7 @@ use crate::media_view::{
     self, Generated, Offers, Photo, PhotoCache, Recording, Speech, Viewer, Voice,
 };
 use crate::names::{area_name, offered_area_name, topic_name};
+use crate::paste;
 use crate::person_view::{self, Comparing, PersonAction, PersonView, SendBack};
 use crate::profile_view::{self, CardForm, ProfileAction, ProfileView, Square};
 use crate::ring::{self, Rung};
@@ -667,8 +668,8 @@ enum Action {
     /// Plays recordings at this speed from now on, the one playing
     /// included, and keeps it on this Device.
     Speed(f64),
-    /// Keeps the picture on the clipboard as a photo Note.
-    PastePhoto,
+    /// Keeps this picture pasted as a photo Note, with what is typed.
+    PastedPhoto(Vec<u8>),
     /// Asks the system's dialog for pictures and sound files and makes
     /// them into a Note.
     PickFiles,
@@ -1026,6 +1027,11 @@ pub struct App {
     /// Note is saved.
     recorded: Vec<Vec<u8>>,
     clipboard: Option<Box<dyn Clipboard>>,
+    /// Whether the last Paste found nothing, said in grey above the
+    /// capture field until something is pasted or typed (#130).
+    paste_empty: bool,
+    /// Whether Ctrl+V's paste was taken, until its keys are let go.
+    paste_held: bool,
     /// The background threads making Transcripts and Photo Texts.
     transcriber: Option<Enricher>,
     reader: Option<Enricher>,
@@ -1299,6 +1305,8 @@ impl App {
             speed,
             recorded: Vec::new(),
             clipboard: None,
+            paste_empty: false,
+            paste_held: false,
             transcriber: None,
             reader: None,
             speech: None,
@@ -3479,16 +3487,7 @@ impl App {
                 }
                 DeviceSettings::new(&self.store).set_playback_speed(speed)?;
             }
-            Action::PastePhoto => {
-                let photo = self.clipboard.as_mut().and_then(|c| c.photo());
-                let Some(photo) = photo else {
-                    let t = self.t;
-                    self.announce_refusal(
-                        t.paste_no_picture(),
-                        "paste: no picture on the clipboard",
-                    );
-                    return Ok(());
-                };
+            Action::PastedPhoto(photo) => {
                 self.capture_note(Notes::default_nudge(), &[photo], &[])?;
             }
             Action::PickFiles => {
@@ -4848,6 +4847,24 @@ impl App {
         Ok(())
     }
 
+    /// Pastes into the capture field `id` (#130): the clipboard's text,
+    /// or `text` when Ctrl+V brought it, at its cursor, and its picture
+    /// kept at once as a photo Note with what is typed, as files are;
+    /// with neither, the grey line says so.
+    fn paste(&mut self, ui: &Ui, id: Id, text: Option<String>, actions: &mut Vec<Action>) {
+        let Some(clipboard) = self.clipboard.as_deref_mut() else {
+            return;
+        };
+        let pasted = paste::take(clipboard, text);
+        self.paste_empty = pasted.is_empty();
+        if let Some(text) = &pasted.text {
+            paste::insert(ui, id, &mut self.capture, text);
+        }
+        if let Some(photo) = pasted.photo {
+            actions.push(Action::PastedPhoto(photo));
+        }
+    }
+
     /// Whether a recording captured now gets its Transcript here: with
     /// the thread making them and a speech model in use.
     fn transcribes(&self) -> bool {
@@ -5758,7 +5775,19 @@ impl App {
             if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, shown) {
                 actions.push(Action::CaptureChoice(asked));
             }
-            ui.add(
+            // Ctrl+V in the empty field takes text and picture alike,
+            // before the field takes the text alone (#130).
+            let blank = self.capture.trim().is_empty();
+            if has_clipboard
+                && recording.is_none()
+                && let Some(text) = paste::ctrl_v(ui, id, blank, &mut self.paste_held)
+            {
+                self.paste(ui, id, text, actions);
+            }
+            if self.paste_empty {
+                paste::empty_line(ui, &t);
+            }
+            let field = ui.add(
                 TextEdit::multiline(&mut self.capture)
                     .id(id)
                     .hint_text(t.capture_hint())
@@ -5768,6 +5797,9 @@ impl App {
                     .desired_width(f32::INFINITY)
                     .frame(Frame::NONE),
             );
+            if field.changed() {
+                self.paste_empty = false;
+            }
             // A stopped recording stays here until the Note is saved.
             for _ in &self.recorded {
                 ui.horizontal(|ui| {
@@ -5783,15 +5815,9 @@ impl App {
                 }
             }
             if has_clipboard && recording.is_none() {
-                ui.horizontal(|ui| {
-                    icons::show(ui, icons::PASTE, 20.0, text);
-                    if ui
-                        .button(RichText::new(t.paste_photo()).color(text))
-                        .clicked()
-                    {
-                        actions.push(Action::PastePhoto);
-                    }
-                });
+                if paste::button(ui, &t) {
+                    self.paste(ui, id, None, actions);
+                }
                 ui.label(RichText::new(t.photos_hint()).small().color(weak));
             }
             if recording.is_none() {

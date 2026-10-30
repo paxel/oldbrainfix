@@ -34,6 +34,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gallery => 'Gallery';
 
   @override
+  String get paste => 'Paste';
+
+  @override
+  String get pasteEmpty =>
+      'Nothing to paste: the clipboard holds no text and no picture.';
+
+  @override
   String get text => 'Text';
 
   @override

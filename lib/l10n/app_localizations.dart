@@ -146,6 +146,18 @@ abstract class AppLocalizations {
   /// **'Gallery'**
   String get gallery;
 
+  /// Capture button and "+" fan way that fills the capture screen from the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get paste;
+
+  /// Line above the capture field after Paste found nothing usable on the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to paste: the clipboard holds no text and no picture.'**
+  String get pasteEmpty;
+
   /// No description provided for @text.
   ///
   /// In en, this message translates to:

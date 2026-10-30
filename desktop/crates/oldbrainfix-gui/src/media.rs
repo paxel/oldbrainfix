@@ -87,6 +87,12 @@ pub trait Clipboard {
     /// there is none.
     fn photo(&mut self) -> Option<Vec<u8>>;
 
+    /// The text on the clipboard; `None` when there is none, or only
+    /// blanks (#130).
+    fn text(&mut self) -> Option<String> {
+        None
+    }
+
     /// Puts `text` on the clipboard, with `html` beside it for apps that
     /// take formatted text (#129); whether it is there. A clipboard that
     /// cannot leaves it to the window's own, which takes plain text.
@@ -565,6 +571,11 @@ impl Clipboard for SystemClipboard {
             Some(html) => clipboard.set_html(html, Some(text)).is_ok(),
             None => clipboard.set_text(text).is_ok(),
         }
+    }
+
+    fn text(&mut self) -> Option<String> {
+        let text = self.open()?.get_text().ok()?;
+        (!text.trim().is_empty()).then(|| text.replace("\r\n", "\n"))
     }
 
     fn photo(&mut self) -> Option<Vec<u8>> {

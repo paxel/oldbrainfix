@@ -254,7 +254,7 @@ fn a_photo_keeps_the_capture_a_note() -> TestResult {
     let mut harness = window(app);
     type_rows(&mut harness, &["Bread"]);
     pick(&mut harness, "Groceries");
-    click(&mut harness, t().paste_photo());
+    click(&mut harness, t().paste());
     let kept = others(&store, &list)?;
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].text, "Bread");

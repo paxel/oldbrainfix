@@ -302,16 +302,18 @@ fn a_pasted_picture_becomes_a_photo_note_kept_the_phones_way() -> TestResult {
     let store = empty_store()?;
     let devices: Shared = Rc::default();
     let mut harness = window(store.clone(), &devices);
-    harness.get_by_label("Paste a picture").click();
+    harness.get_by_label("Paste").click();
     harness.run();
-    assert_eq!(
-        harness.state().notice(),
-        Some("There is no picture on the clipboard.")
-    );
+    // Nothing there is said in grey, not announced (#130).
+    assert_eq!(harness.state().notice(), None);
+    assert!(shows(
+        &harness,
+        "Nothing to paste: the clipboard holds no text and no picture."
+    ));
     let photo = media::photo_from_file(&png(40, 30)).ok_or("a photo")?;
     devices.borrow_mut().clipboard = Some(photo.clone());
     type_into(&mut harness, "What's on your mind?", "Parking spot");
-    harness.get_by_label("Paste a picture").click();
+    harness.get_by_label("Paste").click();
     harness.run();
     assert_eq!(harness.state().error(), None);
     let notes = Notes::new(&store).all()?;

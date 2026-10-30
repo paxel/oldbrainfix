@@ -774,6 +774,7 @@ class _HomeState extends State<_Home> {
       voice: way == CaptureWay.voice,
       photo: way == CaptureWay.photo,
       gallery: way == CaptureWay.gallery,
+      paste: way == CaptureWay.paste,
       onChanged: () {},
     ),
   );

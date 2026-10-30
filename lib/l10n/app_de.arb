@@ -8,6 +8,8 @@
   "photo": "Foto",
   "voice": "Sprache",
   "gallery": "Galerie",
+  "paste": "Einfügen",
+  "pasteEmpty": "Nichts zum Einfügen: Die Zwischenablage enthält weder Text noch Bild.",
   "text": "Text",
   "captureFanClose": "Schließen",
   "photoMissing": "Foto nicht auf diesem Gerät",

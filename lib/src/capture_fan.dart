@@ -5,7 +5,7 @@ import 'photo_platform.dart';
 import 'voice_platform.dart';
 
 /// A way the Agenda's "+" fans out to capture a Note.
-enum CaptureWay { text, voice, photo, gallery }
+enum CaptureWay { text, voice, photo, gallery, paste }
 
 /// The Agenda's "+" opened: the [ways] fanned out upward from the button
 /// at [anchor], each an icon with its words, Text nearest the button,
@@ -50,6 +50,7 @@ class CaptureFanRoute extends PopupRoute<CaptureWay> {
         CaptureWay.voice => (Icons.mic_none, t.voice),
         CaptureWay.photo => (Icons.photo_camera_outlined, t.photo),
         CaptureWay.gallery => (Icons.photo_library_outlined, t.gallery),
+        CaptureWay.paste => (Icons.content_paste, t.paste),
       };
       return Padding(
         padding: const EdgeInsets.only(top: 12),
@@ -108,6 +109,7 @@ CaptureFanRoute? captureFanFor(BuildContext context, GlobalKey plus) {
       if (VoiceScope.of(context).available) CaptureWay.voice,
       if (photos.available) CaptureWay.photo,
       if (photos.pickable) CaptureWay.gallery,
+      if (photos.pasteable) CaptureWay.paste,
     ],
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
   );

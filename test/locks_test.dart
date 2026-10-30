@@ -217,7 +217,7 @@ void main() {
       await start(tester);
 
       await tap(tester, find.byIcon(Icons.add));
-      for (final way in ['text', 'photo', 'gallery']) {
+      for (final way in ['text', 'photo', 'gallery', 'paste']) {
         expect(fanEntry(way), findsOneWidget);
       }
       await tap(tester, fanEntry('photo'));
@@ -225,6 +225,23 @@ void main() {
       expect(photos.taken, 1);
       expect(find.byType(CaptureScreen), findsOneWidget);
       await back(tester);
+      expect(notes.all().single.photos, hasLength(1));
+      expect(lockScreen, findsOneWidget);
+    });
+
+    testWidgets('lets Paste in the fan of "+" capture without unlocking', (
+      tester,
+    ) async {
+      photos.clipboard = SharedItem(text: 'pills', photos: [onePixelPng]);
+      await start(tester);
+
+      await tap(tester, find.byIcon(Icons.add));
+      await tap(tester, fanEntry('paste'));
+
+      expect(photos.pastes, 1);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      await back(tester);
+      expect(notes.all().single.text, 'pills');
       expect(notes.all().single.photos, hasLength(1));
       expect(lockScreen, findsOneWidget);
     });

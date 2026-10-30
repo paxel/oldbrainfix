@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/photo_views.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -28,6 +29,7 @@ void main() {
   final photo = find.byKey(const ValueKey('capturePhoto'));
   final mic = find.byKey(const ValueKey('captureVoice'));
   final gallery = find.byKey(const ValueKey('captureGallery'));
+  final paste = find.byKey(const ValueKey('capturePaste'));
   final stop = find.byKey(const ValueKey('stopRecording'));
 
   Future<void> tap(WidgetTester tester, Finder finder) async {
@@ -65,26 +67,33 @@ void main() {
     expect(label.size.height, line.height);
   }
 
-  testWidgets('Photo, Voice and Gallery sit side by side above the remind '
-      'me line', (tester) async {
+  testWidgets('Photo, Voice, Gallery and Paste sit side by side above the '
+      'remind me line', (tester) async {
     await openCapture(tester);
 
     expect(find.text('Photo'), findsOneWidget);
     expect(find.text('Voice'), findsOneWidget);
     expect(find.text('Gallery'), findsOneWidget);
-    final left = tester.getRect(photo);
-    final middle = tester.getRect(mic);
-    final right = tester.getRect(gallery);
-    expect(left.top, middle.top);
-    expect(middle.top, right.top);
-    expect(left.right, lessThan(middle.left));
-    expect(middle.right, lessThan(right.left));
-    for (final rect in [left, middle, right]) {
+    expect(find.text('Paste'), findsOneWidget);
+    final rects = [
+      for (final button in [photo, mic, gallery, paste]) tester.getRect(button),
+    ];
+    for (var i = 1; i < rects.length; i++) {
+      expect(rects[i].top, rects[0].top);
+      expect(rects[i - 1].right, lessThan(rects[i].left));
+    }
+    for (final rect in rects) {
       expect(rect.bottom, lessThanOrEqualTo(nudgeTop(tester)));
     }
-    for (final label in ['Photo', 'Voice', 'Gallery']) {
+    for (final label in ['Photo', 'Voice', 'Gallery', 'Paste']) {
       expectOneLine(tester, label);
     }
+    expect(
+      find.descendant(of: paste, matching: find.byIcon(Icons.content_paste)),
+      findsOneWidget,
+    );
+    // The clipboard is read only once Paste is tapped.
+    expect(photos.pastes, 0);
     expect(
       find.descendant(
         of: gallery,
@@ -148,6 +157,66 @@ void main() {
     expect(note.photos, hasLength(2));
     expect(note.text, 'Receipts');
     expect(find.byType(CaptureScreen), findsOneWidget);
+  });
+
+  testWidgets('Paste puts the text at the cursor and the picture into the '
+      'Note', (tester) async {
+    photos.clipboard = SharedItem(text: 'old flat', photos: [onePixelPng]);
+    await openCapture(tester);
+    await tester.enterText(find.byType(TextField), 'Receipts of the ');
+    await tap(tester, paste);
+
+    expect(photos.pastes, 1);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'Receipts of the old flat');
+    expect(
+      field.controller!.selection.baseOffset,
+      field.controller!.text.length,
+    );
+    final note = Notes(store).all().single;
+    expect(note.photos, hasLength(1));
+    expect(note.text, 'Receipts of the old flat');
+    expect(find.byType(CaptureScreen), findsOneWidget);
+  });
+
+  testWidgets('Paste replaces the selected words', (tester) async {
+    photos.clipboard = const SharedItem(text: 'Tuesday');
+    await openCapture(tester);
+    await tester.enterText(find.byType(TextField), 'dentist Monday 9:00');
+    final field = tester.widget<TextField>(find.byType(TextField));
+    field.controller!.selection = const TextSelection(
+      baseOffset: 8,
+      extentOffset: 14,
+    );
+    await tap(tester, paste);
+
+    expect(field.controller!.text, 'dentist Tuesday 9:00');
+    await tap(tester, find.text('Save'));
+    expect(Notes(store).all().single.text, 'dentist Tuesday 9:00');
+  });
+
+  testWidgets('Paste with nothing usable says so above the field and '
+      'changes nothing', (tester) async {
+    await openCapture(tester);
+    await tester.enterText(find.byType(TextField), 'buy stamps');
+    await tap(tester, paste);
+
+    expect(photos.pastes, 1);
+    expect(find.byKey(const ValueKey('paste-empty')), findsOneWidget);
+    expect(
+      find.text(
+        'Nothing to paste: the clipboard holds no text and no picture.',
+      ),
+      findsOneWidget,
+    );
+    expect(Notes(store).all(), isEmpty);
+
+    // A Paste that finds something answers it.
+    photos.clipboard = const SharedItem(text: ' at noon');
+    await tap(tester, paste);
+    expect(find.byKey(const ValueKey('paste-empty')), findsNothing);
+    await tap(tester, find.text('Save'));
+    expect(Notes(store).all().single.text, 'buy stamps at noon');
   });
 
   testWidgets('leaving while the pictures are read still keeps them', (
@@ -228,10 +297,28 @@ void main() {
     expect(find.text('Foto'), findsOneWidget);
     expect(find.text('Sprache'), findsOneWidget);
     expect(find.text('Galerie'), findsOneWidget);
-    for (final label in ['Foto', 'Sprache', 'Galerie']) {
+    expect(find.text('Einfügen'), findsOneWidget);
+    for (final label in ['Foto', 'Sprache', 'Galerie', 'Einfügen']) {
       expectOneLine(tester, label);
     }
-    for (final button in [photo, mic, gallery]) {
+    // Four in a row: a long word shrinks to fit its button, not cut.
+    for (final (button, label) in [
+      (photo, 'Foto'),
+      (mic, 'Sprache'),
+      (gallery, 'Galerie'),
+      (paste, 'Einfügen'),
+    ]) {
+      final words = tester.renderObject<RenderParagraph>(find.text(label));
+      expect(
+        words.size.width,
+        greaterThanOrEqualTo(words.getMaxIntrinsicWidth(double.infinity)),
+      );
+      final shown = tester.getRect(find.text(label));
+      final box = tester.getRect(button);
+      expect(shown.left, greaterThanOrEqualTo(box.left));
+      expect(shown.right, lessThanOrEqualTo(box.right));
+    }
+    for (final button in [photo, mic, gallery, paste]) {
       expect(
         tester.getRect(button).bottom,
         lessThanOrEqualTo(height - keyboard),

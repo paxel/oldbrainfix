@@ -28,7 +28,8 @@ import 'voice_platform.dart';
 typedef Captured = ({String noteId, List<Future<bool>> attached});
 
 /// Opens text Capture, or voice Capture recording at once when [voice] is
-/// set, or the camera at once when [photo] is set, filing the new Note into the Area or Topic [place] when one is
+/// set, or the camera at once when [photo] is set, or filled from the
+/// clipboard when [paste] is set, filing the new Note into the Area or Topic [place] when one is
 /// given, or with the [shared] item from another app filled in. [onChanged] runs once the user left Capture, for the caller to
 /// show the new Note, and again when its location or more of its Capture
 /// Context arrived later.
@@ -48,6 +49,7 @@ Future<void> captureNote(
   bool voice = false,
   bool photo = false,
   bool gallery = false,
+  bool paste = false,
   required VoidCallback onChanged,
   ValueChanged<String>? onCaptured,
 }) async {
@@ -71,6 +73,7 @@ Future<void> captureNote(
         startVoice: voice,
         startPhoto: photo,
         startGallery: gallery,
+        startPaste: paste,
       ),
     ),
   );
@@ -214,7 +217,14 @@ void announceUntranscribable(
 ///
 /// The Photo button takes a photo into the Note, and the Gallery button
 /// picks pictures from the Device into it, several at once; the text is
-/// then optional. Closing the picker without picking changes nothing. Something shared in from another app opens here with its
+/// then optional. Closing the picker without picking changes nothing.
+///
+/// The Paste button reads the clipboard, only then, as Android shows a
+/// notice for every read: its text goes into the field at the cursor, its
+/// pictures into the Note as photos, and a clipboard with neither is said
+/// in a line above the field, which goes once the user types or pastes.
+///
+/// Something shared in from another app opens here with its
 /// text, photos and sound files filled in, the sound files as voice
 /// recordings, and the app it came from recorded. All of it goes into one
 /// Note written at once, so nothing is lost.
@@ -251,6 +261,10 @@ class CaptureScreen extends StatefulWidget {
   /// is text Capture with the pictures picked.
   final bool startGallery;
 
+  /// Fills the screen from the clipboard at once, as its Paste button
+  /// does.
+  final bool startPaste;
+
   const CaptureScreen({
     super.key,
     required this.notes,
@@ -263,6 +277,7 @@ class CaptureScreen extends StatefulWidget {
     this.startVoice = false,
     this.startPhoto = false,
     this.startGallery = false,
+    this.startPaste = false,
   });
 
   @override
@@ -301,6 +316,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   /// The pictures being picked and written; null while none are.
   Future<void>? _picking;
+
+  /// The clipboard being read and filled in; null while it is not.
+  Future<void>? _pasting;
+
+  /// Whether the last Paste found nothing to paste, said above the field.
+  var _pasteEmpty = false;
 
   /// Counts the recording's seconds while it runs.
   Timer? _ticker;
@@ -386,6 +407,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _takePhoto());
     } else if (widget.startGallery && widget.photos.pickable) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _pickPhotos());
+    } else if (widget.startPaste && widget.photos.pasteable) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _paste());
     }
   }
 
@@ -696,6 +719,49 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
   }
 
+  /// Fills in what the clipboard holds; the same reading when asked
+  /// again while it runs.
+  Future<void> _paste() =>
+      _pasting ??= _takeClipboard().whenComplete(() => _pasting = null);
+
+  /// Reads the clipboard and fills in its text, then its pictures, so a
+  /// Note written for them holds the text too. Leaving began meanwhile,
+  /// nothing is filled in; the clipboard still holds it.
+  Future<void> _takeClipboard() async {
+    final pasted = await widget.photos.takeClipboard();
+    if (!mounted || _leaving) return;
+    setState(() {
+      _pasteEmpty = pasted == null;
+      if (pasted == null) return;
+      if (pasted.text.trim().isNotEmpty) _insert(pasted.text);
+      _addPhotos(pasted.photos);
+    });
+  }
+
+  /// Puts [text] into the field in place of the selection, the cursor
+  /// after it; without a cursor, after what is there, on a line of its
+  /// own.
+  void _insert(String text) {
+    final value = _text.value;
+    final selection = value.selection;
+    final String joined;
+    final int end;
+    if (selection.isValid) {
+      joined = value.text.replaceRange(selection.start, selection.end, text);
+      end = selection.start + text.length;
+    } else {
+      final before = value.text.isEmpty || value.text.endsWith('\n')
+          ? value.text
+          : '${value.text}\n';
+      joined = '$before$text';
+      end = joined.length;
+    }
+    _text.value = TextEditingValue(
+      text: joined,
+      selection: TextSelection.collapsed(offset: end),
+    );
+  }
+
   /// Writes the recording [bytes] into the Note, capturing it with the
   /// text so far when there is none yet.
   void _addRecording(Uint8List bytes) {
@@ -892,6 +958,21 @@ class _CaptureScreenState extends State<CaptureScreen> {
                               SliverToBoxAdapter(child: choices),
                             for (final attachment in _attachments(context))
                               SliverToBoxAdapter(child: attachment),
+                            if (_pasteEmpty)
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(
+                                    t.pasteEmpty,
+                                    key: const ValueKey('paste-empty'),
+                                    style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             SliverFillRemaining(
                               hasScrollBody: false,
                               child: TextField(
@@ -901,6 +982,10 @@ class _CaptureScreenState extends State<CaptureScreen> {
                                     !widget.startPhoto &&
                                     !widget.startGallery,
                                 maxLines: null,
+                                // What is typed answers "nothing to paste".
+                                onChanged: _pasteEmpty
+                                    ? (_) => setState(() => _pasteEmpty = false)
+                                    : null,
                                 decoration: InputDecoration(
                                   hintText:
                                       _photos.isEmpty && _recordings.isEmpty
@@ -1081,9 +1166,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
     ],
   ];
 
-  /// The Photo, Voice and Gallery buttons above the Nudge choices, side
-  /// by side, each with its icon above its one-word label so three fit
-  /// the row; none while recording, where the big stop button comes
+  /// The Photo, Voice, Gallery and Paste buttons above the Nudge choices,
+  /// side by side, each with its icon above its one-word label so four
+  /// fit the row; none while recording, where the big stop button comes
   /// first. Below the text field, they rise with the keyboard.
   Widget _captureButtons(BuildContext context) {
     final t = context.t;
@@ -1108,6 +1193,13 @@ class _CaptureScreenState extends State<CaptureScreen> {
           onPressed: _pickPhotos,
           icon: Icons.photo_library_outlined,
           label: t.gallery,
+        ),
+      if (widget.photos.pasteable)
+        _captureButton(
+          key: const ValueKey('capturePaste'),
+          onPressed: _paste,
+          icon: Icons.content_paste,
+          label: t.paste,
         ),
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
@@ -1139,7 +1231,11 @@ class _CaptureScreenState extends State<CaptureScreen> {
       children: [
         Icon(icon, size: 28),
         const SizedBox(height: 4),
-        Text(label, maxLines: 1, softWrap: false),
+        // Four in a row: a long word shrinks rather than being cut.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1, softWrap: false),
+        ),
       ],
     ),
   );

@@ -34,6 +34,13 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gallery => 'Galerie';
 
   @override
+  String get paste => 'Einfügen';
+
+  @override
+  String get pasteEmpty =>
+      'Nichts zum Einfügen: Die Zwischenablage enthält weder Text noch Bild.';
+
+  @override
   String get text => 'Text';
 
   @override

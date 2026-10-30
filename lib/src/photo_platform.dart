@@ -56,9 +56,10 @@ String sharedText(String? subject, String? text) {
   return '$s\n$t';
 }
 
-/// The platform seam for photos: the camera, the system's picture picker
-/// and what other apps share in, sound files included (android/…/Photos.kt, ShareActivity.kt).
-/// Widget tests hand in a fake.
+/// The platform seam for photos: the camera, the system's picture picker,
+/// what other apps share in, sound files included, and the clipboard for
+/// Paste (android/…/Photos.kt, ShareActivity.kt, Clipboards.kt). Widget
+/// tests hand in a fake.
 abstract interface class PhotoPlatform {
   /// Whether this Device has a camera to take photos with; the camera
   /// button only shows where it has.
@@ -76,6 +77,15 @@ abstract interface class PhotoPlatform {
   /// picked one as a JPEG without metadata, none when the picker was
   /// closed without picking.
   Future<List<Uint8List>> pickPhotos();
+
+  /// Whether this Device's clipboard can be read for Paste; the Paste
+  /// buttons only show where it can.
+  bool get pasteable;
+
+  /// What the clipboard holds, read now and only now, as Paste was
+  /// tapped: its text and its pictures, each as a JPEG without metadata;
+  /// null when it holds neither or cannot be read.
+  Future<SharedItem?> takeClipboard();
 
   /// What was shared in and not taken yet, or null; taking clears it.
   Future<SharedItem?> takeShared();
@@ -99,6 +109,12 @@ class NoPhotos implements PhotoPlatform {
 
   @override
   Future<List<Uint8List>> pickPhotos() async => const [];
+
+  @override
+  bool get pasteable => false;
+
+  @override
+  Future<SharedItem?> takeClipboard() async => null;
 
   @override
   Future<SharedItem?> takeShared() async => null;
@@ -142,6 +158,28 @@ class AndroidPhotos implements PhotoPlatform {
     } on PlatformException {
       return const [];
     }
+  }
+
+  @override
+  bool get pasteable => true;
+
+  @override
+  Future<SharedItem?> takeClipboard() async {
+    final Map<String, Object?>? raw;
+    try {
+      raw = await _channel.invokeMapMethod<String, Object?>('paste');
+    } on PlatformException {
+      return null;
+    }
+    if (raw == null) return null;
+    final item = SharedItem(
+      text: raw['text'] as String? ?? '',
+      photos: [
+        for (final photo in raw['photos'] as List? ?? const [])
+          if (photo is Uint8List) photo,
+      ],
+    );
+    return item.isEmpty ? null : item;
   }
 
   @override

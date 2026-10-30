@@ -607,6 +607,7 @@ class _AgendaScreenState extends State<AgendaScreen> {
       voice: way == CaptureWay.voice,
       photo: way == CaptureWay.photo,
       gallery: way == CaptureWay.gallery,
+      paste: way == CaptureWay.paste,
       onCaptured: (id) => _capturedId = id,
       onChanged: _reloadIfMounted,
     );

@@ -81,8 +81,8 @@ final Uint8List onePixelPng = Uint8List.fromList(const [
 /// byte after its end.
 final Uint8List otherPng = Uint8List.fromList([...onePixelPng, 0]);
 
-/// A [PhotoPlatform] the test drives: what the camera hands back, and
-/// what other apps share in.
+/// A [PhotoPlatform] the test drives: what the camera hands back, what
+/// the clipboard holds, and what other apps share in.
 class FakePhotos implements PhotoPlatform {
   /// What the next photo taken is; null as if the user backed out.
   Uint8List? nextPhoto;
@@ -103,6 +103,13 @@ class FakePhotos implements PhotoPlatform {
 
   /// How often the picker was opened.
   int picks = 0;
+
+  /// What the clipboard holds for the next Paste; null as if it held
+  /// nothing usable.
+  SharedItem? clipboard;
+
+  /// How often the clipboard was read.
+  int pastes = 0;
 
   /// The shares not taken yet, oldest first.
   final waiting = <SharedItem>[];
@@ -133,6 +140,15 @@ class FakePhotos implements PhotoPlatform {
   Future<List<Uint8List>> pickPhotos() async {
     picks++;
     return picker?.future ?? nextPicked;
+  }
+
+  @override
+  bool get pasteable => true;
+
+  @override
+  Future<SharedItem?> takeClipboard() async {
+    pastes++;
+    return clipboard;
   }
 
   @override

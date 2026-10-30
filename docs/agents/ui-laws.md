@@ -66,16 +66,20 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 
 - **Capture never asks anything and never needs unlocking.** The App
   Lock and Area Locks guard browsing, not Capture.
-- **The Agenda's "+" fans out Text, Voice, Photo and Gallery**, and so
-  does the lock screen's, each an icon with
+- **The Agenda's "+" fans out Text, Voice, Photo, Gallery and Paste**,
+  and so does the lock screen's, each an icon with
   its words, upward from the button; it is not a bottom sheet. While
   the fan is open, "+" reads as close; a second tap on it, a tap
   outside or Back closes the fan. Text opens text capture, Voice starts
   recording at once, Photo opens the camera, Gallery opens the system's
-  picture picker and continues as a photo Note. The text capture screen
-  keeps its Photo, Voice and Gallery buttons. Every other quick entry
-  point (widget, tile, shortcut, hardware button) opens its capture
-  screen directly, with no fan and no screen in between.
+  picture picker and continues as a photo Note, Paste opens text capture
+  filled from the clipboard: its text in the field, its picture as the
+  Note's photo, both when it holds both, and a line on the screen, no
+  announcement, when it holds neither. The clipboard is read only on
+  that tap, never on opening or in the background. The text capture
+  screen keeps its Photo, Voice, Gallery and Paste buttons. Every other
+  quick entry point (widget, tile, shortcut, hardware button) opens its
+  capture screen directly, with no fan and no screen in between.
 - Voice recording starts at once and **ends by tapping one big stop
   button**. No hold-to-talk, no stop on silence. After Stop, and after
   the photo or the pictures picked, the user is on the capture screen
@@ -86,7 +90,7 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   The three are actions, not a choice of value: a tap saves the Note
   with that Nudge time, so the radio-button law does not apply to them.
 - **Above them sits the Note card's action row**, on every capture
-  path (text, Voice, Photo, Gallery, share, widget, tile, shortcut,
+  path (text, Voice, Photo, Gallery, Paste, share, widget, tile, shortcut,
   hardware button): File into…, Routine, Reminder, Frog or Session, and
   ⋮ with the Importance, Make it a Tally and Add to a Shopping List.
   Each opens its usual page and comes back to the capture screen with

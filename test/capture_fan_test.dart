@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/agenda_screen.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/capture_requests.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/photo_platform.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -55,7 +56,7 @@ void main() {
 
   final plus = find.byIcon(Icons.add);
   final close = find.byKey(const ValueKey('captureFanClose'));
-  const ways = ['text', 'voice', 'photo', 'gallery'];
+  const ways = ['text', 'voice', 'photo', 'gallery', 'paste'];
 
   void expectFanOpen(bool open) {
     for (final way in ways) {
@@ -65,13 +66,13 @@ void main() {
   }
 
   group('"+" on the Agenda', () {
-    testWidgets('fans out Text, Voice, Photo and Gallery, each with its '
-        'words, and opens no capture by itself', (tester) async {
+    testWidgets('fans out Text, Voice, Photo, Gallery and Paste, each with '
+        'its words, and opens no capture by itself', (tester) async {
       await start(tester);
       await tap(tester, plus);
 
       expectFanOpen(true);
-      for (final label in ['Text', 'Voice', 'Photo', 'Gallery']) {
+      for (final label in ['Text', 'Voice', 'Photo', 'Gallery', 'Paste']) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.byType(CaptureScreen), findsNothing);
@@ -85,6 +86,8 @@ void main() {
       expect(voice.starts, 0);
       expect(photos.taken, 0);
       expect(photos.picks, 0);
+      // The clipboard is read only once Paste is tapped.
+      expect(photos.pastes, 0);
     });
 
     testWidgets('shows only the ways the Device has', (tester) async {
@@ -96,6 +99,7 @@ void main() {
       expect(fanEntry('voice'), findsNothing);
       expect(fanEntry('photo'), findsNothing);
       expect(fanEntry('gallery'), findsNothing);
+      expect(fanEntry('paste'), findsNothing);
     });
 
     testWidgets('speaks German', (tester) async {
@@ -105,7 +109,7 @@ void main() {
       await tap(tester, plus);
 
       final de = AppLocalizationsDe();
-      for (final label in [de.text, de.voice, de.photo, de.gallery]) {
+      for (final label in [de.text, de.voice, de.photo, de.gallery, de.paste]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.byTooltip(de.captureFanClose), findsOneWidget);
@@ -253,6 +257,75 @@ void main() {
       expect(notes.all(), isEmpty);
       await tap(tester, find.text('Save'));
       expect(notes.all(), isEmpty);
+    });
+
+    testWidgets('Paste fills text Capture with the clipboard\'s text', (
+      tester,
+    ) async {
+      photos.clipboard = const SharedItem(text: 'call the vet');
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('paste'));
+
+      expect(photos.pastes, 1);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.autofocus, isTrue);
+      expect(field.controller!.text, 'call the vet');
+      expect(field.controller!.selection.baseOffset, 'call the vet'.length);
+      // Like typed text, it is written on leaving.
+      expect(notes.all(), isEmpty);
+
+      await tap(tester, find.text('Save'));
+      expect(notes.all().single.text, 'call the vet');
+      expect(notes.all().single.photos, isEmpty);
+    });
+
+    testWidgets('Paste makes a picture the Note\'s photo, and text and '
+        'picture one Note', (tester) async {
+      photos.clipboard = SharedItem(
+        text: 'the old flat',
+        photos: [onePixelPng],
+      );
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('paste'));
+
+      final note = notes.all().single;
+      expect(note.text, 'the old flat');
+      expect(note.photos, hasLength(1));
+      expect(photos.taken, 0);
+      expect(photos.picks, 0);
+    });
+
+    testWidgets('Paste with Markdown on the clipboard makes a formatted '
+        'Note', (tester) async {
+      photos.clipboard = const SharedItem(text: '# Groceries\n- milk');
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('paste'));
+      await tap(tester, find.text('Save'));
+
+      expect(notes.all().single.textFormat, TextFormats.markdown);
+    });
+
+    testWidgets('Paste with nothing usable opens text Capture empty and '
+        'says so in the screen', (tester) async {
+      await start(tester);
+      await tap(tester, plus);
+      await tap(tester, fanEntry('paste'));
+
+      expect(photos.pastes, 1);
+      expect(find.byType(CaptureScreen), findsOneWidget);
+      expect(find.text(en.pasteEmpty), findsOneWidget);
+      expect(notes.all(), isEmpty);
+
+      // Typing answers it.
+      await tester.enterText(find.byType(TextField), 'call');
+      await tester.pump();
+      expect(find.text(en.pasteEmpty), findsNothing);
+      await tap(tester, find.text('Save'));
+      expect(notes.all().single.text, 'call');
     });
   });
 }
