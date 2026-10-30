@@ -211,7 +211,7 @@ class _DangerButton extends StatelessWidget {
 var _licensesRegistered = false;
 
 /// The lists of what ships inside the app but not as a Dart package, with
-/// its licence: the ocrs models, whisper.cpp, the Whisper model, Material
+/// its licence: the PP-OCRv6 models, whisper.cpp, the Whisper model, Material
 /// Icons and Rust's standard library; the Android libraries; the Rust
 /// crates in the OCR library (written by tool/licenses.dart).
 const licenseLists = [

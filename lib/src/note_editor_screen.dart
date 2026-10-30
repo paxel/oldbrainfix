@@ -776,7 +776,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     required bool photo,
   }) {
     final t = context.t;
-    // ocrs is tried until it is known not to run; Whisper needs a model.
+    // RustO is tried until it is known not to run; Whisper needs a model.
     final engine = photo
         ? switch (PhotoReaderScope.of(context)) {
             final reader? => reader.supported != false,

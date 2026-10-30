@@ -93,7 +93,7 @@ gradle.taskGraph.whenReady {
     }
 }
 
-// A debug build is for a 64-bit phone or the emulator: Whisper and ocrs
+// A debug build is for a 64-bit phone or the emulator: Whisper and RustO
 // are built for arm64-v8a only there, which halves the native build.
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
@@ -122,9 +122,9 @@ androidComponents {
 }
 
 /**
- * ocrs for Photo Texts (ADR 0007): the Rust library in android/ocr,
+ * RustO for Photo Texts (ADR 0007): the Rust library in android/ocr,
  * cross-built with cargo-ndk into liboldbrainfix_ocr.so per ABI. Always
- * optimised, in debug builds too: ocrs is far too slow otherwise. At most
+ * optimised, in debug builds too: RustO is far too slow otherwise. At most
  * two compile jobs, so the build never takes the machine down. Up to
  * date, and not run, while the crate's sources and lock file stay the
  * same; cargo's own target directory keeps the rest incremental.

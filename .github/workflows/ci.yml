@@ -154,7 +154,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      # ocrs for Photo Texts is Rust, cross-built by the APK build.
+      # RustO for Photo Texts is Rust, cross-built by the APK build.
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi

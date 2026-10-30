@@ -26,7 +26,7 @@
       <li>Routines and Reminders made from any Note show notifications with Done and Snooze and repeat until they are marked Done.</li>
       <li>The Agenda lists today's and tomorrow's Routines and Reminders and the Unsorted Notes.</li>
       <li>Voice Notes are transcribed on the computer with Whisper, in English or German, after a one-time download of the speech model.</li>
-      <li>Text in photos is recognised on the computer with ocrs.</li>
+      <li>Text in photos is recognised on the computer with RustO, German letters and the euro sign included.</li>
       <li>Search covers Note text, Transcripts and recognised text.</li>
       <li>Phone and desktop sync over the local network or through a shared folder, such as one kept by Syncthing or Nextcloud.</li>
       <li>Encrypted Backups go into a folder of the user's choice.</li>

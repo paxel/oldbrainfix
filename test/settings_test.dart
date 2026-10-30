@@ -583,14 +583,14 @@ void main() {
         return found.single;
       }
 
-      final models = of('ocrs models');
+      final models = of('PP-OCRv6 Tiny models');
       for (final tasl in [
-        'Ocrs pre-trained models',
-        'Robert Knight',
-        'https://huggingface.co/robertknight/ocrs',
-        'https://creativecommons.org/licenses/by-sa/4.0/',
-        'bundled unmodified',
-        'Attribution-ShareAlike 4.0 International',
+        'PP-OCRv6 Tiny text detection and text recognition models',
+        'PaddlePaddle Authors',
+        'https://huggingface.co/PaddlePaddle/PP-OCRv6_tiny_det',
+        'https://www.apache.org/licenses/LICENSE-2.0',
+        "the only change to PaddlePaddle's models is RustO's conversion",
+        'Copyright (c) 2016 PaddlePaddle Authors',
       ]) {
         expect(models, contains(tasl));
       }
@@ -610,7 +610,7 @@ void main() {
             .expand((e) => e.packages)
             .firstWhere((p) => RegExp('^$name [0-9]').hasMatch(p)),
       );
-      expect(ofCrate('ocrs'), contains('Ocrs project contributors'));
+      expect(ofCrate('rusto-rs'), contains('RustO Contributors'));
       expect(ofCrate('rten'), contains('RTen project contributors'));
     });
 
@@ -636,7 +636,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       for (final name in [
-        'ocrs models',
+        'PP-OCRv6 Tiny models',
         'OpenAI Whisper base model',
         'whisper.cpp',
         'com.google.zxing:core',
@@ -646,10 +646,12 @@ void main() {
             .position
             .jumpTo(0);
         await tester.pump();
+        // The OCR library's crates make the list long.
         await tester.scrollUntilVisible(
           find.text(name),
           200,
           scrollable: find.byType(Scrollable).last,
+          maxScrolls: 200,
         );
         expect(find.text(name), findsOneWidget);
       }

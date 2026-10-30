@@ -49,8 +49,8 @@ platform are on the [install page](https://paxel.github.io/oldbrainfix/en/refere
 
 Dual-licensed under [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at
 your option.
-Every third-party component the apps ship or download, such as the ocrs text
-recognition models (CC BY-SA 4.0) and OpenAI's Whisper speech model (MIT),
+Every third-party component the apps ship or download, such as the PP-OCRv6
+text recognition models (Apache-2.0) and OpenAI's Whisper speech model (MIT),
 is listed with its licence in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md);
 the full texts are in [licenses/](licenses) and in each app's open-source
 licences.

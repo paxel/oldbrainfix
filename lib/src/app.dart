@@ -90,7 +90,7 @@ class OldBrainFixApp extends StatefulWidget {
   /// Whisper and its model for Transcripts; none when not given.
   final SpeechPlatform speech;
 
-  /// ocrs for Photo Texts; none when not given.
+  /// RustO for Photo Texts; none when not given.
   final OcrPlatform ocr;
 
   /// The calendar app to add to and the apps to share calendar files

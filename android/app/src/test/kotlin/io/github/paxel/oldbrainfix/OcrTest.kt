@@ -24,15 +24,16 @@ class OcrTest {
     }
 
     /**
-     * The models bundled for ocrs are exactly those from ocrs' own model
-     * host (ocrs-models.s3-accelerate.amazonaws.com, January 2024), as
-     * named in assets/ocrs/NOTICE.
+     * The model files bundled for RustO are exactly those of RustO's
+     * release models-rten-v0.3.2 (RustO-Models-PPOCRv6-Tiny.zip), as
+     * named in assets/rusto/NOTICE.
      */
     @Test
     fun `the bundled models are the pinned ones`() {
         val pinned = mapOf(
-            Ocr.DETECTION to "f15cfb56bd02c4bf478a20343986504a1f01e1665c2b3a0ad66340f054b1b5ca",
-            Ocr.RECOGNITION to "e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e",
+            Ocr.DETECTION to "ca1f0196d2a2da2b485e2cda6aaf5ba02258ac71127d577c8a77a75e89b67605",
+            Ocr.RECOGNITION to "6c94c6b42c43a39d11cf3dd1267199ba04a11afe9de43632daa6f3983b365a9b",
+            Ocr.CHARACTERS to "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
         )
         for ((name, sha256) in pinned) {
             val bytes = File("src/main/assets/${Ocr.ASSETS}/$name").readBytes()

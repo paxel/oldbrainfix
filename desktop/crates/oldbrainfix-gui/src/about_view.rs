@@ -34,7 +34,7 @@ pub fn privacy_policy_url(locale: &str) -> String {
     )
 }
 
-/// The lists: what the phone ships too (the ocrs models, whisper.cpp,
+/// The lists: what the phone ships too (the PP-OCRv6 models, whisper.cpp,
 /// the Whisper model, Material Icons, Rust's standard library), what only
 /// the desktop ships (SQLite, egui's fonts, KDE's protocols), and the
 /// Rust crates.
@@ -186,14 +186,14 @@ mod tests {
                 .map(|l| l.text)
                 .unwrap_or_default()
         };
-        assert!(of("ocrs models").contains("Robert Knight"));
-        assert!(of("ocrs models").contains("bundled unmodified"));
+        assert!(of("PP-OCRv6 Tiny models").contains("PaddlePaddle Authors"));
+        assert!(of("PP-OCRv6 Tiny models").contains("Apache License"));
         assert!(of("OpenAI Whisper base model").contains("Copyright (c) 2022 OpenAI"));
         assert!(of("whisper.cpp").contains("The ggml authors"));
         assert!(of("Material Icons").contains("Attribution 4.0 International"));
         assert!(of("SQLite").contains("blessing"));
         assert!(of("Ubuntu font").contains("UBUNTU FONT LICENCE"));
-        assert!(of_crate("ocrs").contains("Ocrs project contributors"));
+        assert!(of_crate("rusto-rs").contains("RustO Contributors"));
         assert!(of_crate("egui").contains("Emil Ernerfeldt"));
     }
 

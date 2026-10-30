@@ -139,7 +139,7 @@ jobs:
         with:
           channel: stable
           cache: true
-      # ocrs for Photo Texts is Rust, cross-built by the APK build.
+      # RustO for Photo Texts is Rust, cross-built by the APK build.
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
@@ -153,7 +153,7 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/upload.jks"
           printf 'storeFile=%s\nkeyAlias=oldbrainfix\n' "$RUNNER_TEMP/upload.jks" > android/key.properties
       - run: flutter pub get
-      # Whisper and ocrs are built for the two phone ABIs only, so no
+      # Whisper and RustO are built for the two phone ABIs only, so no
       # x86_64 APK: it would ship without transcription and text reading.
       # $GITHUB_RUN_NUMBER of this workflow is the version code.
       - name: Build release APKs and the Play app bundle

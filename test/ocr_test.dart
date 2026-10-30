@@ -66,7 +66,7 @@ void main() {
       expect(ocr.idles, 1);
     });
 
-    testWidgets('nothing is read where ocrs does not run', (tester) async {
+    testWidgets('nothing is read where RustO does not run', (tester) async {
       notes.capture('', photos: [onePixelPng]);
       ocr
         ..runs = false
@@ -89,7 +89,7 @@ void main() {
       await tap(tester, find.byIcon(Icons.photo_camera_outlined));
       await tap(tester, find.byKey(const ValueKey('nudge10')));
 
-      // Saved and back on the Agenda while ocrs still reads.
+      // Saved and back on the Agenda while RustO still reads.
       expect(find.byType(CaptureScreen), findsNothing);
       expect(find.byType(NoteCard), findsOneWidget);
       expect(ocr.readPhotos, [onePixelPng]);

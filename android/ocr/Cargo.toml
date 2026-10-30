@@ -3,7 +3,7 @@ name = "oldbrainfix_ocr"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Text in photos for Old Brain Fix on Android: ocrs behind JNI (ADR 0007)."
+description = "Text in photos for Old Brain Fix on Android: RustO behind JNI (ADR 0007)."
 publish = false
 
 [lib]
@@ -11,10 +11,13 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Only the .rten model format: the bundled models are .rten, so the ONNX
-# parser is not built in.
-ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
-rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
+# RustO without its UniFFI bindings. It builds rten with the ONNX parser
+# too; the bundled models are .rten. rten, rten-tensor and ndarray at
+# RustO's own versions load the models from bytes.
+rusto-rs = { version = "0.3.2", default-features = false }
+rten = { version = "0.27.0", default-features = false, features = ["rten_format"] }
+rten-tensor = "0.27.0"
+ndarray = { version = "0.16.1", default-features = false }
 jni = "0.21.1"
 
 [dev-dependencies]
@@ -26,6 +29,6 @@ codegen-units = 4
 panic = "unwind"
 strip = true
 
-# ocrs is far too slow unoptimised, also in `cargo test`.
+# RustO is far too slow unoptimised, also in `cargo test`.
 [profile.dev.package."*"]
 opt-level = 3

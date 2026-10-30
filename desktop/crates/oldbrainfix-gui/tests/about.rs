@@ -53,13 +53,13 @@ fn the_licences_open_from_the_settings_and_list_every_component() -> TestResult 
     harness.run();
     assert_eq!(harness.state().selection(), &Selection::Licences);
     for name in [
-        "ocrs models",
+        "PP-OCRv6 Tiny models",
         "OpenAI Whisper base model",
         "whisper.cpp",
         "Material Icons",
         "SQLite",
         "Noto Emoji font",
-        "ocrs 0.",
+        "rusto-rs 0.",
         "egui 0.",
     ] {
         assert!(shows(&harness, name), "{name}");
@@ -91,6 +91,6 @@ fn the_about_view_speaks_german() -> TestResult {
         .click_accesskit();
     harness.run();
     assert!(shows(&harness, "Jede Fremdkomponente in dieser App"));
-    assert!(shows(&harness, "ocrs models"));
+    assert!(shows(&harness, "PP-OCRv6 Tiny models"));
     Ok(())
 }

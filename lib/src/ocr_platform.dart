@@ -7,11 +7,11 @@ import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import 'l10n.dart';
 
-/// The platform seam for Photo Texts: ocrs with its models bundled in
+/// The platform seam for Photo Texts: RustO with its models bundled in
 /// the app (android/ocr, android/…/Ocr.kt), so it works offline and
 /// needs nothing fetched. Widget tests hand in a fake.
 abstract interface class OcrPlatform {
-  /// Whether ocrs runs on this Device.
+  /// Whether RustO runs on this Device.
   Future<bool> supported();
 
   /// The text in the photo [jpeg], one line per line of text, empty when
@@ -36,7 +36,7 @@ class NoOcr implements OcrPlatform {
   Future<void> idle() async {}
 }
 
-/// ocrs built into the app, behind the app's method channel. No Google
+/// RustO built into the app, behind the app's method channel. No Google
 /// library, no network.
 class AndroidOcr implements OcrPlatform {
   static const _channel = MethodChannel('io.github.paxel.oldbrainfix/ocr');
@@ -98,7 +98,7 @@ class PhotoReader extends ChangeNotifier {
   String? photoTextOf(String noteId, String hash) =>
       notes.byId(noteId)?.photoTexts[hash];
 
-  /// Whether ocrs runs here: null until known.
+  /// Whether RustO runs here: null until known.
   bool? get supported => _supported;
 
   /// Reads the text in the photo [hash] of the Note [noteId] again, after
@@ -114,7 +114,7 @@ class PhotoReader extends ChangeNotifier {
   }
 
   /// Starts reading once whatever changed the log is done, unless it
-  /// runs already or ocrs does not run here.
+  /// runs already or RustO does not run here.
   void _kick() {
     if (_running) _again = true;
     if (_queued || _running || _supported == false) return;
@@ -172,7 +172,7 @@ class PhotoReader extends ChangeNotifier {
     } finally {
       _running = false;
       waiting?.complete(false);
-      // Where ocrs does not run, or gone: nothing asked for is read.
+      // Where RustO does not run, or gone: nothing asked for is read.
       if (_disposed || _supported == false) _dropAsked();
     }
     if (_again) _kick();

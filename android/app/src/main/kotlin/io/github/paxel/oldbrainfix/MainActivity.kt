@@ -57,7 +57,7 @@ class MainActivity : FlutterActivity() {
     /** The answer to the speech model's "pick", until the file picker comes back. */
     private var modelAnswer: MethodChannel.Result? = null
 
-    /** ocrs and its bundled models for the Photo Texts of photos. */
+    /** RustO and its bundled models for the Photo Texts of photos. */
     private val ocr by lazy { Ocr(this) }
 
     private var syncChannel: MethodChannel? = null

@@ -14,16 +14,18 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/paxel/oldbrainfix"
 
-# ocrs is far too slow unoptimised, also in `cargo test`.
-[profile.dev.package.ocrs]
+# RustO is far too slow unoptimised, also in `cargo test`.
+[profile.dev.package.rusto-rs]
+opt-level = 3
+[profile.dev.package.clipper2-rust]
+opt-level = 3
+[profile.dev.package.ndarray]
 opt-level = 3
 [profile.dev.package.rten]
 opt-level = 3
 [profile.dev.package.rten-base]
 opt-level = 3
 [profile.dev.package.rten-gemm]
-opt-level = 3
-[profile.dev.package.rten-imageproc]
 opt-level = 3
 [profile.dev.package.rten-parallel]
 opt-level = 3

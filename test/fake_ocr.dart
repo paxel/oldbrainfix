@@ -3,10 +3,10 @@ import 'dart:typed_data';
 
 import 'package:oldbrainfix/src/ocr_platform.dart';
 
-/// An [OcrPlatform] the test drives: whether ocrs runs, and what text
+/// An [OcrPlatform] the test drives: whether RustO runs, and what text
 /// each photo holds.
 class FakeOcr implements OcrPlatform {
-  /// Whether ocrs runs on this Device.
+  /// Whether RustO runs on this Device.
   bool runs;
 
   /// The text in each photo, by its bytes' length; a photo missing here

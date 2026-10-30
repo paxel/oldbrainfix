@@ -52,7 +52,7 @@ pub mod keys {
     /// Whisper heard no words; absent means not transcribed (yet); null
     /// means removed while the recording stays (ADR 0025).
     pub const TRANSCRIPT_PREFIX: &str = "transcript:";
-    /// The Photo Text of a photo, `ocr:<hash>` = the text ocrs recognised
+    /// The Photo Text of a photo, `ocr:<hash>` = the text RustO recognised
     /// in it, on the Note holding `photo:<hash>`. An empty text means no
     /// text was found; absent means not read (yet); null means removed
     /// while the photo stays (ADR 0025).

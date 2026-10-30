@@ -39,10 +39,14 @@ rodio = { version = "0.22", default-features = false, features = ["playback", "r
 arboard = "3.6"
 # Photos pasted or dropped in, kept as the phone keeps them, and shown.
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
-# Photo Texts with the phone's engine and models (ADR 0007); only the
-# .rten model format, as android/ocr builds it.
-ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
-rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
+# Photo Texts with the phone's engine and models (ADR 0007), as
+# android/ocr builds them: RustO without its UniFFI bindings, and rten,
+# rten-tensor and ndarray at RustO's own versions to load the models
+# from bytes.
+rusto-rs = { version = "0.3.2", default-features = false }
+rten = { version = "0.27.0", default-features = false, features = ["rten_format"] }
+rten-tensor = "0.27.0"
+ndarray = { version = "0.16.1", default-features = false }
 # The pair code as a QR in the Sync view.
 qrcode = { version = "0.14", default-features = false }
 # The shared folder, the Backup folder and every file picked with the

@@ -5,7 +5,7 @@ Old Brain Fix ist eine Notiz- und Erinnerungs-App für Android. Eine Desktop-App
 • Inhalte, die aus anderen Apps geteilt werden, werden als Notiz gespeichert.
 • Jede Notiz speichert den Zeitpunkt der Erfassung. Optional: den Ort (als benannter Ort wie „Zuhause“ angezeigt, wenn einer passt), den laufenden Kalendertermin und das verbundene Bluetooth-Gerät.
 • Sprachnotizen werden auf dem Gerät mit Whisper transkribiert (Deutsch und Englisch). Das Sprachmodell (148 MB) wird einmalig auf Anforderung heruntergeladen.
-• Text in Fotos und Screenshots wird auf dem Gerät mit ocrs erkannt. Die Erkennung umfasst nur lateinische Buchstaben ohne Umlaute und ß.
+• Text in Fotos und Screenshots wird auf dem Gerät mit RustO erkannt, Umlaute, ß und das Euro-Zeichen eingeschlossen.
 • Transkripte und erkannter Text werden bei der Suche berücksichtigt.
 
 <b>Ordnen</b>

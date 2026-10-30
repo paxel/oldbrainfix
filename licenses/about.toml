@@ -231,13 +231,6 @@ path = "LICENSE.txt"
 license = "MIT"
 checksum = "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
 
-[ocrs.clarify]
-license = "MIT OR Apache-2.0"
-[[ocrs.clarify.git]]
-path = "LICENSE-MIT.txt"
-license = "MIT"
-checksum = "96b5371602fbd3cb11a680dade714465520c72b02397be5095a3c29b1a3fb30a"
-
 [opus-decoder.clarify]
 license = "MIT OR Apache-2.0"
 [[opus-decoder.clarify.git]]
@@ -280,16 +273,16 @@ path = "LICENSE-MIT.txt"
 license = "MIT"
 checksum = "5096967f408fab8da02f4b6dfac6b00ccc19ca17c635f9009ee74594ac275e18"
 
-[rten-imageproc.clarify]
+[rten-model-file.clarify]
 license = "MIT OR Apache-2.0"
-[[rten-imageproc.clarify.git]]
+[[rten-model-file.clarify.git]]
 path = "LICENSE-MIT.txt"
 license = "MIT"
 checksum = "5096967f408fab8da02f4b6dfac6b00ccc19ca17c635f9009ee74594ac275e18"
 
-[rten-model-file.clarify]
+[rten-onnx.clarify]
 license = "MIT OR Apache-2.0"
-[[rten-model-file.clarify.git]]
+[[rten-onnx.clarify.git]]
 path = "LICENSE-MIT.txt"
 license = "MIT"
 checksum = "5096967f408fab8da02f4b6dfac6b00ccc19ca17c635f9009ee74594ac275e18"
@@ -342,6 +335,15 @@ license = "MIT OR Apache-2.0"
 path = "LICENSE-MIT"
 license = "MIT"
 checksum = "b47fb719a40d9ef9c8e3be525c41ce129c46d613cfc96a91bddd7c19dcebf7a1"
+
+# wide offers Zlib, Apache-2.0 or MIT, but ships and keeps only its Zlib
+# text, which carries its copyright line.
+[wide.clarify]
+license = "Zlib"
+[[wide.clarify.files]]
+path = "LICENSE-ZLIB.md"
+license = "Zlib"
+checksum = "c43b9a9b1387ed53d2c49263838261129a010e280e3a174a792242c3e2c98db9"
 
 [windows.clarify]
 license = "MIT OR Apache-2.0"

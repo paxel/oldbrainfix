@@ -7,20 +7,20 @@ import android.system.Os
 import java.util.concurrent.Executors
 
 /**
- * ocrs through the app's Rust library (android/ocr). 0 handles mean "no
+ * RustO through the app's Rust library (android/ocr). 0 handles mean "no
  * models loaded". [loaded] is false where the library is not built for
  * the Device's ABI: then no text is read, and nothing crashes.
  */
 object OcrNative {
     val loaded: Boolean = runCatching {
-        // ocrs reads with one thread fewer than the Device has cores, at
+        // RustO reads with one thread fewer than the Device has cores, at
         // most four, like Whisper; set before its thread pool starts.
         val threads = Speech.threadsFor(Runtime.getRuntime().availableProcessors())
         Os.setenv("RTEN_NUM_THREADS", threads.toString(), true)
         System.loadLibrary("oldbrainfix_ocr")
     }.isSuccess
 
-    external fun open(detection: ByteArray, recognition: ByteArray): Long
+    external fun open(detection: ByteArray, recognition: ByteArray, characters: ByteArray): Long
 
     external fun read(reader: Long, rgba: ByteArray, width: Int, height: Int): String?
 
@@ -29,8 +29,9 @@ object OcrNative {
 
 /**
  * Photo Texts (ADR 0007): the text in a photo, read on the phone by
- * ocrs with the detection and recognition models bundled in the app's
- * assets (assets/ocrs/, see its NOTICE). Offline: nothing is fetched.
+ * RustO with the PP-OCRv6 Tiny detection and recognition models and
+ * their character list bundled in the app's assets (assets/rusto/, see
+ * its NOTICE). Offline: nothing is fetched.
  */
 class Ocr(private val context: Context) {
     /** The one thread reading: photos go one at a time. */
@@ -69,7 +70,9 @@ class Ocr(private val context: Context) {
         val argb = IntArray(width * height)
         bitmap.getPixels(argb, 0, width, 0, 0, width, height)
         bitmap.recycle()
-        if (reader == 0L) reader = OcrNative.open(asset(DETECTION), asset(RECOGNITION))
+        if (reader == 0L) {
+            reader = OcrNative.open(asset(DETECTION), asset(RECOGNITION), asset(CHARACTERS))
+        }
         if (reader == 0L) return null
         return OcrNative.read(reader, rgba(argb), width, height)
     }
@@ -83,11 +86,12 @@ class Ocr(private val context: Context) {
     }
 
     companion object {
-        const val ASSETS = "ocrs"
-        const val DETECTION = "text-detection.rten"
-        const val RECOGNITION = "text-recognition.rten"
+        const val ASSETS = "rusto"
+        const val DETECTION = "det.rten"
+        const val RECOGNITION = "rec.rten"
+        const val CHARACTERS = "dict.txt"
 
-        /** Android's ARGB pixels as the RGBA bytes ocrs reads, row by row. */
+        /** Android's ARGB pixels as the RGBA bytes RustO reads, row by row. */
         fun rgba(argb: IntArray): ByteArray {
             val bytes = ByteArray(argb.size * 4)
             for ((i, pixel) in argb.withIndex()) {

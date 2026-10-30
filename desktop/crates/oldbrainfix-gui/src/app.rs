@@ -5945,7 +5945,7 @@ impl App {
         let speed = self.speed;
         let transcribing = self.transcriber.as_ref().and_then(|e| e.current());
         let transcribing = transcribing.as_deref();
-        // Whisper needs its model; ocrs is built in.
+        // Whisper needs its model; RustO is built in.
         let heard = self.speech.as_ref().is_none_or(|s| s.current().is_some());
         let offering = Offering {
             view: &self.view,

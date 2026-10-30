@@ -11,20 +11,23 @@
 //! capture going into a Shopping List does (#124), is told once each has
 //! a Transcript or one could not be read.
 //!
-//! The engines sit behind a trait: Whisper and ocrs in the app, fakes in
+//! The engines sit behind a trait: Whisper and RustO in the app, fakes in
 //! the tests. Whisper is led in with the Area and Topic names as the user
 //! reads them, and for German speech with the English words German is
 //! full of (`TranscriptPrompts`); what it only repeats of that lead-in
 //! is taken out of the Transcript.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 
+use ndarray::ArrayD;
 use oldbrainfix_core::{Blob, Notes, Places, Store, TranscriptPrompts};
 use oldbrainfix_whisper::Prompts;
 use parking_lot::Mutex;
+use rten_tensor::prelude::*;
+use rusto::engine::{EngineError, InferenceSession};
 
 use crate::l10n::L10n;
 use crate::names;
@@ -341,53 +344,146 @@ impl Engine for WhisperEngine {
     }
 }
 
-/// The text-detection and text-recognition models the phone bundles
-/// (android/app/src/main/assets/ocrs, CC BY-SA 4.0, see its NOTICE), the
+/// The PP-OCRv6 Tiny text-detection and text-recognition models and
+/// their character list that the phone bundles
+/// (android/app/src/main/assets/rusto, Apache-2.0, see its NOTICE), the
 /// same files, built in.
-static DETECTION: &[u8] =
-    include_bytes!("../../../../android/app/src/main/assets/ocrs/text-detection.rten");
+static DETECTION: &[u8] = include_bytes!("../../../../android/app/src/main/assets/rusto/det.rten");
 static RECOGNITION: &[u8] =
-    include_bytes!("../../../../android/app/src/main/assets/ocrs/text-recognition.rten");
+    include_bytes!("../../../../android/app/src/main/assets/rusto/rec.rten");
+static CHARACTERS: &str = include_str!("../../../../android/app/src/main/assets/rusto/dict.txt");
 
-/// ocrs with the phone's models, loaded on first use and let go when
+/// RustO with the phone's models, loaded on first use and let go when
 /// idle, as android/ocr reads photos.
 #[derive(Default)]
 pub struct OcrEngine {
-    engine: Option<ocrs::OcrEngine>,
+    engine: Option<rusto::RustO>,
 }
 
 impl OcrEngine {
-    fn engine() -> Option<ocrs::OcrEngine> {
-        let detection = rten::Model::load(DETECTION.to_vec()).ok()?;
-        let recognition = rten::Model::load(RECOGNITION.to_vec()).ok()?;
-        ocrs::OcrEngine::new(ocrs::OcrEngineParams {
-            detection_model: Some(detection),
-            recognition_model: Some(recognition),
+    fn engine() -> Option<rusto::RustO> {
+        let detection = ModelSession::new(DETECTION.to_vec(), None)?;
+        let characters = CHARACTERS.lines().map(String::from).collect();
+        let recognition = ModelSession::new(RECOGNITION.to_vec(), Some(characters))?;
+        // The PP-OCRv6 settings; the paths are not read, the sessions
+        // hold the models.
+        let config = rusto::InitializeConfig::ppv6("det.rten", "rec.rten", "dict.txt");
+        rusto::RustO::with_custom_engines(config, detection, recognition).ok()
+    }
+}
+
+/// How RustO reads, as on the phone (ADR 0007): the text laid out as on
+/// the picture, and a box kept from a probability of 0.3 instead of 0.6,
+/// so the lines of a curved page are not dropped. The threshold is the
+/// top-level `postprocess`; RustO 0.3.2 ignores `detection.postprocess`
+/// (https://github.com/byrizki/rusto-rs/issues/21).
+pub fn ocr_options() -> rusto::OcrRunOptions {
+    rusto::OcrRunOptions {
+        output: rusto::OutputGranularity::Spatial,
+        postprocess: Some(rusto::PostprocessRunOptions {
+            box_threshold: Some(0.3),
             ..Default::default()
-        })
-        .ok()
+        }),
+        ..Default::default()
     }
 }
 
 impl Engine for OcrEngine {
     fn read(&mut self, bytes: Vec<u8>) -> Option<String> {
-        let pixels = image::load_from_memory(&bytes).ok()?.into_rgba8();
+        let pixels = image::load_from_memory(&bytes).ok()?.into_rgb8();
         if self.engine.is_none() {
             self.engine = Self::engine();
         }
-        let engine = self.engine.as_ref()?;
-        let source = ocrs::ImageSource::from_bytes(pixels.as_raw(), pixels.dimensions()).ok()?;
-        let input = engine.prepare_input(source).ok()?;
-        let words = engine.detect_words(&input).ok()?;
-        let lines = engine.find_text_lines(&input, &words);
-        let texts = engine.recognize_text(&input, &lines).ok()?;
-        Some(join_lines(
-            texts.into_iter().flatten().map(|line| line.to_string()),
-        ))
+        let engine = self.engine.as_mut()?;
+        let (width, height) = pixels.dimensions();
+        let result = engine
+            .detect_text_rgb(
+                pixels.as_raw(),
+                width,
+                height,
+                width as usize * 3,
+                &ocr_options(),
+            )
+            .ok()?;
+        Some(match result {
+            rusto::DetectTextResult::Spatial(text) => join_lines(text.lines().map(String::from)),
+            rusto::DetectTextResult::Structured(lines) => {
+                join_lines(lines.into_iter().map(|line| line.text))
+            }
+        })
     }
 
     fn idle(&mut self) {
         self.engine = None;
+    }
+}
+
+/// One model run as RustO runs its own models from a file, but loaded
+/// from the bytes built in, as on the phone: the first input in, the
+/// first output out. The recognition model also holds its characters.
+struct ModelSession {
+    model: rten::Model,
+    characters: Option<Vec<String>>,
+}
+
+impl ModelSession {
+    fn new(bytes: Vec<u8>, characters: Option<Vec<String>>) -> Option<ModelSession> {
+        let model = rten::Model::load(bytes).ok()?;
+        Some(ModelSession { model, characters })
+    }
+}
+
+impl InferenceSession for ModelSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        let shape = input.shape().to_vec();
+        let tensor = rten_tensor::Tensor::<f32>::from_data(
+            &shape,
+            input.iter().copied().collect::<Vec<_>>(),
+        );
+        let input_id = *self
+            .model
+            .input_ids()
+            .first()
+            .ok_or_else(|| EngineError::OutputError("Model has no inputs".into()))?;
+        let outputs = self.model.run(
+            vec![(input_id, tensor.view().into())],
+            self.model.output_ids(),
+            None,
+        )?;
+        match outputs.first() {
+            Some(rten::Value::FloatTensor(output)) => Ok(ArrayD::from_shape_vec(
+                output.shape().to_vec(),
+                output.iter().copied().collect(),
+            )?),
+            Some(_) => Err(EngineError::OutputError(
+                "Unsupported output tensor type".into(),
+            )),
+            None => Err(EngineError::OutputError("Model produced no outputs".into())),
+        }
+    }
+
+    fn run_all(
+        &mut self,
+        _input: ArrayD<f32>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        Err(EngineError::Engine("not used for text".into()))
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        _inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        Err(EngineError::Engine("not used for text".into()))
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        (key == "character")
+            .then(|| self.characters.clone())
+            .flatten()
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        key == "character" && self.characters.is_some()
     }
 }
 
@@ -424,6 +520,49 @@ mod tests {
         .unwrap_or_default();
         let text = OcrEngine::default().read(photo).unwrap_or_default();
         assert!(text.contains("THE RUST\nPROGRAMMING\nLANGUAGE"), "{text}");
+    }
+
+    /// A photo of android/ocr's testdata, read as the desktop reads it.
+    fn read_testdata(name: &str) -> String {
+        let path = format!(
+            "{}/../../../android/ocr/testdata/{name}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let photo = std::fs::read(path).unwrap_or_default();
+        OcrEngine::default().read(photo).unwrap_or_default()
+    }
+
+    #[test]
+    fn german_letters_and_the_euro_sign_are_read() {
+        let text = read_testdata("german-receipt.jpg");
+        assert!(text.contains("Bäckerei Müller GmbH"), "{text}");
+        assert!(text.contains("Hauptstraße 7, 80331 München"), "{text}");
+        assert!(
+            text.lines()
+                .any(|line| line.starts_with("Käsekuchen") && line.ends_with("3,90 €")),
+            "{text}"
+        );
+    }
+
+    /// With RustO's own box threshold of 0.6 seven of the page's twelve
+    /// lines are gone.
+    #[test]
+    fn every_line_of_a_curved_page_is_read() {
+        let text = read_testdata("curved-page.jpg");
+        assert_eq!(text.lines().count(), 12, "{text}");
+        assert!(text.contains("once or twice"), "{text}");
+        assert!(text.contains("queue full"), "{text}");
+    }
+
+    /// The box threshold must sit at the top level: RustO 0.3.2 ignores
+    /// `detection.postprocess`.
+    #[test]
+    fn spatial_text_with_the_lower_box_threshold() {
+        let options = ocr_options();
+        assert_eq!(options.output, rusto::OutputGranularity::Spatial);
+        assert!(options.detection.is_none());
+        let box_threshold = options.postprocess.and_then(|p| p.box_threshold);
+        assert_eq!(box_threshold, Some(0.3));
     }
 
     #[test]

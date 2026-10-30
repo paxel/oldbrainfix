@@ -1,6 +1,6 @@
 # The Flatpak of the desktop app, built from source without network
 # access (#45): the Rust crates come from cargo-sources.json, whisper.cpp,
-# the ocrs models and the translations from the repository itself.
+# the PP-OCRv6 models and the translations from the repository itself.
 #
 # One manifest for Flathub and the .flatpak file on each GitHub Release.
 # packaging/flatpak/render.sh writes it next to cargo-sources.json and the
