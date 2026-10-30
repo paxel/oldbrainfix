@@ -997,7 +997,8 @@ int _handRoles(Store store, SigningKey old) {
   var handed = 0;
   for (final MapEntry(key: area, value: grants) in areas) {
     final grant = grants.grantOf(device);
-    if (grant == null || grants.everGranted(self)) continue;
+    // A grant not known here is not this version's to hand on.
+    if (grant == null || grant.newer || grants.everGranted(self)) continue;
     dseq++;
     // After every grant there, or it would not be judged after them,
     // whatever this Device's clock says.

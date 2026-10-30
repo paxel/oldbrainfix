@@ -286,6 +286,9 @@ struct View {
     people_shown: Vec<Profile>,
     blocked_people: Vec<Profile>,
     blocked_open: bool,
+    /// Those of `people_shown` a newer version of the app saved a Profile
+    /// or an Override of in a form this one does not know (ADR 0034).
+    people_newer: std::collections::HashSet<String>,
     /// The person whose Profile the dialog shows.
     person: Option<PersonView>,
     /// The person this Device belongs to in each Shared Area.
@@ -333,6 +336,9 @@ struct View {
     capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
+    /// How many of them a newer version of the app saved the schedule of,
+    /// which shows only that (ADR 0034).
+    newer_routines: usize,
     /// The Frogs the selected Note spawned, oldest first, each with
     /// whether this Device may check it off.
     note_frogs: Vec<(Frog, bool)>,
@@ -354,6 +360,9 @@ struct View {
     /// Every Routine and Reminder in alphabetical order with its name
     /// and its Note's Area, while their page shows (#115).
     all_routines: Vec<(Routine, String, Option<Area>)>,
+    /// Those whose schedule a newer version of the app saved, with the
+    /// name and Area of their Note, which a click opens (ADR 0034).
+    all_newer: Vec<all_routines_view::NewerRow>,
     /// While the Agenda shows.
     agenda: Option<AgendaView>,
     /// The strangers' Sent Items waiting, while their list shows.
@@ -369,6 +378,10 @@ struct View {
     /// The user's own Profile and its short code.
     profile: Option<Profile>,
     profile_code: Option<String>,
+    /// Whether a newer version of the app saved the own Profile in a form
+    /// this one does not know: it shows, and only that version changes it
+    /// (ADR 0034).
+    profile_newer: bool,
     /// The other Profile "Which one is you?" asks about, if it does.
     profile_question: Option<ProfileChoice>,
     /// Whether sync waits for an AI Task (ADR 0026), and the AI Task
@@ -3009,9 +3022,12 @@ impl App {
             }
             None => false,
         };
-        let note_routines = match &detail {
-            Some((p, _)) if !p.note.is_trashed() => routines.of_note(&p.note.id)?,
-            _ => Vec::new(),
+        let (note_routines, newer_routines) = match &detail {
+            Some((p, _)) if !p.note.is_trashed() => (
+                routines.of_note(&p.note.id)?,
+                routines.newer_of_note(&p.note.id)?.len(),
+            ),
+            _ => (Vec::new(), 0),
         };
         let mut note_frogs = Vec::new();
         if let Some((p, _)) = &detail
@@ -3294,18 +3310,43 @@ impl App {
                 all_routines.push((routine, name, area));
             }
         }
+        let mut all_newer = Vec::new();
+        if self.selection == Selection::AllRoutines {
+            for routine in routines.newer()? {
+                if let Some(note) = routines.note_of_newer(&routine)? {
+                    let name = all_routines_view::routine_name(&self.t, Some(&note));
+                    let area = place(note.clone())?.area;
+                    all_newer.push(all_routines_view::NewerRow {
+                        id: routine.id,
+                        note: note.id,
+                        name,
+                        area,
+                    });
+                }
+            }
+        }
         let (frogs_open, frogs_done) = if self.selection == Selection::Frogs {
             (shown_frogs(frogs.open()?)?, shown_frogs(frogs.done()?)?)
         } else {
             (Vec::new(), Vec::new())
         };
+        let people_shown = self.store.people_shown()?;
+        let mut people_newer = std::collections::HashSet::new();
+        for person in &people_shown {
+            if self.store.person_is_newer(&person.id)?
+                || self.store.override_is_newer(&person.id)?
+            {
+                people_newer.insert(person.id.clone());
+            }
+        }
         Ok(View {
             areas,
             access,
             people,
             names,
             shown: shown_people,
-            people_shown: self.store.people_shown()?,
+            people_shown,
+            people_newer,
             blocked_people: self.store.blocked_people()?,
             blocked_open: self.store.local_setting(BLOCKED_OPEN)?.as_deref() == Some("true"),
             person: match &self.dialog {
@@ -3331,6 +3372,7 @@ impl App {
             )?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
             routines: note_routines,
+            newer_routines,
             note_frogs,
             tally,
             checklist,
@@ -3339,6 +3381,7 @@ impl App {
             makes_shopping,
             frogs_open,
             all_routines,
+            all_newer,
             frogs_done,
             frogs_done_open: self.store.local_setting(FROGS_DONE_OPEN)?.as_deref() == Some("true"),
             agenda,
@@ -3357,6 +3400,7 @@ impl App {
             trashed_frogs,
             profile: OwnProfile::new(&self.store).get()?,
             profile_code: OwnProfile::new(&self.store).code()?,
+            profile_newer: OwnProfile::new(&self.store).is_newer()?,
             profile_question: OwnProfile::new(&self.store).question()?,
             sync_paused: self.store.sync_paused()?,
             ai_review: match &ai_task {
@@ -5899,9 +5943,11 @@ impl App {
             }
             Selection::AllRoutines => {
                 let mut asked = Vec::new();
-                all_routines_view::page(ui, &self.t, tones, &self.view.all_routines, &mut asked);
+                let rows = (&self.view.all_routines[..], &self.view.all_newer[..]);
+                all_routines_view::page(ui, &self.t, tones, rows, &mut asked);
                 actions.extend(asked.into_iter().map(|asked| match asked {
                     AllRoutinesAction::Open(id) => Action::OpenRoutine(id),
+                    AllRoutinesAction::OpenNote(id) => Action::SelectNote(id),
                     AllRoutinesAction::Export => Action::ExportRoutines,
                 }));
                 return;
@@ -6193,6 +6239,7 @@ impl App {
             return;
         };
         let linked = &self.view.routines;
+        let newer_routines = self.view.newer_routines;
         let tally = self.view.tally.as_ref();
         let tally_count = self.tally_look.count;
         let checklist = self.view.checklist.as_ref();
@@ -6679,6 +6726,12 @@ impl App {
                         if row(ui, tones, false, 0.0, Some((icon, text)), &label, false).clicked() {
                             actions.push(Action::OpenRoutine(routine.id.clone()));
                         }
+                    }
+                    for _ in 0..newer_routines {
+                        ui.horizontal(|ui| {
+                            icons::show(ui, icons::HISTORY, 18.0, weak);
+                            ui.label(RichText::new(t.newer_version_needed()).color(weak));
+                        });
                     }
                     // Its Frogs, checked off here too; the words open the
                     // Frog view.
@@ -7403,6 +7456,8 @@ impl App {
         let mut people_asked = Vec::new();
         let profile = self.view.profile.as_ref();
         let code = self.view.profile_code.as_deref();
+        let profile_newer = self.view.profile_newer;
+        let people_newer = &self.view.people_newer;
         let question = self.view.profile_question.is_some();
         ui.heading(RichText::new(t.profile_title()).color(text));
         ui.add_space(8.0);
@@ -7413,7 +7468,7 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 16.0;
                 ui.add_space(4.0);
                 embossed(ui, tones, false, None, |ui| {
-                    profile_view::header(ui, &t, view, profile, code, &mut asked);
+                    profile_view::header(ui, &t, view, (profile, profile_newer), code, &mut asked);
                 });
                 if profile.is_some() {
                     embossed(ui, tones, false, None, |ui| {
@@ -7456,7 +7511,8 @@ impl App {
                         ui.label(RichText::new(t.profile_people_empty()).small().color(weak));
                     }
                     for person in people {
-                        people_row(ui, &t, pictures, person, &mut people_asked);
+                        let newer = people_newer.contains(&person.id);
+                        people_row(ui, &t, pictures, (person, newer), &mut people_asked);
                     }
                     if !blocked.is_empty() {
                         let fold = egui::CollapsingHeader::new(
@@ -7466,7 +7522,7 @@ impl App {
                         .open(Some(blocked_open))
                         .show(ui, |ui| {
                             for person in blocked {
-                                people_row(ui, &t, pictures, person, &mut people_asked);
+                                people_row(ui, &t, pictures, (person, false), &mut people_asked);
                             }
                         });
                         if fold.header_response.clicked() {
@@ -7671,7 +7727,11 @@ impl App {
         else {
             return Ok(());
         };
+        // An Override a newer version of the app saved is changed only
+        // there (ADR 0034), whatever a stale form still asks.
+        let locked = self.store.override_is_newer(id)?;
         match asked {
+            PersonAction::Rename(_) | PersonAction::TheirPicture if locked => {}
             PersonAction::Rename(typed) => {
                 self.store.set_override_name(id, &typed)?;
                 *name = self
@@ -7745,7 +7805,7 @@ impl App {
         let Some(Dialog::Person { id, .. }) = &self.dialog else {
             return Ok(());
         };
-        if !take {
+        if !take || self.store.override_is_newer(id)? {
             return Ok(());
         }
         match square.make() {
@@ -7758,7 +7818,15 @@ impl App {
     /// Does what was asked of the own Profile on the Profile page.
     fn profile_action(&mut self, asked: ProfileAction) -> oldbrainfix_core::Result<()> {
         let own = OwnProfile::new(&self.store);
+        // A Profile a newer version of the app saved is changed only there
+        // (ADR 0034), whatever a stale form still asks.
+        let locked = own.is_newer()?;
         match asked {
+            ProfileAction::Rename(_) | ProfileAction::Initials | ProfileAction::UseSquare
+                if locked =>
+            {
+                self.profile_view.square = None;
+            }
             ProfileAction::Rename(name) => {
                 if own.get()?.is_some() {
                     own.rename(&name)?;
@@ -8421,10 +8489,11 @@ fn people_row(
     ui: &mut Ui,
     t: &L10n,
     pictures: &mut profile_view::Pictures,
-    person: &Profile,
+    (person, newer): (&Profile, bool),
     asked: &mut Vec<String>,
 ) {
     let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
     let name = profile_view::display_name(t, &person.name).to_string();
     ui.horizontal(|ui| {
         let open = t.person_open(&name);
@@ -8432,6 +8501,10 @@ fn people_row(
         let line = ui.add(egui::Button::new(RichText::new(&name).color(text)).frame(false));
         if picture.clicked() || line.clicked() {
             asked.push(person.id.clone());
+        }
+        // Saved by a newer version of the app (ADR 0034).
+        if newer {
+            ui.label(RichText::new(t.newer_version_needed()).small().color(weak));
         }
     });
 }
@@ -9294,9 +9367,12 @@ fn people_form(
         let own = Some(person.id.as_str()) == mine;
         let name = person_name(t, names, person);
         let name = if own { t.people_you(&name) } else { name };
+        // A role a newer version of the app gave is kept as it is, and
+        // nothing here changes it (ADR 0034).
         let role = match person.role {
-            AreaRole::Manager => t.role_manager(),
-            AreaRole::Member => t.role_member(),
+            Some(AreaRole::Manager) => t.role_manager(),
+            Some(AreaRole::Member) => t.role_member(),
+            None => t.newer_version_needed(),
         };
         ui.horizontal(|ui| {
             // Another person's picture opens their Profile (#52).
@@ -9317,12 +9393,11 @@ fn people_form(
             }
             ui.label(RichText::new(&name).color(text));
             ui.label(RichText::new(role).small().color(weak));
-            if !manages || own {
-                return;
-            }
             let (label, next) = match person.role {
-                AreaRole::Member => (t.make_manager(), AreaRole::Manager),
-                AreaRole::Manager => (t.make_member(), AreaRole::Member),
+                _ if !manages || own => return,
+                Some(AreaRole::Member) => (t.make_manager(), AreaRole::Manager),
+                Some(AreaRole::Manager) => (t.make_member(), AreaRole::Member),
+                None => return,
             };
             if ui.button(RichText::new(label).color(text)).clicked() {
                 actions.push(Action::SetRole {

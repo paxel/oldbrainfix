@@ -31,6 +31,10 @@ pub mod keys {
     pub const TIMES: &str = "times";
     /// The schedule's rule as an RRULE value; absent for a Reminder.
     pub const RULE: &str = "rule";
+    /// The version of the schedule's structure (ADR 0034): version 1
+    /// holds [`START`], [`TIMES`] and [`RULE`]; it is the default and never
+    /// written, so it is absent.
+    pub const SCHEDULE_VERSION: &str = "scheduleVersion";
     /// Prefix of the field marking an Occurrence Done, keyed by its
     /// wall-clock key; the value is when it was checked off.
     pub const DONE_PREFIX: &str = "done@";
@@ -43,7 +47,7 @@ pub mod keys {
     /// The Note the Routine went to the trash with.
     pub const TRASHED_WITH: &str = "trashedWith";
     /// The fields that make up the schedule.
-    pub const SCHEDULE_FIELDS: [&str; 3] = [START, TIMES, RULE];
+    pub const SCHEDULE_FIELDS: [&str; 4] = [START, TIMES, RULE, SCHEDULE_VERSION];
 
     /// The field marking `occurrence` Done.
     pub fn done(occurrence: &crate::schedule::Occurrence) -> String {
@@ -87,6 +91,19 @@ impl Routine {
     pub fn done_at(&self, occurrence: &Occurrence) -> Option<DateTime<Utc>> {
         self.done.get(&occurrence.key()).copied()
     }
+}
+
+/// A Routine or Reminder whose schedule this version cannot read, as the
+/// Dart core's `NewerRoutine`: one of a later structure, or with a part
+/// it does not know (ADR 0034). It is kept as it is, fires nothing here
+/// and nothing here changes it; the apps show that a newer version of
+/// the app is needed for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewerRoutine {
+    /// Entity id, `routine:<id>`.
+    pub id: String,
+    /// The Note it was spawned from, as stored.
+    pub note_id: String,
 }
 
 /// `routines` in alphabetical order of their names, as the list of all
@@ -447,20 +464,98 @@ impl<'a> Routines<'a> {
     }
 
     /// The schedule the Routine `fields` hold, or `None` when they hold
-    /// none.
+    /// none or one this version cannot read ([`Routines::schedule_is_newer`]).
     pub fn schedule_of(fields: &Fields) -> Option<Schedule> {
+        if !known_schedule_version(fields) {
+            return None;
+        }
         let start = Day::parse(fields.get(keys::START).unwrap_or_default())?;
         let rule = match fields.get(keys::RULE) {
             None => None,
             Some(text) => Some(Recurrence::parse(text).ok()?),
         };
-        let times: Vec<ClockTime> = fields
-            .get(keys::TIMES)
-            .unwrap_or_default()
-            .split(',')
-            .filter_map(ClockTime::parse)
-            .collect();
+        let text = fields.get(keys::TIMES).unwrap_or_default();
+        // Empty for all day; a time this version cannot read is a part it
+        // does not know, not one to leave out.
+        let times: Vec<ClockTime> = if text.is_empty() {
+            Vec::new()
+        } else {
+            text.split(',')
+                .map(ClockTime::parse)
+                .collect::<Option<_>>()?
+        };
         Schedule::new(start, &times, rule)
+    }
+
+    /// Whether the Routine `fields` hold a schedule this version cannot
+    /// read (ADR 0034): of a later structure, its
+    /// [`keys::SCHEDULE_VERSION`] anything but absent or `1`, or with a
+    /// start, times or rule it does not know. Fields without a start or a
+    /// version hold no schedule.
+    pub fn schedule_is_newer(fields: &Fields) -> bool {
+        Self::schedule_of(fields).is_none()
+            && (!known_schedule_version(fields) || fields.get(keys::START).is_some())
+    }
+
+    /// The Routine `id` when its schedule needs a newer version of the
+    /// app ([`Routines::schedule_is_newer`]), trashed or not.
+    pub fn newer_by_id(&self, id: &str) -> Result<Option<NewerRoutine>> {
+        let fields = self.store.current_fields(id)?;
+        if fields.get(keys::TYPE) != Some(keys::TYPE_ROUTINE) {
+            return Ok(None);
+        }
+        let Some(note_id) = fields.get(keys::NOTE) else {
+            return Ok(None);
+        };
+        if !Self::schedule_is_newer(&fields) {
+            return Ok(None);
+        }
+        Ok(Some(NewerRoutine {
+            id: id.to_string(),
+            note_id: note_id.to_string(),
+        }))
+    }
+
+    /// Every Routine and Reminder not in the trash whose schedule needs a
+    /// newer version of the app, by id: [`Routines::all`] leaves them out.
+    pub fn newer(&self) -> Result<Vec<NewerRoutine>> {
+        let mut ids = self.store.entities_of_type(keys::TYPE_ROUTINE)?;
+        ids.sort();
+        let mut out = Vec::new();
+        for id in ids {
+            if let Some(routine) = self.newer_by_id(&id)?
+                && self.store.current(&id, keys::TRASHED)?.is_none()
+            {
+                out.push(routine);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The Routines and Reminders of [`Routines::newer`] the Note
+    /// `note_id` spawned, those of the Notes merged into it included.
+    pub fn newer_of_note(&self, note_id: &str) -> Result<Vec<NewerRoutine>> {
+        let mut out = Vec::new();
+        for routine in self.newer()? {
+            if self
+                .note_of_newer(&routine)?
+                .is_some_and(|n| n.id == note_id)
+            {
+                out.push(routine);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The Note `routine` shows under, as [`Routines::note`] finds it for
+    /// a Routine.
+    pub fn note_of_newer(&self, routine: &NewerRoutine) -> Result<Option<Note>> {
+        let notes = Notes::new(self.store);
+        let note = notes.by_id(&routine.note_id)?;
+        match note.as_ref().and_then(|n| n.merged_into.clone()) {
+            None => Ok(note),
+            Some(into) => notes.by_id(&into),
+        }
     }
 
     /// Every Routine and Reminder not in the trash.
@@ -585,6 +680,12 @@ impl<'a> Routines<'a> {
 
 /// The Agenda's order: by Occurrence, then by the Note's text, then by
 /// id, as the Dart core sorts.
+/// Whether the schedule version the Routine `fields` hold is 1: absent
+/// or `1` exactly.
+fn known_schedule_version(fields: &Fields) -> bool {
+    matches!(fields.get(keys::SCHEDULE_VERSION), None | Some("1"))
+}
+
 fn agenda_order(a: &AgendaRow, b: &AgendaRow) -> Ordering {
     let text = |r: &AgendaRow| r.note.as_ref().map(|n| n.text.clone()).unwrap_or_default();
     a.occurrence
@@ -605,6 +706,106 @@ mod tests {
             Some(s) => s,
             None => panic!("a schedule"),
         }
+    }
+
+    fn fields(pairs: &[(&str, &str)]) -> Fields {
+        Fields::new(
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_schedule_reads_as_newer_by_its_version_or_a_part_not_known() {
+        let daily = [
+            (keys::START, "2026-10-24"),
+            (keys::TIMES, "08:00"),
+            (keys::RULE, "FREQ=DAILY"),
+        ];
+        let with = |key: &'static str, value: &'static str| {
+            let mut out: Vec<(&str, &str)> =
+                daily.iter().filter(|(k, _)| *k != key).copied().collect();
+            out.push((key, value));
+            out
+        };
+        for known in [
+            daily.to_vec(),
+            with(keys::SCHEDULE_VERSION, "1"),
+            with(keys::TIMES, ""),
+        ] {
+            let f = fields(&known);
+            assert!(Routines::schedule_of(&f).is_some(), "{known:?}");
+            assert!(!Routines::schedule_is_newer(&f), "{known:?}");
+        }
+        for newer in [
+            with(keys::SCHEDULE_VERSION, "2"),
+            with(keys::SCHEDULE_VERSION, "01"),
+            with(keys::SCHEDULE_VERSION, " 1"),
+            with(keys::SCHEDULE_VERSION, "1.0"),
+            with(keys::SCHEDULE_VERSION, ""),
+            vec![(keys::SCHEDULE_VERSION, "2")],
+            with(keys::TIMES, "08:00,8pm"),
+            with(keys::TIMES, "08:00,"),
+            with(keys::RULE, "FREQ=DAILY;BYEASTER=1"),
+            with(keys::START, "2026-13-01"),
+        ] {
+            let f = fields(&newer);
+            assert!(Routines::schedule_of(&f).is_none(), "{newer:?}");
+            assert!(Routines::schedule_is_newer(&f), "{newer:?}");
+        }
+        for none in [
+            vec![],
+            vec![(keys::TIMES, "08:00"), (keys::RULE, "FREQ=DAILY")],
+            vec![(keys::SCHEDULE_VERSION, "1")],
+        ] {
+            assert!(!Routines::schedule_is_newer(&fields(&none)), "{none:?}");
+        }
+    }
+
+    #[test]
+    fn a_routine_of_a_later_version_fires_nothing_and_nothing_here_changes_it() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let routines = Routines::new(&store);
+        let pills = notes.capture("pills", None, None)?;
+        let id = "routine:later";
+        store.batch(|| {
+            store.append(id, keys::TYPE, Some(keys::TYPE_ROUTINE), None)?;
+            store.append(id, keys::NOTE, Some(&pills.id), None)?;
+            store.append(id, keys::START, Some("2026-01-01"), None)?;
+            store.append(id, keys::TIMES, Some("08:00"), None)?;
+            store.append(id, keys::RULE, Some("FREQ=DAILY"), None)?;
+            store.append(id, keys::SCHEDULE_VERSION, Some("2"), None)?;
+            Ok(())
+        })?;
+        assert_eq!(routines.by_id(id)?, None);
+        assert!(routines.all()?.is_empty());
+        let newer = NewerRoutine {
+            id: id.to_string(),
+            note_id: pills.id.clone(),
+        };
+        assert_eq!(routines.newer()?, vec![newer.clone()]);
+        assert_eq!(routines.newer_of_note(&pills.id)?, vec![newer]);
+        let before = store.history(id)?.len();
+        let occurrence = Occurrence::new(Day::new(2026, 1, 1), ClockTime::new(8, 0));
+        assert!(routines.reschedule(id, &daily_at_eight()).is_err());
+        assert!(routines.set_renag(id, Some(Duration::minutes(5))).is_err());
+        assert!(routines.set_escalation(id, Some(2)).is_err());
+        assert!(routines.trash(id).is_err());
+        assert!(routines.mark_done(id, &occurrence, None).is_err());
+        assert!(routines.unmark_done(id, &occurrence).is_err());
+        assert_eq!(store.history(id)?.len(), before);
+        // Merged into another Note, it shows under that one.
+        let bx = notes.capture("pill box", None, None)?;
+        notes.merge(&pills.id, &bx.id)?;
+        assert_eq!(routines.newer_of_note(&bx.id)?.len(), 1);
+        assert!(routines.newer_of_note(&pills.id)?.is_empty());
+        // In the trash, by a newer version, it is listed no more.
+        store.append(id, keys::TRASHED, Some("2026-01-01T10:00:00.000Z"), None)?;
+        assert!(routines.newer()?.is_empty());
+        Ok(())
     }
 
     #[test]

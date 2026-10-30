@@ -1,0 +1,368 @@
+{
+  "routines": [
+    "routine:00000000000000000000000000000002",
+    "routine:version-one"
+  ],
+  "newer": [
+    {
+      "id": "routine:later-rule",
+      "noteId": "note:00000000000000000000000000000003"
+    },
+    {
+      "id": "routine:later-times",
+      "noteId": "note:00000000000000000000000000000001"
+    },
+    {
+      "id": "routine:later-version",
+      "noteId": "note:00000000000000000000000000000001"
+    }
+  ],
+  "newerOfNote": {
+    "note:00000000000000000000000000000004": [
+      "routine:later-rule"
+    ],
+    "note:00000000000000000000000000000001": [
+      "routine:later-times",
+      "routine:later-version"
+    ]
+  },
+  "scheduleIsNewer": {
+    "routine:00000000000000000000000000000002": false,
+    "routine:later-rule": true,
+    "routine:later-times": true,
+    "routine:later-version": true,
+    "routine:version-one": false
+  },
+  "areaName": "Household",
+  "people": [
+    {
+      "id": "65b60673d6ed884bf01c2c222d82ada0",
+      "role": null,
+      "newer": true,
+      "devices": [
+        "65b60673d6ed884bf01c2c222d82ada0"
+      ]
+    },
+    {
+      "id": "dan",
+      "role": "member",
+      "newer": false,
+      "devices": [
+        "dan"
+      ]
+    },
+    {
+      "id": "ben",
+      "role": null,
+      "newer": true,
+      "devices": [
+        "ben"
+      ]
+    },
+    {
+      "id": "cara",
+      "role": null,
+      "newer": true,
+      "devices": [
+        "cara"
+      ]
+    }
+  ],
+  "devices": {
+    "ben": {
+      "access": "none",
+      "role": null,
+      "newer": true,
+      "sharedWith": [
+        "area:00000000000000000000000000000005"
+      ]
+    },
+    "cara": {
+      "access": "none",
+      "role": null,
+      "newer": true,
+      "sharedWith": [
+        "area:00000000000000000000000000000005"
+      ]
+    },
+    "dan": {
+      "access": "member",
+      "role": "member",
+      "newer": false,
+      "sharedWith": [
+        "area:00000000000000000000000000000005"
+      ]
+    },
+    "laptop": {
+      "access": "none",
+      "role": null,
+      "newer": null,
+      "sharedWith": []
+    },
+    "65b60673d6ed884bf01c2c222d82ada0": {
+      "access": "none",
+      "role": null,
+      "newer": true,
+      "sharedWith": [
+        "area:00000000000000000000000000000005"
+      ]
+    }
+  },
+  "mayWriteIn": false,
+  "mayManage": false,
+  "overrides": {
+    "ben": {
+      "name": "Ben B.",
+      "newer": false
+    },
+    "cara": {
+      "name": "Cara C.",
+      "newer": true
+    }
+  },
+  "grantValues": {
+    "{\"profile\":\"p\",\"role\":\"member\"}": {
+      "profile": "p",
+      "role": "member"
+    },
+    "{\"profile\":\"p\",\"role\":\"manager\",\"v\":1}": {
+      "profile": "p",
+      "role": "manager"
+    },
+    "{\"profile\":\"p\",\"role\":\"viewer\"}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"v\":2}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"v\":1.5}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"v\":1.0}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"v\":\"1\"}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"v\":null}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\",\"role\":\"member\",\"until\":\"2027\"}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"p\"}": {
+      "profile": "p",
+      "role": null
+    },
+    "{\"profile\":\"\",\"role\":\"member\"}": null,
+    "{\"role\":\"member\"}": null,
+    "member": null
+  },
+  "records": {
+    "{\"id\":\"p\",\"name\":\"A\",\"version\":1}": {
+      "newer": false,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 1
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"v\":1,\"version\":2}": {
+      "newer": false,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 2
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"v\":2,\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"v\":1.0,\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"v\":\"1\",\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"pronouns\":\"she\",\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":{\"en\":\"A\"},\"v\":2,\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"picture\":\"%%\",\"v\":2,\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": null,
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"picture\":\"AQID\",\"v\":2,\"version\":3}": {
+      "newer": true,
+      "profile": {
+        "id": "p",
+        "name": "A",
+        "picture": "AQID",
+        "version": 3
+      }
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"picture\":\"%%\",\"version\":3}": {
+      "newer": false,
+      "profile": null
+    },
+    "{\"id\":\"p\",\"name\":\"A\",\"v\":2}": {
+      "newer": true,
+      "profile": null
+    },
+    "{\"name\":\"A\",\"v\":2,\"version\":3}": {
+      "newer": true,
+      "profile": null
+    }
+  },
+  "schedules": [
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00",
+        "rule": "FREQ=DAILY"
+      },
+      "schedule": true,
+      "newer": false
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "",
+        "scheduleVersion": "1"
+      },
+      "schedule": true,
+      "newer": false
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00",
+        "scheduleVersion": "2"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00",
+        "scheduleVersion": "01"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00",
+        "scheduleVersion": ""
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "scheduleVersion": "2"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00,"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "8:00"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "times": "08:00,08:00"
+      },
+      "schedule": true,
+      "newer": false
+    },
+    {
+      "fields": {
+        "start": "2026-01-01",
+        "rule": "FREQ=DAILY;BYEASTER=1"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "start": "2026-13-01"
+      },
+      "schedule": false,
+      "newer": true
+    },
+    {
+      "fields": {
+        "times": "08:00"
+      },
+      "schedule": false,
+      "newer": false
+    },
+    {
+      "fields": {},
+      "schedule": false,
+      "newer": false
+    }
+  ]
+}

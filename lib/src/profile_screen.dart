@@ -214,8 +214,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     message: t.profilePictureChange,
                     child: GestureDetector(
                       key: const ValueKey('profilePicture'),
-                      onTapUp: (details) =>
-                          unawaited(_pictureMenu(details.globalPosition)),
+                      onTapUp: model.newer
+                          ? null
+                          : (details) =>
+                                unawaited(_pictureMenu(details.globalPosition)),
                       child: ProfileAvatar(profile: model.profile, size: 112),
                     ),
                   ),
@@ -226,6 +228,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     key: const ValueKey('profileName'),
                     controller: _name,
                     focusNode: _nameFocus,
+                    // Saved by a newer version of the app: shown, not
+                    // changed here (ADR 0034).
+                    readOnly: model.newer,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
@@ -235,6 +240,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onSubmitted: (_) => _saveName(),
                   ),
                 ),
+                if (model.newer)
+                  Padding(
+                    key: const ValueKey('profileNewer'),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                    child: Text(t.newerVersionNeeded),
+                  ),
                 if (model.question != null)
                   ListTile(
                     key: const ValueKey('profileQuestion'),

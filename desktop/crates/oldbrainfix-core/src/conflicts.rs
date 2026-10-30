@@ -27,8 +27,8 @@ use chrono::Duration;
 use crate::entry::{Entry, WireEntry};
 use crate::notes::keys as note_keys;
 use crate::places::keys as place_keys;
-use crate::routines::keys as routine_keys;
-use crate::store::{Store, utf16_cmp};
+use crate::routines::{Routines, keys as routine_keys};
+use crate::store::{Fields, Store, utf16_cmp};
 use crate::text_format::StoredText;
 use crate::{Error, Result};
 
@@ -39,13 +39,14 @@ pub const SCHEDULE_UNIT: &str = "schedule";
 pub const RADIUS: &str = "radius";
 
 /// Every field concurrent edits are a Conflict on.
-pub const CONFLICT_FIELDS: [&str; 6] = [
+pub const CONFLICT_FIELDS: [&str; 7] = [
     note_keys::TEXT,
     place_keys::NAME,
     RADIUS,
     routine_keys::START,
     routine_keys::TIMES,
     routine_keys::RULE,
+    routine_keys::SCHEDULE_VERSION,
 ];
 
 /// The unit `field` conflicts as, or `None` when concurrent edits to it
@@ -55,7 +56,10 @@ pub fn conflict_unit(field: &str) -> Option<&'static str> {
         note_keys::TEXT => Some(note_keys::TEXT),
         place_keys::NAME => Some(place_keys::NAME),
         RADIUS => Some(RADIUS),
-        routine_keys::START | routine_keys::TIMES | routine_keys::RULE => Some(SCHEDULE_UNIT),
+        routine_keys::START
+        | routine_keys::TIMES
+        | routine_keys::RULE
+        | routine_keys::SCHEDULE_VERSION => Some(SCHEDULE_UNIT),
         _ => None,
     }
 }
@@ -162,9 +166,17 @@ pub struct Conflict {
 impl Conflict {
     /// Whether this version may pick one: not when a version is a text in
     /// a format it does not know, which picking another would overwrite
-    /// and keeping could not show as it is (ADR 0018).
+    /// and keeping could not show as it is (ADR 0018), nor a schedule it
+    /// cannot read (ADR 0034).
     pub fn resolvable(&self) -> bool {
-        self.unit != note_keys::TEXT || self.versions.iter().all(|v| v.text().editable)
+        match self.unit.as_str() {
+            note_keys::TEXT => self.versions.iter().all(|v| v.text().editable),
+            SCHEDULE_UNIT => self
+                .versions
+                .iter()
+                .all(|v| Routines::schedule_of(&Fields::new(v.values.clone())).is_some()),
+            _ => true,
+        }
     }
 }
 
@@ -235,7 +247,7 @@ impl Store {
             let head = &written[h];
             let values: Vec<(String, Option<String>)> = fields
                 .iter()
-                .map(|field| {
+                .filter_map(|field| {
                     // What the head's writer had of the field: the last it
                     // had of it, the newest by latest wins among several.
                     let had: Vec<&Entry> = written
@@ -253,7 +265,12 @@ impl Store {
                             newest = Some(e);
                         }
                     }
-                    (field.to_string(), newest.and_then(|e| e.value.clone()))
+                    // A schedule's version 1, never written, is no value of
+                    // it.
+                    if newest.is_none() && *field == routine_keys::SCHEDULE_VERSION {
+                        return None;
+                    }
+                    Some((field.to_string(), newest.and_then(|e| e.value.clone())))
                 })
                 .collect();
             // A text written before its format was recorded is the same
@@ -308,6 +325,10 @@ impl Store {
         }
         self.batch(|| {
             for field in &fields {
+                // Version 1 of a schedule is never written (ADR 0034).
+                if *field == routine_keys::SCHEDULE_VERSION && kept.get(field).is_none() {
+                    continue;
+                }
                 self.append(&conflict.entity, field, kept.get(field), Some(date))?;
             }
             Ok(())
@@ -480,6 +501,66 @@ mod tests {
             a.resolve_conflict(&conflict, &conflict.versions[0])
                 .is_err()
         );
+        Ok(())
+    }
+
+    fn at(hour: u32) -> Result<crate::Schedule> {
+        let time = crate::ClockTime::new(hour, 0).ok_or(Error::Invalid("a time".into()))?;
+        crate::Schedule::new(crate::Day::new(2026, 3, 1), &[time], None)
+            .ok_or(Error::Invalid("a schedule".into()))
+    }
+
+    #[test]
+    fn a_schedule_kept_writes_no_version() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let routine = Routines::new(&a).create("Pills", &at(8)?)?;
+        send(&a, &b)?;
+        Routines::new(&a).reschedule(&routine.id, &at(9)?)?;
+        Routines::new(&b).reschedule(&routine.id, &at(10)?)?;
+        send(&b, &a)?;
+        let conflict = a
+            .conflict_on(&routine.id, SCHEDULE_UNIT)?
+            .ok_or(Error::Invalid("a conflict".into()))?;
+        assert!(conflict.resolvable());
+        assert!(conflict.versions.iter().all(|v| {
+            v.values
+                .iter()
+                .all(|(k, _)| k != routine_keys::SCHEDULE_VERSION)
+        }));
+        a.resolve_conflict(&conflict, &conflict.versions[0])?;
+        // Version 1 of a schedule is never written (ADR 0034).
+        assert!(
+            a.history(&routine.id)?
+                .iter()
+                .all(|e| e.field != routine_keys::SCHEDULE_VERSION)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_schedule_of_a_later_version_is_no_pick_here() -> Result<()> {
+        let a = device(1)?;
+        let b = device(2)?;
+        let routine = Routines::new(&a).create("Pills", &at(8)?)?;
+        send(&a, &b)?;
+        Routines::new(&a).reschedule(&routine.id, &at(9)?)?;
+        // As the later version writes it.
+        b.batch(|| {
+            b.append(&routine.id, routine_keys::TIMES, Some("08:00~2"), None)?;
+            b.append(&routine.id, routine_keys::SCHEDULE_VERSION, Some("2"), None)?;
+            Ok(())
+        })?;
+        send(&b, &a)?;
+        let conflict = a
+            .conflict_on(&routine.id, SCHEDULE_UNIT)?
+            .ok_or(Error::Invalid("a conflict".into()))?;
+        assert!(!conflict.resolvable());
+        let before = a.history(&routine.id)?.len();
+        for kept in &conflict.versions {
+            assert!(a.resolve_conflict(&conflict, kept).is_err());
+        }
+        assert_eq!(a.history(&routine.id)?.len(), before);
         Ok(())
     }
 

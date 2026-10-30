@@ -701,14 +701,18 @@ List<Entry> _inArea(Store store, String area, List<Entry> entries) {
   final mine = grants?.grantOf(store.deviceId);
   final theirs = grants?.grantOf(offer.from.device);
   final sharer = Profile.parse(offer.profile.record)?.id;
-  if (mine == null || !store.isOwnPerson(mine.profile)) return null;
+  // A grant not known here gives no role this version could take.
+  final role = mine?.role;
+  if (mine == null || role == null || !store.isOwnPerson(mine.profile)) {
+    return null;
+  }
   if (theirs == null ||
       theirs.role != AreaRole.manager ||
       sharer == null ||
       store.resolvePerson(theirs.profile) != store.resolvePerson(sharer)) {
     return null;
   }
-  return (role: mine.role, ignored: judged.ignored);
+  return (role: role, ignored: judged.ignored);
 }
 
 /// The Profiles the bundle [folder] holds sealed with one of [keys], in

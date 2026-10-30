@@ -1012,7 +1012,237 @@ final _scenarios = <Scenario>[
       notes.capture('Unsorted thought');
     },
   ),
+  (
+    name: 'markers',
+    about:
+        'Values of a later version (ADR 0034): Routines whose schedule is '
+        'of structure version 2, holds times or a rule not known, or names '
+        'version 1 written out, one of them under a Note merged into '
+        'another; an Area shared, a person granted a role not known, one a '
+        'grant of a later structure and one a Member; this Device then '
+        'granted a role not known itself, granting a Device of its own and '
+        'renaming the Area, neither of which counts; Overrides of version '
+        '1 and of a later one.',
+    build: (store) {
+      final notes = Notes(store);
+      final pills = notes.capture('Take the pills');
+      Routines(store).spawn(
+        pills.id,
+        Schedule(
+          start: Day(2026, 1, 1),
+          times: [_at(8)],
+          rule: Recurrence(frequency: Frequency.daily),
+        ),
+      );
+      void later(String id, String noteId, Map<String, String> fields) {
+        store.batch(() {
+          store.append(id, RoutineKeys.type, RoutineKeys.typeRoutine);
+          store.append(id, RoutineKeys.note, noteId);
+          for (final MapEntry(:key, :value) in fields.entries) {
+            store.append(id, key, value);
+          }
+        });
+      }
+
+      later('routine:later-version', pills.id, {
+        RoutineKeys.start: '2026-01-01',
+        RoutineKeys.times: '08:00',
+        RoutineKeys.rule: 'FREQ=DAILY',
+        RoutineKeys.scheduleVersion: '2',
+      });
+      later('routine:later-times', pills.id, {
+        RoutineKeys.start: '2026-01-01',
+        RoutineKeys.times: '08:00,8pm',
+      });
+      final plants = notes.capture('Water the plants');
+      later('routine:later-rule', plants.id, {
+        RoutineKeys.start: '2026-01-01',
+        RoutineKeys.times: '',
+        RoutineKeys.rule: 'FREQ=DAILY;BYEASTER=1',
+      });
+      later('routine:version-one', plants.id, {
+        RoutineKeys.start: '2026-01-02',
+        RoutineKeys.times: '18:00',
+        RoutineKeys.scheduleVersion: '1',
+      });
+      notes.merge(plants.id, notes.capture('Garden').id);
+      final area = store.share(Places(store).addArea('Household').id);
+      final self = store.deviceId;
+      store.batch(() {
+        store.append(
+          area,
+          ShareKeys.role('ben'),
+          '{"profile":"ben","role":"viewer"}',
+        );
+        store.append(
+          area,
+          ShareKeys.role('cara'),
+          '{"profile":"cara","role":"member","v":2}',
+        );
+        store.append(
+          area,
+          ShareKeys.role('dan'),
+          Grant(AreaRole.member, 'dan').encode(),
+        );
+      });
+      store.append(
+        area,
+        ShareKeys.role(self),
+        '{"profile":"$self","role":"viewer"}',
+      );
+      store.append(
+        area,
+        ShareKeys.role('laptop'),
+        Grant(AreaRole.member, self).encode(),
+      );
+      store.append(area, PlaceKeys.name, 'Not counted');
+      store.append('${OverrideKeys.prefix}ben', OverrideKeys.name, 'Ben B.');
+      store.batch(() {
+        store.append(
+          '${OverrideKeys.prefix}cara',
+          OverrideKeys.name,
+          'Cara C.',
+        );
+        store.append('${OverrideKeys.prefix}cara', OverrideKeys.version, '2');
+      });
+    },
+  ),
 ];
+
+/// Grant values as a Device of a later version may write them, for the
+/// `markers` scenario's `markers.json`.
+const _grantValues = [
+  '{"profile":"p","role":"member"}',
+  '{"profile":"p","role":"manager","v":1}',
+  '{"profile":"p","role":"viewer"}',
+  '{"profile":"p","role":"member","v":2}',
+  '{"profile":"p","role":"member","v":1.5}',
+  '{"profile":"p","role":"member","v":1.0}',
+  '{"profile":"p","role":"member","v":"1"}',
+  '{"profile":"p","role":"member","v":null}',
+  '{"profile":"p","role":"member","until":"2027"}',
+  '{"profile":"p"}',
+  '{"profile":"","role":"member"}',
+  '{"role":"member"}',
+  'member',
+];
+
+/// Profile records as a Device of a later version may write them.
+const _laterRecords = [
+  '{"id":"p","name":"A","version":1}',
+  '{"id":"p","name":"A","v":1,"version":2}',
+  '{"id":"p","name":"A","v":2,"version":3}',
+  '{"id":"p","name":"A","v":1.0,"version":3}',
+  '{"id":"p","name":"A","v":"1","version":3}',
+  '{"id":"p","name":"A","pronouns":"she","version":3}',
+  '{"id":"p","name":{"en":"A"},"v":2,"version":3}',
+  '{"id":"p","name":"A","picture":"%%","v":2,"version":3}',
+  '{"id":"p","name":"A","picture":"AQID","v":2,"version":3}',
+  '{"id":"p","name":"A","picture":"%%","version":3}',
+  '{"id":"p","name":"A","v":2}',
+  '{"name":"A","v":2,"version":3}',
+];
+
+/// Schedule fields as a Device of a later version may write them.
+const _laterSchedules = <Map<String, String>>[
+  {'start': '2026-01-01', 'times': '08:00', 'rule': 'FREQ=DAILY'},
+  {'start': '2026-01-01', 'times': '', 'scheduleVersion': '1'},
+  {'start': '2026-01-01', 'times': '08:00', 'scheduleVersion': '2'},
+  {'start': '2026-01-01', 'times': '08:00', 'scheduleVersion': '01'},
+  {'start': '2026-01-01', 'times': '08:00', 'scheduleVersion': ''},
+  {'scheduleVersion': '2'},
+  {'start': '2026-01-01', 'times': '08:00,'},
+  {'start': '2026-01-01', 'times': '8:00'},
+  {'start': '2026-01-01', 'times': '08:00,08:00'},
+  {'start': '2026-01-01', 'rule': 'FREQ=DAILY;BYEASTER=1'},
+  {'start': '2026-13-01'},
+  {'times': '08:00'},
+  {},
+];
+
+/// What the values of a later version in the `markers` log come to.
+Map<String, Object?> _markers(Store store) {
+  final routines = Routines(store);
+  final notes = Notes(store);
+  final ids = store.entitiesOfType(RoutineKeys.typeRoutine)..sort();
+  final area = Places(store).areas().single.id;
+  final devices = ['ben', 'cara', 'dan', 'laptop', store.deviceId];
+  return {
+    'routines': [for (final r in routines.all()) r.id]..sort(),
+    'newer': [
+      for (final r in routines.newer()) {'id': r.id, 'noteId': r.noteId},
+    ],
+    'newerOfNote': {
+      for (final note in notes.all())
+        note.id: [for (final r in routines.newerOfNote(note.id)) r.id],
+    },
+    'scheduleIsNewer': {
+      for (final id in ids)
+        id: Routines.scheduleIsNewer(store.currentFields(id)),
+    },
+    'areaName': Places(store).areaById(area)?.name,
+    'people': [
+      for (final p in store.people(area))
+        {
+          'id': p.id,
+          'role': p.role?.name,
+          'newer': p.newer,
+          'devices': p.devices,
+        },
+    ],
+    'devices': {
+      for (final d in devices)
+        d: {
+          'access': store.accessIn(area, device: d).name,
+          'role': store.grantsOf(area)?.grantOf(d)?.role?.name,
+          'newer': store.grantsOf(area)?.grantOf(d)?.newer,
+          'sharedWith': store.areasSharedWith(d).toList()..sort(),
+        },
+    },
+    'mayWriteIn': store.mayWriteIn(area),
+    'mayManage': store.mayManage(area),
+    'overrides': {
+      for (final id in ['ben', 'cara'])
+        id: {
+          'name': store.personOverride(id)?.name,
+          'newer': store.overrideIsNewer(id),
+        },
+    },
+    'grantValues': {
+      for (final v in _grantValues)
+        v: switch (Grant.parse(v)) {
+          final g? => {'profile': g.profile, 'role': g.role?.name},
+          null => null,
+        },
+    },
+    'records': {
+      for (final r in _laterRecords)
+        r: {
+          'newer': Profile.recordIsNewer(r),
+          'profile': switch (Profile.parse(r)) {
+            final p? => {
+              'id': p.id,
+              'name': p.name,
+              'picture': switch (p.picture) {
+                final bytes? => base64.encode(bytes),
+                null => null,
+              },
+              'version': p.version,
+            },
+            null => null,
+          },
+        },
+    },
+    'schedules': [
+      for (final fields in _laterSchedules)
+        {
+          'fields': fields,
+          'schedule': Routines.scheduleOf(fields) != null,
+          'newer': Routines.scheduleIsNewer(fields),
+        },
+    ],
+  };
+}
 
 /// The European wall clock [days] days on: the scenario's clock moves by
 /// seconds, the Agenda by days.
@@ -3703,7 +3933,7 @@ Map<String, Object?> _roles(Store store, String area, List<String> ids) => {
       {
         'id': p.id,
         'name': store.personShown(p.id).name,
-        'role': p.role.name,
+        'role': p.role?.name,
         'devices': p.devices,
       },
   ],
@@ -6245,6 +6475,12 @@ Future<void> main(List<String> args) async {
     '- `routines/alarms.json`: the Agenda, alarm plan, Missed Summary and '
     'Nudge of the `routines` log at held moments with this Device\'s '
     'settings, on the same clock.\n'
+    '- `markers/markers.json`: what the values of a later version in the '
+    '`markers` log come to (ADR 0034): the Routines read and those whose '
+    'schedule needs a newer version, by Note too, the people of the '
+    'shared Area with their roles, what each Device may do there and '
+    'which Areas go to it, the Overrides; grant values, Profile records '
+    'and schedule fields read as known or as of a later version.\n'
     '- `frogs/frogs.json`: each Frog of the `frogs` log, the open ones, '
     'those Done, the rotation, the Frogs of each Note, and the "Eat a '
     'frog" section the day before, on and after the clock held, on the '
@@ -6596,6 +6832,12 @@ Future<void> main(List<String> args) async {
         _write(
           File('${out.path}/checklists.json'),
           '${_json.convert(_checklists(store))}\n',
+        );
+      }
+      if (scenario.name == 'markers') {
+        _write(
+          File('${out.path}/markers.json'),
+          '${_json.convert(_markers(store))}\n',
         );
       }
       if (ShoppingLists(store).ofNotes(noteIds, _frogDay(0)).isNotEmpty) {

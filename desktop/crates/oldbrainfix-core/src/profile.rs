@@ -80,14 +80,22 @@ impl Profile {
     }
 
     /// The record `text` holds, its name sanitised again; none when it is
+    /// none. A record of a later structure ([`Profile::record_is_newer`])
+    /// is read as far as this version can: its id and version as always,
+    /// its name and picture where they are what version 1 holds, else
     /// none.
     pub fn parse(text: &str) -> Option<Profile> {
         #[cfg(test)]
         tests::PARSED.with(|n| n.set(n.get() + 1));
         let json: Value = serde_json::from_str(text).ok()?;
         let map = json.as_object()?;
+        let newer = newer_record(map);
         let id = map.get("id")?.as_str().filter(|id| !id.is_empty())?;
-        let name = map.get("name")?.as_str()?;
+        let name = match map.get("name").and_then(Value::as_str) {
+            Some(name) => name,
+            None if newer => "",
+            None => return None,
+        };
         let version = map.get("version")?.as_i64().filter(|v| *v >= 1)?;
         // A whole number written as a double is no version.
         if !map.get("version")?.is_i64() && !map.get("version")?.is_u64() {
@@ -95,7 +103,12 @@ impl Profile {
         }
         let picture = match map.get("picture") {
             None | Some(Value::Null) => None,
-            Some(Value::String(text)) => Some(BASE64.decode(text).ok()?),
+            Some(Value::String(text)) => match BASE64.decode(text) {
+                Ok(bytes) => Some(bytes),
+                Err(_) if newer => None,
+                Err(_) => return None,
+            },
+            Some(_) if newer => None,
             Some(_) => return None,
         };
         Some(Profile {
@@ -106,6 +119,17 @@ impl Profile {
         })
     }
 
+    /// Whether the record `text` is of a structure this version does not
+    /// know (ADR 0034): its `v` anything but absent or 1, or a key version
+    /// 1 does not hold. It is shown as far as it can be, passed on as it
+    /// came, and never written anew here.
+    pub fn record_is_newer(text: &str) -> bool {
+        serde_json::from_str::<Value>(text)
+            .ok()
+            .and_then(|json| json.as_object().map(newer_record))
+            .unwrap_or(false)
+    }
+
     fn next(&self, name: Option<String>, picture: Option<Option<Vec<u8>>>) -> Profile {
         Profile {
             id: self.id.clone(),
@@ -114,6 +138,15 @@ impl Profile {
             version: self.version + 1,
         }
     }
+}
+
+/// The keys version 1 of a record holds.
+const RECORD_KEYS: [&str; 5] = ["id", "name", "picture", "v", "version"];
+
+/// Whether the record `map` is of a later structure.
+fn newer_record(map: &Map<String, Value>) -> bool {
+    map.get("v").is_some_and(|v| v.as_u64() != Some(1))
+        || !map.keys().all(|k| RECORD_KEYS.contains(&k.as_str()))
 }
 
 // ------------------------------------------------------------- names
@@ -582,7 +615,12 @@ pub(crate) fn check(sent: &SignedProfile) -> Option<Checked> {
         return None;
     }
     let shown = match &profile.picture {
-        Some(picture) => Some(received_picture(picture)?),
+        // A record of a later structure stays, its picture showing none.
+        Some(picture) => match received_picture(picture) {
+            Some(shown) => Some(shown),
+            None if Profile::record_is_newer(&sent.record) => None,
+            None => return None,
+        },
         None => None,
     };
     Some(Checked {
@@ -721,15 +759,40 @@ impl<'a> OwnProfile<'a> {
         else {
             return Ok(None);
         };
-        if profile.picture.is_some()
-            && let Some(shown) = self
+        if profile.picture.is_some() {
+            match self
                 .store
                 .local_setting(SHOWN)?
                 .and_then(|s| BASE64.decode(s).ok())
-        {
-            profile.picture = Some(shown);
+            {
+                Some(shown) => profile.picture = Some(shown),
+                // Of a later structure, the picture shows only as made
+                // again here.
+                None if self.is_newer()? => profile.picture = None,
+                None => {}
+            }
         }
         Ok(Some(profile))
+    }
+
+    /// Whether the own Profile's record is of a structure this version
+    /// does not know ([`Profile::record_is_newer`]): taken from one of the
+    /// user's Devices with a newer version of the app, it shows as far as
+    /// it can and its name and picture are changed only there (ADR 0034).
+    pub fn is_newer(&self) -> Result<bool> {
+        Ok(self
+            .store
+            .local_setting(RECORD)?
+            .is_some_and(|r| Profile::record_is_newer(&r)))
+    }
+
+    fn refuse_newer(&self) -> Result<()> {
+        if self.is_newer()? {
+            return Err(Error::Invalid(
+                "the own Profile is of a structure not known here".into(),
+            ));
+        }
+        Ok(())
     }
 
     /// The first key of the own Profile: the signing key of the Device
@@ -850,8 +913,9 @@ impl<'a> OwnProfile<'a> {
             return Ok(made);
         };
         // A Profile held by several Devices keeps the name and picture it
-        // had: each Device's own defaults would replace each other's.
-        if !self.alone()? {
+        // had: each Device's own defaults would replace each other's. One
+        // of a later structure is not this version's to write.
+        if !self.alone()? || self.is_newer()? {
             return Ok(current);
         }
         let take_name = !self.chosen(NAME_CHOSEN)? && clean != current.name;
@@ -864,11 +928,16 @@ impl<'a> OwnProfile<'a> {
         Ok(next)
     }
 
-    /// Gives the own Profile the `name` the user typed, sanitised.
+    /// Gives the own Profile the `name` the user typed, sanitised. Another
+    /// name is refused while it [`OwnProfile::is_newer`].
     pub fn rename(&self, name: &str) -> Result<Profile> {
         let current = self.own()?;
-        self.store.set_local_setting(NAME_CHOSEN, "true")?;
         let clean = sanitize_name(name);
+        if clean == current.name && self.is_newer()? {
+            return Ok(current);
+        }
+        self.refuse_newer()?;
+        self.store.set_local_setting(NAME_CHOSEN, "true")?;
         if clean == current.name {
             return Ok(current);
         }
@@ -878,9 +947,14 @@ impl<'a> OwnProfile<'a> {
     }
 
     /// Gives the own Profile the `picture` the user chose (a Profile
-    /// picture), or the placeholder for none.
+    /// picture), or the placeholder for none. Another picture is refused
+    /// while it [`OwnProfile::is_newer`].
     pub fn set_picture(&self, picture: Option<Vec<u8>>) -> Result<Profile> {
         let current = self.own()?;
+        if picture == current.picture && self.is_newer()? {
+            return Ok(current);
+        }
+        self.refuse_newer()?;
         self.store.set_local_setting(PICTURE_CHOSEN, "true")?;
         if picture == current.picture {
             return Ok(current);
@@ -1802,6 +1876,113 @@ mod tests {
         assert!(OwnProfile::new(&pad).restore(Some(&sent), &desk.signing_key()?)?);
         assert_eq!(id(&pad)?, desk_id);
         assert!(OwnProfile::new(&pad).aliases()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_of_a_later_structure_is_read_as_far_as_it_can_be() {
+        for known in [
+            r#"{"id":"p","name":"A","version":1}"#,
+            r#"{"id":"p","name":"A","v":1,"version":1}"#,
+            "nope",
+        ] {
+            assert!(!Profile::record_is_newer(known), "{known}");
+        }
+        for (newer, name, picture) in [
+            (r#"{"id":"p","name":"A","v":2,"version":3}"#, "A", false),
+            (r#"{"id":"p","name":"A","v":"1","version":3}"#, "A", false),
+            (r#"{"id":"p","name":"A","v":1.5,"version":3}"#, "A", false),
+            (r#"{"id":"p","name":"A","v":0,"version":3}"#, "A", false),
+            (r#"{"id":"p","name":"A","v":null,"version":3}"#, "A", false),
+            (
+                r#"{"id":"p","name":"A","pronouns":"she","version":3}"#,
+                "A",
+                false,
+            ),
+            (
+                r#"{"id":"p","name":{"en":"A"},"v":2,"version":3}"#,
+                "",
+                false,
+            ),
+            (
+                r#"{"id":"p","name":"A","picture":"%%","v":2,"version":3}"#,
+                "A",
+                false,
+            ),
+            (
+                r#"{"id":"p","name":"A","picture":"AQID","v":2,"version":3}"#,
+                "A",
+                true,
+            ),
+        ] {
+            assert!(Profile::record_is_newer(newer), "{newer}");
+            let profile = Profile::parse(newer);
+            assert_eq!(
+                profile.as_ref().map(|p| p.id.as_str()),
+                Some("p"),
+                "{newer}"
+            );
+            assert_eq!(profile.as_ref().map(|p| p.version), Some(3), "{newer}");
+            assert_eq!(
+                profile.as_ref().map(|p| p.name.as_str()),
+                Some(name),
+                "{newer}"
+            );
+            assert_eq!(
+                profile.as_ref().map(|p| p.picture.is_some()),
+                Some(picture),
+                "{newer}"
+            );
+        }
+        // Its id and version stay what they always were.
+        for bad in [
+            r#"{"name":"A","v":2,"version":3}"#,
+            r#"{"id":"p","name":"A","v":2}"#,
+            r#"{"id":"p","name":"A","v":2,"version":"3"}"#,
+        ] {
+            assert_eq!(Profile::parse(bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_record_of_a_later_structure_is_taken_shown_and_never_written_anew() -> TestResult {
+        let phone = device(1, "Pixel 7")?;
+        let desk = device(2, "Desk")?;
+        OwnProfile::new(&desk).rename("Ada")?;
+        exchange(&phone, &desk)?;
+        let key = SigningKey::from_seed([2; 32]);
+        let mine = OwnProfile::new(&desk).get()?.ok_or("a Profile")?;
+        // As the desk's later version writes it, its picture none here.
+        let later = format!(
+            r#"{{"id":"{}","name":"Ada L.","picture":"{}","pronouns":"she","v":2,"version":{}}}"#,
+            mine.id,
+            BASE64.encode(b"a picture of later"),
+            mine.version + 1
+        );
+        let mut sent = OwnProfile::new(&desk).to_send()?.ok_or("sent")?;
+        sent["record"] = json!(later);
+        sent["sig"] = json!(key.sign(&record_bytes(&later)));
+        let own = OwnProfile::new(&phone);
+        assert_eq!(
+            own.take(Some(&sent), &key.public_key())?,
+            ProfileTaken::Updated
+        );
+        assert!(own.is_newer()?);
+        assert!(phone.person_is_newer(&mine.id)?);
+        let shown = own.get()?.ok_or("a Profile")?;
+        assert_eq!(shown.name, "Ada L.");
+        assert_eq!(shown.picture, None);
+        assert_eq!(own.signed()?.map(|s| s.record), Some(later.clone()));
+        assert!(own.rename("Ada").is_err());
+        // The same name again, as a page left unchanged keeps it, is fine.
+        own.rename("Ada L.")?;
+        own.set_picture(None)?;
+        let picture = square_picture(&halves(300, 300, ImageFormat::Png));
+        assert!(own.set_picture(picture).is_err());
+        own.apply_defaults("Pixel 8", None)?;
+        assert_eq!(own.signed()?.map(|s| s.record), Some(later));
+        assert!(!OwnProfile::new(&desk).is_newer()?);
+        assert!(!desk.person_is_newer(&mine.id)?);
         Ok(())
     }
 

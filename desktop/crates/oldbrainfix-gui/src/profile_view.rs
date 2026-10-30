@@ -293,18 +293,36 @@ pub fn avatar(
 }
 
 /// The top of the Profile page: the picture with the buttons that change
-/// it, the name field and the short code.
+/// it, the name field and the short code. A Profile a `newer` version of
+/// the app saved shows its picture and name, saying so, and nothing to
+/// change them (ADR 0034).
 pub fn header(
     ui: &mut Ui,
     t: &L10n,
     view: &mut ProfileView,
-    profile: Option<&Profile>,
+    (profile, newer): (Option<&Profile>, bool),
     code: Option<&str>,
     actions: &mut Vec<ProfileAction>,
 ) {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     view.follow(profile);
+    if newer {
+        ui.horizontal(|ui| {
+            avatar(ui, view, profile, 96.0, t.profile_picture_change());
+            ui.add_space(16.0);
+            let name = display_name(t, profile.map(|p| p.name.as_str()).unwrap_or_default());
+            ui.label(RichText::new(name).size(18.0).color(text));
+        });
+        ui.label(RichText::new(t.newer_version_needed()).color(weak));
+        if let Some(code) = code {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(t.profile_code()).color(weak));
+                ui.label(RichText::new(code).monospace().size(16.0).color(text));
+            });
+        }
+        return;
+    }
     ui.horizontal(|ui| {
         avatar(ui, view, profile, 96.0, t.profile_picture_change());
         ui.add_space(16.0);

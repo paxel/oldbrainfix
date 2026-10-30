@@ -857,12 +857,16 @@ impl Store {
         let Some(sharer) = Profile::parse(&offer.profile.record).map(|p| p.id) else {
             return Ok(None);
         };
-        if theirs.role != AreaRole::Manager
+        if theirs.role != Some(AreaRole::Manager)
             || self.resolve_person(&theirs.profile)? != self.resolve_person(&sharer)?
         {
             return Ok(None);
         }
-        Ok(Some((mine.role, judged.ignored.clone())))
+        // A grant not known here gives no role this version could take.
+        let Some(role) = mine.role else {
+            return Ok(None);
+        };
+        Ok(Some((role, judged.ignored.clone())))
     }
 
     /// The Profiles the bundle `folder` holds sealed with one of `keys`,

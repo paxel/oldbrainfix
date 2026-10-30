@@ -29,6 +29,10 @@ class OwnProfileModel extends ChangeNotifier {
   /// The own Profile's short code; null until it exists.
   String? get code => store.ownProfileCode;
 
+  /// Whether a newer version of the app saved the Profile in a form this
+  /// one does not know: it shows, and only that version changes it.
+  bool get newer => store.ownProfileIsNewer;
+
   /// The other Profile "Which one is you?" asks about, if it does.
   ProfileChoice? get question => _question;
 
@@ -52,14 +56,14 @@ class OwnProfileModel extends ChangeNotifier {
 
   /// Gives the Profile the [name] the user typed.
   void rename(String name) {
-    if (profile == null) return;
+    if (profile == null || newer) return;
     store.renameOwnProfile(name);
   }
 
   /// Gives the Profile the [picture] the user chose, or the initials for
   /// null.
   void setPicture(Uint8List? picture) {
-    if (profile == null) return;
+    if (profile == null || newer) return;
     store.setOwnProfilePicture(picture);
   }
 }

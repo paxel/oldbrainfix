@@ -628,6 +628,40 @@ void main() {
       expect(next.changes!.textEdited, isFalse);
     });
 
+    test('a Routine the receiver\'s later version rescheduled is neither '
+        'changed nor added again (ADR 0034)', () {
+      final (:ann, :ben, :sent, :got) = accepted();
+      final daily = Routines(ben).ofNote(got).firstWhere((r) => !r.isReminder);
+      // As Ben's later version writes it.
+      ben.append(daily.id, RoutineKeys.scheduleVersion, '2');
+      final reminder = Routines(ann)
+          .ofNote(sent)
+          .firstWhere((r) => r.isReminder);
+      final annDaily = Routines(ann)
+          .ofNote(sent)
+          .firstWhere((r) => !r.isReminder);
+      Routines(ann).reschedule(
+        annDaily.id,
+        Schedule(start: Day(2026, 3, 1), times: [ClockTime(9, 0)]),
+      );
+      Routines(ann).reschedule(
+        reminder.id,
+        Schedule(start: Day(2026, 3, 4), times: [ClockTime(14, 0)]),
+      );
+      final opened = openSentItem(ben, sendNote(ann, sent));
+      final changes = opened.changes!;
+      expect(changes.routinesAdded, isEmpty);
+      expect(changes.routinesRemoved, isEmpty);
+      expect(changes.rescheduled.map((r) => r.routine), [
+        Routines(ben).ofNote(got).single.id,
+      ]);
+      final before = ben.history(daily.id).length;
+      acceptSentItem(ben, opened.item);
+      expect(ben.history(daily.id), hasLength(before));
+      expect(Routines(ben).newerOfNote(got).map((r) => r.id), [daily.id]);
+      expect(Routines(ben).ofNote(got), hasLength(1));
+    });
+
     test('an older version is ignored', () {
       final (:ann, :ben, :sent, :got) = accepted();
       final second = sendNote(ann, sent);

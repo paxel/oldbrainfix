@@ -283,6 +283,22 @@ impl Store {
         })
     }
 
+    /// Whether the Profile [`Store::person_theirs`] shows for `id` is of
+    /// a structure this version does not know
+    /// ([`Profile::record_is_newer`]): shown as far as it can be, a newer
+    /// version of the app is needed for the rest (ADR 0034).
+    pub fn person_is_newer(&self, id: &str) -> Result<bool> {
+        if self.is_own_person(id)? && OwnProfile::new(self).get()?.is_some() {
+            return OwnProfile::new(self).is_newer();
+        }
+        let resolved = self.resolve_person(id)?;
+        Ok(self
+            .people_index()?
+            .by_id
+            .get(&resolved)
+            .is_some_and(|held| Profile::record_is_newer(&held.sent.record)))
+    }
+
     /// The short code of the person `id`'s Profile, when it is kept here
     /// or is the own one.
     pub fn person_code(&self, id: &str) -> Result<Option<String>> {

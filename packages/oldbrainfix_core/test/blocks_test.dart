@@ -390,6 +390,11 @@ void main() {
         entry(
           'area:ab12',
           'role:ab12',
+          '{"profile":"cd34","role":"member","v":2}',
+        ),
+        entry(
+          'area:ab12',
+          'role:ab12',
           '{"profile":"Rude words","role":"member"}',
         ),
         entry('area:ab12', 'name', 'Rude'),

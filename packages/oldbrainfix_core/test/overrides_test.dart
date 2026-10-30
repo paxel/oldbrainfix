@@ -141,6 +141,49 @@ void main() {
       expect(ann.personShown(benId).name, 'Ben');
       expect(ann.personOverride(benId), isNull);
     });
+
+    test('an Override of a later structure shows and is changed only '
+        'there (ADR 0034)', () {
+      household();
+      final benId = idOf(ben);
+      ann.setOverrideName(benId, _marker);
+      // As Ann's desk of a later version writes it.
+      final later = annDesk.append(
+        '${OverrideKeys.prefix}$benId',
+        OverrideKeys.version,
+        '2',
+      );
+      ann.applyEntries([later], verifiedDevice: annDesk.deviceId);
+      expect(ann.overrideIsNewer(benId), isTrue);
+      expect(ann.personShown(benId).name, _marker);
+      final before = overrides(ann).length;
+      expect(() => ann.setOverrideName(benId, 'Ben'), throwsStateError);
+      // The same name again, as a page left unchanged keeps it, is fine.
+      ann.setOverrideName(benId, _marker);
+      expect(() => ann.setOverridePicture(benId, picture), throwsStateError);
+      expect(overrides(ann), hasLength(before));
+      expect(ann.overrideIsNewer(idOf(ann)), isFalse);
+      for (final (value, newer) in [('1', false), (null, false), ('x', true)]) {
+        ann.append('${OverrideKeys.prefix}$benId', OverrideKeys.version, value);
+        expect(ann.overrideIsNewer(benId), newer, reason: '$value');
+      }
+    });
+
+    test('a version another person\'s Device wrote locks nothing', () {
+      household();
+      final benId = idOf(ben);
+      // As a modified app would: Ben locks the name Ann gives him.
+      final forged = ben.append(
+        '${OverrideKeys.prefix}$benId',
+        OverrideKeys.version,
+        '2',
+      );
+      ann.applyEntries([forged], verifiedDevice: ben.deviceId);
+      expect(ann.allEntries().map((e) => e.id), contains(forged.id));
+      expect(ann.overrideIsNewer(benId), isFalse);
+      ann.setOverrideName(benId, _marker);
+      expect(ann.personShown(benId).name, _marker);
+    });
   });
 
   group("one's own Devices", () {

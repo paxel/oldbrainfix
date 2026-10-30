@@ -313,7 +313,7 @@ fn the_invited_persons_profile_shows_before_anything_is_shared() -> TestResult {
     }
     assert_eq!(names, ["Ann", "Ben"]);
     assert_eq!(
-        store.people(&area)?.last().map(|p| p.role),
+        store.people(&area)?.last().and_then(|p| p.role),
         Some(AreaRole::Manager)
     );
     Ok(())
@@ -357,7 +357,7 @@ fn a_manager_changes_roles_and_removes_people() -> TestResult {
             ben = Some(p);
         }
     }
-    assert_eq!(ben.map(|p| p.role), Some(AreaRole::Manager));
+    assert_eq!(ben.and_then(|p| p.role), Some(AreaRole::Manager));
     harness.get_by_label("Remove").click();
     harness.run();
     assert!(shows(&harness, "Remove Ben from Household?"));

@@ -17,6 +17,11 @@ abstract final class OverrideKeys {
   /// The picture the user gave the person, a Profile picture (JPEG) in
   /// base64; null for none.
   static const picture = 'overridePicture';
+
+  /// The version of the Override's structure: which fields it holds and
+  /// what they mean (ADR 0034). Version 1 holds [name] and [picture]; it
+  /// is the default and never written, so it is absent.
+  static const version = 'overrideVersion';
 }
 
 /// The name and picture the user gave another person; null where they
@@ -51,28 +56,52 @@ extension Overrides on Store {
 
   /// Gives the person [id] the [name] for the user alone, sanitised; an
   /// empty name takes it away, so their own shows again. Nothing for the
-  /// own Profile.
+  /// own Profile; another name is refused while the Override
+  /// [overrideIsNewer].
   void setOverrideName(String id, String name) {
     if (isOwnPerson(id)) return;
     final clean = sanitizeProfileName(name);
     final value = clean.isEmpty ? null : clean;
     if (personOverride(id)?.name == value) return;
+    _refuseNewerOverride(id);
     append(_overrideEntity(id), OverrideKeys.name, value);
     profileChanged();
   }
 
   /// Gives the person [id] the [picture] (a Profile picture) for the user
   /// alone; null takes it away, so their own shows again. Nothing for
-  /// the own Profile.
+  /// the own Profile; another picture is refused while the Override
+  /// [overrideIsNewer].
   void setOverridePicture(String id, Uint8List? picture) {
     if (isOwnPerson(id)) return;
     if (_same(personOverride(id)?.picture, picture)) return;
+    _refuseNewerOverride(id);
     append(
       _overrideEntity(id),
       OverrideKeys.picture,
       picture == null ? null : base64.encode(picture),
     );
     profileChanged();
+  }
+
+  /// Whether the Override of the person [id] is of a structure this
+  /// version does not know: its [OverrideKeys.version], as one of the
+  /// user's own Devices wrote it last, anything but absent or `1`. It
+  /// shows as far as it can and is changed only by a newer version of
+  /// the app (ADR 0034); what another person's Device wrote counts for
+  /// nothing here either.
+  bool overrideIsNewer(String id) {
+    if (isOwnPerson(id)) return false;
+    return switch (currentByOwn(_overrideEntity(id), OverrideKeys.version)) {
+      null || '1' => false,
+      _ => true,
+    };
+  }
+
+  void _refuseNewerOverride(String id) {
+    if (overrideIsNewer(id)) {
+      throw StateError('the Override of $id is of a structure not known here');
+    }
   }
 
   String _overrideEntity(String id) =>

@@ -729,9 +729,13 @@ class _PeopleScreenState extends State<PeopleScreen> {
                     ? t.peopleYou(_name(t, person))
                     : _name(t, person),
               ),
-              subtitle: Text(
-                person.role == AreaRole.manager ? t.roleManager : t.roleMember,
-              ),
+              // A role a newer version of the app gave is kept as it is,
+              // and nothing here changes it (ADR 0034).
+              subtitle: Text(switch (person.role) {
+                AreaRole.manager => t.roleManager,
+                AreaRole.member => t.roleMember,
+                null => t.newerVersionNeeded,
+              }),
               // Another person's Profile opens from their line (#52).
               onTap: person.id == _mine || !canOpenPerson(context, person.id)
                   ? null
@@ -739,7 +743,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                       await openPerson(context, person.id);
                       if (mounted) setState(_load);
                     },
-              trailing: !_manages || person.id == _mine
+              trailing: !_manages || person.id == _mine || person.newer
                   ? null
                   : PopupMenuButton<_PersonAction>(
                       key: ValueKey('person-menu-${person.id}'),

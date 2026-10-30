@@ -441,6 +441,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   List<Section> _sections = const [];
   List<Routine> _routines = const [];
 
+  /// Those whose schedule a newer version of the app saved (ADR 0034).
+  List<NewerRoutine> _newerRoutines = const [];
+
   /// The photos and recordings, by the Note or Section they belong to,
   /// that this Device may remove while their texts stay.
   Set<(String, String)> _removable = const {};
@@ -548,6 +551,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _isShopping = shopping.isShoppingList(widget.noteId);
     _sections = widget.notes.sections(widget.noteId);
     _routines = _routineBook.ofNote(widget.noteId);
+    _newerRoutines = _routineBook.newerOfNote(widget.noteId);
     final notes = widget.notes;
     final store = notes.store;
     final files = [
@@ -1170,6 +1174,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                           ),
                         ),
                         onTap: () => _openRoutine(routine),
+                      ),
+                    for (final routine in _newerRoutines)
+                      ListTile(
+                        key: ValueKey('newer-${routine.id}'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.update),
+                        title: Text(t.newerVersionNeeded),
                       ),
                     if (!schedules)
                       Text(t.onlyManagers)

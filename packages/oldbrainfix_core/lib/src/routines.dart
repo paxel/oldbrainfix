@@ -22,6 +22,12 @@ abstract final class RoutineKeys {
   /// The [Schedule.rule] as an RRULE value; absent for a Reminder.
   static const rule = 'rule';
 
+  /// The version of the schedule's structure: which schedule fields the
+  /// Routine holds and what they mean (ADR 0034). Version 1 holds
+  /// [start], [times] and [rule]; it is the default and never written,
+  /// so it is absent. A later version that writes another writes it out.
+  static const scheduleVersion = 'scheduleVersion';
+
   /// The field marking [occurrence] Done: its value is when it was
   /// checked off, null when it was unchecked again. Keyed by the
   /// wall-clock Occurrence, so two Devices checking off the same one
@@ -47,7 +53,7 @@ abstract final class RoutineKeys {
   static const trashedWith = 'trashedWith';
 
   /// The fields that make up the schedule.
-  static const scheduleFields = [start, times, rule];
+  static const scheduleFields = [start, times, rule, scheduleVersion];
 }
 
 /// Something to be done on a schedule, spawned from a Note (CONTEXT.md).
@@ -104,6 +110,20 @@ class Routine {
 
   /// When [occurrence] was checked off, or null while it is not Done.
   DateTime? doneAt(Occurrence occurrence) => done[occurrence.key];
+}
+
+/// A Routine or Reminder whose schedule this version cannot read: one of
+/// a later structure, or with a part it does not know (ADR 0034). It is
+/// kept as it is, fires nothing here and nothing here changes it; the
+/// apps show that a newer version of the app is needed for it.
+class NewerRoutine {
+  /// Entity id, `routine:<id>`.
+  final String id;
+
+  /// The Note it was spawned from, as stored.
+  final String noteId;
+
+  const NewerRoutine({required this.id, required this.noteId});
 }
 
 /// [routines] in alphabetical order of their names, as the list of all
@@ -401,22 +421,79 @@ class Routines {
     );
   }
 
-  /// The schedule the Routine [fields] hold, or null when they hold none.
+  /// The schedule the Routine [fields] hold, or null when they hold none
+  /// or one this version cannot read ([scheduleIsNewer]).
   static Schedule? scheduleOf(Map<String, String?> fields) {
+    if (!_knownScheduleVersion(fields)) return null;
     final start = Day.tryParse(fields[RoutineKeys.start] ?? '');
     if (start == null) return null;
     final ruleText = fields[RoutineKeys.rule];
     final rule = ruleText == null ? null : Recurrence.tryParse(ruleText);
     if (ruleText != null && rule == null) return null;
-    final times = [
-      for (final text in (fields[RoutineKeys.times] ?? '').split(','))
-        ?ClockTime.tryParse(text),
-    ];
+    final timesText = fields[RoutineKeys.times] ?? '';
+    final times = <ClockTime>[];
+    // Empty for all day; a time this version cannot read is a part it
+    // does not know, not one to leave out.
+    if (timesText.isNotEmpty) {
+      for (final text in timesText.split(',')) {
+        final time = ClockTime.tryParse(text);
+        if (time == null) return null;
+        times.add(time);
+      }
+    }
     try {
       return Schedule(start: start, times: times, rule: rule);
     } on ArgumentError {
       return null;
     }
+  }
+
+  /// Whether the Routine [fields] hold a schedule this version cannot
+  /// read (ADR 0034): of a later structure, its [RoutineKeys.scheduleVersion]
+  /// anything but absent or `1`, or with a start, times or rule it does
+  /// not know. Fields without a start or a version hold no schedule.
+  static bool scheduleIsNewer(Map<String, String?> fields) =>
+      scheduleOf(fields) == null &&
+      (!_knownScheduleVersion(fields) || fields[RoutineKeys.start] != null);
+
+  static bool _knownScheduleVersion(Map<String, String?> fields) =>
+      switch (fields[RoutineKeys.scheduleVersion]) {
+        null || '1' => true,
+        _ => false,
+      };
+
+  /// The Routine [id] when its schedule needs a newer version of the app
+  /// ([scheduleIsNewer]), trashed or not; else null.
+  NewerRoutine? newerById(String id) {
+    final fields = store.currentFields(id);
+    if (fields[RoutineKeys.type] != RoutineKeys.typeRoutine) return null;
+    final noteId = fields[RoutineKeys.note];
+    if (noteId == null || !scheduleIsNewer(fields)) return null;
+    return NewerRoutine(id: id, noteId: noteId);
+  }
+
+  /// Every Routine and Reminder not in the trash whose schedule needs a
+  /// newer version of the app, by id: [all] leaves them out.
+  List<NewerRoutine> newer() => [
+    for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort())
+      if (newerById(id) case final routine?
+          when store.current(id, RoutineKeys.trashed) == null)
+        routine,
+  ];
+
+  /// The Routines and Reminders of [newer] the Note [noteId] spawned,
+  /// those of the Notes merged into it included.
+  List<NewerRoutine> newerOfNote(String noteId) => [
+    for (final routine in newer())
+      if (noteOfNewer(routine)?.id == noteId) routine,
+  ];
+
+  /// The Note [routine] shows under, as [note] finds it for a Routine.
+  Note? noteOfNewer(NewerRoutine routine) {
+    final notes = Notes(store);
+    final note = notes.byId(routine.noteId);
+    final into = note?.mergedInto;
+    return into == null ? note : notes.byId(into);
   }
 
   /// Every Routine and Reminder not in the trash.

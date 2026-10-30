@@ -39,7 +39,8 @@ enum AreaAccess {
   manager,
   member,
 
-  /// Shared, and no role here, or removed.
+  /// Shared, and no role here, or removed; or a grant this version
+  /// cannot read ([Grant.newer]).
   none,
 }
 
@@ -58,25 +59,49 @@ abstract final class ShareKeys {
 /// One grant as it is signed: the role, and the Profile of the person
 /// the Device belongs to (ADR 0017).
 class Grant {
-  final AreaRole role;
+  /// The role; null for a grant this version cannot read ([newer]).
+  final AreaRole? role;
 
   /// The id of the person's Profile, as the grant named it.
   final String profile;
 
   const Grant(this.role, this.profile);
 
-  /// The value of the grant field: keys sorted, no spaces, the same from
-  /// both cores.
-  String encode() => jsonEncode({'profile': profile, 'role': role.name});
+  /// Whether the grant needs a newer version of the app (ADR 0034): of
+  /// a later structure, or with a role this version does not know. It
+  /// holds, so the person keeps getting the Area, but allows nothing
+  /// here, and nothing here changes or ends it.
+  bool get newer => role == null;
 
-  /// The grant in [value]; null when it is none.
+  /// The value of the grant field: keys sorted, no spaces, the same from
+  /// both cores. Never for a [newer] grant, which is not this version's
+  /// to write.
+  String encode() => switch (role) {
+    final role? => jsonEncode({'profile': profile, 'role': role.name}),
+    null => throw StateError('a grant of $profile not known here'),
+  };
+
+  /// The keys version 1 of a grant holds.
+  static const _keys = {'profile', 'role', 'v'};
+
+  /// The grant in [value]; null when it is none. A grant names a
+  /// person; one of a structure other than version 1 (`v` absent or 1),
+  /// with a key version 1 does not hold, or with a role this version
+  /// does not know is [newer].
   static Grant? parse(String value) {
     try {
       final json = jsonDecode(value);
-      if (json case {'profile': final String profile, 'role': final String role}
-          when profile.isNotEmpty) {
-        final r = AreaRole.values.asNameMap()[role];
-        return r == null ? null : Grant(r, profile);
+      if (json case {'profile': final String profile}
+          when profile.isNotEmpty && json is Map<String, Object?>) {
+        final v = json['v'];
+        final known =
+            (!json.containsKey('v') || (v is int && v == 1)) &&
+            json.keys.every(_keys.contains);
+        final role = json['role'];
+        return Grant(
+          known && role is String ? AreaRole.values.asNameMap()[role] : null,
+          profile,
+        );
       }
     } on FormatException {
       return null;
@@ -89,12 +114,18 @@ class Grant {
 /// of their Profile as the grants name it.
 class Person {
   final String id;
-  final AreaRole role;
+
+  /// Their role; null when a grant of one of their Devices needs a newer
+  /// version of the app ([Grant.newer]): then nothing here changes them.
+  final AreaRole? role;
 
   /// The ids of their Devices that hold the role, sorted.
   final List<String> devices;
 
   const Person({required this.id, required this.role, required this.devices});
+
+  /// Whether a grant of theirs needs a newer version of the app.
+  bool get newer => role == null;
 }
 
 /// A grant that counts, with the entry that signed it; [grant] is null
@@ -210,7 +241,9 @@ JudgedLog judgeLog(Iterable<Entry> entries) {
         if (grant == null) {
           return byDevice[target]?.last.grant?.profile == signer.profile;
         }
-        return grant.role == AreaRole.member &&
+        // A grant not known here allows nothing more (ADR 0034).
+        return signer.role == AreaRole.member &&
+            grant.role == AreaRole.member &&
             grant.profile == signer.profile &&
             !byDevice.containsKey(target);
       }
@@ -481,6 +514,8 @@ extension SharedAreas on Store {
         byPerson[grant.profile] = (grant, [device]);
       } else {
         held.$2.add(device);
+        // One grant not known here makes the person's role one too.
+        if (grant.newer) byPerson[grant.profile] = (grant, held.$2);
       }
     }
     final mine = grants.personOf(deviceId);
@@ -523,7 +558,8 @@ extension SharedAreas on Store {
 
   /// Grants [device] [role] in the Shared Area [areaId], as the person
   /// whose Profile is [profile]: under the person it already belongs to
-  /// there, else that one. Nothing for a Device of this one's own group.
+  /// there, else that one. Nothing for a Device of this one's own group,
+  /// nor for one holding a grant not known here.
   void invite(
     String areaId,
     String device, {
@@ -533,14 +569,18 @@ extension SharedAreas on Store {
     // A Device of this one's own group is no other person: it keeps the
     // role it has.
     if (isOwnDevice(device)) return;
+    // Nor one whose grant is not known here: it stays (ADR 0034).
+    if (grantsOf(areaId)?.grantOf(device)?.newer ?? false) return;
     final person = grantsOf(areaId)?.personOf(device) ?? profile;
     append(areaId, ShareKeys.role(device), Grant(role, person).encode());
   }
 
-  /// Gives every Device of [person] in [areaId] the role [role].
+  /// Gives every Device of [person] in [areaId] the role [role]. Refused
+  /// while a grant of theirs is not known here (ADR 0034).
   void setRole(String areaId, String person, AreaRole role) {
     final grants = grantsOf(areaId);
     if (grants == null) return;
+    _refuseNewer(grants, person);
     batch(() {
       for (final device in grants.devices) {
         final grant = grants.grantOf(device);
@@ -554,9 +594,11 @@ extension SharedAreas on Store {
   /// Takes [person] out of [areaId]: their Devices' grants end, and no
   /// Device that learns of it sends them anything more of the Area. They
   /// keep what they have; only a new key would take that (ADR 0013).
+  /// Refused while a grant of theirs is not known here (ADR 0034).
   void removePerson(String areaId, String person) {
     final grants = grantsOf(areaId);
     if (grants == null) return;
+    _refuseNewer(grants, person);
     batch(() {
       for (final device in grants.devices) {
         if (grants.grantOf(device)?.profile == person) {
@@ -564,6 +606,16 @@ extension SharedAreas on Store {
         }
       }
     });
+  }
+
+  /// Throws when a grant of [person] in [grants] is not known here.
+  void _refuseNewer(AreaGrants grants, String person) {
+    for (final device in grants.devices) {
+      final grant = grants.grantOf(device);
+      if (grant != null && grant.profile == person && grant.newer) {
+        throw StateError('a grant of $person is not known here');
+      }
+    }
   }
 
   /// Leaves the Shared Area [areaId] (#90): ends the grant of every
@@ -591,13 +643,16 @@ extension SharedAreas on Store {
 
   /// Gives the Device [peer] of this Device's own group, met in a sync,
   /// this Device's role and person in every Shared Area where it
-  /// holds one and [peer] never held any. Returns how many it gave.
+  /// holds one and [peer] never held any; not a grant this version
+  /// cannot read, which only a newer one may pass on. Returns how many
+  /// it gave.
   int extendRolesTo(String peer) {
     if (peer.isEmpty || peer == deviceId) return 0;
     final self = deviceId;
     final given = [
       for (final MapEntry(:key, :value) in judged.areas.entries)
-        if (value.grantOf(self) case final grant? when !value.everGranted(peer))
+        if (value.grantOf(self) case final grant?
+            when !grant.newer && !value.everGranted(peer))
           (key, grant),
     ]..sort((a, b) => a.$1.compareTo(b.$1));
     if (given.isEmpty) return 0;

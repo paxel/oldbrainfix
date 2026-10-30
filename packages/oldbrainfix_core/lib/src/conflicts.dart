@@ -47,7 +47,10 @@ const conflictFields = [
 /// Place's name [PlaceKeys.name].
 String? conflictUnit(String field) => switch (field) {
   NoteKeys.text || PlaceKeys.name || NamedPlaceKeys.radius => field,
-  RoutineKeys.start || RoutineKeys.times || RoutineKeys.rule => scheduleUnit,
+  RoutineKeys.start ||
+  RoutineKeys.times ||
+  RoutineKeys.rule ||
+  RoutineKeys.scheduleVersion => scheduleUnit,
   _ => null,
 };
 
@@ -129,9 +132,15 @@ class Conflict {
 
   /// Whether this version may pick one: not when a version is a text in a
   /// format it does not know, which picking another would overwrite and
-  /// keeping could not show as it is (ADR 0018).
-  bool get resolvable =>
-      unit != NoteKeys.text || versions.every((v) => v.text.editable);
+  /// keeping could not show as it is (ADR 0018), nor a schedule it cannot
+  /// read (ADR 0034).
+  bool get resolvable => switch (unit) {
+    NoteKeys.text => versions.every((v) => v.text.editable),
+    scheduleUnit => versions.every(
+      (v) => Routines.scheduleOf(v.values) != null,
+    ),
+    _ => true,
+  };
 }
 
 extension Conflicts on Store {
@@ -194,6 +203,8 @@ extension Conflicts on Store {
           if (had.any((y) => !identical(y, x) && _saw(y, x))) continue;
           if (newest == null || Store.latestWins(x, newest) > 0) newest = x;
         }
+        // A schedule's version 1, never written, is no value of it.
+        if (newest == null && field == RoutineKeys.scheduleVersion) continue;
         values[field] = newest?.value;
       }
       // A text written before its format was recorded is the same as
@@ -230,6 +241,11 @@ extension Conflicts on Store {
     }
     batch(() {
       for (final field in fields) {
+        // Version 1 of a schedule is never written (ADR 0034).
+        if (field == RoutineKeys.scheduleVersion &&
+            kept.values[field] == null) {
+          continue;
+        }
         append(conflict.entity, field, kept.values[field], date: date);
       }
     });

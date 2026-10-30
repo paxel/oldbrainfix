@@ -246,6 +246,16 @@ extension People on Store {
         );
   }
 
+  /// Whether the Profile [personTheirs] shows for [id] is of a structure
+  /// this version does not know ([Profile.recordIsNewer]): shown as far
+  /// as it can be, a newer version of the app is needed for the rest
+  /// (ADR 0034).
+  bool personIsNewer(String id) {
+    if (isOwnPerson(id) && ownProfile != null) return ownProfileIsNewer;
+    final held = _people.byId[resolvePerson(id)];
+    return held != null && Profile.recordIsNewer(held.sent.record);
+  }
+
   /// The short code of the person [id]'s Profile, when it is kept here
   /// or is the own one.
   String? personCode(String id) {

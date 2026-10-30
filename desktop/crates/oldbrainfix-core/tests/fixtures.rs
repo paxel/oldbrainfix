@@ -38,13 +38,14 @@ use std::collections::BTreeMap;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const SCENARIOS: [&str; 15] = [
+const SCENARIOS: [&str; 16] = [
     "checklist-routines",
     "checklists",
     "edits",
     "formats",
     "frogs",
     "markdown",
+    "markers",
     "media",
     "notes",
     "places",
@@ -840,6 +841,328 @@ fn write_markdown(store: &Store) -> Built {
     Ok(())
 }
 
+// -------------------------------------------- values of a later version
+
+/// The generator's `markers` scenario (ADR 0034).
+fn write_markers(store: &Store) -> Built {
+    use oldbrainfix_core::AreaRole;
+    use oldbrainfix_core::overrides;
+    use oldbrainfix_core::routines::keys as routine_keys;
+    use oldbrainfix_core::shared::{encode_grant, role_field};
+    let notes = Notes::new(store);
+    let pills = notes.capture("Take the pills", None, None)?;
+    Routines::new(store).spawn(
+        &pills.id,
+        &schedule(Day::new(2026, 1, 1), &[at(8, 0)?], Some("FREQ=DAILY"))?,
+    )?;
+    let later = |id: &str, note_id: &str, fields: &[(&str, &str)]| -> Built {
+        store.batch(|| {
+            store.append(
+                id,
+                routine_keys::TYPE,
+                Some(routine_keys::TYPE_ROUTINE),
+                None,
+            )?;
+            store.append(id, routine_keys::NOTE, Some(note_id), None)?;
+            for (key, value) in fields {
+                store.append(id, key, Some(value), None)?;
+            }
+            Ok(())
+        })?;
+        Ok(())
+    };
+    later(
+        "routine:later-version",
+        &pills.id,
+        &[
+            (routine_keys::START, "2026-01-01"),
+            (routine_keys::TIMES, "08:00"),
+            (routine_keys::RULE, "FREQ=DAILY"),
+            (routine_keys::SCHEDULE_VERSION, "2"),
+        ],
+    )?;
+    later(
+        "routine:later-times",
+        &pills.id,
+        &[
+            (routine_keys::START, "2026-01-01"),
+            (routine_keys::TIMES, "08:00,8pm"),
+        ],
+    )?;
+    let plants = notes.capture("Water the plants", None, None)?;
+    later(
+        "routine:later-rule",
+        &plants.id,
+        &[
+            (routine_keys::START, "2026-01-01"),
+            (routine_keys::TIMES, ""),
+            (routine_keys::RULE, "FREQ=DAILY;BYEASTER=1"),
+        ],
+    )?;
+    later(
+        "routine:version-one",
+        &plants.id,
+        &[
+            (routine_keys::START, "2026-01-02"),
+            (routine_keys::TIMES, "18:00"),
+            (routine_keys::SCHEDULE_VERSION, "1"),
+        ],
+    )?;
+    let garden = notes.capture("Garden", None, None)?;
+    notes.merge(&plants.id, &garden.id)?;
+    let house = Places::new(store).add_area("Household")?;
+    let area = store.share(&house.id)?;
+    let me = store.device_id()?;
+    store.batch(|| {
+        store.append(
+            &area,
+            &role_field("ben"),
+            Some(r#"{"profile":"ben","role":"viewer"}"#),
+            None,
+        )?;
+        store.append(
+            &area,
+            &role_field("cara"),
+            Some(r#"{"profile":"cara","role":"member","v":2}"#),
+            None,
+        )?;
+        store.append(
+            &area,
+            &role_field("dan"),
+            Some(&encode_grant(AreaRole::Member, "dan")),
+            None,
+        )?;
+        Ok(())
+    })?;
+    store.append(
+        &area,
+        &role_field(&me),
+        Some(&format!(r#"{{"profile":"{me}","role":"viewer"}}"#)),
+        None,
+    )?;
+    store.append(
+        &area,
+        &role_field("laptop"),
+        Some(&encode_grant(AreaRole::Member, &me)),
+        None,
+    )?;
+    store.append(&area, place_keys::NAME, Some("Not counted"), None)?;
+    let ben = format!("{}ben", overrides::PREFIX);
+    store.append(&ben, overrides::NAME, Some("Ben B."), None)?;
+    let cara = format!("{}cara", overrides::PREFIX);
+    store.batch(|| {
+        store.append(&cara, overrides::NAME, Some("Cara C."), None)?;
+        store.append(&cara, overrides::VERSION, Some("2"), None)?;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// The generator's `_grantValues`.
+const GRANT_VALUES: [&str; 13] = [
+    r#"{"profile":"p","role":"member"}"#,
+    r#"{"profile":"p","role":"manager","v":1}"#,
+    r#"{"profile":"p","role":"viewer"}"#,
+    r#"{"profile":"p","role":"member","v":2}"#,
+    r#"{"profile":"p","role":"member","v":1.5}"#,
+    r#"{"profile":"p","role":"member","v":1.0}"#,
+    r#"{"profile":"p","role":"member","v":"1"}"#,
+    r#"{"profile":"p","role":"member","v":null}"#,
+    r#"{"profile":"p","role":"member","until":"2027"}"#,
+    r#"{"profile":"p"}"#,
+    r#"{"profile":"","role":"member"}"#,
+    r#"{"role":"member"}"#,
+    "member",
+];
+
+/// The generator's `_laterRecords`.
+const LATER_RECORDS: [&str; 12] = [
+    r#"{"id":"p","name":"A","version":1}"#,
+    r#"{"id":"p","name":"A","v":1,"version":2}"#,
+    r#"{"id":"p","name":"A","v":2,"version":3}"#,
+    r#"{"id":"p","name":"A","v":1.0,"version":3}"#,
+    r#"{"id":"p","name":"A","v":"1","version":3}"#,
+    r#"{"id":"p","name":"A","pronouns":"she","version":3}"#,
+    r#"{"id":"p","name":{"en":"A"},"v":2,"version":3}"#,
+    r#"{"id":"p","name":"A","picture":"%%","v":2,"version":3}"#,
+    r#"{"id":"p","name":"A","picture":"AQID","v":2,"version":3}"#,
+    r#"{"id":"p","name":"A","picture":"%%","version":3}"#,
+    r#"{"id":"p","name":"A","v":2}"#,
+    r#"{"name":"A","v":2,"version":3}"#,
+];
+
+/// The generator's `_laterSchedules`.
+const LATER_SCHEDULES: [&[(&str, &str)]; 13] = [
+    &[
+        ("start", "2026-01-01"),
+        ("times", "08:00"),
+        ("rule", "FREQ=DAILY"),
+    ],
+    &[
+        ("start", "2026-01-01"),
+        ("times", ""),
+        ("scheduleVersion", "1"),
+    ],
+    &[
+        ("start", "2026-01-01"),
+        ("times", "08:00"),
+        ("scheduleVersion", "2"),
+    ],
+    &[
+        ("start", "2026-01-01"),
+        ("times", "08:00"),
+        ("scheduleVersion", "01"),
+    ],
+    &[
+        ("start", "2026-01-01"),
+        ("times", "08:00"),
+        ("scheduleVersion", ""),
+    ],
+    &[("scheduleVersion", "2")],
+    &[("start", "2026-01-01"), ("times", "08:00,")],
+    &[("start", "2026-01-01"), ("times", "8:00")],
+    &[("start", "2026-01-01"), ("times", "08:00,08:00")],
+    &[("start", "2026-01-01"), ("rule", "FREQ=DAILY;BYEASTER=1")],
+    &[("start", "2026-13-01")],
+    &[("times", "08:00")],
+    &[],
+];
+
+#[test]
+fn values_of_a_later_version_come_to_what_the_dart_core_says() -> TestResult {
+    use oldbrainfix_core::{Fields, Grant, Profile};
+    let expected = read_json(&fixtures().join("markers").join("markers.json"))?;
+    let read_at = read_json(&fixtures().join("markers").join("expected.json"))?;
+    let store = load("markers", read_at["now"].as_str().ok_or("now")?)?;
+    let routines = Routines::new(&store);
+    let notes = Notes::new(&store);
+    let mut ids = store.entities_of_type("routine")?;
+    ids.sort();
+    let mut all: Vec<String> = routines.all()?.into_iter().map(|r| r.id).collect();
+    all.sort();
+    assert_eq!(json!(all), expected["routines"]);
+    let newer: Vec<Value> = routines
+        .newer()?
+        .into_iter()
+        .map(|r| json!({"id": r.id, "noteId": r.note_id}))
+        .collect();
+    assert_eq!(json!(newer), expected["newer"]);
+    let mut of_note = serde_json::Map::new();
+    for note in notes.all()? {
+        let ids: Vec<String> = routines
+            .newer_of_note(&note.id)?
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        of_note.insert(note.id.clone(), json!(ids));
+    }
+    assert_eq!(Value::Object(of_note), expected["newerOfNote"]);
+    let mut is_newer = serde_json::Map::new();
+    for id in &ids {
+        is_newer.insert(
+            id.clone(),
+            json!(Routines::schedule_is_newer(&store.current_fields(id)?)),
+        );
+    }
+    assert_eq!(Value::Object(is_newer), expected["scheduleIsNewer"]);
+    let area = Places::new(&store)
+        .areas()?
+        .first()
+        .map(|a| a.id.clone())
+        .ok_or("an Area")?;
+    assert_eq!(
+        json!(Places::new(&store).area_by_id(&area)?.map(|a| a.name)),
+        expected["areaName"]
+    );
+    let mut people = Vec::new();
+    for p in store.people(&area)? {
+        people.push(json!({
+            "id": p.id,
+            "role": p.role.map(|r| r.name()),
+            "newer": p.role.is_none(),
+            "devices": p.devices,
+        }));
+    }
+    assert_eq!(json!(people), expected["people"]);
+    let grants = store.grants_of(&area)?.ok_or("shared")?;
+    let mut devices = serde_json::Map::new();
+    for d in ["ben", "cara", "dan", "laptop", &store.device_id()?] {
+        let mut shared: Vec<String> = store.areas_shared_with(d)?.into_iter().collect();
+        shared.sort();
+        let grant = grants.grant_of(d);
+        devices.insert(
+            d.to_string(),
+            json!({
+                "access": store.access_in(&area, Some(d))?.name(),
+                "role": grant.and_then(|g| g.role).map(|r| r.name()),
+                "newer": grant.map(Grant::newer),
+                "sharedWith": shared,
+            }),
+        );
+    }
+    assert_eq!(Value::Object(devices), expected["devices"]);
+    assert_eq!(json!(store.may_write_in(&area)?), expected["mayWriteIn"]);
+    assert_eq!(json!(store.may_manage(Some(&area))?), expected["mayManage"]);
+    let mut overrides = serde_json::Map::new();
+    for id in ["ben", "cara"] {
+        overrides.insert(
+            id.to_string(),
+            json!({
+                "name": store.person_override(id)?.and_then(|o| o.name),
+                "newer": store.override_is_newer(id)?,
+            }),
+        );
+    }
+    assert_eq!(Value::Object(overrides), expected["overrides"]);
+    let mut grant_values = serde_json::Map::new();
+    for v in GRANT_VALUES {
+        grant_values.insert(
+            v.to_string(),
+            match Grant::parse(v) {
+                Some(g) => json!({"profile": g.profile, "role": g.role.map(|r| r.name())}),
+                None => Value::Null,
+            },
+        );
+    }
+    assert_eq!(Value::Object(grant_values), expected["grantValues"]);
+    let mut records = serde_json::Map::new();
+    for r in LATER_RECORDS {
+        let profile = Profile::parse(r).map(|p| {
+            json!({
+                "id": p.id,
+                "name": p.name,
+                "picture": p.picture.map(|b| BASE64.encode(b)),
+                "version": p.version,
+            })
+        });
+        records.insert(
+            r.to_string(),
+            json!({"newer": Profile::record_is_newer(r), "profile": profile}),
+        );
+    }
+    assert_eq!(Value::Object(records), expected["records"]);
+    let mut schedules = Vec::new();
+    for fields in LATER_SCHEDULES {
+        let held = Fields::new(
+            fields
+                .iter()
+                .map(|(k, v)| (k.to_string(), Some(v.to_string())))
+                .collect(),
+        );
+        let shown: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|(k, v)| (k.to_string(), json!(v)))
+            .collect();
+        schedules.push(json!({
+            "fields": shown,
+            "schedule": Routines::schedule_of(&held).is_some(),
+            "newer": Routines::schedule_is_newer(&held),
+        }));
+    }
+    assert_eq!(json!(schedules), expected["schedules"]);
+    Ok(())
+}
+
 /// The generator's `places` scenario.
 fn write_places(store: &Store) -> Built {
     let places = Places::new(store);
@@ -1067,13 +1390,14 @@ fn photos_and_recordings_are_kept_as_the_dart_core_keeps_them() -> TestResult {
 
 #[test]
 fn every_scenario_written_here_is_the_dart_cores_log_byte_for_byte() -> TestResult {
-    let writers: [(&str, Writer); 15] = [
+    let writers: [(&str, Writer); 16] = [
         ("checklist-routines", write_checklist_routines),
         ("checklists", write_checklists),
         ("edits", write_edits),
         ("formats", write_formats),
         ("frogs", write_frogs),
         ("markdown", write_markdown),
+        ("markers", write_markers),
         ("media", write_media),
         ("notes", write_notes),
         ("places", write_places),
@@ -3236,7 +3560,7 @@ fn roles_json(
         people.push(json!({
             "id": p.id,
             "name": store.person_shown(&p.id)?.name,
-            "role": p.role.name(),
+            "role": p.role.map(|r| r.name()),
             "devices": p.devices,
         }));
     }

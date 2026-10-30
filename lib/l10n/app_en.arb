@@ -1097,6 +1097,8 @@
   "@conflictNewerFormat": {"description": "On a Conflict about a text when one of its versions is in a text format this version of the app does not know."},
   "textNewerFormat": "This text was written with a newer version of Old Brain Fix. Update the app to change it.",
   "@textNewerFormat": {"description": "Above a Note's or Section's text in the editor when the text is in a format this version of the app does not know; the text then shows as it is stored and cannot be changed."},
+  "newerVersionNeeded": "Saved by a newer version of Old Brain Fix. Update the app to change it.",
+  "@newerVersionNeeded": {"description": "In place of a value a newer version of the app saved in a form this version does not know (ADR 0034): a Routine's schedule in the list of all Routines and Reminders and under its Note, a person's role in a Shared Area, a Profile or the name and picture given to a person; the value is kept as it is and cannot be changed here."},
   "conflictOnThisDevice": "On this Device, {when}",
   "@conflictOnThisDevice": {
     "placeholders": {

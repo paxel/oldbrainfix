@@ -398,7 +398,40 @@ void main() {
         final schedule = Routines(store).byId(routine.id)?.schedule;
         expect(schedule?.times, [ClockTime(9, 0)]);
         expect(schedule?.rule?.format(), 'FREQ=DAILY');
+        // Version 1 of a schedule is never written (ADR 0034).
+        expect(
+          store.history(routine.id).map((e) => e.field),
+          isNot(contains(RoutineKeys.scheduleVersion)),
+        );
       }
+    });
+
+    test('a schedule of a later version is no pick here (ADR 0034)', () {
+      final routine = Routines(phone).create(
+        'Pills',
+        Schedule(start: Day(2026, 3, 1), times: [ClockTime(8, 0)]),
+      );
+      exchange(phone, desk);
+      Routines(phone).reschedule(
+        routine.id,
+        Schedule(start: Day(2026, 3, 1), times: [ClockTime(9, 0)]),
+      );
+      // As the desk's later version writes it.
+      desk.batch(() {
+        desk.append(routine.id, RoutineKeys.times, '08:00~2');
+        desk.append(routine.id, RoutineKeys.scheduleVersion, '2');
+      });
+      exchange(phone, desk);
+      final conflict = phone.conflictOn(routine.id, scheduleUnit)!;
+      expect(conflict.resolvable, isFalse);
+      final before = phone.history(routine.id).length;
+      for (final version in conflict.versions) {
+        expect(
+          () => phone.resolveConflict(conflict, version),
+          throwsStateError,
+        );
+      }
+      expect(phone.history(routine.id), hasLength(before));
     });
   });
 

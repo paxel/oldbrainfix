@@ -397,6 +397,53 @@ void main() {
     });
   });
 
+  group('a record of a later structure (ADR 0034)', () {
+    test('is taken from an own Device, shown, passed on as it came and '
+        'never written anew here', () {
+      final clock = ticking();
+      final phone = device(clock, 'Pixel 7');
+      final desk = device(clock, 'Desk')..renameOwnProfile('Ada');
+      exchange(phone, desk);
+      final key = desk.signingKey;
+      final profile = desk.ownProfile!;
+      // As the desk's later version writes it, its picture none here.
+      final later = jsonEncode({
+        'id': profile.id,
+        'name': 'Ada L.',
+        'picture': base64.encode(utf8.encode('a picture of later')),
+        'pronouns': 'she',
+        'v': 2,
+        'version': profile.version + 1,
+      });
+      final sent = desk.ownSignedProfile!.toJson()
+        ..['record'] = later
+        ..['sig'] = key.sign(profileRecordBytes(later))
+        ..['signer'] = key.publicBase64;
+      expect(
+        phone.takeOwnProfile(sent, from: key.publicKey),
+        ProfileTaken.updated,
+      );
+      expect(phone.ownProfileIsNewer, isTrue);
+      expect(phone.personIsNewer(profile.id), isTrue);
+      expect(phone.ownProfile!.name, 'Ada L.');
+      expect(phone.ownProfile!.picture, isNull);
+      expect(phone.ownSignedProfile!.record, later);
+      expect(() => phone.renameOwnProfile('Ada'), throwsStateError);
+      // The same name again, as a page left unchanged keeps it, is fine.
+      phone.renameOwnProfile('Ada L.');
+      phone.setOwnProfilePicture(null);
+      expect(
+        () =>
+            phone.setOwnProfilePicture(squareProfilePicture(halves(300, 300))),
+        throwsStateError,
+      );
+      phone.applyProfileDefaults(name: 'Pixel 8');
+      expect(phone.ownSignedProfile!.record, later);
+      expect(desk.ownProfileIsNewer, isFalse);
+      expect(desk.personIsNewer(profile.id), isFalse);
+    });
+  });
+
   group('transports', () {
     test('the shared folder carries it, sealed in the keys file', () async {
       final clock = ticking();

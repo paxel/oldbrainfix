@@ -826,20 +826,32 @@ impl Store {
             .collect();
         let routines = Routines::new(self);
         let mut theirs: Vec<(String, Routine)> = Vec::new();
+        // Those whose schedule needs a newer version of the app: neither
+        // changed nor added again (ADR 0034).
+        let mut newer: Vec<String> = Vec::new();
         let mut own = HashMap::new();
         let mut ids = self.entities_of_type(routine_keys::TYPE_ROUTINE)?;
         ids.sort();
         for id in ids {
-            let Some(routine) = routines.by_id(&id)? else {
-                continue;
+            let routine = routines.by_id(&id)?;
+            let later = routines.newer_by_id(&id)?;
+            let of_note = match (&routine, &later) {
+                (Some(r), _) => r.note_id == note_id,
+                (None, Some(r)) => r.note_id == note_id,
+                (None, None) => false,
             };
-            if routine.note_id != note_id {
+            if !of_note {
                 continue;
             }
             let Some(from) = self.own_current(&id, keys::RECEIVED, &mut own)? else {
                 continue;
             };
-            if !theirs.iter().any(|(f, _)| *f == from) {
+            if later.is_some() {
+                newer.push(from.clone());
+            }
+            if let Some(routine) = routine
+                && !theirs.iter().any(|(f, _)| *f == from)
+            {
                 theirs.push((from, routine));
             }
         }
@@ -850,6 +862,7 @@ impl Store {
         let mut routines_added = Vec::new();
         for r in &item.routines {
             match theirs.iter().find(|(f, _)| *f == r.id) {
+                None if newer.contains(&r.id) => {}
                 None => routines_added.push(r.clone()),
                 Some((_, held)) if live(held) && !same_schedule(&held.schedule, &r.schedule) => {
                     rescheduled.push(SentReschedule {
@@ -2158,6 +2171,77 @@ mod tests {
         ben.accept_sent_item(&cancel.item, false)?;
         assert!(Notes::new(&ben).by_id(&got)?.ok_or("note")?.is_trashed());
         assert!(Routines::new(&ben).all()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_routine_the_receivers_later_version_rescheduled_is_neither_changed_nor_added_again()
+    -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let note = Notes::new(&ann).capture("Dentist", None, None)?;
+        let day = |d: &str| Day::parse(d).ok_or("day");
+        let time = |t: &str| ClockTime::parse(t).ok_or("time");
+        let reminder = Routines::new(&ann).spawn(
+            &note.id,
+            &Schedule::new(day("2026-03-03")?, &[time("10:00")?], None).ok_or("schedule")?,
+        )?;
+        let daily = Routines::new(&ann).spawn(
+            &note.id,
+            &Schedule::new(
+                day("2026-03-01")?,
+                &[time("08:00")?],
+                Some(Recurrence::parse("FREQ=DAILY")?),
+            )
+            .ok_or("schedule")?,
+        )?;
+        let first = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "first")?;
+        let got = ben
+            .accept_sent_item(&first.item, false)?
+            .ok_or("accepted")?;
+        let held = Routines::new(&ben).of_note(&got)?;
+        let theirs = held
+            .iter()
+            .find(|r| !r.is_reminder())
+            .map(|r| r.id.clone())
+            .ok_or("daily")?;
+        // As Ben's later version writes it.
+        ben.append(&theirs, routine_keys::SCHEDULE_VERSION, Some("2"), None)?;
+        Routines::new(&ann).reschedule(
+            &daily.id,
+            &Schedule::new(day("2026-03-01")?, &[time("09:00")?], None).ok_or("schedule")?,
+        )?;
+        Routines::new(&ann).reschedule(
+            &reminder.id,
+            &Schedule::new(day("2026-03-04")?, &[time("14:00")?], None).ok_or("schedule")?,
+        )?;
+        let update = ben
+            .open_sent_item(&ann.send_note(&note.id, None, false)?)?
+            .map_err(|_| "update")?;
+        let changes = update.changes.clone().ok_or("changes")?;
+        assert!(changes.routines_added.is_empty());
+        assert!(changes.routines_removed.is_empty());
+        let known = Routines::new(&ben).of_note(&got)?;
+        assert_eq!(
+            changes
+                .rescheduled
+                .iter()
+                .map(|r| r.routine.clone())
+                .collect::<Vec<_>>(),
+            known.iter().map(|r| r.id.clone()).collect::<Vec<_>>()
+        );
+        let before = ben.history(&theirs)?.len();
+        ben.accept_sent_item(&update.item, false)?;
+        assert_eq!(ben.history(&theirs)?.len(), before);
+        let newer: Vec<String> = Routines::new(&ben)
+            .newer_of_note(&got)?
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        assert_eq!(newer, vec![theirs]);
+        assert_eq!(Routines::new(&ben).of_note(&got)?.len(), 1);
         Ok(())
     }
 

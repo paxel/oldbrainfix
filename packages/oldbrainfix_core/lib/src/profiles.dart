@@ -100,17 +100,27 @@ class Profile {
   @visibleForTesting
   static int parsed = 0;
 
+  /// The keys version 1 of a record holds.
+  static const _keys = {'id', 'name', 'picture', 'v', 'version'};
+
   /// The record [text] holds, its name sanitised again; null when it is
-  /// none.
+  /// none. A record of a later structure ([recordIsNewer]) is read as far
+  /// as this version can: its id and version as always, its name and
+  /// picture where they are what version 1 holds, else none.
   static Profile? parse(String text) {
     parsed++;
     try {
       final json = jsonDecode(text);
       if (json is! Map<String, Object?>) return null;
+      final newer = _newer(json);
       final id = json['id'];
-      final name = json['name'];
-      final picture = json['picture'];
+      var name = json['name'];
+      var picture = json['picture'];
       final version = json['version'];
+      if (newer) {
+        if (name is! String || _halfPair(name)) name = '';
+        if (picture is! String || !_standardBase64(picture)) picture = null;
+      }
       if (id is! String || id.isEmpty || name is! String) return null;
       // Half a surrogate pair is no text; the desktop's JSON refuses it.
       if (_halfPair(id) || _halfPair(name)) return null;
@@ -127,6 +137,33 @@ class Profile {
       );
     } on FormatException {
       return null;
+    }
+  }
+
+  /// Whether the record [text] is of a structure this version does not
+  /// know (ADR 0034): its `v` anything but absent or 1, or a key version
+  /// 1 does not hold. It is shown as far as it can be, passed on as it
+  /// came, and never written anew here.
+  static bool recordIsNewer(String text) {
+    try {
+      final json = jsonDecode(text);
+      return json is Map<String, Object?> && _newer(json);
+    } on FormatException {
+      return false;
+    }
+  }
+
+  static bool _newer(Map<String, Object?> json) {
+    final v = json['v'];
+    return (json.containsKey('v') && !(v is int && v == 1)) ||
+        !json.keys.every(_keys.contains);
+  }
+
+  static bool _standardBase64(String text) {
+    try {
+      return base64.encode(base64.decode(text)) == text;
+    } on FormatException {
+      return false;
     }
   }
 
@@ -622,7 +659,8 @@ _Checked? _check(SignedProfile sent) {
   Uint8List? shown;
   if (profile.picture case final picture?) {
     shown = receivedProfilePicture(picture);
-    if (shown == null) return null;
+    // A record of a later structure stays, its picture showing none.
+    if (shown == null && !Profile.recordIsNewer(sent.record)) return null;
   }
   return (profile: profile, keys: keys, shown: shown);
 }
@@ -713,6 +751,17 @@ extension OwnProfile on Store {
     final text = localSetting(_record);
     final profile = text == null ? null : Profile.parse(text);
     final shown = localSetting(_shown);
+    // Of a later structure, the picture shows only as made again here.
+    if (profile != null &&
+        shown == null &&
+        profile.picture != null &&
+        ownProfileIsNewer) {
+      return Profile(
+        id: profile.id,
+        name: profile.name,
+        version: profile.version,
+      );
+    }
     if (profile == null || shown == null || profile.picture == null) {
       return profile;
     }
@@ -740,6 +789,13 @@ extension OwnProfile on Store {
         : profileShortCode(profile.id, key);
   }
 
+  /// Whether the own Profile's record is of a structure this version
+  /// does not know ([Profile.recordIsNewer]): taken from one of the
+  /// user's Devices with a newer version of the app, it shows as far as
+  /// it can and its name and picture are changed only there (ADR 0034).
+  bool get ownProfileIsNewer =>
+      Profile.recordIsNewer(localSetting(_record) ?? '');
+
   /// The ids the own Profile replaced, the kept Profile showing for each.
   Set<String> get ownProfileAliases => {for (final a in _heldAliases) a.alias};
 
@@ -764,8 +820,9 @@ extension OwnProfile on Store {
       return made;
     }
     // A Profile held by several Devices keeps the name and picture it
-    // had: each Device's own defaults would replace each other's.
-    if (!_alone) return current;
+    // had: each Device's own defaults would replace each other's. One of
+    // a later structure is not this version's to write.
+    if (!_alone || ownProfileIsNewer) return current;
     final takeName =
         localSetting(_nameChosen) != 'true' && clean != current.name;
     final takePicture =
@@ -780,11 +837,14 @@ extension OwnProfile on Store {
     return next;
   }
 
-  /// Gives the own Profile the [name] the user typed, sanitised.
+  /// Gives the own Profile the [name] the user typed, sanitised. Another
+  /// name is refused while it is [ownProfileIsNewer].
   Profile renameOwnProfile(String name) {
     final current = _own;
-    setLocalSetting(_nameChosen, 'true');
     final clean = sanitizeProfileName(name);
+    if (ownProfileIsNewer && clean == current.name) return current;
+    _refuseNewer();
+    setLocalSetting(_nameChosen, 'true');
     if (clean == current.name) return current;
     final next = current._with(name: clean);
     _keep(next);
@@ -792,9 +852,12 @@ extension OwnProfile on Store {
   }
 
   /// Gives the own Profile the [picture] the user chose (a Profile
-  /// picture), or the placeholder for null.
+  /// picture), or the placeholder for null. Another picture is refused
+  /// while it is [ownProfileIsNewer].
   Profile setOwnProfilePicture(Uint8List? picture) {
     final current = _own;
+    if (ownProfileIsNewer && _same(picture, current.picture)) return current;
+    _refuseNewer();
     setLocalSetting(_pictureChosen, 'true');
     if (_same(picture, current.picture)) return current;
     final next = current._with(picture: () => picture);
@@ -805,6 +868,12 @@ extension OwnProfile on Store {
   Profile get _own =>
       ownProfile ??
       (throw StateError('no own Profile yet: applyProfileDefaults first'));
+
+  void _refuseNewer() {
+    if (ownProfileIsNewer) {
+      throw StateError('the own Profile is of a structure not known here');
+    }
+  }
 
   /// Keeps [profile] as made here, signed with this Device's key.
   void _keep(Profile profile) {

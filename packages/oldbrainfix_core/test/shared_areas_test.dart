@@ -690,4 +690,113 @@ void main() {
       }
     });
   });
+
+  group('grants of a later version (ADR 0034)', () {
+    test('a grant reads as newer by its version, its keys or its role', () {
+      for (final (value, role) in [
+        ('{"profile":"p","role":"member"}', AreaRole.member),
+        ('{"profile":"p","role":"manager","v":1}', AreaRole.manager),
+      ]) {
+        expect(Grant.parse(value)?.role, role, reason: value);
+      }
+      for (final value in [
+        '{"profile":"p","role":"viewer"}',
+        '{"profile":"p","role":"member","v":2}',
+        '{"profile":"p","role":"member","v":1.5}',
+        '{"profile":"p","role":"member","v":"1"}',
+        '{"profile":"p","role":"member","v":0}',
+        '{"profile":"p","role":"member","v":null}',
+        '{"profile":"p","role":"member","until":"2027"}',
+        '{"profile":"p","role":3}',
+        '{"profile":"p"}',
+      ]) {
+        final grant = Grant.parse(value);
+        expect(grant?.newer, isTrue, reason: value);
+        expect(grant?.profile, 'p', reason: value);
+      }
+      for (final value in [
+        '{"profile":"","role":"member"}',
+        '{"profile":3,"role":"member"}',
+        '{"role":"member"}',
+        '["p","member"]',
+        'member',
+        '',
+      ]) {
+        expect(Grant.parse(value), isNull, reason: value);
+      }
+      expect(() => const Grant(null, 'p').encode(), throwsStateError);
+    });
+
+    test('a person whose grant is newer keeps getting the Area, may write '
+        'nothing into it, and nothing here changes or ends the grant', () {
+      final h = household(AreaRole.member);
+      final benId = ben.ownProfile!.id;
+      // As Ann's Device of a later version writes it.
+      ann.append(
+        h.area,
+        ShareKeys.role(ben.deviceId),
+        jsonEncode({'profile': benId, 'role': 'viewer', 'v': 2}),
+      );
+      exchange(ben, ann);
+      final own = Notes(ben).byId(h.note)!;
+      ben.batch(() {
+        ben.append(own.id, NoteKeys.text, StoredText.plain('Beer').encode());
+        ben.append('note:ben', NoteKeys.type, NoteKeys.typeNote);
+        ben.append('note:ben', NoteKeys.place, h.area);
+      });
+      exchange(ben, ann);
+      for (final store in [ann, ben]) {
+        final person = store.people(h.area).firstWhere((p) => p.id == benId);
+        expect(person.newer, isTrue);
+        expect(person.role, isNull);
+        expect(store.areasSharedWith(ben.deviceId), {h.area});
+        expect(store.accessIn(h.area, device: ben.deviceId), AreaAccess.none);
+        expect(Notes(store).byId(h.note)!.text, 'Buy milk');
+        expect(Notes(store).byId('note:ben'), isNull);
+      }
+      expect(ben.mayWriteIn(h.area), isFalse);
+      final before = ann.history(h.area).length;
+      expect(
+        () => ann.setRole(h.area, benId, AreaRole.manager),
+        throwsStateError,
+      );
+      expect(() => ann.removePerson(h.area, benId), throwsStateError);
+      ann.invite(h.area, ben.deviceId, role: AreaRole.member, profile: benId);
+      expect(ann.history(h.area), hasLength(before));
+      // He still gets what Ann writes.
+      Notes(ann).capture('For Ben to read', place: h.area);
+      exchange(ben, ann);
+      expect(Notes(ben).all().map((n) => n.text), contains('For Ben to read'));
+    });
+
+    test('a person whose grant is newer adds no Device of theirs, and an own '
+        'Device met in a sync is given nothing', () {
+      final h = household(AreaRole.member);
+      final benId = ben.ownProfile!.id;
+      ann.append(
+        h.area,
+        ShareKeys.role(ben.deviceId),
+        jsonEncode({'profile': benId, 'role': 'viewer'}),
+      );
+      exchange(ben, ann);
+      // As a Member adds an own Device, by hand as a modified app would.
+      ben.append(
+        h.area,
+        ShareKeys.role('laptop'),
+        Grant(AreaRole.member, benId).encode(),
+      );
+      exchange(ben, ann);
+      for (final store in [ann, ben]) {
+        expect(store.grantsOf(h.area)?.grantOf('laptop'), isNull);
+        expect(store.accessIn(h.area, device: 'laptop'), AreaAccess.none);
+      }
+      final benLaptop = Store.inMemory(clock: clock);
+      try {
+        exchange(benLaptop, ben);
+        expect(ben.grantsOf(h.area)?.everGranted(benLaptop.deviceId), isFalse);
+      } finally {
+        benLaptop.close();
+      }
+    });
+  });
 }

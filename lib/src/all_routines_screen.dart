@@ -8,6 +8,7 @@ import 'calendar_platform.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'note_card.dart';
+import 'note_editor_screen.dart';
 import 'routine_editor_screen.dart';
 import 'schedule_text.dart';
 import 'system_bars.dart';
@@ -28,7 +29,9 @@ Future<void> openAllRoutines(
 /// those beyond the Agenda's week; a tap opens its editor. Export hands
 /// one calendar file of all of them to the app the user chooses. Those
 /// of closed locked Areas stay out, of the file too. Each card carries
-/// its Area's colour and icon, as on the Agenda.
+/// its Area's colour and icon, as on the Agenda. Those whose schedule a
+/// newer version of the app saved follow, saying so, a tap opening their
+/// Note (ADR 0034); they are in no file.
 class AllRoutinesScreen extends StatefulWidget {
   final Notes notes;
   final Places places;
@@ -49,6 +52,10 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
   /// Each with the name it shows and its Note's Area, read once per
   /// change.
   List<(Routine, String, Area?)>? _rows;
+
+  /// Those whose schedule a newer version of the app saved, with the
+  /// name and Area of their Note, which a tap opens.
+  List<(NewerRoutine, Note, String, Area?)> _newer = const [];
 
   @override
   void didChangeDependencies() {
@@ -75,6 +82,18 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
       for (final r in routinesByName(shown.keys, (r) => shown[r]?.$1 ?? ''))
         (r, shown[r]?.$1 ?? '', shown[r]?.$2),
     ];
+    _newer = [
+      for (final r in _routines.newer())
+        if (_routines.noteOfNewer(r) case final note?
+            when !(lock?.hides(note) ?? false))
+          (r, note, noteText(t, note), placeNote(widget.places, note).area),
+    ];
+  }
+
+  Future<void> _openNote(Note note) async {
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    setState(_load);
   }
 
   Future<void> _open(Routine routine) async {
@@ -109,18 +128,30 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
       body: ListView(
         padding: clearOfSystemBars(context, const EdgeInsets.only(bottom: 16)),
         children: [
-          if (rows.isEmpty)
+          if (rows.isEmpty && _newer.isEmpty)
             BrowserEmpty(text: t.allRoutinesEmpty)
-          else
+          else ...[
             for (final (routine, name, area) in rows)
               _RoutineCard(
                 key: ValueKey('routine-${routine.id}'),
-                routine: routine,
+                icon: routine.isReminder
+                    ? Icons.notifications_outlined
+                    : Icons.repeat,
                 name: name,
                 area: area,
                 schedule: scheduleText(t, locale, routine.schedule),
                 onTap: () => _open(routine),
               ),
+            for (final (routine, note, name, area) in _newer)
+              _RoutineCard(
+                key: ValueKey('routine-${routine.id}'),
+                icon: Icons.update,
+                name: name,
+                area: area,
+                schedule: t.newerVersionNeeded,
+                onTap: () => _openNote(note),
+              ),
+          ],
         ],
       ),
     );
@@ -131,7 +162,8 @@ class _AllRoutinesScreenState extends State<AllRoutinesScreen> {
 /// schedule, and its Area's colour down the side and its icon, as the
 /// Agenda's rows show them.
 class _RoutineCard extends StatelessWidget {
-  final Routine routine;
+  /// Its kind: a Routine's, a Reminder's, or one a newer version saved.
+  final IconData icon;
   final String name;
   final Area? area;
   final String schedule;
@@ -139,7 +171,7 @@ class _RoutineCard extends StatelessWidget {
 
   const _RoutineCard({
     super.key,
-    required this.routine,
+    required this.icon,
     required this.name,
     required this.area,
     required this.schedule,
@@ -164,11 +196,7 @@ class _RoutineCard extends StatelessWidget {
                       border: Border(left: BorderSide(color: colour, width: 6)),
                     ),
               child: ListTile(
-                leading: Icon(
-                  routine.isReminder
-                      ? Icons.notifications_outlined
-                      : Icons.repeat,
-                ),
+                leading: Icon(icon),
                 title: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(schedule),
                 trailing: switch (areaIconData(area?.icon)) {

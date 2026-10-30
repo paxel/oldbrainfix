@@ -10,7 +10,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use serde_json::{Value, json};
 
-use crate::Result;
 use crate::checklists::{Checklists, keys as checklist_keys};
 use crate::entry::Entry;
 use crate::frogs::keys as frog_keys;
@@ -23,6 +22,7 @@ use crate::sessions::keys as session_keys;
 use crate::signing::KeyRecord;
 use crate::store::Store;
 use crate::tallies::keys as tally_keys;
+use crate::{Error, Result};
 
 /// The field prefix of the grants on an Area.
 pub const ROLE_PREFIX: &str = "role:";
@@ -70,7 +70,8 @@ pub enum AreaAccess {
     Owner,
     Manager,
     Member,
-    /// Shared, and no role here, or removed.
+    /// Shared, and no role here, or removed; or a grant this version
+    /// cannot read ([`Grant::newer`]).
     None,
 }
 
@@ -85,7 +86,7 @@ impl AreaAccess {
     }
 
     fn of(grant: Option<&Grant>) -> AreaAccess {
-        match grant.map(|g| g.role) {
+        match grant.and_then(|g| g.role) {
             Some(AreaRole::Manager) => AreaAccess::Manager,
             Some(AreaRole::Member) => AreaAccess::Member,
             None => AreaAccess::None,
@@ -101,25 +102,58 @@ impl AreaAccess {
 /// the Profile of the person the Device belongs to (ADR 0017).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grant {
-    pub role: AreaRole,
+    /// The role; `None` for a grant this version cannot read
+    /// ([`Grant::newer`]).
+    pub role: Option<AreaRole>,
     /// The id of the person's Profile, as the grant named it.
     pub profile: String,
 }
 
+/// The value of a grant of `role` to the person `profile`: keys sorted,
+/// no spaces.
+pub fn encode_grant(role: AreaRole, profile: &str) -> String {
+    json!({"profile": profile, "role": role.name()}).to_string()
+}
+
+/// The keys version 1 of a grant holds.
+const GRANT_KEYS: [&str; 3] = ["profile", "role", "v"];
+
 impl Grant {
-    /// The value of the grant field: keys sorted, no spaces.
-    pub fn encode(&self) -> String {
-        json!({"profile": self.profile, "role": self.role.name()}).to_string()
+    /// Whether the grant needs a newer version of the app (ADR 0034): of
+    /// a later structure, or with a role this version does not know. It
+    /// holds, so the person keeps getting the Area, but allows nothing
+    /// here, and nothing here changes or ends it.
+    pub fn newer(&self) -> bool {
+        self.role.is_none()
     }
 
-    /// The grant in `value`; `None` when it is none.
+    /// The value of the grant field; `None` for a [`Grant::newer`] grant,
+    /// which is not this version's to write.
+    pub fn encode(&self) -> Option<String> {
+        Some(encode_grant(self.role?, &self.profile))
+    }
+
+    /// The grant in `value`; `None` when it is none. A grant names a
+    /// person; one of a structure other than version 1 (`v` absent or 1),
+    /// with a key version 1 does not hold, or with a role this version
+    /// does not know is [`Grant::newer`].
     pub fn parse(value: &str) -> Option<Grant> {
         let json: Value = serde_json::from_str(value).ok()?;
-        let profile = json.get("profile")?.as_str()?;
-        let role = AreaRole::parse(json.get("role")?.as_str()?)?;
+        let object = json.as_object()?;
+        let profile = object.get("profile")?.as_str()?;
         if profile.is_empty() {
             return None;
         }
+        let known = object.get("v").is_none_or(|v| v.as_u64() == Some(1))
+            && object.keys().all(|k| GRANT_KEYS.contains(&k.as_str()));
+        let role = if known {
+            object
+                .get("role")
+                .and_then(Value::as_str)
+                .and_then(AreaRole::parse)
+        } else {
+            None
+        };
         Some(Grant {
             role,
             profile: profile.to_string(),
@@ -142,7 +176,10 @@ pub struct Invite {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Person {
     pub id: String,
-    pub role: AreaRole,
+    /// Their role; `None` when a grant of one of their Devices needs a
+    /// newer version of the app ([`Grant::newer`]): then nothing here
+    /// changes them.
+    pub role: Option<AreaRole>,
     /// The ids of their Devices that hold the role, sorted.
     pub devices: Vec<String>,
 }
@@ -218,6 +255,21 @@ impl AreaGrants {
         }
         AreaAccess::of(pick.and_then(|g| g.grant.as_ref()))
     }
+}
+
+/// Fails when a grant of `person` in `grants` is not known here.
+fn refuse_newer(grants: &AreaGrants, person: &str) -> Result<()> {
+    for device in grants.devices() {
+        if grants
+            .grant_of(&device)
+            .is_some_and(|g| g.profile == person && g.newer())
+        {
+            return Err(Error::Invalid(format!(
+                "a grant of {person} is not known here"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// What [`judge_log`] found: the entries no role allows, and the grants
@@ -300,7 +352,7 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
             let counts = if target.is_empty() || (e.value.is_some() && grant.is_none()) {
                 false
             } else if first.is_none() {
-                target == e.device && grant.as_ref().map(|g| g.role) == Some(AreaRole::Manager)
+                target == e.device && grant.as_ref().and_then(|g| g.role) == Some(AreaRole::Manager)
             } else {
                 match by_device
                     .get(&e.device)
@@ -308,7 +360,7 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                     .and_then(|g| g.grant.as_ref())
                 {
                     None => false,
-                    Some(signer) if signer.role == AreaRole::Manager => true,
+                    Some(signer) if signer.role == Some(AreaRole::Manager) => true,
                     // A person ends the grants of their own Devices: they
                     // leave.
                     Some(signer) if grant.is_none() => by_device
@@ -316,8 +368,11 @@ pub fn judge_log(entries: &[Entry]) -> JudgedLog {
                         .and_then(|g| g.last())
                         .and_then(|g| g.grant.as_ref())
                         .is_some_and(|g| g.profile == signer.profile),
+                    // A grant not known here allows nothing more (ADR
+                    // 0034).
                     Some(signer) => grant.as_ref().is_some_and(|g| {
-                        g.role == AreaRole::Member
+                        signer.role == Some(AreaRole::Member)
+                            && g.role == Some(AreaRole::Member)
                             && g.profile == signer.profile
                             && !by_device.contains_key(target)
                     }),
@@ -641,7 +696,14 @@ impl Store {
                 continue;
             };
             match people.iter_mut().find(|p| p.id == grant.profile) {
-                Some(person) => person.devices.push(device),
+                Some(person) => {
+                    person.devices.push(device);
+                    // One grant not known here makes the person's role one
+                    // too.
+                    if grant.newer() {
+                        person.role = None;
+                    }
+                }
                 None => people.push(Person {
                     id: grant.profile.clone(),
                     role: grant.role,
@@ -700,11 +762,7 @@ impl Store {
                 Some(own) => own.id,
                 None => me.clone(),
             };
-            let grant = Grant {
-                role: AreaRole::Manager,
-                profile,
-            }
-            .encode();
+            let grant = encode_grant(AreaRole::Manager, &profile);
             self.append(&id, &role_field(&me), Some(&grant), None)?;
             for device in self.paired_devices()? {
                 if !device.shared {
@@ -717,43 +775,49 @@ impl Store {
 
     /// Grants `device` `role` in `area`, as the person whose Profile is
     /// `profile`: under the person it already belongs to there, else
-    /// that one. Nothing for a Device of this one's own group.
+    /// that one. Nothing for a Device of this one's own group, nor for one
+    /// holding a grant not known here.
     pub fn invite(&self, area: &str, device: &str, role: AreaRole, profile: &str) -> Result<()> {
         // A Device of this one's own group is no other person: it keeps
         // the role it has.
         if self.is_own_device(device)? {
             return Ok(());
         }
-        let person = self
-            .grants_of(area)?
+        let grants = self.grants_of(area)?;
+        // Nor one whose grant is not known here: it stays (ADR 0034).
+        if grants
+            .as_ref()
+            .and_then(|g| g.grant_of(device))
+            .is_some_and(Grant::newer)
+        {
+            return Ok(());
+        }
+        let person = grants
+            .as_ref()
             .and_then(|g| g.person_of(device).map(str::to_string))
             .unwrap_or_else(|| profile.to_string());
-        let grant = Grant {
-            role,
-            profile: person,
-        };
-        self.append(area, &role_field(device), Some(&grant.encode()), None)
+        let grant = encode_grant(role, &person);
+        self.append(area, &role_field(device), Some(&grant), None)
             .map(drop)
     }
 
-    /// Gives every Device of `person` in `area` the role `role`.
+    /// Gives every Device of `person` in `area` the role `role`. Refused
+    /// while a grant of theirs is not known here (ADR 0034).
     pub fn set_role(&self, area: &str, person: &str, role: AreaRole) -> Result<()> {
         let Some(grants) = self.grants_of(area)? else {
             return Ok(());
         };
+        refuse_newer(&grants, person)?;
         self.batch(|| {
             for device in grants.devices() {
                 let Some(grant) = grants.grant_of(&device) else {
                     continue;
                 };
-                if grant.profile != person || grant.role == role {
+                if grant.profile != person || grant.role == Some(role) {
                     continue;
                 }
-                let next = Grant {
-                    role,
-                    profile: person.to_string(),
-                };
-                self.append(area, &role_field(&device), Some(&next.encode()), None)?;
+                let next = encode_grant(role, person);
+                self.append(area, &role_field(&device), Some(&next), None)?;
             }
             Ok(())
         })
@@ -761,10 +825,12 @@ impl Store {
 
     /// Takes `person` out of `area`: their Devices' grants end and no
     /// Device that learns of it sends them anything more of the Area.
+    /// Refused while a grant of theirs is not known here (ADR 0034).
     pub fn remove_person(&self, area: &str, person: &str) -> Result<()> {
         let Some(grants) = self.grants_of(area)? else {
             return Ok(());
         };
+        refuse_newer(&grants, person)?;
         self.batch(|| {
             for device in grants.devices() {
                 if grants.grant_of(&device).map(|g| g.profile.as_str()) == Some(person) {
@@ -809,7 +875,8 @@ impl Store {
 
     /// Gives the Device `peer` of this Device's own group this Device's
     /// role and person in every Shared Area where it holds one and
-    /// `peer` never held any. Returns how many it gave.
+    /// `peer` never held any; not a grant this version cannot read, which
+    /// only a newer one may pass on. Returns how many it gave.
     pub fn extend_roles_to(&self, peer: &str) -> Result<usize> {
         let me = self.device_id()?;
         if peer.is_empty() || peer == me {
@@ -820,7 +887,7 @@ impl Store {
             .areas
             .iter()
             .filter(|(_, g)| !g.ever_granted(peer))
-            .filter_map(|(id, g)| g.grant_of(&me).map(|grant| (id.clone(), grant.encode())))
+            .filter_map(|(id, g)| Some((id.clone(), g.grant_of(&me)?.encode()?)))
             .collect();
         if given.is_empty() {
             return Ok(0);
@@ -1324,6 +1391,104 @@ mod tests {
         assert_eq!(ann.access_in(&area, Some(&id))?, AreaAccess::Manager);
         assert_eq!(ann.people(&area)?.len(), 1);
         assert_eq!(ann.extend_roles_to(&id)?, 0, "given once");
+        Ok(())
+    }
+
+    #[test]
+    fn a_grant_reads_as_newer_by_its_version_its_keys_or_its_role() {
+        for (value, role) in [
+            (r#"{"profile":"p","role":"member"}"#, AreaRole::Member),
+            (
+                r#"{"profile":"p","role":"manager","v":1}"#,
+                AreaRole::Manager,
+            ),
+        ] {
+            assert_eq!(
+                Grant::parse(value).and_then(|g| g.role),
+                Some(role),
+                "{value}"
+            );
+        }
+        for value in [
+            r#"{"profile":"p","role":"viewer"}"#,
+            r#"{"profile":"p","role":"member","v":2}"#,
+            r#"{"profile":"p","role":"member","v":1.5}"#,
+            r#"{"profile":"p","role":"member","v":1.0}"#,
+            r#"{"profile":"p","role":"member","v":"1"}"#,
+            r#"{"profile":"p","role":"member","v":0}"#,
+            r#"{"profile":"p","role":"member","v":null}"#,
+            r#"{"profile":"p","role":"member","until":"2027"}"#,
+            r#"{"profile":"p","role":3}"#,
+            r#"{"profile":"p"}"#,
+        ] {
+            let grant = Grant::parse(value);
+            assert_eq!(grant.as_ref().map(Grant::newer), Some(true), "{value}");
+            assert_eq!(grant.map(|g| g.profile).as_deref(), Some("p"), "{value}");
+        }
+        for value in [
+            r#"{"profile":"","role":"member"}"#,
+            r#"{"profile":3,"role":"member"}"#,
+            r#"{"role":"member"}"#,
+            r#"["p","member"]"#,
+            "member",
+            "",
+        ] {
+            assert_eq!(Grant::parse(value), None, "{value}");
+        }
+        let newer = Grant {
+            role: None,
+            profile: "p".into(),
+        };
+        assert_eq!(newer.encode(), None);
+    }
+
+    #[test]
+    fn a_person_whose_grant_is_newer_keeps_the_area_and_nothing_here_changes_it() -> TestResult {
+        let ann = device(1)?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let area = ann.share(&house.id)?;
+        // As Ann's Device of a later version writes it.
+        let viewer = r#"{"profile":"ben","role":"viewer","v":2}"#;
+        ann.append(&area, &role_field("ben"), Some(viewer), None)?;
+        let people = ann.people(&area)?;
+        let ben = people.iter().find(|p| p.id == "ben").ok_or("Ben")?;
+        assert_eq!(ben.role, None);
+        assert_eq!(ann.access_in(&area, Some("ben"))?, AreaAccess::None);
+        assert!(ann.areas_shared_with("ben")?.contains(&area));
+        let before = ann.history(&area)?.len();
+        assert!(ann.set_role(&area, "ben", AreaRole::Manager).is_err());
+        assert!(ann.remove_person(&area, "ben").is_err());
+        ann.invite(&area, "ben", AreaRole::Member, "ben")?;
+        assert_eq!(ann.history(&area)?.len(), before);
+        Ok(())
+    }
+
+    #[test]
+    fn a_device_whose_grant_is_newer_grants_nothing_and_writes_nothing_that_counts() -> TestResult {
+        let ann = device(1)?;
+        let house = Places::new(&ann).add_area("Household")?;
+        let area = ann.share(&house.id)?;
+        let me = ann.device_id()?;
+        let profile = ann
+            .people(&area)?
+            .first()
+            .map(|p| p.id.clone())
+            .ok_or("Ann")?;
+        let viewer = format!(r#"{{"profile":"{profile}","role":"viewer"}}"#);
+        ann.append(&area, &role_field(&me), Some(&viewer), None)?;
+        // As a Member adds an own Device, by hand as a modified app would.
+        let member = encode_grant(AreaRole::Member, &profile);
+        ann.append(&area, &role_field("laptop"), Some(&member), None)?;
+        ann.append(&area, place_keys::NAME, Some("Not counted"), None)?;
+        let grants = ann.grants_of(&area)?.ok_or("shared")?;
+        assert_eq!(grants.grant_of("laptop"), None);
+        assert_eq!(ann.access_in(&area, Some("laptop"))?, AreaAccess::None);
+        assert_eq!(
+            Places::new(&ann).area_by_id(&area)?.map(|a| a.name),
+            Some("Household".into())
+        );
+        assert!(!ann.may_write_in(&area)?);
+        assert_eq!(ann.extend_roles_to("peer")?, 0);
         Ok(())
     }
 }

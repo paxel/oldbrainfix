@@ -1252,12 +1252,17 @@ SentItemChanges _changes(
   };
   final routines = Routines(store);
   final theirs = <String, Routine>{};
+  // Those whose schedule needs a newer version of the app: neither
+  // changed nor added again (ADR 0034).
+  final newer = <String>{};
   final own = <String, bool>{};
   for (final id in store.entitiesOfType(RoutineKeys.typeRoutine)..sort()) {
     if (store.current(id, RoutineKeys.note) != noteId) continue;
     final from = store.currentByOwn(id, SentKeys.received, own);
+    if (from == null) continue;
+    if (routines.newerById(id) != null) newer.add(from);
     final routine = routines.byId(id);
-    if (from == null || routine == null) continue;
+    if (routine == null) continue;
     theirs.putIfAbsent(from, () => routine);
   }
   bool live(Routine r) => !r.isTrashed || (restores && r.trashedWith == noteId);
@@ -1266,7 +1271,7 @@ SentItemChanges _changes(
   for (final r in item.routines) {
     final held = theirs[r.id];
     if (held == null) {
-      added.add(r);
+      if (!newer.contains(r.id)) added.add(r);
     } else if (live(held) && !_sameSchedule(held.schedule, r.schedule)) {
       rescheduled.add(SentReschedule(held.id, held.schedule, r.schedule));
     }

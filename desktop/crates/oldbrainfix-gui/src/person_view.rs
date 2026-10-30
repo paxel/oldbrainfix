@@ -77,6 +77,12 @@ pub struct PersonView {
     /// they are not blocked and an Area is shared with a Device of
     /// theirs (#108).
     pub sends_changes: bool,
+    /// Whether a newer version of the app saved their Profile in a form
+    /// this one does not know (ADR 0034).
+    pub newer: bool,
+    /// Whether it saved the name and picture given to them so: then they
+    /// show and are not changed here.
+    pub override_newer: bool,
 }
 
 impl PersonView {
@@ -93,6 +99,8 @@ impl PersonView {
                 .is_some_and(|o| o.picture.is_some()),
             blocked,
             sends_changes: store.sends_by_bundle(id)?,
+            newer: store.person_is_newer(id)?,
+            override_newer: store.override_is_newer(id)?,
         })
     }
 }
@@ -126,6 +134,9 @@ pub fn form(
             }
         });
     });
+    if person.newer {
+        ui.label(RichText::new(t.newer_version_needed()).color(weak));
+    }
     if person.blocked {
         ui.label(RichText::new(t.person_blocked()).color(text));
     }
@@ -204,6 +215,40 @@ pub fn form(
     ui.separator();
     ui.label(RichText::new(t.person_for_me()).strong().color(text));
     ui.label(RichText::new(t.person_for_me_detail()).small().color(weak));
+    // Saved by a newer version of the app: shown, not changed here (ADR
+    // 0034).
+    if person.override_newer {
+        ui.horizontal(|ui| {
+            person_picture(ui, pictures, &person.shown, 56.0, t.person_for_me_picture());
+            ui.add_space(12.0);
+            ui.label(RichText::new(display_name(t, &person.shown.name)).color(text));
+        });
+        ui.label(RichText::new(t.newer_version_needed()).color(weak));
+    } else {
+        for_me(ui, t, pictures, person, (name, &theirs), actions);
+    }
+    ui.separator();
+    let (label, asked) = if person.blocked {
+        (t.person_unblock(), PersonAction::Unblock)
+    } else {
+        (t.person_block(), PersonAction::Block)
+    };
+    if ui.button(RichText::new(label).color(text)).clicked() {
+        actions.push(asked);
+    }
+}
+
+/// The picture and the field `name` the user gives the person for
+/// themselves alone, `theirs` the name they go by.
+fn for_me(
+    ui: &mut Ui,
+    t: &L10n,
+    pictures: &mut Pictures,
+    person: &PersonView,
+    (name, theirs): (&mut String, &str),
+    actions: &mut Vec<PersonAction>,
+) {
+    let text = ui.visuals().text_color();
     ui.horizontal(|ui| {
         if person_button(ui, pictures, &person.shown, 56.0, t.person_for_me_picture()).clicked() {
             actions.push(PersonAction::PickPicture);
@@ -229,20 +274,11 @@ pub fn form(
     let field = ui.add(
         TextEdit::singleline(name)
             .id(Id::new("person name"))
-            .hint_text(theirs.as_str())
+            .hint_text(theirs)
             .desired_width(320.0),
     );
     field.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, t.person_for_me_name()));
     if field.lost_focus() {
         actions.push(PersonAction::Rename(name.clone()));
-    }
-    ui.separator();
-    let (label, asked) = if person.blocked {
-        (t.person_unblock(), PersonAction::Unblock)
-    } else {
-        (t.person_block(), PersonAction::Block)
-    };
-    if ui.button(RichText::new(label).color(text)).clicked() {
-        actions.push(asked);
     }
 }

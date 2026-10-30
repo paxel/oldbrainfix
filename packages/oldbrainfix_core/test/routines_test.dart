@@ -521,6 +521,96 @@ void main() {
     });
   });
 
+  group('schedules of a later version (ADR 0034)', () {
+    /// A Routine of [noteId] with [fields] as a later version writes them.
+    String written(String noteId, Map<String, String> fields) {
+      const id = 'routine:later';
+      store.batch(() {
+        store.append(id, RoutineKeys.type, RoutineKeys.typeRoutine);
+        store.append(id, RoutineKeys.note, noteId);
+        for (final MapEntry(:key, :value) in fields.entries) {
+          store.append(id, key, value);
+        }
+      });
+      return id;
+    }
+
+    test('a schedule reads as newer by its version or a part not known', () {
+      final daily = {
+        RoutineKeys.start: '2026-10-24',
+        RoutineKeys.times: '08:00',
+        RoutineKeys.rule: 'FREQ=DAILY',
+      };
+      for (final fields in [
+        daily,
+        {...daily, RoutineKeys.scheduleVersion: '1'},
+        {...daily, RoutineKeys.times: ''},
+      ]) {
+        expect(Routines.scheduleOf(fields), isNotNull, reason: '$fields');
+        expect(Routines.scheduleIsNewer(fields), isFalse, reason: '$fields');
+      }
+      for (final fields in [
+        {...daily, RoutineKeys.scheduleVersion: '2'},
+        {...daily, RoutineKeys.scheduleVersion: '01'},
+        {...daily, RoutineKeys.scheduleVersion: ' 1'},
+        {...daily, RoutineKeys.scheduleVersion: '1.0'},
+        {...daily, RoutineKeys.scheduleVersion: ''},
+        {RoutineKeys.scheduleVersion: '2'},
+        {...daily, RoutineKeys.times: '08:00,8pm'},
+        {...daily, RoutineKeys.times: '08:00,'},
+        {...daily, RoutineKeys.rule: 'FREQ=DAILY;BYEASTER=1'},
+        {...daily, RoutineKeys.start: '2026-13-01'},
+      ]) {
+        expect(Routines.scheduleOf(fields), isNull, reason: '$fields');
+        expect(Routines.scheduleIsNewer(fields), isTrue, reason: '$fields');
+      }
+      for (final fields in [
+        <String, String?>{},
+        {RoutineKeys.times: '08:00', RoutineKeys.rule: 'FREQ=DAILY'},
+        {RoutineKeys.scheduleVersion: '1'},
+      ]) {
+        expect(Routines.scheduleIsNewer(fields), isFalse, reason: '$fields');
+      }
+    });
+
+    test('such a Routine is listed as needing a newer version, fires '
+        'nothing and nothing here changes it', () {
+      final pills = notes.capture('pills');
+      final id = written(pills.id, {
+        RoutineKeys.start: '2026-10-24',
+        RoutineKeys.times: '08:00',
+        RoutineKeys.rule: 'FREQ=DAILY',
+        RoutineKeys.scheduleVersion: '2',
+      });
+      expect(routines.byId(id), isNull);
+      expect(routines.all(), isEmpty);
+      expect(routines.newer().map((r) => (r.id, r.noteId)), [(id, pills.id)]);
+      expect(routines.newerOfNote(pills.id).map((r) => r.id), [id]);
+      expect(routines.agenda(europe).todayRows, isEmpty);
+      final before = store.history(id).length;
+      final occurrence = Occurrence(today, at(8));
+      for (final change in <void Function()>[
+        () => routines.reschedule(id, daily([at(9)])),
+        () => routines.setRenag(id, const Duration(minutes: 5)),
+        () => routines.setEscalation(id, 2),
+        () => routines.trash(id),
+        () => routines.markDone(id, occurrence),
+        () => routines.unmarkDone(id, occurrence),
+      ]) {
+        expect(change, throwsArgumentError);
+      }
+      expect(store.history(id), hasLength(before));
+      // Merged into another Note, it shows under that one.
+      final box = notes.capture('pill box');
+      notes.merge(pills.id, box.id);
+      expect(routines.newerOfNote(box.id).map((r) => r.id), [id]);
+      expect(routines.newerOfNote(pills.id), isEmpty);
+      // In the trash, by a newer version, it is listed no more.
+      store.append(id, RoutineKeys.trashed, now.toIso8601String());
+      expect(routines.newer(), isEmpty);
+    });
+  });
+
   group('by name', () {
     Routine named(String id) => Routine(
       id: id,

@@ -1903,6 +1903,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieser Text wurde mit einer neueren Version von Old Brain Fix geschrieben. Aktualisiere die App, um ihn zu ändern.';
 
   @override
+  String get newerVersionNeeded =>
+      'Von einer neueren Version von Old Brain Fix gespeichert. Aktualisiere die App, um es zu ändern.';
+
+  @override
   String conflictOnThisDevice(String when) {
     return 'Auf diesem Gerät, $when';
   }

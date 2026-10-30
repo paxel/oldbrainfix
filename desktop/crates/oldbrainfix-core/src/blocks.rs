@@ -150,8 +150,9 @@ fn kept(entity: &str, field: &str, value: Option<&str>, author: &str, plain: boo
         let Some(value) = value else {
             return true;
         };
-        return Grant::parse(value)
-            .is_some_and(|grant| grant.encode() == value && is_id(&grant.profile));
+        return Grant::parse(value).is_some_and(|grant| {
+            grant.encode().as_deref() == Some(value) && is_id(&grant.profile)
+        });
     }
     if kind == "note" && field == note_keys::TYPE {
         return value.is_none_or(|v| v == note_keys::TYPE_NOTE);
@@ -234,7 +235,7 @@ impl Store {
                 let Some(grant) = grants.grant_of(&device) else {
                     continue;
                 };
-                if grant.role == AreaRole::Manager
+                if grant.role == Some(AreaRole::Manager)
                     && device != own_device
                     && !self.is_own_person(&grant.profile)?
                     && self.resolve_person(&grant.profile)? == person
@@ -923,14 +924,11 @@ mod tests {
         let mine = Notes::new(desk).capture("Mine", Some(&h.area), None)?;
         exchange(desk, ann, false)?;
         // As a modified app of a Manager would: the desk named as Carol's.
-        let grant = Grant {
-            role: AreaRole::Member,
-            profile: own_id(carol)?,
-        };
+        let grant = crate::shared::encode_grant(AreaRole::Member, &own_id(carol)?);
         ann.append(
             &h.area,
             &crate::shared::role_field(&desk.device_id()?),
-            Some(&grant.encode()),
+            Some(&grant),
             None,
         )?;
         let grants = ann.grants_of(&h.area)?.ok_or("grants")?;
@@ -1157,11 +1155,7 @@ mod tests {
 
     #[test]
     fn a_check_off_a_grant_and_a_notes_place_are_kept_as_the_apps_write_them() {
-        let member = Grant {
-            role: AreaRole::Member,
-            profile: "cd34".into(),
-        }
-        .encode();
+        let member = crate::shared::encode_grant(AreaRole::Member, "cd34");
         for e in [
             entry(
                 "routine:ab12",
@@ -1239,6 +1233,11 @@ mod tests {
                 "area:ab12",
                 "role:ab12",
                 Some(r#"{"profile":"cd34","role":"member","x":1}"#),
+            ),
+            entry(
+                "area:ab12",
+                "role:ab12",
+                Some(r#"{"profile":"cd34","role":"member","v":2}"#),
             ),
             entry(
                 "area:ab12",

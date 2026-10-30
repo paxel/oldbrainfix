@@ -260,6 +260,42 @@ void main() {
         expect(Profile.parse(bad), isNull, reason: bad);
       }
     });
+
+    test('of a later structure is read as far as it can be (ADR 0034)', () {
+      for (final known in [
+        '{"id":"p","name":"A","version":1}',
+        '{"id":"p","name":"A","v":1,"version":1}',
+        'nope',
+      ]) {
+        expect(Profile.recordIsNewer(known), isFalse, reason: known);
+      }
+      for (final (newer, name, picture) in [
+        ('{"id":"p","name":"A","v":2,"version":3}', 'A', false),
+        ('{"id":"p","name":"A","v":"1","version":3}', 'A', false),
+        ('{"id":"p","name":"A","v":1.5,"version":3}', 'A', false),
+        ('{"id":"p","name":"A","v":0,"version":3}', 'A', false),
+        ('{"id":"p","name":"A","v":null,"version":3}', 'A', false),
+        ('{"id":"p","name":"A","pronouns":"she","version":3}', 'A', false),
+        ('{"id":"p","name":{"en":"A"},"v":2,"version":3}', '', false),
+        ('{"id":"p","name":"A","picture":"%%","v":2,"version":3}', 'A', false),
+        ('{"id":"p","name":"A","picture":"AQID","v":2,"version":3}', 'A', true),
+      ]) {
+        expect(Profile.recordIsNewer(newer), isTrue, reason: newer);
+        final profile = Profile.parse(newer);
+        expect(profile?.id, 'p', reason: newer);
+        expect(profile?.version, 3, reason: newer);
+        expect(profile?.name, name, reason: newer);
+        expect(profile?.picture != null, picture, reason: newer);
+      }
+      // Its id and version stay what they always were.
+      for (final bad in [
+        '{"name":"A","v":2,"version":3}',
+        '{"id":"p","name":"A","v":2}',
+        '{"id":"p","name":"A","v":2,"version":"3"}',
+      ]) {
+        expect(Profile.parse(bad), isNull, reason: bad);
+      }
+    });
   });
 
   group('the own Profile', () {

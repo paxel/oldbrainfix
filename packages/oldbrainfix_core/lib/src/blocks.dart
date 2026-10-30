@@ -75,6 +75,7 @@ bool keptFromBlocked(Entry e) {
     if (value == null) return true;
     final grant = Grant.parse(value);
     return grant != null &&
+        !grant.newer &&
         grant.encode() == value &&
         _blockedId.hasMatch(grant.profile);
   }

@@ -31,6 +31,10 @@ A Sent Item (ADR 0015) carries the format of the Note's text and of every Sectio
 
 Amended by ADR 0033 (#127): this version knows two formats, `plain` and `markdown`, both in structure version 1, and edits a text in either. A plain text becomes `markdown` at its first format and stays so; a Device of 0.1.x, which knows only `plain`, keeps a formatted text read-only as this section describes. Sent Items, the shared folder, bundles and Backups carry `markdown` as they carry any format.
 
+## Other values (ADR 0034)
+
+Amended by ADR 0034 (#131): the same rule holds beyond texts. A Routine's schedule, a grant in a Shared Area, a Profile record and an Override carry the version of their structure, and a value of a later version is kept read-only with the same note, on the phone and on the desktop. Unlike a text, a value whose version is no whole number from 1 counts as of a later version too, as there is no source to show for it.
+
 ## Considered Options
 
 - The format as a field of its own next to `text` (rejected: text and format could be won by latest wins from different writers, and a text would become a Conflict unit of two fields).

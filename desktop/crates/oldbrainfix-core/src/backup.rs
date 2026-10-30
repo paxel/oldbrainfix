@@ -966,7 +966,8 @@ fn hand_roles(store: &Store, old: &SigningKey) -> Result<usize> {
     let author = store.author()?;
     let mut handed = 0;
     for (area, grants) in &judged.areas {
-        let Some(grant) = grants.grant_of(&device) else {
+        // A grant not known here is not this version's to hand on.
+        let Some(value) = grants.grant_of(&device).and_then(|g| g.encode()) else {
             continue;
         };
         if grants.ever_granted(&own) {
@@ -982,7 +983,6 @@ fn hand_roles(store: &Store, old: &SigningKey) -> Result<usize> {
         }
         let iso = dart_iso(now);
         let field = role_field(&own);
-        let value = grant.encode();
         let sig = old.sign(&entry_bytes(
             &device,
             dseq,

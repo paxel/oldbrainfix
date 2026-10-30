@@ -3068,6 +3068,12 @@ abstract class AppLocalizations {
   /// **'This text was written with a newer version of Old Brain Fix. Update the app to change it.'**
   String get textNewerFormat;
 
+  /// In place of a value a newer version of the app saved in a form this version does not know (ADR 0034): a Routine's schedule in the list of all Routines and Reminders and under its Note, a person's role in a Shared Area, a Profile or the name and picture given to a person; the value is kept as it is and cannot be changed here.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by a newer version of Old Brain Fix. Update the app to change it.'**
+  String get newerVersionNeeded;
+
   /// No description provided for @conflictOnThisDevice.
   ///
   /// In en, this message translates to:

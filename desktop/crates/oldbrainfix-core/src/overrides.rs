@@ -12,10 +12,10 @@ use std::collections::HashMap;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 
-use crate::Result;
 use crate::entry::Entry;
 use crate::profile::{PICTURE_MAX_BYTES, Profile, sanitize_name};
 use crate::store::Store;
+use crate::{Error, Result};
 
 /// The entity id's prefix, before the Profile id.
 pub const PREFIX: &str = "override:";
@@ -27,6 +27,11 @@ pub const NAME: &str = "overrideName";
 /// The picture the user gave the person, a Profile picture (JPEG) in
 /// base64; none for none.
 pub const PICTURE: &str = "overridePicture";
+
+/// The version of the Override's structure (ADR 0034): version 1 holds
+/// [`NAME`] and [`PICTURE`]; it is the default and never written, so it
+/// is absent.
+pub const VERSION: &str = "overrideVersion";
 
 /// The name and picture the user gave another person; none where they
 /// gave none.
@@ -86,7 +91,8 @@ impl Store {
 
     /// Gives the person `id` the `name` for the user alone, sanitised; an
     /// empty name takes it away, so their own shows again. Nothing for
-    /// the own Profile.
+    /// the own Profile; another name is refused while the Override
+    /// [`Store::override_is_newer`].
     pub fn set_override_name(&self, id: &str, name: &str) -> Result<()> {
         if self.is_own_person(id)? {
             return Ok(());
@@ -96,6 +102,7 @@ impl Store {
         if self.person_override(id)?.and_then(|o| o.name) == value {
             return Ok(());
         }
+        self.refuse_newer_override(id)?;
         let entity = format!("{PREFIX}{}", self.resolve_person(id)?);
         self.append(&entity, NAME, value.as_deref(), None)?;
         Ok(())
@@ -103,7 +110,8 @@ impl Store {
 
     /// Gives the person `id` the `picture` (a Profile picture) for the
     /// user alone; none takes it away, so their own shows again. Nothing
-    /// for the own Profile.
+    /// for the own Profile; another picture is refused while the Override
+    /// [`Store::override_is_newer`].
     pub fn set_override_picture(&self, id: &str, picture: Option<&[u8]>) -> Result<()> {
         if self.is_own_person(id)? {
             return Ok(());
@@ -111,9 +119,34 @@ impl Store {
         if self.person_override(id)?.and_then(|o| o.picture).as_deref() == picture {
             return Ok(());
         }
+        self.refuse_newer_override(id)?;
         let entity = format!("{PREFIX}{}", self.resolve_person(id)?);
         let value = picture.map(|p| BASE64.encode(p));
         self.append(&entity, PICTURE, value.as_deref(), None)?;
+        Ok(())
+    }
+
+    /// Whether the Override of the person `id` is of a structure this
+    /// version does not know: its [`VERSION`], as one of the user's own
+    /// Devices wrote it last, anything but absent or `1`. It shows as far
+    /// as it can and is changed only by a newer version of the app (ADR
+    /// 0034); what another person's Device wrote counts for nothing here
+    /// either.
+    pub fn override_is_newer(&self, id: &str) -> Result<bool> {
+        if self.is_own_person(id)? {
+            return Ok(false);
+        }
+        let entity = format!("{PREFIX}{}", self.resolve_person(id)?);
+        let version = self.own_current(&entity, VERSION, &mut HashMap::new())?;
+        Ok(!matches!(version.as_deref(), None | Some("1")))
+    }
+
+    fn refuse_newer_override(&self, id: &str) -> Result<()> {
+        if self.override_is_newer(id)? {
+            return Err(Error::Invalid(format!(
+                "the Override of {id} is of a structure not known here"
+            )));
+        }
         Ok(())
     }
 
@@ -468,6 +501,60 @@ mod tests {
         folder_sync(&h.ann, &mut folder, &mut random_nonce)?;
         folder_sync(&h.desk, &mut folder, &mut random_nonce)?;
         assert_eq!(h.desk.person_shown(&ben_id)?.name, "Mother");
+        Ok(())
+    }
+
+    #[test]
+    fn an_override_of_a_later_structure_shows_and_is_changed_only_there() -> TestResult {
+        let h = household()?;
+        let ben_id = own_id(&h.ben)?;
+        h.ann.set_override_name(&ben_id, MARKER)?;
+        // As Ann's desk of a later version writes it.
+        let later = h
+            .desk
+            .append(&format!("{PREFIX}{ben_id}"), VERSION, Some("2"), None)?;
+        let mut report = ImportReport::default();
+        h.ann.apply_entries(
+            &[later.wire()],
+            &h.desk.key_records()?,
+            Some(&h.desk.device_id()?),
+            &mut report,
+        )?;
+        assert!(h.ann.override_is_newer(&ben_id)?);
+        assert_eq!(h.ann.person_shown(&ben_id)?.name, MARKER);
+        let before = overrides(&h.ann)?;
+        assert!(h.ann.set_override_name(&ben_id, "Ben").is_err());
+        // The same name again, as a page left unchanged keeps it, is fine.
+        h.ann.set_override_name(&ben_id, MARKER)?;
+        assert!(h.ann.set_override_picture(&ben_id, Some(JPEG)).is_err());
+        assert_eq!(overrides(&h.ann)?, before);
+        assert!(!h.ann.override_is_newer(&own_id(&h.ann)?)?);
+        for (value, newer) in [(Some("1"), false), (None, false), (Some("x"), true)] {
+            h.ann
+                .append(&format!("{PREFIX}{ben_id}"), VERSION, value, None)?;
+            assert_eq!(h.ann.override_is_newer(&ben_id)?, newer, "{value:?}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_version_another_persons_device_wrote_locks_nothing() -> TestResult {
+        let h = household()?;
+        let ben_id = own_id(&h.ben)?;
+        // As a modified app would: Ben locks the name Ann gives him.
+        let forged = h
+            .ben
+            .append(&format!("{PREFIX}{ben_id}"), VERSION, Some("2"), None)?;
+        let mut report = ImportReport::default();
+        h.ann.apply_entries(
+            &[forged.wire()],
+            &[],
+            Some(&h.ben.device_id()?),
+            &mut report,
+        )?;
+        assert!(!h.ann.override_is_newer(&ben_id)?);
+        h.ann.set_override_name(&ben_id, MARKER)?;
+        assert_eq!(h.ann.person_shown(&ben_id)?.name, MARKER);
         Ok(())
     }
 

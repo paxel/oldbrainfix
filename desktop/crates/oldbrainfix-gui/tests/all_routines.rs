@@ -195,6 +195,37 @@ fn a_click_on_the_page_opens_the_routine_editor() -> TestResult {
 }
 
 #[test]
+fn a_routine_of_a_later_version_says_so_and_opens_its_note() -> TestResult {
+    use oldbrainfix_core::routines::keys;
+    let store = store()?;
+    let pills = Notes::new(&store).capture("Take the pills", None, None)?;
+    // As a Device of a later version writes it (ADR 0034).
+    let id = "routine:later";
+    store.batch(|| {
+        store.append(id, keys::TYPE, Some(keys::TYPE_ROUTINE), None)?;
+        store.append(id, keys::NOTE, Some(&pills.id), None)?;
+        store.append(id, keys::START, Some("2026-10-28"), None)?;
+        store.append(id, keys::TIMES, Some("08:00"), None)?;
+        store.append(id, keys::SCHEDULE_VERSION, Some("2"), None)?;
+        Ok(())
+    })?;
+    let mut app = App::new(store, "en");
+    app.select(Selection::AllRoutines);
+    let mut harness = window(app);
+    let notice = "Saved by a newer version of Old Brain Fix. Update the app to change it.";
+    assert!(shows(&harness, notice));
+    cards(&harness, "Take the pills")
+        .next()
+        .ok_or("its card")?
+        .click();
+    harness.run();
+    assert!(harness.state().routine_editor().is_none());
+    assert_eq!(harness.state().selected_note(), Some(pills.id.as_str()));
+    assert!(shows(&harness, notice), "under its Note too");
+    Ok(())
+}
+
+#[test]
 fn export_saves_one_calendar_file_of_all_of_them_in_the_pages_order() -> TestResult {
     let store = store()?;
     let routines = Routines::new(&store);

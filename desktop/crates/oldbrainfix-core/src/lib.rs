@@ -83,7 +83,7 @@ pub use pending::{
 pub use people::{PersonFilter, PersonTaken};
 pub use places::{AREA_ICONS, Area, NotesGo, Places, STARTER_SET, StarterPlace, Topic};
 pub use profile::{OwnProfile, Profile, ProfileChoice, SentProfile};
-pub use routines::{Agenda, AgendaRow, Routine, Routines};
+pub use routines::{Agenda, AgendaRow, NewerRoutine, Routine, Routines};
 pub use schedule::{
     ClockTime, Day, Occurrence, Recurrence, RepeatEnd, RepeatKind, RepeatUnit, Schedule,
     SimpleRepeat, WallClock,

@@ -200,6 +200,12 @@ class _PersonScreenState extends State<PersonScreen> {
   var _verified = false;
   var _blocked = false;
 
+  /// Whether a newer version of the app saved their Profile, or the name
+  /// and picture given to them, in a form this one does not know (ADR
+  /// 0034); the latter is then not changed here.
+  var _newer = false;
+  var _overrideNewer = false;
+
   /// Whether "Send changes" shows: changes travel with them by bundles
   /// (#108), and they are not blocked.
   var _sendsChanges = false;
@@ -234,6 +240,8 @@ class _PersonScreenState extends State<PersonScreen> {
     _verified = store.personVerified(widget.id);
     _blocked = store.isBlocked(widget.id);
     _sendsChanges = store.sendsByBundle(widget.id);
+    _newer = store.personIsNewer(widget.id);
+    _overrideNewer = store.overrideIsNewer(widget.id);
   }
 
   @override
@@ -265,6 +273,7 @@ class _PersonScreenState extends State<PersonScreen> {
   /// Keeps the typed name for the user alone, sanitised, and shows it as
   /// kept.
   void _saveName() {
+    if (_overrideNewer) return;
     widget.store.setOverrideName(widget.id, _name.text);
     final kept = _override?.name ?? '';
     if (_name.text != kept) _name.text = kept;
@@ -391,6 +400,7 @@ class _PersonScreenState extends State<PersonScreen> {
   /// Offers where the picture for the user comes from, where the finger
   /// is.
   Future<void> _pictureMenu(Offset at) async {
+    if (_overrideNewer) return;
     final t = context.t;
     final camera = PhotoScope.of(context);
     final overlay =
@@ -412,6 +422,9 @@ class _PersonScreenState extends State<PersonScreen> {
       ],
     );
     if (picked == null || !mounted) return;
+    // A newer version may have saved it meanwhile (ADR 0034).
+    setState(_read);
+    if (_overrideNewer) return;
     if (picked == 'theirs') {
       widget.store.setOverridePicture(widget.id, null);
       setState(_read);
@@ -427,6 +440,10 @@ class _PersonScreenState extends State<PersonScreen> {
       ),
     );
     if (made == null || !mounted) return;
+    if (widget.store.overrideIsNewer(widget.id)) {
+      setState(_read);
+      return;
+    }
     widget.store.setOverridePicture(widget.id, made);
     setState(_read);
   }
@@ -490,6 +507,15 @@ class _PersonScreenState extends State<PersonScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
+              if (_newer)
+                Padding(
+                  key: const ValueKey('personNewer'),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                  child: Text(
+                    t.newerVersionNeeded,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               if (_offerBack && !blocked) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
@@ -573,8 +599,10 @@ class _PersonScreenState extends State<PersonScreen> {
                   message: t.personForMePicture,
                   child: GestureDetector(
                     key: const ValueKey('overridePicture'),
-                    onTapUp: (details) =>
-                        unawaited(_pictureMenu(details.globalPosition)),
+                    onTapUp: _overrideNewer
+                        ? null
+                        : (details) =>
+                              unawaited(_pictureMenu(details.globalPosition)),
                     child: ProfileAvatar(profile: shown, size: 72),
                   ),
                 ),
@@ -585,6 +613,7 @@ class _PersonScreenState extends State<PersonScreen> {
                   key: const ValueKey('overrideName'),
                   controller: _name,
                   focusNode: _nameFocus,
+                  readOnly: _overrideNewer,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
@@ -594,6 +623,12 @@ class _PersonScreenState extends State<PersonScreen> {
                   onSubmitted: (_) => setState(_saveName),
                 ),
               ),
+              if (_overrideNewer)
+                Padding(
+                  key: const ValueKey('overrideNewer'),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                  child: Text(t.newerVersionNeeded),
+                ),
             ],
           ),
         ),
@@ -625,6 +660,10 @@ class _PeopleSectionState extends State<PeopleSection> {
   /// again.
   late List<Profile> _people;
   late List<Profile> _blocked;
+
+  /// The people a newer version of the app saved a Profile or an
+  /// Override of in a form this one does not know (ADR 0034).
+  Set<String> _newer = const {};
   late bool _blockedOpen;
 
   @override
@@ -638,6 +677,10 @@ class _PeopleSectionState extends State<PeopleSection> {
     final store = widget.store;
     _people = store.peopleShown;
     _blocked = store.blockedPeople;
+    _newer = {
+      for (final p in _people)
+        if (store.personIsNewer(p.id) || store.overrideIsNewer(p.id)) p.id,
+    };
     _blockedOpen = store.localSetting(_blockedOpenKey) == 'true';
   }
 
@@ -695,6 +738,9 @@ class _PeopleSectionState extends State<PeopleSection> {
             key: ValueKey('people-${person.id}'),
             leading: ProfileAvatar(profile: person, size: 40),
             title: Text(profileDisplayName(t, person.name)),
+            subtitle: _newer.contains(person.id)
+                ? Text(t.newerVersionNeeded)
+                : null,
             onTap: () => openPerson(context, person.id),
           ),
         if (blocked.isNotEmpty)
