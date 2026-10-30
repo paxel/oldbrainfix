@@ -66,6 +66,9 @@ struct Texts {
     /// The capture field's hint, and a thought typed into it.
     hint: &'static str,
     capture: &'static str,
+    /// A Note with a typo, and its text as an AI Task fixes it.
+    typo: &'static str,
+    fixed: &'static str,
 }
 
 const EN: Texts = Texts {
@@ -88,6 +91,8 @@ const EN: Texts = Texts {
     garage: "Call the garage about the winter tyres",
     hint: "What's on your mind?",
     capture: "Ask Dana if she still needs the ladder",
+    typo: "Pick up the parcel for Dana at the post office tomorow",
+    fixed: "Pick up the parcel for Dana at the post office tomorrow",
 };
 
 const DE: Texts = Texts {
@@ -110,6 +115,8 @@ const DE: Texts = Texts {
     garage: "Werkstatt wegen der Winterreifen anrufen",
     hint: "Was geht dir durch den Kopf?",
     capture: "Dana fragen, ob sie die Leiter noch braucht",
+    typo: "Packet für Dana morgen bei der Post abhohlen",
+    fixed: "Paket für Dana morgen bei der Post abholen",
 };
 
 /// A store with a few days of a household's and a job's Notes and
@@ -315,7 +322,19 @@ fn window(
     locale: &str,
     theme: egui::Theme,
 ) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
-    let (store, _) = demo(x)?;
+    window_with(x, locale, theme, |_, _| Ok(()))
+}
+
+/// The window as [`window`] opens it, once `prepare` changed the demo
+/// store, given with the ids of its filed Notes.
+fn window_with(
+    x: &Texts,
+    locale: &str,
+    theme: egui::Theme,
+    prepare: impl FnOnce(&Store, &[String]) -> oldbrainfix_core::Result<()>,
+) -> Result<Harness<'static, App>, Box<dyn std::error::Error>> {
+    let (store, ids) = demo(x)?;
+    prepare(&store, &ids)?;
     let mut app = App::new(store, locale);
     app.set_wall_clock(Arc::new(utc));
     let mut harness = Harness::builder()
@@ -356,6 +375,26 @@ fn guide_frames() -> TestResult {
             harness.get_by(|n| n.is_focused()).type_text(texts.capture);
             harness.run();
             problems.extend(match_frame(&mut harness, &frame("capture"))?);
+            // An AI Task that fixed a typo and filed two Unsorted Notes
+            // into the Household waits for its review: since before the
+            // window opened, so the review shows at once.
+            let mut harness = window_with(texts, language, theme, |store, ids| {
+                let notes = Notes::new(store);
+                let parcel = notes.capture(texts.typo, None, None)?;
+                let household = Places::new(store)
+                    .areas()?
+                    .into_iter()
+                    .find(|a| a.name == texts.household)
+                    .map(|a| a.id)
+                    .unwrap_or_default();
+                let task = store.open_ai_task()?;
+                store.drafting(&task, || {
+                    notes.edit(&parcel.id, texts.fixed)?;
+                    notes.file(&parcel.id, &household)?;
+                    notes.file(&ids[5], &household)
+                })
+            })?;
+            problems.extend(match_frame(&mut harness, &frame("ai-review"))?);
         }
     }
     assert!(

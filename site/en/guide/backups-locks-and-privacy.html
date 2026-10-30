@@ -1,0 +1,152 @@
+<!-- page: title="Backups, locks and privacy" track="guide" order=7 summary="Backups and the Recovery Sheet, the passphrase and the recovery key, restoring, Google backup, the App Lock and Area Locks, blocking a person, and what the app keeps where." -->
+<p class="lede">
+  Backups are encrypted files of everything on a Device, opened with your passphrase or with the
+  recovery key on the Recovery Sheet. The App Lock and the Area Locks keep others from browsing your
+  Notes on the phone, and a block keeps a person's writing off your Devices.
+</p>
+
+<h2>Backups</h2>
+<p>
+  On the Profile page, under Backups and recovery, <strong>Back up this Device</strong> opens
+  Backups. "A Backup is an encrypted file of all your Areas, Notes, photos, voice recordings,
+  Routines and their history. Only your passphrase, or the recovery key on the Recovery Sheet, opens
+  it. This Device's settings stay out, except the playback speed. All your Devices share one
+  passphrase and one recovery key, and each writes Backups of its own."
+</p>
+
+<h3>Setting up</h3>
+<p>
+  Type a passphrase into <strong>Passphrase</strong> and again into <strong>Passphrase
+  again</strong>: at least 8 characters, and a short sentence is easy to remember. <strong>Set up
+  Backups</strong> takes a few seconds. Set up on another of your Devices already, they need no
+  setting up here: sync with that Device, and this one takes the same passphrase and recovery key.
+</p>
+
+<h3>The Recovery Sheet</h3>
+<p>
+  The Recovery Sheet is a PDF page with your recovery key, as text and as a QR code. The recovery
+  key opens the Backups of all your Devices, also when the passphrase is forgotten, so whoever holds
+  it can read them: keep the sheet somewhere safe, in a drawer or a password manager, never next to
+  the Backups. <strong>Print or save</strong> opens the print dialog, <strong>Share</strong> hands
+  the PDF to the app you pick. The Backups page offers both at any time, not only after setting up.
+  The sheet also says how to restore.
+</p>
+
+<h3>The folder</h3>
+<p>
+  "Backups go into a folder you choose: on this Device, on a USB stick or in a cloud app."
+  <strong>Choose folder</strong> picks it and writes the first Backup into it at once. Then:
+</p>
+<ul>
+  <li><strong>Back up every week</strong>, on by default: "The last 4 Backups of this Device are kept; older ones go." Backups of your other Devices in the same folder are left alone.</li>
+  <li><strong>Back up now</strong> writes one at once.</li>
+  <li>The page shows when the last Backup was written, or that the last one could not be written, with the question whether the folder is still there.</li>
+</ul>
+<p>
+  Each Backup is a file named after the time it was written, ending in <code>.obfbackup</code>.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/backups.png" alt="Backups set up: the Recovery Sheet with Print or save and Share, and the folder with Back up every week, the last Backup and Back up now" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/backups.png" alt="Backups set up: the Recovery Sheet with Print or save and Share, and the folder with Back up every week, the last Backup and Back up now" width="648" height="1152" loading="lazy">
+  <figcaption>Backups, set up, with a folder chosen.</figcaption>
+</figure>
+
+<h3>Google backup</h3>
+<p>
+  On an Android phone, Backups also offer <strong>Also keep the newest Backup in my Google
+  account</strong>, off by default. "Android's own backup then keeps the newest Backup file,
+  encrypted as it is, in your Google account, and nothing else of the app. On a new phone it comes
+  back with your apps, and the app asks for the passphrase or the recovery key." With it on, the
+  weekly Backup needs no folder. Google takes at most 25 MB: a larger Backup is not kept there, and
+  the page says so; a folder still takes it.
+</p>
+
+<h3>Restoring</h3>
+<p>
+  A Backup is restored on the first start of a Device that holds no Notes yet, with
+  <strong>Restore from a Backup</strong> (see <a href="getting-started.html#restore-from-a-backup">Getting
+  started</a>): choose the Backup file, then type the passphrase, or type or scan the recovery key
+  from the Recovery Sheet. Settings such as alarms, Quiet Hours and locks are not in a Backup; set
+  them again afterwards, choose the Backup folder again and pair your other Devices again.
+</p>
+
+<h2>The App Lock</h2>
+<p>
+  Settings, under Privacy: <strong>App Lock</strong> "asks for the PIN before showing your Notes.
+  Capture and alarms never need it." While the app is locked, it shows "Old Brain Fix is locked"
+  with the PIN field and <strong>Unlock</strong>; its "+" fans out the ways to capture as on the
+  Agenda, without unlocking.
+</p>
+<ul>
+  <li>The PIN has at least 4 digits and is asked for twice when a lock is first switched on. It unlocks the App Lock and the Area Locks on this phone. <strong>Change PIN</strong> changes it.</li>
+  <li><strong>Unlock with fingerprint or screen lock</strong> shows where the phone has them. The PIN always works as well.</li>
+  <li><strong>Lock again after</strong>: how long the app may be in the background before it locks again, <strong>At once</strong>, or after 1, 5 or 15 minutes; 1 minute by default.</li>
+  <li>Turning a lock off and changing the PIN ask for the PIN or the fingerprint first.</li>
+</ul>
+<p>
+  Behind the App Lock, a Sent Item opened from another app, a Profile card link and a tap on the
+  Changes Nudge wait until the app is unlocked.
+</p>
+
+<h2>Area Locks</h2>
+<p>
+  Under the App Lock, <strong>Area Locks</strong> lists every Area with its switch. "A locked Area
+  and its Notes stay hidden until you unlock it." In the Areas list, a locked Area asks for the PIN or
+  the fingerprint when it is opened; it stays open until the app locks again or you are back on the
+  Agenda. <strong>Unlock {Area} for good</strong> asks the same before a lock goes off.
+</p>
+<p>
+  While an Area is locked, "Alarms and Agenda show" chooses:
+</p>
+<ul>
+  <li><strong>Masked</strong>, the default: its Occurrences show in notifications and on the Agenda as "Private Routine, 08:00" or "Private Reminder", without the Note's text, and can be checked off all the same. On the Agenda, a Frog and a Shopping List of a Masked Area show as "Private Frog" and "Private Shopping List", and a Session's pick from it as "Private Tally".</li>
+  <li><strong>In full</strong>: they show as for any other Area. Choosing it asks for the PIN or the fingerprint.</li>
+</ul>
+<p>
+  A Routine of a Masked Area written into your calendar shows there as "Private Routine". A Note of
+  a locked Area is never handed to another app while the Area is closed.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/area-locks.png" alt="Area Locks: Car unlocked, Household locked and Masked, Work locked and shown in full" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/area-locks.png" alt="Area Locks: Car unlocked, Household locked and Masked, Work locked and shown in full" width="648" height="1152" loading="lazy">
+  <figcaption>Area Locks: Household locked and Masked, Work locked and shown in full.</figcaption>
+</figure>
+<p>
+  The locks and the PIN are settings of the phone they were set on: they are not synced and not in a
+  Backup.
+</p>
+
+<h2>Block a person</h2>
+<p>
+  On another person's Profile, <strong>Block</strong> sits on the bar; a Sent Item's or a shared
+  Area's preview offers <strong>Decline and block</strong>. "Everything {name} wrote is deleted from
+  your Devices, except their check-offs, and nothing more of theirs is kept. A shared folder can
+  still hold their encrypted files, which the app never opens; leaving the folder removes them."
+</p>
+<ul>
+  <li>The block goes to all of your own Devices. Nothing they write afterwards is kept or shown, in any Shared Area and from any Device that passes it on, and no Sent Item of theirs is shown. Their check-offs stay, without their name or picture.</li>
+  <li>The person is not told.</li>
+  <li>Blocking a Manager of a Shared Area you are in means leaving that Area: the dialog names the Areas and offers <strong>Block and leave</strong>. What the Area held stays on your Devices.</li>
+  <li>Blocked people leave People and are listed in the fold <strong>Blocked</strong> under it, without their picture. <strong>Unblock</strong> on their Profile: "What they wrote comes back with the next sync with a Device that still holds it."</li>
+  <li>Notes you accepted from them as Sent Items before the block stay.</li>
+</ul>
+
+<h2>What the app keeps where</h2>
+<p>
+  Everything you capture stays on your own Devices: on the Device you captured it on, on the Devices
+  you paired with it, and, for a Note in a Shared Area, on the Devices of that Area's people.
+  Settings stay on each Device. There is no server and no account. The
+  <a href="../reference/privacy-policy.html">privacy policy</a> lists what the app stores, when it
+  goes online and what each permission is used for.
+</p>
+
+<h2>On the desktop</h2>
+<ul>
+  <li>Backups are a card on the Profile page, set up with the same passphrase or taken from another of your Devices in a sync. <strong>Save the Recovery Sheet…</strong> saves the PDF to print from there.</li>
+  <li>The folder, <strong>Back up every week</strong> and <strong>Back up now</strong> work as on the phone; the weekly Backup is written for as long as the app runs, also in the tray. There is no Google backup.</li>
+  <li>A Backup is restored on the desktop's first start (see <a href="getting-started.html#on-the-desktop">Getting started</a>).</li>
+  <li>The desktop has no App Lock and no Area Locks.</li>
+  <li><strong>Block</strong> and <strong>Unblock</strong> are at the end of a person's Profile.</li>
+</ul>

@@ -1,0 +1,290 @@
+<!-- page: title="Sharing and sync" track="guide" order=6 summary="People and Profile cards, Shared Areas in person and from afar, Sent Items, pairing your Devices, LAN sync, the shared folder, bundles and the Changes Nudge, Pending Changes and Conflicts." -->
+<p class="lede">
+  Your own Devices sync everything with each other. Other people get only what you give them: an Area
+  you share, or a single Note you send. There is no server; changes travel over your home network,
+  through a shared folder or as files through any messenger, encrypted.
+</p>
+
+<h2>Your Profile and People</h2>
+<p>
+  The Profile picture in the Agenda's top corner opens the Profile page: your picture, your name and
+  your code, then <strong>Backups and recovery</strong>, <strong>Your Devices</strong>,
+  <strong>People</strong> and <strong>Settings of this Device</strong>. Your Profile is the same on
+  all of your Devices. A tap on the picture changes it: <strong>Choose a picture</strong>,
+  <strong>Take a photo</strong>, or <strong>Show initials instead</strong> while it has a picture.
+</p>
+
+<h3>Profile cards</h3>
+<p>
+  A Profile card is your name and the id of your Profile, without the picture. It adds you to another
+  person's People; it never shares an Area. On the Profile page:
+</p>
+<ul>
+  <li><strong>Send my Profile</strong> sends it as a link through the app you pick, such as a messenger.</li>
+  <li><strong>Show my QR</strong> shows it as a QR code for someone next to you to scan.</li>
+</ul>
+<p>
+  Under People, <strong>Add a person</strong> takes someone else's card: <strong>Scan their
+  QR</strong> with the camera, <strong>QR from a picture</strong> such as a screenshot, or the link
+  pasted into <strong>Their Profile link</strong> and <strong>Add</strong>. A card link tapped in
+  another app opens in Old Brain Fix as well (see <a href="../reference/profile-card.html">Profile
+  card</a>). Their Profile then opens; a person new to you is offered <strong>Send yours
+  back</strong>, so they can add you too.
+</p>
+
+<h3>Verified or not</h3>
+<p>
+  Every Profile has a short code of eight characters, made from its id and its first key.
+  A person is verified once you made sure in person that the code is theirs:
+</p>
+<ul>
+  <li>Their QR scanned with the camera marks them verified at once.</li>
+  <li><strong>Compare codes</strong> asks you to have them read out the code on their own Profile page. <strong>Codes match</strong> marks them verified; <strong>Codes differ</strong> says that this Profile may not be the person it names, and leaves it unverified.</li>
+</ul>
+<p>
+  A card that came as a link, or as a QR in a picture, adds the person as "Not verified: compare
+  codes in person to be sure." Sent Items and shared Areas from them say whether they are verified.
+</p>
+
+<h3>A person's Profile</h3>
+<p>
+  A tap on a person in People, or on their picture anywhere it shows, opens their Profile: their
+  picture, name and code, whether they are verified, with <strong>Compare codes</strong> while they
+  are not, and <strong>Their Notes</strong>, every Note they wrote that you can see. Under
+  <strong>Name and picture for me</strong> you give them a name and a picture only you see, on your
+  own Devices, such as "Mum"; their own name and picture stay as they are.
+  <strong>Block</strong> is on the bar (see <a href="backups-locks-and-privacy.html#block-a-person">Block a person</a>).
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/person.png" alt="Lena's Profile: her code, not verified with Compare codes, Their Notes, Send changes to Lena, and Name and picture for me" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/person.png" alt="Lena's Profile: her code, not verified with Compare codes, Their Notes, Send changes to Lena, and Name and picture for me" width="648" height="1152" loading="lazy">
+  <figcaption>Another person's Profile, added from a link and not verified yet.</figcaption>
+</figure>
+
+<h2>Shared Areas</h2>
+<p>
+  A Shared Area is an Area other people sync with. Only that Area goes to them, with its Topics,
+  Notes, Routines, Reminders and their history; everything outside it stays private. In the Areas
+  list, ⋮ next to an Area offers <strong>Share…</strong> to its owner and its Managers, and
+  <strong>People</strong> once it is shared. A Shared Area shows the names of its people under it.
+</p>
+
+<h3>Roles</h3>
+<ul>
+  <li><strong>Manager</strong>: everything in the Area.</li>
+  <li><strong>Member</strong>: adds Notes and changes their own, adds to any Note, checks off Occurrences and Frogs, and adds and checks Lines of any Checklist or Shopping List. A Member does not change Routines, Reminders, Frogs, other people's Notes or the Lines of their Checklists and Shopping Lists.</li>
+</ul>
+<p>
+  The first to share an Area is its first Manager. Under ⋮, <strong>People</strong> lists everyone
+  in it with their role. A Manager has <strong>Make Manager</strong> or <strong>Make Member</strong>,
+  and <strong>Remove</strong>, for everyone else: nothing more of the Area goes to a person removed,
+  and what they already have stays with them.
+</p>
+
+<h3>In person</h3>
+<p>
+  <strong>Share…</strong> opens the share page. Pick <strong>Member</strong> or
+  <strong>Manager</strong> under "They may", then meet the other person, both Devices on the same
+  Wi-Fi:
+</p>
+<ul>
+  <li>On their Device, they open Sync and show its code. You tap <strong>Scan the code</strong>, or type it into <strong>Pair code</strong> and tap <strong>Invite</strong>.</li>
+  <li>Or you tap <strong>Show this Device's code</strong>, and they scan it in Sync on their Device.</li>
+</ul>
+<p>
+  Nobody types a name. Once the Devices met, their Profile shows with its code: "Compare the code
+  with the one on their Profile page. Only then is anything shared." <strong>Share</strong> gives
+  their Device this Area and nothing else, and the Area shows as shared from then on. A phone shares
+  with a phone as well as with a computer.
+</p>
+
+<h3>From afar</h3>
+<p>
+  Under "Someone not nearby", <strong>Share with…</strong> lists the people in People the Area can
+  go to, those not verified marked "Not verified". Pick one, with the role chosen above. The first
+  time, the app asks "How do changes travel with {name}?":
+</p>
+<ul>
+  <li><strong>A shared folder you both reach</strong>: Nextcloud, Syncthing or a USB folder; changes travel on their own. Without a shared folder yet, you choose one.</li>
+  <li><strong>Files through a messenger</strong>: you send changes as a file from their Profile page.</li>
+</ul>
+<p>
+  The offer goes as a file through the app you pick. The question is asked only when this Device can
+  use a shared folder; otherwise changes travel as files.
+</p>
+<p>
+  The person who gets the offer opens the file with Old Brain Fix. Their Agenda shows "1 shared Area
+  waiting" until they decide; its preview says who shares which Area as what, and how changes travel.
+  "Nothing of the Area is kept until you accept." <strong>Compare codes</strong> marks the sharer
+  verified on Accept. <strong>Accept</strong> takes the Area in, and asks for the shared folder when
+  changes travel through one and none is chosen yet; <strong>Decline</strong> keeps nothing;
+  <strong>Decline and block</strong> keeps nothing and blocks the sharer. Until the person accepts,
+  and also after a decline, they are listed among the Area's people, and you remove them as anyone
+  else.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/share-area.png" alt="Share Household: the roles Member and Manager, Scan the code, the Pair code field with Invite, Show this Device's code, and Share with… for someone not nearby" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/share-area.png" alt="Share Household: the roles Member and Manager, Scan the code, the Pair code field with Invite, Show this Device's code, and Share with… for someone not nearby" width="648" height="1152" loading="lazy">
+  <figcaption>Sharing an Area, in person or with someone not nearby.</figcaption>
+</figure>
+
+<h2>Sent Items and sharing to an app</h2>
+<p>
+  A Note's ⋮ on its card, and the bar of the Note editor, hold two ways to hand a Note on:
+</p>
+<ul>
+  <li><strong>Share to an app</strong> hands the Note to another app, such as a messenger or mail: its text and its Sections, each under its date, and the photos and recordings this Device holds, as files. Nothing of it is encrypted, and the other side needs no Old Brain Fix.</li>
+  <li><strong>Send to a person</strong> sends the Note as a Sent Item to another person with Old Brain Fix, outside any Shared Area.</li>
+</ul>
+
+<h3>Sending</h3>
+<p>
+  "Who gets it?" offers each person whose Device's keys are known here, "{name}, encrypted", and
+  <strong>Anyone, not encrypted</strong>: whoever gets that file can read it. "It carries the text,
+  the Sections and the Routines and Reminders; no photos, recordings or where it was captured."
+  <strong>Send</strong> hands the file to the app you pick. Sending the same Note again sends it as
+  an update; <strong>Send a cancellation instead</strong> lets them move it to their trash, with its
+  alarms off.
+</p>
+
+<h3>Receiving</h3>
+<p>
+  A Sent Item opened with Old Brain Fix shows its preview: who sent it, whether they are verified
+  ("Verified: code compared in person", "Not verified: known here, code not compared yet" or "Not
+  verified: this Profile is new here", each with the code), whether it came encrypted, and its text,
+  Sections, Routines and Reminders. <strong>Accept</strong> adds it to Unsorted with its alarms on,
+  and the sender to People; <strong>Decline</strong> keeps nothing; <strong>Decline and
+  block</strong> keeps nothing and blocks the sender.
+</p>
+<p>
+  An update shows "What changes", such as a Routine moved from one time to another, and
+  <strong>Apply update</strong>. Your own Sections, Routines and Reminders, Done marks, Importance
+  and where you filed the Note stay as they are; a text you changed yourself is replaced. A
+  cancellation offers <strong>Move to the trash</strong>, from where the Note can be restored. Only
+  the sender can update or cancel what they sent.
+</p>
+<p>
+  A Sent Item from someone not among your People is held: the Agenda shows "1 Sent Item waiting",
+  and its preview says only who it is from, "An unknown person: not among your People." "What they
+  sent stays hidden until you tap Show." <strong>Accept</strong>, <strong>Decline</strong> and
+  <strong>Decline and block</strong> work before <strong>Show</strong> too; Show is not remembered,
+  so the item is hidden again the next time it opens.
+</p>
+
+<h2>Your Devices</h2>
+<p>
+  On the Profile page, under Your Devices, <strong>Sync with another Device</strong> opens Sync.
+  Devices of your own pair once by code; both then hold the same Notes, Areas and Routines. Settings
+  stay on each Device and are never synced.
+</p>
+
+<h3>Pairing</h3>
+<p>
+  Both Devices are on the same Wi-Fi. Either one shows its code and the other scans or types it, in
+  both directions, also from phone to phone:
+</p>
+<ul>
+  <li><strong>Show this Device's code</strong> shows a QR code with the code to type under it, for as long as the page is open.</li>
+  <li>On the other Device, <strong>Scan the code</strong>, or type it into <strong>Pair code</strong> and tap <strong>Sync now</strong>.</li>
+</ul>
+<p>
+  The Device showing the code asks "Let {name} join?": "It gets everything on this Device and syncs
+  with it from then on. Say yes only to a Device of your own." <strong>Let it join</strong> pairs
+  them. A code that points outside your home network is refused. When both Devices had a Profile of
+  their own, the app asks "Which one is you?"; the one you pick is kept on all of your Devices.
+</p>
+
+<h3>Sync on your network</h3>
+<p>
+  "Paired Devices on the same Wi-Fi sync on their own, while the app is open and every quarter of an
+  hour in the background." Under Paired Devices, Sync lists each one with when it last synced,
+  <strong>Forget</strong>; a Device that can be found on the network also has the switch <strong>Sync
+  automatically</strong>, on by default. Another
+  person's Device, met by sharing an Area in person, shows as "Another person's Device" and gets
+  only the Areas shared with them.
+</p>
+
+<h3>The shared folder</h3>
+<p>
+  "Syncs through a folder that Syncthing, Nextcloud or a USB stick carries between your Devices,
+  wherever they are. Everything in it is encrypted: only Devices paired with this one can read it."
+  <strong>Choose folder</strong> picks it and syncs through it at once; Sync then shows when it last
+  synced and what came in, and <strong>Forget</strong> stops using it. A Device pairs once in person
+  before it can read the folder: files from a Device this one is not paired with are counted and left
+  unread. A Shared Area uses whatever shared folder both people reach; the other person reads that
+  Area's files there and nothing else.
+</p>
+
+<h3>Bundles</h3>
+<p>
+  A bundle "sends what is new as one file through any messenger or mail, and the other Device
+  imports it." Under Sync bundle, <strong>For</strong> picks a paired Device or
+  <strong>Everything</strong>; <strong>Send bundle</strong> hands the file to the app you pick, and
+  <strong>Import bundle</strong> takes one in. A bundle opened with Old Brain Fix from a messenger or
+  a file manager is imported as well. It too is encrypted, and only a paired Device can read it.
+</p>
+
+<h3>The Changes Nudge</h3>
+<p>
+  With a person whose changes travel as files, nothing moves until you send them. Their Profile page
+  shows <strong>Send changes to {name}</strong>, "As a file through any messenger": a bundle with
+  what is new in the Areas shared with them, for all of their Devices.
+</p>
+<p>
+  The Changes Nudge reminds you: a notification such as "Changes for Bob and Carol", 30 minutes after
+  the first change no bundle carried to them yet, one for everyone waiting. It comes again as the
+  Nudge does, at the Nudge's repeat time, and waits during Quiet Hours. A tap on it offers each
+  person's bundle in turn, one app picker after another; a picker left without an app keeps the
+  Changes Nudge for that person.
+</p>
+
+<h2>Pending Changes</h2>
+<p>
+  Some changes wait for your decision before anything of them is kept: an Area offered to you from
+  afar, a Sent Item from someone not among your People, and, on the desktop, an AI Task. They wait,
+  also across a restart, until you accept or decline them; declining leaves nothing behind.
+</p>
+
+<h2>Conflicts</h2>
+<p>
+  When two Devices changed the same thing before they synced, the newer version shows, and Sync
+  lists a Conflict: a Note's text, text added to a Note, a Line of a Checklist or Shopping List, the
+  name of an Area, a Topic or a Named Place, a Named Place's radius, or a Routine's schedule. Each
+  version says on which Device and when it was written; a tap on <strong>Keep this version</strong>
+  keeps that one. A sync that brought Conflicts says so at the top, and a tap there leads to them.
+</p>
+
+<h2>On the desktop</h2>
+<ul>
+  <li>The Profile picture in the Agenda's corner opens the Profile page with the same parts. <strong>Copy my Profile link</strong> copies your card for a message, <strong>Show my QR</strong> shows it to scan, and <strong>Add a person from a link</strong> takes a pasted card.</li>
+  <li><strong>Share…</strong> on an Area asks for the role; <strong>Show the code</strong> then shows this computer's code for the other person's phone to scan in Sync, and their Profile shows here to confirm. <strong>Share with…</strong> saves the offer as a file to send.</li>
+  <li><strong>Send…</strong> in the Note editor saves a Sent Item as a file to send through any messenger or mail. <strong>Copy as text</strong> and <strong>Save as Markdown…</strong> hand a Note to other programs, Markdown with its photos and recordings beside it.</li>
+  <li>Sync shows this computer's code, as a QR code and as text with its PIN, while the page is open; a phone that is not paired yet is asked about first, <strong>Trust</strong> or <strong>Refuse</strong>. A phone's code is typed into <strong>Pair code</strong> and joined with <strong>Sync with this code</strong>. "Paired Devices on the same network sync on their own for as long as this app runs, also in the tray."</li>
+  <li>The shared folder has <strong>Sync now</strong>. <strong>Save bundle…</strong> and <strong>Import bundle…</strong> save and open bundles; a bundle or a Sent Item dropped onto the window is opened too. The Conflicts are listed in Sync, each version a button that keeps it.</li>
+  <li>A click on the Changes Nudge opens a save dialog for each person waiting, one after another.</li>
+</ul>
+
+<h3>The AI Task</h3>
+<p>
+  On the desktop, an AI model of your choice can work on your Notes for one task, such as fixing
+  typos. Settings, <strong>Open the AI port</strong> opens a port reachable only from this computer
+  with its token, and shows its address with ways to copy what a client needs: <strong>Copy client
+  config</strong> for MCP clients that connect over HTTP, <strong>Copy the command for Claude
+  Code</strong> and <strong>Copy the config for Claude Desktop</strong>. While the port is open and
+  until the review, sync is paused, and a banner says so.
+</p>
+<p>
+  <strong>Done, review</strong> closes the port and opens "Review the AI Task": every change, grouped
+  by kind, such as Notes filed and Texts changed, each with its before and after. "Nothing of this is
+  kept until you accept it." <strong>Accept all</strong> keeps every change; <strong>Reject
+  all</strong> asks once and keeps none. Where you changed something yourself after the AI did, your
+  edit stays, marked "Your edit stays". One AI Task runs at a time.
+</p>
+
+<figure class="frame">
+  <img class="shot-light" src="../../assets/frames/desktop/en/light/ai-review.png" alt="Review the AI Task: two Notes filed into Household and a typo fixed, each with before and after, Accept all and Reject all" width="1280" height="800" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/desktop/en/dark/ai-review.png" alt="Review the AI Task: two Notes filed into Household and a typo fixed, each with before and after, Accept all and Reject all" width="1280" height="800" loading="lazy">
+  <figcaption>The review of an AI Task in the desktop app.</figcaption>
+</figure>

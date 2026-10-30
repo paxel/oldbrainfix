@@ -26,16 +26,22 @@ import 'package:oldbrainfix/src/alarm_platform.dart';
 import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/bundle_platform.dart';
 import 'package:oldbrainfix/src/capture_screen.dart';
+import 'package:oldbrainfix/src/backup_screen.dart';
 import 'package:oldbrainfix/src/first_start_screen.dart';
+import 'package:oldbrainfix/src/folder_platform.dart';
+import 'package:oldbrainfix/src/lock_settings.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
+import 'package:oldbrainfix/src/person_screen.dart';
 import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
+import 'package:oldbrainfix/src/share_area_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
 import 'package:oldbrainfix/src/table_screen.dart';
 import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import '../backup_test.dart' show DirFolders, quickKey;
 import '../bundle_test.dart' show FakeBundles;
 import '../fake_alarms.dart';
 import '../fake_photos.dart';
@@ -222,7 +228,15 @@ class _Seeded {
   /// With [lists], the Household also holds a Checklist, a Shopping List
   /// and a Tally with its entries, for the guide's frames of them.
   /// With [formatted], it holds a formatted Note and one with a table.
-  factory _Seeded(_Texts x, {bool lists = false, bool formatted = false}) {
+  /// With [people], the user's Profile is Sam's and Lena is in People;
+  /// with [shared] too, Work is shared with her from afar.
+  factory _Seeded(
+    _Texts x, {
+    bool lists = false,
+    bool formatted = false,
+    bool people = false,
+    bool shared = false,
+  }) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
     final store = Store.inMemory(clock: () => clock)
@@ -231,6 +245,7 @@ class _Seeded {
     final snack = _seed(store, x, (at) => clock = at);
     if (lists) _seedLists(store, x, (at) => clock = at);
     if (formatted) _seedFormatted(store, x, (at) => clock = at);
+    if (people || shared) _seedPeople(store, shared: shared);
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
     Alarms(store).markSeen();
@@ -488,6 +503,39 @@ void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
   notes.capture(x.formatted, format: TextFormats.markdown, place: household.id);
 }
 
+/// The user's own Profile as Sam's, and Lena in People from her Profile
+/// card, sent through a messenger, so not verified. With [shared], Work
+/// is shared with her from afar as a Member, its changes travelling by
+/// bundles.
+void _seedPeople(Store store, {required bool shared}) {
+  store
+    ..applyProfileDefaults(name: 'Sam')
+    ..renameOwnProfile('Sam');
+  // Her key from a fixed seed: the same short code on every run.
+  final lena =
+      Store.inMemory(
+          clock: () => _now,
+          newKey: () => SigningKey.fromSeed(
+            Uint8List.fromList([for (var i = 0; i < 32; i++) 45]),
+          ),
+        )
+        ..applyProfileDefaults(name: 'Lena')
+        ..renameOwnProfile('Lena');
+  final id = lena.ownProfile!.id;
+  final card = lena.profileCard()!;
+  lena.close();
+  store.openProfileCard(card);
+  if (!shared) return;
+  final work = Places(store).areas().firstWhere((a) => a.starter == 'work');
+  shareAreaWith(
+    store,
+    work.id,
+    id,
+    role: AreaRole.member,
+    transport: Transport.bundle,
+  );
+}
+
 /// The Flutter SDK's root, from the test runner it started.
 String _flutterRoot() {
   final runner = Platform.resolvedExecutable;
@@ -581,6 +629,7 @@ Future<AppLocalizations> _start(
   double dpr, {
   FakeAlarms? alarms,
   BundlePlatform bundles = const NoBundles(),
+  FolderPlatform folders = const NoFolders(),
 }) async {
   tester.view
     ..physicalSize = _frame / _dpr * dpr
@@ -598,6 +647,7 @@ Future<AppLocalizations> _start(
         voice: FakeVoice(),
         photos: FakePhotos(),
         bundles: bundles,
+        folders: folders,
       ),
     ),
   );
@@ -1044,6 +1094,103 @@ void main() {
             );
             await _tap(tester, table.first);
             expect(find.byType(TableScreen), findsOneWidget);
+          });
+
+          frame('share-area', (tester) async {
+            final seeded = _Seeded(texts, people: true)
+              ..store.themeChoice = choice;
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
+            final household = Places(seeded.store)
+                .areas()
+                .firstWhere((a) => a.starter == 'household');
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(
+              tester,
+              find.byKey(ValueKey('area-menu-${household.id}')),
+            );
+            await _tap(tester, find.text(t.shareArea));
+            expect(find.byType(ShareAreaScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('share-afar')), findsOneWidget);
+          });
+
+          frame('person', (tester) async {
+            final seeded = _Seeded(texts, shared: true)
+              ..store.themeChoice = choice;
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+              bundles: FakeBundles(Directory('build')),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final lena = find.text('Lena');
+            await tester.scrollUntilVisible(
+              lena,
+              300,
+              scrollable: notesList.first,
+            );
+            await _tap(tester, lena);
+            expect(find.byType(PersonScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('sendChanges')), findsOneWidget);
+          });
+
+          frame('backups', (tester) async {
+            final seeded = seed();
+            await setUpBackups(seeded.store, 'correct horse', derive: quickKey);
+            final dir = Directory('build/guide-backups')
+              ..createSync(recursive: true);
+            seeded.store
+              ..backupFolder = dir.path
+              ..setLocalSetting(
+                'backup:last',
+                DateTime(2026, 10, 25, 19, 30).toUtc().toIso8601String(),
+              );
+            final t = await _start(
+              tester,
+              boundary,
+              language,
+              seeded.store,
+              _guideDpr,
+              folders: DirFolders(dir.path),
+            );
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            await _tap(tester, find.byKey(const ValueKey('backups')));
+            expect(find.byType(BackupScreen), findsOneWidget);
+            expect(find.byKey(const ValueKey('backup-now')), findsOneWidget);
+          });
+
+          frame('area-locks', (tester) async {
+            final seeded = seed();
+            final places = Places(seeded.store);
+            String area(String slug) =>
+                places.areas().firstWhere((a) => a.starter == slug).id;
+            seeded.store
+              ..setPin('2468', iterations: 1)
+              ..setAreaLocked(area('household'), true)
+              ..setAreaLocked(area('work'), true)
+              ..setAreaMasked(area('work'), false);
+            final t = await start(tester, seeded);
+            await _tap(tester, find.byTooltip(t.profileTitle));
+            final settings = find.byKey(const ValueKey('deviceSettings'));
+            await tester.ensureVisible(settings);
+            await _tap(tester, settings);
+            final locks = find.byKey(const ValueKey('areaLocks'));
+            await tester.scrollUntilVisible(
+              locks,
+              300,
+              scrollable: notesList.last,
+            );
+            await _tap(tester, locks);
+            expect(find.byType(AreaLocksScreen), findsOneWidget);
           });
         }
       }
