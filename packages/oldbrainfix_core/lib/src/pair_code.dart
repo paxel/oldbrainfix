@@ -33,12 +33,18 @@ int pairCodeLength(int addressBytes, int fingerprintBytes) =>
     ((addressBytes + 5 + fingerprintBytes) * 8 + 4) ~/ 5;
 
 /// Character count → (address bytes, fingerprint bytes) for every shape
-/// a code can have; decoding tells them apart by length alone.
+/// a code of version 1 can have, the only version written: it carries no
+/// version and is told by its length alone.
 final Map<int, (int, int)> _shapes = {
   for (final address in const [4, 16])
     for (final fp in const [typedFingerprintBytes, fullFingerprintBytes])
       pairCodeLength(address, fp): (address, fp),
 };
+
+/// The characters a code of a later version starts with, its version
+/// (ADR 0034): `2` to `9`. No code of version 1 on a local network starts
+/// with one: those of 10.x start with `1`, the others with a letter.
+const _laterVersions = '23456789';
 
 /// Whether [host] is an address on a local network, the only place a
 /// Device to pair with in person can be. A code naming a public address
@@ -83,15 +89,10 @@ String encodePairCode(
 
 /// Reads a code as the user typed it: underscores, spaces, dashes, case
 /// and the classic confusions (i/l→1, o→0, u→v) are all forgiven.
-/// Returns null when it is not a code.
+/// Returns null when it is not a code, or one of a later version
+/// ([pairCodeNeedsUpdate]).
 PairInfo? decodePairCode(String input) {
-  final cleaned = input
-      .toLowerCase()
-      .replaceAll(RegExp(r'[\s_\-]'), '')
-      .replaceAll('i', '1')
-      .replaceAll('l', '1')
-      .replaceAll('o', '0')
-      .replaceAll('u', 'v');
+  final cleaned = _clean(input);
   final bytes = _fromBase32(cleaned);
   final shape = _shapes[cleaned.length];
   if (bytes == null || shape == null) return null;
@@ -113,6 +114,28 @@ PairInfo? decodePairCode(String input) {
     bytes.sublist(addressLength + 5, addressLength + 5 + fpLength),
   );
 }
+
+/// Whether [input], read as [decodePairCode] reads it, is a code of a
+/// later version (ADR 0034): not of a length version 1 has, at least as
+/// long as its shortest, and starting with its version, `2` to `9`. This
+/// version cannot join with it: the app needs an update.
+bool pairCodeNeedsUpdate(String input) {
+  final cleaned = _clean(input);
+  return !_shapes.containsKey(cleaned.length) &&
+      cleaned.length >= pairCodeLength(4, typedFingerprintBytes) &&
+      _laterVersions.contains(cleaned[0]) &&
+      _fromBase32(cleaned) != null;
+}
+
+/// [input] as a code is read: underscores, spaces and dashes out, lower
+/// case, i/l→1, o→0, u→v.
+String _clean(String input) => input
+    .toLowerCase()
+    .replaceAll(RegExp(r'[\s_\-]'), '')
+    .replaceAll('i', '1')
+    .replaceAll('l', '1')
+    .replaceAll('o', '0')
+    .replaceAll('u', 'v');
 
 /// The code's groups in lines of three, as the screens show them.
 List<String> pairCodeLines(String code) {

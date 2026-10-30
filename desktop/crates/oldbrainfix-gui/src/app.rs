@@ -72,6 +72,7 @@ use oldbrainfix_core::sent::{
     self, HeldSentItem, OpenError, Opened, Received, Recipient, SenderTrust, SentItemState,
 };
 use oldbrainfix_core::share::{self, NoteShare};
+use oldbrainfix_core::sync::SETTINGS_SOURCE;
 use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, CaptureContext, CardTaken,
     Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
@@ -403,6 +404,17 @@ impl View {
             .flat_map(|(_, topics)| topics)
             .find(|t| t.id == id)
     }
+}
+
+/// A notice that an update is needed, announced at the top once.
+#[derive(Debug, Clone)]
+struct UpdateNotice {
+    /// Whether a setting a newer version saved was kept (ADR 0034),
+    /// rather than a sync needing the update.
+    settings: bool,
+    /// What needs the update, and the full text.
+    cause: String,
+    details: String,
 }
 
 /// The last selected Area and Topic, where forward leads, as the phone's
@@ -1098,9 +1110,9 @@ pub struct App {
     /// and leaves it closed.
     notice_dialog: Option<(String, Dialog)>,
     /// Syncs that need an update of the app here or on another Device,
-    /// each announced once, which Device behind the click (ADR 0019):
-    /// what needs the update and the full text.
-    updates: std::collections::VecDeque<(String, String)>,
+    /// and settings a newer version saved that were kept (ADR 0034), each
+    /// announced once, which Device behind the click (ADR 0019).
+    updates: std::collections::VecDeque<UpdateNotice>,
     /// The own Profile's picture, name field and new picture's square.
     profile_view: ProfileView,
     /// The own Profile card copied, and another person's being pasted
@@ -1575,6 +1587,13 @@ impl App {
                             }
                             self.notice = None;
                         }
+                        Err(oldbrainfix_core::Error::Backup(backup::Problem::NeedsUpdate)) => self
+                            .announce_failure(
+                                t.restore_not_done(),
+                                t.restore_not_done_title(),
+                                (t.restore_needs_update(), t.update_open_again_fix()),
+                                "backup: a Backup of a later format".into(),
+                            ),
                         _ => self.announce_failure(
                             t.restore_not_done(),
                             t.restore_not_done_title(),
@@ -2786,7 +2805,11 @@ impl App {
         for (source, update) in self.store.take_update_notices().unwrap_or_default() {
             let text = update_notice_text(&self.t, &self.store, &source, update);
             let details = format!("update needed: {update:?} ({source})");
-            self.updates.push_back((text, details));
+            self.updates.push_back(UpdateNotice {
+                settings: source == SETTINGS_SOURCE,
+                cause: text,
+                details,
+            });
         }
         // "Which one is you?" opens once it comes up, and goes once it was
         // answered here or on another Device.
@@ -4294,13 +4317,18 @@ impl App {
                 }
             }
             Action::ShowUpdate if self.dialog.is_none() => {
-                if let Some((cause, details)) = self.updates.pop_front() {
+                if let Some(notice) = self.updates.pop_front() {
                     let t = self.t;
+                    let fix = if notice.settings {
+                        t.settings_update_fix()
+                    } else {
+                        t.update_fix()
+                    };
                     self.dialog = Some(Dialog::Failure {
                         title: t.update_needed_title().into(),
-                        cause,
-                        fix: t.update_fix().into(),
-                        details,
+                        cause: notice.cause,
+                        fix: fix.into(),
+                        details: notice.details,
                     });
                 }
             }
@@ -5557,7 +5585,12 @@ impl App {
                 .frame(Frame::NONE.inner_margin(Margin::same(12)).fill(tones.card))
                 .show(ui, |ui| {
                     let colour = ui.visuals().text_color();
-                    let text = RichText::new(self.t.update_needed()).color(colour);
+                    let headline = if self.updates.front().is_some_and(|n| n.settings) {
+                        self.t.settings_update_needed()
+                    } else {
+                        self.t.update_needed()
+                    };
+                    let text = RichText::new(headline).color(colour);
                     let label = egui::Label::new(text).sense(egui::Sense::click());
                     if ui.add(label).clicked() {
                         actions.push(Action::ShowUpdate);
@@ -8973,6 +9006,7 @@ fn refused(t: &L10n, error: OpenError) -> (&'static str, &'static str) {
     match error {
         OpenError::NotForUs => (t.sent_item_not_for_us(), t.sent_item_ask_again_fix()),
         OpenError::NotASentItem => (t.sent_item_unreadable(), t.sent_item_ask_again_fix()),
+        OpenError::NeedsUpdate => (t.sent_item_needs_update(), t.update_open_again_fix()),
         OpenError::NotFromSender => (t.sent_item_not_from_sender(), t.sent_item_ask_again_fix()),
         OpenError::FromBlocked => (t.sent_item_from_blocked(), t.blocked_fix()),
     }

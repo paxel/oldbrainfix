@@ -246,10 +246,36 @@ pub fn pair_code_lines(code: &str) -> Vec<String> {
         .collect()
 }
 
-/// Reads a code as typed: spaces, underscores, dashes, case and the
-/// classic confusions are forgiven; none when it is not a code.
-pub fn decode_pair_code(input: &str) -> Option<PairInfo> {
-    let cleaned: String = input
+/// How many base32 characters a code of `address` + port + PIN +
+/// `fingerprint` bytes takes: five bits per character, rounded up.
+fn pair_code_length(address: usize, fingerprint: usize) -> usize {
+    ((address + 5 + fingerprint) * 8).div_ceil(5)
+}
+
+/// (address bytes, fingerprint bytes) of the version 1 code `length`
+/// characters long, the only version written: it carries no version and
+/// is told by its length alone.
+fn version_1_shape(length: usize) -> Option<(usize, usize)> {
+    [4usize, 16]
+        .iter()
+        .flat_map(|a| {
+            [TYPED_FINGERPRINT_BYTES, FULL_FINGERPRINT_BYTES]
+                .into_iter()
+                .map(move |fp| (*a, fp))
+        })
+        .find(|(a, fp)| pair_code_length(*a, *fp) == length)
+}
+
+/// The characters a code of a later version starts with, its version
+/// (ADR 0034), as the Dart core's: `2` to `9`. No code of version 1 on a
+/// local network starts with one: those of 10.x start with `1`, the
+/// others with a letter.
+const LATER_VERSIONS: &str = "23456789";
+
+/// `input` as a code is read: spaces, underscores and dashes out, lower
+/// case, i/l→1, o→0, u→v.
+fn clean_pair_code(input: &str) -> String {
+    input
         .to_lowercase()
         .chars()
         .filter(|c| !c.is_whitespace() && *c != '_' && *c != '-')
@@ -259,16 +285,33 @@ pub fn decode_pair_code(input: &str) -> Option<PairInfo> {
             'u' => 'v',
             other => other,
         })
-        .collect();
+        .collect()
+}
+
+/// Whether `input`, read as [`decode_pair_code`] reads it, is a code of a
+/// later version (ADR 0034), as the Dart core's `pairCodeNeedsUpdate`:
+/// not of a length version 1 has, at least as long as its shortest, and
+/// starting with its version, `2` to `9`. This version cannot join with
+/// it: the app needs an update.
+pub fn pair_code_needs_update(input: &str) -> bool {
+    let cleaned = clean_pair_code(input);
+    let length = cleaned.chars().count();
+    version_1_shape(length).is_none()
+        && length >= pair_code_length(4, TYPED_FINGERPRINT_BYTES)
+        && cleaned
+            .chars()
+            .next()
+            .is_some_and(|c| LATER_VERSIONS.contains(c))
+        && from_base32(&cleaned).is_some()
+}
+
+/// Reads a code as typed: spaces, underscores, dashes, case and the
+/// classic confusions are forgiven; none when it is not a code, or one
+/// of a later version ([`pair_code_needs_update`]).
+pub fn decode_pair_code(input: &str) -> Option<PairInfo> {
+    let cleaned = clean_pair_code(input);
     let bytes = from_base32(&cleaned)?;
-    let (address_length, fp_length) = [4usize, 16]
-        .iter()
-        .flat_map(|a| {
-            [TYPED_FINGERPRINT_BYTES, FULL_FINGERPRINT_BYTES]
-                .into_iter()
-                .map(move |fp| (*a, fp))
-        })
-        .find(|(a, fp)| ((a + 5 + fp) * 8).div_ceil(5) == cleaned.len())?;
+    let (address_length, fp_length) = version_1_shape(cleaned.len())?;
     if bytes.len() < address_length + 5 + fp_length {
         return None;
     }
@@ -1833,6 +1876,32 @@ mod tests {
         );
         assert!(decode_pair_code("nope").is_none());
         Ok(())
+    }
+
+    #[test]
+    fn pair_codes_of_a_later_version_need_an_update() {
+        let fp = [7u8; 32];
+        let typed = encode_pair_code(Ipv4Addr::new(10, 0, 0, 5), 8080, "999999", &fp, true);
+        assert!(!pair_code_needs_update(&typed));
+        // Its version first, at a length version 1 does not have.
+        let later = format!("2{}", typed.replace('_', ""));
+        assert!(decode_pair_code(&later).is_none());
+        assert!(pair_code_needs_update(&later));
+        assert!(pair_code_needs_update(&format!(
+            "9 {} 00",
+            typed.to_uppercase()
+        )));
+        // A 10.x code cut short starts with 1: no code, not a later one.
+        assert!(!pair_code_needs_update(&typed[..typed.len() - 1]));
+        assert!(!pair_code_needs_update(&format!(
+            "1{}",
+            typed.replace('_', "")
+        )));
+        // Too short for any code, or not base32.
+        assert!(!pair_code_needs_update("2abcd"));
+        assert!(!pair_code_needs_update(&format!("2{}", "!".repeat(30))));
+        // At a length of version 1 it is read as version 1.
+        assert!(!pair_code_needs_update(&format!("2{}", "0".repeat(27))));
     }
 
     #[test]

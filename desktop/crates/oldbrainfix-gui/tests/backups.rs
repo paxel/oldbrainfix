@@ -241,6 +241,31 @@ fn first_start(
 }
 
 #[test]
+fn a_backup_of_a_later_format_says_an_update_is_needed() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let later = dir.path().join(format!("later.{EXTENSION}"));
+    std::fs::write(&later, b"{\"format\":2,\"type\":\"oldbrainfix-backup\"}\n")?;
+    let mut harness = first_start(later)?;
+    click(&mut harness, "Restore from a Backup");
+    assert!(!shows(&harness, "Backup of "));
+    assert_eq!(
+        harness.state().notice(),
+        Some("The Backup was not restored.")
+    );
+    harness.get_by_label("The Backup was not restored.").click();
+    harness.run();
+    assert!(shows(
+        &harness,
+        "This Backup was made by a newer Old Brain Fix."
+    ));
+    assert!(shows(
+        &harness,
+        "Update Old Brain Fix on this Device, then open it again."
+    ));
+    Ok(())
+}
+
+#[test]
 fn the_first_start_restores_a_backup_with_the_passphrase() -> TestResult {
     let dir = tempfile::tempdir()?;
     let (path, _) = old_backup(dir.path())?;

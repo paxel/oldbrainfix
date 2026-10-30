@@ -888,6 +888,35 @@ fn a_typed_text_that_is_no_code_says_so_under_the_field() -> TestResult {
 }
 
 #[test]
+fn a_code_of_a_later_version_says_an_update_is_needed() -> TestResult {
+    let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
+    let code = encode_pair_code(
+        Ipv4Addr::new(192, 168, 1, 20),
+        4000,
+        "123456",
+        &[7; 8],
+        true,
+    );
+    harness
+        .get_by_role(egui::accesskit::Role::TextInput)
+        .click();
+    harness.step();
+    harness
+        .get_by(|n| n.is_focused())
+        .type_text(&format!("2{}", code.replace('_', "")));
+    harness.step();
+    harness.key_press(egui::Key::Enter);
+    harness.step();
+    harness.step();
+    assert!(!harness.state().sync_host().joining());
+    assert!(shows(
+        &harness,
+        "This code comes from a newer Old Brain Fix."
+    ));
+    Ok(())
+}
+
+#[test]
 fn every_failure_of_a_join_is_said_under_the_field() -> TestResult {
     let mut harness = sync_view(store(1)?, std::path::Path::new("/nonexistent"))?;
     let code = encode_pair_code(

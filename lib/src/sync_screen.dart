@@ -65,8 +65,8 @@ class SyncScreen extends StatefulWidget {
 class _SyncScreenState extends State<SyncScreen> {
   final _code = TextEditingController();
 
-  /// Whether the code typed is no pair code; said under the field until
-  /// it changes.
+  /// Whether the code typed is no pair code, or one of a later version;
+  /// said under the field until it changes.
   var _codeInvalid = false;
   var _busy = false;
   late var _paired = widget.store.pairedDevices();
@@ -216,7 +216,8 @@ class _SyncScreenState extends State<SyncScreen> {
     if (!mounted || photo == null) return;
     final code = await pairing.readQr(photo);
     if (!mounted) return;
-    if (code == null || decodePairCode(code) == null) {
+    if (code == null ||
+        (decodePairCode(code) == null && !pairCodeNeedsUpdate(code))) {
       announceCodeNotRead(context);
       return;
     }
@@ -519,7 +520,7 @@ class _SyncScreenState extends State<SyncScreen> {
             decoration: InputDecoration(
               labelText: t.syncCodeLabel,
               border: const OutlineInputBorder(),
-              errorText: _codeInvalid ? t.syncInvalidCode : null,
+              errorText: _codeInvalid ? invalidCodeText(t, _code.text) : null,
             ),
             onChanged: (_) {
               if (_codeInvalid) setState(() => _codeInvalid = false);
@@ -628,6 +629,7 @@ String updateNoticeText(
   UpdateNeeded where,
 ) {
   if (source == UpdateNotices.folderSource) return t.folderNeedsUpdate;
+  if (source == UpdateNotices.settingsSource) return t.settingsNeedUpdate;
   final name = store.pairedDevice(source)?.name ?? '';
   return switch (where) {
     UpdateNeeded.here when name.isNotEmpty => t.syncUpdateHereWith(name),
@@ -680,6 +682,11 @@ void announceSyncFailed(
     details: error is SyncException ? 'sync: ${failure.name}' : '$error',
   );
 }
+
+/// What the code field says under a [code] that does not join: that it
+/// is none, or that it comes from a later version (ADR 0034).
+String invalidCodeText(AppLocalizations t, String code) =>
+    pairCodeNeedsUpdate(code) ? t.pairCodeNeedsUpdate : t.syncInvalidCode;
 
 /// Announces that no pair code was found in the photo taken; what to do
 /// behind the tap.

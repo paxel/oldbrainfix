@@ -269,6 +269,24 @@ void main() {
     expect(find.text(invalid), findsNothing);
   });
 
+  testWidgets('a code of a later version says an update is needed', (
+    tester,
+  ) async {
+    await open(tester);
+    final later = '2${code.replaceAll('_', '')}';
+    await tester.enterText(find.byKey(const ValueKey('code')), later);
+    await tester.tap(find.byKey(const ValueKey('join')));
+    await tester.pumpAndSettle();
+    expect(joined, isEmpty);
+    expect(
+      find.text(
+        'This code comes from a newer Old Brain Fix. Update Old Brain Fix '
+        'on this Device, then try again.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('a refused sync says why at the top', (tester) async {
     failure = SyncFailure.wrongPin;
     await open(tester);

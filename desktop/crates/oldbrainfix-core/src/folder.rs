@@ -296,8 +296,10 @@ pub struct FolderSyncResult {
     pub blobs_out: usize,
     /// Segments of other Devices sealed with a key not held here.
     pub unreadable: usize,
-    /// Devices whose manifest is of a newer format than this version
-    /// reads: nothing of theirs was read, this app needs an update.
+    /// Devices whose manifest, keys file or Profiles file is of a newer
+    /// format than this version reads: nothing of it was read, and this
+    /// Device's own keys file of one was not written over; this app needs
+    /// an update.
     pub newer: usize,
     pub moment: Option<Moment>,
     pub report: ImportReport,
@@ -336,14 +338,15 @@ pub fn folder_sync(
         folder.write("", ".nomedia", &[])?;
     }
     let mut report = ImportReport::default();
-    let profile_changed = learn_keys(store, folder, &mut report)?;
-    learn_area_signing_keys(store, folder, &mut report)?;
+    let mut newer = BTreeSet::new();
+    let profile_changed = learn_keys(store, folder, &mut report, &mut newer)?;
+    learn_area_signing_keys(store, folder, &mut report, &mut newer)?;
     let before = store.current_seq()?;
-    let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, true)?;
+    let (applied, unreadable) = read_foreign(store, folder, &mut report, &mut newer, true)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause::FOLDER, None)?;
     let people = learn_profiles(store, folder)?;
     store.ensure_area_keys()?;
-    publish_keys(store, folder, nonce)?;
+    publish_keys(store, folder, nonce, &mut newer)?;
     publish_profiles(store, folder, nonce)?;
     let entries_out = publish_entries(store, folder, nonce)?;
     let mut names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
@@ -357,7 +360,7 @@ pub fn folder_sync(
         blobs_in,
         blobs_out,
         unreadable,
-        newer,
+        newer: newer.len(),
         moment,
         report,
         conflicts,
@@ -378,10 +381,11 @@ pub fn read_sealed(
     label: Option<&str>,
 ) -> Result<FolderSyncResult> {
     let mut report = ImportReport::default();
-    let profile_changed = learn_keys(store, folder, &mut report)?;
-    learn_area_signing_keys(store, folder, &mut report)?;
+    let mut newer = BTreeSet::new();
+    let profile_changed = learn_keys(store, folder, &mut report, &mut newer)?;
+    learn_area_signing_keys(store, folder, &mut report, &mut newer)?;
     let before = store.current_seq()?;
-    let (applied, unreadable, newer) = read_foreign(store, folder, &mut report, false)?;
+    let (applied, unreadable) = read_foreign(store, folder, &mut report, &mut newer, false)?;
     let moment = store.moment_for(before, !applied.is_empty(), cause, label)?;
     let people = learn_profiles(store, folder)?;
     let names: BTreeSet<String> = folder.list("blobs")?.into_iter().collect();
@@ -393,7 +397,7 @@ pub fn read_sealed(
         blobs_in,
         blobs_out: 0,
         unreadable,
-        newer,
+        newer: newer.len(),
         moment,
         report,
         conflicts,
@@ -414,11 +418,26 @@ pub fn write_sealed(
     nonce: Nonces<'_>,
 ) -> Result<(usize, usize)> {
     store.ensure_area_keys()?;
-    publish_keys(store, folder, nonce)?;
+    publish_keys(store, folder, nonce, &mut BTreeSet::new())?;
     publish_profiles(store, folder, nonce)?;
     let out = write_segments(store, folder, nonce, entries, Vec::new(), 1)?;
     let blobs_out = publish_blobs(store, folder, &mut BTreeSet::new(), nonce, Some(blobs))?;
     Ok((out, blobs_out))
+}
+
+/// Whether `json`, what a keys or Profiles file holds, is of a later
+/// version (ADR 0034), as the Dart core's `_laterFile`: its `v` is there
+/// and not the whole number 1. Nothing of it is read, and the own keys
+/// file is not written over.
+fn later_json(json: &Value) -> bool {
+    json.is_object() && json.get("v").is_some_and(|v| v.as_i64() != Some(1))
+}
+
+/// Whether the opened keys or Profiles file `plain` is of a later
+/// version ([`later_json`]), as the Dart core's `laterFolderFile`; bytes
+/// that are no JSON are not.
+pub fn later_file(plain: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(plain).is_ok_and(|json| later_json(&json))
 }
 
 /// The (device, key id) a name `<device>.<key id>.<rest>` names.
@@ -434,9 +453,15 @@ fn device_and_key(name: &str) -> Option<(&str, &str)> {
 /// here and takes in what it carries, until nothing new comes. The own
 /// Profile a writer published is taken in, its writer's key bound to it
 /// (ADR 0017): the personal key shows the writer is one of the user's
-/// own Devices. Returns whether the own Profile changed or a question
-/// came up.
-fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport) -> Result<bool> {
+/// own Devices. A file of a later version is not read, and its writer is
+/// added to `newer`. Returns whether the own Profile changed or a
+/// question came up.
+fn learn_keys(
+    store: &Store,
+    folder: &dyn SyncFolder,
+    report: &mut ImportReport,
+    newer: &mut BTreeSet<String>,
+) -> Result<bool> {
     let own = store.device_id()?;
     let files: Vec<(String, String, String)> = folder
         .list("keys")?
@@ -469,6 +494,10 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
             let Ok(json) = serde_json::from_slice::<Value>(&plain) else {
                 continue;
             };
+            if later_json(&json) {
+                newer.insert(device.clone());
+                continue;
+            }
             let signing: Vec<KeyRecord> = json
                 .get("signing")
                 .and_then(Value::as_array)
@@ -497,10 +526,13 @@ fn learn_keys(store: &Store, folder: &dyn SyncFolder, report: &mut ImportReport)
 /// bundle checks what the others' Devices write. Before the entries. A
 /// key record names the Device its key belongs to, so a record from
 /// anyone holding the Area key pins nothing that is not that Device's.
+/// A file of a later version is not read, and its writer is added to
+/// `newer`.
 fn learn_area_signing_keys(
     store: &Store,
     folder: &dyn SyncFolder,
     report: &mut ImportReport,
+    newer: &mut BTreeSet<String>,
 ) -> Result<()> {
     let own = store.device_id()?;
     for name in folder.list("keys")? {
@@ -525,6 +557,10 @@ fn learn_area_signing_keys(
         let Ok(json) = serde_json::from_slice::<Value>(&plain) else {
             continue;
         };
+        if later_json(&json) {
+            newer.insert(device.to_string());
+            continue;
+        }
         let signing: Vec<KeyRecord> = json
             .get("keys")
             .and_then(Value::as_array)
@@ -538,8 +574,9 @@ fn learn_area_signing_keys(
 /// Opens every other Device's Profiles file sealed with the key of a
 /// Shared Area held here and takes in the Profiles of the people that
 /// Area's grants name (ADR 0017), as the Dart core's `_learnProfiles`.
-/// Read after the entries, so the grants that came with them count.
-/// Returns whether a Profile came in or changed.
+/// Read after the entries, so the grants that came with them count; one
+/// of a later version is not read ([`learn_area_signing_keys`] counts
+/// it). Returns whether a Profile came in or changed.
 fn learn_profiles(store: &Store, folder: &dyn SyncFolder) -> Result<bool> {
     let own = store.device_id()?;
     let mut changed = false;
@@ -568,6 +605,9 @@ fn learn_profiles(store: &Store, folder: &dyn SyncFolder) -> Result<bool> {
         let Ok(json) = serde_json::from_slice::<Value>(&plain) else {
             continue;
         };
+        if later_json(&json) {
+            continue;
+        }
         let allowed = store.people_of(&key.scope)?;
         changed |= store.take_people(json.get("profiles"), Some(&allowed))?;
     }
@@ -662,21 +702,22 @@ fn segment_entries(
 }
 
 /// Reads every other Device's segments sealed with a key held here, as
-/// the Dart core does; never filtered by the version vector. A manifest
-/// of a newer format is counted, and nothing of its writer read. A
-/// blocked person's Devices' segments are never opened (ADR 0021).
+/// the Dart core does; never filtered by the version vector. The writer
+/// of a manifest of a newer format is added to `newer`, and nothing of
+/// it read. A blocked person's Devices' segments are never opened (ADR
+/// 0021).
 fn read_foreign(
     store: &Store,
     folder: &dyn SyncFolder,
     report: &mut ImportReport,
+    newer: &mut BTreeSet<String>,
     remember: bool,
-) -> Result<(Vec<WireEntry>, usize, usize)> {
+) -> Result<(Vec<WireEntry>, usize)> {
     let own = store.device_id()?;
     let blocked = store.blocked_devices()?;
     let mut fresh = Vec::new();
     let mut states = Vec::new();
     let mut unreadable = 0;
-    let mut newer = 0;
     for name in folder.list("")? {
         let Some(device) = name.strip_suffix(".manifest") else {
             continue;
@@ -689,7 +730,7 @@ fn read_foreign(
         };
         let Some(manifest) = Manifest::parse(bytes.as_deref()) else {
             if Manifest::is_newer(bytes.as_deref()) {
-                newer += 1;
+                newer.insert(device.to_string());
             }
             continue;
         };
@@ -733,7 +774,7 @@ fn read_foreign(
     }
     let applied = store.apply_entries(&fresh, &[], None, report)?;
     if !remember {
-        return Ok((applied, unreadable, newer));
+        return Ok((applied, unreadable));
     }
     for (device, generation, lines) in states {
         store.set_local_setting(
@@ -741,10 +782,20 @@ fn read_foreign(
             &json!({"generation": generation, "lines": lines}).to_string(),
         )?;
     }
-    Ok((applied, unreadable, newer))
+    Ok((applied, unreadable))
 }
 
-fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -> Result<()> {
+/// Publishes the keys this Device holds, as the Dart core's
+/// `_publishKeys`. A file that already says the same stays untouched,
+/// and so does one a later version wrote (ADR 0034): only the user's own
+/// Devices hold the personal key, so it is this Device's own, from a
+/// newer app, and this Device is added to `newer`.
+fn publish_keys(
+    store: &Store,
+    folder: &mut dyn SyncFolder,
+    nonce: Nonces<'_>,
+    newer: &mut BTreeSet<String>,
+) -> Result<()> {
     let own = store.device_id()?;
     let keys = store.area_keys()?;
     // Keys in sorted order, whether or not serde_json keeps the order
@@ -778,6 +829,10 @@ fn publish_keys(store: &Store, folder: &mut dyn SyncFolder, nonce: Nonces<'_>) -
             .read("keys", &name)?
             .and_then(|held| unseal(&key.key, &held, &aad));
         if said.as_deref() == Some(plain.as_slice()) {
+            continue;
+        }
+        if said.as_deref().is_some_and(later_file) {
+            newer.insert(own.clone());
             continue;
         }
         let sealed = seal(&key.key, &plain, &aad, &nonce()?)?;
@@ -1321,6 +1376,65 @@ mod tests {
             desk.take_update_notices()?.len(),
             1,
             "news again after it was over"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_keys_file_of_a_later_version_is_not_read_and_the_own_one_not_written_over() -> TestResult {
+        let phone = device(1)?;
+        let desk = device(2)?;
+        meet(&phone, &desk)?;
+        // Its key reaches the phone only through the desk's keys file.
+        let kids = Places::new(&desk).add_area("Kids")?;
+        let mut folder = MemoryFolder::default();
+        sync(&desk, &mut folder)?;
+        let personal = desk
+            .area_keys()?
+            .into_iter()
+            .find(|k| k.scope == PERSONAL_SCOPE)
+            .ok_or("a personal key")?;
+        let own = desk.device_id()?;
+        let name = keys_file_name(&own, &personal.id());
+        let aad = sealed_as::keys(&own);
+        let held = folder.read("keys", &name)?.ok_or("a keys file")?;
+        let plain = unseal(&personal.key, &held, &aad).ok_or("opens")?;
+        let json: Value = serde_json::from_slice(&plain)?;
+        assert!(json.get("v").is_none(), "version 1 says none");
+        let with = |v: Value| -> Result<Vec<u8>> {
+            let mut json = json.clone();
+            if let Some(map) = json.as_object_mut() {
+                map.insert("v".into(), v);
+            }
+            seal(
+                &personal.key,
+                json.to_string().as_bytes(),
+                &aad,
+                &random_nonce()?,
+            )
+        };
+        let later = with(json!(2))?;
+        folder.write("keys", &name, &later)?;
+
+        let mut nonce = random_nonce;
+        let read = folder_round(&phone, &mut folder, &mut nonce)?.ok_or("a round")?;
+        assert!(phone.writing_key(&kids.id)?.is_none());
+        assert_eq!(read.newer, 1);
+        assert_eq!(
+            phone.take_update_notices()?,
+            vec![(FOLDER_SOURCE.to_string(), UpdateNeeded::Here)]
+        );
+        // The desk, back at this version, keeps what its newer app wrote.
+        Places::new(&desk).add_area("School")?;
+        assert_eq!(sync(&desk, &mut folder)?.newer, 1);
+        assert_eq!(folder.read("keys", &name)?, Some(later));
+        // Version 1 written out reads as before.
+        folder.write("keys", &name, &with(json!(1))?)?;
+        let again = folder_round(&phone, &mut folder, &mut nonce)?.ok_or("a round")?;
+        assert_eq!(again.newer, 0);
+        assert_eq!(
+            phone.writing_key(&kids.id)?.map(|k| k.id()),
+            desk.writing_key(&kids.id)?.map(|k| k.id())
         );
         Ok(())
     }

@@ -440,6 +440,10 @@ const UPDATE_SEEN: &str = " seen";
 /// The source of the shared folder's update notice.
 pub const FOLDER_SOURCE: &str = "folder";
 
+/// The source of the notice that a local setting a later version of the
+/// app wrote was kept as it is ([`crate::store::later_setting`]).
+pub const SETTINGS_SOURCE: &str = "settings";
+
 /// Syncs that need an update, kept so each is announced once and not at
 /// every automatic try, as the Dart core's `UpdateNotices`: by the Device
 /// synced with, or [`FOLDER_SOURCE`]. Local settings, never synced.

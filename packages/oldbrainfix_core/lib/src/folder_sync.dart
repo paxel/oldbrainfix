@@ -139,8 +139,10 @@ class FolderSyncResult {
   /// hold: it was not paired with them, or their keys are on the way.
   final int unreadable;
 
-  /// Devices whose manifest is of a newer format than this version
-  /// reads: nothing of theirs was read, this app needs an update.
+  /// Devices whose manifest, keys file or Profiles file is of a newer
+  /// format than this version reads: nothing of it was read, and this
+  /// Device's own keys file of one was not written over; this app needs
+  /// an update.
   final int newer;
   final Moment? moment;
   final ImportReport report;
@@ -302,13 +304,15 @@ Future<FolderSyncResult> folderSync(
     await folder.write('', '.nomedia', const []);
   }
   final report = ImportReport();
-  final profileChanged = await _learnKeys(store, folder, report);
-  await _learnAreaSigningKeys(store, folder, report);
+  final newer = <String>{};
+  final profileChanged = await _learnKeys(store, folder, report, newer);
+  await _learnAreaSigningKeys(store, folder, report, newer);
   final before = store.currentSeq();
-  final (applied, unreadable, newer) = await _readForeign(
+  final (applied, unreadable) = await _readForeign(
     store,
     folder,
     report,
+    newer,
   );
   final moment = store.momentFor(
     before: before,
@@ -317,7 +321,7 @@ Future<FolderSyncResult> folderSync(
   );
   final people = await _learnProfiles(store, folder);
   store.ensureAreaKeys();
-  await _publishKeys(store, folder, nextNonce);
+  await _publishKeys(store, folder, nextNonce, newer);
   await _publishProfiles(store, folder, nextNonce);
   final entriesOut = await _publishEntries(store, folder, nextNonce);
   final names = (await folder.list('blobs')).toSet();
@@ -330,7 +334,7 @@ Future<FolderSyncResult> folderSync(
     blobsIn: blobsIn,
     blobsOut: blobsOut,
     unreadable: unreadable,
-    newer: newer,
+    newer: newer.length,
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
@@ -350,13 +354,15 @@ Future<FolderSyncResult> readSealed(
   String? label,
 }) async {
   final report = ImportReport();
-  final profileChanged = await _learnKeys(store, folder, report);
-  await _learnAreaSigningKeys(store, folder, report);
+  final newer = <String>{};
+  final profileChanged = await _learnKeys(store, folder, report, newer);
+  await _learnAreaSigningKeys(store, folder, report, newer);
   final before = store.currentSeq();
-  final (applied, unreadable, newer) = await _readForeign(
+  final (applied, unreadable) = await _readForeign(
     store,
     folder,
     report,
+    newer,
     remember: false,
   );
   final moment = store.momentFor(
@@ -374,7 +380,7 @@ Future<FolderSyncResult> readSealed(
     blobsIn: blobsIn,
     blobsOut: 0,
     unreadable: unreadable,
-    newer: newer,
+    newer: newer.length,
     moment: moment,
     report: report,
     conflicts: store.conflictsAmong(applied),
@@ -396,7 +402,7 @@ Future<({int entries, int blobs})> writeSealed(
   required Uint8List Function() nonce,
 }) async {
   store.ensureAreaKeys();
-  await _publishKeys(store, folder, nonce);
+  await _publishKeys(store, folder, nonce, <String>{});
   await _publishProfiles(store, folder, nonce);
   final out = await _writeSegments(
     store,
@@ -423,16 +429,37 @@ Future<({int entries, int blobs})> writeSealed(
   return (parts[0], parts[1]);
 }
 
+/// Whether [json], what a keys or Profiles file holds, is of a later
+/// version (ADR 0034): its `v` is there and not the whole number 1.
+/// Nothing of it is read, and the own keys file is not written over.
+bool _laterFile(Object? json) =>
+    json is Map &&
+    json.containsKey('v') &&
+    !(json['v'] is int && json['v'] == 1);
+
+/// Whether the opened keys or Profiles file [plain] is of a later
+/// version ([_laterFile]); bytes that are no JSON are not.
+bool laterFolderFile(List<int> plain) {
+  try {
+    return _laterFile(jsonDecode(utf8.decode(plain)));
+  } on FormatException {
+    return false;
+  }
+}
+
 /// Opens every other Device's keys file sealed with a personal key held
 /// here and takes in what it carries, until nothing new comes: a key
 /// learned from one file may open another. The own Profile a writer
 /// published is taken in, its writer's key bound to it (ADR 0017): the
 /// personal key shows the writer is one of the user's own Devices.
-/// Returns whether the own Profile changed or a question came up.
+/// A file of a later version is not read, and its writer is added to
+/// [newer]. Returns whether the own Profile changed or a question came
+/// up.
 Future<bool> _learnKeys(
   Store store,
   SyncFolder folder,
   ImportReport report,
+  Set<String> newer,
 ) async {
   final self = store.deviceId;
   final files = [
@@ -468,6 +495,10 @@ Future<bool> _learnKeys(
       } on FormatException {
         continue;
       }
+      if (_laterFile(json)) {
+        newer.add(device);
+        continue;
+      }
       if (json is! Map) continue;
       store.learnKeys([
         for (final k in json['signing'] is List ? json['signing'] : const [])
@@ -495,11 +526,13 @@ Future<bool> _learnKeys(
 /// through the folder or a bundle checks what the others' Devices write.
 /// Before the entries, which are checked against them. A key record
 /// names the Device its key belongs to, so a record from anyone holding
-/// the Area key pins nothing that is not that Device's.
+/// the Area key pins nothing that is not that Device's. A file of a later
+/// version is not read, and its writer is added to [newer].
 Future<void> _learnAreaSigningKeys(
   Store store,
   SyncFolder folder,
   ImportReport report,
+  Set<String> newer,
 ) async {
   final self = store.deviceId;
   for (final name in await folder.list('keys')) {
@@ -524,6 +557,10 @@ Future<void> _learnAreaSigningKeys(
     } on FormatException {
       continue;
     }
+    if (_laterFile(json)) {
+      newer.add(device);
+      continue;
+    }
     if (json is! Map) continue;
     store.learnKeys([
       for (final k in json['keys'] is List ? json['keys'] : const [])
@@ -535,8 +572,9 @@ Future<void> _learnAreaSigningKeys(
 /// Opens every other Device's Profiles file sealed with the key of a
 /// Shared Area held here and takes in the Profiles of the people that
 /// Area's grants name (ADR 0017); the rest stay out. Read after the
-/// entries, so the grants that came with them count. Returns whether a
-/// Profile came in or changed.
+/// entries, so the grants that came with them count; one of a later
+/// version is not read ([_learnAreaSigningKeys] counts it). Returns
+/// whether a Profile came in or changed.
 Future<bool> _learnProfiles(Store store, SyncFolder folder) async {
   final self = store.deviceId;
   var changed = false;
@@ -562,7 +600,7 @@ Future<bool> _learnProfiles(Store store, SyncFolder folder) async {
     } on FormatException {
       continue;
     }
-    if (json is! Map) continue;
+    if (json is! Map || _laterFile(json)) continue;
     if (store.takePeople(
       json['profiles'],
       allowed: store.peopleOf(key.scope),
@@ -612,13 +650,14 @@ String _readStateKey(String device) => 'folderRead:$device';
 /// segment of a key not held is counted as unreadable and left unread,
 /// to be read once the key is here. Entries are never filtered by the
 /// version vector: a segment of a key learned late fills a gap below it,
-/// and only the store knows what it holds. A manifest of a newer format
-/// is counted, and nothing of its writer read. A blocked person's
-/// Devices' segments are never opened (ADR 0021).
-Future<(List<Entry>, int, int)> _readForeign(
+/// and only the store knows what it holds. The writer of a manifest of
+/// a newer format is added to [newer], and nothing of it read. A blocked
+/// person's Devices' segments are never opened (ADR 0021).
+Future<(List<Entry>, int)> _readForeign(
   Store store,
   SyncFolder folder,
-  ImportReport report, {
+  ImportReport report,
+  Set<String> newer, {
   bool remember = true,
 }) async {
   final self = store.deviceId;
@@ -626,7 +665,6 @@ Future<(List<Entry>, int, int)> _readForeign(
   final fresh = <Entry>[];
   final states = <String, Map<String, Object>>{};
   var unreadable = 0;
-  var newer = 0;
   for (final name in await folder.list('')) {
     if (!name.endsWith('.manifest')) continue;
     final device = name.substring(0, name.length - '.manifest'.length);
@@ -640,7 +678,7 @@ Future<(List<Entry>, int, int)> _readForeign(
       continue;
     }
     if (manifest == null) {
-      if (FolderManifest.isNewer(bytes)) newer++;
+      if (FolderManifest.isNewer(bytes)) newer.add(device);
       continue; // half-written, or a newer format
     }
     var state = remember
@@ -680,7 +718,7 @@ Future<(List<Entry>, int, int)> _readForeign(
       store.setLocalSetting(_readStateKey(key), jsonEncode(value));
     }
   }
-  return (applied, unreadable, newer);
+  return (applied, unreadable);
 }
 
 /// Every entry the other Devices' segments in [folder] hold sealed with
@@ -751,11 +789,15 @@ Future<List<Entry>?> _segmentEntries(
 /// one it pinned, the own Profile's backup key (ADR 0016) and Profile,
 /// signed, with its binding (ADR 0017), sealed once with each personal
 /// key it holds, so a Device holding any of them learns the rest. A
-/// file that already says the same stays untouched.
+/// file that already says the same stays untouched, and so does one a
+/// later version wrote (ADR 0034): only the user's own Devices hold the
+/// personal key, so it is this Device's own, from a newer app, and this
+/// Device is added to [newer].
 Future<void> _publishKeys(
   Store store,
   SyncFolder folder,
   Uint8List Function() nonce,
+  Set<String> newer,
 ) async {
   final self = store.deviceId;
   final keys = store.areaKeys();
@@ -775,6 +817,10 @@ Future<void> _publishKeys(
         ? null
         : unseal(key.key, held, aad: SealedAs.keys(self));
     if (said != null && _same(said, plain)) continue;
+    if (said != null && laterFolderFile(said)) {
+      newer.add(self);
+      continue;
+    }
     await folder.write(
       'keys',
       name,

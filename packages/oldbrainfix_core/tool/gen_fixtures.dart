@@ -4809,13 +4809,121 @@ Map<String, Object?> _pairCodes() {
         'typed': encodePairCode(host, port, pin, fp, typed: true),
       },
   ];
+  // Version 1 says none (ADR 0034): a later one starts with its version.
+  final typed = (codes[1]['typed'] as String).replaceAll('_', '');
+  final full = (codes[0]['full'] as String).replaceAll('_', '');
   return {
     'codes': codes,
     'typedAs': {
       'R2M02 5XGNW 0AEG8 3188H G7S65 MTO': 'r2m02_5xgnw_0aeg8_3188h_g7s65_mt0',
     },
-    'invalid': ['nope', '', 'r2m02_5xgnw_0aeg8'],
+    'invalid': [
+      'nope',
+      '',
+      'r2m02_5xgnw_0aeg8',
+      // Cut short, or one too many, a code of 10.x starts with 1.
+      typed.substring(0, typed.length - 1),
+      '1$typed',
+      // Too short for any code, or not base32.
+      '2abcd',
+      '2${'!' * 30}',
+      // A length version 1 has: read as version 1, port 0.
+      '2${'0' * 27}',
+    ],
+    'newer': ['2$typed', '9 ${typed.toUpperCase()} 00', '3${full}x'],
   };
+}
+
+/// Files and values of a later version (ADR 0034) and what each core
+/// makes of them: Sent Items, Backup headers, the opened keys and
+/// Profiles files of the shared folder, local settings. Backup headers
+/// are read from files in [work]; [header] is a whole one.
+Map<String, Object?> _laterFormats(Directory work, String header) {
+  final store = _store();
+  try {
+    String opens(String file) {
+      try {
+        openSentItem(store, utf8.encode(file));
+        return 'opened';
+      } on SentItemNeedsUpdate {
+        return 'needsUpdate';
+      } on NotASentItem {
+        return 'notASentItem';
+      } on SentItemNotForUs {
+        return 'notForUs';
+      }
+    }
+
+    var n = 0;
+    String reads(String line) {
+      final file = File('${work.path}/later${n++}.$backupExtension')
+        ..writeAsStringSync('$line\n');
+      try {
+        return readBackupHeader(file.path) == null ? 'none' : 'header';
+      } on BackupException catch (e) {
+        return e.problem.name;
+      }
+    }
+
+    String withFormat(String format) =>
+        '{"format":$format,${header.substring(1)}';
+    const objects = [
+      '{"v":2,"signing":[]}',
+      '{"v":"1"}',
+      '{"v":1.0}',
+      '{"v":null}',
+      '{"v":0}',
+      '{"v":1,"signing":[]}',
+      '{"signing":[]}',
+      '{"a":{"v":2}}',
+      'not json',
+      '"v"',
+      '[{"v":2}]',
+      '[1,{"v":1}]',
+      '[[{"v":2}]]',
+    ];
+    return {
+      'sentItems': {
+        for (final file in [
+          '{"format":3,"item":"x","sig":"y"}',
+          '{"format":"2","item":"x","sig":"y"}',
+          '{"format":2.0,"item":"x","sig":"y"}',
+          '{"format":1e0,"item":"x","sig":"y"}',
+          '{"format":null}',
+          '{"format":0}',
+          '{"format":3,"sealed":"AAAA","to":[]}',
+          '{"format":1,"item":"x","sig":"y"}',
+          '{"format":2,"item":"x","sig":"y"}',
+          '{"item":"x","sig":"y"}',
+          '{"sealed":"AAAA","to":[]}',
+          '{}',
+          '[]',
+        ])
+          file: opens(file),
+      },
+      'backupHeaders': {
+        for (final line in [
+          header,
+          withFormat('1'),
+          withFormat('2'),
+          withFormat('"1"'),
+          withFormat('1.0'),
+          withFormat('null'),
+          '{"format":2,"type":"$backupType"}',
+          '{"format":2,"type":"other"}',
+          '{"format":1,"type":"$backupType"}',
+          'not json',
+        ])
+          line: reads(line),
+      },
+      'folderFiles': {
+        for (final plain in objects) plain: laterFolderFile(utf8.encode(plain)),
+      },
+      'settings': {for (final value in objects) value: laterSetting(value)},
+    };
+  } finally {
+    store.close();
+  }
 }
 
 /// The writer's key record, as it travels.
@@ -6532,7 +6640,11 @@ Future<void> main(List<String> args) async {
     'for them, the day before, on and after the clock held, on the same '
     'clock.\n'
     '- `pair_codes.json`: pair codes for a QR and for typing, codes as '
-    'typed, and what is no code.\n'
+    'typed, what is no code and codes of a later version (ADR 0034).\n'
+    '- `later_formats.json`: what files and values of a later version '
+    '(ADR 0034) come to: Sent Items, Backup header lines, the opened keys '
+    'and Profiles files of the shared folder and local settings, with '
+    'garbled versions and those of this version beside them.\n'
     '- `keys.json`: the writer\'s key record, and another key claiming its '
     'device.\n'
     '- `sync/`: two Devices that met once and wrote more since: their logs '
@@ -6782,6 +6894,17 @@ Future<void> main(List<String> args) async {
   _sentFixture(root);
   _sentChecklistFixture(root);
   await _backupFixture(root);
+  final later = Directory.systemTemp.createTempSync('oldbrainfix_later_');
+  try {
+    final backup = File('${root.path}/backup/backup.$backupExtension');
+    final head = backup.readAsBytesSync();
+    _write(
+      File('${root.path}/later_formats.json'),
+      '${_json.convert(_laterFormats(later, utf8.decode(head.sublist(0, head.indexOf(0x0a)))))}\n',
+    );
+  } finally {
+    later.deleteSync(recursive: true);
+  }
   _profilesFixture(root);
   _cardsFixture(root);
   _versionsFixture(root);

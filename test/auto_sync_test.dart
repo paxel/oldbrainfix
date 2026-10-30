@@ -567,6 +567,26 @@ void main() {
       expect(announcements.visible, isNull);
     });
 
+    testWidgets('a setting a newer version saved is kept and said once '
+        '(ADR 0034)', (tester) async {
+      const later = '{"generation":3,"v":2}';
+      phone
+        ..setLocalSetting('folderRead:x', later)
+        ..forgetFolderReads();
+      expect(phone.localSetting('folderRead:x'), later);
+      await start(tester);
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'An update of Old Brain Fix is needed.',
+        title: 'Update needed',
+        cause:
+            'A setting a newer Old Brain Fix saved on this Device is kept as '
+            'it is.',
+        fix: 'Install the latest Old Brain Fix on this Device.',
+      );
+    });
+
     testWidgets('Conflicts a background sync brought are announced when the '
         'app opens', (tester) async {
       editApart();

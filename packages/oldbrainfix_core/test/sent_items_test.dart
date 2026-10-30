@@ -269,6 +269,45 @@ void main() {
       expect(looksLikeSentItem([0x50, 0x4b, 3, 4]), isFalse);
       expect(looksLikeSentItem(utf8.encode(' \n{')), isTrue);
     });
+
+    test('one of a later format needs an update, and says so', () {
+      final clock = ticking();
+      final ann = device(clock, 'Ann');
+      final ben = device(clock, 'Ben');
+      final note = Notes(ann).capture('Buy milk');
+      final signed = utf8.decode(sendNote(ann, note.id));
+      expect(signed, startsWith('{"item":'));
+      for (final format in ['3', '"1"', '1.0', 'null', '0']) {
+        final later = utf8.encode('{"format":$format,${signed.substring(1)}');
+        expect(
+          () => openSentItem(ben, later),
+          throwsA(isA<SentItemNeedsUpdate>()),
+          reason: format,
+        );
+      }
+      // Whatever else a later format holds.
+      expect(
+        () => openSentItem(ben, utf8.encode('{"format":3,"parts":[]}')),
+        throwsA(isA<SentItemNeedsUpdate>()),
+      );
+      // Encrypted, the signed file inside says it.
+      _pairByInvite(ann, ben);
+      final to = ben.ownKeyRecord.boxKey ?? Uint8List(0);
+      final inner = utf8.encode('{"format":3,${signed.substring(1)}');
+      expect(
+        () => openSentItem(ben, _sealedTo(inner, to)),
+        throwsA(isA<SentItemNeedsUpdate>()),
+      );
+      // Of the formats known, it opens as before.
+      expect(
+        openSentItem(ben, _sealedTo(utf8.encode(signed), to)).encrypted,
+        isTrue,
+      );
+      expect(
+        openSentItem(ben, utf8.encode('{"format":1,${signed.substring(1)}')),
+        isA<OpenedSentItem>(),
+      );
+    });
   });
 
   group('receiving', () {
@@ -897,4 +936,29 @@ void main() {
       expect(ben.personVerified(annId), isTrue);
     });
   });
+}
+
+/// [signed], a signed Sent Item, encrypted to the X25519 key [to] as
+/// [encodeSentItem] does, with fixed bytes.
+Uint8List _sealedTo(List<int> signed, List<int> to) {
+  final content = Uint8List(areaKeyBytes)..fillRange(0, areaKeyBytes, 7);
+  final ephemeral = Uint8List(boxKeyBytes)..fillRange(0, boxKeyBytes, 9);
+  final public = boxPublicOf(ephemeral);
+  final shared = x25519(ephemeral, to) ?? Uint8List(0);
+  final wrap = hkdfSha256(
+    shared,
+    salt: [...public, ...to],
+    info: utf8.encode(SentAs.key),
+  );
+  return utf8.encode(
+    jsonEncode({
+      'sealed': base64.encode(seal(content, signed, aad: SentAs.sealed)),
+      'to': [
+        {
+          'eph': base64.encode(public),
+          'key': base64.encode(seal(wrap, content, aad: SentAs.key)),
+        },
+      ],
+    }),
+  );
 }

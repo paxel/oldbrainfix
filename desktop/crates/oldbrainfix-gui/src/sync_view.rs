@@ -23,12 +23,12 @@ use oldbrainfix_core::conflicts::{RADIUS, SCHEDULE_UNIT};
 use oldbrainfix_core::join::{JoinResult, SyncFailure, lan_sync};
 use oldbrainfix_core::lan::{
     Host, JoinAsk, PairInfo, Request, Response, Session, decode_pair_code, lan_address, new_pin,
-    pair_code_lines,
+    pair_code_lines, pair_code_needs_update,
 };
 use oldbrainfix_core::notes::keys as note_keys;
 use oldbrainfix_core::offers::OfferError;
 use oldbrainfix_core::places::keys as place_keys;
-use oldbrainfix_core::sync::{FOLDER_SOURCE, UpdateNeeded};
+use oldbrainfix_core::sync::{FOLDER_SOURCE, SETTINGS_SOURCE, UpdateNeeded};
 use oldbrainfix_core::{
     AreaRole, Conflict, Entry, Error, Fields, Invite, Notes, PairedDevice, Places, ProfileChoice,
     Routines, ShoppingLists, Store, StoredText,
@@ -317,7 +317,7 @@ impl SyncHost {
             return;
         }
         let Some(info) = decode_pair_code(&self.code) else {
-            self.code_error = Some(t.sync_invalid_code().to_string());
+            self.code_error = Some(invalid_code_text(t, &self.code).to_string());
             return;
         };
         self.code_error = None;
@@ -997,12 +997,26 @@ pub fn offer_refusal(t: &L10n, error: OfferError) -> (&'static str, &'static str
     }
 }
 
+/// What the code field says under a `code` that does not join, as the
+/// phone's `invalidCodeText`: that it is none, or that it comes from a
+/// later version (ADR 0034).
+pub fn invalid_code_text(t: &L10n, code: &str) -> &'static str {
+    if pair_code_needs_update(code) {
+        t.pair_code_needs_update()
+    } else {
+        t.sync_invalid_code()
+    }
+}
+
 /// What a sync that needs an update (ADR 0019) says at the top, as the
 /// phone's `updateNoticeText`: which Device needs it, by the name it is
 /// paired under where known.
 pub fn update_notice_text(t: &L10n, store: &Store, source: &str, update: UpdateNeeded) -> String {
     if source == FOLDER_SOURCE {
         return t.folder_needs_update().to_string();
+    }
+    if source == SETTINGS_SOURCE {
+        return t.settings_need_update().to_string();
     }
     let name = store
         .paired_device(source)

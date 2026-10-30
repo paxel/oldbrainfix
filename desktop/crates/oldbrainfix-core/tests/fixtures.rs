@@ -2945,7 +2945,7 @@ fn bare_routine(id: &str, schedule: Schedule) -> Routine {
 
 #[test]
 fn pair_codes_are_written_and_read_as_the_dart_core_does() -> TestResult {
-    use oldbrainfix_core::lan::{decode_pair_code, encode_pair_code};
+    use oldbrainfix_core::lan::{decode_pair_code, encode_pair_code, pair_code_needs_update};
     let fixture = read_json(&fixtures().join("pair_codes.json"))?;
     for code in fixture["codes"].as_array().ok_or("codes")? {
         let s = |k: &str| code[k].as_str().ok_or(format!("{k} is text"));
@@ -2976,7 +2976,71 @@ fn pair_codes_are_written_and_read_as_the_dart_core_does() -> TestResult {
         );
     }
     for invalid in fixture["invalid"].as_array().ok_or("invalid")? {
-        assert_eq!(decode_pair_code(invalid.as_str().ok_or("text")?), None);
+        let invalid = invalid.as_str().ok_or("text")?;
+        assert_eq!(decode_pair_code(invalid), None, "{invalid}");
+        assert!(!pair_code_needs_update(invalid), "{invalid}");
+    }
+    // Version 1 says none; a later one starts with its version (ADR 0034).
+    for newer in fixture["newer"].as_array().ok_or("newer")? {
+        let newer = newer.as_str().ok_or("text")?;
+        assert_eq!(decode_pair_code(newer), None, "{newer}");
+        assert!(pair_code_needs_update(newer), "{newer}");
+    }
+    for code in fixture["codes"].as_array().ok_or("codes")? {
+        for kind in ["full", "typed"] {
+            assert!(!pair_code_needs_update(
+                code[kind].as_str().ok_or("a code")?
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn files_and_values_of_a_later_version_read_as_the_dart_core_reads_them() -> TestResult {
+    use oldbrainfix_core::Error;
+    use oldbrainfix_core::backup::{Problem, read_header};
+    use oldbrainfix_core::folder::later_file;
+    use oldbrainfix_core::sent::OpenError;
+    use oldbrainfix_core::store::later_setting;
+    let fixture = read_json(&fixtures().join("later_formats.json"))?;
+    let store = Store::in_memory(Box::new(Utc::now), || Ok(writer_key()))?;
+    for (file, opens) in fixture["sentItems"].as_object().ok_or("sentItems")? {
+        let got = match store.open_sent_item(file.as_bytes())? {
+            Ok(_) => "opened",
+            Err(OpenError::NeedsUpdate) => "needsUpdate",
+            Err(OpenError::NotASentItem) => "notASentItem",
+            Err(OpenError::NotForUs) => "notForUs",
+            Err(other) => return Err(format!("{file}: {other:?}").into()),
+        };
+        assert_eq!(Some(got), opens.as_str(), "{file}");
+    }
+    let dir = tempfile::tempdir()?;
+    for (n, (line, reads)) in fixture["backupHeaders"]
+        .as_object()
+        .ok_or("backupHeaders")?
+        .iter()
+        .enumerate()
+    {
+        let path = dir.path().join(format!("later{n}.obfbackup"));
+        std::fs::write(&path, format!("{line}\n"))?;
+        let got = match read_header(&path) {
+            Ok(Some(_)) => "header",
+            Ok(None) => "none",
+            Err(Error::Backup(Problem::NeedsUpdate)) => "needsUpdate",
+            Err(e) => return Err(format!("{line}: {e}").into()),
+        };
+        assert_eq!(Some(got), reads.as_str(), "{line}");
+    }
+    for (plain, later) in fixture["folderFiles"].as_object().ok_or("folderFiles")? {
+        assert_eq!(
+            Some(later_file(plain.as_bytes())),
+            later.as_bool(),
+            "{plain}"
+        );
+    }
+    for (value, later) in fixture["settings"].as_object().ok_or("settings")? {
+        assert_eq!(Some(later_setting(value)), later.as_bool(), "{value}");
     }
     Ok(())
 }

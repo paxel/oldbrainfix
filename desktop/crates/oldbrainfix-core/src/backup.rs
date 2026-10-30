@@ -107,8 +107,11 @@ fn nonce(random: Random) -> Result<[u8; SEAL_NONCE_BYTES]> {
 /// Why a Backup could not be restored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Problem {
-    /// The file is no Backup, or one of a later format.
+    /// The file is no Backup.
     NotABackup,
+    /// A Backup of a later format (ADR 0034): this app needs an update to
+    /// restore it.
+    NeedsUpdate,
     /// Neither the passphrase nor the recovery key opens it.
     WrongSecret,
     /// It opened, but was changed or cut off.
@@ -265,16 +268,31 @@ impl Header {
     }
 }
 
-/// The header of the Backup at `path`, or none when it is none.
+/// The header of the Backup at `path`, or none when it is none;
+/// [`Problem::NeedsUpdate`] for a Backup of a later format, as the Dart
+/// core's `readBackupHeader`.
 pub fn read_header(path: &Path) -> Result<Option<Header>> {
     let mut head = Vec::new();
     File::open(path)?
         .take(MAX_HEADER_BYTES)
         .read_to_end(&mut head)?;
-    Ok(head
-        .iter()
-        .position(|b| *b == b'\n')
-        .and_then(|end| Header::parse(&head[..end])))
+    let Some(end) = head.iter().position(|b| *b == b'\n') else {
+        return Ok(None);
+    };
+    let line = &head[..end];
+    let header = Header::parse(line);
+    if header.is_none() && later_header(line) {
+        return Err(problem(Problem::NeedsUpdate));
+    }
+    Ok(header)
+}
+
+/// Whether `line` is the header of a Backup of a later format: it says
+/// it is a Backup, and a format this version does not read.
+fn later_header(line: &[u8]) -> bool {
+    serde_json::from_slice::<Value>(line).is_ok_and(|json| {
+        json.get("type").and_then(Value::as_str) == Some(TYPE) && later_format(&json)
+    })
 }
 
 /// The backup key that opens `header`: through `passphrase`, or the
@@ -758,10 +776,16 @@ impl<R: Read> ChunkReader<R> {
 /// Whether `json`, the header or the `about` record, is in the format
 /// this version reads: `format`, 1 when missing (ADR 0019).
 fn in_format(json: &Value) -> bool {
-    match json.get("format") {
-        None => true,
-        Some(format) => format.as_i64() == Some(FORMAT),
-    }
+    json.is_object() && !later_format(json)
+}
+
+/// Whether `json` says a format this version does not read: a Backup of
+/// a later version (ADR 0034), as the Dart core's `_laterFormat`. Only an
+/// absent `format` and the whole number 1 are known; `"1"`, `1.0` or
+/// `null` are later too.
+fn later_format(json: &Value) -> bool {
+    json.get("format")
+        .is_some_and(|format| format.as_i64() != Some(FORMAT))
 }
 
 /// The old Device's signing key in the `about` record, or none.
@@ -839,6 +863,9 @@ pub fn restore(store: &Store, path: &Path, backup_key: &[u8; KEY_BYTES]) -> Resu
             return Err(damaged());
         }
         if old.is_none() {
+            if json.get("about").is_some_and(later_format) {
+                return Err(problem(Problem::NeedsUpdate));
+            }
             old = Some(about(&json).ok_or_else(damaged)?);
             continue;
         }
@@ -1342,6 +1369,59 @@ mod tests {
             );
             assert_eq!(store.current_seq()?, 0, "variant {n}");
             assert!(!store.backups_set_up()?, "variant {n}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn one_of_a_later_format_needs_an_update_in_its_header_or_first_record() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let old = full(dir.path())?;
+        let code = set_up(&old, PASSPHRASE, CHEAP, &mut system_random)?;
+        let backup_key = recovery::decode_code(&code).ok_or(damaged_err())?;
+        let pass = old.backup_pass()?.ok_or(damaged_err())?;
+        let content_key = [7; KEY_BYTES];
+        let sealed_key = seal(&backup_key, &content_key, sealed_as::KEY, &[1; 24])?;
+        let line = Header::encode(*held(2).lock(), &pass, &sealed_key, CHUNK_BYTES);
+        let text = String::from_utf8_lossy(&line).into_owned();
+        let mut later: Vec<Vec<u8>> = ["2", r#""1""#, "1.0", "null", "0"]
+            .iter()
+            .map(|f| format!("{{\"format\":{f},{}\n", &text[1..]).into_bytes())
+            .collect();
+        // Whatever else a later header holds.
+        later.push(format!("{{\"format\":2,\"type\":\"{TYPE}\"}}\n").into_bytes());
+        // The first record says it too.
+        let aad = sealed_as::chunk(&hex::encode(Sha256::digest(&line)), 0, true);
+        let about = b"{\"about\":{\"device\":\"x\",\"format\":2,\"seed\":\"y\"}}\n";
+        let mut file = line.clone();
+        file.push(b'\n');
+        file.extend(seal(&content_key, about, &aad, &[2; 24])?);
+        let first = later.len();
+        later.push(file);
+        for (n, bytes) in later.iter().enumerate() {
+            let path = dir.path().join(format!("later{n}.{EXTENSION}"));
+            std::fs::write(&path, bytes)?;
+            if n < first {
+                assert!(
+                    matches!(read_header(&path), Err(Error::Backup(Problem::NeedsUpdate))),
+                    "variant {n}"
+                );
+            }
+            let store = device(dir.path(), &format!("l{n}"), &held(20), 2)?;
+            assert!(
+                is(restore(&store, &path, &backup_key), Problem::NeedsUpdate),
+                "variant {n}"
+            );
+            assert_eq!(store.current_seq()?, 0, "variant {n}");
+        }
+        // A header that says no Backup, or is not whole, is none.
+        for none in [
+            r#"{"format":2,"type":"other"}"#,
+            r#"{"format":1,"type":"oldbrainfix-backup"}"#,
+        ] {
+            let path = dir.path().join(format!("none.{EXTENSION}"));
+            std::fs::write(&path, format!("{none}\n"))?;
+            assert!(read_header(&path)?.is_none(), "{none}");
         }
         Ok(())
     }

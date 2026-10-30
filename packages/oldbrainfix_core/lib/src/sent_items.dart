@@ -46,10 +46,17 @@ const sentItemFormat = 1;
 const sentItemListFormat = 2;
 
 /// Whether [json] is in a format this version reads.
-bool _inFormat(Object? json) =>
+bool _inFormat(Object? json) => json is Map && !_laterFormat(json);
+
+/// Whether [json] says a format this version does not read: a file of a
+/// later version (ADR 0034). Only an absent `format` and the whole
+/// numbers 1 and 2 are known; `"2"`, `2.0` or `null` are later too.
+bool _laterFormat(Object? json) =>
     json is Map &&
-    switch (json.containsKey('format') ? json['format'] : 1) {
-      sentItemFormat || sentItemListFormat => true,
+    json.containsKey('format') &&
+    !switch (json['format']) {
+      final int format =>
+        format == sentItemFormat || format == sentItemListFormat,
       _ => false,
     };
 
@@ -98,6 +105,15 @@ class NotASentItem implements Exception {
 
   @override
   String toString() => 'NotASentItem';
+}
+
+/// A Sent Item of a format a later version of the app writes (ADR 0034):
+/// this app needs an update to open it.
+class SentItemNeedsUpdate implements Exception {
+  const SentItemNeedsUpdate();
+
+  @override
+  String toString() => 'SentItemNeedsUpdate';
 }
 
 /// A Sent Item whose id came here from another key: only its sender may
@@ -758,7 +774,7 @@ class OpenedSentItem extends ReceivedSentItem {
 /// checks the signature over it and what accepting it would do here.
 /// Throws [NotASentItem] for a file that is none, damaged, not signed by
 /// the key it names or with a Profile not bound to that key,
-/// [SentItemNotForUs] for one encrypted to other
+/// [SentItemNeedsUpdate] for one of a later format, [SentItemNotForUs] for one encrypted to other
 /// Devices, [SentItemFromBlocked] for one from a person the user blocked
 /// (ADR 0021), before anything of it is shown, and [SentItemNotFromSender]
 /// for one whose id came here from another key (ADR 0009).
@@ -792,6 +808,7 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
 ) {
   if (bytes.length > maxSentItemBytes) throw const NotASentItem();
   final outer = _json(bytes);
+  if (_laterFormat(outer)) throw const SentItemNeedsUpdate();
   var encrypted = false;
   var signed = outer;
   if (outer case {'sealed': final String sealed, 'to': final List<Object?> to}
@@ -799,6 +816,7 @@ OpenedSentItem openSentItem(Store store, List<int> bytes) {
     final inner = _open(store, sealed, to);
     if (inner == null) throw const SentItemNotForUs();
     signed = _json(inner);
+    if (_laterFormat(signed)) throw const SentItemNeedsUpdate();
     encrypted = true;
   }
   if (signed case {'item': final String payload, 'sig': final String sig}

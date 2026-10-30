@@ -96,6 +96,51 @@ void main() {
       expect(desk.takeUpdateNotices(), hasLength(1), reason: 'news again');
     });
 
+    test('a keys file of a later version is not read, and the own one is '
+        'not written over (ADR 0034)', () async {
+      final clock = ticking();
+      final phone = device(clock, 'Ada');
+      final desk = device(clock, 'Ada');
+      exchange(phone, desk);
+      // Its key reaches the phone only through the desk's keys file.
+      final kids = Places(desk).addArea('Kids');
+      final folder = MemorySyncFolder();
+      await folderSync(desk, folder);
+      final personal = desk.areaKeys().firstWhere(
+        (k) => k.scope == personalScope,
+      );
+      final name = keysFileName(desk.deviceId, personal.id);
+      final aad = SealedAs.keys(desk.deviceId);
+      final plain = unseal(personal.key, folder.dirs['keys']![name]!, aad: aad);
+      final json = jsonDecode(utf8.decode(plain!)) as Map<String, Object?>;
+      expect(json.containsKey('v'), isFalse, reason: 'version 1 says none');
+      final later = seal(
+        personal.key,
+        utf8.encode(jsonEncode({...json, 'v': 2})),
+        aad: aad,
+      );
+      folder.dirs['keys']![name] = later;
+
+      final read = await folderRound(phone, folder);
+      expect(phone.writingKey(kids.id), isNull);
+      expect(read?.newer, 1);
+      expect(phone.takeUpdateNotices(), [
+        (UpdateNotices.folderSource, UpdateNeeded.here),
+      ]);
+      // The desk, back at this version, keeps what its newer app wrote.
+      Places(desk).addArea('School');
+      expect((await folderSync(desk, folder)).newer, 1);
+      expect(folder.dirs['keys']![name], later);
+      // Version 1 written out reads as before.
+      folder.dirs['keys']![name] = seal(
+        personal.key,
+        utf8.encode(jsonEncode({...json, 'v': 1})),
+        aad: aad,
+      );
+      expect((await folderRound(phone, folder))?.newer, 0);
+      expect(phone.writingKey(kids.id)?.id, desk.writingKey(kids.id)?.id);
+    });
+
     test(
       'another folder is read whole; forgetting touches nothing in it',
       () async {

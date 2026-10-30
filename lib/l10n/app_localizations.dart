@@ -7075,6 +7075,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The words in its cells are deleted from the Note.'**
   String get tableDeleteBody;
+
+  /// Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it.
+  ///
+  /// In en, this message translates to:
+  /// **'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.'**
+  String get pairCodeNeedsUpdate;
+
+  /// Why a Sent Item was not opened: it is in a format a later version of the app writes (ADR 0034).
+  ///
+  /// In en, this message translates to:
+  /// **'This file comes from a newer Old Brain Fix.'**
+  String get sentItemNeedsUpdate;
+
+  /// Why a Backup was not restored: it is in a format a later version of the app writes (ADR 0034).
+  ///
+  /// In en, this message translates to:
+  /// **'This Backup was made by a newer Old Brain Fix.'**
+  String get restoreNeedsUpdate;
+
+  /// The fix for 'sentItemNeedsUpdate' and 'restoreNeedsUpdate': the file is kept as it is.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Old Brain Fix on this Device, then open it again.'**
+  String get updateOpenAgainFix;
+
+  /// Announced at the top in place of 'updateNeeded' for the notice 'settingsNeedUpdate'; the tap shows why and what to do.
+  ///
+  /// In en, this message translates to:
+  /// **'An update of Old Brain Fix is needed.'**
+  String get settingsUpdateNeeded;
+
+  /// The cause in the update notice when this Device would have changed a setting a later version of the app saved in a form this version does not know (ADR 0034): the setting is not changed.
+  ///
+  /// In en, this message translates to:
+  /// **'A setting a newer Old Brain Fix saved on this Device is kept as it is.'**
+  String get settingsNeedUpdate;
+
+  /// The fix for 'settingsNeedUpdate'.
+  ///
+  /// In en, this message translates to:
+  /// **'Install the latest Old Brain Fix on this Device.'**
+  String get settingsUpdateFix;
 }
 
 class _AppLocalizationsDelegate

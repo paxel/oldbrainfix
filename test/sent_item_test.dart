@@ -433,6 +433,25 @@ void main() {
       expect(find.byType(SentItemScreen), findsNothing);
     });
 
+    testWidgets('a file of a later format says an update is needed', (
+      tester,
+    ) async {
+      await app(tester);
+      final later = '${dir.path}/later';
+      File(later).writeAsStringSync('{"format":3,"item":"x","sig":"y"}');
+      files.open(later);
+      await tester.pumpAndSettle();
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The file was not taken.',
+        title: 'File not taken',
+        cause: 'This file comes from a newer Old Brain Fix.',
+        fix: 'Update Old Brain Fix on this Device, then open it again.',
+      );
+      expect(find.byType(SentItemScreen), findsNothing);
+    });
+
     testWidgets('an update shows what changes; applying keeps the own '
         'additions', (tester) async {
       final (note, got) = acceptedFromAnn();

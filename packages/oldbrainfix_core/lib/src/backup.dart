@@ -43,9 +43,15 @@ const backupType = 'oldbrainfix-backup';
 const backupFormat = 1;
 
 /// Whether [json] is in the format this version reads.
-bool _inFormat(Object? json) =>
+bool _inFormat(Object? json) => json is Map && !_laterFormat(json);
+
+/// Whether [json] says a format this version does not read: a Backup of
+/// a later version (ADR 0034). Only an absent `format` and the whole
+/// number 1 are known; `"1"`, `1.0` or `null` are later too.
+bool _laterFormat(Object? json) =>
     json is Map &&
-    (json.containsKey('format') ? json['format'] : 1) == backupFormat;
+    json.containsKey('format') &&
+    !(json['format'] is int && json['format'] == backupFormat);
 
 /// How many payload bytes each sealed chunk holds.
 const backupChunkBytes = 65536;
@@ -188,8 +194,12 @@ class BackupPass {
 
 /// Why a Backup could not be restored.
 enum BackupProblem {
-  /// The file is no Backup, or one of a later format.
+  /// The file is no Backup.
   notABackup,
+
+  /// A Backup of a later format (ADR 0034): this app needs an update to
+  /// restore it.
+  needsUpdate,
 
   /// Neither the passphrase nor the recovery key opens it.
   wrongSecret,
@@ -283,7 +293,9 @@ class BackupHeader {
   }
 }
 
-/// The header of the Backup at [path], or null when it is none.
+/// The header of the Backup at [path], or null when it is none. Throws
+/// a [BackupException] of [BackupProblem.needsUpdate] for a Backup of a
+/// later format.
 BackupHeader? readBackupHeader(String path) {
   final file = File(path);
   if (!file.existsSync()) return null;
@@ -291,9 +303,26 @@ BackupHeader? readBackupHeader(String path) {
   try {
     final head = raf.readSync(_maxHeaderBytes);
     final end = head.indexOf(0x0a);
-    return end < 0 ? null : BackupHeader.parse(head.sublist(0, end));
+    if (end < 0) return null;
+    final line = head.sublist(0, end);
+    final header = BackupHeader.parse(line);
+    if (header == null && _laterHeader(line)) {
+      throw const BackupException(BackupProblem.needsUpdate);
+    }
+    return header;
   } finally {
     raf.closeSync();
+  }
+}
+
+/// Whether [line] is the header of a Backup of a later format: it says
+/// it is a Backup, and a format this version does not read.
+bool _laterHeader(List<int> line) {
+  try {
+    final json = jsonDecode(utf8.decode(line));
+    return json is Map && json['type'] == backupType && _laterFormat(json);
+  } on FormatException {
+    return false;
   }
 }
 
@@ -863,6 +892,9 @@ Future<RestoreResult> restoreBackup(
       }
       if (json is! Map<String, dynamic>) throw damaged;
       if (old == null) {
+        if (_laterFormat(json['about'])) {
+          throw const BackupException(BackupProblem.needsUpdate);
+        }
         old = _about(json['about']);
         if (old == null) throw damaged;
         continue;

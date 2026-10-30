@@ -1171,5 +1171,12 @@
   "tableDeleteRowQuestion": "Diese Zeile löschen?",
   "tableDeleteColumnQuestion": "Diese Spalte löschen?",
   "tableDeleteTableQuestion": "Die Tabelle löschen?",
-  "tableDeleteBody": "Die Wörter in ihren Zellen werden aus der Notiz gelöscht."
+  "tableDeleteBody": "Die Wörter in ihren Zellen werden aus der Notiz gelöscht.",
+  "pairCodeNeedsUpdate": "Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.",
+  "sentItemNeedsUpdate": "Diese Datei stammt von einem neueren Old Brain Fix.",
+  "restoreNeedsUpdate": "Diese Sicherung wurde von einem neueren Old Brain Fix erstellt.",
+  "updateOpenAgainFix": "Aktualisiere Old Brain Fix auf diesem Gerät und öffne sie dann noch einmal.",
+  "settingsUpdateNeeded": "Ein Update von Old Brain Fix ist nötig.",
+  "settingsNeedUpdate": "Eine Einstellung, die ein neueres Old Brain Fix auf diesem Gerät gespeichert hat, bleibt, wie sie ist.",
+  "settingsUpdateFix": "Installiere auf diesem Gerät das neueste Old Brain Fix."
 }

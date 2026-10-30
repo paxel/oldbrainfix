@@ -4359,4 +4359,31 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get tableDeleteBody =>
       'Die Wörter in ihren Zellen werden aus der Notiz gelöscht.';
+
+  @override
+  String get pairCodeNeedsUpdate =>
+      'Dieser Code stammt von einem neueren Old Brain Fix. Aktualisiere Old Brain Fix auf diesem Gerät und versuch es dann noch einmal.';
+
+  @override
+  String get sentItemNeedsUpdate =>
+      'Diese Datei stammt von einem neueren Old Brain Fix.';
+
+  @override
+  String get restoreNeedsUpdate =>
+      'Diese Sicherung wurde von einem neueren Old Brain Fix erstellt.';
+
+  @override
+  String get updateOpenAgainFix =>
+      'Aktualisiere Old Brain Fix auf diesem Gerät und öffne sie dann noch einmal.';
+
+  @override
+  String get settingsUpdateNeeded => 'Ein Update von Old Brain Fix ist nötig.';
+
+  @override
+  String get settingsNeedUpdate =>
+      'Eine Einstellung, die ein neueres Old Brain Fix auf diesem Gerät gespeichert hat, bleibt, wie sie ist.';
+
+  @override
+  String get settingsUpdateFix =>
+      'Installiere auf diesem Gerät das neueste Old Brain Fix.';
 }

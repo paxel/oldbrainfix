@@ -720,6 +720,7 @@ class _SentItemScreenState extends State<SentItemScreen> {
 /// for anything else.
 (String, String)? _refused(AppLocalizations t, Object error) => switch (error) {
   NotASentItem() => (t.sentItemUnreadable, t.sentItemAskAgainFix),
+  SentItemNeedsUpdate() => (t.sentItemNeedsUpdate, t.updateOpenAgainFix),
   SentItemNotForUs() => (t.sentItemNotForUs, t.sentItemAskAgainFix),
   SentItemNotFromSender() => (t.sentItemNotFromSender, t.sentItemAskAgainFix),
   SentItemFromBlocked() => (t.sentItemFromBlocked, t.blockedFix),

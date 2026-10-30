@@ -289,6 +289,10 @@ extension UpdateNotices on Store {
   /// The source of the shared folder's notice.
   static const folderSource = 'folder';
 
+  /// The source of the notice that a local setting a later version of the
+  /// app wrote was kept as it is ([laterSetting]).
+  static const settingsSource = 'settings';
+
   /// Keeps that syncing with [source] needs an update [where], to be
   /// announced ([takeUpdateNotices]) unless that was known already.
   void noteUpdateNeeded(String source, UpdateNeeded where) {

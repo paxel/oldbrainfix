@@ -1,0 +1,59 @@
+{
+  "sentItems": {
+    "{\"format\":3,\"item\":\"x\",\"sig\":\"y\"}": "needsUpdate",
+    "{\"format\":\"2\",\"item\":\"x\",\"sig\":\"y\"}": "needsUpdate",
+    "{\"format\":2.0,\"item\":\"x\",\"sig\":\"y\"}": "needsUpdate",
+    "{\"format\":1e0,\"item\":\"x\",\"sig\":\"y\"}": "needsUpdate",
+    "{\"format\":null}": "needsUpdate",
+    "{\"format\":0}": "needsUpdate",
+    "{\"format\":3,\"sealed\":\"AAAA\",\"to\":[]}": "needsUpdate",
+    "{\"format\":1,\"item\":\"x\",\"sig\":\"y\"}": "notASentItem",
+    "{\"format\":2,\"item\":\"x\",\"sig\":\"y\"}": "notASentItem",
+    "{\"item\":\"x\",\"sig\":\"y\"}": "notASentItem",
+    "{\"sealed\":\"AAAA\",\"to\":[]}": "notForUs",
+    "{}": "notASentItem",
+    "[]": "notASentItem"
+  },
+  "backupHeaders": {
+    "{\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "header",
+    "{\"format\":1,\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "header",
+    "{\"format\":2,\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "needsUpdate",
+    "{\"format\":\"1\",\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "needsUpdate",
+    "{\"format\":1.0,\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "needsUpdate",
+    "{\"format\":null,\"chunk\":65536,\"created\":\"2026-01-02T10:00:31.000Z\",\"kdf\":{\"m\":65536,\"p\":1,\"salt\":\"cXJzdHV2d3h5ent8fX5/gA==\",\"t\":3},\"key\":\"8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJMkMZtgiFJ1ABwMiq8uRAbWMRV/EgPkU/tS18xtxLQDwR0i+a7MxEF0Ko36/fZ2hc\",\"pass\":\"lpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytYFVzsBwg8Ju1/Y+X7tcdRtF6MhTNX7RqXvE4qaXK9fVBg7QxYS3wBwngwAFTKlK6\",\"type\":\"oldbrainfix-backup\"}": "needsUpdate",
+    "{\"format\":2,\"type\":\"oldbrainfix-backup\"}": "needsUpdate",
+    "{\"format\":2,\"type\":\"other\"}": "none",
+    "{\"format\":1,\"type\":\"oldbrainfix-backup\"}": "none",
+    "not json": "none"
+  },
+  "folderFiles": {
+    "{\"v\":2,\"signing\":[]}": true,
+    "{\"v\":\"1\"}": true,
+    "{\"v\":1.0}": true,
+    "{\"v\":null}": true,
+    "{\"v\":0}": true,
+    "{\"v\":1,\"signing\":[]}": false,
+    "{\"signing\":[]}": false,
+    "{\"a\":{\"v\":2}}": false,
+    "not json": false,
+    "\"v\"": false,
+    "[{\"v\":2}]": false,
+    "[1,{\"v\":1}]": false,
+    "[[{\"v\":2}]]": false
+  },
+  "settings": {
+    "{\"v\":2,\"signing\":[]}": true,
+    "{\"v\":\"1\"}": true,
+    "{\"v\":1.0}": true,
+    "{\"v\":null}": true,
+    "{\"v\":0}": true,
+    "{\"v\":1,\"signing\":[]}": false,
+    "{\"signing\":[]}": false,
+    "{\"a\":{\"v\":2}}": false,
+    "not json": false,
+    "\"v\"": false,
+    "[{\"v\":2}]": true,
+    "[1,{\"v\":1}]": false,
+    "[[{\"v\":2}]]": false
+  }
+}

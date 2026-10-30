@@ -396,6 +396,22 @@ void main() {
       );
       expect(find.byKey(const ValueKey('restore')), findsNothing);
 
+      // A Backup of a later format.
+      final later = '${dir.path}/later.$backupExtension';
+      File(later).writeAsStringSync('{"format":2,"type":"$backupType"}\n');
+      bundles.picks = copy(later);
+      await tester.tap(find.byKey(const ValueKey('restore-pick')));
+      await tester.pumpAndSettle();
+      await expectFailureAnnounced(
+        tester,
+        announcements,
+        'The Backup was not restored.',
+        title: 'Backup not restored',
+        cause: 'This Backup was made by a newer Old Brain Fix.',
+        fix: 'Update Old Brain Fix on this Device, then open it again.',
+      );
+      expect(find.byKey(const ValueKey('restore')), findsNothing);
+
       bundles.picks = copy(path);
       await tester.tap(find.byKey(const ValueKey('restore-pick')));
       await tester.pumpAndSettle();

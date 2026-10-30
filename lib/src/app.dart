@@ -589,18 +589,20 @@ class _HomeState extends State<_Home> {
   }
 
   /// An automatic sync, now or in the background, or the shared folder
-  /// needs an update of the app here or on another Device: announced at
-  /// the top, once (ADR 0019), which Device behind the tap.
+  /// needs an update of the app here or on another Device, or a setting
+  /// a newer version saved was kept (ADR 0034): announced at the top,
+  /// once (ADR 0019), which Device behind the tap.
   void _updatesNeeded() {
     if (!mounted) return;
     final t = context.t;
     for (final (source, where) in widget.autoSync.takeUpdates()) {
+      final settings = source == UpdateNotices.settingsSource;
       announceFailure(
         context,
-        t.updateNeeded,
+        settings ? t.settingsUpdateNeeded : t.updateNeeded,
         title: t.updateNeededTitle,
         cause: updateNoticeText(t, widget.store, source, where),
-        fix: t.updateFix,
+        fix: settings ? t.settingsUpdateFix : t.updateFix,
         details: 'update needed: ${where.name}',
       );
     }

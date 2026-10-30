@@ -14,6 +14,7 @@ import 'pending.dart';
 import 'photos.dart';
 import 'shared_areas.dart';
 import 'signing.dart';
+import 'sync.dart';
 
 /// The version of the tables this version keeps the log in, recorded as
 /// the database's `user_version` (ADR 0034). 0, SQLite's own default, is
@@ -226,13 +227,36 @@ class Store {
     return rows.isEmpty ? null : rows.first['value'] as String;
   }
 
-  void setLocalSetting(String key, String value) => _db.execute(
-    'INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)',
-    [key, value],
-  );
+  /// Sets [key] to [value], unless what [key] holds a later version of
+  /// the app wrote ([laterSetting]): that stays as it is, and an update
+  /// notice says so ([UpdateNotices.settingsSource]).
+  void setLocalSetting(String key, String value) {
+    if (_keepsLater(key)) return;
+    _db.execute(
+      'INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)',
+      [key, value],
+    );
+  }
 
-  void removeLocalSetting(String key) =>
-      _db.execute('DELETE FROM local_settings WHERE key = ?', [key]);
+  /// Removes [key], unless a later version wrote it, as [setLocalSetting].
+  void removeLocalSetting(String key) {
+    if (_keepsLater(key)) return;
+    _db.execute('DELETE FROM local_settings WHERE key = ?', [key]);
+  }
+
+  /// The own Profile's record, whose later structure has a rule of its
+  /// own (ADR 0034): another of the user's Devices may replace it.
+  static const _ownProfileRecord = 'profile';
+
+  /// Whether [key] holds a setting of a later version, kept as it is;
+  /// noted for the update notice.
+  bool _keepsLater(String key) {
+    if (key == _ownProfileRecord) return false;
+    final held = localSetting(key);
+    if (held == null || !laterSetting(held)) return false;
+    noteUpdateNeeded(UpdateNotices.settingsSource, UpdateNeeded.here);
+    return true;
+  }
 
   /// Every setting of this Device whose key starts with [prefix], as
   /// (key, value), by key.
@@ -1141,4 +1165,20 @@ class RefusalMark {
     }
     return null;
   }
+}
+
+/// Whether a local setting's [value] is JSON a later version of the app
+/// wrote (ADR 0034): an object whose `v` is there and not the whole
+/// number 1, or a list holding one; this version writes neither. Every
+/// other value, JSON or not, is this version's.
+bool laterSetting(String value) {
+  final Object? json;
+  try {
+    json = jsonDecode(value);
+  } on FormatException {
+    return false;
+  }
+  bool later(Object? o) =>
+      o is Map && o.containsKey('v') && !(o['v'] is int && o['v'] == 1);
+  return later(json) || (json is List && json.any(later));
 }

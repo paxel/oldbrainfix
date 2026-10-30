@@ -61,8 +61,8 @@ class ShareAreaScreen extends StatefulWidget {
 class _ShareAreaScreenState extends State<ShareAreaScreen> {
   final _code = TextEditingController();
 
-  /// Whether the code typed is no pair code; said under the field until
-  /// it changes.
+  /// Whether the code typed is no pair code, or one of a later version;
+  /// said under the field until it changes.
   var _codeInvalid = false;
   var _role = AreaRole.member;
   var _busy = false;
@@ -136,7 +136,8 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
     if (!mounted || photo == null) return;
     final code = await pairing.readQr(photo);
     if (!mounted) return;
-    if (code == null || decodePairCode(code) == null) {
+    if (code == null ||
+        (decodePairCode(code) == null && !pairCodeNeedsUpdate(code))) {
       announceCodeNotRead(context);
       return;
     }
@@ -357,7 +358,7 @@ class _ShareAreaScreenState extends State<ShareAreaScreen> {
             decoration: InputDecoration(
               labelText: t.syncCodeLabel,
               border: const OutlineInputBorder(),
-              errorText: _codeInvalid ? t.syncInvalidCode : null,
+              errorText: _codeInvalid ? invalidCodeText(t, _code.text) : null,
             ),
             onChanged: (_) {
               if (_codeInvalid) setState(() => _codeInvalid = false);

@@ -895,6 +895,32 @@ void main() {
       expect(ben.personShown(idOf(ann)).name, 'Ann A.');
     });
 
+    test('a Profiles file of a later version is not read (ADR 0034)', () async {
+      final area = household();
+      final folder = MemorySyncFolder();
+      ann.renameOwnProfile('Ann A.');
+      await folderSync(ann, folder);
+      final key = ann.areaKeys().firstWhere((k) => k.scope == area);
+      final name = profilesFileName(ann.deviceId, key.id);
+      final aad = SealedAs.profiles(ann.deviceId);
+      final plain = unseal(key.key, folder.dirs['keys']![name]!, aad: aad);
+      final json = jsonDecode(utf8.decode(plain!)) as Map<String, Object?>;
+      folder.dirs['keys']![name] = seal(
+        key.key,
+        utf8.encode(jsonEncode({...json, 'v': 2})),
+        aad: aad,
+      );
+      final result = await folderSync(ben, folder);
+      expect(result.newer, 1);
+      expect(result.profileChanged, isFalse);
+      expect(ben.personShown(idOf(ann)).name, 'Ann');
+      // Anyone holding the Area's key could have written that one: the
+      // own is written over as before.
+      await folderSync(ann, folder);
+      final again = unseal(key.key, folder.dirs['keys']![name]!, aad: aad);
+      expect(jsonDecode(utf8.decode(again!)), json);
+    });
+
     test('a bundle for the other person carries the Profiles', () async {
       final area = household();
       ann.renameOwnProfile('Ann A.');

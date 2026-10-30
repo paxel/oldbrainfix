@@ -431,6 +431,79 @@ void main() {
       );
     });
 
+    test('one of a later format needs an update, in its header or its '
+        'first record', () async {
+      final (old, code, path) = await backedUp();
+      addTearDown(old.close);
+      final key = decodeRecoveryCode(code)!;
+      final bytes = File(path).readAsBytesSync();
+      final header = readBackupHeader(path)!;
+      final rest = bytes.sublist(header.line.length);
+      final line = utf8.decode(header.line);
+      final later = {
+        for (final format in ['2', '"1"', '1.0', 'null', '0'])
+          format: [
+            ...utf8.encode('{"format":$format,${line.substring(1)}'),
+            ...rest,
+          ],
+        // Whatever else a later header holds.
+        'nothing more': utf8.encode(
+          '{"format":2,"type":"oldbrainfix-backup"}\n',
+        ),
+        // The first record says it too.
+        'about': [
+          ...header.line,
+          0x0a,
+          ...seal(
+            unseal(key, header.sealedKey, aad: SealedAs.backupKey)!,
+            utf8.encode('{"about":{"device":"x","format":2,"seed":"y"}}\n'),
+            aad: SealedAs.backupChunk(header.hash, 0, last: true),
+          ),
+        ],
+      };
+      var n = 0;
+      for (final MapEntry(key: what, value: changed) in later.entries) {
+        final file = File('${dir.path}/later${n++}.$backupExtension')
+          ..writeAsBytesSync(changed);
+        if (what != 'about') {
+          expect(
+            () => readBackupHeader(file.path),
+            throwsA(
+              isA<BackupException>().having(
+                (e) => e.problem,
+                'problem',
+                BackupProblem.needsUpdate,
+              ),
+            ),
+            reason: what,
+          );
+        }
+        final store = fresh('l$n');
+        addTearDown(store.close);
+        await expectLater(
+          restoreBackup(store, file.path, key),
+          throwsA(
+            isA<BackupException>().having(
+              (e) => e.problem,
+              'problem',
+              BackupProblem.needsUpdate,
+            ),
+          ),
+          reason: what,
+        );
+        expect(store.currentSeq(), 0, reason: what);
+      }
+      // A header that says no Backup, or is not whole, is none.
+      for (final none in [
+        '{"format":2,"type":"other"}',
+        '{"format":1,"type":"oldbrainfix-backup"}',
+      ]) {
+        final file = File('${dir.path}/none.$backupExtension')
+          ..writeAsStringSync('$none\n');
+        expect(readBackupHeader(file.path), isNull, reason: none);
+      }
+    });
+
     test('goes only into an empty log', () async {
       final (old, code, path) = await backedUp();
       addTearDown(old.close);

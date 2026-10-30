@@ -31,6 +31,16 @@
   "invalid": [
     "nope",
     "",
-    "r2m02_5xgnw_0aeg8"
+    "r2m02_5xgnw_0aeg8",
+    "1800018zj07m4fr3188hg7s65mt",
+    "11800018zj07m4fr3188hg7s65mt0",
+    "2abcd",
+    "2!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+    "2000000000000000000000000000"
+  ],
+  "newer": [
+    "21800018zj07m4fr3188hg7s65mt0",
+    "9 1800018ZJ07M4FR3188HG7S65MT0 00",
+    "3r2m025xgnw0aeg83188hg7s65mt3pgj9a1bnwsbcedx8324fjtet9axjq70cfkpnvgx"
   ]
 }

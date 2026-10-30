@@ -4303,4 +4303,31 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tableDeleteBody =>
       'The words in its cells are deleted from the Note.';
+
+  @override
+  String get pairCodeNeedsUpdate =>
+      'This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.';
+
+  @override
+  String get sentItemNeedsUpdate =>
+      'This file comes from a newer Old Brain Fix.';
+
+  @override
+  String get restoreNeedsUpdate =>
+      'This Backup was made by a newer Old Brain Fix.';
+
+  @override
+  String get updateOpenAgainFix =>
+      'Update Old Brain Fix on this Device, then open it again.';
+
+  @override
+  String get settingsUpdateNeeded => 'An update of Old Brain Fix is needed.';
+
+  @override
+  String get settingsNeedUpdate =>
+      'A setting a newer Old Brain Fix saved on this Device is kept as it is.';
+
+  @override
+  String get settingsUpdateFix =>
+      'Install the latest Old Brain Fix on this Device.';
 }

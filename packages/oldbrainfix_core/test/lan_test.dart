@@ -47,6 +47,27 @@ void main() {
       expect(decodePairCode('r2m02_5xgnw_0aeg8'), isNull, reason: 'no print');
     });
 
+    test('of a later version need an update, and today\'s do not', () {
+      final typed = encodePairCode('10.0.0.5', 8080, '999999', fp, typed: true);
+      expect(pairCodeNeedsUpdate(typed), isFalse);
+      // Its version first, at a length version 1 does not have.
+      final later = '2${typed.replaceAll('_', '')}';
+      expect(decodePairCode(later), isNull);
+      expect(pairCodeNeedsUpdate(later), isTrue);
+      expect(pairCodeNeedsUpdate('9 ${typed.toUpperCase()} 00'), isTrue);
+      // A 10.x code cut short starts with 1: no code, not a later one.
+      expect(
+        pairCodeNeedsUpdate(typed.substring(0, typed.length - 1)),
+        isFalse,
+      );
+      expect(pairCodeNeedsUpdate('1${typed.replaceAll('_', '')}'), isFalse);
+      // Too short for any code, or not base32.
+      expect(pairCodeNeedsUpdate('2abcd'), isFalse);
+      expect(pairCodeNeedsUpdate('2${'!' * 30}'), isFalse);
+      // At a length of version 1 it is read as version 1.
+      expect(pairCodeNeedsUpdate('2${'0' * 27}'), isFalse);
+    });
+
     test('only private addresses are partners', () {
       for (final host in [
         '10.0.0.5',

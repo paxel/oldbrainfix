@@ -2317,5 +2317,19 @@
   "tableDeleteTableQuestion": "Delete the table?",
   "@tableDeleteTableQuestion": {"description": "Question before the last row or column of a table is deleted, which deletes the whole table."},
   "tableDeleteBody": "The words in its cells are deleted from the Note.",
-  "@tableDeleteBody": {"description": "Body of the question before a row, column or table is deleted."}
+  "@tableDeleteBody": {"description": "Body of the question before a row, column or table is deleted."},
+  "pairCodeNeedsUpdate": "This code comes from a newer Old Brain Fix. Update Old Brain Fix on this Device, then try again.",
+  "@pairCodeNeedsUpdate": {"description": "Under the pair code field, on the phone and the desktop, when the code typed or scanned is of a layout a later version of the app writes (ADR 0034): this version cannot join with it."},
+  "sentItemNeedsUpdate": "This file comes from a newer Old Brain Fix.",
+  "@sentItemNeedsUpdate": {"description": "Why a Sent Item was not opened: it is in a format a later version of the app writes (ADR 0034)."},
+  "restoreNeedsUpdate": "This Backup was made by a newer Old Brain Fix.",
+  "@restoreNeedsUpdate": {"description": "Why a Backup was not restored: it is in a format a later version of the app writes (ADR 0034)."},
+  "updateOpenAgainFix": "Update Old Brain Fix on this Device, then open it again.",
+  "@updateOpenAgainFix": {"description": "The fix for 'sentItemNeedsUpdate' and 'restoreNeedsUpdate': the file is kept as it is."},
+  "settingsUpdateNeeded": "An update of Old Brain Fix is needed.",
+  "@settingsUpdateNeeded": {"description": "Announced at the top in place of 'updateNeeded' for the notice 'settingsNeedUpdate'; the tap shows why and what to do."},
+  "settingsNeedUpdate": "A setting a newer Old Brain Fix saved on this Device is kept as it is.",
+  "@settingsNeedUpdate": {"description": "The cause in the update notice when this Device would have changed a setting a later version of the app saved in a form this version does not know (ADR 0034): the setting is not changed."},
+  "settingsUpdateFix": "Install the latest Old Brain Fix on this Device.",
+  "@settingsUpdateFix": {"description": "The fix for 'settingsNeedUpdate'."}
 }

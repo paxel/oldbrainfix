@@ -201,6 +201,48 @@ void main() {
     expect(heard, 2);
   });
 
+  test('a setting a later version wrote is kept as it is, and noted '
+      '(ADR 0034)', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    const later = '{"generation":3,"v":2}';
+    const listed = '[{"v":1},{"id":"a","v":"2"}]';
+    store
+      ..setLocalSetting('folderRead:x', later)
+      ..setLocalSetting('changes:x', listed);
+    expect(store.takeUpdateNotices(), isEmpty);
+    store
+      ..setLocalSetting('folderRead:x', '{"generation":1,"lines":{}}')
+      ..removeLocalSetting('changes:x')
+      ..forgetFolderReads();
+    expect(store.localSetting('folderRead:x'), later);
+    expect(store.localSetting('changes:x'), listed);
+    expect(store.takeUpdateNotices(), [
+      (UpdateNotices.settingsSource, UpdateNeeded.here),
+    ]);
+    // Version 1, said or not, and what is no object of a later one are
+    // this version's.
+    for (final mine in [
+      '{"v":1}',
+      '[{"v":1},2]',
+      '"v"',
+      '2',
+      'not json',
+      '{"a":{"v":2}}',
+    ]) {
+      store
+        ..setLocalSetting('k', mine)
+        ..setLocalSetting('k', 'next');
+      expect(store.localSetting('k'), 'next', reason: mine);
+      store.removeLocalSetting('k');
+    }
+    // The own Profile's record has a rule of its own.
+    store
+      ..setLocalSetting('profile', '{"id":"p","v":2,"version":1}')
+      ..setLocalSetting('profile', '{"id":"p","version":2}');
+    expect(store.localSetting('profile'), '{"id":"p","version":2}');
+  });
+
   test('new ids come from the id maker, random by default', () {
     final ids = {Store.newId(), Store.newId()};
     expect(ids, hasLength(2));

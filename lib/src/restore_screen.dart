@@ -32,6 +32,9 @@ String? newestBackupIn(String dir) {
       header = readBackupHeader(file.path);
     } on FileSystemException {
       continue;
+    } on BackupException {
+      // Of a later format: this version cannot restore it.
+      continue;
     }
     if (header == null) continue;
     if (made == null || header.created.isAfter(made)) {
@@ -87,7 +90,11 @@ class _RestoreScreenState extends State<RestoreScreen> {
   void initState() {
     super.initState();
     if (widget.found case final found?) {
-      _header = readBackupHeader(found);
+      try {
+        _header = readBackupHeader(found);
+      } on BackupException {
+        // Of a later format: picked by hand, it says so.
+      }
       if (_header != null) _path = found;
     }
   }
@@ -131,7 +138,13 @@ class _RestoreScreenState extends State<RestoreScreen> {
     final path = await BundleScope.of(context).pick();
     if (!mounted || path == null) return;
     _drop();
-    final header = readBackupHeader(path);
+    BackupHeader? header;
+    var later = false;
+    try {
+      header = readBackupHeader(path);
+    } on BackupException {
+      later = true;
+    }
     setState(() {
       _path = header == null ? null : path;
       _header = header;
@@ -142,11 +155,19 @@ class _RestoreScreenState extends State<RestoreScreen> {
       } on FileSystemException {
         // Gone already.
       }
-      _notRestored(
-        t.restoreNotABackup,
-        t.restorePickFix,
-        'backup: no Backup header in the file picked',
-      );
+      if (later) {
+        _notRestored(
+          t.restoreNeedsUpdate,
+          t.updateOpenAgainFix,
+          'backup: a Backup of a later format',
+        );
+      } else {
+        _notRestored(
+          t.restoreNotABackup,
+          t.restorePickFix,
+          'backup: no Backup header in the file picked',
+        );
+      }
     }
   }
 
@@ -212,6 +233,10 @@ class _RestoreScreenState extends State<RestoreScreen> {
     } on BackupException catch (e) {
       final (cause, fix) = switch (e.problem) {
         BackupProblem.notABackup => (t.restoreNotABackup, t.restorePickFix),
+        BackupProblem.needsUpdate => (
+          t.restoreNeedsUpdate,
+          t.updateOpenAgainFix,
+        ),
         BackupProblem.wrongSecret => (t.restoreWrong, t.restoreWrongFix),
         BackupProblem.damaged => (t.restoreDamagedCause, t.restoreDamagedFix),
         BackupProblem.notEmpty => (t.restoreNotEmpty, t.restoreNotEmptyFix),

@@ -50,10 +50,16 @@ pub const LIST_FORMAT: i64 = 2;
 
 /// Whether `json` is in a format this version reads.
 fn in_format(json: &Value) -> bool {
-    match json.get("format") {
-        None => true,
-        Some(format) => matches!(format.as_i64(), Some(FORMAT | LIST_FORMAT)),
-    }
+    json.is_object() && !later_format(json)
+}
+
+/// Whether `json` says a format this version does not read: a file of a
+/// later version (ADR 0034), as the Dart core's `_laterFormat`. Only an
+/// absent `format` and the whole numbers 1 and 2 are known; `"2"`, `2.0`
+/// or `null` are later too.
+fn later_format(json: &Value) -> bool {
+    json.get("format")
+        .is_some_and(|format| !matches!(format.as_i64(), Some(FORMAT | LIST_FORMAT)))
 }
 
 /// A file larger than this is no Sent Item: it holds only texts.
@@ -1441,6 +1447,9 @@ pub enum OpenError {
     /// No Sent Item: no JSON, damaged, too large, not signed by the key
     /// it names, or carrying a Profile not bound to that key.
     NotASentItem,
+    /// Of a format a later version of the app writes (ADR 0034): this
+    /// app needs an update to open it.
+    NeedsUpdate,
     /// Encrypted to other Devices, not to this one.
     NotForUs,
     /// Its id came here from another key: only its sender may update or
@@ -1510,6 +1519,9 @@ impl Store {
         let Ok(outer) = serde_json::from_slice::<Value>(bytes) else {
             return Ok(Err(OpenError::NotASentItem));
         };
+        if later_format(&outer) {
+            return Ok(Err(OpenError::NeedsUpdate));
+        }
         let mut signed = outer.clone();
         let mut encrypted = false;
         if in_format(&outer)
@@ -1527,6 +1539,9 @@ impl Store {
             let Ok(inner) = serde_json::from_slice::<Value>(&inner) else {
                 return Ok(Err(OpenError::NotASentItem));
             };
+            if later_format(&inner) {
+                return Ok(Err(OpenError::NeedsUpdate));
+            }
             signed = inner;
             encrypted = true;
         }
@@ -2242,6 +2257,67 @@ mod tests {
             .collect();
         assert_eq!(newer, vec![theirs]);
         assert_eq!(Routines::new(&ben).of_note(&got)?.len(), 1);
+        Ok(())
+    }
+
+    /// `signed`, a signed Sent Item, encrypted to the X25519 key `to` as
+    /// [`encode_sent_item`] does, with fixed bytes.
+    fn sealed_to(signed: &[u8], to: &[u8; BOX_KEY_BYTES]) -> Result<Vec<u8>> {
+        let content = [7u8; AREA_KEY_BYTES];
+        let ephemeral = [9u8; BOX_KEY_BYTES];
+        let public = box_public_of(&ephemeral);
+        let shared = x25519(&ephemeral, to).ok_or(Error::Invalid("no key".into()))?;
+        let nonce = [1u8; SEAL_NONCE_BYTES];
+        let sealed = seal(&content, signed, SEALED_AAD, &nonce)?;
+        let wrapped = seal(
+            &wrap_key(&shared, &public, to),
+            &content,
+            SENT_KEY_AAD,
+            &nonce,
+        )?;
+        Ok(json!({
+            "sealed": BASE64.encode(sealed),
+            "to": [{"eph": BASE64.encode(public), "key": BASE64.encode(wrapped)}],
+        })
+        .to_string()
+        .into_bytes())
+    }
+
+    #[test]
+    fn one_of_a_later_format_needs_an_update_and_says_so() -> TestResult {
+        let ann = device(1);
+        let ben = device(2);
+        let note = Notes::new(&ann).capture("Buy milk", None, None)?;
+        let signed = String::from_utf8(ann.send_note(&note.id, None, false)?)?;
+        assert!(signed.starts_with(r#"{"item":"#));
+        for format in ["3", r#""1""#, "1.0", "null", "0"] {
+            let later = format!(r#"{{"format":{format},{}"#, &signed[1..]);
+            assert_eq!(
+                ben.open_sent_item(later.as_bytes())?.err(),
+                Some(OpenError::NeedsUpdate),
+                "{format}"
+            );
+        }
+        // Whatever else a later format holds.
+        assert_eq!(
+            ben.open_sent_item(br#"{"format":3,"parts":[]}"#)?.err(),
+            Some(OpenError::NeedsUpdate)
+        );
+        // Encrypted, the signed file inside says it.
+        invite(&ann, &ben, "Ben")?;
+        let to = ann.sent_item_recipients()?;
+        let key = to.first().and_then(|r| r.keys.first()).ok_or("a key")?;
+        let inner = format!(r#"{{"format":3,{}"#, &signed[1..]);
+        assert_eq!(
+            ben.open_sent_item(&sealed_to(inner.as_bytes(), key)?)?
+                .err(),
+            Some(OpenError::NeedsUpdate)
+        );
+        // Of the formats known, it opens as before.
+        let opened = ben.open_sent_item(&sealed_to(signed.as_bytes(), key)?)?;
+        assert!(opened.map_err(|_| "opened")?.encrypted);
+        let one = format!(r#"{{"format":1,{}"#, &signed[1..]);
+        assert!(ben.open_sent_item(one.as_bytes())?.is_ok());
         Ok(())
     }
 

@@ -1028,6 +1028,51 @@ mod tests {
     }
 
     #[test]
+    fn a_profiles_file_of_a_later_version_is_not_read() -> TestResult {
+        use crate::folder::{
+            MemoryFolder, SyncFolder, folder_sync, profiles_file_name, random_nonce,
+        };
+        use crate::keys::{seal, sealed_as, unseal};
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let area = household(&ann, &ben)?;
+        let mut folder = MemoryFolder::default();
+        OwnProfile::new(&ann).rename("Ann A.")?;
+        folder_sync(&ann, &mut folder, &mut random_nonce)?;
+        let key = ann
+            .area_keys()?
+            .into_iter()
+            .find(|k| k.scope == area)
+            .ok_or("the Area's key")?;
+        let own = ann.device_id()?;
+        let name = profiles_file_name(&own, &key.id());
+        let aad = sealed_as::profiles(&own);
+        let held = folder.read("keys", &name)?.ok_or("a Profiles file")?;
+        let plain = unseal(&key.key, &held, &aad).ok_or("opens")?;
+        let mut json: Value = serde_json::from_slice(&plain)?;
+        if let Some(map) = json.as_object_mut() {
+            map.insert("v".into(), serde_json::json!(2));
+        }
+        let later = seal(
+            &key.key,
+            json.to_string().as_bytes(),
+            &aad,
+            &random_nonce()?,
+        )?;
+        folder.write("keys", &name, &later)?;
+        let result = folder_sync(&ben, &mut folder, &mut random_nonce)?;
+        assert_eq!(result.newer, 1);
+        assert!(!result.profile_changed);
+        assert_eq!(ben.person_shown(&own_id(&ann)?)?.name, "Ann");
+        // Anyone holding the Area's key could have written that one: the
+        // own is written over as before.
+        folder_sync(&ann, &mut folder, &mut random_nonce)?;
+        let again = folder.read("keys", &name)?.ok_or("a Profiles file")?;
+        assert_eq!(unseal(&key.key, &again, &aad), Some(plain));
+        Ok(())
+    }
+
+    #[test]
     fn an_update_signed_by_a_key_not_bound_is_refused() -> TestResult {
         let ann = device(1, "Ann")?;
         let ben = device(2, "Ben")?;

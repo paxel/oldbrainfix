@@ -457,8 +457,15 @@ impl Store {
             .optional()?)
     }
 
+    /// Sets `key` to `value`, unless what `key` holds a later version of
+    /// the app wrote ([`later_setting`]): that stays as it is, and an
+    /// update notice says so ([`crate::sync::SETTINGS_SOURCE`]), as the
+    /// Dart core's `setLocalSetting`.
     pub fn set_local_setting(&self, key: &str, value: &str) -> Result<()> {
         self.refuse_while_drafting()?;
+        if self.keeps_later(key)? {
+            return Ok(());
+        }
         self.db.lock().execute(
             "INSERT OR REPLACE INTO local_settings (key, value) VALUES (?, ?)",
             [key, value],
@@ -466,12 +473,38 @@ impl Store {
         Ok(())
     }
 
+    /// Removes `key`, unless a later version wrote it, as
+    /// [`Store::set_local_setting`].
     pub fn remove_local_setting(&self, key: &str) -> Result<()> {
         self.refuse_while_drafting()?;
+        if self.keeps_later(key)? {
+            return Ok(());
+        }
         self.db
             .lock()
             .execute("DELETE FROM local_settings WHERE key = ?", [key])?;
         Ok(())
+    }
+
+    /// Whether `key` holds a setting of a later version, kept as it is;
+    /// noted for the update notice. The own Profile's record has a rule
+    /// of its own (ADR 0034): another of the user's Devices may replace
+    /// it.
+    fn keeps_later(&self, key: &str) -> Result<bool> {
+        if key == crate::profile::RECORD {
+            return Ok(false);
+        }
+        if !self
+            .local_setting(key)?
+            .is_some_and(|held| later_setting(&held))
+        {
+            return Ok(false);
+        }
+        self.note_update_needed(
+            crate::sync::SETTINGS_SOURCE,
+            crate::sync::UpdateNeeded::Here,
+        )?;
+        Ok(true)
     }
 
     /// Every setting of this Device whose key starts with `prefix`, as
@@ -1543,6 +1576,20 @@ pub fn utf16_cmp(a: &str, b: &str) -> Ordering {
     a.encode_utf16().cmp(b.encode_utf16())
 }
 
+/// Whether a local setting's `value` is JSON a later version of the app
+/// wrote (ADR 0034), as the Dart core's `laterSetting`: an object whose
+/// `v` is there and not the whole number 1, or a list holding one; this
+/// version writes neither. Every other value, JSON or not, is this
+/// version's.
+pub fn later_setting(value: &str) -> bool {
+    fn later(json: &serde_json::Value) -> bool {
+        json.is_object() && json.get("v").is_some_and(|v| v.as_i64() != Some(1))
+    }
+    serde_json::from_str::<serde_json::Value>(value).is_ok_and(|json| {
+        later(&json) || json.as_array().is_some_and(|list| list.iter().any(later))
+    })
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -1567,6 +1614,49 @@ pub(crate) mod tests {
             Ok(s) => s,
             Err(e) => panic!("store: {e}"),
         }
+    }
+
+    #[test]
+    fn a_setting_a_later_version_wrote_is_kept_as_it_is_and_noted() -> Result<()> {
+        use crate::sync::{SETTINGS_SOURCE, UpdateNeeded};
+        let store = store();
+        let later = r#"{"generation":3,"v":2}"#;
+        let listed = r#"[{"v":1},{"id":"a","v":"2"}]"#;
+        store.set_local_setting("folderRead:x", later)?;
+        store.set_local_setting("changes:x", listed)?;
+        assert!(store.take_update_notices()?.is_empty());
+        store.set_local_setting("folderRead:x", r#"{"generation":1,"lines":{}}"#)?;
+        store.remove_local_setting("changes:x")?;
+        store.forget_folder_reads()?;
+        assert_eq!(store.local_setting("folderRead:x")?.as_deref(), Some(later));
+        assert_eq!(store.local_setting("changes:x")?.as_deref(), Some(listed));
+        assert_eq!(
+            store.take_update_notices()?,
+            vec![(SETTINGS_SOURCE.to_string(), UpdateNeeded::Here)]
+        );
+        // Version 1, said or not, and what is no object of a later one
+        // are this version's.
+        for mine in [
+            r#"{"v":1}"#,
+            r#"[{"v":1},2]"#,
+            r#""v""#,
+            "2",
+            "not json",
+            r#"{"a":{"v":2}}"#,
+        ] {
+            store.set_local_setting("k", mine)?;
+            store.set_local_setting("k", "next")?;
+            assert_eq!(store.local_setting("k")?.as_deref(), Some("next"), "{mine}");
+            store.remove_local_setting("k")?;
+        }
+        // The own Profile's record has a rule of its own.
+        store.set_local_setting("profile", r#"{"id":"p","v":2,"version":1}"#)?;
+        store.set_local_setting("profile", r#"{"id":"p","version":2}"#)?;
+        assert_eq!(
+            store.local_setting("profile")?.as_deref(),
+            Some(r#"{"id":"p","version":2}"#)
+        );
+        Ok(())
     }
 
     #[test]

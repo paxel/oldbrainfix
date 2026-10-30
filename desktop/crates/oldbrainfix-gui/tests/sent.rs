@@ -289,6 +289,30 @@ fn a_sent_item_dropped_or_handed_over_is_previewed_and_accepted_or_declined() ->
 }
 
 #[test]
+fn a_sent_item_of_a_later_format_says_an_update_is_needed() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let later = dir.path().join("later.oldbrain");
+    std::fs::write(&later, br#"{"format":3,"item":"x","sig":"y"}"#)?;
+    let mut app = App::new(store(1, "Ada")?, "en");
+    app.select(Selection::Agenda);
+    let mut harness = window(app);
+    drop_file(&mut harness, &later);
+    assert_eq!(harness.state().notice(), Some("The file was not taken."));
+    harness.get_by_label("The file was not taken.").click();
+    harness.run();
+    assert!(shows(&harness, "File not taken"));
+    assert!(shows(
+        &harness,
+        "This file comes from a newer Old Brain Fix."
+    ));
+    assert!(shows(
+        &harness,
+        "Update Old Brain Fix on this Device, then open it again."
+    ));
+    Ok(())
+}
+
+#[test]
 fn a_note_sent_before_goes_as_an_update_or_a_cancellation() -> TestResult {
     let desk = store(1, "Ada")?;
     let ben = store(2, "Ben")?;

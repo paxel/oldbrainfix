@@ -352,6 +352,9 @@ pub fn welcome(
 pub fn restore_failure(t: &L10n, error: &Error) -> (&'static str, &'static str) {
     match error {
         Error::Backup(Problem::NotABackup) => (t.restore_not_a_backup(), t.restore_pick_fix()),
+        Error::Backup(Problem::NeedsUpdate) => {
+            (t.restore_needs_update(), t.update_open_again_fix())
+        }
         Error::Backup(Problem::WrongSecret) => (t.restore_wrong(), t.restore_wrong_fix()),
         Error::Backup(Problem::Damaged) => (t.restore_damaged_cause(), t.restore_damaged_fix()),
         Error::Backup(Problem::NotEmpty) => (t.restore_not_empty(), t.restore_not_empty_fix()),
