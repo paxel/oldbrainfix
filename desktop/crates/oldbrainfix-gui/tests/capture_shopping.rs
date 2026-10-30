@@ -255,6 +255,14 @@ fn a_photo_keeps_the_capture_a_note() -> TestResult {
     type_rows(&mut harness, &["Bread"]);
     pick(&mut harness, "Groceries");
     click(&mut harness, t().paste());
+    // The picture waits on the field until the capture is saved.
+    assert!(others(&store, &list)?.is_empty());
+    harness
+        .get_by(|n| n.role() == Role::MultilineTextInput && n.value().as_deref() == Some("Bread"))
+        .click();
+    harness.run();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, Key::Enter);
+    harness.run();
     let kept = others(&store, &list)?;
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].text, "Bread");
