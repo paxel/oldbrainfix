@@ -1291,8 +1291,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
                 child: Column(
                   children: [
                     _Heading(t.agendaTomorrow),
+                    // Only today's empty day tells how to capture.
                     if (_tomorrow.isEmpty)
-                      BrowserEmpty(text: t.nothingTomorrow)
+                      _NothingPlanned(t.nothingPlanned)
                     else
                       ...rows(_tomorrow),
                   ],

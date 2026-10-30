@@ -2068,6 +2068,7 @@ pub(crate) mod tests {
             text: text.into(),
             indent: false,
             checked: true,
+            reappear: None,
         };
         item.lines = Some(vec![
             lines[0].clone(),

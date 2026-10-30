@@ -7,6 +7,7 @@ import 'area_look.dart';
 import 'browser.dart';
 import 'capture_screen.dart';
 import 'file_into_screen.dart';
+import 'frogs_screen.dart';
 import 'l10n.dart';
 import 'look.dart';
 import 'merge_into_screen.dart';
@@ -188,6 +189,13 @@ class _AreasScreenState extends State<AreasScreen>
     _reload();
   }
 
+  /// Opens the Frog view: the open Frogs and the eaten ones folded.
+  Future<void> _openFrogs() async {
+    await openFrogs(context, widget.notes, widget.places);
+    if (!mounted) return;
+    _reload();
+  }
+
   Future<void> _openTrash() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -344,6 +352,11 @@ class _AreasScreenState extends State<AreasScreen>
                 tooltip: t.allNotesTitle,
                 onPressed: _openAllNotes,
                 icon: const Icon(Icons.notes),
+              ),
+              IconButton(
+                tooltip: t.frogsTitle,
+                onPressed: _openFrogs,
+                icon: const FrogIcon(),
               ),
               IconButton(
                 tooltip: t.trashTitle,

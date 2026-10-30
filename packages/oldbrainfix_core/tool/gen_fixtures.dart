@@ -3933,6 +3933,149 @@ void _sentChecklistFixture(Directory root) {
   }
 }
 
+/// Ada sends a Shopping List to Ben, its Lines with their reappear
+/// times and all open on arrival; he accepts it and makes it his own; she
+/// changes it, then turns it back into a plain Note, and he applies both
+/// updates (ADR 0030). Everything after her log is at held clocks.
+void _sentShoppingFixture(Directory root) {
+  final out = Directory('${root.path}/sent-shopping')
+    ..createSync(recursive: true);
+  final ada = _store();
+  final ben = Store.inMemory(
+    clock: _clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  )..setLocalSetting('author', 'Ben');
+  DateTime utc(DateTime at) => at;
+  String line(Store store, String note, String text) =>
+      ShoppingLists(store)
+          .byNote(note, utc)!
+          .lines
+          .firstWhere((l) => l.text == text)
+          .id;
+  try {
+    final note = Notes(ada).capture('Groceries\nMilk\nBread\nEggs').id;
+    final lists = ShoppingLists(ada);
+    lists.make(note);
+    lists.setReappear(line(ada, note, 'Eggs'), Reappear.week2);
+    lists.setReappear(line(ada, note, 'Bread'), Reappear.once);
+    lists.check(line(ada, note, 'Bread'), utc);
+    lists.check(line(ada, note, 'Milk'), utc);
+    _write(File('${out.path}/sender.jsonl'), _log(ada));
+    ada.applyProfileDefaults(name: 'Ada');
+    _write(
+      File('${out.path}/settings.json'),
+      '${_json.convert([
+        for (final (key, value) in ada.localSettingsWithPrefix('profile')) [key, value],
+      ])}\n',
+    );
+    Map<String, Object?> changesOf(SentItemChanges c) => {
+      'makesShoppingList': c.makesShoppingList,
+      'makesChecklist': c.makesChecklist,
+      'makesPlain': c.makesPlain,
+      'linesAdded': [
+        for (final l in c.linesAdded)
+          {'id': l.id, 'text': l.text, 'reappear': l.reappear?.code},
+      ],
+      'linesRenamed': [
+        for (final r in c.linesRenamed) [r.line, r.before, r.after],
+      ],
+      'linesRemoved': [for (final l in c.linesRemoved) l.id],
+    };
+    Map<String, Object?> readOf(Store store, String id) => {
+      'text': Notes(store).byId(id)!.text,
+      'unsorted': Notes(store).byId(id)!.isUnsorted,
+      'list': switch (ShoppingLists(store).byNote(id, utc)) {
+        final list? => _shoppingList(list),
+        null => null,
+      },
+    };
+
+    var ids = 0xa00;
+    Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+    _held = DateTime.utc(2026, 1, 3, 12);
+    var mark = ada.currentSeq();
+    final item = sentItemOf(ada, note);
+    _writeAfter(ada, mark, File('${out.path}/sent.jsonl'));
+    final file = encodeSentItem(item, ada.signingKey);
+    File('${out.path}/shopping.$sentItemExtension').writeAsBytesSync(file);
+
+    ids = 0xb00;
+    _held = DateTime.utc(2026, 1, 4, 18);
+    mark = ben.currentSeq();
+    final opened = openSentItem(ben, file);
+    final got =
+        acceptSentItem(ben, opened.item) ??
+        (throw StateError('Ben did not accept it'));
+    _writeAfter(ben, mark, File('${out.path}/accepted.jsonl'));
+    final first = readOf(ben, got);
+
+    ids = 0xc00;
+    _held = DateTime.utc(2026, 1, 5, 9);
+    mark = ben.currentSeq();
+    ShoppingLists(ben).check(line(ben, got, 'Eggs'), utc);
+    ShoppingLists(ben).add(got, 'Coffee', utc);
+    _writeAfter(ben, mark, File('${out.path}/receiver.jsonl'));
+
+    ids = 0xd00;
+    _held = DateTime.utc(2026, 1, 6, 10);
+    mark = ada.currentSeq();
+    lists.rename(line(ada, note, 'Eggs'), 'Free-range eggs');
+    lists.delete(line(ada, note, 'Milk'));
+    lists.add(note, 'Tea', utc);
+    _writeAfter(ada, mark, File('${out.path}/changed.jsonl'));
+    _held = DateTime.utc(2026, 1, 6, 11);
+    mark = ada.currentSeq();
+    final update = encodeSentItem(sentItemOf(ada, note), ada.signingKey);
+    _writeAfter(ada, mark, File('${out.path}/update.jsonl'));
+    File('${out.path}/update.$sentItemExtension').writeAsBytesSync(update);
+
+    ids = 0xe00;
+    _held = DateTime.utc(2026, 1, 7, 8);
+    final toUpdate = openSentItem(ben, update);
+    final changes = toUpdate.changes ?? (throw StateError('no update'));
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toUpdate.item);
+    _writeAfter(ben, mark, File('${out.path}/updated.jsonl'));
+    final second = readOf(ben, got);
+
+    ids = 0xf00;
+    _held = DateTime.utc(2026, 1, 8, 7);
+    mark = ada.currentSeq();
+    lists.toPlain(note, utc);
+    final plain = encodeSentItem(sentItemOf(ada, note), ada.signingKey);
+    _writeAfter(ada, mark, File('${out.path}/plain.jsonl'));
+    File('${out.path}/plain.$sentItemExtension').writeAsBytesSync(plain);
+
+    ids = 0x1000;
+    _held = DateTime.utc(2026, 1, 8, 12);
+    final toPlain = openSentItem(ben, plain);
+    final plainChanges = toPlain.changes ?? (throw StateError('no update'));
+    mark = ben.currentSeq();
+    acceptSentItem(ben, toPlain.item);
+    _writeAfter(ben, mark, File('${out.path}/plained.jsonl'));
+    final third = readOf(ben, got);
+
+    _write(
+      File('${out.path}/expected.json'),
+      '${_json.convert({
+        'shopping': opened.item.shopping,
+        'lines': [
+          for (final l in opened.item.lines ?? const <SentLine>[]) {'id': l.id, 'text': l.text, 'indent': l.indent, 'checked': l.checked, 'reappear': l.reappear?.code},
+        ],
+        'accepted': got,
+        'first': first,
+        'update': changesOf(changes),
+        'second': second,
+        'plain': changesOf(plainChanges),
+        'third': third,
+      })}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+  }
+}
+
 /// The Profiles of other people [store] keeps, as its `person:`
 /// settings.
 List<List<String>> _personSettings(Store store) => [
@@ -6668,6 +6811,13 @@ Future<void> main(List<String> args) async {
     'and sends that (`plain.jsonl`, `plain.$sentItemExtension`), which Ben '
     'applies (`plained.jsonl`, from 0x1001); what he reads and the changes '
     'at each step (`expected.json`).\n'
+    '- `sent-shopping/`: Ada sends a Shopping List to Ben (ADR 0030), as '
+    'for `sent-checklist/`, the file `shopping.$sentItemExtension`: one '
+    'Line struck and one checked Once at hers, which stays with her; the '
+    'others arrive open with their reappear times. Ben checks a Line and '
+    'adds one; Ada renames, deletes and adds Lines and sends the update; '
+    'she turns it back into a plain Note and sends that. Read on a UTC '
+    'wall clock.\n'
     '- `sessions/sessions.json`: each Session of the `sessions` log with '
     'its pool, counts and rule, the Tallies it picks from and may pick, '
     'its Routine with what is Done, from entries too, and today\'s '
@@ -6928,6 +7078,7 @@ Future<void> main(List<String> args) async {
   await _sharedFixture(root);
   _sentFixture(root);
   _sentChecklistFixture(root);
+  _sentShoppingFixture(root);
   await _backupFixture(root);
   final later = Directory.systemTemp.createTempSync('oldbrainfix_later_');
   try {

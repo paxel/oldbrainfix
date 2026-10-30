@@ -42,7 +42,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - A checkbox or switch is the only thing that toggles state; the row
   around it does not.
 - **A horizontal swipe only navigates** (see Navigation); it never
-  changes data or swipes a row or card away.
+  changes data or swipes a row or card away. The one exception is the
+  full-screen table: a one-finger drag on its cells moves it sideways,
+  as its bar does.
 
 ## Announcements
 
@@ -133,7 +135,9 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   day orders its rows the same way.
 - After a visible gap comes tomorrow, in dimmer colours, then the five
   days after it, each under its weekday and date, dimmed alike. Every
-  day shows, an empty one with "Nothing planned". The later days'
+  day shows, an empty one with "Nothing planned"; only an empty today
+  says how to capture instead ("Nothing due today. Tap + to capture a
+  thought."). The later days'
   Occurrences can be checked off today.
 - **The Agenda's bar**, in this order: All Routines and Reminders,
   Calendar, new Routine, then the Profile picture in the corner. All

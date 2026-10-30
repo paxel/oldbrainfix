@@ -1,0 +1,149 @@
+{
+  "shopping": true,
+  "lines": [
+    {
+      "id": "line:00000000000000000000000000000005",
+      "text": "Eggs",
+      "indent": false,
+      "checked": false,
+      "reappear": "2w"
+    },
+    {
+      "id": "line:00000000000000000000000000000003",
+      "text": "Milk",
+      "indent": false,
+      "checked": false,
+      "reappear": "1w"
+    }
+  ],
+  "accepted": "note:00000000000000000000000000000b01",
+  "first": {
+    "text": "Groceries",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000b03",
+          "text": "Eggs",
+          "reappear": "2w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "V"
+        },
+        {
+          "id": "line:00000000000000000000000000000b04",
+          "text": "Milk",
+          "reappear": "1w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "W"
+        }
+      ],
+      "count": 2,
+      "openCount": 2,
+      "struckCount": 0
+    }
+  },
+  "update": {
+    "makesShoppingList": false,
+    "makesChecklist": false,
+    "makesPlain": false,
+    "linesAdded": [
+      {
+        "id": "line:00000000000000000000000000000d01",
+        "text": "Tea",
+        "reappear": "1w"
+      }
+    ],
+    "linesRenamed": [
+      [
+        "line:00000000000000000000000000000b03",
+        "Eggs",
+        "Free-range eggs"
+      ]
+    ],
+    "linesRemoved": [
+      "line:00000000000000000000000000000b04"
+    ]
+  },
+  "second": {
+    "text": "Groceries",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000e01",
+          "text": "Tea",
+          "reappear": "1w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "Y"
+        },
+        {
+          "id": "line:00000000000000000000000000000c01",
+          "text": "Coffee",
+          "reappear": "1w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "X"
+        },
+        {
+          "id": "line:00000000000000000000000000000b03",
+          "text": "Free-range eggs",
+          "reappear": "2w",
+          "struck": true,
+          "checkedAt": "2026-01-05T09:00:00.000Z",
+          "backOn": "2026-01-19",
+          "cameBackOn": null,
+          "order": "V"
+        }
+      ],
+      "count": 3,
+      "openCount": 2,
+      "struckCount": 1
+    }
+  },
+  "plain": {
+    "makesShoppingList": false,
+    "makesChecklist": false,
+    "makesPlain": false,
+    "linesAdded": [],
+    "linesRenamed": [],
+    "linesRemoved": [
+      "line:00000000000000000000000000000e01",
+      "line:00000000000000000000000000000b03"
+    ]
+  },
+  "third": {
+    "text": "Groceries\nTea\nFree-range eggs",
+    "unsorted": true,
+    "list": {
+      "making": "00000000000000000000000000000b02",
+      "lines": [
+        {
+          "id": "line:00000000000000000000000000000c01",
+          "text": "Coffee",
+          "reappear": "1w",
+          "struck": false,
+          "checkedAt": null,
+          "backOn": null,
+          "cameBackOn": null,
+          "order": "X"
+        }
+      ],
+      "count": 1,
+      "openCount": 1,
+      "struckCount": 0
+    }
+  }
+}

@@ -49,7 +49,8 @@ Future<void> openTable(
 /// A table of a formatted text full screen (ADR 0033): its header row
 /// stays on screen while the rows scroll up and down, and so does its
 /// first column when it holds headings. Sideways the table moves by the
-/// bar above it, not by a swipe, which is navigation (UI laws).
+/// bar above it and by a drag on its cells, the one place where a
+/// horizontal swipe does not navigate (UI laws).
 ///
 /// With [edit], a tap on a cell edits it in place, its frame drawn, its
 /// words typed as in the Note editor, in two rows when set so, with the
@@ -496,37 +497,45 @@ class _TableScreenState extends State<TableScreen> {
     final padding = clearOfSystemBars(context, EdgeInsets.zero);
     return Padding(
       padding: EdgeInsets.only(left: padding.left, right: padding.right),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_most > 0)
-            _SidewaysBar(
-              key: const ValueKey('table-sideways'),
-              offset: _offset,
-              most: _most,
-              room: _room,
-              whole: moving,
-              label: t.tableSideways,
-            ),
-          if (_edits) _letters(table),
-          _row(context, table, 0),
-          Expanded(
-            child: GestureDetector(
-              // A tap beside the cells ends editing.
-              behavior: HitTestBehavior.translucent,
-              onTap: _finish,
-              child: ListView(
-                key: const ValueKey('table-rows'),
-                padding: EdgeInsets.only(bottom: padding.bottom + 16),
-                children: [
-                  for (var r = 1; r < table.rows.length; r++)
-                    _row(context, table, r),
-                  if (_edits) _row(context, table, table.rows.length),
-                ],
+      // A drag on the cells moves the table under the finger; the bar
+      // keeps its own.
+      child: GestureDetector(
+        onHorizontalDragUpdate: _most > 0
+            ? (d) =>
+                  _offset.value = (_offset.value - d.delta.dx).clamp(0, _most)
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_most > 0)
+              _SidewaysBar(
+                key: const ValueKey('table-sideways'),
+                offset: _offset,
+                most: _most,
+                room: _room,
+                whole: moving,
+                label: t.tableSideways,
+              ),
+            if (_edits) _letters(table),
+            _row(context, table, 0),
+            Expanded(
+              child: GestureDetector(
+                // A tap beside the cells ends editing.
+                behavior: HitTestBehavior.translucent,
+                onTap: _finish,
+                child: ListView(
+                  key: const ValueKey('table-rows'),
+                  padding: EdgeInsets.only(bottom: padding.bottom + 16),
+                  children: [
+                    for (var r = 1; r < table.rows.length; r++)
+                      _row(context, table, r),
+                    if (_edits) _row(context, table, table.rows.length),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -229,17 +229,36 @@ void main() {
       expect(tester.getTopLeft(key('cell-10-0')).dy, lessThan(row.dy));
     });
 
-    testWidgets('moves sideways by its bar, not by a swipe, the first '
-        'column staying when it holds headings', (tester) async {
+    testWidgets('a drag on the cells moves the table under the finger, the '
+        'header row with it and the first column staying when it holds '
+        'headings', (tester) async {
       await open(tester, wide(headings: true));
       final first = tester.getTopLeft(key('cell-1-0'));
       final third = tester.getTopLeft(key('cell-1-2'));
       final header = tester.getTopLeft(key('cell-0-2'));
 
-      // A swipe is navigation: the table stays.
-      await tester.drag(key('cell-1-1'), const Offset(-200, 0));
+      await tester.drag(key('cell-1-1'), const Offset(-100, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(TableScreen), findsOneWidget, reason: 'it stays');
+      expect(tester.getTopLeft(key('cell-1-0')), first);
+      final dragged = tester.getTopLeft(key('cell-1-2'));
+      expect(dragged.dx, lessThan(third.dx));
+      expect(
+        tester.getTopLeft(key('cell-0-2')).dx - header.dx,
+        dragged.dx - third.dx,
+      );
+      // Back the other way, no further than the start.
+      await tester.drag(key('cell-0-2'), const Offset(400, 0));
       await tester.pumpAndSettle();
       expect(tester.getTopLeft(key('cell-1-2')), third);
+    });
+
+    testWidgets('moves sideways by its bar, the first column staying when '
+        'it holds headings', (tester) async {
+      await open(tester, wide(headings: true));
+      final first = tester.getTopLeft(key('cell-1-0'));
+      final third = tester.getTopLeft(key('cell-1-2'));
+      final header = tester.getTopLeft(key('cell-0-2'));
 
       await tester.drag(key('table-sideways-thumb'), const Offset(100, 0));
       await tester.pumpAndSettle();

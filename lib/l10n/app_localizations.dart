@@ -3614,6 +3614,18 @@ abstract class AppLocalizations {
   /// **'It becomes a Checklist.'**
   String get sentItemMakesChecklist;
 
+  /// No description provided for @sentItemMakesShoppingList.
+  ///
+  /// In en, this message translates to:
+  /// **'It becomes a Shopping List.'**
+  String get sentItemMakesShoppingList;
+
+  /// Under a Line of a Shopping List in a Sent Item's preview; time is shoppingOnce or shoppingWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Reappear time: {time}'**
+  String sentItemLineReappear(String time);
+
   /// No description provided for @sentItemMakesPlain.
   ///
   /// In en, this message translates to:

@@ -31,7 +31,8 @@ import 'text_format.dart';
 ///
 /// What travels is the Note's text, the texts of its Sections, the
 /// schedules of its Routines and Reminders and the Lines of its
-/// Checklist; never its Capture Context, photos or voice recordings.
+/// Checklist or Shopping List; never its Capture Context, photos or voice
+/// recordings.
 const sentItemExtension = 'oldbrain';
 
 /// The type a Sent Item is shared as.
@@ -41,9 +42,19 @@ const sentItemMimeType = 'application/vnd.oldbrainfix.item';
 /// never written (ADR 0019).
 const sentItemFormat = 1;
 
-/// The format of a file whose Note is a Checklist: a version that does
-/// not know Lines refuses it rather than keep its text alone (ADR 0030).
+/// The format of a file whose Note is a Checklist or a Shopping List: a
+/// version that does not know Lines refuses it rather than keep its text
+/// alone (ADR 0030).
 const sentItemListFormat = 2;
+
+/// What the note of a Shopping List's file says under `list`; a
+/// Checklist's says nothing there.
+const _shoppingList = ShoppingKeys.shopping;
+
+/// The wall clock a Shopping List is read on to be sent: UTC, the same
+/// on every Device and in both cores. It decides only the order of its
+/// Lines, which all arrive open (ADR 0030).
+DateTime _sentWall(DateTime utc) => utc;
 
 /// Whether [json] is in a format this version reads.
 bool _inFormat(Object? json) => json is Map && !_laterFormat(json);
@@ -61,7 +72,7 @@ bool _laterFormat(Object? json) =>
     };
 
 /// Whether [json] says it is in [sentItemListFormat], the format of a
-/// Checklist's file.
+/// Checklist's or a Shopping List's file.
 bool _listed(Object? json) =>
     json is Map && json['format'] == sentItemListFormat;
 
@@ -172,19 +183,25 @@ class SentRoutine {
   const SentRoutine(this.id, this.schedule);
 }
 
-/// A Line of a Sent Item's Checklist: the sender's id for it, its text,
-/// whether it is under the Line above and whether it shows checked.
+/// A Line of a Sent Item's Checklist or Shopping List: the sender's id
+/// for it, its text, whether it is under the Line above and whether it
+/// shows checked; a Shopping List's Line instead has its reappear time,
+/// is under none and arrives open.
 class SentLine {
   final String id;
   final String text;
   final bool indent;
   final bool checked;
 
+  /// How long it stays struck once checked; null for a Checklist's Line.
+  final Reappear? reappear;
+
   const SentLine(
     this.id,
     this.text, {
     this.indent = false,
     this.checked = false,
+    this.reappear,
   });
 }
 
@@ -214,9 +231,12 @@ class SentItem {
   final List<SentSection> sections;
   final List<SentRoutine> routines;
 
-  /// The Lines of the Note's Checklist, in the order they show; null for
-  /// a Note that is none.
+  /// The Lines of the Note's Checklist or Shopping List, in the order
+  /// they show; null for a Note that is neither.
   final List<SentLine>? lines;
+
+  /// Whether [lines] are a Shopping List's.
+  final bool shopping;
 
   const SentItem({
     required this.id,
@@ -229,13 +249,16 @@ class SentItem {
     this.sections = const [],
     this.routines = const [],
     this.lines,
+    this.shopping = false,
     this.cancel = false,
   });
 
   /// What is signed: keys sorted, no spaces, the same from both cores. A
   /// Reminder has no rule; only a cancellation says its kind. Every text
   /// says its format, and the version of its structure when it is more
-  /// than 1; a file without them is read as plain, version 1.
+  /// than 1; a file without them is read as plain, version 1. A Shopping
+  /// List's note says so under `list`, and each of its Lines its
+  /// reappear time.
   String encode() => jsonEncode({
     'from': {'key': from.toJson(), 'profile': profile.toJson()},
     'id': id,
@@ -249,9 +272,11 @@ class SentItem {
               if (l.checked) 'checked': true,
               'id': l.id,
               if (l.indent) 'indent': true,
+              if (l.reappear case final r?) 'reappear': r.code,
               'text': l.text,
             },
         ],
+      if (shopping && lines != null) 'list': _shoppingList,
       'sections': [
         for (final s in sections)
           {
@@ -321,7 +346,9 @@ class SentItem {
             return null;
           }
         }
-        final lines = _lines(json['note']);
+        final list = _list(json['note']);
+        if (list == null) return null;
+        final lines = _lines(json['note'], shopping: list.$1);
         if (lines == null) return null;
         final scheduled = <SentRoutine>[];
         for (final r in routines) {
@@ -355,6 +382,7 @@ class SentItem {
           sections: parts,
           routines: scheduled,
           lines: lines.$1,
+          shopping: list.$1,
           cancel: kind == _cancelKind,
         );
       }
@@ -364,10 +392,21 @@ class SentItem {
     return null;
   }
 
+  /// Whether the note [json] is a Shopping List's, in a record; null when
+  /// it names another list, or one without Lines.
+  static (bool,)? _list(Object? json) {
+    if (json is! Map || !json.containsKey('list')) return (false,);
+    return json['list'] == _shoppingList && json.containsKey('lines')
+        ? (true,)
+        : null;
+  }
+
   /// The Lines the note [json] carries, null in the record when it is no
-  /// Checklist; null when they are no Lines. Of two with one id, the
-  /// first counts.
-  static (List<SentLine>?,)? _lines(Object? json) {
+  /// list; null when they are no Lines. Of two with one id, the first
+  /// counts. A Shopping List's Line has its reappear time, the one a new
+  /// Line gets when it says none or one not known here, is under none and
+  /// arrives open.
+  static (List<SentLine>?,)? _lines(Object? json, {required bool shopping}) {
     if (json is! Map || !json.containsKey('lines')) return (null,);
     final lines = json['lines'];
     if (lines is! List) return null;
@@ -378,8 +417,14 @@ class SentItem {
         final indent = l['indent'] ?? false;
         final checked = l['checked'] ?? false;
         if (indent is! bool || checked is! bool) return null;
+        final reappear = l['reappear'];
+        if (shopping && reappear != null && reappear is! String) return null;
         if (!ids.add(id)) continue;
-        out.add(SentLine(id, text, indent: indent, checked: checked));
+        out.add(
+          shopping
+              ? SentLine(id, text, reappear: Reappear.read(reappear as String?))
+              : SentLine(id, text, indent: indent, checked: checked),
+        );
       } else {
         return null;
       }
@@ -473,7 +518,8 @@ List<Recipient> sentItemRecipients(Store store) {
 
 /// The Sent Item the Note [noteId] goes out as now: its text, the texts
 /// of its Sections, its Routines and Reminders and the Lines of its
-/// Checklist, under the id it went
+/// Checklist, or of its Shopping List those that show with their
+/// reappear times, in their order on a UTC wall clock, under the id it went
 /// out with from this Device before and the next version, or a new id.
 /// Records the id and version on the Note, so sending it again keeps
 /// them; a Note this Device may not change goes out under a new id each
@@ -508,6 +554,7 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
   final routines = Routines(store).ofNote(noteId)
     ..sort((a, b) => a.id.compareTo(b.id));
   final list = Checklists(store).byNote(noteId);
+  final shopping = ShoppingLists(store).byNote(noteId, _sentWall);
   return SentItem(
     id: id,
     version: version,
@@ -528,12 +575,18 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
           ),
     ],
     routines: [for (final r in routines) SentRoutine(r.id, r.schedule)],
-    lines: list == null
-        ? null
-        : [
-            for (final l in list.lines)
-              SentLine(l.id, l.text, indent: l.inGroup, checked: l.checked),
-          ],
+    lines: switch ((list, shopping)) {
+      (final list?, _) => [
+        for (final l in list.lines)
+          SentLine(l.id, l.text, indent: l.inGroup, checked: l.checked),
+      ],
+      (_, final shopping?) => [
+        for (final l in shopping.lines)
+          SentLine(l.id, l.text, reappear: l.reappear),
+      ],
+      _ => null,
+    },
+    shopping: list == null && shopping != null,
   );
 }
 
@@ -542,8 +595,8 @@ SentItem sentItemOf(Store store, String noteId, {bool cancel = false}) {
 /// key, the nonces and the ephemeral keys come from [random] in this
 /// order: content key, nonce of the content, then per recipient its
 /// ephemeral secret and the nonce of its key; the fixture generator
-/// hands in a counter. A file carrying a Checklist says it is in
-/// [sentItemListFormat].
+/// hands in a counter. A file carrying a Checklist or a Shopping List
+/// says it is in [sentItemListFormat].
 Uint8List encodeSentItem(
   SentItem item,
   SigningKey key, {
@@ -701,8 +754,12 @@ class SentItemChanges {
   /// [linesAdded].
   final bool makesChecklist;
 
+  /// Whether the Note becomes a Shopping List here, with the Lines of
+  /// [linesAdded].
+  final bool makesShoppingList;
+
   /// Whether the Note becomes a plain Note again here: the sender's is
-  /// none, and no Line of the receiver's own is left.
+  /// no list, and no Line of the receiver's own is left.
   final bool makesPlain;
 
   /// The sender's Lines not here yet, added at the end in their order.
@@ -723,6 +780,7 @@ class SentItemChanges {
     this.routinesRemoved = const [],
     this.restores = false,
     this.makesChecklist = false,
+    this.makesShoppingList = false,
     this.makesPlain = false,
     this.linesAdded = const [],
     this.linesRenamed = const [],
@@ -738,6 +796,7 @@ class SentItemChanges {
       routinesRemoved.isEmpty &&
       !restores &&
       !makesChecklist &&
+      !makesShoppingList &&
       !makesPlain &&
       linesAdded.isEmpty &&
       linesRenamed.isEmpty &&
@@ -1258,8 +1317,9 @@ _Held? _held(Store store, SentItem item) {
 /// the Note is in the trash ([restores]) those that went with it count.
 /// The sender's Lines, known by the sender's id for each, are added,
 /// renamed when the sender changed their text since, or taken away; the
-/// Note follows the sender into a Checklist, and out of one once no Line
-/// of the receiver's own is left. A Tally here takes none of it.
+/// Note follows the sender into a Checklist or a Shopping List, and out
+/// of one once no Line of the receiver's own is left. A Tally here takes
+/// none of it, nor a list of the other kind.
 SentItemChanges _changes(
   Store store,
   String noteId,
@@ -1324,6 +1384,7 @@ SentItemChanges _changes(
     ],
     restores: restores,
     makesChecklist: lists.makesChecklist,
+    makesShoppingList: lists.makesShoppingList,
     makesPlain: lists.makesPlain,
     linesAdded: lists.added,
     linesRenamed: lists.renamed,
@@ -1331,10 +1392,42 @@ SentItemChanges _changes(
   );
 }
 
-/// What the update [item] changes on the Checklist of the Note [noteId],
-/// as [_changes] says.
+/// The list the Note [noteId] is here: which one, its making and its
+/// Lines, a Shopping List's gone ones too; null for a Note that is none.
+({bool shopping, String making, List<Line> lines})? _listHere(
+  Store store,
+  String noteId,
+) {
+  if (Checklists(store).byNote(noteId) case final list?) {
+    return (shopping: false, making: list.making, lines: list.lines);
+  }
+  if (ShoppingLists(store).byNote(noteId, _sentWall) case final list?) {
+    return (
+      shopping: true,
+      making: list.making,
+      lines: [
+        for (final l in [...list.lines, ...list.gone])
+          Line(
+            id: l.id,
+            noteId: l.noteId,
+            text: l.text,
+            checked: l.struck,
+            checkedAt: l.checkedAt,
+            parent: null,
+            order: l.order,
+          ),
+      ],
+    );
+  }
+  return null;
+}
+
+/// What the update [item] changes on the Checklist or Shopping List of
+/// the Note [noteId], as [_changes] says. A list here of another kind
+/// than the sender's stays as it is.
 ({
   bool makesChecklist,
+  bool makesShoppingList,
   bool makesPlain,
   List<SentLine> added,
   List<SentRename> renamed,
@@ -1343,17 +1436,15 @@ SentItemChanges _changes(
 _listChanges(Store store, String noteId, SentItem item) {
   const none = (
     makesChecklist: false,
+    makesShoppingList: false,
     makesPlain: false,
     added: <SentLine>[],
     renamed: <SentRename>[],
     removed: <Line>[],
   );
-  // The receiver's Tally or Shopping List stays one.
-  if (Tallies(store).isTally(noteId) ||
-      ShoppingLists(store).isShoppingList(noteId)) {
-    return none;
-  }
-  final here = Checklists(store).byNote(noteId);
+  // The receiver's Tally stays one.
+  if (Tallies(store).isTally(noteId)) return none;
+  final here = _listHere(store, noteId);
   final theirs = <String, Line>{};
   final own = <String, bool>{};
   for (final l in here?.lines ?? const <Line>[]) {
@@ -1366,12 +1457,14 @@ _listChanges(Store store, String noteId, SentItem item) {
     final removed = theirs.values.toList();
     return (
       makesChecklist: false,
+      makesShoppingList: false,
       makesPlain: removed.isNotEmpty && removed.length == here.lines.length,
       added: <SentLine>[],
       renamed: <SentRename>[],
       removed: removed,
     );
   }
+  if (here != null && here.shopping != item.shopping) return none;
   final added = <SentLine>[];
   final renamed = <SentRename>[];
   for (final l in lines) {
@@ -1390,7 +1483,8 @@ _listChanges(Store store, String noteId, SentItem item) {
   }
   final kept = {for (final l in lines) l.id};
   return (
-    makesChecklist: here == null,
+    makesChecklist: here == null && !item.shopping,
+    makesShoppingList: here == null && item.shopping,
     makesPlain: false,
     added: added,
     renamed: renamed,
@@ -1455,7 +1549,13 @@ String _acceptNew(Store store, SentItem item) {
   for (final r in item.routines) {
     _writeRoutine(store, id, r);
   }
-  if (item.lines case final lines?) _writeChecklist(store, id, lines);
+  if (item.lines case final lines?) {
+    if (item.shopping) {
+      _writeShoppingList(store, id, lines, now);
+    } else {
+      _writeChecklist(store, id, lines);
+    }
+  }
   return id;
 }
 
@@ -1465,6 +1565,53 @@ void _writeChecklist(Store store, String noteId, List<SentLine> lines) {
   final making = Store.newId();
   store.append(noteId, ChecklistKeys.kind, ChecklistKeys.kindOf(making));
   _writeLines(store, noteId, making, lines, after: '', first: true);
+}
+
+/// Makes the Note [noteId] a Shopping List of [lines], all open, knowing
+/// the sender's id for each; not spawned, so a new Note stays in
+/// Unsorted.
+void _writeShoppingList(
+  Store store,
+  String noteId,
+  List<SentLine> lines,
+  DateTime now,
+) {
+  final making = Store.newId();
+  store.append(noteId, ChecklistKeys.kind, ShoppingKeys.kindOf(making));
+  _writeShoppingLines(store, noteId, making, lines, after: '', date: now);
+}
+
+/// Writes [lines] into the making [making] of the Shopping List [noteId],
+/// open, with their reappear times, placed after the key [after] in their
+/// order. All are written at [date], so they show in that order, at the
+/// top as the latest.
+void _writeShoppingLines(
+  Store store,
+  String noteId,
+  String making,
+  List<SentLine> lines, {
+  required String after,
+  required DateTime date,
+}) {
+  var key = after;
+  for (final l in lines) {
+    key = LineOrder.after(key);
+    final id = writeLine(
+      store,
+      noteId,
+      making,
+      text: l.text,
+      order: key,
+      received: l.id,
+      date: date,
+    );
+    store.append(
+      id,
+      ShoppingKeys.reappear,
+      (l.reappear ?? Reappear.standard).code,
+      date: date,
+    );
+  }
 }
 
 /// Writes [lines] into the making [making] of the Note [noteId], placed
@@ -1497,7 +1644,8 @@ void _writeLines(
 /// Applies the update [item] to the Note [noteId] as [changes] says, at
 /// [now], in one go: back from the trash first when it is there, then
 /// its text, its link, the Sections added, the Routines and Reminders
-/// rescheduled, added and taken away, then its Checklist.
+/// rescheduled, added and taken away, then its Checklist or Shopping
+/// List.
 void _apply(
   Store store,
   String noteId,
@@ -1534,13 +1682,29 @@ void _apply(
   }
   if (changes.makesChecklist) {
     _writeChecklist(store, noteId, changes.linesAdded);
-  } else if (Checklists(store).byNote(noteId) case final list?
+  } else if (changes.makesShoppingList) {
+    _writeShoppingList(store, noteId, changes.linesAdded, now);
+  } else if (_listHere(store, noteId) case final list?
       when changes.linesAdded.isNotEmpty) {
     var last = '';
     for (final l in list.lines) {
-      if (l.order case final key? when LineOrder.isValid(key)) last = key;
+      if (l.order case final key?
+          when LineOrder.isValid(key) && key.compareTo(last) > 0) {
+        last = key;
+      }
     }
-    _writeLines(store, noteId, list.making, changes.linesAdded, after: last);
+    if (list.shopping) {
+      _writeShoppingLines(
+        store,
+        noteId,
+        list.making,
+        changes.linesAdded,
+        after: last,
+        date: now,
+      );
+    } else {
+      _writeLines(store, noteId, list.making, changes.linesAdded, after: last);
+    }
   }
   for (final r in changes.linesRenamed) {
     final from = store.current(r.line, SentKeys.received);

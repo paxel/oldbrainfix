@@ -2272,6 +2272,14 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sentItemMakesChecklist => 'Sie wird zur Checkliste.';
 
   @override
+  String get sentItemMakesShoppingList => 'Sie wird zur Einkaufsliste.';
+
+  @override
+  String sentItemLineReappear(String time) {
+    return 'Wiederkehr: $time';
+  }
+
+  @override
   String get sentItemMakesPlain => 'Sie wird wieder eine einfache Notiz.';
 
   @override
@@ -3329,17 +3337,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get tallyFieldNameMissing => 'Gib dem Feld einen Namen.';
 
   @override
-  String get tallyUnit => 'Einheit';
+  String get tallyUnit => 'Maßeinheit';
 
   @override
-  String get tallyUnitTyped => 'Andere Einheit';
+  String get tallyUnitTyped => 'Andere Maßeinheit';
 
   @override
   String get tallyUnitTypedHint => 'z. B. Seiten, Mal';
 
   @override
   String get tallyUnitFixed =>
-      'Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Einheit.';
+      'Einträge haben Werte für dieses Feld, daher bleibt die Art seiner Maßeinheit.';
 
   @override
   String get unitKindMass => 'Masse';
@@ -3478,11 +3486,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get edit => 'Bearbeiten';
 
   @override
-  String get settingsUnits => 'Einheiten';
+  String get settingsUnits => 'Maßeinheiten';
 
   @override
   String get settingsUnitsDetail =>
-      'Wie Strichlisten bekannte Einheiten zeigen. Gespeichert werden die Werte immer metrisch.';
+      'Wie Strichlisten bekannte Maßeinheiten zeigen. Gespeichert werden die Werte immer metrisch.';
 
   @override
   String unitSystemRegion(String system) {

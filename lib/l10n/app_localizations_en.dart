@@ -2251,6 +2251,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sentItemMakesChecklist => 'It becomes a Checklist.';
 
   @override
+  String get sentItemMakesShoppingList => 'It becomes a Shopping List.';
+
+  @override
+  String sentItemLineReappear(String time) {
+    return 'Reappear time: $time';
+  }
+
+  @override
   String get sentItemMakesPlain => 'It becomes a plain Note again.';
 
   @override

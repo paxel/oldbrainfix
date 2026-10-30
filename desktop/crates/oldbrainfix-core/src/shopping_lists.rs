@@ -203,6 +203,11 @@ impl ShoppingList {
         self.lines.iter().filter(|l| !l.struck).collect()
     }
 
+    /// The Lines checked Once: gone, shown nowhere.
+    pub fn gone(&self) -> &[ShoppingLine] {
+        &self.gone
+    }
+
     pub fn struck(&self) -> Vec<&ShoppingLine> {
         self.lines.iter().filter(|l| l.struck).collect()
     }
@@ -1537,6 +1542,150 @@ mod tests {
         ben.accept_sent_item(&opened.item, false)?;
         assert_eq!(shown(&ben, &got)?, ["Milk"]);
         assert!(Checklists::new(&ben).by_note(&got)?.is_none());
+        Ok(())
+    }
+
+    /// What `to` opens of what `from` sends of `note`.
+    fn sent(from: &Store, to: &Store, note: &str) -> Made<crate::sent::Opened> {
+        let item = from.sent_item_of(note, false)?;
+        let mut random = |n: usize| -> Result<Vec<u8>> { Ok(vec![7; n]) };
+        let file = crate::sent::encode(&item, &from.signing_key()?, &[], &mut random)?;
+        let json: serde_json::Value = serde_json::from_slice(&file)?;
+        assert_eq!(json["format"], crate::sent::LIST_FORMAT);
+        Ok(to.open_sent_item(&file)?.map_err(|_| "a Sent Item")?)
+    }
+
+    #[test]
+    fn a_sent_shopping_list_carries_its_lines_and_they_arrive_open() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let note = shopping(&ann, "Shop\nMilk\nBread\nEggs", None)?;
+        let lists = ShoppingLists::new(&ann);
+        lists.set_reappear(&id_of(&ann, &note, "Eggs")?, Reappear::Week2)?;
+        lists.set_reappear(&id_of(&ann, &note, "Bread")?, Reappear::Once)?;
+        lists.check(&id_of(&ann, &note, "Bread")?, &wall)?;
+        lists.check(&id_of(&ann, &note, "Milk")?, &wall)?;
+        let opened = sent(&ann, &ben, &note)?;
+        assert!(opened.item.shopping);
+        let carried: Vec<String> = opened
+            .item
+            .lines
+            .iter()
+            .flatten()
+            .map(|l| format!("{} {}", l.text, l.reappear.map_or("", Reappear::code)))
+            .collect();
+        assert_eq!(carried, ["Eggs 2w", "Milk 1w"]);
+        let got = ben
+            .accept_sent_item(&opened.item, false)?
+            .ok_or("accepted")?;
+        assert_eq!(shown(&ben, &got)?, ["Eggs", "Milk"]);
+        assert_eq!(line_of(&ben, &got, "Eggs")?.reappear, Reappear::Week2);
+        assert!(Checklists::new(&ben).by_note(&got)?.is_none());
+        assert!(Notes::new(&ben).by_id(&got)?.ok_or("note")?.is_unsorted());
+        Ok(())
+    }
+
+    #[test]
+    fn an_update_changes_the_senders_lines_and_keeps_the_receivers() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let note = shopping(&ann, "Shop\nMilk\nEggs", None)?;
+        let got = ben
+            .accept_sent_item(&sent(&ann, &ben, &note)?.item, false)?
+            .ok_or("accepted")?;
+        let his = ShoppingLists::new(&ben);
+        his.check(&id_of(&ben, &got, "Eggs")?, &wall)?;
+        his.add(&got, "Coffee", &wall)?;
+        let hers = ShoppingLists::new(&ann);
+        hers.rename(&id_of(&ann, &note, "Eggs")?, "Free-range eggs")?;
+        hers.delete(&id_of(&ann, &note, "Milk")?)?;
+        hers.add(&note, "Tea", &wall)?;
+        let opened = sent(&ann, &ben, &note)?;
+        let changes = opened.changes.as_ref().ok_or("an update")?;
+        assert!(!changes.makes_shopping_list);
+        let added: Vec<&str> = changes
+            .lines_added
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect();
+        assert_eq!(added, ["Tea"]);
+        assert_eq!(changes.lines_renamed.len(), 1);
+        assert_eq!(changes.lines_renamed[0].after, "Free-range eggs");
+        let removed: Vec<&str> = changes
+            .lines_removed
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect();
+        assert_eq!(removed, ["Milk"]);
+        ben.accept_sent_item(&opened.item, false)?;
+        assert_eq!(shown(&ben, &got)?, ["Tea", "Coffee", "~Free-range eggs"]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_line_gone_here_is_not_added_again() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let note = shopping(&ann, "Shop\nMilk", None)?;
+        let got = ben
+            .accept_sent_item(&sent(&ann, &ben, &note)?.item, false)?
+            .ok_or("accepted")?;
+        let milk = id_of(&ben, &got, "Milk")?;
+        ShoppingLists::new(&ben).set_reappear(&milk, Reappear::Once)?;
+        ShoppingLists::new(&ben).check(&milk, &wall)?;
+        let opened = sent(&ann, &ben, &note)?;
+        assert!(opened.changes.as_ref().ok_or("an update")?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_note_follows_the_sender_into_a_shopping_list_and_out() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let ben = clock.device(2, "Ben")?;
+        let note = Notes::new(&ann).capture("Shop\nMilk", None, None)?.id;
+        let got = ben
+            .accept_sent_item(&sent_plain(&ann, &ben, &note)?, false)?
+            .ok_or("accepted")?;
+        ShoppingLists::new(&ann).make(&note)?;
+        let made = sent(&ann, &ben, &note)?;
+        let changes = made.changes.as_ref().ok_or("an update")?;
+        assert!(changes.makes_shopping_list && !changes.makes_checklist);
+        ben.accept_sent_item(&made.item, false)?;
+        assert_eq!(shown(&ben, &got)?, ["Milk"]);
+        ShoppingLists::new(&ann).to_plain(&note, &wall)?;
+        let plain = ann.sent_item_of(&note, false)?;
+        let mut random = |n: usize| -> Result<Vec<u8>> { Ok(vec![7; n]) };
+        let file = crate::sent::encode(&plain, &ann.signing_key()?, &[], &mut random)?;
+        let opened = ben.open_sent_item(&file)?.map_err(|_| "a Sent Item")?;
+        assert!(opened.changes.as_ref().ok_or("an update")?.makes_plain);
+        ben.accept_sent_item(&opened.item, false)?;
+        assert!(!ShoppingLists::new(&ben).is_shopping_list(&got)?);
+        Ok(())
+    }
+
+    /// What `to` opens of the plain Note `note` that `from` sends.
+    fn sent_plain(from: &Store, to: &Store, note: &str) -> Made<crate::sent::SentItem> {
+        let item = from.sent_item_of(note, false)?;
+        let mut random = |n: usize| -> Result<Vec<u8>> { Ok(vec![7; n]) };
+        let file = crate::sent::encode(&item, &from.signing_key()?, &[], &mut random)?;
+        Ok(to.open_sent_item(&file)?.map_err(|_| "a Sent Item")?.item)
+    }
+
+    #[test]
+    fn a_file_naming_another_list_is_no_sent_item() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk", None)?;
+        let item = ann.sent_item_of(&note, false)?;
+        let payload = item.encode();
+        assert!(crate::sent::SentItem::parse(&payload).is_some_and(|i| i.shopping));
+        let other = payload.replacen("\"list\":\"shopping\"", "\"list\":\"pantry\"", 1);
+        assert_ne!(other, payload);
+        assert!(crate::sent::SentItem::parse(&other).is_none());
         Ok(())
     }
 }

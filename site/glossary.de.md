@@ -120,7 +120,7 @@ Eine unbeachtete Fälligkeit in festem Abstand wieder auslösen, bis sie erledig
 _Avoid_: Wiederholen, Erinnerung
 
 **Eskalation** [Escalation]:
-Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton.
+Ein Schritt, den du einschalten kannst: eine Fälligkeit, die mehrmals unbeachtet wieder geklingelt hat, wird zu einem Vollbild-Alarm mit Ton. Den Vollbild-Alarm gibt es nur auf dem Telefon; auf dem Desktop wird die Benachrichtigung dringend, mit dem Alarmton des Systems.
 
 **Verpasst** [Missed]:
 Eine Fälligkeit, die nie erledigt wurde: bei einer Routine, wenn ihre nächste Fälligkeit beginnt, bei einer Erinnerung um Mitternacht.
@@ -142,10 +142,13 @@ Der Anteil der Fälligkeiten einer Routine, die in einem Zeitraum erledigt wurde
 Der Startbildschirm: die Fälligkeiten von heute, dann gedimmt morgen, mit der Verpasst-Übersicht und der Zahl der unsortierten Notizen obenauf.
 _Avoid_: Dashboard, Tagesansicht, Startseite
 
+**Kalenderseite** [Calendar page]:
+Die Seite des Telefons für seine Kalender: „Aus deinem Kalender lesen“, das die Termine der gewählten Kalender auf der Agenda zeigt und beim Erfassen den laufenden Termin festhält, und „In deinen Kalender schreiben“, das die Routinen und Erinnerungen in einen Kalender schreibt. Nur auf dem Telefon: Der Desktop hat keine Kalenderseite und zeigt keine Termine.
+
 ## Strichlisten
 
 **Strichliste** [Tally]:
-Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihre Felder, jedes eine Zahl mit Einheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt.
+Eine Notiz, die festhält, wie viel von etwas getan wurde, etwa Liegestütze, gelesene Seiten oder Minuten Video: ihre Felder, jedes eine Zahl mit Maßeinheit, einem freiwilligen Ziel und einer Regel für einen Tag mit mehreren Einträgen (ihre Summe oder der größte), und ihre Einträge, untereinander aufgelistet, der neueste zuerst, und als ein Diagramm je Feld nach Tag, Woche, Monat oder Jahr gezeigt.
 _Avoid_: Tracker, Protokoll, Training, Übung, Gewohnheit
 
 **Eintrag** [Entry]:

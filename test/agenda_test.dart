@@ -84,7 +84,13 @@ void main() {
         find.text('Nothing due today. Tap + to capture a thought.'),
         findsOneWidget,
       );
-      expect(find.text('Nothing due tomorrow.'), findsOneWidget);
+      // Only today tells how to capture; tomorrow and every later day
+      // with nothing due say "Nothing planned".
+      expect(find.text('Nothing due tomorrow.'), findsNothing);
+      expect(
+        tester.getTopLeft(find.text('Nothing planned').first).dy,
+        greaterThan(tester.getTopLeft(find.text('Tomorrow')).dy),
+      );
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
       expect(scaffold.bottomNavigationBar, isNull);
       expect(scaffold.bottomSheet, isNull);
@@ -208,8 +214,8 @@ void main() {
       expect(agendaRows(tester), ['07:00 bins', 'All day dentist']);
       expect(dimmed(tester, 'bins'), isTrue);
       expect(dimmed(tester, 'dentist'), isTrue);
-      // Each empty day after tomorrow says so, dimmed.
-      expect(find.text('Nothing planned'), findsNWidgets(3));
+      // Each empty day from tomorrow on says so, dimmed.
+      expect(find.text('Nothing planned'), findsNWidgets(4));
       expect(dimmed(tester, 'Nothing planned'), isTrue);
       final bins = tester.getTopLeft(find.text('bins')).dy;
       expect(bins, greaterThan(tester.getTopLeft(find.text(week[2])).dy));
@@ -249,7 +255,7 @@ void main() {
         'Dienstag, 3. Nov.',
       ];
       expect(headings(tester, week), week);
-      expect(find.text('Nichts geplant'), findsNWidgets(5));
+      expect(find.text('Nichts geplant'), findsNWidgets(6));
     });
 
     testWidgets('each time of day is checked off on its own', (tester) async {
@@ -281,7 +287,7 @@ void main() {
       now = DateTime(2026, 10, 25, 0, 0, 30);
       await tester.pump(const Duration(minutes: 1, seconds: 1));
       expect(dimmed(tester, 'dentist'), isFalse);
-      expect(find.text('Nothing due tomorrow.'), findsOneWidget);
+      expect(find.text('Nothing planned'), findsWidgets);
     });
 
     testWidgets('tomorrow is checked off today, and stays where it is', (

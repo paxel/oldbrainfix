@@ -9,13 +9,14 @@
 //!
 //! What travels is the Note's text, the texts of its Sections, the
 //! schedules of its Routines and Reminders and the Lines of its
-//! Checklist; never its Capture Context, photos or voice recordings.
+//! Checklist or Shopping List; never its Capture Context, photos or voice
+//! recordings.
 
 use std::collections::{HashMap, HashSet};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde_json::{Map, Value, json};
 
 use crate::box_keys::{BOX_KEY_BYTES, box_public_of, box_secret_of, wrap_key, x25519};
@@ -28,7 +29,7 @@ use crate::notes::keys as note_keys;
 use crate::pending::PendingSet;
 use crate::profile::{Profile, SentProfile, SignedProfile, short_code};
 use crate::routines::keys as routine_keys;
-use crate::shopping_lists::ShoppingLists;
+use crate::shopping_lists::{Reappear, ShoppingLists, keys as shopping_keys};
 use crate::signing::{KeyRecord, SigningKey, verify_signature};
 use crate::store::{ACCEPTED_PENDING_PREFIX, Fields, Store};
 use crate::text_format::{self, StoredText};
@@ -44,9 +45,17 @@ pub const MIME_TYPE: &str = "application/vnd.oldbrainfix.item";
 /// never written (ADR 0019).
 pub const FORMAT: i64 = 1;
 
-/// The format of a file whose Note is a Checklist: a version that does
-/// not know Lines refuses it rather than keep its text alone (ADR 0030).
+/// The format of a file whose Note is a Checklist or a Shopping List: a
+/// version that does not know Lines refuses it rather than keep its text
+/// alone (ADR 0030).
 pub const LIST_FORMAT: i64 = 2;
+
+/// The wall clock a Shopping List is read on to be sent: UTC, the same
+/// on every Device and in both cores. It decides only the order of its
+/// Lines, which all arrive open (ADR 0030).
+fn sent_wall(at: DateTime<Utc>) -> NaiveDateTime {
+    at.naive_utc()
+}
 
 /// Whether `json` is in a format this version reads.
 fn in_format(json: &Value) -> bool {
@@ -63,7 +72,7 @@ fn later_format(json: &Value) -> bool {
 }
 
 /// Whether `json` says it is in [`LIST_FORMAT`], the format of a
-/// Checklist's file.
+/// Checklist's or a Shopping List's file.
 fn listed(json: &Value) -> bool {
     json.get("format").and_then(Value::as_i64) == Some(LIST_FORMAT)
 }
@@ -119,14 +128,19 @@ pub struct SentRoutine {
     pub schedule: Schedule,
 }
 
-/// A Line of a Sent Item's Checklist: the sender's id for it, its text,
-/// whether it is under the Line above and whether it shows checked.
+/// A Line of a Sent Item's Checklist or Shopping List: the sender's id
+/// for it, its text, whether it is under the Line above and whether it
+/// shows checked; a Shopping List's Line instead has its reappear time,
+/// is under none and arrives open.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SentLine {
     pub id: String,
     pub text: String,
     pub indent: bool,
     pub checked: bool,
+    /// How long it stays struck once checked; `None` for a Checklist's
+    /// Line.
+    pub reappear: Option<Reappear>,
 }
 
 /// What a Sent Item holds, as signed.
@@ -148,9 +162,11 @@ pub struct SentItem {
     pub text_version: i64,
     pub sections: Vec<SentSection>,
     pub routines: Vec<SentRoutine>,
-    /// The Lines of the Note's Checklist, in the order they show; `None`
-    /// for a Note that is none.
+    /// The Lines of the Note's Checklist or Shopping List, in the order
+    /// they show; `None` for a Note that is neither.
     pub lines: Option<Vec<SentLine>>,
+    /// Whether `lines` are a Shopping List's.
+    pub shopping: bool,
 }
 
 /// Builds a JSON object in key order, the same with or without
@@ -167,7 +183,8 @@ impl SentItem {
     /// What is signed: keys sorted, no spaces, as the Dart core writes it;
     /// only a cancellation says its kind. Every text says its format, and
     /// the version of its structure when it is more than 1; a file
-    /// without them is read as plain, version 1.
+    /// without them is read as plain, version 1. A Shopping List's note
+    /// says so under `list`, and each of its Lines its reappear time.
     pub fn encode(&self) -> String {
         let sections: Vec<Value> = self
             .sections
@@ -210,11 +227,17 @@ impl SentItem {
                     if l.indent {
                         pairs.push(("indent", json!(true)));
                     }
+                    if let Some(r) = l.reappear {
+                        pairs.push(("reappear", json!(r.code())));
+                    }
                     pairs.push(("text", json!(l.text)));
                     object(pairs)
                 })
                 .collect();
             note.push(("lines", Value::Array(lines)));
+            if self.shopping {
+                note.push(("list", json!(shopping_keys::SHOPPING)));
+            }
         }
         note.extend([
             ("sections", Value::Array(sections)),
@@ -292,9 +315,21 @@ impl SentItem {
                 schedule: Routines::schedule_of(&Fields::new(fields))?,
             });
         }
+        // A Shopping List's says so; any other list, or one without
+        // Lines, is none this version knows.
+        let shopping = match note.get("list") {
+            None => false,
+            Some(list)
+                if list.as_str() == Some(shopping_keys::SHOPPING)
+                    && note.get("lines").is_some() =>
+            {
+                true
+            }
+            Some(_) => return None,
+        };
         let lines = match note.get("lines") {
             None => None,
-            Some(lines) => Some(sent_lines(lines)?),
+            Some(lines) => Some(sent_lines(lines, shopping)?),
         };
         Some(SentItem {
             id: id.to_string(),
@@ -308,13 +343,16 @@ impl SentItem {
             sections,
             routines,
             lines,
+            shopping,
         })
     }
 }
 
 /// The Lines `json` holds; `None` when they are no Lines. Of two with
-/// one id, the first counts.
-fn sent_lines(json: &Value) -> Option<Vec<SentLine>> {
+/// one id, the first counts. A Shopping List's Line has its reappear
+/// time, the one a new Line gets when it says none or one not known here,
+/// is under none and arrives open.
+fn sent_lines(json: &Value, shopping: bool) -> Option<Vec<SentLine>> {
     let flag = |l: &Value, key: &str| match l.get(key) {
         None | Some(Value::Null) => Some(false),
         Some(Value::Bool(b)) => Some(*b),
@@ -323,11 +361,31 @@ fn sent_lines(json: &Value) -> Option<Vec<SentLine>> {
     let mut out = Vec::new();
     let mut ids = HashSet::new();
     for l in json.as_array()? {
-        let line = SentLine {
-            id: l.get("id")?.as_str()?.to_string(),
-            text: l.get("text")?.as_str()?.to_string(),
-            indent: flag(l, "indent")?,
-            checked: flag(l, "checked")?,
+        let id = l.get("id")?.as_str()?.to_string();
+        let text = l.get("text")?.as_str()?.to_string();
+        let indent = flag(l, "indent")?;
+        let checked = flag(l, "checked")?;
+        let line = if shopping {
+            let reappear = match l.get("reappear") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(code)) => Some(code.as_str()),
+                Some(_) => return None,
+            };
+            SentLine {
+                id,
+                text,
+                indent: false,
+                checked: false,
+                reappear: Some(Reappear::read(reappear)),
+            }
+        } else {
+            SentLine {
+                id,
+                text,
+                indent,
+                checked,
+                reappear: None,
+            }
         };
         if ids.insert(line.id.clone()) {
             out.push(line);
@@ -472,7 +530,9 @@ impl Store {
         Ok(out)
     }
 
-    /// The Sent Item the Note `note_id` goes out as now, under the id it
+    /// The Sent Item the Note `note_id` goes out as now, with the Lines of
+    /// its Checklist, or of its Shopping List those that show with their
+    /// reappear times in their order on a UTC wall clock, under the id it
     /// went out with from this Device before and the next version, or a
     /// new id; records both on the Note when this Device may change it.
     /// With `cancel` it goes out as the cancellation of that id. It
@@ -508,17 +568,37 @@ impl Store {
         }
         let mut routines = Routines::new(self).of_note(note_id)?;
         routines.sort_by(|a, b| a.id.cmp(&b.id));
-        let lines = Checklists::new(self).by_note(note_id)?.map(|list| {
-            list.lines
-                .iter()
-                .map(|l| SentLine {
-                    id: l.id.clone(),
-                    text: l.text.clone(),
-                    indent: l.in_group(),
-                    checked: l.checked,
-                })
-                .collect()
-        });
+        let list = Checklists::new(self).by_note(note_id)?;
+        let bought = ShoppingLists::new(self).by_note(note_id, &sent_wall)?;
+        let shopping = list.is_none() && bought.is_some();
+        let lines = match (list, bought) {
+            (Some(list), _) => Some(
+                list.lines
+                    .iter()
+                    .map(|l| SentLine {
+                        id: l.id.clone(),
+                        text: l.text.clone(),
+                        indent: l.in_group(),
+                        checked: l.checked,
+                        reappear: None,
+                    })
+                    .collect(),
+            ),
+            (None, Some(bought)) => Some(
+                bought
+                    .lines
+                    .iter()
+                    .map(|l| SentLine {
+                        id: l.id.clone(),
+                        text: l.text.clone(),
+                        indent: false,
+                        checked: false,
+                        reappear: Some(l.reappear),
+                    })
+                    .collect(),
+            ),
+            (None, None) => None,
+        };
         Ok(SentItem {
             id,
             version,
@@ -547,6 +627,7 @@ impl Store {
                 })
                 .collect(),
             lines,
+            shopping,
         })
     }
 
@@ -823,8 +904,9 @@ impl Store {
     /// (`restores`) those that went with it count. The sender's Lines,
     /// known by the sender's id for each, are added, renamed when the
     /// sender changed their text since, or taken away; the Note follows
-    /// the sender into a Checklist, and out of one once no Line of the
-    /// receiver's own is left. A Tally here takes none of it.
+    /// the sender into a Checklist or a Shopping List, and out of one once
+    /// no Line of the receiver's own is left. A Tally here takes none of
+    /// it, nor a list of the other kind.
     fn changes(&self, note_id: &str, item: &SentItem, restores: bool) -> Result<SentItemChanges> {
         let notes = Notes::new(self);
         let text = StoredText::read(self.current(note_id, note_keys::TEXT)?.as_deref());
@@ -911,6 +993,7 @@ impl Store {
             routines_removed,
             restores,
             makes_checklist: lists.makes_checklist,
+            makes_shopping_list: lists.makes_shopping_list,
             makes_plain: lists.makes_plain,
             lines_added: lists.lines_added,
             lines_renamed: lists.lines_renamed,
@@ -918,20 +1001,46 @@ impl Store {
         })
     }
 
-    /// What the update `item` changes on the Checklist of the Note
-    /// `note_id`, as [`Store::changes`] says; only the parts of a
-    /// Checklist are set.
+    /// The list the Note `note_id` is here: whether a Shopping List, its
+    /// making and its Lines, a Shopping List's gone ones too; `None` for a
+    /// Note that is none.
+    fn list_here(&self, note_id: &str) -> Result<Option<(bool, String, Vec<Line>)>> {
+        if let Some(list) = Checklists::new(self).by_note(note_id)? {
+            return Ok(Some((false, list.making, list.lines)));
+        }
+        let Some(list) = ShoppingLists::new(self).by_note(note_id, &sent_wall)? else {
+            return Ok(None);
+        };
+        let lines = list
+            .lines
+            .iter()
+            .chain(list.gone())
+            .map(|l| Line {
+                id: l.id.clone(),
+                note_id: l.note_id.clone(),
+                text: l.text.clone(),
+                checked: l.struck,
+                checked_at: l.checked_at,
+                parent: None,
+                order: l.order.clone(),
+            })
+            .collect();
+        Ok(Some((true, list.making, lines)))
+    }
+
+    /// What the update `item` changes on the Checklist or Shopping List
+    /// of the Note `note_id`, as [`Store::changes`] says; only the parts
+    /// of a list are set. A list here of another kind than the sender's
+    /// stays as it is.
     fn list_changes(&self, note_id: &str, item: &SentItem) -> Result<SentItemChanges> {
-        // The receiver's Tally or Shopping List stays one.
-        if Tallies::new(self).is_tally(note_id)?
-            || ShoppingLists::new(self).is_shopping_list(note_id)?
-        {
+        // The receiver's Tally stays one.
+        if Tallies::new(self).is_tally(note_id)? {
             return Ok(SentItemChanges::default());
         }
-        let here = Checklists::new(self).by_note(note_id)?;
+        let here = self.list_here(note_id)?;
         let mut theirs: Vec<(String, Line)> = Vec::new();
         let mut own = HashMap::new();
-        for l in here.iter().flat_map(|list| list.lines.iter()) {
+        for l in here.iter().flat_map(|(_, _, lines)| lines.iter()) {
             if let Some(from) = self.own_current(&l.id, keys::RECEIVED, &mut own)?
                 && !theirs.iter().any(|(f, _)| *f == from)
             {
@@ -939,16 +1048,22 @@ impl Store {
             }
         }
         let Some(lines) = &item.lines else {
-            let Some(here) = here else {
+            let Some((_, _, here)) = here else {
                 return Ok(SentItemChanges::default());
             };
             let removed: Vec<Line> = theirs.into_iter().map(|(_, l)| l).collect();
             return Ok(SentItemChanges {
-                makes_plain: !removed.is_empty() && removed.len() == here.lines.len(),
+                makes_plain: !removed.is_empty() && removed.len() == here.len(),
                 lines_removed: removed,
                 ..SentItemChanges::default()
             });
         };
+        if here
+            .as_ref()
+            .is_some_and(|(shopping, _, _)| *shopping != item.shopping)
+        {
+            return Ok(SentItemChanges::default());
+        }
         let mut added = Vec::new();
         let mut renamed = Vec::new();
         for l in lines {
@@ -969,7 +1084,8 @@ impl Store {
             }
         }
         Ok(SentItemChanges {
-            makes_checklist: here.is_none(),
+            makes_checklist: here.is_none() && !item.shopping,
+            makes_shopping_list: here.is_none() && item.shopping,
             lines_added: added,
             lines_renamed: renamed,
             lines_removed: theirs
@@ -1026,9 +1142,67 @@ impl Store {
             self.write_routine(&id, r)?;
         }
         if let Some(lines) = &item.lines {
-            self.write_checklist(&id, lines)?;
+            if item.shopping {
+                self.write_shopping_list(&id, lines, now)?;
+            } else {
+                self.write_checklist(&id, lines)?;
+            }
         }
         Ok(id)
+    }
+
+    /// Makes the Note `note_id` a Shopping List of `lines`, all open,
+    /// knowing the sender's id for each; not spawned, so a new Note stays
+    /// in Unsorted.
+    fn write_shopping_list(
+        &self,
+        note_id: &str,
+        lines: &[SentLine],
+        now: DateTime<Utc>,
+    ) -> Result<()> {
+        let making = self.new_id()?;
+        let kind = shopping_keys::kind_of(&making);
+        self.append(note_id, checklist_keys::KIND, Some(&kind), None)?;
+        self.write_shopping_lines(note_id, &making, lines, "", now)
+    }
+
+    /// Writes `lines` into the making `making` of the Shopping List
+    /// `note_id`, open, with their reappear times, placed after the key
+    /// `after` in their order. All are written at `at`, so they show in
+    /// that order, at the top as the latest.
+    fn write_shopping_lines(
+        &self,
+        note_id: &str,
+        making: &str,
+        lines: &[SentLine],
+        after: &str,
+        at: DateTime<Utc>,
+    ) -> Result<()> {
+        let mut key = after.to_string();
+        for l in lines {
+            key = line_order::after(&key);
+            let id = write_line(
+                self,
+                note_id,
+                making,
+                &NewLine {
+                    text: &l.text,
+                    order: &key,
+                    indent: false,
+                    checked: false,
+                    received: Some(&l.id),
+                    at: Some(at),
+                },
+            )?;
+            let reappear = l.reappear.unwrap_or(Reappear::STANDARD);
+            self.append(
+                &id,
+                shopping_keys::REAPPEAR,
+                Some(reappear.code()),
+                Some(at),
+            )?;
+        }
+        Ok(())
     }
 
     /// Makes the Note `note_id` a Checklist of `lines`, knowing the
@@ -1114,17 +1288,23 @@ impl Store {
         }
         if changes.makes_checklist {
             self.write_checklist(note_id, &changes.lines_added)?;
+        } else if changes.makes_shopping_list {
+            self.write_shopping_list(note_id, &changes.lines_added, now)?;
         } else if !changes.lines_added.is_empty()
-            && let Some(list) = Checklists::new(self).by_note(note_id)?
+            && let Some((shopping, making, lines)) = self.list_here(note_id)?
         {
-            let last = list
-                .lines
+            let last = lines
                 .iter()
                 .filter_map(|l| l.order.as_deref())
-                .rfind(|key| line_order::is_valid(Some(key)))
+                .filter(|key| line_order::is_valid(Some(key)))
+                .max()
                 .unwrap_or("")
                 .to_string();
-            self.write_lines(note_id, &list.making, &changes.lines_added, &last, false)?;
+            if shopping {
+                self.write_shopping_lines(note_id, &making, &changes.lines_added, &last, now)?;
+            } else {
+                self.write_lines(note_id, &making, &changes.lines_added, &last, false)?;
+            }
         }
         for r in &changes.lines_renamed {
             let from = self.current(&r.line, keys::RECEIVED)?;
@@ -1314,8 +1494,11 @@ pub struct SentItemChanges {
     /// Whether the Note becomes a Checklist here, with the Lines of
     /// `lines_added`.
     pub makes_checklist: bool,
+    /// Whether the Note becomes a Shopping List here, with the Lines of
+    /// `lines_added`.
+    pub makes_shopping_list: bool,
     /// Whether the Note becomes a plain Note again here: the sender's is
-    /// none, and no Line of the receiver's own is left.
+    /// no list, and no Line of the receiver's own is left.
     pub makes_plain: bool,
     /// The sender's Lines not here yet, added at the end in their order.
     pub lines_added: Vec<SentLine>,
@@ -1335,6 +1518,7 @@ impl SentItemChanges {
             && self.routines_removed.is_empty()
             && !self.restores
             && !self.makes_checklist
+            && !self.makes_shopping_list
             && !self.makes_plain
             && self.lines_added.is_empty()
             && self.lines_renamed.is_empty()
@@ -1344,7 +1528,7 @@ impl SentItemChanges {
 
 /// The file `item` goes out as, signed by `key`: signed only when `to`
 /// is empty, else encrypted to each X25519 key of `to`; one carrying a
-/// Checklist says it is in [`LIST_FORMAT`]. The bytes come
+/// Checklist or a Shopping List says it is in [`LIST_FORMAT`]. The bytes come
 /// from `random` as the Dart core draws them: the content key, the
 /// content's nonce, then per recipient its ephemeral secret and nonce.
 pub fn encode(
@@ -2429,6 +2613,7 @@ mod tests {
             sections: Vec::new(),
             routines: Vec::new(),
             lines: None,
+            shopping: false,
         };
         let file = encode(&item, &eve.signing_key()?, &[], &mut |n| Ok(vec![0; n]))?;
         assert_eq!(
@@ -2506,6 +2691,7 @@ mod tests {
             sections: Vec::new(),
             routines: Vec::new(),
             lines: None,
+            shopping: false,
         };
         let file = encode(&item, &eve.signing_key()?, &[], &mut |n| Ok(vec![0; n]))?;
         let fake = ben.open_sent_item(&file)?.map_err(|_| "fake")?;

@@ -160,6 +160,9 @@ class ShoppingList {
       if (!l.struck) l,
   ];
 
+  /// The Lines checked Once: gone, shown nowhere.
+  List<ShoppingLine> get gone => List.unmodifiable(_gone);
+
   List<ShoppingLine> get struck => [
     for (final l in lines)
       if (l.struck) l,

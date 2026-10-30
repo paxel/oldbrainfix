@@ -28,7 +28,7 @@ A blocked person's checks and unchecks are kept, in their exact shape, as their 
 
 ## Sent Items
 
-A Sent Item of a Checklist carries its Lines in the order they show, each with the sender's id for it, its text and whether it is under the Line above and shows checked, under `lines` in the item's `note`. Its file says `format` 2, so a version that does not know Lines refuses it instead of keeping the title alone; a Sent Item of any other Note stays in format 1 (ADR 0019). Accepting one makes the new Note a Checklist of those Lines, not spawned, so it stays in Unsorted, each Line knowing the sender's id under `received`. An update adds the sender's Lines not there yet at the end, renames those whose text the sender changed since, takes away those the sender took away and makes the Note a Checklist when the sender's became one; once the sender's Note is a plain Note again, it becomes one here too when no Line of the receiver's own is left. What the receiver checked, renamed, added or moved stays.
+A Sent Item of a Checklist carries its Lines in the order they show, each with the sender's id for it, its text and whether it is under the Line above and shows checked, under `lines` in the item's `note`. Its file says `format` 2, so a version that does not know Lines refuses it instead of keeping the title alone; so does a Shopping List's (see Shopping Lists below), and a Sent Item of any other Note stays in format 1 (ADR 0019). Accepting one makes the new Note a Checklist of those Lines, not spawned, so it stays in Unsorted, each Line knowing the sender's id under `received`. An update adds the sender's Lines not there yet at the end, renames those whose text the sender changed since, takes away those the sender took away and makes the Note a Checklist when the sender's became one; once the sender's Note is a plain Note again, it becomes one here too when no Line of the receiver's own is left. What the receiver checked, renamed, added or moved stays.
 
 ## With a Routine or Reminder
 
@@ -56,7 +56,7 @@ On the Agenda (#123) a Line "came back today" when its last check runs out at th
 
 A Routine or Reminder spawned from a Shopping List is a plain one: its Occurrences are Done only when checked off, and the Lines show their own checks on every day. Only the Lines of a making that the Note's kind named as a Checklist count for a Done from checks, so a `check@` field naming a Line of a Shopping List counts for nothing.
 
-A Sent Item of a Shopping List carries the Note's text alone, as a plain Note's does, in format 1; its Lines stay with the sender. A receiver who made a received Checklist a Shopping List keeps it one: an update from the sender then changes none of its Lines, as for a Tally.
+A Sent Item of a Shopping List carries its Lines that show, in format 2 as a Checklist's, under `lines` in the item's `note` with `list` = `shopping` beside them. Each Line has the sender's id for it, its text and its reappear time under `reappear`; it says neither `indent` nor `checked`, since every Line arrives open, and those gone Once stay with the sender. Which Lines show struck depends on the wall clock, so the sender reads its list on UTC for their order alone: both cores send the same Lines in the same order on every Device. A `list` naming anything else, or a `list` without `lines`, makes the file no Sent Item; a Line's reappear time that is missing or not known here reads as `1w`, as on a Line. Accepting one makes the new Note a Shopping List of those Lines, all written at one moment, so they show in the sender's order, each with its reappear time and the sender's id under `received`, not spawned, so it stays in Unsorted. An update follows the rules of a Checklist's: it adds the sender's Lines not there yet, as the latest, so at the top; renames those whose text the sender changed since; takes away those the sender took away, a Line gone Once here too; makes the Note a Shopping List when it is a plain Note here and the sender's became one; and makes it a plain Note again once the sender's is one and no Line of the receiver's own is left. A reappear time the receiver set, and every check, stays as the receiver has it. A list here of the other kind stays as it is: a receiver who made a received Checklist a Shopping List, or a received Shopping List a Checklist, keeps it, and an update changes none of its Lines, as for a Tally.
 
 ## Considered Options
 
@@ -79,7 +79,10 @@ A Sent Item of a Shopping List carries the Note's text alone, as a plain Note's 
 - The check's moment from its value (rejected: a value no app writes could read differently in the two cores; the entry's date is the same everywhere).
 - Names compared by Unicode's full case folding (rejected: both cores lower each character the way Dart's `toLowerCase` does, which keeps them equal without a table of their own).
 - Checks per Occurrence for a Routine spawned from a Shopping List (rejected: the reappear time brings its Lines back already, and a weekly Routine would open every Line again at each Occurrence).
-- The Lines of a Shopping List in a Sent Item (left for later: which show struck depends on the wall clock, which making a Sent Item does not have).
+- A Sent Item of a Shopping List carrying its text alone (rejected: the receiver would get a list without its Lines; the Lines go along, all open, so the wall clock decides nothing but their order).
+- A Shopping List's Lines in a Sent Item struck as the sender sees them (rejected: which are struck depends on the sender's wall clock and changes by itself; open on arrival, the receiver starts from the whole list).
+- The sender's wall clock for the order of a Shopping List's Lines in a Sent Item (rejected: the two cores and every Device would need the same zone to write the same file; UTC is the same everywhere).
+- An update changing the reappear times of the Lines the receiver has (rejected: the receiver may have set their own; a new Line comes with the sender's).
 
 ## Consequences
 
@@ -101,4 +104,4 @@ A Sent Item of a Shopping List carries the Note's text alone, as a plain Note's 
 - ADR 0028: a Note that is a list is never a Tally too.
 - ADR 0005: making a Note a Shopping List takes it out of Unsorted; a Routine or Reminder spawned from one is Done only when checked off.
 - ADR 0013: any role adds, checks and brings back the Lines of a Shopping List; their reappear time is the Note's author's, the Line's author's and the Managers'.
-- ADR 0019: a Sent Item of a Shopping List stays in format 1, the Note's text alone.
+- ADR 0019: a Sent Item of a Shopping List is in format 2, with its Lines and `list` = `shopping`.

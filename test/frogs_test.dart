@@ -219,6 +219,29 @@ void main() {
   });
 
   group('the Frog view', () {
+    testWidgets('opens from "Frogs" on the Areas list\'s bar, beside All '
+        'Notes, eaten Frogs too', (tester) async {
+      final all = [frog('cupboard'), frog('old DVDs')];
+      frogs.markDone(all[1].id);
+      await start(tester);
+      await tap(tester, find.byTooltip('Search and browse'));
+      final bar = find.byType(AppBar);
+      final button = find.descendant(
+        of: bar,
+        matching: find.byTooltip('Frogs'),
+      );
+      expect(button, findsOneWidget);
+      expect(
+        tester.getTopLeft(button).dx,
+        greaterThan(tester.getTopLeft(find.byTooltip('All Notes')).dx),
+      );
+      await tap(tester, button);
+      expect(find.byType(FrogsScreen), findsOneWidget);
+      expect(shown(tester, all), ['cupboard']);
+      await tap(tester, find.text('Done'));
+      expect(shown(tester, all), ['cupboard', 'old DVDs']);
+    });
+
     testWidgets('opens from the heading: the open Frogs oldest first, the '
         'Done ones folded below and unchecked there', (tester) async {
       final all = [frog('cupboard'), frog('windows'), frog('old DVDs')];

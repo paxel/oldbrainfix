@@ -8,6 +8,7 @@ import 'package:oldbrainfix/src/app.dart';
 import 'package:oldbrainfix/src/conflicts_screen.dart';
 import 'package:oldbrainfix/src/note_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
+import 'package:oldbrainfix/src/sent_item_screen.dart';
 import 'package:oldbrainfix/src/shopping_list_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
@@ -448,6 +449,63 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('No conflicts. Every Device agrees.'), findsOneWidget);
       expect(shown(note), ['Soy milk']);
+    });
+
+    testWidgets('a Sent Item shows its Lines open with their reappear '
+        'times, and an update that it becomes a Shopping List', (tester) async {
+      final ann = Store.inMemory(clock: tick)
+        ..applyProfileDefaults(name: 'Ann');
+      addTearDown(ann.close);
+      final note = Notes(ann).capture('Shop\nMilk\nEggs').id;
+      final theirs = ShoppingLists(ann)..make(note);
+      final eggs = theirs
+          .byNote(note, deviceWallClock)!
+          .lines
+          .firstWhere((l) => l.text == 'Eggs')
+          .id;
+      theirs.setReappear(eggs, Reappear.once);
+      theirs.check(
+        theirs
+            .byNote(note, deviceWallClock)!
+            .lines
+            .firstWhere((l) => l.text == 'Milk')
+            .id,
+        deviceWallClock,
+      );
+      final opened = openSentItem(store, sendNote(ann, note));
+      await tester.pumpWidget(
+        screen(SentItemScreen(store: store, opened: opened)),
+      );
+      await tester.pumpAndSettle();
+      for (final text in ['Milk', 'Reappear time: 1 week']) {
+        expect(
+          find.descendant(of: key('sent-lines'), matching: find.text(text)),
+          findsOneWidget,
+        );
+      }
+      // Eggs is Once and not checked, so it goes along; Milk arrives open.
+      expect(find.text('Reappear time: Once'), findsOneWidget);
+      final checks = tester.widgetList<Checkbox>(
+        find.descendant(of: key('sent-lines'), matching: find.byType(Checkbox)),
+      );
+      expect([for (final c in checks) c.value], [false, false]);
+
+      final plain = Notes(ann).capture('Hardware\nNails').id;
+      acceptSentItem(store, openSentItem(store, sendNote(ann, plain)).item);
+      ShoppingLists(ann).make(plain);
+      final update = openSentItem(store, sendNote(ann, plain));
+      await tester.pumpWidget(
+        screen(
+          SentItemScreen(
+            key: const ValueKey('update'),
+            store: store,
+            opened: update,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('It becomes a Shopping List.'), findsOneWidget);
+      expect(find.text('New Line: Nails'), findsOneWidget);
     });
 
     testWidgets('in German the day it comes back reads "wieder" with the '

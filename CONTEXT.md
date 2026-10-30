@@ -122,7 +122,7 @@ Firing an ignored Occurrence again at a fixed interval until it is Done, snoozed
 _Avoid_: repeat, reminder
 
 **Escalation**:
-An opt-in step where an Occurrence ignored for several Re-nags turns into a full-screen alarm with sound.
+An opt-in step where an Occurrence ignored for several Re-nags turns into a full-screen alarm with sound. The full-screen alarm is phone-only; on the desktop Escalation makes the notification urgent, with the system's alarm sound.
 
 **Missed**:
 An Occurrence that was never Done: a Routine's when its next Occurrence starts, a Reminder's at midnight.
@@ -143,6 +143,9 @@ The share of a Routine's Occurrences that were Done over a period, e.g. "92 % th
 **Agenda**:
 The home screen: today's Occurrences, then two Frogs to eat one of, then the rest of the week dimmed (tomorrow and the five days after), with the Missed Summary and the Unsorted count on top.
 _Avoid_: dashboard, today view, home
+
+**Calendar page**:
+The phone's page for its calendars: "Read from your calendar", which shows the appointments of the calendars picked on the Agenda and notes the running appointment at Capture, and "Write to your calendar", which writes the Routines and Reminders into a calendar. Phone-only: the desktop has no Calendar page and shows no appointments. German: Kalenderseite.
 
 ### Tallies
 

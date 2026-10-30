@@ -5604,3 +5604,187 @@ fn a_sent_checklist_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
     assert_eq!(read_of(&ben, &got)?, expected["third"]);
     Ok(())
 }
+
+/// What the generator's `sent-shopping` fixture reads of the Note `id`.
+fn read_shopping_of(store: &Store, id: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let note = Notes::new(store).by_id(id)?.ok_or("the Note")?;
+    let utc = |at: DateTime<Utc>| at.naive_utc();
+    Ok(json!({
+        "text": note.text,
+        "unsorted": note.is_unsorted(),
+        "list": ShoppingLists::new(store).by_note(id, &utc)?.as_ref().map(shopping_list_json),
+    }))
+}
+
+/// The parts of a Shopping List in `c`, as the generator lists them.
+fn shopping_changes_json(c: &oldbrainfix_core::sent::SentItemChanges) -> Value {
+    json!({
+        "makesShoppingList": c.makes_shopping_list,
+        "makesChecklist": c.makes_checklist,
+        "makesPlain": c.makes_plain,
+        "linesAdded": c.lines_added.iter().map(|l| json!({
+            "id": l.id,
+            "text": l.text,
+            "reappear": l.reappear.map(Reappear::code),
+        })).collect::<Vec<_>>(),
+        "linesRenamed": c.lines_renamed.iter().map(|r| json!([r.line, r.before, r.after])).collect::<Vec<_>>(),
+        "linesRemoved": c.lines_removed.iter().map(|l| l.id.clone()).collect::<Vec<_>>(),
+    })
+}
+
+#[test]
+fn a_sent_shopping_list_goes_as_the_dart_core_sends_and_takes_it() -> TestResult {
+    use oldbrainfix_core::sent;
+    let dir = fixtures().join("sent-shopping");
+    let expected = read_json(&dir.join("expected.json"))?;
+    let clock = held_clock("2026-01-03T12:00:00.000Z")?;
+    let at = |time: &str| -> TestResult {
+        *clock.lock() = parse_time(time)?;
+        Ok(())
+    };
+    let utc = |at: DateTime<Utc>| at.naive_utc();
+    let line =
+        |store: &Store, note: &str, text: &str| -> Result<String, Box<dyn std::error::Error>> {
+            let list = ShoppingLists::new(store)
+                .by_note(note, &utc)?
+                .ok_or("a Shopping List")?;
+            Ok(list
+                .lines
+                .iter()
+                .find(|l| l.text == text)
+                .ok_or("a Line")?
+                .id
+                .clone())
+        };
+    let held = clock.clone();
+    let mut ada = Store::in_memory(Box::new(move || *held.lock()), || Ok(writer_key()))?;
+    ada.set_local_setting("author", "Ada")?;
+    insert_lines(&ada, &dir.join("sender.jsonl"))?;
+    let settings = read_json(&dir.join("settings.json"))?;
+    for pair in settings.as_array().ok_or("settings")? {
+        ada.set_local_setting(
+            pair[0].as_str().ok_or("a key")?,
+            pair[1].as_str().ok_or("a value")?,
+        )?;
+    }
+    let key = writer_key();
+    let note = ada
+        .entities_of_type("note")?
+        .into_iter()
+        .next()
+        .ok_or("note")?;
+
+    // Sending writes the same entry and the same file, in format 2.
+    counted_ids(&mut ada, 0xa00);
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(lines_after(&ada, mark)?, lines_of(&dir.join("sent.jsonl"))?);
+    let file = std::fs::read(dir.join("shopping.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == file);
+
+    // Ben takes it as the Dart core does: every Line open.
+    at("2026-01-04T18:00:00.000Z")?;
+    let held = clock.clone();
+    let mut ben = Store::in_memory(Box::new(move || *held.lock()), || Ok(joiner_key()))?;
+    ben.set_local_setting("author", "Ben")?;
+    counted_ids(&mut ben, 0xb00);
+    let mark = ben.current_seq()?;
+    let opened = ben.open_sent_item(&file)?.map_err(|_| "opened")?;
+    assert_eq!(json!(opened.item.shopping), expected["shopping"]);
+    let lines: Vec<Value> = opened
+        .item
+        .lines
+        .iter()
+        .flatten()
+        .map(|l| {
+            json!({
+                "id": l.id,
+                "text": l.text,
+                "indent": l.indent,
+                "checked": l.checked,
+                "reappear": l.reappear.map(Reappear::code),
+            })
+        })
+        .collect();
+    assert_eq!(json!(lines), expected["lines"]);
+    let got = ben
+        .accept_sent_item(&opened.item, false)?
+        .ok_or("accepted")?;
+    assert_eq!(got, expected["accepted"].as_str().ok_or("accepted")?);
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("accepted.jsonl"))?
+    );
+    assert_eq!(read_shopping_of(&ben, &got)?, expected["first"]);
+
+    // Ben checks a Line and adds one; Ada renames, deletes and adds.
+    at("2026-01-05T09:00:00.000Z")?;
+    counted_ids(&mut ben, 0xc00);
+    let mark = ben.current_seq()?;
+    ShoppingLists::new(&ben).check(&line(&ben, &got, "Eggs")?, &utc)?;
+    ShoppingLists::new(&ben).add(&got, "Coffee", &utc)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("receiver.jsonl"))?
+    );
+    at("2026-01-06T10:00:00.000Z")?;
+    counted_ids(&mut ada, 0xd00);
+    let mark = ada.current_seq()?;
+    let lists = ShoppingLists::new(&ada);
+    lists.rename(&line(&ada, &note, "Eggs")?, "Free-range eggs")?;
+    lists.delete(&line(&ada, &note, "Milk")?)?;
+    lists.add(&note, "Tea", &utc)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("changed.jsonl"))?
+    );
+    at("2026-01-06T11:00:00.000Z")?;
+    let mark = ada.current_seq()?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("update.jsonl"))?
+    );
+    let update = std::fs::read(dir.join("update.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == update);
+
+    // Ben applies it as the Dart core does.
+    at("2026-01-07T08:00:00.000Z")?;
+    counted_ids(&mut ben, 0xe00);
+    let opened = ben.open_sent_item(&update)?.map_err(|_| "update")?;
+    let changes = opened.changes.as_ref().ok_or("changes")?;
+    assert_eq!(shopping_changes_json(changes), expected["update"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("updated.jsonl"))?
+    );
+    assert_eq!(read_shopping_of(&ben, &got)?, expected["second"]);
+
+    // Ada turns it back into a plain Note and sends that; Ben applies it.
+    at("2026-01-08T07:00:00.000Z")?;
+    counted_ids(&mut ada, 0xf00);
+    let mark = ada.current_seq()?;
+    ShoppingLists::new(&ada).to_plain(&note, &utc)?;
+    let item = ada.sent_item_of(&note, false)?;
+    assert_eq!(
+        lines_after(&ada, mark)?,
+        lines_of(&dir.join("plain.jsonl"))?
+    );
+    let plain = std::fs::read(dir.join("plain.oldbrain"))?;
+    assert!(sent::encode(&item, &key, &[], &mut counted_after(0))? == plain);
+    at("2026-01-08T12:00:00.000Z")?;
+    counted_ids(&mut ben, 0x1000);
+    let opened = ben.open_sent_item(&plain)?.map_err(|_| "plain")?;
+    let changes = opened.changes.as_ref().ok_or("changes")?;
+    assert_eq!(shopping_changes_json(changes), expected["plain"]);
+    let mark = ben.current_seq()?;
+    ben.accept_sent_item(&opened.item, false)?;
+    assert_eq!(
+        lines_after(&ben, mark)?,
+        lines_of(&dir.join("plained.jsonl"))?
+    );
+    assert_eq!(read_shopping_of(&ben, &got)?, expected["third"]);
+    Ok(())
+}

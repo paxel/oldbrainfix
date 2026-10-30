@@ -597,6 +597,11 @@ class _SentItemScreenState extends State<SentItemScreen> {
                         icon: Icons.checklist,
                         text: t.sentItemMakesChecklist,
                       ),
+                    if (changes.makesShoppingList)
+                      _Line(
+                        icon: Icons.shopping_cart_outlined,
+                        text: t.sentItemMakesShoppingList,
+                      ),
                     if (changes.makesPlain)
                       _Line(icon: Icons.notes, text: t.sentItemMakesPlain),
                     for (final l in changes.linesAdded)
@@ -656,7 +661,9 @@ class _SentItemScreenState extends State<SentItemScreen> {
                     format: item.textFormat,
                     style: text.bodyLarge,
                   ),
-                  // The Lines of a Checklist, to look at, not to check.
+                  // The Lines of a Checklist or a Shopping List, to look at,
+                  // not to check; a Shopping List's all open, each with its
+                  // reappear time.
                   if (item.lines case final lines? when full)
                     ChecklistLines(
                       key: const ValueKey('sent-lines'),
@@ -666,7 +673,15 @@ class _SentItemScreenState extends State<SentItemScreen> {
                             id: l.id,
                             text: l.text,
                             inGroup: l.indent,
-                            below: null,
+                            below: switch (l.reappear) {
+                              null => null,
+                              Reappear.once => t.sentItemLineReappear(
+                                t.shoppingOnce,
+                              ),
+                              final r => t.sentItemLineReappear(
+                                t.shoppingWeeks(r.weeks),
+                              ),
+                            },
                             checked: l.checked,
                           ),
                       ],

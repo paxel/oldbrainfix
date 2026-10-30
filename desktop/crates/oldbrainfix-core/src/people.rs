@@ -1844,6 +1844,7 @@ mod tests {
                     sections: Vec::new(),
                     routines: Vec::new(),
                     lines: None,
+                    shopping: false,
                 };
                 accepted(
                     &ben,

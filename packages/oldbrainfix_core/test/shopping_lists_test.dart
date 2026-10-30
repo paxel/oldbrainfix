@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
 
@@ -570,5 +572,113 @@ void main() {
     acceptSentItem(ben, opened.item);
     expect(shown(ben, got), ['Milk']);
     expect(Checklists(ben).byNote(got), isNull);
+  });
+
+  group('sent to a person', () {
+    late Store ben;
+
+    setUp(() => ben = device(clock.call, 'Ben'));
+
+    /// What [ben] opens of what Ann sends of [note].
+    OpenedSentItem send(String note) => openSentItem(ben, sendNote(ann, note));
+
+    test('carries the Lines that show with their reappear times, in format '
+        '2, and they all arrive open in a Shopping List in Unsorted', () {
+      final note = shopping(ann, 'Shop\nMilk\nBread\nEggs');
+      ShoppingLists(ann).setReappear(idOf(ann, note, 'Eggs'), Reappear.week2);
+      ShoppingLists(ann).setReappear(idOf(ann, note, 'Bread'), Reappear.once);
+      ShoppingLists(ann).check(idOf(ann, note, 'Bread'), _wall);
+      ShoppingLists(ann).check(idOf(ann, note, 'Milk'), _wall);
+      final file = sendNote(ann, note);
+      expect(jsonDecode(utf8.decode(file))['format'], sentItemListFormat);
+      final opened = openSentItem(ben, file);
+      expect(opened.item.shopping, isTrue);
+      expect(
+        [for (final l in opened.item.lines!) '${l.text} ${l.reappear!.code}'],
+        ['Eggs 2w', 'Milk 1w'],
+      );
+      final got = acceptSentItem(ben, opened.item)!;
+      expect(shown(ben, got), ['Eggs', 'Milk']);
+      expect(lineOf(ben, got, 'Eggs').reappear, Reappear.week2);
+      expect(lineOf(ben, got, 'Milk').reappear, Reappear.week1);
+      expect(Checklists(ben).byNote(got), isNull);
+      expect(Notes(ben).byId(got)!.isUnsorted, isTrue);
+    });
+
+    test('an update adds, renames and takes away the sender\'s Lines and '
+        'keeps the receiver\'s own and their checks', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs');
+      final got = acceptSentItem(ben, send(note).item)!;
+      ShoppingLists(ben).check(idOf(ben, got, 'Eggs'), _wall);
+      ShoppingLists(ben).add(got, 'Coffee', _wall);
+      ShoppingLists(ann).rename(idOf(ann, note, 'Eggs'), 'Free-range eggs');
+      ShoppingLists(ann).delete(idOf(ann, note, 'Milk'));
+      ShoppingLists(ann).add(note, 'Tea', _wall);
+      final opened = send(note);
+      final changes = opened.changes!;
+      expect(changes.makesShoppingList, isFalse);
+      expect([for (final l in changes.linesAdded) l.text], ['Tea']);
+      expect(
+        [for (final r in changes.linesRenamed) '${r.before}>${r.after}'],
+        ['Eggs>Free-range eggs'],
+      );
+      expect([for (final l in changes.linesRemoved) l.text], ['Milk']);
+      acceptSentItem(ben, opened.item);
+      expect(shown(ben, got), ['Tea', 'Coffee', '~Free-range eggs']);
+    });
+
+    test('a Line gone here is not added again', () {
+      final note = shopping(ann, 'Shop\nMilk');
+      final got = acceptSentItem(ben, send(note).item)!;
+      final milk = idOf(ben, got, 'Milk');
+      ShoppingLists(ben).setReappear(milk, Reappear.once);
+      ShoppingLists(ben).check(milk, _wall);
+      final opened = send(note);
+      expect(opened.changes!.linesAdded, isEmpty);
+      expect(opened.changes!.isEmpty, isTrue);
+      acceptSentItem(ben, opened.item);
+      expect(shown(ben, got), isEmpty);
+    });
+
+    test('a Note follows the sender into a Shopping List and out of it', () {
+      final note = Notes(ann).capture('Shop\nMilk').id;
+      final got = acceptSentItem(ben, send(note).item)!;
+      ShoppingLists(ann).make(note);
+      final made = send(note);
+      expect(made.changes!.makesShoppingList, isTrue);
+      expect(made.changes!.makesChecklist, isFalse);
+      acceptSentItem(ben, made.item);
+      expect(shown(ben, got), ['Milk']);
+      ShoppingLists(ann).toPlain(note, _wall);
+      final plain = send(note);
+      expect(plain.changes!.makesPlain, isTrue);
+      acceptSentItem(ben, plain.item);
+      expect(ShoppingLists(ben).isShoppingList(got), isFalse);
+    });
+
+    test('a Checklist here stays one when the sender\'s is a Shopping '
+        'List', () {
+      final note = Notes(ann).capture('Shop\nMilk').id;
+      final got = acceptSentItem(ben, send(note).item)!;
+      Checklists(ben).make(got);
+      ShoppingLists(ann).make(note);
+      final opened = send(note);
+      expect(opened.changes!.makesShoppingList, isFalse);
+      expect(opened.changes!.linesAdded, isEmpty);
+      acceptSentItem(ben, opened.item);
+      expect(ShoppingLists(ben).isShoppingList(got), isFalse);
+      expect(Checklists(ben).byNote(got)!.lines.single.text, 'Milk');
+    });
+
+    test('a file naming another list is no Sent Item', () {
+      final note = shopping(ann, 'Shop\nMilk');
+      final item = sentItemOf(ann, note);
+      final payload = item.encode().replaceFirst(
+        '"list":"shopping"',
+        '"list":"pantry"',
+      );
+      expect(SentItem.parse(payload), isNull);
+      expect(SentItem.parse(item.encode())!.shopping, isTrue);
+    });
   });
 }
