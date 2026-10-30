@@ -3575,6 +3575,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get addToShoppingList => 'Add to a Shopping List';
+
+  @override
+  String captureChoiceShopping(String list) {
+    return 'Shopping List: $list';
+  }
+
+  @override
+  String get captureShoppingUntranscribed =>
+      'Kept as a Note: its recording could not be transcribed for the Shopping List.';
+
+  @override
+  String get captureShoppingGone =>
+      'Kept as a Note: that Shopping List can no longer be added to.';
+
+  @override
   String get noteBeingCaptured => 'The Note being captured';
 
   @override

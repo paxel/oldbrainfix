@@ -7,7 +7,9 @@
 //! recording or photo itself is always kept. Asked to, one reads a
 //! recording or photo again, ahead of the others and whether or not it
 //! has a text, as "Transcribe again" and "Read the text again" do
-//! (ADR 0025).
+//! (ADR 0025). What waits for the recordings of a Note, as a voice
+//! capture going into a Shopping List does (#124), is told once each has
+//! a Transcript or one could not be read.
 //!
 //! The engines sit behind a trait: Whisper and ocrs in the app, fakes in
 //! the tests. Whisper is led in with the Area and Topic names as the user
@@ -81,6 +83,15 @@ impl Kind {
     }
 }
 
+/// What an announcement at the top says, a sentence without values, and
+/// the full text behind its click.
+pub type Said = (&'static str, String);
+
+/// What runs on the thread once every recording of a Note has a
+/// Transcript, told `true`, or one could not be read or the Note is gone,
+/// told `false`; what it has to announce, if anything.
+pub type Then = Box<dyn FnOnce(bool) -> Option<Said> + Send>;
+
 /// One background thread reading recordings or photos into text; its
 /// clones all tell the same thread.
 #[derive(Clone)]
@@ -91,11 +102,14 @@ pub struct Enricher {
 }
 
 /// The recordings or photos asked to be read again, oldest ask first,
-/// and those of them that brought no text.
+/// and those of them that brought no text; what waits for the
+/// recordings of a Note, by its id, and what that had to announce.
 #[derive(Default)]
 struct Asked {
     waiting: Mutex<VecDeque<Blob>>,
     failed: Mutex<Vec<Blob>>,
+    waiters: Mutex<Vec<(String, Then)>>,
+    said: Mutex<Vec<Said>>,
 }
 
 impl Enricher {
@@ -141,6 +155,20 @@ impl Enricher {
     /// call.
     pub fn take_failed(&self) -> Vec<Blob> {
         std::mem::take(&mut *self.asked.failed.lock())
+    }
+
+    /// Runs `then` once every recording of the Note `note_id` has a
+    /// Transcript or one could not be read; after the next look for
+    /// something to read at the latest.
+    pub fn when_read(&self, note_id: &str, then: Then) {
+        self.asked.waiters.lock().push((note_id.to_string(), then));
+        self.kick();
+    }
+
+    /// What the ones [`Enricher::when_read`] ran had to announce since
+    /// the last call.
+    pub fn take_said(&self) -> Vec<Said> {
+        std::mem::take(&mut *self.asked.said.lock())
     }
 
     /// Looks for something to read, unless it reads already; it looks
@@ -202,8 +230,53 @@ fn run(
                 }
             }
             changed();
+            settle(&notes, asked, &skipped, changed);
         }
+        settle(&notes, asked, &skipped, changed);
         engine.idle();
+    }
+}
+
+/// Runs what waits for the recordings of a Note that are all read now,
+/// or of which one could not be read (`skipped`), keeping what they
+/// have to announce; `changed` once any ran.
+fn settle(notes: &Notes, asked: &Asked, skipped: &HashSet<String>, changed: &dyn Fn()) {
+    let mut ready: Vec<(Then, bool)> = Vec::new();
+    {
+        let mut waiters = asked.waiters.lock();
+        let mut i = 0;
+        while i < waiters.len() {
+            match read_all(notes, &waiters[i].0, skipped) {
+                Some(read) => ready.push((waiters.remove(i).1, read)),
+                None => i += 1,
+            }
+        }
+    }
+    if ready.is_empty() {
+        return;
+    }
+    for (then, read) in ready {
+        if let Some(said) = then(read) {
+            asked.said.lock().push(said);
+        }
+    }
+    changed();
+}
+
+/// Whether every recording of the Note `note_id` has a Transcript, or a
+/// removed one: `Some(true)` when so, `Some(false)` when one could not be
+/// read or the Note is gone, `None` while one still waits.
+fn read_all(notes: &Notes, note_id: &str, skipped: &HashSet<String>) -> Option<bool> {
+    let Ok(Some(note)) = notes.by_id(note_id) else {
+        return Some(false);
+    };
+    let mut waiting = note.recordings.iter().filter(|hash| {
+        !note.transcripts.contains_key(*hash) && !note.removed_transcripts.contains(hash)
+    });
+    match waiting.clone().next() {
+        None => Some(true),
+        Some(_) if waiting.any(|hash| skipped.contains(hash)) => Some(false),
+        Some(_) => None,
     }
 }
 

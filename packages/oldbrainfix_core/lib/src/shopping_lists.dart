@@ -260,6 +260,26 @@ class ShoppingLists {
     ];
   }
 
+  /// The Notes that are a Shopping List this Device may add Lines to:
+  /// each one not in the trash nor merged where it holds a role, oldest
+  /// capture first. What a capture can be sorted into (#124).
+  List<Note> addable() {
+    final notes = Notes(store);
+    final found = <Note>[];
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      if (making(id) == null || !mayCheck(id)) continue;
+      if (notes.byId(id) case final note?
+          when !note.isTrashed && !note.isMerged) {
+        found.add(note);
+      }
+    }
+    found.sort((a, b) {
+      final byCapture = a.captured.compareTo(b.captured);
+      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+    });
+    return found;
+  }
+
   /// The making of the Shopping List the Note [noteId] is now, or null
   /// when it is none: no Note, another list, or a Tally.
   String? making(String noteId) {
@@ -402,6 +422,25 @@ class ShoppingLists {
     }
     final key = LineOrder.place(last, null);
     return store.batch(() => _writeLine(noteId, list.making, named, key));
+  }
+
+  /// Adds every line of [text] that is not blank to the Shopping List of
+  /// [noteId] as [add] does, all in one batch, the first line ending at
+  /// the top: what a capture sorted into the list becomes (#124). Returns
+  /// the ids of the Lines added, brought back or found, in the order of
+  /// the lines; none for a blank [text].
+  List<String> addLines(String noteId, String text, WallClock wallClock) {
+    final rows = [
+      for (final row in splitLines(text))
+        if (row.trim().isNotEmpty) row,
+    ];
+    if (rows.isEmpty) return const [];
+    return store.batch(() {
+      final ids = [
+        for (final row in rows.reversed) add(noteId, row, wallClock),
+      ];
+      return ids.reversed.toList();
+    });
   }
 
   /// Renames the Line [lineId].

@@ -332,6 +332,47 @@ void main() {
       expect(ann.entitiesOfType(ChecklistKeys.typeLine), hasLength(4));
     });
 
+    test('the lines of a text come in at once, the first at the top, a '
+        'name it has coming back instead', () {
+      final note = shopping(ann, 'Shop\nMilk\nTea');
+      final lists = ShoppingLists(ann);
+      final milk = idOf(ann, note, 'Milk');
+      final tea = idOf(ann, note, 'Tea');
+      lists.check(milk, _wall);
+      final ids = lists.addLines(note, 'Eggs\r\n  milk \n\n Tea\rbread', _wall);
+      expect(shown(ann, note), [
+        'Eggs',
+        'Milk',
+        'bread',
+        'Tea',
+      ], reason: 'an open one stays');
+      expect(ids, [
+        idOf(ann, note, 'Eggs'),
+        milk,
+        tea,
+        idOf(ann, note, 'bread'),
+      ]);
+      expect(ann.entitiesOfType(ChecklistKeys.typeLine), hasLength(4));
+      expect(lists.addLines(note, ' \n ', _wall), isEmpty);
+      expect(
+        () => lists.addLines(Notes(ann).capture('plain').id, 'Milk', _wall),
+        throwsArgumentError,
+      );
+    });
+
+    test('the lists to add to are those not in the trash, oldest first', () {
+      final groceries = shopping(ann, 'Groceries');
+      Notes(ann).capture('plain');
+      final gone = shopping(ann, 'Gone');
+      final hardware = shopping(ann, 'Hardware');
+      Checklists(ann).make(Notes(ann).capture('Packing\nSocks').id);
+      Notes(ann).trash(gone);
+      expect(ShoppingLists(ann).addable().map((n) => n.id), [
+        groceries,
+        hardware,
+      ]);
+    });
+
     test('a deleted Line is not brought back by its name', () {
       final note = shopping(ann, 'Shop\nMilk');
       final lists = ShoppingLists(ann);

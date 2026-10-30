@@ -3611,6 +3611,22 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get addToShoppingList => 'Zu einer Einkaufsliste hinzufügen';
+
+  @override
+  String captureChoiceShopping(String list) {
+    return 'Einkaufsliste: $list';
+  }
+
+  @override
+  String get captureShoppingUntranscribed =>
+      'Als Notiz behalten: Die Aufnahme ließ sich für die Einkaufsliste nicht transkribieren.';
+
+  @override
+  String get captureShoppingGone =>
+      'Als Notiz behalten: Zu dieser Einkaufsliste lässt sich nichts mehr hinzufügen.';
+
+  @override
   String get noteBeingCaptured => 'Die Notiz, die gerade erfasst wird';
 
   @override

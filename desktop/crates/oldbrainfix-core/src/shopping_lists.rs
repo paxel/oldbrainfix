@@ -657,6 +657,55 @@ impl<'a> ShoppingLists<'a> {
             .batch(|| self.write_line(note_id, &list.making, &named, &key, false, None))
     }
 
+    /// The Notes that are a Shopping List this Device may add Lines to:
+    /// each one not in the trash nor merged where it holds a role, oldest
+    /// capture first. What a capture can be sorted into (#124).
+    pub fn addable(&self) -> Result<Vec<Note>> {
+        let notes = Notes::new(self.store);
+        let mut found = Vec::new();
+        for id in self.store.entities_of_type(note_keys::TYPE_NOTE)? {
+            if self.making(&id)?.is_none() || !self.may_check(&id)? {
+                continue;
+            }
+            if let Some(note) = notes.by_id(&id)?
+                && !note.is_trashed()
+                && !note.is_merged()
+            {
+                found.push(note);
+            }
+        }
+        found.sort_by(|a, b| {
+            a.captured
+                .cmp(&b.captured)
+                .then_with(|| utf16_cmp(&a.id, &b.id))
+        });
+        Ok(found)
+    }
+
+    /// Adds every line of `text` that is not blank to the Shopping List of
+    /// `note_id` as [`ShoppingLists::add`] does, all in one batch, the first
+    /// line ending at the top: what a capture sorted into the list becomes
+    /// (#124). Returns the ids of the Lines added, brought back or found,
+    /// in the order of the lines; none for a blank `text`.
+    pub fn add_lines(&self, note_id: &str, text: &str, wall: &WallClock) -> Result<Vec<String>> {
+        let rows: Vec<String> = split_lines(text)
+            .into_iter()
+            .filter(|row| !dart_trim(row).is_empty())
+            .collect();
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.store.batch(|| {
+            let mut ids = rows
+                .iter()
+                .rev()
+                .map(|row| self.add(note_id, row, wall))
+                .collect::<Result<Vec<String>>>()?;
+            ids.reverse();
+            Ok(ids)
+        })
+    }
+
     /// Renames the Line `line_id`.
     pub fn rename(&self, line_id: &str, text: &str) -> Result<()> {
         let fields = self.require_editable(line_id)?;
@@ -1228,6 +1277,58 @@ mod tests {
         lists.delete(&rice)?;
         assert_ne!(lists.add(&note, "rice", &wall)?, rice);
         assert!(lists.add(&note, "  ", &wall).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn the_lists_to_add_to_are_those_not_in_the_trash_oldest_first() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let notes = Notes::new(&ann);
+        let groceries = shopping(&ann, "Groceries", None)?;
+        notes.capture("plain", None, None)?;
+        let gone = shopping(&ann, "Gone", None)?;
+        let hardware = shopping(&ann, "Hardware", None)?;
+        let packing = notes.capture("Packing\nSocks", None, None)?.id;
+        Checklists::new(&ann).make(&packing)?;
+        notes.trash(&gone)?;
+        let ids: Vec<String> = ShoppingLists::new(&ann)
+            .addable()?
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        assert_eq!(ids, [groceries, hardware]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_lines_of_a_text_come_in_at_once_the_first_at_the_top() -> TestResult {
+        let clock = Clock::new()?;
+        let ann = clock.device(1, "Ann")?;
+        let note = shopping(&ann, "Shop\nMilk\nTea", None)?;
+        let lists = ShoppingLists::new(&ann);
+        let milk = id_of(&ann, &note, "Milk")?;
+        let tea = id_of(&ann, &note, "Tea")?;
+        lists.check(&milk, &wall)?;
+        let ids = lists.add_lines(&note, "Eggs\r\n  milk \n\n Tea\rbread", &wall)?;
+        assert_eq!(
+            shown(&ann, &note)?,
+            ["Eggs", "Milk", "bread", "Tea"],
+            "an open one stays"
+        );
+        assert_eq!(
+            ids,
+            [
+                id_of(&ann, &note, "Eggs")?,
+                milk,
+                tea,
+                id_of(&ann, &note, "bread")?
+            ]
+        );
+        assert_eq!(ann.entities_of_type(checklist_keys::TYPE_LINE)?.len(), 4);
+        assert!(lists.add_lines(&note, " \n ", &wall)?.is_empty());
+        let plain = Notes::new(&ann).capture("plain", None, None)?.id;
+        assert!(lists.add_lines(&plain, "Milk", &wall).is_err());
         Ok(())
     }
 

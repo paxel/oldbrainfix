@@ -7,7 +7,9 @@
 //!
 //! Above the Nudge buttons sit the Note card's buttons (#113): "File
 //! into…", Routine, Reminder, Frog and Session where this Device may
-//! spawn, and "More" with the Importance and "Make it a Tally". Routine,
+//! spawn, and "More" with the Importance, "Make it a Tally" and "Add to a
+//! Shopping List", whose lines then go into the list picked instead of a
+//! Note, the rest waiting unshown (#124). Routine,
 //! Reminder, Session and the Tally open their page in the popup, grown
 //! for it, which hands its choice back; every choice shows at the top,
 //! not saved yet, with a button that drops it. All of it is saved with
@@ -38,15 +40,17 @@ use egui::{
 };
 use oldbrainfix_core::{APP_ID, Area, DeviceSettings, Note, Notes, Places, Store, Topic};
 
-use crate::app::{failure_form, local_wall, region_of};
-use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
+use crate::app::{Wall, failure_form, local_wall, region_of};
+use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Opens};
 use crate::cli::note_text;
+use crate::enrich::Enricher;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::Recorder;
 use crate::media_view::{self, Voice};
 use crate::routine_editor::{Intent, RoutineEditor};
 use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
+use crate::speech::SpeechModel;
 use crate::tally_view::{FieldForm, FormIntent, TallyForm};
 use crate::theme;
 
@@ -131,6 +135,13 @@ pub struct CapturePopup {
     areas: Vec<(Area, Vec<Topic>)>,
     /// Whether this Device may spawn from the Note where it goes.
     spawns: bool,
+    /// The Shopping Lists the lines can go into, by their Note's id with
+    /// their title, read with the Areas.
+    lists: Vec<ListTitle>,
+    /// The thread making Transcripts, and the speech model it needs; a
+    /// recording goes into a Shopping List only with both.
+    transcriber: Option<(Enricher, Option<SpeechModel>)>,
+    wall: Wall,
     page: Option<Page>,
     /// The region the system reports, for the units of a Tally.
     region: Option<String>,
@@ -152,6 +163,9 @@ impl CapturePopup {
             choices: CaptureChoices::default(),
             areas: Vec::new(),
             spawns: true,
+            lists: Vec::new(),
+            transcriber: None,
+            wall: Arc::new(local_wall),
             page: None,
             region: region_of(sys_locale::get_locale().as_deref()),
         };
@@ -162,6 +176,35 @@ impl CapturePopup {
     /// The microphone voice Notes are recorded with.
     pub fn set_recorder(&mut self, recorder: Box<dyn Recorder>) {
         self.recorder = Some(recorder);
+    }
+
+    /// The thread making Transcripts and the speech model it needs, for
+    /// a voice capture going into a Shopping List; without a model it
+    /// waits for none.
+    pub fn set_transcriber(&mut self, transcriber: Enricher, speech: Option<SpeechModel>) {
+        self.transcriber = Some((transcriber, speech));
+    }
+
+    /// The wall clock the days of a Shopping List's Lines are on.
+    pub fn set_wall_clock(&mut self, wall: Wall) {
+        self.wall = wall;
+    }
+
+    /// Whether a recording captured now gets its Transcript here.
+    fn transcribes(&self) -> bool {
+        self.transcriber
+            .as_ref()
+            .is_some_and(|(_, speech)| speech.as_ref().is_none_or(|s| s.current().is_some()))
+    }
+
+    /// The Shopping Lists the lines can go into: none while a recording
+    /// gets no Transcript here.
+    fn offered_lists(&self) -> &[ListTitle] {
+        let voice = self.recording() || !self.recorded.is_empty();
+        if voice && !self.transcribes() {
+            return &[];
+        }
+        &self.lists
     }
 
     /// Whether a voice recording runs.
@@ -273,6 +316,10 @@ impl CapturePopup {
             Ok(areas) => self.areas = areas,
             Err(e) => self.error = Some(Failure::of(&self.t, &e)),
         }
+        match capture_choices::shopping_lists(&self.store, &self.t) {
+            Ok(lists) => self.lists = lists,
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
+        }
         // An Area or Topic deleted meanwhile is no place to go.
         if let Some(place) = &self.choices.place
             && capture_choices::place_name(&self.t, &self.areas, place).is_none()
@@ -304,13 +351,22 @@ impl CapturePopup {
         {
             self.recorded.push(bytes);
         }
+        // Without a Transcript to come, a recording keeps it a Note, as
+        // said once it is saved.
+        let picked = self.choices.shopping.clone();
+        let untranscribed = picked.is_some() && !self.recorded.is_empty() && !self.transcribes();
+        let mut choices = self.choices.clone();
+        if untranscribed {
+            choices.shopping = None;
+        }
+        let list = choices.shopping.clone();
         let saved = capture_choices::capture(
             &self.store,
             &self.text,
             self.choices.place.as_deref(),
             nudge_in,
             (&[], &self.recorded),
-            &self.choices,
+            (&choices, &*self.wall),
         );
         match saved {
             // Only once all of it is written: a failed save keeps it here.
@@ -320,10 +376,40 @@ impl CapturePopup {
                 self.error = None;
                 self.choices = CaptureChoices::default();
                 self.page = None;
-                if saved.is_some()
+                if let (Captured::Waiting(note), Some((transcriber, _)), Some(list)) =
+                    (&saved, &self.transcriber, &list)
+                {
+                    let held = (self.store.clone(), self.wall.clone());
+                    capture_choices::pour_later(transcriber, held, self.t, &note.id, list);
+                }
+                if !matches!(saved, Captured::Nothing)
                     && let Some(saved) = &self.saved
                 {
                     saved();
+                }
+                // Kept as a Note instead: said here, as the popup is all
+                // there is to say it.
+                let t = self.t;
+                let list = picked.as_deref().unwrap_or("");
+                let said = match saved {
+                    Captured::Kept(_) => Some((
+                        t.capture_shopping_gone(),
+                        format!("shopping list {list}: it can no longer be added to"),
+                    )),
+                    Captured::Note(_) if untranscribed => Some((
+                        t.capture_shopping_untranscribed(),
+                        format!("shopping list {list}: no speech model to transcribe with"),
+                    )),
+                    _ => None,
+                };
+                if let Some((said, details)) = said {
+                    self.error = Some(Failure {
+                        said,
+                        cause: said,
+                        details,
+                    });
+                    self.read_places();
+                    return Outcome::Open;
                 }
                 Outcome::Closed
             }
@@ -398,6 +484,7 @@ impl CapturePopup {
         let place_chip = self.choices.place.as_ref().and_then(|place| {
             capture_choices::place_name(&t, &self.areas, place).map(|name| (name, true))
         });
+        let lists = self.offered_lists().to_vec();
         Frame::NONE
             .fill(tones.background)
             .inner_margin(Margin::same(16))
@@ -405,7 +492,8 @@ impl CapturePopup {
                 ui.set_min_size(ui.available_size());
                 // Announcements go to the top (UI laws).
                 self.failure_line(ui);
-                if let Some(chip) = capture_choices::chips(ui, &t, &self.choices, place_chip) {
+                let shown = (place_chip, self.lists.as_slice());
+                if let Some(chip) = capture_choices::chips(ui, &t, &self.choices, shown) {
                     asked = Some(chip);
                 }
                 let field = ui.add(
@@ -438,7 +526,7 @@ impl CapturePopup {
                     }
                 }
                 ui.add_space(4.0);
-                let offer = (self.areas.as_slice(), self.spawns);
+                let offer = (self.areas.as_slice(), self.spawns, lists.as_slice());
                 if let Some(button) = capture_choices::action_row(ui, &t, &self.choices, offer) {
                     asked = Some(button);
                 }

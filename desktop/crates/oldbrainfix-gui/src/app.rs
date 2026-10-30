@@ -88,7 +88,7 @@ use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
 use crate::backups;
-use crate::capture_choices::{self, Ask, CaptureChoices, Opens};
+use crate::capture_choices::{self, Ask, CaptureChoices, Captured, ListTitle, Opens};
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_sync;
@@ -318,6 +318,9 @@ struct View {
     detail: Option<(Placed, Vec<Section>)>,
     /// Whether the Note being captured may spawn where it goes (#113).
     capture_spawns: bool,
+    /// The Shopping Lists the Note being captured can go into, by their
+    /// Note's id with their title (#124).
+    capture_lists: Vec<ListTitle>,
     /// The Routines and Reminders the selected Note spawned.
     routines: Vec<Routine>,
     /// The Frogs the selected Note spawned, oldest first, each with
@@ -3137,6 +3140,7 @@ impl App {
                 &self.store,
                 self.capture_place().as_deref(),
             )?,
+            capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
             routines: note_routines,
             note_frogs,
             tally,
@@ -4431,26 +4435,80 @@ impl App {
         // The recordings held on the field go into the same Note.
         let mut recordings = recordings.to_vec();
         recordings.extend(self.recorded.iter().cloned());
-        let Some(note) = capture_choices::capture(
+        // Without a Transcript to come, a recording keeps it a Note, as
+        // said once it is saved.
+        let picked = self.capture_choices.shopping.clone();
+        // A photo keeps it a Note anyway.
+        let untranscribed =
+            picked.is_some() && photos.is_empty() && !recordings.is_empty() && !self.transcribes();
+        let mut choices = self.capture_choices.clone();
+        if untranscribed {
+            choices.shopping = None;
+        }
+        let list = choices.shopping.clone();
+        let captured = capture_choices::capture(
             &self.store,
             &self.capture,
             place.as_deref(),
             nudge_in,
             (photos, &recordings),
-            &self.capture_choices,
-        )?
-        else {
-            return Ok(());
+            (&choices, &*self.wall),
+        )?;
+        let shown = match captured {
+            Captured::Nothing => return Ok(()),
+            Captured::Note(note) => {
+                if untranscribed {
+                    let t = self.t;
+                    let list = picked.as_deref().unwrap_or("");
+                    let details =
+                        format!("shopping list {list}: no speech model to transcribe with");
+                    self.announce_done(t.capture_shopping_untranscribed(), details);
+                }
+                Some(note)
+            }
+            Captured::Poured => None,
+            Captured::Waiting(note) => {
+                if let (Some(transcriber), Some(list)) = (&self.transcriber, &list) {
+                    let held = (self.store.clone(), self.wall.clone());
+                    capture_choices::pour_later(transcriber, held, self.t, &note.id, list);
+                }
+                None
+            }
+            Captured::Kept(note) => {
+                let t = self.t;
+                let list = list.as_deref().unwrap_or("");
+                let details = format!("shopping list {list}: it can no longer be added to");
+                self.announce_done(t.capture_shopping_gone(), details);
+                Some(note)
+            }
         };
         // Only once all of it is written: a failed save keeps it here.
         self.capture.clear();
         self.recorded.clear();
         self.capture_choices = CaptureChoices::default();
         self.save_text()?;
-        self.selected_note = Some(note.id);
-        self.editor = None;
-        self.tally_form = None;
+        if let Some(note) = shown {
+            self.selected_note = Some(note.id);
+            self.editor = None;
+            self.tally_form = None;
+        }
         Ok(())
+    }
+
+    /// Whether a recording captured now gets its Transcript here: with
+    /// the thread making them and a speech model in use.
+    fn transcribes(&self) -> bool {
+        self.transcriber.is_some() && self.speech.as_ref().is_none_or(|s| s.current().is_some())
+    }
+
+    /// The Shopping Lists the Note being captured can go into: none while
+    /// it holds a recording that gets no Transcript here.
+    fn capture_lists(&self) -> &[ListTitle] {
+        let voice = self.recording() || !self.recorded.is_empty();
+        if voice && !self.transcribes() {
+            return &[];
+        }
+        &self.view.capture_lists
     }
 
     /// Where the Note being captured goes: the Area or Topic picked with
@@ -4808,6 +4866,14 @@ impl App {
             {
                 self.again_failed = Some(photo);
             }
+        }
+        // A voice capture went into its Shopping List, or stayed a Note.
+        let said = self.transcriber.as_ref().map(Enricher::take_said);
+        if let Some(said) = said.filter(|said| !said.is_empty()) {
+            for (said, details) in said {
+                self.announce_done(said, details);
+            }
+            self.refresh();
         }
         // A phone's requests are answered while the Sync view shows.
         if self.sync.hosting() {
@@ -5264,7 +5330,9 @@ impl App {
     /// Once something is typed, the Note card's buttons show (#113),
     /// whose choices show at the top, not saved yet, and under them the
     /// Nudge times, Ctrl+Enter taking the 1 h one; a Note filed or with
-    /// something set up gets one Save instead and no Nudge.
+    /// something set up gets one Save instead and no Nudge. With a
+    /// Shopping List picked in "More", the lines go into it instead of a
+    /// Note (#124).
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let place = self.capture_place();
@@ -5293,7 +5361,8 @@ impl App {
                 actions.push(Action::Capture(Notes::default_nudge()));
             }
             // Announcements and choices go to the top (UI laws).
-            if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, place_chip) {
+            let shown = (place_chip, self.view.capture_lists.as_slice());
+            if let Some(asked) = capture_choices::chips(ui, &t, &self.capture_choices, shown) {
                 actions.push(Action::CaptureChoice(asked));
             }
             ui.add(
@@ -5348,7 +5417,7 @@ impl App {
                 return;
             }
             ui.add_space(4.0);
-            let offer = (self.view.areas.as_slice(), spawns);
+            let offer = (self.view.areas.as_slice(), spawns, self.capture_lists());
             if let Some(asked) = capture_choices::action_row(ui, &t, &self.capture_choices, offer) {
                 actions.push(Action::CaptureChoice(asked));
             }

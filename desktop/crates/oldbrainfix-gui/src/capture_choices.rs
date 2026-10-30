@@ -10,17 +10,28 @@
 //! Note card's buttons ([`action_row`]) and the choices shown at the top
 //! ([`chips`]), each with a button that drops it again. Merging, sending
 //! and the trash need a saved Note and are not offered here.
+//!
+//! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
+//! of the list picked instead, and keeps no Note; the other choices wait
+//! unshown and unwritten meanwhile, and come back when its chip is
+//! dropped. A recording gives the lines of its Transcript: as the desktop
+//! transcribes only what is written, such a capture is written Unsorted
+//! with nothing else and goes into the list once the Transcripts are
+//! there ([`pour_later`]); without one it stays a Note, announced at the
+//! top. No Line holds a photo, so a photo keeps it a Note.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use chrono::Duration;
 use egui::{Frame, Margin, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, Frogs, Importance, Note, Notes, Routines, Schedule, SessionRule, Sessions, Store,
-    Tallies, TallyRule, Topic,
+    Area, Error, Frogs, Importance, Note, Notes, Routines, Schedule, SessionRule, Sessions,
+    ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock,
 };
 
-use crate::app::icon_button;
+use crate::app::{Wall, icon_button};
+use crate::enrich::{Enricher, Said};
 use crate::icons;
 use crate::l10n::L10n;
 use crate::names::{area_name, topic_name};
@@ -104,6 +115,9 @@ pub struct CaptureChoices {
     pub tally: Option<TallyFieldChoice>,
     pub schedules: Vec<ScheduleChoice>,
     pub frog: bool,
+    /// The Note of the Shopping List the lines go into instead of a
+    /// Note; while one is, the rest waits unwritten.
+    pub shopping: Option<String>,
 }
 
 /// Something on the capture's buttons or its choices to spawn.
@@ -124,6 +138,7 @@ pub enum Chip {
     /// The Routine, Reminder or Session at this index.
     Schedule(usize),
     Frog,
+    Shopping,
 }
 
 /// What was asked of the capture's buttons or its choices.
@@ -133,6 +148,8 @@ pub enum Ask {
     Spawn(Spawn),
     Importance(Importance),
     MakeTally,
+    /// The lines go into the Shopping List of this Note.
+    Shopping(String),
     /// Drops the choice again.
     Remove(Chip),
 }
@@ -145,11 +162,15 @@ pub enum Opens {
 }
 
 impl CaptureChoices {
-    /// Whether the Note leaves Unsorted going into `place`: filed, or
-    /// with something spawned from it or made of it. It needs no Nudge
-    /// then.
+    /// Whether the Note leaves Unsorted going into `place`: filed, with
+    /// something spawned from it or made of it, or going into a Shopping
+    /// List. It needs no Nudge then.
     pub fn sorted(&self, place: Option<&str>) -> bool {
-        place.is_some() || self.tally.is_some() || !self.schedules.is_empty() || self.frog
+        place.is_some()
+            || self.tally.is_some()
+            || !self.schedules.is_empty()
+            || self.frog
+            || self.shopping.is_some()
     }
 
     /// Writes all of it into the Note `note_id`, which holds its place
@@ -216,6 +237,7 @@ impl CaptureChoices {
             }
             Ask::Importance(importance) => self.importance = importance,
             Ask::MakeTally => return Ok(Some(Opens::Tally)),
+            Ask::Shopping(list) => self.shopping = Some(list),
             Ask::Remove(chip) => match chip {
                 Chip::Place => self.place = None,
                 Chip::Importance => self.importance = Importance::Normal,
@@ -223,6 +245,7 @@ impl CaptureChoices {
                 Chip::Schedule(i) if i < self.schedules.len() => drop(self.schedules.remove(i)),
                 Chip::Schedule(_) => {}
                 Chip::Frog => self.frog = false,
+                Chip::Shopping => self.shopping = None,
             },
         }
         Ok(None)
@@ -239,30 +262,184 @@ pub fn may_spawn(store: &Store, place: Option<&str>) -> oldbrainfix_core::Result
     store.may_manage(area.as_deref())
 }
 
+/// A Shopping List a capture can go into: its Note's id and its title.
+pub type ListTitle = (String, String);
+
+/// What the capture's buttons offer: the Areas with their Topics to
+/// file into, whether the Note may spawn where it goes, and the Shopping
+/// Lists it can go into.
+pub type Offer<'a> = (&'a [(Area, Vec<Topic>)], bool, &'a [ListTitle]);
+
+/// What a capture came to.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Captured {
+    /// Nothing, as the Note was empty.
+    Nothing,
+    /// This Note, with all that was set up for it.
+    Note(Note),
+    /// Its lines went into the Shopping List; no Note is kept.
+    Poured,
+    /// This Note, Unsorted with nothing else, until the Transcripts of
+    /// its recordings are there to go into the Shopping List with it.
+    Waiting(Note),
+    /// This Note, with all that was set up for it but the Shopping List,
+    /// which can no longer be added to.
+    Kept(Note),
+}
+
 /// Captures `text` with `photos` and `recordings` as a new Note in
 /// `place`, nudged `nudge_in` from now unless it is sorted, and writes
 /// `choices` into it, all in one batch: when a write on the way fails,
-/// none of it is written. `None`, and nothing written, when the Note is
-/// empty.
+/// none of it is written. Nothing is written when the Note is empty.
+///
+/// With a Shopping List picked, each line of `text` becomes a Line of
+/// it, days as `wall` shows them, and no Note is written; with
+/// recordings, the Note waits Unsorted for their Transcripts. A photo
+/// keeps it a Note, as does a list that can no longer be added to.
 pub fn capture(
     store: &Store,
     text: &str,
     place: Option<&str>,
     nudge_in: Duration,
     (photos, recordings): (&[Vec<u8>], &[Vec<u8>]),
-    choices: &CaptureChoices,
-) -> oldbrainfix_core::Result<Option<Note>> {
+    (choices, wall): (&CaptureChoices, &WallClock),
+) -> oldbrainfix_core::Result<Captured> {
     let text = text.trim();
     if text.is_empty() && photos.is_empty() && recordings.is_empty() {
+        return Ok(Captured::Nothing);
+    }
+    let note = |choices: &CaptureChoices| {
+        let mut choices = choices.clone();
+        choices.shopping = None;
+        // A sorted Note needs no Nudge (#113).
+        let nudge = (!choices.sorted(place)).then_some(nudge_in);
+        store.batch(|| {
+            let note = Notes::new(store).capture_with(text, place, nudge, photos, recordings)?;
+            choices.write(store, &note.id)?;
+            Ok(note)
+        })
+    };
+    // No Line holds a photo: the capture stays a Note, to keep it.
+    let Some(list) = choices.shopping.as_deref().filter(|_| photos.is_empty()) else {
+        return note(choices).map(Captured::Note);
+    };
+    if recordings.is_empty() {
+        return match ShoppingLists::new(store).add_lines(list, text, wall) {
+            Ok(_) => Ok(Captured::Poured),
+            // The list went meanwhile: a Note with all that was set up.
+            Err(Error::Invalid(_)) => note(choices).map(Captured::Kept),
+            Err(e) => Err(e),
+        };
+    }
+    // Until the Transcripts are there, the Note holds all of it.
+    Notes::new(store)
+        .capture_with(text, None, None, &[], recordings)
+        .map(Captured::Waiting)
+}
+
+/// Makes each line of the text of the Note `note_id` and of its
+/// recordings' Transcripts a Line of the Shopping List `list_id`, a name
+/// the list has bringing its Line back, and discards the Note, all in one
+/// batch (#124). `Some(true)` when it did; `Some(false)` when the list can
+/// no longer be added to, and `None` when the Note may no longer go:
+/// deleted, merged or with something spawned from it meanwhile. Either
+/// way the Note stays.
+pub fn pour(
+    store: &Store,
+    note_id: &str,
+    list_id: &str,
+    wall: &WallClock,
+) -> oldbrainfix_core::Result<Option<bool>> {
+    let notes = Notes::new(store);
+    let Some(note) = notes.by_id(note_id)? else {
+        return Ok(None);
+    };
+    if note.is_trashed() || note.is_merged() || note.spawned {
         return Ok(None);
     }
-    // A sorted Note needs no Nudge (#113).
-    let nudge = (!choices.sorted(place)).then_some(nudge_in);
-    store.batch(|| {
-        let note = Notes::new(store).capture_with(text, place, nudge, photos, recordings)?;
-        choices.write(store, &note.id)?;
-        Ok(Some(note))
-    })
+    let mut lines = vec![note.text.as_str()];
+    lines.extend(
+        note.recordings
+            .iter()
+            .filter_map(|hash| note.transcripts.get(hash).map(String::as_str)),
+    );
+    let text = lines.join("\n");
+    let poured = store.batch(|| {
+        ShoppingLists::new(store).add_lines(list_id, &text, wall)?;
+        notes.discard(note_id)
+    });
+    match poured {
+        Ok(()) => Ok(Some(true)),
+        Err(Error::Invalid(_)) => Ok(Some(false)),
+        Err(e) => Err(e),
+    }
+}
+
+/// Pours the Note `note_id` into the Shopping List `list_id` as [`pour`]
+/// does once `transcriber` has read its recordings. Until then the Note
+/// holds all of it, so nothing is lost when the app ends meanwhile.
+/// Without a Transcript, or when the list can no longer be added to, the
+/// Note stays and the window announces why at the top.
+pub fn pour_later(
+    transcriber: &Enricher,
+    (store, wall): (Arc<Store>, Wall),
+    t: L10n,
+    note_id: &str,
+    list_id: &str,
+) {
+    let (note, list) = (note_id.to_string(), list_id.to_string());
+    transcriber.when_read(
+        note_id,
+        Box::new(move |read| -> Option<Said> {
+            if !read {
+                // Said unless it went meanwhile.
+                let stays = Notes::new(&store)
+                    .by_id(&note)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|n| !n.is_trashed());
+                let details = format!("shopping list {list}: no Transcript for {note}");
+                return stays.then_some((t.capture_shopping_untranscribed(), details));
+            }
+            match pour(&store, &note, &list, &*wall) {
+                Ok(Some(false)) => Some((
+                    t.capture_shopping_gone(),
+                    format!("shopping list {list}: it can no longer be added to"),
+                )),
+                Ok(_) => None,
+                Err(e) => Some((t.action_failed(), e.to_string())),
+            }
+        }),
+    );
+}
+
+/// What a Shopping List is called where it is picked: the first line of
+/// its text, "Shopping List" while that is blank.
+pub fn shopping_title(t: &L10n, note: &Note) -> String {
+    match note.text.trim().split('\n').next().map(str::trim) {
+        Some(title) if !title.is_empty() => title.to_string(),
+        _ => t.shopping_heading().to_string(),
+    }
+}
+
+/// The Shopping Lists a capture can go into, by their Note's id with
+/// their title: each one this Device may add Lines to, oldest capture
+/// first.
+pub fn shopping_lists(store: &Store, t: &L10n) -> oldbrainfix_core::Result<Vec<ListTitle>> {
+    Ok(ShoppingLists::new(store)
+        .addable()?
+        .iter()
+        .map(|note| (note.id.clone(), shopping_title(t, note)))
+        .collect())
+}
+
+/// The title of the Shopping List `id` among `lists`; "Shopping List"
+/// for one no longer there.
+pub fn shopping_name(t: &L10n, lists: &[ListTitle], id: &str) -> String {
+    lists.iter().find(|(list, _)| list == id).map_or_else(
+        || t.shopping_heading().to_string(),
+        |(_, title)| title.clone(),
+    )
 }
 
 /// The Area or Topic `id` as the user reads it, "Area / Topic" for a
@@ -307,18 +484,53 @@ pub fn file_into_menu(ui: &mut Ui, t: &L10n, areas: &[(Area, Vec<Topic>)]) -> Op
     picked
 }
 
+/// "Add to a Shopping List" in a menu: its heading over `lists`, by
+/// their Note's id with their title, as radio buttons, the one picked
+/// before on; the one picked.
+fn shopping_picker(
+    ui: &mut Ui,
+    t: &L10n,
+    current: Option<&str>,
+    lists: &[ListTitle],
+) -> Option<String> {
+    let text = ui.visuals().text_color();
+    ui.label(RichText::new(t.add_to_shopping_list()).strong().color(text));
+    let mut picked = None;
+    for (id, title) in lists {
+        let on = current == Some(id.as_str());
+        if ui.radio(on, RichText::new(title).color(text)).clicked() && !on {
+            picked = Some(id.clone());
+        }
+    }
+    picked
+}
+
 /// The Note card's buttons on a capture: "File into…" over `areas`,
 /// Routine, Reminder, Frog and Session while `spawns`, else why not, and
-/// "More" with the Importance and "Make it a Tally".
+/// "More" with the Importance, "Make it a Tally" and "Add to a Shopping
+/// List" over `lists`, offered while there is one. While a Shopping List
+/// is picked, "More" holds only that.
 pub fn action_row(
     ui: &mut Ui,
     t: &L10n,
     choices: &CaptureChoices,
-    (areas, spawns): (&[(Area, Vec<Topic>)], bool),
+    (areas, spawns, lists): Offer<'_>,
 ) -> Option<Ask> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
+    // Lines need none of the rest: it waits while a list is picked.
+    let shopping = choices.shopping.as_deref();
+    if shopping.is_some() {
+        ui.horizontal_wrapped(|ui| {
+            ui.menu_button(RichText::new(t.more()).color(text), |ui| {
+                if let Some(list) = shopping_picker(ui, t, shopping, lists) {
+                    asked = Some(Ask::Shopping(list));
+                }
+            });
+        });
+        return asked;
+    }
     ui.horizontal_wrapped(|ui| {
         if let Some(place) = file_into_menu(ui, t, areas) {
             asked = Some(Ask::FileInto(place));
@@ -362,6 +574,12 @@ pub fn action_row(
                     asked = Some(Ask::MakeTally);
                 }
             }
+            if !lists.is_empty() {
+                ui.separator();
+                if let Some(list) = shopping_picker(ui, t, None, lists) {
+                    asked = Some(Ask::Shopping(list));
+                }
+            }
         });
     });
     if !spawns {
@@ -374,13 +592,21 @@ pub fn action_row(
 /// goes (`place`, as the user reads it, and whether it can be dropped),
 /// its Importance, its Tally, Routines, Reminders and Sessions and its
 /// Frog, each with a button that drops it; nothing while there is none.
+/// While a Shopping List is picked, only it shows, by its title `lists`
+/// gives.
 pub fn chips(
     ui: &mut Ui,
     t: &L10n,
     choices: &CaptureChoices,
-    place: Option<(String, bool)>,
+    (place, lists): (Option<(String, bool)>, &[ListTitle]),
 ) -> Option<Ask> {
     let mut shown: Vec<(Chip, String, bool)> = Vec::new();
+    // The other choices wait unshown while the lines go into a list.
+    if let Some(list) = &choices.shopping {
+        let title = shopping_name(t, lists, list);
+        shown.push((Chip::Shopping, t.capture_choice_shopping(&title), true));
+        return chip_row(ui, t, shown);
+    }
     if let Some((name, removable)) = place {
         shown.push((Chip::Place, t.capture_choice_place_desk(&name), removable));
     }
@@ -410,6 +636,12 @@ pub fn chips(
     if choices.frog {
         shown.push((Chip::Frog, t.frog().into(), true));
     }
+    chip_row(ui, t, shown)
+}
+
+/// The chips `shown`, each with its label and whether a button drops it;
+/// what was asked of them.
+fn chip_row(ui: &mut Ui, t: &L10n, shown: Vec<(Chip, String, bool)>) -> Option<Ask> {
     if shown.is_empty() {
         return None;
     }

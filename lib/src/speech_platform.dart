@@ -419,6 +419,9 @@ class Transcriber extends ChangeNotifier {
 
   /// Recordings the user asked to transcribe again, oldest ask first.
   final _asked = <({String noteId, String hash, Completer<bool> done})>[];
+
+  /// Who waits for a recording's first Transcript, by its hash.
+  final _waiting = <String, List<Completer<bool>>>{};
   String? _current;
   var _running = false;
   var _queued = false;
@@ -476,6 +479,21 @@ class Transcriber extends ChangeNotifier {
     return done.future;
   }
 
+  /// Waits for the recording [hash] of the Note [noteId] to have a
+  /// Transcript, as a capture sorted into a Shopping List does (#124);
+  /// whether it got one. False at once without a model, and as soon as it
+  /// could not be transcribed; one that could not be before is tried
+  /// again.
+  Future<bool> transcribed(String noteId, String hash) {
+    if (transcriptOf(noteId, hash) != null) return Future.value(true);
+    if (_disposed || model.current == null) return Future.value(false);
+    if (_skipped.contains(hash)) return transcribeAgain(noteId, hash);
+    final done = Completer<bool>();
+    (_waiting[hash] ??= []).add(done);
+    _kick();
+    return done.future;
+  }
+
   /// Starts transcribing once whatever changed the log is done, unless
   /// it runs already.
   void _kick() {
@@ -527,6 +545,9 @@ class Transcriber extends ChangeNotifier {
         }
         waiting?.complete(kept);
         waiting = null;
+        for (final waits in _waiting.remove(next.hash) ?? const []) {
+          waits.complete(kept);
+        }
         notifyListeners();
       }
       await platform.idle();
@@ -546,6 +567,10 @@ class Transcriber extends ChangeNotifier {
       asked.done.complete(false);
     }
     _asked.clear();
+    for (final waits in _waiting.values.expand((all) => all)) {
+      waits.complete(false);
+    }
+    _waiting.clear();
   }
 
   @override

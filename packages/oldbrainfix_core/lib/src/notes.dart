@@ -898,6 +898,22 @@ class Notes {
     );
   }
 
+  /// Removes the Note [noteId] for good, without the trash, as purging
+  /// does: for a Note just captured whose content went elsewhere, such as
+  /// a capture sorted into a Shopping List (#124). Refused for a Note that
+  /// spawned something, which would be left without its Note, and where
+  /// this Device may not change it.
+  void discard(String noteId) {
+    final note = byId(noteId);
+    if (note == null) {
+      throw ArgumentError.value(noteId, 'noteId', 'not a Note');
+    }
+    if (note.spawned || !store.mayChange(noteId)) {
+      throw StateError('$noteId may not be discarded');
+    }
+    store.append(noteId, NoteKeys.type, null);
+  }
+
   /// Brings the Note [noteId] back from the trash, to where it was filed.
   void restore(String noteId) {
     _requireNote(noteId);

@@ -137,6 +137,11 @@ class NoteActions {
   /// plain Note and unchecking all of its Lines, each left out when null.
   final ChecklistMenu Function()? checklist;
 
+  /// Picks a Shopping List for the lines of a Note being captured
+  /// (#124), read as the menu opens; left out while it is null or gives
+  /// null.
+  final VoidCallback? Function()? addToShopping;
+
   /// Deletes the Note, after asking once.
   final VoidCallback? onDelete;
 
@@ -151,6 +156,7 @@ class NoteActions {
     this.onMakeTally,
     this.onAddEntry,
     this.checklist,
+    this.addToShopping,
     this.onDelete,
   });
 }
@@ -613,6 +619,7 @@ class _MoreButton extends StatelessWidget {
             : null;
         final tally = actions.isTally?.call();
         final list = actions.checklist?.call();
+        final addToShopping = actions.addToShopping?.call();
         PopupMenuItem<VoidCallback> item(
           String key,
           IconData icon,
@@ -691,6 +698,13 @@ class _MoreButton extends StatelessWidget {
           if (tally == false && !(list?.isList ?? false))
             if (actions.onMakeTally case final make?)
               item('note-make-tally', Icons.bar_chart, t.makeTally, make),
+          if (addToShopping != null)
+            item(
+              'note-add-to-shopping',
+              Icons.add_shopping_cart,
+              t.addToShoppingList,
+              addToShopping,
+            ),
           if (list?.make case final make?)
             item('note-make-checklist', Icons.checklist, t.makeChecklist, make),
           if (list?.makeShopping case final make?)

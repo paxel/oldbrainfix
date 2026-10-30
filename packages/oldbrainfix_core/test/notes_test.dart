@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 import 'package:test/test.dart';
@@ -255,6 +256,29 @@ void main() {
       expect(notes.all().map((n) => n.id), [kept.id]);
       // The log still holds what the Note said.
       expect(store.history(note.id), isNotEmpty);
+    });
+
+    test('a discarded Note is gone at once, without the trash', () {
+      final note = notes.capture(
+        'milk',
+        recordings: [
+          Uint8List.fromList([1, 2, 3]),
+        ],
+      );
+      final kept = notes.capture('kept');
+      notes.discard(note.id);
+      expect(notes.byId(note.id), isNull);
+      expect(notes.all().map((n) => n.id), [kept.id]);
+      expect(notes.trashed(), isEmpty);
+      expect(notes.untranscribed(), isEmpty);
+      expect(() => notes.discard(note.id), throwsArgumentError);
+    });
+
+    test('a Note that spawned something is not discarded', () {
+      final note = notes.capture('milk');
+      Frogs(store).spawn(note.id);
+      expect(() => notes.discard(note.id), throwsStateError);
+      expect(notes.byId(note.id), isNotNull);
     });
   });
 

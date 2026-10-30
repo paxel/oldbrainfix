@@ -5798,6 +5798,30 @@ abstract class AppLocalizations {
   /// **'Tally: {field}'**
   String captureChoiceTally(String field);
 
+  /// In the ⋮ of a capture screen, and the title of the page it opens: makes each line of the Note being captured a Line of a Shopping List picked there, and keeps no Note (CONTEXT.md: Shopping List, Line).
+  ///
+  /// In en, this message translates to:
+  /// **'Add to a Shopping List'**
+  String get addToShoppingList;
+
+  /// On a capture screen: the Shopping List the lines being captured go into, by its title.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping List: {list}'**
+  String captureChoiceShopping(String list);
+
+  /// Announcement after a voice capture sorted into a Shopping List whose recording got no Transcript: the Note stays (CONTEXT.md: Transcript).
+  ///
+  /// In en, this message translates to:
+  /// **'Kept as a Note: its recording could not be transcribed for the Shopping List.'**
+  String get captureShoppingUntranscribed;
+
+  /// Announcement after a capture sorted into a Shopping List that was deleted or changed meanwhile: the Note stays.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept as a Note: that Shopping List can no longer be added to.'**
+  String get captureShoppingGone;
+
   /// In the Routine editor opened from a capture screen, for a Note without text yet.
   ///
   /// In en, this message translates to:

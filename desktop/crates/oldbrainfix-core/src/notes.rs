@@ -776,6 +776,21 @@ impl<'a> Notes<'a> {
             .map(drop)
     }
 
+    /// Removes the Note `note_id` for good, without the trash, as purging
+    /// does: for a Note just captured whose content went elsewhere, such as
+    /// a capture sorted into a Shopping List (#124). Refused for a Note that
+    /// spawned something, which would be left without its Note, and where
+    /// this Device may not change it.
+    pub fn discard(&self, note_id: &str) -> Result<()> {
+        let Some(note) = self.by_id(note_id)? else {
+            return Err(Error::Invalid(format!("not a Note: {note_id}")));
+        };
+        if note.spawned || !self.store.may_change(note_id)? {
+            return Err(Error::Invalid(format!("{note_id} may not be discarded")));
+        }
+        self.store.append(note_id, keys::TYPE, None, None).map(drop)
+    }
+
     /// Brings the Note `note_id` back from the trash, to where it was
     /// filed.
     pub fn restore(&self, note_id: &str) -> Result<()> {
@@ -1398,6 +1413,26 @@ mod tests {
             crate::profile::OwnProfile::new(&store).apply_defaults(name, None)?;
             Ok(store)
         }
+    }
+
+    #[test]
+    fn a_discarded_note_is_gone_at_once_without_the_trash() -> Result<()> {
+        let store = crate::store::tests::store();
+        let notes = Notes::new(&store);
+        let note = notes.capture_with("milk", None, None, &[], &[voice(1)])?;
+        let kept = notes.capture("kept", None, None)?;
+        notes.discard(&note.id)?;
+        assert!(notes.by_id(&note.id)?.is_none());
+        let ids: Vec<String> = notes.all()?.into_iter().map(|n| n.id).collect();
+        assert_eq!(ids, [kept.id]);
+        assert!(notes.trashed()?.is_empty());
+        assert!(notes.untranscribed()?.is_empty());
+        assert!(notes.discard(&note.id).is_err());
+        let frog = notes.capture("frog", None, None)?;
+        crate::Frogs::new(&store).spawn(&frog.id)?;
+        assert!(notes.discard(&frog.id).is_err(), "it spawned a Frog");
+        assert!(notes.by_id(&frog.id)?.is_some());
+        Ok(())
     }
 
     /// Stand-ins: a JPEG start, so the store keeps the photo as it is.

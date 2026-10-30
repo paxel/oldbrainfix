@@ -88,10 +88,17 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
 - **Above them sits the Note card's action row**, on every capture
   path (text, Voice, Photo, Gallery, share, widget, tile, shortcut,
   hardware button): File into…, Routine, Reminder, Frog or Session, and
-  ⋮ with the Importance and Make it a Tally. Each opens its usual page
-  and comes back to the capture screen with the choice shown at the top
-  ("→ Household"), not saved yet; the user can keep typing or add more.
-  All of it is optional.
+  ⋮ with the Importance, Make it a Tally and Add to a Shopping List.
+  Each opens its usual page and comes back to the capture screen with
+  the choice shown at the top ("→ Household"), not saved yet; the user
+  can keep typing or add more. All of it is optional.
+- **Add to a Shopping List** makes each line of the capture a Line of
+  the list picked, and keeps no Note. While a list is picked, the other
+  choices wait unshown. It is not offered with a photo on the screen, a
+  photo taken afterwards drops it, and behind the App Lock it is not
+  offered. A recording gives the lines of its Transcript; until the
+  Transcript is there the Note waits Unsorted and goes into the list
+  once it is, and without one it stays a Note, announced at the top.
 - **Everything is saved together** when the user leaves the screen or
   taps a save button. Nothing is half-saved: for an empty Note nothing
   is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
