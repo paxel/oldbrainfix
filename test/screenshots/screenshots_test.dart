@@ -32,6 +32,8 @@ import 'package:oldbrainfix/src/ring_screen.dart';
 import 'package:oldbrainfix/src/routine_editor_screen.dart';
 import 'package:oldbrainfix/src/routine_history_screen.dart';
 import 'package:oldbrainfix/src/starter_set_screen.dart';
+import 'package:oldbrainfix/src/table_screen.dart';
+import 'package:oldbrainfix/src/text_marks_view.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
 import '../bundle_test.dart' show FakeBundles;
@@ -85,6 +87,8 @@ typedef _Texts = ({
   String reading,
   String pagesRead,
   String pages,
+  String formatted,
+  String meters,
 });
 
 const _en = (
@@ -128,6 +132,23 @@ const _en = (
   reading: 'Reading before bed',
   pagesRead: 'Pages read',
   pages: 'pages',
+  formatted:
+      '## Boiler service\n'
+      'Booked for **Thursday, 8 to 10**. Have the *service booklet* ready.\n'
+      '- Pressure checked: 1.5 bar\n'
+      '- Spare valve in stock\n'
+      '- Bleed the radiators\n'
+      'Manual: [the maker\'s page](https://example.org/boiler)\n'
+      'Error `F28` means no ignition. #boiler',
+  meters:
+      'Meter readings 2026\n'
+      '\n'
+      '<!-- first column headings -->\n'
+      '| Meter | Jan | Feb | Mar | Apr | May | Jun |\n'
+      '| --- | --: | --: | --: | --: | --: | --: |\n'
+      '| Electricity kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
+      '| Water m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
+      '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
 );
 
 const _de = (
@@ -171,6 +192,23 @@ const _de = (
   reading: 'Lesen vor dem Schlafen',
   pagesRead: 'Gelesene Seiten',
   pages: 'Seiten',
+  formatted:
+      '## Wartung der Therme\n'
+      'Termin am **Donnerstag, 8 bis 10 Uhr**. Das *Serviceheft* bereitlegen.\n'
+      '- Druck geprüft: 1,5 bar\n'
+      '- Ersatzventil vorrätig\n'
+      '- Heizkörper entlüften\n'
+      'Anleitung: [Seite des Herstellers](https://example.org/therme)\n'
+      'Fehler `F28` heißt: keine Zündung. #Therme',
+  meters:
+      'Zählerstände 2026\n'
+      '\n'
+      '<!-- first column headings -->\n'
+      '| Zähler | Jan | Feb | Mär | Apr | Mai | Jun |\n'
+      '| --- | --: | --: | --: | --: | --: | --: |\n'
+      '| Strom kWh | 4210 | 4402 | 4588 | 4795 | 4960 | 5121 |\n'
+      '| Wasser m³ | 312 | 318 | 324 | 330 | 337 | 343 |\n'
+      '| Gas m³ | 8840 | 9012 | 9150 | 9241 | 9290 | 9318 |',
 );
 
 /// A store seeded with a believable household, work and car life in
@@ -183,7 +221,8 @@ class _Seeded {
 
   /// With [lists], the Household also holds a Checklist, a Shopping List
   /// and a Tally with its entries, for the guide's frames of them.
-  factory _Seeded(_Texts x, {bool lists = false}) {
+  /// With [formatted], it holds a formatted Note and one with a table.
+  factory _Seeded(_Texts x, {bool lists = false, bool formatted = false}) {
     // Each Note and Done at its own moment while seeding, then [_now].
     var clock = _now;
     final store = Store.inMemory(clock: () => clock)
@@ -191,6 +230,7 @@ class _Seeded {
       ..alarmSetupDone = true;
     final snack = _seed(store, x, (at) => clock = at);
     if (lists) _seedLists(store, x, (at) => clock = at);
+    if (formatted) _seedFormatted(store, x, (at) => clock = at);
     clock = _now;
     // What the history Missed was seen already: no Missed Summary.
     Alarms(store).markSeen();
@@ -435,6 +475,19 @@ class _Seeded {
   }
 }
 
+/// A formatted Note about the boiler's service and one with a table of
+/// meter readings, both in the Household, the newest of its Notes.
+void _seedFormatted(Store store, _Texts x, void Function(DateTime) setClock) {
+  final notes = Notes(store);
+  final household = Places(store)
+      .areas()
+      .firstWhere((a) => a.starter == 'household');
+  setClock(DateTime(2026, 10, 27, 8, 50));
+  notes.capture(x.meters, format: TextFormats.markdown, place: household.id);
+  setClock(DateTime(2026, 10, 27, 9, 10));
+  notes.capture(x.formatted, format: TextFormats.markdown, place: household.id);
+}
+
 /// The Flutter SDK's root, from the test runner it started.
 String _flutterRoot() {
   final runner = Platform.resolvedExecutable;
@@ -475,6 +528,28 @@ Future<void> _loadFonts() async {
   final icons = FontLoader('MaterialIcons')
     ..addFont(bytes(File('${dir.path}/MaterialIcons-Regular.otf')));
   await icons.load();
+  // Code in a formatted text, as a phone's monospace font would show it.
+  final mono = FontLoader('monospace')
+    ..addFont(
+      bytes(
+        File(
+          [
+            _flutterRoot(),
+            'bin',
+            'cache',
+            'dart-sdk',
+            'bin',
+            'resources',
+            'devtools',
+            'assets',
+            'fonts',
+            'Roboto_Mono',
+            'RobotoMono-Regular.ttf',
+          ].join(Platform.pathSeparator),
+        ),
+      ),
+    );
+  await mono.load();
   // The Frog's emoji, as a phone's own emoji font would show it.
   final emoji = FontLoader('Noto Color Emoji')
     ..addFont(
@@ -910,6 +985,65 @@ void main() {
               alignment: 0.12,
             );
             await tester.pumpAndSettle();
+          });
+
+          /// The Household with its formatted Notes, the newest on top.
+          Future<void> formattedNotes(WidgetTester tester) async {
+            final t = await start(
+              tester,
+              _Seeded(texts, formatted: true)..store.themeChoice = choice,
+            );
+            await _tap(tester, find.byTooltip(t.browseTooltip));
+            await _tap(tester, find.text(t.starterHousehold));
+          }
+
+          /// The card's text of [text], as drawn on the list.
+          Finder cardText(String text) =>
+              find.byWidgetPredicate((w) => w is MarkedText && w.text == text);
+
+          frame('formatted-text', (tester) async {
+            await formattedNotes(tester);
+            final boiler = cardText(texts.formatted);
+            await tester.scrollUntilVisible(
+              boiler,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            await tester.longPress(boiler.first);
+            await tester.pumpAndSettle();
+            expect(find.byType(NoteEditorScreen), findsOneWidget);
+            // The keyboard up, drawn as nothing: the format bar and the
+            // cursor's line show at the bottom, the cursor in the bold.
+            final field = find.byType(TextField).first;
+            await tester.showKeyboard(field);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 1);
+            addTearDown(tester.view.resetViewInsets);
+            final controller = tester.widget<TextField>(field).controller!;
+            final bold = controller.text.indexOf('**') + 6;
+            controller.selection = TextSelection.collapsed(offset: bold);
+            await tester.pumpAndSettle();
+            expect(find.byKey(const ValueKey('format-bar')), findsOneWidget);
+            expect(find.byKey(const ValueKey('two-row-bar')), findsOneWidget);
+          });
+
+          frame('table', (tester) async {
+            await formattedNotes(tester);
+            final meters = cardText(texts.meters);
+            await tester.scrollUntilVisible(
+              meters,
+              300,
+              scrollable: notesList.first,
+            );
+            await tester.pumpAndSettle();
+            final table = find.descendant(
+              of: meters.first,
+              matching: find.byWidgetPredicate(
+                (w) => w is GestureDetector && '${w.key}'.contains('table-'),
+              ),
+            );
+            await _tap(tester, table.first);
+            expect(find.byType(TableScreen), findsOneWidget);
           });
         }
       }

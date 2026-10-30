@@ -1,0 +1,230 @@
+<!-- page: title="Formatierter Text, Transkripte und Fototexte" track="guide" order=5 summary="Den Text einer Notiz formatieren, Statuszeichen und #Wörter, Tabellen, Transkripte mit den Sprachmodellen, Fototexte und die Suche." -->
+<p class="lede">
+  Der Text einer Notiz kann formatiert sein und Statuszeichen, #Wörter und Tabellen enthalten.
+  Sprachaufnahmen bekommen ein Transkript und Fotos einen Fototext, beides auf dem Gerät erzeugt;
+  die Suche findet Notizen an all dem.
+</p>
+
+<h2>Formatierter Text</h2>
+<p>
+  Der Text einer Notiz und eines Abschnitts kann fett, kursiv oder durchgestrichen sein, zwei
+  Überschriftenebenen haben, Aufzählungen und nummerierte Listen mit einer Einrückungsebene, Zitate,
+  Links, Code im Text und Tabellen. Er wird als Markdown gespeichert, genau so, wie er geschrieben
+  ist. Ein Text bleibt unformatiert, bis er zum ersten Mal formatiert wird, und bleibt von da an
+  formatiert: durch eine Taste der Formatleiste, durch ein als Markdown getipptes Format oder durch
+  Einfügen eines Texts, der eines verwendet. Karten, Abschnitte, gesendete Notizen und Sicherungen
+  zeigen ihn formatiert. Ein Gerät mit Old Brain Fix 0.1 zeigt das Markdown und kann es nicht ändern.
+</p>
+
+<h3>Die Formatleiste</h3>
+<p>
+  Auf dem Handy sitzt die Formatleiste auf der Tastatur, solange der Notiz-Editor oder Zur Notiz
+  hinzufügen sie geöffnet hat. Ihre Tasten, in dieser Reihenfolge:
+</p>
+<ul>
+  <li>☐: <strong>☐ an den Anfang der Zeile setzen</strong> (nur im Notiz-Editor; siehe Statuszeichen).</li>
+  <li><strong>Fett</strong>, <strong>Kursiv</strong> und <strong>Durchstreichen</strong>.</li>
+  <li><strong>H1</strong> und <strong>H2</strong>: <strong>Große Überschrift</strong> und <strong>Kleine Überschrift</strong>.</li>
+  <li><strong>Aufzählung</strong>, <strong>Nummerierte Liste</strong> und <strong>Zitat</strong>.</li>
+  <li><strong>Link</strong> und <strong>Code</strong>.</li>
+  <li><strong>Listenpunkt einrücken</strong> und <strong>Listenpunkt ausrücken</strong>.</li>
+  <li><strong>Tabelle</strong>.</li>
+</ul>
+<p>
+  Die Tasten, die keinen Platz finden, kommen in das ⋮ am Ende der Leiste, <strong>Weitere
+  Formate</strong>, das sich am Finger öffnet. Fett, kursiv, durchgestrichen und Code wirken auf die
+  Auswahl oder, wenn nichts ausgewählt ist, auf das Wort am Cursor; die Zeilenformate wirken auf
+  jede Zeile, die die Auswahl berührt. Eine Taste ist hervorgehoben, solange der Cursor in ihrem
+  Format steht, und ein zweites Tippen nimmt das Format wieder weg.
+</p>
+<p>
+  Mit <strong>In zwei Zeilen schreiben</strong>, in den Einstellungen unter „Schreiben“ und
+  voreingestellt, zeigt die obere Zeile den Text formatiert, ohne seine Markdown-Zeichen, und die
+  Zeile über der Tastatur das Markdown der Zeile mit dem Cursor, mit ◀ und ▶, um den Cursor zu
+  bewegen. Ist es aus, zeigt das Feld die Zeichen gedämpft.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/de/light/formatted-text.png" alt="Der Notiz-Editor mit einem formatierten Text, die Formatleiste mit hervorgehobenem Fett und die Zeile mit dem Cursor als Markdown über der Tastatur" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/de/dark/formatted-text.png" alt="Der Notiz-Editor mit einem formatierten Text, die Formatleiste mit hervorgehobenem Fett und die Zeile mit dem Cursor als Markdown über der Tastatur" width="648" height="1152" loading="lazy">
+  <figcaption>Die Formatleiste und die Zeile mit dem Cursor im Notiz-Editor; die Tastatur ist weggelassen.</figcaption>
+</figure>
+
+<h3>Markdown tippen</h3>
+<p>
+  Ein als Markdown getipptes Format wirkt schon beim Tippen:
+</p>
+<ul>
+  <li>Am Anfang einer Zeile, gefolgt von einem Leerzeichen: <code>#</code> für eine große Überschrift, <code>##</code> für eine kleine, <code>-</code>, <code>*</code> oder <code>+</code> für einen Aufzählungspunkt, <code>1.</code> für einen nummerierten Punkt und <code>&gt;</code> für ein Zitat.</li>
+  <li>Innerhalb einer Zeile: <code>**fett**</code>, <code>*kursiv*</code> oder <code>_kursiv_</code>, <code>~~durchgestrichen~~</code>, <code>`Code`</code> und <code>[Text](Adresse)</code>.</li>
+</ul>
+<p>
+  Jeder Zeilenumbruch bleibt einer, sodass untereinander getippte Zeilen getrennt bleiben. Ein
+  Punkt, der um zwei Leerzeichen oder mehr eingerückt ist, steht eine Ebene weiter innen; tiefere
+  Punkte erscheinen eine Ebene weiter innen. Aufeinanderfolgende nummerierte Punkte zählen weiter,
+  sodass <code>1.</code> auf jeder Zeile 1, 2, 3 zeigt. Tiefere Überschriften (<code>###</code>),
+  Codeblöcke, Bilder und anderes Markdown erscheinen so, wie sie geschrieben sind.
+</p>
+<p>
+  Ein Erfassungsbildschirm hat keine Formatleiste, aber ein Text, der mit Markdown getippt oder
+  eingefügt wird, wird als formatierter Text gespeichert.
+</p>
+
+<h3>Links</h3>
+<p>
+  <strong>Link</strong> fragt nach der „Web- oder E-Mail-Adresse“, eine vorhandene schon
+  eingetragen; <strong>Link setzen</strong> legt sie auf die Auswahl oder das Wort am Cursor. Leer
+  gelassen, entfernt sie den Link. Eine Adresse ohne „https://“ gilt als Webadresse, oder als
+  E-Mail-Adresse, wenn sie ein „@“ enthält. Ein Tippen auf einen Link auf einer Karte öffnet ihn im
+  Browser oder in der Mail-App. Nur Web- und E-Mail-Adressen öffnen sich; jeder andere Link, der
+  auch von einer anderen Person in einem geteilten Bereich kommen kann, bleibt Text.
+</p>
+
+<h2>Tabellen</h2>
+<p>
+  Im Text erscheint eine Tabelle als Raster, auf die Breite verkleinert, ihre Kopfzeile fett. Ein
+  Tippen darauf öffnet sie im Vollbild. <strong>Tabelle</strong> in der Formatleiste öffnet die
+  Tabelle, in der der Cursor steht; anderswo setzt sie eine neue Tabelle an den Cursor, zwei leere
+  Spalten mit einer Kopfzeile und einer weiteren Zeile, auf eigenen Zeilen, und öffnet sie mit ihrer
+  ersten Zelle in Bearbeitung.
+</p>
+<ul>
+  <li>Im Vollbild bleibt die Kopfzeile sichtbar, während die Zeilen hoch und runter rollen, und ebenso die erste Spalte, solange sie Überschriften enthält. Seitwärts bewegt sich die Tabelle über die Leiste über ihr, <strong>Tabelle seitlich verschieben</strong>, nicht durch Wischen.</li>
+  <li>Ein Tippen auf eine Zelle bearbeitet sie an ihrem Platz, umrahmt, mit der Formatleiste für fett, kursiv, durchgestrichen, Link, Code und ☐. Eine Zelle hält eine Zeile; ↵, ein Tippen auf eine andere Zelle oder auf den Platz um die Tabelle oder Zurück schreibt sie.</li>
+  <li>Ein Tippen oder langes Drücken auf die Nummer einer Zeile öffnet am Finger <strong>Zeile darüber einfügen</strong>, <strong>Zeile darunter einfügen</strong>, <strong>Nach oben</strong>, <strong>Nach unten</strong> und <strong>Zeile löschen</strong>; der Buchstabe einer Spalte öffnet <strong>Spalte links einfügen</strong>, <strong>Spalte rechts einfügen</strong>, <strong>Nach links</strong>, <strong>Nach rechts</strong> und <strong>Spalte löschen</strong>, und bei Spalte A den Schalter <strong>Erste Spalte als Überschriften</strong>.</li>
+  <li>Die leere Zeile unter der Tabelle (+) und die leere Spalte daneben fügen eine Zeile oder Spalte hinzu, sobald Wörter in sie geschrieben werden.</li>
+  <li>Eine Zeile oder Spalte zu löschen, die Wörter enthält, fragt einmal nach: „Die Wörter in ihren Zellen werden aus der Notiz gelöscht.“ Die letzte Zeile oder Spalte zu löschen, löscht die Tabelle.</li>
+</ul>
+<p>
+  Tabellen werden als GFM-Tabellen geschrieben: Jede Änderung schreibt die ganze Tabelle neu, jede
+  Zeile als <code>| a | b |</code>, und lässt die Wörter in ihren Zellen, wie sie waren. Eine Zeile,
+  die direkt unter einer Tabelle getippt wird, ohne Leerzeile dazwischen, wird eine Zeile von ihr.
+  Eingefügte Markdown-Tabellen werden zu Tabellen. Wo du die Notiz nur lesen darfst, öffnet sich die
+  Tabelle zum Lesen.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/de/light/table.png" alt="Eine Tabelle mit Zählerständen im Vollbild, ihre erste Spalte als Überschriften, darüber die Leiste zum seitlichen Verschieben" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/de/dark/table.png" alt="Eine Tabelle mit Zählerständen im Vollbild, ihre erste Spalte als Überschriften, darüber die Leiste zum seitlichen Verschieben" width="648" height="1152" loading="lazy">
+  <figcaption>Eine Tabelle im Vollbild, ihre erste Spalte als Überschriften.</figcaption>
+</figure>
+
+<h2>Statuszeichen</h2>
+<p>
+  Ein ☐, ✅ oder ❌ am Anfang einer Zeile ist ein Statuszeichen: offen, abgehakt oder gescheitert,
+  etwa „✅ v2 beim Kunden unterstützt“. Ein Tippen darauf öffnet am Finger ein Menü mit
+  <strong>Abhaken</strong>, <strong>Als gescheitert markieren</strong> und <strong>Wieder
+  öffnen</strong>, ohne den aktuellen Zustand, und die Wahl ändert das Zeichen im Text. Das ist eine
+  Änderung des Notiztexts wie jede andere und wird auf jedes Gerät synchronisiert.
+</p>
+<ul>
+  <li>Vor dem Zeichen dürfen Leerzeichen und Tabulatoren stehen und ein Listenzeichen, <code>-</code>, <code>*</code> oder <code>+</code>, mit einem Leerzeichen danach, sodass „- ☐ Milch“ zählt. Nach einer Nummer („1. ☐“) oder in einem Zitat zählt es nicht; ebenso wenig ein Zeichen mitten in einer Zeile oder andere Kästchen und Haken wie ☑ oder ✓.</li>
+  <li>In einem formatierten Text zählt auch ein Zeichen am Anfang einer Tabellenzelle.</li>
+  <li>Die Zeichen lassen sich auf der Karte der Notiz, im Notiz-Editor und in einer Tabelle im Vollbild ändern. Die eines Abschnitts erscheinen, lassen sich aber nicht ändern.</li>
+  <li>☐ in der Formatleiste setzt „☐ “ an den Anfang der Zeile mit dem Cursor, nach ihren Leerzeichen und ihrem Listenzeichen; auf einer Zeile, die schon ein Zeichen hat, tut es nichts.</li>
+  <li>In einem geteilten Bereich ändern nur die Person, die die Notiz geschrieben hat, und die Verwalter ihre Zeichen.</li>
+</ul>
+
+<h2>#Wörter</h2>
+<p>
+  Ein Wort mit „#“ davor, etwa „#Garten“, ist hervorgehoben, auf Karten, in Abschnitten und im
+  Editor. Ein Tippen darauf auf einer Karte, in einem Abschnitt oder in einer Tabelle öffnet die
+  Suche in allen Notizen nach dem Wort, so wie es geschrieben ist. Für ein #Wort wird nichts
+  gespeichert, und es gibt keine Liste davon; es ist ein Wort des Texts.
+</p>
+<ul>
+  <li>Ein #Wort besteht aus Buchstaben, Ziffern, „_“ und „-“ und enthält mindestens einen Buchstaben: „#to-do“ und „#v2“ zählen, „#126“ ist eine Zahl.</li>
+  <li>„# Titel“ mit Leerzeichen, „C#“ und das „#“ in einer Webadresse zählen nicht. In einem formatierten Text zählt auch ein „#Wort“ in Code oder in der Adresse eines Links nicht.</li>
+  <li>Die Suche nach „#Garten“ findet jede Notiz, die es in beliebiger Groß- und Kleinschreibung enthält, auch „#Gartenarbeit“, das damit beginnt, aber nicht das Wort „Garten“ ohne „#“.</li>
+</ul>
+
+<h2>Transkripte</h2>
+<p>
+  Eine Sprachaufnahme bekommt ein Transkript: die darin erkannten Wörter, neben der Aufnahme
+  aufbewahrt. Whisper schreibt es auf dem Gerät, auf Deutsch oder Englisch, je nachdem, wonach die
+  Aufnahme eher klingt, im Hintergrund und eine Aufnahme nach der anderen, sobald die Notiz
+  gespeichert ist; Aufnahmen, die vor dem Sprachmodell erfasst wurden, folgen. Solange es läuft,
+  steht „Wird transkribiert …“ unter der Aufnahme; eine Aufnahme ohne Sprache zeigt „Keine Worte
+  erkannt.“. Die Aufnahme bleibt immer erhalten.
+</p>
+<p>
+  Whisper bekommt die Namen deiner Bereiche und Themen vorgegeben, bei deutscher Sprache auch die
+  englischen Wörter, die im Deutschen üblich sind, und die Wörter der App wie Unsortiert, Routine und
+  Agenda, damit sie so geschrieben werden, wie man sie schreibt. Wo Whisper diese Vorgabe nur
+  wiederholt, wird die Wiederholung aus dem Transkript genommen.
+</p>
+
+<h3>Die Sprachmodelle</h3>
+<p>
+  Transkripte brauchen ein Sprachmodell, das einmal heruntergeladen wird. Das Handy bietet es nach
+  dem ersten Start an (siehe <a href="getting-started.html">Erste Schritte</a>); Einstellungen,
+  <strong>Sprachmodell</strong> bietet es auf dem Handy und dem Desktop jederzeit an. Unter „Modell“:
+</p>
+<ul>
+  <li><strong>Basis, 148 MB</strong>: schneller und genug für Deutsch oder Englisch allein.</li>
+  <li><strong>Klein, 488 MB</strong>: besser mit englischen Wörtern in deutscher Sprache, aber langsamer, und es braucht mehr Arbeitsspeicher.</li>
+</ul>
+<p>
+  Ein Modell zu wählen, lädt es herunter, mit Fortschritt und <strong>Abbrechen</strong>. Nur das
+  gewählte Modell wird behalten: Das vorige wird gelöscht, sobald das neue bereit ist. Jeder Download
+  kommt nur aus der eigenen Veröffentlichung von Old Brain Fix auf GitHub und wird vor der
+  Verwendung gegen eine feste Prüfsumme geprüft; ein abgebrochener oder nicht passender Download
+  behält nichts und sagt das. <strong>Eigene Datei verwenden</strong> nimmt die mehrsprachige
+  ggml-base.bin oder ggml-small.bin von whisper.cpp vom Gerät; jede andere Datei wird abgelehnt.
+</p>
+
+<h2>Fototexte</h2>
+<p>
+  Ein Foto oder Bild bekommt einen Fototext: den darin erkannten Text, neben dem Foto aufbewahrt.
+  RustO liest ihn auf dem Gerät mit den Modellen PP-OCRv6 Tiny von PaddleOCR, die Teil der App sind,
+  sodass nichts heruntergeladen wird und nichts das Gerät verlässt. Es liest deutsche Buchstaben (ä,
+  ö, ü, ß) und € und behält die Zeilen so, wie sie auf dem Foto liegen, sodass ein Preis auf der
+  Zeile seines Artikels bleibt. Bei einer stark gewölbten Seite können Zeilen fehlen. Fotos werden im
+  Hintergrund gelesen, eins nach dem anderen, sobald die Notiz gespeichert ist; das Erfassen wartet
+  nie darauf.
+</p>
+<p>
+  Auf einer vollen Karte stehen Transkripte und Fototexte gedämpft unter dem Wort „Transkript“ oder
+  „Fototext“; eine kompakte Karte zeigt ihre ersten drei Zeilen.
+</p>
+
+<h2>Erkannten Text übernehmen und entfernen</h2>
+<p>
+  Ein Transkript oder Fototext wird nur von der App geschrieben; er lässt sich nicht bearbeiten. Im
+  Notiz-Editor steht unter jedem Transkript und Fototext, auch denen eines Abschnitts einer
+  zusammengeführten Notiz:
+</p>
+<ul>
+  <li><strong>Notiztext ersetzen</strong> macht ihn zum Text der Notiz; <strong>An Notiztext anhängen</strong> fügt ihn auf einer eigenen Zeile nach dem Text an. Der Notiztext wird dann wie gewohnt bearbeitet. In einen formatierten Text geht er als einfacher Text, so geschrieben, dass er sich selbst liest.</li>
+  <li><strong>Erkannten Text entfernen</strong> fragt einmal nach („Dieses Transkript entfernen?“ oder „Diesen Fototext entfernen?“): Die Suche findet den Text auf keinem deiner Geräte mehr, und Aufnahme oder Foto bleiben. Der Text einer entfernten Aufnahme oder eines entfernten Fotos lässt sich nicht entfernen; er ist alles, was davon bleibt.</li>
+  <li><strong>Erneut transkribieren</strong> und <strong>Text erneut lesen</strong> erzeugen den Text neu aus der Datei, anstelle des vorigen oder eines entfernten. Sie erscheinen, solange die Datei auf diesem Gerät ist und das Sprachmodell oder RustO dort läuft. Kommt nichts dabei heraus, sagt eine Meldung oben das, und ein Tippen darauf nennt den Grund; die Datei bleibt.</li>
+</ul>
+<p>
+  <strong>Aufnahme entfernen, Text behalten</strong> und <strong>Foto entfernen, Text
+  behalten</strong>, im Editor und im ⋮ der Karte, tun das Umgekehrte für eine Aufnahme oder ein Foto
+  mit Text: Die Datei verschwindet von all deinen Geräten und bei allen, mit denen du den Bereich der
+  Notiz teilst, und der Text bleibt in der Notiz. In einem geteilten Bereich tut ein Mitglied all
+  das nur bei seinen eigenen Notizen.
+</p>
+
+<h2>Suche</h2>
+<p>
+  Der Notizbrowser hat auf jeder Ebene ein Suchfeld: „Alle Notizen durchsuchen“ in der Liste der
+  Bereiche, „Diesen Bereich durchsuchen“ und „Dieses Thema durchsuchen“ darunter. Die Suche findet,
+  was getippt wird, in beliebiger Groß- und Kleinschreibung, im Text einer Notiz und ihrer
+  Abschnitte, in ihren Transkripten und Fototexten, in den Textzeilen der Einträge ihrer Strichliste
+  und in den Zeilen ihrer Checkliste oder Einkaufsliste. Ein formatierter Text wird so durchsucht,
+  wie er sich liest: „fett“ findet „**fett**“, und die Markdown-Zeichen werden nirgends gefunden. Ein
+  entferntes Transkript oder ein entfernter Fototext wird nicht mehr gefunden.
+</p>
+
+<h2>Auf dem Desktop</h2>
+<ul>
+  <li>Die Formatleiste sitzt über dem Textfeld des Notiz-Editors, mit denselben Tasten; jede zeigt ihren Namen als Tooltip. Strg+B und Strg+I sind beim Tippen fett und kursiv.</li>
+  <li>Ein formatierter Text erscheint so, wie er sich liest; ein Klick darauf bearbeitet sein Markdown, die Zeichen gedämpft. Das Feld zu verlassen oder Strg+Enter speichert ihn.</li>
+  <li>Zur Notiz hinzufügen hat keine Formatleiste; ein mit Markdown getippter Text wird als formatierter Abschnitt hinzugefügt.</li>
+  <li>Ein Klick auf einen Link öffnet ihn im Browser oder im Mailprogramm; die Maus darüber zeigt seine Adresse.</li>
+  <li>Eine Tabelle im Vollbild rollt mit dem Mausrad, mit Umschalt und dem Mausrad oder mit den Bildlaufleisten. Ein Klick auf eine Zelle bearbeitet ihre Wörter, umrahmt: Enter oder ein Klick anderswohin schreibt sie, Tab geht zur nächsten Zelle, Umschalt+Tab zurück, und Esc lässt die Zelle, wie sie war. Die Nummern der Zeilen und die Buchstaben der Spalten öffnen ihre Menüs mit einem Klick oder Rechtsklick. Alt+Links, die Zurück-Taste der Maus, Esc oder der Pfeil oben verlassen die Tabelle.</li>
+  <li>Ein Klick auf ein #Wort durchsucht alle Notizen, wie auf dem Handy; im Feld, das gerade bearbeitet wird, setzt er den Cursor.</li>
+  <li>Das Sprachmodell wird unter Einstellungen, Sprachmodell gewählt und heruntergeladen, wie auf dem Handy; Transkripte und Fototexte funktionieren ebenso.</li>
+</ul>

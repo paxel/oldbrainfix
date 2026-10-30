@@ -1,0 +1,221 @@
+<!-- page: title="Formatted text, Transcripts and Photo Texts" track="guide" order=5 summary="Formatting a Note's text, status marks and #tags, tables, Transcripts with the speech models, Photo Texts, and the search." -->
+<p class="lede">
+  A Note's text can be formatted, hold status marks, #tags and tables. Voice recordings get a
+  Transcript and photos a Photo Text, both written on the Device; the search finds Notes by all of
+  them.
+</p>
+
+<h2>Formatted text</h2>
+<p>
+  The text of a Note and of a Section can be bold, italic or struck through, have two heading
+  levels, bulleted and numbered lists one level in, quotes, links, inline code and tables. It is
+  kept as Markdown, exactly as written. A text stays plain until it is first formatted, and stays
+  formatted from then on: by a button of the format bar, by a format typed as Markdown, or by
+  pasting a text that uses one. Cards, Sections, Sent Items and Backups show it formatted. A Device
+  with Old Brain Fix 0.1 shows the Markdown and cannot change it.
+</p>
+
+<h3>The format bar</h3>
+<p>
+  On the phone, the format bar sits on the keyboard while the Note editor or Add to Note has it
+  open. Its buttons, in this order:
+</p>
+<ul>
+  <li>☐: <strong>Put ☐ at the start of the line</strong> (in the Note editor only; see Status marks).</li>
+  <li><strong>Bold</strong>, <strong>Italic</strong> and <strong>Strike through</strong>.</li>
+  <li><strong>H1</strong> and <strong>H2</strong>: <strong>Large heading</strong> and <strong>Small heading</strong>.</li>
+  <li><strong>Bulleted list</strong>, <strong>Numbered list</strong> and <strong>Quote</strong>.</li>
+  <li><strong>Link</strong> and <strong>Code</strong>.</li>
+  <li><strong>Indent list item</strong> and <strong>Move list item out</strong>.</li>
+  <li><strong>Table</strong>.</li>
+</ul>
+<p>
+  The buttons that find no room go into ⋮ at the end of the bar, <strong>More formats</strong>,
+  which opens at the finger. Bold, italic, strike-through and code work on the selection, or on the
+  word at the cursor when nothing is selected; the line formats work on every line the selection
+  touches. A button shows highlighted while the cursor is in its format, and a second tap takes the
+  format off again.
+</p>
+<p>
+  With <strong>Type in two rows</strong> on, the default in Settings under "Typing", the top row
+  shows the text formatted, its Markdown marks left out, and the row above the keyboard shows the
+  Markdown of the cursor's line, with ◀ and ▶ to move the cursor. With it off, the field shows the
+  marks dimmed.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/formatted-text.png" alt="The Note editor with a formatted text, the format bar with Bold highlighted, and the cursor's line as Markdown above the keyboard" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/formatted-text.png" alt="The Note editor with a formatted text, the format bar with Bold highlighted, and the cursor's line as Markdown above the keyboard" width="648" height="1152" loading="lazy">
+  <figcaption>The format bar and the cursor's line in the Note editor; the keyboard is left out.</figcaption>
+</figure>
+
+<h3>Typing Markdown</h3>
+<p>
+  A format typed as Markdown takes effect as it is typed:
+</p>
+<ul>
+  <li>At the start of a line, followed by a space: <code>#</code> for a large heading, <code>##</code> for a small one, <code>-</code>, <code>*</code> or <code>+</code> for a bulleted item, <code>1.</code> for a numbered item and <code>&gt;</code> for a quote.</li>
+  <li>Within a line: <code>**bold**</code>, <code>*italic*</code> or <code>_italic_</code>, <code>~~struck~~</code>, <code>`code`</code> and <code>[label](address)</code>.</li>
+</ul>
+<p>
+  Every line break shows as one, so lines typed one under the other stay apart. An item indented by
+  two spaces or more is one level in; deeper items show one level in. Numbered items that follow one
+  another count on, so <code>1.</code> on every line shows 1, 2, 3. Deeper headings
+  (<code>###</code>), code blocks, images and other Markdown show as written.
+</p>
+<p>
+  On a capture screen there is no format bar, but a text typed or pasted with Markdown is saved as a
+  formatted text.
+</p>
+
+<h3>Links</h3>
+<p>
+  <strong>Link</strong> asks for the "Web or e-mail address", the one there already filled in;
+  <strong>Set link</strong> puts it on the selection or the word at the cursor. Leave it empty to
+  remove the link. An address typed without "https://" is taken as a web address, or as an e-mail
+  address when it holds an "@". A tap on a link on a card opens it in the browser or the mail app.
+  Only web and e-mail addresses open; any other link, which may come from another person in a Shared
+  Area, stays text.
+</p>
+
+<h2>Tables</h2>
+<p>
+  In the text, a table is drawn as a grid, made smaller to fit the width, its header row in bold. A
+  tap on it opens it full screen. <strong>Table</strong> in the format bar opens the table the cursor
+  is in; elsewhere it puts a new table at the cursor, two empty columns with a header row and one
+  more row, on lines of their own, and opens it with its first cell being edited.
+</p>
+<ul>
+  <li>Full screen, the header row stays on screen while the rows scroll up and down, and so does the first column while it holds headings. Sideways the table moves by the bar above it, <strong>Move the table sideways</strong>, not by a swipe.</li>
+  <li>A tap on a cell edits it in place, framed, with the format bar of bold, italic, strike-through, link, code and ☐. A cell holds one line; ↵, a tap on another cell or on the space around the table, or Back writes it.</li>
+  <li>A tap or long press on a row's number opens <strong>Insert a row above</strong>, <strong>Insert a row below</strong>, <strong>Move up</strong>, <strong>Move down</strong> and <strong>Delete row</strong> at the finger; a column's letter opens <strong>Insert a column to the left</strong>, <strong>Insert a column to the right</strong>, <strong>Move left</strong>, <strong>Move right</strong> and <strong>Delete column</strong>, and for column A the switch <strong>First column as headings</strong>.</li>
+  <li>The empty row under the table (+) and the empty column beside it add a row or column once words are written into them.</li>
+  <li>Deleting a row or column that holds words asks once: "The words in its cells are deleted from the Note." Deleting the last row or column deletes the table.</li>
+</ul>
+<p>
+  Tables are written as GFM tables: each edit writes the whole table anew, every row as
+  <code>| a | b |</code>, and leaves the words in its cells as they were. A line typed right under a
+  table, without a blank line between, becomes a row of it. Markdown tables pasted in become
+  tables. Where you may only read the Note, the table opens to read.
+</p>
+
+<figure class="frame phone">
+  <img class="shot-light" src="../../assets/frames/phone/en/light/table.png" alt="A table of meter readings full screen, its first column as headings, the bar to move it sideways above it" width="648" height="1152" loading="lazy">
+  <img class="shot-dark" src="../../assets/frames/phone/en/dark/table.png" alt="A table of meter readings full screen, its first column as headings, the bar to move it sideways above it" width="648" height="1152" loading="lazy">
+  <figcaption>A table full screen, its first column as headings.</figcaption>
+</figure>
+
+<h2>Status marks</h2>
+<p>
+  A ☐, ✅ or ❌ at the start of a line is a status mark: open, checked or failed, such as "✅ v2
+  supported at the customer". A tap on it opens a menu at the finger with <strong>Check</strong>,
+  <strong>Fail</strong> and <strong>Open</strong>, the current state left out, and the choice
+  changes the character in the text. This is an edit of the Note's text like any other, synced to
+  every Device.
+</p>
+<ul>
+  <li>Spaces and tabs may come before the mark, and one list bullet, <code>-</code>, <code>*</code> or <code>+</code>, with a space after it, so "- ☐ milk" counts. After a number ("1. ☐") or in a quote it does not; nor does a mark in the middle of a line, nor other boxes and ticks such as ☑ or ✓.</li>
+  <li>In a formatted text, a mark at the start of a table's cell counts too.</li>
+  <li>The marks can be changed on the Note's card, in the Note editor and in a table full screen. Those of a Section show but cannot be changed.</li>
+  <li>☐ in the format bar puts "☐ " at the start of the cursor's line, after its spaces and bullet; on a line that has a mark it does nothing.</li>
+  <li>In a Shared Area only the Note's author and the Managers change its marks.</li>
+</ul>
+
+<h2>#tags</h2>
+<p>
+  A word with "#" in front, such as "#garden", is a tag and is drawn in the accent colour, on cards,
+  in Sections and in the editor. A tap on it on a card, in a Section or in a table opens the search
+  of all Notes with the tag as written. Nothing is stored for a tag, and there is no list of tags;
+  it is a word of the text.
+</p>
+<ul>
+  <li>A tag is made of letters, digits, "_" and "-", and holds at least one letter: "#to-do" and "#v2" are tags, "#126" is a number.</li>
+  <li>"# Title" with a space, "C#" and the "#" in a web address are no tags. In a formatted text, a "#word" inside code or inside a link's address is none either.</li>
+  <li>The search for "#garden" finds every Note holding it in any case, also "#gardening", which begins with it, but not the word "garden" without "#".</li>
+</ul>
+
+<h2>Transcripts</h2>
+<p>
+  A voice recording gets a Transcript: the words recognised in it, kept next to the recording.
+  Whisper writes it on the Device, in English or German, whichever the recording sounds more like,
+  in the background and one recording at a time once the Note is saved; recordings captured before
+  the speech model was there follow. While it runs, "Transcribing…" shows under the recording; a
+  recording without speech shows "No words heard.". The recording is always kept.
+</p>
+<p>
+  Whisper is led in with your Area and Topic names; for German speech also with the English words
+  German is full of and the app's words, such as Unsorted, Routine and Agenda, so that they are
+  written as they are spelt. Where Whisper only repeats that lead-in, the repeat is taken out of the
+  Transcript.
+</p>
+
+<h3>The speech models</h3>
+<p>
+  Transcripts need a speech model, downloaded once. The phone offers it after the first start (see
+  <a href="getting-started.html">Getting started</a>); Settings, <strong>Speech model</strong>
+  offers it on the phone and the desktop at any time. Under "Model":
+</p>
+<ul>
+  <li><strong>Base, 148 MB</strong>: faster, and enough for English or German alone.</li>
+  <li><strong>Small, 488 MB</strong>: better with English words in German speech, but slower, and it needs more memory.</li>
+</ul>
+<p>
+  Choosing a model downloads it, with its progress and <strong>Cancel</strong>. Only the chosen
+  model is kept: the one before is deleted once the new one is in place. Each download comes only
+  from Old Brain Fix's own release on GitHub and is checked against a fixed checksum before it is
+  used; a download that broke off or did not match keeps nothing and says so.
+  <strong>Use a file of my own</strong> takes whisper.cpp's multilingual ggml-base.bin or
+  ggml-small.bin from the Device; any other file is rejected.
+</p>
+
+<h2>Photo Texts</h2>
+<p>
+  A photo or a picture gets a Photo Text: the text recognised in it, kept next to the photo. RustO
+  reads it on the Device with PaddleOCR's PP-OCRv6 Tiny models, which are part of the app, so
+  nothing is downloaded and nothing leaves the Device. It reads German letters (ä, ö, ü, ß) and €,
+  and keeps the lines as they are laid out on the photo, so a price stays on the line of its item.
+  A strongly curved page can lose some of its lines. Photos are read in the background, one at a
+  time, once the Note is saved; capturing never waits for it.
+</p>
+<p>
+  On a full card, Transcripts and Photo Texts show dimmed under the word "Transcript" or "Photo
+  Text"; a compact card shows their first three lines.
+</p>
+
+<h2>Taking over and removing generated text</h2>
+<p>
+  Only the app writes a Transcript or Photo Text; it cannot be edited. In the Note editor, under each
+  Transcript and Photo Text, also those of a merged Note's Section:
+</p>
+<ul>
+  <li><strong>Replace Note text</strong> makes it the Note's text; <strong>Append to Note text</strong> adds it on a line of its own after the text. The Note's text is then edited as usual. Into a formatted text it goes as plain text, written so that it reads as itself.</li>
+  <li><strong>Remove generated text</strong> asks once ("Remove this Transcript?" or "Remove this Photo Text?"): the search no longer finds the text, on all your Devices, and the recording or photo stays. The text of a recording or photo that was removed cannot be removed; it is all that is left of it.</li>
+  <li><strong>Transcribe again</strong> and <strong>Read the text again</strong> make the text anew from the file, in place of the one before or of a removed one. They show while the file is on this Device and the speech model or RustO runs there. When nothing comes of it, an announcement at the top says so and its tap tells why; the file stays.</li>
+</ul>
+<p>
+  <strong>Remove recording, keep text</strong> and <strong>Remove photo, keep text</strong>, in the
+  editor and in the card's ⋮, do the opposite for a recording or photo that has a text: the file
+  goes from all your Devices and from everyone you share the Note's Area with, and the text stays on
+  the Note. In a Shared Area a Member does all of this only on their own Notes.
+</p>
+
+<h2>Search</h2>
+<p>
+  The notes browser has a search field on every level: "Search all Notes" on the Areas list,
+  "Search this Area" and "Search this Topic" below it. The search finds what is typed in any case,
+  in a Note's text and its Sections, its Transcripts and Photo Texts, the text lines of its Tally's
+  entries and the Lines of its Checklist or Shopping List. A formatted text is searched as it reads:
+  "bold" finds "**bold**", and the Markdown marks are found nowhere. A removed Transcript or Photo
+  Text is no longer found.
+</p>
+
+<h2>On the desktop</h2>
+<ul>
+  <li>The format bar sits above the text field of the Note editor, with the same buttons; each shows its name as a tooltip. Ctrl+B and Ctrl+I are bold and italic while typing.</li>
+  <li>A formatted text shows as it reads; a click on it edits its Markdown, the marks dimmed. Leaving the field or Ctrl+Enter saves it.</li>
+  <li>Add to Note has no format bar; a text typed with Markdown is added as a formatted Section.</li>
+  <li>A click on a link opens it in the browser or the mail program; the mouse over it shows its address.</li>
+  <li>A table full screen scrolls with the mouse wheel, Shift and the wheel, or the scroll bars. A click on a cell edits its words, framed: Enter or a click elsewhere writes them, Tab goes on to the next cell, Shift+Tab back, and Esc leaves the cell as it was. The rows' numbers and the columns' letters open their menus on a click or a right-click. Alt+Left, the mouse's back button, Esc or the arrow at the top leave the table.</li>
+  <li>A tag's click searches all Notes, as on the phone; in the field being edited it places the cursor.</li>
+  <li>The speech model is chosen and downloaded under Settings, Speech model, as on the phone; Transcripts and Photo Texts work the same.</li>
+</ul>
