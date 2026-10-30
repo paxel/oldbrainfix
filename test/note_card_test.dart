@@ -258,7 +258,11 @@ void main() {
       }
     }
 
+    /// Taps the ⋮ item [key] after scrolling it on screen: the menu is
+    /// longer than the test surface, and it scrolls.
     Future<void> pick(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(ValueKey(key)));
       await tester.pumpAndSettle();
     }

@@ -53,7 +53,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Taps [finder] after scrolling it on screen: the card's ⋮ is longer
+  /// than the test surface, and its menu scrolls.
   Future<void> tap(WidgetTester tester, Finder finder) async {
+    await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
