@@ -475,14 +475,23 @@ pub fn line_rows<P>(
                     return;
                 };
                 let mut picked = None;
-                words.context_menu(|ui| picked = picked.take().or(menu(ui, &line.id)));
+                // A pick closes the menu, also one made with the keyboard
+                // or a screen reader, which no pointer click closes.
+                let mut entries = |ui: &mut Ui| {
+                    let step = menu(ui, &line.id);
+                    if step.is_some() {
+                        ui.close();
+                    }
+                    picked = picked.take().or(step);
+                };
+                words.context_menu(&mut entries);
                 // ⋮ at the right edge, as on an Agenda row.
                 let more = ui
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         icon_button(ui, icons::MORE_VERT, &menu_label(t, &line.text), weak)
                     })
                     .inner;
-                egui::Popup::menu(&more).show(|ui| picked = picked.take().or(menu(ui, &line.id)));
+                egui::Popup::menu(&more).show(&mut entries);
                 if let Some(step) = picked {
                     asked.push(LineAsk::Menu(line.id.clone(), step));
                 }

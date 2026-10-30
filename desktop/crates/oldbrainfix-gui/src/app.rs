@@ -10560,6 +10560,11 @@ fn note_card(
         if let Some(asked) = menu.and_then(|m| shopping_view::card_menu_entry(ui, t, m)) {
             picked = Some(Action::Shopping(asked));
         }
+        // A pick closes the menu, also one made with the keyboard or a
+        // screen reader, which no pointer click closes.
+        if picked.is_some() {
+            ui.close();
+        }
     };
     if let Some(more_rect) = more_rect {
         let title = row_title(t, Some(note));

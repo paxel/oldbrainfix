@@ -533,6 +533,9 @@ fn a_sent_checklist_previews_its_lines_and_an_update_what_changes() -> TestResul
     let mut harness = window(&desk, None);
     drop_file(&mut harness, &first);
     assert!(harness.state().previewing());
+    // From a stranger: held, nothing of it before "Show" (#91).
+    assert!(boxes(&harness, "Charger").is_empty());
+    click(&mut harness, "Show")?;
     // To look at, not to check.
     let charger = boxes(&harness, "Charger").pop().ok_or("Charger")?;
     assert!(charger.accesskit_node().is_disabled());
@@ -546,6 +549,7 @@ fn a_sent_checklist_previews_its_lines_and_an_update_what_changes() -> TestResul
     lists.add(&note.id, "Water", None, false)?;
     let update = dir.path().join("update.oldbrain");
     std::fs::write(&update, ann.send_note(&note.id, None, false)?)?;
+    // Ann is kept now: her update shows at once.
     drop_file(&mut harness, &update);
     assert!(shows(&harness, "Line: Ticket → Train ticket"));
     assert!(shows(&harness, "New Line: Water"));
