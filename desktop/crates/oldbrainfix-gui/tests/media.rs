@@ -725,7 +725,7 @@ fn the_merge_dialog_finds_notes_by_their_transcripts_too() -> TestResult {
         .state_mut()
         .select_note("note:00000000000000000000000000000001");
     harness.run();
-    harness.get_by_label("Merge into…").click();
+    harness.get_by_label("Merge into…").click_accesskit();
     harness.run();
     let count = |harness: &Harness<'_, App>, label| harness.query_all_by_label(label).count();
     let (groceries, shed) = (count(&harness, "Groceries"), count(&harness, "Shed"));

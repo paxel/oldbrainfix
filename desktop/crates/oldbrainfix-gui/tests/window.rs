@@ -526,7 +526,7 @@ fn a_note_in_an_unknown_format_is_merged_with_its_text_as_it_is() -> TestResult 
         .ok_or("selected")?
         .to_string();
     let before = harness.state().store().current(&id, "text")?;
-    harness.get_by_label("Merge into…").click();
+    harness.get_by_label("Merge into…").click_accesskit();
     harness.run();
     // The picker's search has the keyboard; the list behind has one too.
     typing(&harness).type_text("OAT");
@@ -619,7 +619,7 @@ fn a_note_is_amended_weighed_trashed_restored_and_merged() -> TestResult {
 
     // Merging picks from every other Note; the merged one becomes a
     // Section of the one picked.
-    harness.get_by_label("Merge into…").click();
+    harness.get_by_label("Merge into…").click_accesskit();
     harness.run();
     assert!(shows(&harness, "Sort the cellar"));
     field(&harness, "Search all Notes").type_text("CELLAR");
