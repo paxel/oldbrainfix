@@ -13,6 +13,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -22,6 +23,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -31,6 +33,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -40,6 +43,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -49,6 +53,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Z"
             },
             {
@@ -58,6 +63,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -67,6 +73,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             },
             {
@@ -76,6 +83,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "z1"
             },
             {
@@ -85,6 +93,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "z2"
             },
             {
@@ -94,6 +103,7 @@
               "struck": true,
               "checkedAt": null,
               "backOn": "2026-01-08",
+              "cameBackOn": null,
               "order": "z3"
             },
             {
@@ -103,6 +113,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": "2026-01-09",
+              "cameBackOn": null,
               "order": "X"
             },
             {
@@ -112,6 +123,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Y"
             }
           ],
@@ -129,6 +141,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -138,6 +151,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
@@ -149,6 +163,22 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Odd five\n✓ Odd blank\n✓ Odd garbled\n✓ Tea\n✓ Bread",
         "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+      },
+      "agenda": {
+        "lines": [],
+        "back": [],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -164,6 +194,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -173,6 +204,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -182,6 +214,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -191,6 +224,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -200,6 +234,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -209,6 +244,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -218,6 +254,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -227,6 +264,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Z"
             },
             {
@@ -236,6 +274,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -245,6 +284,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             },
             {
@@ -254,6 +294,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": "2026-01-09",
+              "cameBackOn": null,
               "order": "X"
             },
             {
@@ -263,6 +304,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Y"
             }
           ],
@@ -280,6 +322,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -289,6 +332,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
@@ -300,6 +344,43 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
         "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -315,6 +396,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -324,6 +406,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -333,6 +416,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -342,6 +426,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -351,6 +436,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -360,6 +446,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -369,6 +456,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -378,6 +466,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Z"
             },
             {
@@ -387,6 +476,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -396,6 +486,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             },
             {
@@ -405,6 +496,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": "2026-01-09",
+              "cameBackOn": null,
               "order": "X"
             },
             {
@@ -414,6 +506,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Y"
             }
           ],
@@ -431,6 +524,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -440,6 +534,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
@@ -451,6 +546,43 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Tea\n✓ Bread",
         "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -466,6 +598,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-09",
               "order": "X"
             },
             {
@@ -475,6 +608,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -484,6 +618,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -493,6 +628,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -502,6 +638,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -511,6 +648,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -520,6 +658,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -529,6 +668,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -538,6 +678,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Z"
             },
             {
@@ -547,6 +688,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -556,6 +698,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             },
             {
@@ -565,6 +708,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Y"
             }
           ],
@@ -582,6 +726,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -591,6 +736,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
@@ -602,6 +748,40 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
         "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000005"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000005"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000005",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -617,6 +797,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-09",
               "order": "X"
             },
             {
@@ -626,6 +807,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -635,6 +817,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -644,6 +827,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -653,6 +837,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -662,6 +847,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -671,6 +857,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -680,6 +867,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -689,6 +877,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Z"
             },
             {
@@ -698,6 +887,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -707,6 +897,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             },
             {
@@ -716,6 +907,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "Y"
             }
           ],
@@ -733,6 +925,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -742,6 +935,7 @@
               "struck": true,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": "2026-01-15",
+              "cameBackOn": null,
               "order": "W"
             }
           ],
@@ -753,6 +947,26 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Apples\n✓ Coffee\n✓ Rice\n✓ Bread",
         "note:0000000000000000000000000000000c": "Hardware\n✓ Glue\n✓ Nails"
+      },
+      "agenda": {
+        "lines": [],
+        "back": [],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000005",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -768,6 +982,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Y"
             },
             {
@@ -777,6 +992,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Z"
             },
             {
@@ -786,6 +1002,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-09",
               "order": "X"
             },
             {
@@ -795,6 +1012,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -804,6 +1022,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -813,6 +1032,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -822,6 +1042,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -831,6 +1052,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -840,6 +1062,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -849,6 +1072,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -858,6 +1082,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": "2026-01-22",
+              "cameBackOn": null,
               "order": "a"
             },
             {
@@ -867,6 +1092,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             }
           ],
@@ -884,6 +1110,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
@@ -893,6 +1120,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "W"
             }
           ],
@@ -904,6 +1132,65 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Coffee\n✓ Rice",
         "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000000c",
+            "lines": [
+              "line:00000000000000000000000000000011",
+              "line:00000000000000000000000000000012"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000000c",
+            "lines": [
+              "line:00000000000000000000000000000011",
+              "line:00000000000000000000000000000012"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000005",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000000c",
+            "lines": [
+              "line:00000000000000000000000000000011",
+              "line:00000000000000000000000000000012"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -919,6 +1206,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-22",
               "order": "a"
             },
             {
@@ -928,6 +1216,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Y"
             },
             {
@@ -937,6 +1226,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Z"
             },
             {
@@ -946,6 +1236,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-09",
               "order": "X"
             },
             {
@@ -955,6 +1246,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -964,6 +1256,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -973,6 +1266,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -982,6 +1276,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -991,6 +1286,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -1000,6 +1296,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -1009,6 +1306,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             },
             {
@@ -1018,6 +1316,7 @@
               "struck": true,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": "2026-01-29",
+              "cameBackOn": null,
               "order": "b"
             }
           ],
@@ -1035,6 +1334,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
@@ -1044,6 +1344,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "W"
             }
           ],
@@ -1055,6 +1356,50 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nCoffee\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt\n✓ Rice",
         "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000008"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000008"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000005",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000000c",
+            "lines": [
+              "line:00000000000000000000000000000011",
+              "line:00000000000000000000000000000012"
+            ]
+          }
+        ],
+        "off": []
       }
     },
     {
@@ -1070,6 +1415,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:56.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-29",
               "order": "b"
             },
             {
@@ -1079,6 +1425,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:22.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-22",
               "order": "a"
             },
             {
@@ -1088,6 +1435,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:32:37.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Y"
             },
             {
@@ -1097,6 +1445,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:01:18.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "Z"
             },
             {
@@ -1106,6 +1455,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T23:32:32.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-09",
               "order": "X"
             },
             {
@@ -1115,6 +1465,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:06.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z1"
             },
             {
@@ -1124,6 +1475,7 @@
               "struck": false,
               "checkedAt": "2026-01-01T10:02:15.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z2"
             },
             {
@@ -1133,6 +1485,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": "2026-01-08",
               "order": "z3"
             },
             {
@@ -1142,6 +1495,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "é"
             },
             {
@@ -1151,6 +1505,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "d"
             },
             {
@@ -1160,6 +1515,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "V"
             },
             {
@@ -1169,6 +1525,7 @@
               "struck": false,
               "checkedAt": null,
               "backOn": null,
+              "cameBackOn": null,
               "order": "c"
             }
           ],
@@ -1186,6 +1543,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "V"
             },
             {
@@ -1195,6 +1553,7 @@
               "struck": false,
               "checkedAt": "2026-01-08T11:33:10.000Z",
               "backOn": null,
+              "cameBackOn": "2026-01-15",
               "order": "W"
             }
           ],
@@ -1206,6 +1565,51 @@
       "plain": {
         "note:00000000000000000000000000000001": "Groceries\nRice\nCoffee\nBread\nApples\nTea\nOdd five\nOdd blank\nOdd garbled\nOdd key\nSoy milk\nMilk\nSalt",
         "note:0000000000000000000000000000000c": "Hardware\nGlue\nNails"
+      },
+      "agenda": {
+        "lines": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000009"
+            ]
+          }
+        ],
+        "back": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000009"
+            ]
+          }
+        ],
+        "open": [
+          {
+            "note": "note:00000000000000000000000000000001",
+            "lines": [
+              "line:00000000000000000000000000000009",
+              "line:00000000000000000000000000000008",
+              "line:00000000000000000000000000000006",
+              "line:00000000000000000000000000000007",
+              "line:00000000000000000000000000000005",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee2",
+              "line:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeee3",
+              "line:0000000000000000000000000000000b",
+              "line:00000000000000000000000000000003",
+              "line:0000000000000000000000000000000a"
+            ]
+          },
+          {
+            "note": "note:0000000000000000000000000000000c",
+            "lines": [
+              "line:00000000000000000000000000000011",
+              "line:00000000000000000000000000000012"
+            ]
+          }
+        ],
+        "off": []
       }
     }
   ],

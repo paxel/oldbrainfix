@@ -6,7 +6,10 @@
 //! its Line back; the Line menu renames, sets the reappear time and
 //! deletes for good after asking once; full cards check, compact cards
 //! count the open Lines; a Member checks and adds but changes only their
-//! own Lines; and a Line Conflict is named as a Shopping List's.
+//! own Lines; and a Line Conflict is named as a Shopping List's. Today's
+//! Agenda shows the Shopping Lists the way Settings of this Device choose
+//! (#123): each Line back today with its box, one row per list with the
+//! Lines back or open, or none; a click on a row opens the Note.
 
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
@@ -18,8 +21,9 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::lan::{Joining, answer_sync_inviting, apply_answer_as, sync_request_as};
 use oldbrainfix_core::{
-    AreaRole, ImportReport, Invite, Notes, OwnProfile, PairedDevice, Places, Reappear,
-    ShoppingList, ShoppingLists, SigningKey, Store,
+    AreaRole, ClockTime, Day, DeviceSettings, ImportReport, Invite, Notes, OwnProfile,
+    PairedDevice, Places, Reappear, Routines, Schedule, ShoppingAgenda, ShoppingList,
+    ShoppingLists, SigningKey, Store,
 };
 use oldbrainfix_gui::l10n::L10n;
 use oldbrainfix_gui::{App, Selection};
@@ -584,4 +588,156 @@ fn the_reappear_time_reads_in_both_languages() {
     assert_eq!(reappear_label(&en, Reappear::Week1), "1 week");
     assert_eq!(reappear_label(&de, Reappear::Week4), "4 Wochen");
     assert_eq!(reappear_label(&de, Reappear::Once), "Einmal");
+}
+
+/// The start of Saturday, 31 October 2026, on UTC: the day a Line
+/// checked at [`NOW`] comes back.
+const BACK: &str = "2026-10-31T00:00:01Z";
+
+/// [`SHOPPING`] made a Shopping List with "Bread" checked at [`NOW`],
+/// the clock at [`BACK`] so "Bread" came back today, and the Agenda
+/// showing it the way `way`: the window on the Agenda and the Note's id.
+fn agenda(
+    way: ShoppingAgenda,
+) -> Result<(Harness<'static, App>, String), Box<dyn std::error::Error>> {
+    let (store, note, moment) = with_note()?;
+    let lists = ShoppingLists::new(&store);
+    lists.make(&note)?;
+    lists.check(&line_id(&store, &note, "Bread")?, &utc)?;
+    moment.store(
+        DateTime::parse_from_rfc3339(BACK)?.timestamp(),
+        Ordering::SeqCst,
+    );
+    DeviceSettings::new(&store).set_shopping_agenda(way)?;
+    let mut harness = window(&store, None);
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    Ok((harness, note))
+}
+
+/// The Agenda's message for a day with nothing due.
+const NOTHING_TODAY: &str = "Nothing due today. Tap + to capture a thought.";
+
+#[test]
+fn by_default_the_agenda_has_a_row_per_list_with_the_lines_back_today() -> TestResult {
+    let (mut harness, note) = agenda(ShoppingAgenda::STANDARD)?;
+    assert!(shows(&harness, "Weekly: 1 back"));
+    assert!(boxes(&harness, "Bread").is_empty());
+    assert!(!shows(&harness, NOTHING_TODAY));
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly: 1 back")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_open_way_counts_every_line_not_struck() -> TestResult {
+    let (harness, _) = agenda(ShoppingAgenda::Open)?;
+    assert!(shows(&harness, "Weekly: 3 open"));
+    assert!(!shows(&harness, "Weekly: 1 back"));
+    Ok(())
+}
+
+#[test]
+fn the_lines_way_checks_a_line_on_the_agenda_and_it_leaves() -> TestResult {
+    let (mut harness, note) = agenda(ShoppingAgenda::Lines)?;
+    assert!(shows(&harness, "Weekly: Bread"));
+    assert!(!shows(&harness, "Weekly: Milk"));
+    assert!(!checked(&harness, "Bread")?);
+    tick(&mut harness, "Bread")?;
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Apples", "✓ Bread"]);
+    assert!(!shows(&harness, "Weekly: Bread"));
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn a_line_row_opens_its_note() -> TestResult {
+    let (mut harness, note) = agenda(ShoppingAgenda::Lines)?;
+    harness
+        .get_by_role_and_label(Role::Button, "Weekly: Bread")
+        .click();
+    harness.run();
+    assert_eq!(harness.state().selected_note(), Some(note.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_off_way_shows_no_shopping_list() -> TestResult {
+    let (harness, _) = agenda(ShoppingAgenda::Off)?;
+    assert!(!shows_part(&harness, "Weekly:"));
+    assert!(boxes(&harness, "Bread").is_empty());
+    assert!(shows(&harness, NOTHING_TODAY));
+    Ok(())
+}
+
+#[test]
+fn the_shopping_rows_sit_after_the_all_day_occurrences_before_the_timed() -> TestResult {
+    let (mut harness, _) = agenda(ShoppingAgenda::Back)?;
+    let day = Day::new(2026, 10, 31);
+    let nine: Vec<ClockTime> = ClockTime::new(9, 0).into_iter().collect();
+    let routines = Routines::new(harness.state().store());
+    routines.create(
+        "Water the plants",
+        &Schedule::new(day, &[], None).ok_or("all day")?,
+    )?;
+    routines.create(
+        "Call Dana",
+        &Schedule::new(day, &nine, None).ok_or("at nine")?,
+    )?;
+    harness.state_mut().select(Selection::All);
+    harness.run();
+    harness.state_mut().select(Selection::Agenda);
+    harness.run();
+    let top = |label: &str| -> Result<f32, Box<dyn std::error::Error>> {
+        Ok(harness
+            .query_all_by_label(label)
+            .next()
+            .ok_or(format!("{label:?}"))?
+            .rect()
+            .top())
+    };
+    let shopping = top("Weekly: 1 back")?;
+    assert!(top("Water the plants")? < shopping);
+    assert!(shopping < top("Call Dana")?);
+    Ok(())
+}
+
+#[test]
+fn settings_choose_how_the_agenda_shows_shopping_lists() -> TestResult {
+    let (store, _, _) = with_note()?;
+    let mut harness = window(&store, None);
+    harness.state_mut().select(Selection::Settings);
+    harness.run();
+    assert!(shows(&harness, "Shopping Lists on the Agenda"));
+    let radio =
+        |harness: &Harness<'_, App>, label: &str| -> Result<bool, Box<dyn std::error::Error>> {
+            let node = harness
+                .query_all_by_role_and_label(Role::RadioButton, label)
+                .next()
+                .ok_or(format!("{label:?}"))?;
+            Ok(node.accesskit_node().toggled() == Some(Toggled::True))
+        };
+    assert!(radio(
+        &harness,
+        "One row per Shopping List on a day when Lines came back"
+    )?);
+    assert!(!radio(&harness, "Not at all")?);
+    click(&mut harness, "Not at all")?;
+    assert!(radio(&harness, "Not at all")?);
+    assert_eq!(
+        DeviceSettings::new(harness.state().store()).shopping_agenda()?,
+        ShoppingAgenda::Off
+    );
+    click(
+        &mut harness,
+        "Each Line that came back today, on its own row",
+    )?;
+    assert_eq!(
+        DeviceSettings::new(harness.state().store()).shopping_agenda()?,
+        ShoppingAgenda::Lines
+    );
+    Ok(())
 }

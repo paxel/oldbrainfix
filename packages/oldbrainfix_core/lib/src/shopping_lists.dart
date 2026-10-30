@@ -54,6 +54,33 @@ enum Reappear {
   }
 }
 
+/// How the Agenda of a Device shows Shopping Lists (#123), a setting of
+/// that Device.
+enum ShoppingAgenda {
+  /// Each Line that came back today on its own row, checkable there.
+  lines,
+
+  /// One row per Shopping List on a day when Lines came back.
+  back,
+
+  /// One row per Shopping List on every day it has open Lines.
+  open,
+
+  /// Not at all.
+  off;
+
+  /// What a Device shows when nothing was chosen.
+  static const standard = back;
+
+  /// The way [code] names; [standard] for none, or a code not known here.
+  static ShoppingAgenda read(String? code) =>
+      values.asNameMap()[code] ?? standard;
+}
+
+/// A Shopping List on today's Agenda with the Lines its row stands for:
+/// those that came back today, or for [ShoppingAgenda.open] those open.
+typedef ShoppingAgendaList = ({ShoppingList list, List<ShoppingLine> lines});
+
 /// One line of a Shopping List (CONTEXT.md): a Line with its reappear
 /// time, struck through for a while once checked.
 class ShoppingLine {
@@ -75,6 +102,12 @@ class ShoppingLine {
   /// while it is open.
   final Day? backOn;
 
+  /// The day it came back by itself, at its start, while it is open
+  /// since then: on that day it "came back today". Null while it is
+  /// struck, and for a Line never checked or brought back by hand or by
+  /// adding its name.
+  final Day? cameBackOn;
+
   /// Its place as stored ([LineOrder]).
   final String? order;
 
@@ -86,6 +119,7 @@ class ShoppingLine {
     required this.struck,
     required this.checkedAt,
     required this.backOn,
+    required this.cameBackOn,
     required this.order,
   });
 }
@@ -129,6 +163,12 @@ class ShoppingList {
   List<ShoppingLine> get struck => [
     for (final l in lines)
       if (l.struck) l,
+  ];
+
+  /// The Lines that came back by themselves at the start of [day].
+  List<ShoppingLine> cameBack(Day day) => [
+    for (final l in lines)
+      if (l.cameBackOn == day) l,
   ];
 
   int get count => lines.length;
@@ -187,6 +227,37 @@ class ShoppingLists {
       for (final MapEntry(key: note, value: making) in makings.entries)
         note: _list(note, making, read[note] ?? []),
     };
+  }
+
+  /// The Shopping Lists on today's Agenda by [wallClock] when it shows
+  /// them the way [way]: each list not in the trash nor merged with the
+  /// Lines that came back today, or for [ShoppingAgenda.open] those
+  /// open, where there are any; oldest capture first. For
+  /// [ShoppingAgenda.lines] each of those Lines is a row of its own.
+  List<ShoppingAgendaList> agenda(ShoppingAgenda way, WallClock wallClock) {
+    if (way == ShoppingAgenda.off) return const [];
+    final notes = Notes(store);
+    final shown = <Note>[];
+    for (final id in store.entitiesOfType(NoteKeys.typeNote)) {
+      if (making(id) == null) continue;
+      if (notes.byId(id) case final note?
+          when !note.isTrashed && !note.isMerged) {
+        shown.add(note);
+      }
+    }
+    shown.sort((a, b) {
+      final byCapture = a.captured.compareTo(b.captured);
+      return byCapture != 0 ? byCapture : a.id.compareTo(b.id);
+    });
+    final lists = ofNotes([for (final n in shown) n.id], wallClock);
+    final today = Day.today(store.clock(), wallClock);
+    return [
+      for (final note in shown)
+        if (lists[note.id] case final list?)
+          if (way == ShoppingAgenda.open ? list.open : list.cameBack(today)
+              case final lines when lines.isNotEmpty)
+            (list: list, lines: lines),
+    ];
   }
 
   /// The making of the Shopping List the Note [noteId] is now, or null
@@ -538,6 +609,7 @@ class _Read {
     final check = latest[ChecklistKeys.checked];
     final value = check?.value;
     Day? back;
+    Day? came;
     var struck = false;
     var gone = false;
     final DateTime at;
@@ -546,6 +618,7 @@ class _Read {
       final day = Day.of(wallClock(check.date)).addDays(7 * reappear.weeks);
       struck = !gone && today < day;
       if (struck) back = day;
+      if (!gone && !struck) came = day;
       at = gone || struck
           ? check.date
           : DateTime.utc(day.year, day.month, day.day);
@@ -562,6 +635,7 @@ class _Read {
         struck: struck,
         checkedAt: DateTime.tryParse(value ?? '')?.toUtc(),
         backOn: back,
+        cameBackOn: came,
         order: latest[ChecklistKeys.order]?.value,
       ),
       gone,

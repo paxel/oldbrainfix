@@ -229,6 +229,73 @@ void main() {
     });
   });
 
+  group('on the Agenda', () {
+    /// Today's Agenda the way [way]: each list's text with its Lines.
+    List<String> agenda(ShoppingAgenda way) => [
+      for (final (:list, :lines) in ShoppingLists(ann).agenda(way, _wall))
+        '${Notes(ann).byId(list.noteId)!.text}: '
+            '${[for (final l in lines) l.text].join(', ')}',
+    ];
+
+    test('a Line came back on the day its check runs out, not when brought '
+        'back by hand or by its name', () {
+      final note = shopping(ann, 'Shop\nMilk\nEggs\nTea\nRice');
+      final lists = ShoppingLists(ann);
+      for (final text in ['Milk', 'Eggs', 'Tea']) {
+        lists.check(idOf(ann, note, text), _wall);
+      }
+      lists.uncheck(idOf(ann, note, 'Eggs'), _wall);
+      lists.add(note, 'tea', _wall);
+      expect(lineOf(ann, note, 'Milk').cameBackOn, isNull, reason: 'struck');
+      // Midnight on the wall: Thursday the 12th begins.
+      clock.set(DateTime.utc(2026, 3, 11, 23));
+      final list = lists.byNote(note, _wall)!;
+      expect(list.line(idOf(ann, note, 'Milk'))!.cameBackOn, Day(2026, 3, 12));
+      for (final text in ['Eggs', 'Tea', 'Rice']) {
+        expect(lineOf(ann, note, text).cameBackOn, isNull, reason: text);
+      }
+      expect(
+        [for (final l in list.cameBack(Day(2026, 3, 12))) l.text],
+        ['Milk'],
+      );
+      // The day after it is still open, but no longer back today.
+      clock.set(DateTime.utc(2026, 3, 12, 23));
+      expect(lineOf(ann, note, 'Milk').cameBackOn, Day(2026, 3, 12));
+      expect(lists.byNote(note, _wall)!.cameBack(Day(2026, 3, 13)), isEmpty);
+    });
+
+    test('each way shows the lists with Lines back today, or open, oldest '
+        'first, and none when off', () {
+      final week = shopping(ann, 'Groceries\nMilk\nEggs\nTea');
+      final hardware = shopping(ann, 'Hardware\nNails\nGlue');
+      final done = shopping(ann, 'Done\nSoap');
+      final gone = shopping(ann, 'Gone\nSalt');
+      final lists = ShoppingLists(ann);
+      for (final text in ['Milk', 'Eggs']) {
+        lists.check(idOf(ann, week, text), _wall);
+      }
+      lists.check(idOf(ann, done, 'Soap'), _wall);
+      lists.setReappear(idOf(ann, hardware, 'Nails'), Reappear.week2);
+      lists.check(idOf(ann, hardware, 'Nails'), _wall);
+      lists.check(idOf(ann, gone, 'Salt'), _wall);
+      Notes(ann).trash(gone);
+      expect(agenda(ShoppingAgenda.lines), isEmpty);
+      expect(agenda(ShoppingAgenda.open), ['Groceries: Tea', 'Hardware: Glue']);
+      clock.set(DateTime.utc(2026, 3, 11, 23, 30));
+      lists.check(idOf(ann, done, 'Soap'), _wall);
+      expect(agenda(ShoppingAgenda.lines), ['Groceries: Milk, Eggs']);
+      expect(agenda(ShoppingAgenda.back), agenda(ShoppingAgenda.lines));
+      expect(agenda(ShoppingAgenda.open), [
+        'Groceries: Milk, Eggs, Tea',
+        'Hardware: Glue',
+      ]);
+      expect(agenda(ShoppingAgenda.off), isEmpty);
+      // The next day nothing came back.
+      clock.set(DateTime.utc(2026, 3, 12, 23, 30));
+      expect(agenda(ShoppingAgenda.back), isEmpty);
+    });
+  });
+
   group('adding', () {
     test('a new name comes in at the top with a week', () {
       final note = shopping(ann, 'Shop\nMilk');

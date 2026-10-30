@@ -142,6 +142,49 @@ void main() {
       expect(store.chosenUnitSystem, isNull);
     });
 
+    testWidgets('show Shopping Lists on the Agenda one row per list with '
+        'Lines back until another way is picked as a radio button', (
+      tester,
+    ) async {
+      await start(tester);
+      await openDeviceSettings(tester);
+      final column = find.byKey(const ValueKey('shoppingAgenda'));
+      await tester.scrollUntilVisible(
+        column,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: column,
+          matching: find.byType(RadioListTile<ShoppingAgenda>),
+        ),
+        findsNWidgets(4),
+      );
+      expect(
+        tester
+            .widget<RadioGroup<ShoppingAgenda>>(
+              find.descendant(
+                of: column,
+                matching: find.byType(RadioGroup<ShoppingAgenda>),
+              ),
+            )
+            .groupValue,
+        ShoppingAgenda.back,
+      );
+      for (final way in [
+        ShoppingAgenda.lines,
+        ShoppingAgenda.open,
+        ShoppingAgenda.off,
+        ShoppingAgenda.back,
+      ]) {
+        await tap(tester, find.byKey(ValueKey('shoppingAgenda-${way.name}')));
+        expect(store.shoppingAgenda, way);
+      }
+      expect(store.allEntries(), isEmpty, reason: 'settings are never synced');
+    });
+
     testWidgets('are kept on this Device and never logged', (tester) async {
       await start(tester);
       await openDeviceSettings(tester);

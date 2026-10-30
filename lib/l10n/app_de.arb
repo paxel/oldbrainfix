@@ -1098,5 +1098,14 @@
   "speechModelFailedCause": "Der Download wurde nicht fertig.",
   "speechModelFailedFix": "Nichts wurde behalten; versuch es später noch einmal.",
   "speechModelMismatchCause": "Das ist nicht das erwartete Sprachmodell.",
-  "speechModelMismatchFix": "Lade eines der aufgeführten Modelle herunter oder wähl die Datei eines davon."
+  "speechModelMismatchFix": "Lade eines der aufgeführten Modelle herunter oder wähl die Datei eines davon.",
+  "settingsShoppingAgenda": "Einkaufslisten in der Agenda",
+  "settingsShoppingAgendaDetail": "Nur für heute und nur auf diesem Gerät.",
+  "shoppingAgendaLines": "Jede heute wiedergekommene Zeile in einer eigenen Reihe",
+  "shoppingAgendaBack": "Eine Reihe je Einkaufsliste an Tagen, an denen Zeilen wiederkommen",
+  "shoppingAgendaOpen": "Eine Reihe je Einkaufsliste an jedem Tag mit offenen Zeilen",
+  "shoppingAgendaOff": "Gar nicht",
+  "shoppingRowBack": "{list}: {count} wieder da",
+  "shoppingRowOpen": "{list}: {count} offen",
+  "maskedShoppingList": "Private Einkaufsliste"
 }

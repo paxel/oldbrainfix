@@ -69,6 +69,9 @@ pub const MORE: char = '\u{e402}';
 pub const ALL_ROUTINES: char = '\u{e2b8}';
 pub const MORE_VERT: char = '\u{e404}';
 pub const EXPORT: char = '\u{f05d}';
+/// `shopping_cart_outlined`, as the phone marks a Shopping List's row on
+/// the Agenda (#123).
+pub const SHOPPING_CART: char = '\u{f37f}';
 
 /// How the phone draws each of the core's Area icons.
 pub fn area_icon(key: Option<&str>) -> Option<char> {

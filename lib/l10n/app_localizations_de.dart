@@ -4113,4 +4113,39 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get speechModelMismatchFix =>
       'Lade eines der aufgeführten Modelle herunter oder wähl die Datei eines davon.';
+
+  @override
+  String get settingsShoppingAgenda => 'Einkaufslisten in der Agenda';
+
+  @override
+  String get settingsShoppingAgendaDetail =>
+      'Nur für heute und nur auf diesem Gerät.';
+
+  @override
+  String get shoppingAgendaLines =>
+      'Jede heute wiedergekommene Zeile in einer eigenen Reihe';
+
+  @override
+  String get shoppingAgendaBack =>
+      'Eine Reihe je Einkaufsliste an Tagen, an denen Zeilen wiederkommen';
+
+  @override
+  String get shoppingAgendaOpen =>
+      'Eine Reihe je Einkaufsliste an jedem Tag mit offenen Zeilen';
+
+  @override
+  String get shoppingAgendaOff => 'Gar nicht';
+
+  @override
+  String shoppingRowBack(String list, int count) {
+    return '$list: $count wieder da';
+  }
+
+  @override
+  String shoppingRowOpen(String list, int count) {
+    return '$list: $count offen';
+  }
+
+  @override
+  String get maskedShoppingList => 'Private Einkaufsliste';
 }

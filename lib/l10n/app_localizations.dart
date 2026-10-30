@@ -6637,6 +6637,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download one of the models listed, or pick the file of one of them.'**
   String get speechModelMismatchFix;
+
+  /// Section title in Settings: how this Device's Agenda shows Shopping Lists, today only.
+  ///
+  /// In en, this message translates to:
+  /// **'Shopping Lists on the Agenda'**
+  String get settingsShoppingAgenda;
+
+  /// Under the section title 'Shopping Lists on the Agenda' in Settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Today only, and on this Device only.'**
+  String get settingsShoppingAgendaDetail;
+
+  /// Radio choice: every Line of a Shopping List that came back today gets its own checkable row on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Each Line that came back today, on its own row'**
+  String get shoppingAgendaLines;
+
+  /// Radio choice, the default: one Agenda row per Shopping List with the number of Lines that came back today.
+  ///
+  /// In en, this message translates to:
+  /// **'One row per Shopping List on a day when Lines came back'**
+  String get shoppingAgendaBack;
+
+  /// Radio choice: one Agenda row per Shopping List every day it has Lines not struck through.
+  ///
+  /// In en, this message translates to:
+  /// **'One row per Shopping List on every day it has open Lines'**
+  String get shoppingAgendaOpen;
+
+  /// Radio choice: Shopping Lists do not show on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Not at all'**
+  String get shoppingAgendaOff;
+
+  /// An Agenda row of a Shopping List: its title and how many of its Lines came back today, such as 'Groceries: 3 back'.
+  ///
+  /// In en, this message translates to:
+  /// **'{list}: {count} back'**
+  String shoppingRowBack(String list, int count);
+
+  /// An Agenda row of a Shopping List: its title and how many of its Lines are not struck through, such as 'Groceries: 5 open'.
+  ///
+  /// In en, this message translates to:
+  /// **'{list}: {count} open'**
+  String shoppingRowOpen(String list, int count);
+
+  /// A Shopping List from a locked Area set to Masked, on the Agenda.
+  ///
+  /// In en, this message translates to:
+  /// **'Private Shopping List'**
+  String get maskedShoppingList;
 }
 
 class _AppLocalizationsDelegate

@@ -8,6 +8,10 @@ Two Devices with alerts on both fire the same Occurrence until a sync tells one 
 
 A Backup carries none of them but the playback speed of voice recordings, which a restored Device takes over (ADR 0016, #86).
 
+## Shopping Lists on the Agenda (ADR 0030)
+
+Amended by #123: how a Device's Agenda shows Shopping Lists today is a setting of its own, one row per list on a day when Lines came back until another way is chosen.
+
 ## Units (ADR 0028)
 
 Amended by ADR 0028 (#103): whether a Device shows the known units of Tallies in metric or imperial is a setting of its own, following the region the system reports until one is chosen.

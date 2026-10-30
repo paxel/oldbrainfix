@@ -76,8 +76,8 @@ use oldbrainfix_core::{
     Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings, Frog, Frogs, FrogsToday,
     Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo, Occurrence, OwnProfile, Person,
     PersonFilter, Places, Profile, QuietHours, Routine, RoutineOccurrence, Routines, Search,
-    Section, Sessions, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies, Topic,
-    UnitSystem, bundle,
+    Section, Sessions, ShoppingAgenda, ShoppingLine, ShoppingList, ShoppingLists, Store, Tallies,
+    Topic, UnitSystem, bundle,
 };
 
 use crate::about_view;
@@ -202,10 +202,30 @@ struct Row {
     lines: Option<(Checklist, bool)>,
 }
 
+/// A Shopping List's row on today's Agenda (#123): one Line that came
+/// back today when `line` is set, else the list with what its row says,
+/// "Groceries: 3 back"; with the Area its Note is filed in and whether
+/// this Device may check its Lines.
+#[derive(Debug, Clone)]
+struct ShoppingRow {
+    note_id: String,
+    area: Option<Area>,
+    /// The list's title: the first line of its Note's text, else
+    /// "Shopping List".
+    title: String,
+    line: Option<ShoppingLine>,
+    /// What the row of the list says; the Line's text on a Line's row.
+    text: String,
+    checks: bool,
+}
+
 /// What the Agenda shows.
 #[derive(Debug, Clone, Default)]
 struct AgendaView {
     today: Vec<Row>,
+    /// Today's rows of the Shopping Lists, as Settings of this Device
+    /// choose (#123).
+    shopping: Vec<ShoppingRow>,
     tomorrow: Vec<Row>,
     /// The days after tomorrow, each with its rows.
     later: Vec<(Day, Vec<Row>)>,
@@ -861,6 +881,8 @@ enum Setting {
     /// The system Tallies show known units in; `None` follows the
     /// region (#103).
     Units(Option<UnitSystem>),
+    /// How the Agenda shows Shopping Lists today (#123).
+    ShoppingAgenda(ShoppingAgenda),
 }
 
 /// The wall clock the window shows days on.
@@ -2975,8 +2997,45 @@ impl App {
                 // it is new, and reading again writes nothing.
                 let today = frogs.pick_today(wall)?;
                 let frog_rows = shown_frogs(today.shown.clone())?;
+                let way = DeviceSettings::new(store).shopping_agenda()?;
+                let mut shopping_rows = Vec::new();
+                for shown in shopping.agenda(way, wall)? {
+                    let Some(note) = notes.by_id(&shown.list.note_id)? else {
+                        continue;
+                    };
+                    let title = match row_title(&self.t, Some(&note)).lines().next() {
+                        Some(first) if !first.trim().is_empty() => first.trim().to_string(),
+                        _ => self.t.shopping_heading().to_string(),
+                    };
+                    let checks = shopping.may_check(&note.id)?;
+                    let area = place(note.clone())?.area;
+                    let row = |line: Option<ShoppingLine>, text: String| ShoppingRow {
+                        note_id: note.id.clone(),
+                        area: area.clone(),
+                        title: title.clone(),
+                        line,
+                        text,
+                        checks,
+                    };
+                    let count = shown.lines.len() as i64;
+                    match way {
+                        ShoppingAgenda::Lines => {
+                            for line in shown.lines {
+                                let text = line.text.clone();
+                                shopping_rows.push(row(Some(line), text));
+                            }
+                        }
+                        ShoppingAgenda::Open => {
+                            shopping_rows.push(row(None, self.t.shopping_row_open(&title, count)));
+                        }
+                        ShoppingAgenda::Back | ShoppingAgenda::Off => {
+                            shopping_rows.push(row(None, self.t.shopping_row_back(&title, count)));
+                        }
+                    }
+                }
                 Some(AgendaView {
                     later,
+                    shopping: shopping_rows,
                     today: agenda
                         .today_rows
                         .into_iter()
@@ -4515,6 +4574,7 @@ impl App {
             }
             Setting::AlarmSound(sound) => settings.set_alarm_sound(sound.as_deref())?,
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
+            Setting::ShoppingAgenda(way) => settings.set_shopping_agenda(way)?,
         }
         Ok(())
     }
@@ -6453,12 +6513,26 @@ impl App {
                         .size(16.0)
                         .color(text),
                 );
-                if agenda.today.is_empty() {
+                if agenda.today.is_empty() && agenda.shopping.is_empty() {
                     ui.label(
                         RichText::new(t.nothing_today()).color(ui.visuals().weak_text_color()),
                     );
                 }
-                for row in &agenda.today {
+                // The Shopping Lists' rows after the all-day Occurrences,
+                // before the timed ones (#123).
+                let timed = agenda
+                    .today
+                    .iter()
+                    .position(|r| !r.row.occurrence.all_day())
+                    .unwrap_or(agenda.today.len());
+                let (all_day, timed) = agenda.today.split_at(timed);
+                for row in all_day {
+                    agenda_row(ui, &t, tones, row, actions);
+                }
+                for row in &agenda.shopping {
+                    shopping_row(ui, tones, row, actions);
+                }
+                for row in timed {
                     agenda_row(ui, &t, tones, row, actions);
                 }
                 // Under what is due, never above it (#101).
@@ -7115,6 +7189,9 @@ impl App {
         let ai_waiting = self.ai_port.is_none() && self.view.ai_task.is_some();
         let ai_copied = self.ai_copied;
         let units = settings.chosen_unit_system().ok().flatten();
+        let shopping_way = settings
+            .shopping_agenda()
+            .unwrap_or(ShoppingAgenda::STANDARD);
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         egui::ScrollArea::vertical()
             .id_salt("settings")
@@ -7264,6 +7341,31 @@ impl App {
                     let mut chosen = units;
                     if radio_column(ui, &mut chosen, options) && chosen != units {
                         actions.push(Action::Setting(Setting::Units(chosen)));
+                    }
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    ui.label(
+                        RichText::new(t.settings_shopping_agenda())
+                            .strong()
+                            .color(text),
+                    );
+                    ui.label(
+                        RichText::new(t.settings_shopping_agenda_detail())
+                            .small()
+                            .color(weak),
+                    );
+                    let options = ShoppingAgenda::ALL.map(|way| {
+                        let label = match way {
+                            ShoppingAgenda::Lines => t.shopping_agenda_lines(),
+                            ShoppingAgenda::Back => t.shopping_agenda_back(),
+                            ShoppingAgenda::Open => t.shopping_agenda_open(),
+                            ShoppingAgenda::Off => t.shopping_agenda_off(),
+                        };
+                        (way, label.to_string())
+                    });
+                    let mut chosen = shopping_way;
+                    if radio_column(ui, &mut chosen, options) && chosen != shopping_way {
+                        actions.push(Action::Setting(Setting::ShoppingAgenda(chosen)));
                     }
                 });
             });
@@ -8867,6 +8969,78 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
             });
             actions.extend(asked.into_iter().map(Action::Checklist));
         }
+    });
+}
+
+/// A Shopping List's row today as an embossed row with its Area's colour
+/// and icon (#123): a Line that came back today with its box and the
+/// list's title under it, checking it strikes it and it leaves the
+/// Agenda; or the list with the cart and how many came back or are open.
+/// A click on its text opens the Note.
+fn shopping_row(ui: &mut Ui, tones: Tones, row: &ShoppingRow, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    let colour = row
+        .area
+        .as_ref()
+        .and_then(|a| area_colour(a.colour.as_deref()));
+    embossed(ui, tones, false, colour, |ui| {
+        ui.horizontal(|ui| {
+            match &row.line {
+                Some(line) => {
+                    let ticked = ui
+                        .add_enabled_ui(row.checks, |ui| check(ui, tones, false, &line.text))
+                        .inner;
+                    if ticked.clicked() {
+                        actions.push(Action::Shopping(ShoppingAction::Check(
+                            line.id.clone(),
+                            true,
+                        )));
+                    }
+                }
+                None => {
+                    let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), Sense::hover());
+                    icons::paint(ui.painter(), rect.shrink(4.0), icons::SHOPPING_CART, weak);
+                }
+            }
+            ui.add_space(4.0);
+            let width = (ui.available_width() - 32.0).max(40.0);
+            let body = ui.vertical(|ui| {
+                ui.set_max_width(width);
+                ui.add(
+                    egui::Label::new(RichText::new(&row.text).size(15.0).color(text)).truncate(),
+                );
+                if row.line.is_some() {
+                    ui.add(
+                        egui::Label::new(RichText::new(&row.title).small().color(weak)).truncate(),
+                    );
+                }
+            });
+            let salt = match &row.line {
+                Some(line) => ("shopping line", line.id.as_str()),
+                None => ("shopping row", row.note_id.as_str()),
+            };
+            let open = ui
+                .interact(body.response.rect, Id::new(salt), Sense::click())
+                .on_hover_cursor(egui::CursorIcon::PointingHand);
+            let label = match &row.line {
+                Some(line) => format!("{}: {}", row.title, line.text),
+                None => row.text.clone(),
+            };
+            open.widget_info(|| WidgetInfo::labeled(WidgetType::Button, true, &label));
+            if open.clicked() {
+                actions.push(Action::SelectNote(row.note_id.clone()));
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if let Some(icon) = row
+                    .area
+                    .as_ref()
+                    .and_then(|a| icons::area_icon(a.icon.as_deref()))
+                {
+                    icons::show(ui, icon, 20.0, colour.unwrap_or(weak));
+                }
+            });
+        });
     });
 }
 

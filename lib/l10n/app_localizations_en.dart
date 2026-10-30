@@ -4058,4 +4058,39 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get speechModelMismatchFix =>
       'Download one of the models listed, or pick the file of one of them.';
+
+  @override
+  String get settingsShoppingAgenda => 'Shopping Lists on the Agenda';
+
+  @override
+  String get settingsShoppingAgendaDetail =>
+      'Today only, and on this Device only.';
+
+  @override
+  String get shoppingAgendaLines =>
+      'Each Line that came back today, on its own row';
+
+  @override
+  String get shoppingAgendaBack =>
+      'One row per Shopping List on a day when Lines came back';
+
+  @override
+  String get shoppingAgendaOpen =>
+      'One row per Shopping List on every day it has open Lines';
+
+  @override
+  String get shoppingAgendaOff => 'Not at all';
+
+  @override
+  String shoppingRowBack(String list, int count) {
+    return '$list: $count back';
+  }
+
+  @override
+  String shoppingRowOpen(String list, int count) {
+    return '$list: $count open';
+  }
+
+  @override
+  String get maskedShoppingList => 'Private Shopping List';
 }

@@ -67,12 +67,29 @@ typedef _ShownPicks = ({
   bool swaps,
 });
 
+/// A Shopping List's row on today's Agenda (#123): one Line that came
+/// back today when [line] is set, else the list with [count] Lines back
+/// or open; with where its Note is filed, whether it shows Masked and
+/// whether this Device may check its Lines.
+typedef _ShoppingRow = ({
+  Note note,
+  Area? area,
+  bool masked,
+  ShoppingLine? line,
+  int count,
+  bool checks,
+});
+
 /// What the menu of an Occurrence's row does.
 enum _RowChoice { history, share }
 
-/// One row of a day on the Agenda: an Occurrence, or a part of a
-/// calendar appointment.
-typedef _DayEntry = ({_PlacedRow? row, AppointmentPiece? piece});
+/// One row of a day on the Agenda: an Occurrence, a part of a calendar
+/// appointment, or a Shopping List's.
+typedef _DayEntry = ({
+  _PlacedRow? row,
+  AppointmentPiece? piece,
+  _ShoppingRow? shopping,
+});
 
 /// A Frog of the "Eat a frog" section with its Note and Area, and
 /// whether it shows Masked.
@@ -124,6 +141,12 @@ typedef _ShownFrog = ({PlacedFrog placed, bool masked});
 /// after the all-day Occurrences, the timed ones among the timed
 /// Occurrences by time. They are read only, marked with their calendar,
 /// and "Copy into a Note" makes a Note of one.
+///
+/// Today also shows the Shopping Lists the way Settings of this Device
+/// choose (#123), after the all-day rows: each Line that came back today
+/// with its box, or one row per list with how many came back or are
+/// open, or none. A tap opens the list; a Masked one is one row that
+/// names no Line.
 class AgendaScreen extends StatefulWidget {
   /// How much tomorrow and the days after are faded.
   static const tomorrowOpacity = 0.55;
@@ -171,6 +194,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
   late final _frogs = Frogs(widget.notes.store);
   late final _sessions = Sessions(widget.notes.store);
   late final _checklists = Checklists(widget.notes.store);
+  late final _shopping = ShoppingLists(widget.notes.store);
+
+  /// How this Device shows Shopping Lists today, as read last.
+  var _shoppingWay = ShoppingAgenda.standard;
 
   /// The Notes of the rows that are Checklists, read in one pass so only
   /// their rows read their Lines for the Occurrence.
@@ -327,9 +354,14 @@ class _AgendaScreenState extends State<AgendaScreen> {
   }
 
   /// The rows of [day]: its all-day Occurrences [rows] and all-day
-  /// appointments, then the timed ones of both by time, an Occurrence
-  /// before an appointment at the same time.
-  List<_DayEntry> _entries(Day day, List<_PlacedRow> rows) {
+  /// appointments, then the rows of the Shopping Lists [shopping], then
+  /// the timed ones of both by time, an Occurrence before an appointment
+  /// at the same time.
+  List<_DayEntry> _entries(
+    Day day,
+    List<_PlacedRow> rows, {
+    List<_ShoppingRow> shopping = const [],
+  }) {
     final pieces = appointmentsOn(day, _appointments, deviceWallClock);
     final timedRows = [
       for (final placed in rows)
@@ -348,16 +380,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
           : null;
       final pieceAt = p < timedPieces.length ? timedPieces[p].at : null;
       if (rowAt != null && (pieceAt == null || rowAt.compareTo(pieceAt) <= 0)) {
-        timed.add((row: timedRows[r++], piece: null));
+        timed.add((row: timedRows[r++], piece: null, shopping: null));
       } else {
-        timed.add((row: null, piece: timedPieces[p++]));
+        timed.add((row: null, piece: timedPieces[p++], shopping: null));
       }
     }
     return [
       for (final placed in rows)
-        if (placed.row.occurrence.allDay) (row: placed, piece: null),
+        if (placed.row.occurrence.allDay)
+          (row: placed, piece: null, shopping: null),
       for (final piece in pieces)
-        if (piece.allDay) (row: null, piece: piece),
+        if (piece.allDay) (row: null, piece: piece, shopping: null),
+      for (final row in shopping) (row: null, piece: null, shopping: row),
       ...timed,
     ];
   }
@@ -383,9 +417,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
         })
         .keys
         .toSet();
+    _shoppingWay = widget.notes.store.shoppingAgenda;
     _today = _entries(agenda.today, [
       for (final row in agenda.todayRows) _place(row),
-    ]);
+    ], shopping: _shoppingRows());
     _tomorrow = _entries(agenda.tomorrow, [
       for (final row in agenda.tomorrowRows) _place(row),
     ]);
@@ -426,6 +461,43 @@ class _AgendaScreenState extends State<AgendaScreen> {
             (LockScope.of(context)?.hides(captured) ?? false)
         ? null
         : placeNote(widget.places, captured);
+  }
+
+  /// Today's rows of the Shopping Lists, the way this Device shows them:
+  /// one per Line that came back today, or one per list. A list of a
+  /// Masked Area is one row that tells nothing of its Lines.
+  List<_ShoppingRow> _shoppingRows() {
+    final way = _shoppingWay;
+    final rows = <_ShoppingRow>[];
+    for (final (:list, :lines) in _shopping.agenda(way, deviceWallClock)) {
+      final note = widget.notes.byId(list.noteId);
+      if (note == null) continue;
+      final masked = _masksNote(note);
+      final area = placeNote(widget.places, note).area;
+      final checks = _shopping.mayCheck(note.id);
+      if (way == ShoppingAgenda.lines && !masked) {
+        for (final line in lines) {
+          rows.add((
+            note: note,
+            area: area,
+            masked: false,
+            line: line,
+            count: 1,
+            checks: checks,
+          ));
+        }
+      } else {
+        rows.add((
+          note: note,
+          area: area,
+          masked: masked,
+          line: null,
+          count: lines.length,
+          checks: checks,
+        ));
+      }
+    }
+    return rows;
   }
 
   static String _sessionKey(String id, Occurrence occurrence) =>
@@ -692,6 +764,23 @@ class _AgendaScreenState extends State<AgendaScreen> {
     _reload();
   }
 
+  /// Checks the Line [lineId] of a Shopping List from its row today: it
+  /// is struck through and leaves the Agenda until it comes back.
+  void _checkShopping(String lineId) {
+    _shopping.check(lineId, deviceWallClock);
+    _reload();
+  }
+
+  /// Opens the Shopping List of [note] in its editor, its locked Area
+  /// first.
+  Future<void> _openShopping(Note note) async {
+    if (!await _openAreaOfNote(note) || !mounted) return;
+    await openNote(context, widget.notes, widget.places, note);
+    if (!mounted) return;
+    _closeAreas();
+    _reload();
+  }
+
   void _toggle(AgendaRow row) {
     if (row.done == null) {
       _routines.markDone(row.routine.id, row.occurrence);
@@ -858,6 +947,36 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
+  /// A Shopping List's row today: a Line that came back, with its box
+  /// and the list's title under it, or the list with how many Lines came
+  /// back or are open. A tap opens the list.
+  Widget _shoppingRow(AppLocalizations t, _ShoppingRow shopping) {
+    final (:note, :area, :masked, :line, :count, :checks) = shopping;
+    final title = switch (noteText(t, note).trim().split('\n').first.trim()) {
+      '' => t.shoppingHeading,
+      final title => title,
+    };
+    final shown = masked ? t.maskedShoppingList : title;
+    return _ShoppingListRow(
+      key: ValueKey(
+        line == null ? 'shopping-row-${note.id}' : 'shopping-line-${line.id}',
+      ),
+      area: masked ? null : area,
+      text: switch (line) {
+        final line? => line.text,
+        null when _shoppingWay == ShoppingAgenda.open => t.shoppingRowOpen(
+          shown,
+          count,
+        ),
+        null => t.shoppingRowBack(shown, count),
+      },
+      list: line == null ? null : title,
+      checkKey: line == null ? null : ValueKey('shopping-check-${line.id}'),
+      onCheck: line != null && checks ? () => _checkShopping(line.id) : null,
+      onTap: () => _openShopping(note),
+    );
+  }
+
   /// An appointment's row: read only, marked with its calendar's icon,
   /// colour and name; a tap unfolds its place and description, and its ⋮
   /// or a long press offers "Copy into a Note".
@@ -995,7 +1114,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
         if (entry.piece case final piece?)
           _appointmentRow(t, locale, piece)
         else if (entry.row case final placed?)
-          _occurrenceRow(t, locale, placed),
+          _occurrenceRow(t, locale, placed)
+        else if (entry.shopping case final shopping?)
+          _shoppingRow(t, shopping),
     ];
     // Swipe left opens the notes browser, as the magnifier does.
     return BrowserSwipes(
@@ -1499,6 +1620,122 @@ class _OccurrenceRow extends StatelessWidget {
                         ),
                     ],
                   ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A Shopping List's row today as an embossed row, its Area's colour
+/// and icon on it: a Line that came back today with its box and the
+/// list's title under it, or the list with the cart. Tapping it opens
+/// the list.
+class _ShoppingListRow extends StatelessWidget {
+  final Area? area;
+  final String text;
+
+  /// The list's title under a Line's text; null on a row of the list.
+  final String? list;
+
+  /// The box's key on a Line's row; null on a row of the list, which has
+  /// no box.
+  final Key? checkKey;
+
+  /// Checks the Line; the box is disabled when null.
+  final VoidCallback? onCheck;
+  final VoidCallback onTap;
+
+  const _ShoppingListRow({
+    super.key,
+    required this.area,
+    required this.text,
+    required this.list,
+    required this.checkKey,
+    required this.onCheck,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final styles = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    final colour = areaColour(area?.colour);
+    final list = this.list;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Embossed(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          // The row's ink shows on the card, not under it.
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: onTap,
+              child: Container(
+                decoration: colour == null
+                    ? null
+                    : BoxDecoration(
+                        border: Border(
+                          left: BorderSide(color: colour, width: 6),
+                        ),
+                      ),
+                padding: const EdgeInsets.fromLTRB(4, 4, 16, 4),
+                child: Row(
+                  children: [
+                    if (checkKey case final checkKey?)
+                      Checkbox(
+                        key: checkKey,
+                        value: false,
+                        semanticLabel: text,
+                        onChanged: switch (onCheck) {
+                          null => null,
+                          final onCheck => (_) => onCheck(),
+                        },
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.shopping_cart_outlined,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              text,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: styles.bodyLarge,
+                            ),
+                            if (list != null)
+                              Text(
+                                list,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: styles.labelMedium?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (areaIconData(area?.icon) case final icon?)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Icon(icon, size: 20, color: colour),
+                      ),
+                  ],
                 ),
               ),
             ),

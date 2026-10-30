@@ -137,6 +137,22 @@ void main() {
     expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
   });
 
+  test('the Agenda shows a row per Shopping List with Lines back until '
+      'this Device chooses another way', () {
+    final store = Store.inMemory();
+    addTearDown(store.close);
+    expect(store.shoppingAgenda, ShoppingAgenda.back);
+    for (final way in ShoppingAgenda.values) {
+      store.shoppingAgenda = way;
+      expect(store.shoppingAgenda, way);
+    }
+    store.shoppingAgenda = ShoppingAgenda.lines;
+    expect(store.localSetting('shoppingAgenda'), 'lines');
+    store.setLocalSetting('shoppingAgenda', 'sideways');
+    expect(store.shoppingAgenda, ShoppingAgenda.back);
+    expect(store.allEntries(), isEmpty, reason: 'settings are never logged');
+  });
+
   test('the two-row editor is on until this Device switches it off', () {
     final store = Store.inMemory();
     addTearDown(store.close);

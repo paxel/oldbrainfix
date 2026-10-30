@@ -29,8 +29,9 @@ use oldbrainfix_core::{
     AgendaRow, Alarms, Blob, CaptureContext, Checklist, Checklists, ClockTime, Conflict, Day, Frog,
     Frogs, Importance, Note, Notes, NotesGo, Occurrence, PersonFilter, Places, Reappear,
     Recurrence, RepeatKind, Routine, RoutineOccurrence, Routines, STARTER_SET, Schedule, Search,
-    Section, SessionRule, Sessions, ShoppingList, ShoppingLists, SigningKey, SimpleRepeat, Store,
-    Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry, dart_iso, parse_time,
+    Section, SessionRule, Sessions, ShoppingAgenda, ShoppingList, ShoppingLists, SigningKey,
+    SimpleRepeat, Store, Tallies, TallyEntry, TallyPeriod, TallyRule, UnitSystem, WireEntry,
+    dart_iso, parse_time,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -2016,6 +2017,7 @@ fn shopping_list_json(list: &ShoppingList) -> Value {
             "struck": l.struck,
             "checkedAt": l.checked_at.map(dart_iso),
             "backOn": l.back_on.map(|d| d.to_string()),
+            "cameBackOn": l.came_back_on.map(|d| d.to_string()),
             "order": l.order,
         })).collect::<Vec<_>>(),
         "count": list.count(),
@@ -2046,8 +2048,22 @@ fn shopping_lists_come_to_what_the_dart_core_says() -> TestResult {
             plain.insert(id.clone(), json!(ShoppingLists::plain_text(&title, &list)));
             shown.insert(id, shopping_list_json(&list));
         }
+        let mut agenda = serde_json::Map::new();
+        for way in ShoppingAgenda::ALL {
+            let rows: Vec<Value> = lists
+                .agenda(way, &wall)?
+                .iter()
+                .map(|a| {
+                    json!({
+                        "lines": a.lines.iter().map(|l| l.id.clone()).collect::<Vec<_>>(),
+                        "note": a.list.note_id,
+                    })
+                })
+                .collect();
+            agenda.insert(way.code().to_string(), json!(rows));
+        }
         assert_eq!(store.all_entries()?.len(), before, "reading writes nothing");
-        at.push(json!({"now": now, "lists": shown, "plain": plain}));
+        at.push(json!({"now": now, "lists": shown, "plain": plain, "agenda": agenda}));
     }
     assert_eq!(json!(at), expected["at"]);
     let read_at = read_json(&dir.join("expected.json"))?;

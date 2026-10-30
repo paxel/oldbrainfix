@@ -88,7 +88,9 @@ pub use search::Search;
 pub use sessions::{Session, SessionMarks, SessionOccurrence, SessionPick, SessionRule, Sessions};
 pub use settings::DeviceSettings;
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
-pub use shopping_lists::{Reappear, ShoppingLine, ShoppingList, ShoppingLists};
+pub use shopping_lists::{
+    Reappear, ShoppingAgenda, ShoppingAgendaList, ShoppingLine, ShoppingList, ShoppingLists,
+};
 pub use signing::{ImportReport, KeyRecord, KeyTrust, PinnedKey, SigningKey};
 pub use store::{Clock, Fields, IdMaker, MomentRow, RefusalMark, RefusedRun, Store};
 pub use sync::Moment;

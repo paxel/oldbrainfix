@@ -113,7 +113,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   the "x Sent Items waiting" line while a stranger's Sent Item waits for
   "Show", then the "x shared Areas waiting" line while an offered Area
   waits for Accept or Decline, then today's all-day Occurrences, then the
-  all-day appointments of the calendars picked, then today's timed
+  all-day appointments of the calendars picked, then the Shopping Lists'
+  rows as Settings of this Device choose (today only), then today's timed
   Occurrences and timed appointments together by time (an Occurrence
   before an appointment at the same time), then the "Eat a frog" section
   while today's pick holds a Frog (never above what is due). Every later

@@ -7,6 +7,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::entry::{dart_iso, parse_time};
 use crate::nudges::QuietHours;
 use crate::schedule::ClockTime;
+use crate::shopping_lists::ShoppingAgenda;
 use crate::store::Store;
 use crate::tally_units::{self, UnitSystem};
 use crate::{Error, Result};
@@ -23,6 +24,7 @@ const CAPTURE_HOTKEY: &str = "captureHotkey";
 const PLAYBACK_SPEED: &str = "playbackSpeed";
 const ALARM_SOUND: &str = "alarmSound";
 const UNIT_SYSTEM: &str = "unitSystem";
+const SHOPPING_AGENDA: &str = "shoppingAgenda";
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
@@ -241,6 +243,18 @@ impl<'a> DeviceSettings<'a> {
             .unwrap_or_else(|| tally_units::system_for_region(region)))
     }
 
+    /// How this Device's Agenda shows Shopping Lists; one row per list on
+    /// a day when Lines came back unless another way was chosen.
+    pub fn shopping_agenda(&self) -> Result<ShoppingAgenda> {
+        Ok(ShoppingAgenda::read(
+            self.store.local_setting(SHOPPING_AGENDA)?.as_deref(),
+        ))
+    }
+
+    pub fn set_shopping_agenda(&self, way: ShoppingAgenda) -> Result<()> {
+        self.store.set_local_setting(SHOPPING_AGENDA, way.code())
+    }
+
     /// How fast this Device plays voice recordings: one of
     /// [`PLAYBACK_SPEEDS`], normal speed when none was chosen. The one
     /// Device setting a Backup carries (ADR 0016).
@@ -345,6 +359,26 @@ mod tests {
         assert_eq!(settings.alarm_sound()?, None);
         store.set_local_setting(ALARM_SOUND, "")?;
         assert_eq!(settings.alarm_sound()?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn the_agenda_shows_a_row_per_shopping_list_with_lines_back_until_another_way_is_chosen()
+    -> Result<()> {
+        let store = crate::store::tests::store();
+        let settings = DeviceSettings::new(&store);
+        assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
+        for way in ShoppingAgenda::ALL {
+            settings.set_shopping_agenda(way)?;
+            assert_eq!(settings.shopping_agenda()?, way);
+        }
+        settings.set_shopping_agenda(ShoppingAgenda::Lines)?;
+        assert_eq!(
+            store.local_setting(SHOPPING_AGENDA)?.as_deref(),
+            Some("lines")
+        );
+        store.set_local_setting(SHOPPING_AGENDA, "sideways")?;
+        assert_eq!(settings.shopping_agenda()?, ShoppingAgenda::Back);
         Ok(())
     }
 

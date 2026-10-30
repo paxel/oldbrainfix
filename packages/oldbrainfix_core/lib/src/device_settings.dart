@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'nudges.dart';
 import 'schedule.dart';
+import 'shopping_lists.dart';
 import 'store.dart';
 import 'tally_units.dart';
 
@@ -32,6 +33,7 @@ extension DeviceSettings on Store {
   static const _playbackSpeed = 'playbackSpeed';
   static const _alarmSound = 'alarmSound';
   static const _unitSystem = 'unitSystem';
+  static const _shoppingAgenda = 'shoppingAgenda';
 
   /// The Re-nag interval when nothing else is set.
   static const defaultRenag = Duration(minutes: 10);
@@ -208,6 +210,14 @@ extension DeviceSettings on Store {
   /// reports.
   UnitSystem unitSystem(String? region) =>
       chosenUnitSystem ?? TallyUnits.systemForRegion(region);
+
+  /// How this Device's Agenda shows Shopping Lists; one row per list on
+  /// a day when Lines came back unless another way was chosen.
+  ShoppingAgenda get shoppingAgenda =>
+      ShoppingAgenda.read(localSetting(_shoppingAgenda));
+
+  set shoppingAgenda(ShoppingAgenda way) =>
+      setLocalSetting(_shoppingAgenda, way.name);
 
   /// How fast this Device plays voice recordings: one of
   /// [playbackSpeeds], normal speed when none was chosen. The one Device

@@ -1215,6 +1215,7 @@ Map<String, Object?> _shoppingList(ShoppingList list) => {
         'struck': l.struck,
         'checkedAt': l.checkedAt?.toIso8601String(),
         'backOn': l.backOn?.toString(),
+        'cameBackOn': l.cameBackOn?.toString(),
         'order': l.order,
       },
   ],
@@ -1237,7 +1238,8 @@ final _shoppingMoments = [
 ];
 
 /// Each Shopping List of [store] at each of [_shoppingMoments] on the
-/// European wall clock, with the text each goes back to as a plain Note,
+/// European wall clock, with the text each goes back to as a plain Note
+/// and the lists on the Agenda each way,
 /// which Notes may become one, the Routines with what is Done, and how
 /// reappear times and names are read. Leaves the clock held as it was.
 Map<String, Object?> _shoppingLists(Store store) {
@@ -1258,6 +1260,16 @@ Map<String, Object?> _shoppingLists(Store store) {
           'plain': {
             for (final MapEntry(:key, :value) in shown.entries)
               key: ShoppingLists.plainText(Notes(store).byId(key)!.text, value),
+          },
+          'agenda': {
+            for (final way in ShoppingAgenda.values)
+              way.name: [
+                for (final (:list, :lines) in lists.agenda(way, _frogDay(0)))
+                  {
+                    'note': list.noteId,
+                    'lines': [for (final l in lines) l.id],
+                  },
+              ],
           },
         };
       }(),
@@ -5667,8 +5679,10 @@ Future<void> main(List<String> args) async {
     'after, on the same clock.\n'
     '- `shopping-lists/shopping.json`: each Shopping List of the '
     '`shopping-lists` log with its Lines in the order they show, their '
-    'reappear times, which are struck and the day each comes back, and the '
-    'text each goes back to as a plain Note, read at moments around the '
+    'reappear times, which are struck, the day each comes back and the day '
+    'an open one came back, the text each goes back to as a plain Note, and '
+    'the lists on the Agenda each way it may show them, read at moments '
+    'around the '
     'starts of the days they come back on the same clock; which Notes are '
     'one and may become one, the Routines with what is Done, reappear '
     'times read, and names as an added one is compared.\n'
