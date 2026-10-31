@@ -218,7 +218,7 @@ Every Profile the user's Devices know, listed on the Profile page.
 _Avoid_: contacts, friends
 
 **Profile card**:
-A person's own Profile, without the picture, sent as a link through any messenger or shown as a QR. Opening it adds the person to People, not verified unless the QR was scanned in person; it never shares an Area. German: Profilkarte.
+A person's own Profile, sent as a small file with the picture through any messenger, or shown as a QR without it. Opening it adds the person to People, not verified unless the QR was scanned in person; it never shares an Area. German: Profilkarte.
 _Avoid_: business card, contact card, invite
 
 **Block**:

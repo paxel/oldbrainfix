@@ -110,6 +110,8 @@ The first start asks first whether this is a new user, a Device of one's own bei
 
 ## Profile cards (#107)
 
+Amended by #144, below: a card is sent as a file, with the picture; the link remains only what the QR holds.
+
 A person can add another without meeting them or a computer: each sends their own Profile card through any messenger, or shows it as a QR. Both cores make and open cards the same way (`profile_cards.dart`, `cards.rs`).
 
 A card is the link `https://paxel.github.io/oldbrainfix/p#<payload>.<signature>`, both parts base64url without padding; what follows the `#` never reaches a server. The payload is one JSON object, keys sorted and no spaces, the same bytes from both cores: `{"back":true,"format":1,"key":<key record>,"profile":<signed Profile>}`. `key` is the key record of the Device that made the card, with its X25519 key (ADR 0015); `profile` is the own Profile as it goes to other people, its record without the picture and signed again by that Device, with the binding and no aliases; `back` is there only on a card made to answer one the user opened. The signature is that Device's, over `oldbrainfix:profile-card:` followed by the payload as sent, so a card changed anywhere, its flag included, reads as no card. The picture stays out because a 256 × 256 JPEG does not fit a QR; a one-Device Profile with a 40-code-point name makes a link of under 1,300 characters.
@@ -137,6 +139,31 @@ At the same version, a record with a picture now replaces one without, before th
 - A Device whose key is not bound to its Profile yet, one that took a Profile over before the binding reached it, makes no card; the next sync with another of the user's Devices binds it.
 - The key a card pins goes out with every other pinned key in LAN sessions, as keys always have (ADR 0002): a person of a Shared Area who knows that Device's key can tell the user added its owner.
 - Each further Device in the binding adds about 270 characters to the link.
+
+## Profile card files (#144)
+
+A link opens the app only once the site publishes `assetlinks.json` for every signing key, so a card link tapped in a messenger opened the docs page instead. "Send my Profile" therefore sends a small file, `Ann.obfcard`, which the phone and the desktop open as they open a Sent Item; the QR stays as it is, and nothing sent involves the website.
+
+The file is one JSON object, keys sorted and no spaces, the same bytes from both cores: `{"card":"<payload>.<signature>","type":"oldbrainfix-card"}`. `card` is a card as above, made the same way but for one thing: its record is the own record as kept, picture and all, still signed again by the Device that makes the card, so the person shows with their picture at once. Its signature covers the payload as before; nothing outside `card` is signed, and nothing outside it is read but `type` and `format`. `type` tells a card file from a Sent Item or a bundle, which apps that sniff a file opened from elsewhere need, since a Sent Item is JSON too (`looksLikeProfileCard`, `looks_like_profile_card`). `format` follows ADR 0019 and 0034: absent or the whole number 1 is this version's, and 1 is never written; anything else, `2`, `"1"`, `1.0` or `null`, is a later version, and the file says "made by a newer version" (`CardTaken.needsUpdate`, `CardTaken::NeedsUpdate`) instead of being read. A file larger than 1 MiB, one that is no JSON object, has another or no `type`, or holds a card that is no `<payload>.<signature>` or does not check out, is no card (`unreadable`); the link prefix is not accepted inside a file. A file that reads goes the way a link goes, unchanged: the same checks, the same refusals of one's own card, a blocked person's and a copied id, the same "Send yours back" and `back`. A file is never in person, so the person stays not verified until the codes are compared.
+
+The file is named after the own Profile's name (`profileCardFileName`, `file_name`): sanitised as a name is, each of `/ \ : * ? " < > |` made `_`, blanks and full stops taken off both ends, `_` put before a name Windows keeps for a device (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, before the first full stop, in any case), and `Profile` for a name with nothing left; the ending is `.obfcard`, shared as `application/vnd.oldbrainfix.card` beside the Sent Item's `application/vnd.oldbrainfix.item` and the bundle's `application/vnd.oldbrainfix.sync`.
+
+### Considered options
+
+- The picture left out of the file as of the QR (rejected: a file has room, and without it the person shows the placeholder until their first Sent Item or Shared Area).
+- The own signed record passed on as it is, with the signature of whichever own Device made it (rejected: the card re-signs its record whichever form it takes, and the bytes of the record are the same either way, so the full Profile still replaces nothing).
+- The file as the link's text (rejected: a picture makes the card far larger than the 16 KiB a pasted text is read up to, and a text file says nothing of what it is, so a wrong one could not be told apart).
+- The payload as JSON inside the file rather than as base64url (rejected: the signature would cover bytes the two cores' JSON writers would have to reproduce exactly; the card as sent keeps them exact, and the QR and the file share one reader).
+- A new outcome "not a Profile card" beside `unreadable` (rejected: the apps already say "This is not a Profile card, or it was changed on the way" for it).
+- The person's id or the date in the file name, as a Sent Item's says only the date (rejected: the receiver should see whose card it is before opening it; the name is what the card shows anyway).
+
+### Consequences
+
+- A card file is about 1 KB and, with a picture, about twice the picture's JPEG besides (base64 inside the record, base64url around the payload), a few tens of kilobytes for a photo; far under the 1 MiB read.
+- Opening the file after the QR's card brings the picture (a record with a picture replaces one without at the same version); the QR's card after the file changes nothing.
+- Cards sent as links before, and links pasted, still open: the reader of a card's text is unchanged.
+- A QR read by the camera app of the phone rather than by Old Brain Fix leads to the address in the link, which shows nothing once the page is gone; the app's own scanner reads only what follows the `#`.
+- A crafted file holding a lone surrogate or nesting deeper than serde_json reads may be "made by a newer version" in the Dart core and unreadable in the Rust core; both refuse it.
 
 ## Areas shared from afar (#108)
 

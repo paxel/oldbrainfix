@@ -434,6 +434,7 @@ pub fn card_answer(t: &L10n, taken: CardTaken) -> Option<&str> {
         CardTaken::Blocked => Some(t.card_blocked()),
         CardTaken::Refused => Some(t.card_refused()),
         CardTaken::Unreadable => Some(t.card_unreadable()),
+        CardTaken::NeedsUpdate => Some(t.sent_item_needs_update()),
     }
 }
 

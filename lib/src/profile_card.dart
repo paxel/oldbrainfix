@@ -124,6 +124,7 @@ Future<void> showCardOpened(
     CardTaken.blocked => (t.cardBlocked, t.blockedFix),
     CardTaken.refused => (t.cardRefused, t.cardRefusedFix),
     CardTaken.unreadable => (t.cardUnreadableCause, t.cardAskAgainFix),
+    CardTaken.needsUpdate => (t.sentItemNeedsUpdate, t.updateOpenAgainFix),
   };
   final id = opened.id;
   if (why != null || id == null) {

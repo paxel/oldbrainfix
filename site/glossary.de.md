@@ -216,7 +216,7 @@ Alle Profile, die deine Geräte kennen, aufgelistet auf der Profilseite.
 _Avoid_: Kontakte, Freunde
 
 **Profilkarte** [Profile card]:
-Das eigene Profil eines Menschen, ohne Bild, als Link über einen beliebigen Messenger geschickt oder als QR-Code gezeigt. Wer sie öffnet, hat den Menschen unter Menschen, nicht bestätigt, außer der QR-Code wurde vor Ort gescannt; sie teilt nie einen Bereich.
+Das eigene Profil eines Menschen, als kleine Datei mit Bild über einen beliebigen Messenger geschickt oder ohne Bild als QR-Code gezeigt. Wer sie öffnet, hat den Menschen unter Menschen, nicht bestätigt, außer der QR-Code wurde vor Ort gescannt; sie teilt nie einen Bereich.
 _Avoid_: Visitenkarte, Kontaktkarte, Einladung
 
 **Blockieren** [Block]:

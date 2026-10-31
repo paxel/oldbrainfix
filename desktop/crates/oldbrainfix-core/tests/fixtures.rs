@@ -5130,6 +5130,70 @@ fn profile_cards_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
 }
 
 #[test]
+fn profile_card_files_go_as_the_dart_core_makes_and_opens_them() -> TestResult {
+    let fixture = read_json(&fixtures().join("cards").join("card-files.json"))?;
+    let at = Utc
+        .with_ymd_and_hms(2026, 3, 1, 9, 0, 0)
+        .single()
+        .ok_or("a time")?;
+    let ada = Store::in_memory(Box::new(move || at), || Ok(writer_key()))?;
+    let ben = Store::in_memory(Box::new(move || at), || Ok(joiner_key()))?;
+    for (store, which) in [(&ada, "maker"), (&ben, "receiver")] {
+        for (key, value) in fixture[which].as_object().ok_or(which)? {
+            store.set_local_setting(key, value.as_str().ok_or("a value")?)?;
+        }
+    }
+    // The same Profile signs to the same files, byte for byte.
+    let text = |bytes: Option<Vec<u8>>| bytes.map(String::from_utf8).transpose();
+    assert_eq!(json!(text(ada.profile_card_file(false)?)?), fixture["file"]);
+    assert_eq!(json!(text(ada.profile_card_file(true)?)?), fixture["back"]);
+    assert_eq!(
+        json!(text(ben.profile_card_file(true)?)?),
+        fixture["answer"]
+    );
+    let names = fixture["names"].as_array().ok_or("names")?;
+    for pair in names {
+        let name = pair[0].as_str().ok_or("a name")?;
+        assert_eq!(
+            json!(oldbrainfix_core::cards::file_name(name)),
+            pair[1],
+            "{name:?}"
+        );
+    }
+    assert_eq!(names.len(), 12);
+    let steps = fixture["steps"].as_array().ok_or("steps")?;
+    for step in steps {
+        let case = step["case"].as_str().ok_or("a case")?;
+        let store = if step["store"] == "maker" { &ada } else { &ben };
+        let opened = if let Some(file) = step["openFile"].as_str() {
+            Some(store.open_profile_card_file(&BASE64.decode(file)?)?)
+        } else if let Some(text) = step["open"].as_str() {
+            Some(store.open_profile_card(text, false)?)
+        } else {
+            store.block_person(step["block"].as_str().ok_or("an id")?, false)?;
+            None
+        };
+        let out = opened.map_or(Value::Null, |opened| {
+            json!({
+                "taken": opened.taken.name(),
+                "id": opened.id,
+                "offerBack": opened.offer_back,
+            })
+        });
+        assert_eq!(out, step["out"], "{case}");
+        assert_eq!(card_people(store)?, step["people"], "{case}");
+        let keys: serde_json::Map<String, Value> = store
+            .local_settings_with_prefix("key:")?
+            .into_iter()
+            .map(|(k, v)| (k, json!(v)))
+            .collect();
+        assert_eq!(Value::Object(keys), step["keys"], "{case}");
+    }
+    assert_eq!(steps.len(), 15);
+    Ok(())
+}
+
+#[test]
 fn entries_of_a_later_version_are_kept_and_passed_on_byte_for_byte() -> TestResult {
     use oldbrainfix_core::signing::{ImportReport, KeyRecord};
     let dir = fixtures().join("versions");

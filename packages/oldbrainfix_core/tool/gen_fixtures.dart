@@ -5615,6 +5615,156 @@ void _cardsFixture(Directory root) {
   }
 }
 
+/// Profile card files (#144): Ada (the writer's key) with a picture
+/// makes her card file and the one answering another, Ben (the joiner's
+/// key) his answering hers; the file names of a few names; then Ben opens
+/// files in turn, none, of another type, changed, of later formats, hers
+/// through a messenger, with `format` 1 written out, the QR's card after
+/// it, his own, and hers after he blocked her, and Ada his answer. The
+/// id maker is put back after, so the fixtures after this one keep their
+/// ids.
+void _cardFilesFixture(Directory root) {
+  final dir = Directory('${root.path}/cards');
+  DateTime clock() => DateTime.utc(2026, 3, 1, 9);
+  final idMaker = Store.idMaker;
+  var ids = 0;
+  Store.idMaker = () => (++ids).toRadixString(16).padLeft(32, '0');
+  final ada = Store.inMemory(
+    clock: clock,
+    newKey: () => SigningKey.fromSeed(_seed),
+  );
+  final ben = Store.inMemory(
+    clock: clock,
+    newKey: () => SigningKey.fromSeed(_joinerSeed),
+  );
+  try {
+    ada
+      ..applyProfileDefaults(name: 'Ada')
+      ..setOwnProfilePicture(
+        makeProfilePicture(_gradient(320, 240), left: 40, top: 0, size: 240),
+      );
+    ben.applyProfileDefaults(name: 'Ben');
+    Map<String, String> settings(Store store) => {
+      for (final (key, value) in store.localSettingsWithPrefix('profile'))
+        key: value,
+    };
+    final makerSettings = settings(ada);
+    final receiverSettings = settings(ben);
+    final file = ada.profileCardFile()!;
+    final back = ada.profileCardFile(back: true)!;
+    final answer = ben.profileCardFile(back: true)!;
+    final adaId = ada.ownProfile!.id;
+    final json = jsonDecode(utf8.decode(file)) as Map<String, Object?>;
+    final card = json['card']! as String;
+    final parts = card.split('.');
+    final payload = utf8.decode(
+      base64Url.decode(base64Url.normalize(parts[0])),
+    );
+    final flagged = jsonEncode({
+      'back': true,
+      ...jsonDecode(payload) as Map<String, Object?>,
+    });
+    final changed =
+        '${base64Url.encode(utf8.encode(flagged)).replaceAll('=', '')}'
+        '.${parts[1]}';
+    List<int> encoded(Map<String, Object?> json) =>
+        utf8.encode(jsonEncode(json));
+
+    final steps = <Map<String, Object?>>[];
+    void step(String what, Map<String, Object?> op, Store store, Object? out) =>
+        steps.add({
+          'case': what,
+          ...op,
+          'out': out,
+          'people': _cardPeople(store),
+          'keys': {
+            for (final (key, value) in store.localSettingsWithPrefix('key:'))
+              key: value,
+          },
+        });
+    Map<String, Object?> opened(CardOpened o) => {
+      'taken': o.taken.name,
+      'id': o.id,
+      'offerBack': o.offerBack,
+    };
+    void open(String what, Store store, List<int> bytes) => step(
+      what,
+      {
+        'store': store == ada ? 'maker' : 'receiver',
+        'openFile': base64.encode(bytes),
+      },
+      store,
+      opened(store.openProfileCardFile(bytes)),
+    );
+    open('no JSON', ben, utf8.encode('hello'));
+    open('no type', ben, encoded({'card': card}));
+    open(
+      'another type',
+      ben,
+      encoded({'card': card, 'type': 'oldbrainfix-backup'}),
+    );
+    open(
+      'changed after it was signed',
+      ben,
+      encoded({...json, 'card': changed}),
+    );
+    for (final format in [2, '1', 1.0, null]) {
+      open(
+        'format ${jsonEncode(format)}',
+        ben,
+        encoded({...json, 'format': format}),
+      );
+    }
+    open('through a messenger', ben, file);
+    open('format 1 written out', ben, encoded({...json, 'format': 1}));
+    final qr = ada.profileCard()!;
+    step(
+      'the QR\'s card after it',
+      {'store': 'receiver', 'open': qr},
+      ben,
+      opened(ben.openProfileCard(qr)),
+    );
+    open('his own', ben, answer);
+    open('his answer', ada, answer);
+    ben.blockPerson(adaId);
+    step('blocked', {'store': 'receiver', 'block': adaId}, ben, null);
+    open('a blocked person\'s', ben, file);
+
+    const names = [
+      'Ada',
+      'Ann Berg',
+      'a/b\\c:d*e?f"g<h>i|j',
+      '  ..Ann..  ',
+      '...',
+      '',
+      '​',
+      'con',
+      'COM1',
+      'Nul .x',
+      'COM0',
+      'Zoë \u{1F600}',
+    ];
+    _write(
+      File('${dir.path}/card-files.json'),
+      '${_json.convert({
+        'maker': makerSettings,
+        'receiver': receiverSettings,
+        'file': utf8.decode(file),
+        'back': utf8.decode(back),
+        'answer': utf8.decode(answer),
+        'names': [
+          for (final name in names) [name, profileCardFileName(name)],
+        ],
+        'steps': steps,
+      })}\n',
+    );
+  } finally {
+    ada.close();
+    ben.close();
+    Store.idMaker = idMaker;
+  }
+}
+
 void _profilesFixture(Directory root) {
   final dir = Directory('${root.path}/profiles');
   final writer = SigningKey.fromSeed(_seed).publicKey;
@@ -7377,7 +7527,16 @@ Future<void> main(List<String> args) async {
     'blocked her), Ben taking her Profile with its picture at the same '
     'version, and his block, each with what came of it, the `person:` '
     'settings after (a picture made again only noted) and the keys pinned '
-    '(`cards.json`).\n'
+    '(`cards.json`). Profile card files (#144), from the same Profiles '
+    'made afresh: her file, her file answering another and his answering '
+    'hers, as text; the file names of a few names (`names`, each the name '
+    'and its file name); then each step in turn: a file opened by Ben, '
+    'base64 in `openFile` (no JSON, no type, another type, a card changed '
+    'after it was signed, `format` 2, `"1"`, `1.0` and `null`, hers, hers '
+    'with `format` 1 written out, his own, hers after he blocked her), or '
+    'by Ada for his answer, her QR\'s card after hers and his block, each '
+    'with what came of it, the `person:` settings and the keys pinned '
+    '(`card-files.json`).\n'
     '- `block/`: Ann shares her Household with Carol as a Member and '
     'joins the School Carol manages; Carol writes a Note with a photo and '
     'its Photo Text, Amends Ann\'s Note and checks off Ann\'s Routine, and '
@@ -7476,6 +7635,7 @@ Future<void> main(List<String> args) async {
   }
   _profilesFixture(root);
   _cardsFixture(root);
+  _cardFilesFixture(root);
   _versionsFixture(root);
   _blockFixture(root);
   _pendingFixture(root);

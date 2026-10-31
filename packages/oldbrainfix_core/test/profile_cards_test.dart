@@ -207,6 +207,129 @@ void main() {
     expect(carol.personCode('0123456789abcdef0123456789abcdef'), isNull);
   });
 
+  group('a card file', () {
+    Map<String, Object?> fileJson(List<int> bytes) =>
+        jsonDecode(utf8.decode(bytes)) as Map<String, Object?>;
+
+    test('adds the person with the picture, not verified', () {
+      ann.setOwnProfilePicture(squareProfilePicture(halves(64, 64))!);
+      final bytes = ann.profileCardFile()!;
+      final json = fileJson(bytes);
+      expect(json.keys, ['card', 'type']);
+      expect(json['type'], 'oldbrainfix-card');
+      expect(looksLikeProfileCard(bytes), isTrue);
+      final opened = ben.openProfileCardFile(bytes);
+      expect(opened.taken, CardTaken.added);
+      expect(opened.id, idOf(ann));
+      expect(opened.offerBack, isTrue);
+      expect(ben.personVerified(idOf(ann)), isFalse);
+      expect(ben.personShown(idOf(ann)).picture, isNotNull);
+      // The QR's card after it changes nothing; the full Profile neither.
+      expect(
+        ben.openProfileCard(ann.profileCard()!).taken,
+        CardTaken.unchanged,
+      );
+      expect(ben.takePerson(ann.ownProfileForOthers), PersonTaken.unchanged);
+      // Opened after the QR's card, the file brings the picture.
+      final cara = device(clock, 'Cara');
+      cara.openProfileCard(ann.profileCard()!);
+      expect(cara.personShown(idOf(ann)).picture, isNull);
+      expect(cara.openProfileCardFile(bytes).taken, CardTaken.updated);
+      expect(cara.personShown(idOf(ann)).picture, isNotNull);
+      // The answer offers none; one's own and a blocked person's keep
+      // nothing.
+      final back = ann.openProfileCardFile(ben.profileCardFile(back: true)!);
+      expect(back.taken, CardTaken.added);
+      expect(back.offerBack, isFalse);
+      expect(ann.openProfileCardFile(bytes).taken, CardTaken.own);
+      ben.blockPerson(idOf(ann));
+      expect(ben.openProfileCardFile(bytes).taken, CardTaken.blocked);
+    });
+
+    test('that is none, or holds a changed card, is unreadable', () {
+      final bytes = ann.profileCardFile()!;
+      final card = fileJson(bytes)['card']! as String;
+      final payload = jsonDecode(payloadOf('#$card')) as Map<String, Object?>;
+      final flagged = jsonEncode({'back': true, ...payload});
+      final changed = '${_b64(utf8.encode(flagged))}.${sigOf(card)}';
+      final unreadable = [
+        utf8.encode('hello'),
+        <int>[],
+        [0xff, 0xfe],
+        utf8.encode(jsonEncode({'card': card})),
+        utf8.encode(jsonEncode({'card': card, 'type': 'oldbrainfix-backup'})),
+        utf8.encode(jsonEncode({'card': changed, 'type': 'oldbrainfix-card'})),
+        utf8.encode(
+          jsonEncode({
+            'card': '$profileCardLink$card',
+            'type': 'oldbrainfix-card',
+          }),
+        ),
+        utf8.encode(jsonEncode({'card': 1, 'type': 'oldbrainfix-card'})),
+        [...bytes, ...List.filled(maxProfileCardFileBytes, 0x20)],
+      ];
+      for (final wrong in unreadable) {
+        expect(ben.openProfileCardFile(wrong), (
+          taken: CardTaken.unreadable,
+          id: null,
+          offerBack: false,
+        ));
+      }
+      expect(looksLikeProfileCard(unreadable[0]), isFalse);
+      expect(looksLikeProfileCard(unreadable[3]), isFalse);
+      expect(looksLikeProfileCard(unreadable[8]), isFalse);
+      expect(ben.keptPeople, isEmpty);
+      final fits = [
+        ...bytes,
+        ...List.filled(maxProfileCardFileBytes - bytes.length, 0x20),
+      ];
+      expect(ben.openProfileCardFile(fits).taken, CardTaken.added);
+    });
+
+    test('of a later format needs an update', () {
+      final json = fileJson(ann.profileCardFile()!);
+      for (final format in [2, '1', 1.0, null, 0]) {
+        final bytes = utf8.encode(jsonEncode({...json, 'format': format}));
+        expect(looksLikeProfileCard(bytes), isTrue);
+        expect(ben.openProfileCardFile(bytes), (
+          taken: CardTaken.needsUpdate,
+          id: null,
+          offerBack: false,
+        ), reason: '$format');
+      }
+      expect(ben.keptPeople, isEmpty);
+      expect(
+        ben
+            .openProfileCardFile(
+              utf8.encode(jsonEncode({...json, 'format': 1})),
+            )
+            .taken,
+        CardTaken.added,
+      );
+    });
+
+    test('is named for the person', () {
+      const names = {
+        'Ann': 'Ann.obfcard',
+        'Ann Berg': 'Ann Berg.obfcard',
+        'a/b\\c:d*e?f"g<h>i|j': 'a_b_c_d_e_f_g_h_i_j.obfcard',
+        '  ..Ann..  ': 'Ann.obfcard',
+        '...': 'Profile.obfcard',
+        '': 'Profile.obfcard',
+        '​': 'Profile.obfcard',
+        'con': '_con.obfcard',
+        'COM1': '_COM1.obfcard',
+        'Nul .x': '_Nul .x.obfcard',
+        'COM0': 'COM0.obfcard',
+        'Connie': 'Connie.obfcard',
+        'Zoë \u{1F600}': 'Zoë \u{1F600}.obfcard',
+      };
+      for (final MapEntry(key: name, value: file) in names.entries) {
+        expect(profileCardFileName(name), file, reason: name);
+      }
+    });
+  });
+
   group('what a card shares', () {
     test('the Profile and the Device\'s public keys, nothing else', () {
       final payload = jsonDecode(payloadOf(ann.profileCard()!)) as Map;

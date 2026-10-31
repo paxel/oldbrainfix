@@ -1,18 +1,22 @@
 //! Profile cards, as the Dart core's `profile_cards.dart` makes and
-//! opens them (ADR 0017, #107): a person sends their own Profile as a
-//! link through any messenger, or shows it as a QR, and whoever opens it
-//! has them in People. The card follows the `#` of [`LINK`], which never
-//! reaches a server: `<payload>.<signature>`, both base64url without
-//! padding. The payload is one JSON object, keys sorted and no spaces,
-//! the same bytes from both cores:
+//! opens them (ADR 0017, #107, #144): a person sends their own Profile
+//! as a small file through any messenger, or shows it as a QR, and
+//! whoever opens it has them in People. The card is
+//! `<payload>.<signature>`, both base64url without padding; the QR holds
+//! it after the `#` of [`LINK`], which never reaches a server. The
+//! payload is one JSON object, keys sorted and no spaces, the same bytes
+//! from both cores:
 //! `{"back":true,"format":1,"key":<key record>,"profile":<signed Profile>}`.
 //! `key` is the key record of the Device that made the card (ADR 0015),
-//! `profile` the own Profile as it goes to other people with its picture
-//! left out and no aliases, its record signed again by that Device;
-//! `back` is there when the card answers one the user opened. The
-//! signature is that Device's, over [`card_bytes`] of the payload as
-//! sent, and its key must be bound to the Profile. A card adds a person
-//! and nothing else: no Area, no grant, no key but the public ones.
+//! `profile` the own Profile as it goes to other people with no aliases,
+//! its record signed again by that Device: the record as kept in a file,
+//! without its picture in the QR; `back` is there when the card answers
+//! one the user opened. The signature is that Device's, over
+//! [`card_bytes`] of the payload as sent, and its key must be bound to
+//! the Profile. The file ([`Store::profile_card_file`]) is
+//! `{"card":<card>,"type":"oldbrainfix-card"}`, keys sorted and no
+//! spaces. A card adds a person and nothing else: no Area, no grant, no
+//! key but the public ones.
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -21,17 +25,94 @@ use serde_json::{Map, Value};
 
 use crate::Result;
 use crate::people::PersonTaken;
-use crate::profile::{OwnProfile, Profile, SignedProfile, chain, check, record_bytes, short_code};
+use crate::profile::{
+    OwnProfile, Profile, SignedProfile, chain, check, record_bytes, sanitize_name, short_code,
+};
 use crate::signing::{ImportReport, KeyRecord, verify_signature};
 use crate::store::Store;
 
-/// The address a card goes out under; the card follows the `#`.
+/// The address a QR's card goes out under; the card follows the `#`.
 pub const LINK: &str = "https://paxel.github.io/oldbrainfix/p#";
 
-/// The most characters of a card that are read at all.
+/// The most characters of a card's text that are read at all.
 pub const MAX_CHARS: usize = 16 * 1024;
 
+/// The file ending of a Profile card file.
+pub const EXTENSION: &str = "obfcard";
+
+/// The type a Profile card file is shared as.
+pub const MIME_TYPE: &str = "application/vnd.oldbrainfix.card";
+
+/// A file larger than this is no Profile card: a picture received is at
+/// most 256 KB.
+pub const MAX_FILE_BYTES: usize = 1 << 20;
+
 const FORMAT: i64 = 1;
+
+/// What a Profile card file says it is.
+const FILE_TYPE: &str = "oldbrainfix-card";
+
+/// The names Windows keeps for its devices, with any ending.
+fn is_reserved_file_name(stem: &str) -> bool {
+    let upper = stem.to_ascii_uppercase();
+    matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((upper.starts_with("COM") || upper.starts_with("LPT"))
+            && upper.len() == 4
+            && matches!(upper.as_bytes().get(3), Some(b'1'..=b'9')))
+}
+
+/// The name the Profile card file of a person called `name` goes by,
+/// `Ann.obfcard`, as the Dart core's `profileCardFileName`: the name
+/// sanitised as a Profile's, each character a file name cannot hold made
+/// `_`, without blanks and full stops at either end, `_` before a name
+/// Windows keeps for a device, and `Profile` for a name with nothing
+/// left.
+pub fn file_name(name: &str) -> String {
+    let replaced: String = sanitize_name(name)
+        .chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let mut base = replaced.trim_matches([' ', '.']).to_string();
+    if base.is_empty() {
+        base = "Profile".to_string();
+    }
+    let stem = base
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches(' ');
+    if is_reserved_file_name(stem) {
+        base = format!("_{base}");
+    }
+    format!("{base}.{EXTENSION}")
+}
+
+/// The JSON object of the Profile card file `bytes`: one that says it is
+/// one, of any format; none for anything else or one too large.
+fn card_file_json(bytes: &[u8]) -> Option<Map<String, Value>> {
+    if bytes.len() > MAX_FILE_BYTES {
+        return None;
+    }
+    match serde_json::from_slice(bytes).ok()? {
+        Value::Object(map) if map.get("type").and_then(Value::as_str) == Some(FILE_TYPE) => {
+            Some(map)
+        }
+        _ => None,
+    }
+}
+
+/// Whether `bytes` are a Profile card file rather than a Sent Item or a
+/// bundle, in a format this version reads or a later one, as the Dart
+/// core's `looksLikeProfileCard`.
+pub fn looks_like_profile_card(bytes: &[u8]) -> bool {
+    card_file_json(bytes).is_some()
+}
 
 /// The bytes a card's signature covers: the payload as sent.
 pub fn card_bytes(payload: &str) -> Vec<u8> {
@@ -56,6 +137,9 @@ pub enum CardTaken {
     Refused,
     /// No card, or its signatures do not hold.
     Unreadable,
+    /// A Profile card file of a format a later version writes (ADR 0034):
+    /// this app needs an update to open it.
+    NeedsUpdate,
 }
 
 impl CardTaken {
@@ -69,6 +153,7 @@ impl CardTaken {
             CardTaken::Blocked => "blocked",
             CardTaken::Refused => "refused",
             CardTaken::Unreadable => "unreadable",
+            CardTaken::NeedsUpdate => "needsUpdate",
         }
     }
 }
@@ -142,14 +227,19 @@ fn card_parts(text: &str) -> Option<(String, String)> {
     }
 }
 
-/// The card `text` holds ([`card_parts`]), checked: its key record valid
-/// and its signature over the payload as sent, before anything else of
-/// it is read; then its Profile's signatures, and its key bound to that
-/// Profile. None when any of it fails.
+/// The card `text` holds ([`card_parts`]), checked ([`check_card`]).
 fn read_card(text: &str) -> Option<Card> {
     let (payload, sig) = card_parts(text)?;
-    let payload = String::from_utf8(from_base64_url(&payload)?).ok()?;
-    let sig = from_base64_url(&sig)?;
+    check_card(&payload, &sig)
+}
+
+/// The card of `payload` and `sig`, checked: its key record valid and
+/// its signature over the payload as sent, before anything else of it is
+/// read; then its Profile's signatures, and its key bound to that
+/// Profile. None when any of it fails.
+fn check_card(payload: &str, sig: &str) -> Option<Card> {
+    let payload = String::from_utf8(from_base64_url(payload)?).ok()?;
+    let sig = from_base64_url(sig)?;
     let json: Value = serde_json::from_str(&payload).ok()?;
     let map = json.as_object()?;
     if map.get("format")?.as_i64() != Some(FORMAT) {
@@ -188,13 +278,35 @@ fn read_card(text: &str) -> Option<Card> {
 }
 
 impl Store {
-    /// The own Profile as a card's link, as the Dart core's
+    /// The own Profile as a card's link, for the QR, as the Dart core's
     /// `profileCard`: the record without its picture, signed by this
     /// Device, with the binding and this Device's key record, the whole
     /// signed by this Device; with `back` when it answers a card the
     /// user opened. None before the own Profile exists, or while this
     /// Device's key is not bound to it yet.
     pub fn profile_card(&self, back: bool) -> Result<Option<String>> {
+        Ok(self
+            .own_card(back, false)?
+            .map(|card| format!("{LINK}{card}")))
+    }
+
+    /// The own Profile as a card file, `<Name>.obfcard` ([`file_name`]),
+    /// as the Dart core's `profileCardFile`: the card as
+    /// [`Store::profile_card`] makes it, but with the record as kept,
+    /// picture and all, so the person shows with it at once. None when
+    /// [`Store::profile_card`] is.
+    pub fn profile_card_file(&self, back: bool) -> Result<Option<Vec<u8>>> {
+        Ok(self.own_card(back, true)?.map(|card| {
+            let mut map = Map::new();
+            map.insert("card".into(), Value::String(card));
+            map.insert("type".into(), FILE_TYPE.into());
+            Value::Object(map).to_string().into_bytes()
+        }))
+    }
+
+    /// The own card, `<payload>.<signature>`, with the record as kept
+    /// when `picture`, else without its picture.
+    fn own_card(&self, back: bool, picture: bool) -> Result<Option<String>> {
         let Some(own) = OwnProfile::new(self).signed()? else {
             return Ok(None);
         };
@@ -209,14 +321,18 @@ impl Store {
         {
             return Ok(None);
         }
-        let bare = Profile {
-            picture: None,
-            ..record
-        }
-        .encode();
+        let sent = if picture {
+            own.record
+        } else {
+            Profile {
+                picture: None,
+                ..record
+            }
+            .encode()
+        };
         let profile = SignedProfile {
-            sig: key.sign(&record_bytes(&bare)),
-            record: bare,
+            sig: key.sign(&record_bytes(&sent)),
+            record: sent,
             signer: me,
             first: own.first,
             keys: own.keys,
@@ -235,7 +351,7 @@ impl Store {
             .decode(key.sign(&card_bytes(&payload)))
             .map_err(|e| crate::Error::Invalid(format!("a signature: {e}")))?;
         Ok(Some(format!(
-            "{LINK}{}.{}",
+            "{}.{}",
             BASE64_URL.encode(payload.as_bytes()),
             BASE64_URL.encode(sig)
         )))
@@ -251,7 +367,44 @@ impl Store {
     /// and one that names a Profile kept here under another first key
     /// keep nothing.
     pub fn open_profile_card(&self, text: &str, in_person: bool) -> Result<CardOpened> {
-        let Some(card) = read_card(text) else {
+        self.take_card(read_card(text), in_person)
+    }
+
+    /// Opens the Profile card file `bytes` (a file tapped, opened or
+    /// dropped), as the Dart core's `openProfileCardFile` and as
+    /// [`Store::open_profile_card`] opens a link: a file that is none, is
+    /// larger than [`MAX_FILE_BYTES`] or holds a card that is changed or
+    /// not bound is unreadable, one of a later format
+    /// ([`CardTaken::NeedsUpdate`]) is not read further. Only an absent
+    /// `format` or the whole number 1 is this version's (ADR 0034). A
+    /// file is never in person: the person stays not verified.
+    pub fn open_profile_card_file(&self, bytes: &[u8]) -> Result<CardOpened> {
+        let json = card_file_json(bytes);
+        if json
+            .as_ref()
+            .and_then(|json| json.get("format"))
+            .is_some_and(|format| format.as_i64() != Some(FORMAT))
+        {
+            return Ok(CardOpened::only(CardTaken::NeedsUpdate, None));
+        }
+        let card = json
+            .as_ref()
+            .and_then(|json| json.get("card"))
+            .and_then(Value::as_str)
+            .and_then(|card| {
+                let mut parts = card.split('.');
+                match (parts.next(), parts.next(), parts.next()) {
+                    (Some(payload), Some(sig), None) => check_card(payload, sig),
+                    _ => None,
+                }
+            });
+        self.take_card(card, false)
+    }
+
+    /// Keeps the person of `card`, checked, as
+    /// [`Store::open_profile_card`] says.
+    fn take_card(&self, card: Option<Card>, in_person: bool) -> Result<CardOpened> {
+        let Some(card) = card else {
             return Ok(CardOpened::only(CardTaken::Unreadable, None));
         };
         let id = card.id.clone();
@@ -462,6 +615,174 @@ mod tests {
         );
         assert!(!ben.person_verified(&id_of(&ann)?)?);
         Ok(())
+    }
+
+    fn file(store: &Store, back: bool) -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
+        Ok(store.profile_card_file(back)?.ok_or("a card file")?)
+    }
+
+    /// The JSON of the card file `bytes`.
+    fn file_json(bytes: &[u8]) -> std::result::Result<Value, Box<dyn std::error::Error>> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
+
+    #[test]
+    fn a_card_file_adds_the_person_with_the_picture() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let picture = include_bytes!("../../../fixtures/shared/override.jpg");
+        OwnProfile::new(&ann).set_picture(Some(picture.to_vec()))?;
+        let bytes = file(&ann, false)?;
+        let json = file_json(&bytes)?;
+        assert_eq!(
+            json.as_object()
+                .ok_or("an object")?
+                .keys()
+                .collect::<Vec<_>>(),
+            ["card", "type"]
+        );
+        assert_eq!(json["type"], "oldbrainfix-card");
+        assert!(looks_like_profile_card(&bytes));
+        let opened = ben.open_profile_card_file(&bytes)?;
+        assert_eq!(opened.taken, CardTaken::Added);
+        assert_eq!(opened.id, Some(id_of(&ann)?));
+        assert!(opened.offer_back);
+        assert!(!ben.person_verified(&id_of(&ann)?)?);
+        assert!(ben.person_shown(&id_of(&ann)?)?.picture.is_some());
+        // The QR's card after it changes nothing; the full Profile neither.
+        assert_eq!(
+            ben.open_profile_card(&card(&ann, false)?, false)?.taken,
+            CardTaken::Unchanged
+        );
+        let full = ann.own_profile_for_others()?.ok_or("her Profile")?;
+        assert_eq!(ben.take_person(&full, None)?, PersonTaken::Unchanged);
+        // Opened after the QR's card, the file brings the picture.
+        let cara = device(3, "Cara")?;
+        cara.open_profile_card(&card(&ann, false)?, false)?;
+        assert!(cara.person_shown(&id_of(&ann)?)?.picture.is_none());
+        assert_eq!(
+            cara.open_profile_card_file(&bytes)?.taken,
+            CardTaken::Updated
+        );
+        assert!(cara.person_shown(&id_of(&ann)?)?.picture.is_some());
+        // The answer offers none; one's own and a blocked person's keep
+        // nothing.
+        let back = ann.open_profile_card_file(&file(&ben, true)?)?;
+        assert_eq!(back.taken, CardTaken::Added);
+        assert!(!back.offer_back);
+        assert_eq!(ann.open_profile_card_file(&bytes)?.taken, CardTaken::Own);
+        ben.block_person(&id_of(&ann)?, false)?;
+        assert_eq!(
+            ben.open_profile_card_file(&bytes)?.taken,
+            CardTaken::Blocked
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_that_is_no_card_file_or_holds_a_changed_card_is_unreadable() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let bytes = file(&ann, false)?;
+        let json = file_json(&bytes)?;
+        let card_text = json["card"].as_str().ok_or("a card")?;
+        let (payload, sig) = card_parts(card_text).ok_or("parts")?;
+        let mut flagged: Value = serde_json::from_slice(&BASE64_URL.decode(&payload)?)?;
+        flagged
+            .as_object_mut()
+            .ok_or("an object")?
+            .insert("back".into(), Value::Bool(true));
+        let changed = format!(
+            "{}.{sig}",
+            BASE64_URL.encode(flagged.to_string().as_bytes())
+        );
+        let mut padded = bytes.clone();
+        padded.resize(MAX_FILE_BYTES + 1, b' ');
+        let mut fits = bytes.clone();
+        fits.resize(MAX_FILE_BYTES, b' ');
+        let unreadable = [
+            b"hello".to_vec(),
+            Vec::new(),
+            json!({"card": card_text}).to_string().into_bytes(),
+            json!({"card": card_text, "type": "oldbrainfix-backup"})
+                .to_string()
+                .into_bytes(),
+            json!({"card": changed, "type": "oldbrainfix-card"})
+                .to_string()
+                .into_bytes(),
+            json!({"card": format!("{LINK}{card_text}"), "type": "oldbrainfix-card"})
+                .to_string()
+                .into_bytes(),
+            json!({"card": 1, "type": "oldbrainfix-card"})
+                .to_string()
+                .into_bytes(),
+            padded,
+        ];
+        for wrong in &unreadable {
+            assert_eq!(
+                ben.open_profile_card_file(wrong)?,
+                CardOpened::only(CardTaken::Unreadable, None)
+            );
+        }
+        assert!(!looks_like_profile_card(&unreadable[0]));
+        assert!(!looks_like_profile_card(&unreadable[2]));
+        assert!(!looks_like_profile_card(&unreadable[7]));
+        assert!(ben.kept_people()?.is_empty());
+        assert_eq!(ben.open_profile_card_file(&fits)?.taken, CardTaken::Added);
+        Ok(())
+    }
+
+    #[test]
+    fn a_card_file_of_a_later_format_needs_an_update() -> TestResult {
+        let ann = device(1, "Ann")?;
+        let ben = device(2, "Ben")?;
+        let json = file_json(&file(&ann, false)?)?;
+        for format in [json!(2), json!("1"), json!(1.0), Value::Null, json!(0)] {
+            let mut later = json.clone();
+            later
+                .as_object_mut()
+                .ok_or("an object")?
+                .insert("format".into(), format.clone());
+            let bytes = later.to_string().into_bytes();
+            assert!(looks_like_profile_card(&bytes));
+            assert_eq!(
+                ben.open_profile_card_file(&bytes)?,
+                CardOpened::only(CardTaken::NeedsUpdate, None),
+                "{format}"
+            );
+        }
+        assert!(ben.kept_people()?.is_empty());
+        let mut one = json.clone();
+        one.as_object_mut()
+            .ok_or("an object")?
+            .insert("format".into(), json!(1));
+        assert_eq!(
+            ben.open_profile_card_file(one.to_string().as_bytes())?
+                .taken,
+            CardTaken::Added
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_card_file_is_named_for_the_person() {
+        for (name, file) in [
+            ("Ann", "Ann.obfcard"),
+            ("Ann Berg", "Ann Berg.obfcard"),
+            ("a/b\\c:d*e?f\"g<h>i|j", "a_b_c_d_e_f_g_h_i_j.obfcard"),
+            ("  ..Ann..  ", "Ann.obfcard"),
+            ("...", "Profile.obfcard"),
+            ("", "Profile.obfcard"),
+            ("\u{200B}", "Profile.obfcard"),
+            ("con", "_con.obfcard"),
+            ("COM1", "_COM1.obfcard"),
+            ("Nul .x", "_Nul .x.obfcard"),
+            ("COM0", "COM0.obfcard"),
+            ("Connie", "Connie.obfcard"),
+            ("Zoë 😀", "Zoë 😀.obfcard"),
+        ] {
+            assert_eq!(file_name(name), file, "{name:?}");
+        }
     }
 
     #[test]
