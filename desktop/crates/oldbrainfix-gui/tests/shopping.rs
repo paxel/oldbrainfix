@@ -2,9 +2,10 @@
 //! List" in a Note's editor and in its card's ⋮ turns its lines into
 //! Lines; checking strikes a Line and moves it to the end with the day
 //! it comes back, and at the start of that day it is open at the top
-//! again; the field at the top adds Lines, a name already there bringing
-//! its Line back; the Line menu renames, sets the reappear time and
-//! deletes for good after asking once; full cards check, compact cards
+//! again; the field at the top adds Lines on Enter and on leaving, a name
+//! already there bringing its Line back, and the Lines are renamed in
+//! place (#141); the Line menu sets the reappear time and deletes for
+//! good after asking once; full cards check, compact cards
 //! count the open Lines; a Member checks and adds but changes only their
 //! own Lines; and a Line Conflict is named as a Shopping List's. Today's
 //! Agenda shows the Shopping Lists the way Settings of this Device choose
@@ -175,20 +176,54 @@ fn line_id(store: &Store, note: &str, text: &str) -> Result<String, Box<dyn std:
         .clone())
 }
 
-/// Types `text` into the add field, line by line.
-fn type_lines(harness: &mut Harness<'_, App>, lines: &[&str]) {
-    harness
-        .get_by(|n| n.placeholder() == Some("New Line"))
-        .click();
-    harness.run();
-    for (i, line) in lines.iter().enumerate() {
-        if i > 0 {
-            harness.key_press(egui::Key::Enter);
-            harness.run();
-        }
-        harness.get_by(|n| n.is_focused()).type_text(line);
+/// Types `text` into the add field.
+fn type_line(harness: &mut Harness<'_, App>, text: &str) {
+    let field = |n: &egui_kittest::kittest::AccessKitNode<'_>| {
+        n.role() == Role::MultilineTextInput && n.placeholder() == Some("New Line")
+    };
+    if !harness
+        .query_all_by(|n| n.is_focused() && field(n))
+        .any(|_| true)
+    {
+        harness.get_by(field).click();
         harness.run();
     }
+    harness.get_by(|n| n.is_focused()).type_text(text);
+    harness.run();
+}
+
+/// What the field with the keyboard holds.
+fn focused(harness: &Harness<'_, App>) -> Option<String> {
+    harness
+        .query_all_by(|n| n.is_focused())
+        .next()
+        .and_then(|n| n.value())
+}
+
+fn press(harness: &mut Harness<'_, App>, key: egui::Key) {
+    harness.key_press(key);
+    harness.run();
+}
+
+/// The field a Line is renamed in, holding `value`.
+fn line_field<'a>(
+    harness: &'a Harness<'_, App>,
+    value: &'a str,
+) -> Result<egui_kittest::Node<'a>, Box<dyn std::error::Error>> {
+    Ok(harness
+        .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some(value))
+        .next()
+        .ok_or(format!("a field holding {value:?}"))?)
+}
+
+/// Clicks into the field of the Line `value` and selects all of it.
+fn into_line(harness: &mut Harness<'_, App>, value: &str) -> TestResult {
+    line_field(harness, value)?.click();
+    harness.run();
+    assert_eq!(focused(harness).as_deref(), Some(value));
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    harness.run();
+    Ok(())
 }
 
 #[test]
@@ -279,26 +314,63 @@ fn the_add_field_adds_at_the_top_and_a_name_there_brings_its_line_back() -> Test
         .max_by(|a, b| a.rect().left().total_cmp(&b.rect().left()))
         .ok_or("Milk")?;
     assert!(field < milk.rect().top());
-    type_lines(&mut harness, &["Eggs", "  bread "]);
+    // Enter adds what was typed and leaves the field ready for the next.
+    type_line(&mut harness, "Eggs");
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Eggs", "Milk", "Apples", "✓ Bread"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    // Bread comes back, at the top, not twice.
+    type_line(&mut harness, "  bread ");
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
+    // An open name stays as it is; so does "Add".
+    type_line(&mut harness, "MILK");
     click(&mut harness, "Add")?;
-    // The first typed ends at the top; Bread comes back, not twice.
-    assert_eq!(texts(&harness, &note)?, ["Eggs", "Bread", "Milk", "Apples"]);
+    assert_eq!(texts(&harness, &note)?, ["Bread", "Eggs", "Milk", "Apples"]);
     assert!(
         harness
-            .query_by(|n| n.role() == Role::MultilineTextInput
-                && n.value().is_some_and(|v| v.contains("Eggs")))
+            .query_all_by(|n| n.role() == Role::MultilineTextInput
+                && n.value().is_some_and(|v| v.contains("MILK")))
+            .next()
             .is_none(),
         "the field is empty again"
     );
-    // An open name stays as it is.
-    type_lines(&mut harness, &["MILK"]);
-    click(&mut harness, "Add")?;
-    assert_eq!(texts(&harness, &note)?, ["Eggs", "Bread", "Milk", "Apples"]);
     Ok(())
 }
 
 #[test]
-fn the_line_menu_renames_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
+fn text_left_in_the_field_is_added_and_lines_are_renamed_in_place() -> TestResult {
+    let (store, note, _) = with_note()?;
+    ShoppingLists::new(&store).make(&note)?;
+    let other = Notes::new(&store).capture("Other", None, None)?.id;
+    let mut harness = window(&store, Some(&note));
+    // Enter ends a rename.
+    into_line(&mut harness, "Bread")?;
+    harness.get_by(|n| n.is_focused()).type_text("Rye bread");
+    harness.run();
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(texts(&harness, &note)?, ["Milk", "Rye bread", "Apples"]);
+    assert_eq!(focused(&harness), None);
+    // A rename the cursor leaves is stored; a Line left empty goes on
+    // leaving, and what is left in the field is added.
+    into_line(&mut harness, "Milk")?;
+    harness.get_by(|n| n.is_focused()).type_text("Oat milk");
+    harness.run();
+    into_line(&mut harness, "Apples")?;
+    assert_eq!(texts(&harness, &note)?, ["Oat milk", "Rye bread", "Apples"]);
+    press(&mut harness, egui::Key::Backspace);
+    type_line(&mut harness, "Butter");
+    harness.state_mut().select_note(&other);
+    harness.run();
+    assert_eq!(texts(&harness, &note)?, ["Butter", "Oat milk", "Rye bread"]);
+    Ok(())
+}
+
+#[test]
+fn the_line_menu_sets_the_reappear_time_and_deletes_for_good() -> TestResult {
     let (store, note, _) = with_note()?;
     ShoppingLists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
@@ -349,25 +421,19 @@ fn the_line_menu_renames_sets_the_reappear_time_and_deletes_for_good() -> TestRe
     tick(&mut harness, "Apples")?;
     assert_eq!(texts(&harness, &note)?, ["Bread", "✓ Milk"]);
 
+    // Renaming is typing in place: the menu has no Rename.
     click(&mut harness, "More: Bread")?;
-    click(&mut harness, "Rename")?;
-    assert!(shows(&harness, "Rename Line"));
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    assert!(!shows(&harness, "Rename"));
+    harness.key_press(egui::Key::Escape);
     harness.run();
-    harness
-        .get_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some("Bread"))
-        .type_text("Rye bread");
-    harness.run();
-    click(&mut harness, "Save")?;
-    assert_eq!(texts(&harness, &note)?, ["Rye bread", "✓ Milk"]);
 
     // Deleting asks once, with the menu's words; Cancel keeps it.
-    click(&mut harness, "More: Rye bread")?;
+    click(&mut harness, "More: Bread")?;
     click(&mut harness, "Delete")?;
     assert!(shows(&harness, "Delete this Line?"));
     click(&mut harness, "Cancel")?;
     assert_eq!(list(&harness, &note)?.count(), 2);
-    click(&mut harness, "More: Rye bread")?;
+    click(&mut harness, "More: Bread")?;
     click(&mut harness, "Delete")?;
     click(&mut harness, "Delete")?;
     assert_eq!(texts(&harness, &note)?, ["✓ Milk"]);
@@ -497,10 +563,13 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     assert!(!shows(&harness, "Back to a plain Note"));
     tick(&mut harness, "Milk")?;
     assert!(list(&harness, &note)?.lines[2].struck);
-    type_lines(&mut harness, &["Water"]);
-    click(&mut harness, "Add")?;
-    // His own Line is his to change.
+    // Ann's Lines show as words, not to be renamed.
+    assert!(line_field(&harness, "Bread").is_err());
+    type_line(&mut harness, "Water");
+    press(&mut harness, egui::Key::Enter);
+    // His own Line is his to change, in place too.
     assert!(shows(&harness, "More: Water"));
+    assert!(line_field(&harness, "Water").is_ok());
     click(&mut harness, "More: Water")?;
     assert!(shows(&harness, "Reappear time"));
     harness.key_press(egui::Key::Escape);

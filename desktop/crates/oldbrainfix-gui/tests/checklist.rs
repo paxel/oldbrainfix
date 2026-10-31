@@ -1,8 +1,11 @@
 //! Checklists in the window (#120, ADR 0030): "Make it a Checklist" in
 //! a Note's editor and in its card's ⋮ turns its lines into Lines, one
-//! indented under the Line above; the editor checks them, adds them,
-//! renames, moves, indents and deletes them after asking once, unchecks
-//! all and goes back to a plain Note; full cards check them in place,
+//! indented under the Line above; the editor checks them, moves, indents
+//! and deletes them after asking once, unchecks all and goes back to a
+//! plain Note; the Lines are typed in place (#141): "Add Line" starts an
+//! empty one, Enter splits, Backspace at the start joins, Tab and
+//! Shift+Tab move a Line into a group and out, and leaving keeps what
+//! was typed and drops the empty ones; full cards check them in place,
 //! compact cards count them; a Member checks and adds Lines but changes
 //! only their own; a Line Conflict is offered on the Conflicts view; and
 //! a Sent Item's preview shows its Lines and what an update changes.
@@ -199,38 +202,230 @@ fn checks_follow_the_group_and_uncheck_all_readies_it_again() -> TestResult {
     Ok(())
 }
 
+/// The field a Line is typed in, holding `value`.
+fn line_field<'a>(
+    harness: &'a Harness<'_, App>,
+    value: &'a str,
+) -> Result<egui_kittest::Node<'a>, Box<dyn std::error::Error>> {
+    Ok(harness
+        .query_all_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some(value))
+        .next()
+        .ok_or(format!("a field holding {value:?}"))?)
+}
+
+/// What the field with the keyboard holds.
+fn focused(harness: &Harness<'_, App>) -> Option<String> {
+    harness
+        .query_all_by(|n| n.is_focused())
+        .next()
+        .and_then(|n| n.value())
+}
+
+/// Clicks into the field of the Line `value`, the cursor at its end.
+fn into_line(harness: &mut Harness<'_, App>, value: &str) -> TestResult {
+    line_field(harness, value)?.click();
+    harness.run();
+    press(harness, egui::Key::End);
+    assert_eq!(focused(harness).as_deref(), Some(value));
+    Ok(())
+}
+
+fn press(harness: &mut Harness<'_, App>, key: egui::Key) {
+    harness.key_press(key);
+    harness.run();
+}
+
+fn type_in(harness: &mut Harness<'_, App>, text: &str) {
+    harness.get_by(|n| n.is_focused()).type_text(text);
+    harness.run();
+}
+
+/// Leaves the editor for the Note `other`.
+fn leave_for(harness: &mut Harness<'_, App>, other: &str) {
+    harness.state_mut().select_note(other);
+    harness.run();
+}
+
 #[test]
-fn the_add_field_adds_every_line_typed_one_indented_under_the_line_above() -> TestResult {
+fn add_line_starts_an_empty_line_in_place_and_leaving_keeps_what_was_typed() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;
+    let other = Notes::new(&store).capture("Other", None, None)?.id;
     let mut harness = window(&store, Some(&note));
-    harness
-        .get_by(|n| n.placeholder() == Some("New Line"))
-        .click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Seat");
-    harness.run();
-    harness.key_press(egui::Key::Enter);
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("  Window");
-    harness.run();
-    click(&mut harness, "Add Line")?;
-    assert_eq!(
-        texts(&harness, &note)?,
-        ["Passport", "  Charger", "Ticket", "Seat", "  Window"]
-    );
+    // The separate field is gone; the Lines are typed in place.
+    assert!(line_field(&harness, "Passport").is_ok());
     assert!(
         harness
-            .query_by(|n| n.role() == Role::MultilineTextInput
-                && n.value().is_some_and(|v| v.contains("Window")))
-            .is_none(),
-        "the field is empty again"
+            .query_all_by(
+                |n| n.role() == Role::MultilineTextInput && n.placeholder() == Some("New Line")
+            )
+            .next()
+            .is_none()
+    );
+    click(&mut harness, "Add Line")?;
+    // An empty Line exists only on screen until it holds text.
+    assert_eq!(list(&harness, &note)?.count(), 3);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    type_in(&mut harness, "Seat");
+    // Enter at its end stores it and starts the next.
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Ticket", "Seat"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    type_in(&mut harness, "Window");
+    // Tab puts the new Line under the one above before it is stored.
+    press(&mut harness, egui::Key::Tab);
+    assert_eq!(focused(&harness).as_deref(), Some("Window"));
+    // An emptied Line and a new empty one go on leaving; what was typed
+    // is kept.
+    click(&mut harness, "Add Line")?;
+    into_line(&mut harness, "Ticket")?;
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    harness.run();
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    into_line(&mut harness, "Passport")?;
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    harness.run();
+    type_in(&mut harness, "Passports");
+    assert_eq!(list(&harness, &note)?.lines[0].text, "Passport");
+    leave_for(&mut harness, &other);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passports", "  Charger", "Seat", "  Window"]
     );
     Ok(())
 }
 
 #[test]
-fn the_line_menu_renames_moves_indents_and_deletes_after_asking() -> TestResult {
+fn enter_splits_a_line_at_the_cursor_into_its_group() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    into_line(&mut harness, "Passport")?;
+    for _ in 0..4 {
+        press(&mut harness, egui::Key::ArrowLeft);
+    }
+    press(&mut harness, egui::Key::Enter);
+    // A Line with a group gets the rest as the first of its group.
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Pass", "  port", "  Charger", "Ticket"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("port"));
+    // At the start of a Line, an empty one goes in above; the cursor stays.
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(focused(&harness).as_deref(), Some("Ticket"));
+    assert_eq!(list(&harness, &note)?.count(), 4);
+    // Up goes to the Line above, the new empty one, then to Charger;
+    // Down back.
+    press(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    press(&mut harness, egui::Key::ArrowUp);
+    assert_eq!(focused(&harness).as_deref(), Some("Charger"));
+    press(&mut harness, egui::Key::ArrowDown);
+    assert_eq!(focused(&harness).as_deref(), Some(""));
+    Ok(())
+}
+
+#[test]
+fn backspace_at_the_start_joins_with_the_line_above_which_keeps_its_box() -> TestResult {
+    let (store, note) = with_note()?;
+    let lists = Checklists::new(&store);
+    lists.make(&note)?;
+    let ticket = list_of(&store, &note)?.lines[2].id.clone();
+    lists.add(&note, "Rail card", None, true)?;
+    lists.check(&ticket)?;
+    let mut harness = window(&store, Some(&note));
+    assert!(checked(&harness, "Ticket")?);
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    // Its text goes to the end of the Line above, which keeps its state;
+    // its group stays a group.
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  ChargerTicket", "  Rail card"]
+    );
+    let now = list(&harness, &note)?;
+    assert!(!now.lines[1].checked);
+    assert_eq!(focused(&harness).as_deref(), Some("ChargerTicket"));
+    // The joined Line's checks stay in the log.
+    let store = harness.state().store();
+    assert!(store.current(&ticket, "checked")?.is_some());
+    assert!(store.current(&ticket, "trashed")?.is_some());
+    // The cursor stood where the two met: Enter splits them again.
+    press(&mut harness, egui::Key::Enter);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "  Ticket", "  Rail card"]
+    );
+    // An empty Line simply goes, the cursor at the end of the one above.
+    click(&mut harness, "Add Line")?;
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(focused(&harness).as_deref(), Some("Rail card"));
+    assert_eq!(list(&harness, &note)?.count(), 4);
+    // At the very top there is nothing to join with.
+    into_line(&mut harness, "Passport")?;
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(list(&harness, &note)?.count(), 4);
+    Ok(())
+}
+
+#[test]
+fn tab_and_shift_tab_move_a_line_into_a_group_and_out() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    into_line(&mut harness, "Ticket")?;
+    press(&mut harness, egui::Key::Tab);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "  Ticket"]
+    );
+    // The field keeps the keyboard while its Line moves.
+    assert_eq!(focused(&harness).as_deref(), Some("Ticket"));
+    harness.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+    harness.run();
+    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
+    // The first Line has nothing to go under.
+    into_line(&mut harness, "Passport")?;
+    press(&mut harness, egui::Key::Tab);
+    assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
+    assert_eq!(focused(&harness).as_deref(), Some("Passport"));
+    Ok(())
+}
+
+#[test]
+fn a_line_typed_in_is_stored_as_the_cursor_leaves_it_and_as_the_window_closes() -> TestResult {
+    let (store, note) = with_note()?;
+    Checklists::new(&store).make(&note)?;
+    let mut harness = window(&store, Some(&note));
+    into_line(&mut harness, "Ticket")?;
+    type_in(&mut harness, "s");
+    into_line(&mut harness, "Charger")?;
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Tickets"]
+    );
+    type_in(&mut harness, "s");
+    assert_eq!(list(&harness, &note)?.lines[1].text, "Charger");
+    harness.state_mut().flush();
+    harness.run();
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Chargers", "Tickets"]
+    );
+    Ok(())
+}
+
+#[test]
+fn the_line_menu_moves_indents_and_deletes_after_asking() -> TestResult {
     let (store, note) = with_note()?;
     Checklists::new(&store).make(&note)?;
     let mut harness = window(&store, Some(&note));
@@ -267,19 +462,11 @@ fn the_line_menu_renames_moves_indents_and_deletes_after_asking() -> TestResult 
     line_step(&mut harness, "Ticket", "Back to the top level")?;
     assert_eq!(texts(&harness, &note)?, ["Passport", "  Charger", "Ticket"]);
 
-    line_step(&mut harness, "Ticket", "Rename")?;
-    assert!(shows(&harness, "Rename Line"));
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    // Renaming is typing in place: the menu has no Rename.
+    click(&mut harness, "More: Ticket")?;
+    assert!(!shows(&harness, "Rename"));
+    harness.key_press(egui::Key::Escape);
     harness.run();
-    harness
-        .get_by(|n| n.role() == Role::TextInput && n.value().as_deref() == Some("Ticket"))
-        .type_text("Train ticket");
-    harness.run();
-    click(&mut harness, "Save")?;
-    assert_eq!(
-        texts(&harness, &note)?,
-        ["Passport", "  Charger", "Train ticket"]
-    );
 
     // Deleting asks once; Cancel keeps it.
     line_step(&mut harness, "Charger", "Delete")?;
@@ -288,7 +475,7 @@ fn the_line_menu_renames_moves_indents_and_deletes_after_asking() -> TestResult 
     assert_eq!(list(&harness, &note)?.count(), 3);
     line_step(&mut harness, "Charger", "Delete")?;
     click(&mut harness, "Delete")?;
-    assert_eq!(texts(&harness, &note)?, ["Passport", "Train ticket"]);
+    assert_eq!(texts(&harness, &note)?, ["Passport", "Ticket"]);
     Ok(())
 }
 
@@ -432,18 +619,32 @@ fn a_member_checks_and_adds_lines_but_changes_only_their_own() -> TestResult {
     tick(&mut harness, "Ticket")?;
     assert!(list(&harness, &note)?.lines[2].checked);
     assert!(shows(&harness, "Uncheck all"));
-    harness
-        .get_by(|n| n.placeholder() == Some("New Line"))
-        .click();
-    harness.run();
-    harness.get_by(|n| n.is_focused()).type_text("Water");
-    harness.run();
+    // Ann's Lines show as words, not to be typed in.
+    assert!(line_field(&harness, "Ticket").is_err());
     click(&mut harness, "Add Line")?;
+    type_in(&mut harness, "Water");
+    press(&mut harness, egui::Key::Enter);
     // His own Line is his to change.
     assert!(shows(&harness, "More: Water"));
-    line_step(&mut harness, "Water", "Rename")?;
-    assert!(shows(&harness, "Rename Line"));
-    click(&mut harness, "Cancel")?;
+    assert_eq!(list(&harness, &note)?.count(), 4);
+    // Under Ann's Line nothing is joined; his empty Line goes.
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(focused(&harness).as_deref(), Some("Water"));
+    press(&mut harness, egui::Key::Home);
+    press(&mut harness, egui::Key::Backspace);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Ticket", "Water"]
+    );
+    assert_eq!(focused(&harness).as_deref(), Some("Water"));
+    // He moves his own Line into Ann's group and out.
+    press(&mut harness, egui::Key::Tab);
+    assert_eq!(
+        texts(&harness, &note)?,
+        ["Passport", "  Charger", "Ticket", "  Water"]
+    );
+    harness.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+    harness.run();
     // His card's menu offers nothing of the kind.
     harness.state_mut().select(Selection::All);
     harness.run();

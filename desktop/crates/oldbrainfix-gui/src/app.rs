@@ -103,6 +103,7 @@ use crate::history_view::{self, HistoryShown};
 use crate::hotkey::{self, Chord};
 use crate::icons;
 use crate::l10n::{self, L10n};
+use crate::line_editing::TypedLines;
 use crate::login;
 use crate::media::{
     Clipboard, FromFile, PICTURE_EXTENSIONS, Player, Recorder, SOUND_EXTENSIONS, from_file,
@@ -519,11 +520,6 @@ enum Dialog {
     DeleteEntry {
         id: String,
     },
-    /// The new text of the Checklist's Line `id` (#120).
-    RenameLine {
-        id: String,
-        text: String,
-    },
     /// Whether the Line `id` of a Checklist goes, or of a Shopping List
     /// `for_good` (#122).
     DeleteLine {
@@ -865,8 +861,9 @@ enum Action {
         note: String,
         on: bool,
     },
-    /// Gives the Line the dialog renames its new text.
-    RenameLine,
+    /// Stores what was typed into the Lines of the Note shown and drops
+    /// those left empty, as the editor is left (#141).
+    LeaveLines,
     /// Deletes the Line the dialog asks about.
     DeleteLine,
     Setting(Setting),
@@ -1086,9 +1083,10 @@ pub struct App {
     /// the selected Note's Tally is looked at (#103).
     tally_form: Option<TallyForm>,
     tally_look: TallyLook,
-    /// What the Checklist part of the editor's field holds, to add as
-    /// Lines, and what the menu of the card last opened offers (#120).
-    line_text: String,
+    /// The Lines of the Note shown as they are typed in place, and what
+    /// the Shopping List's field holds (#141); what the menu of the card
+    /// last opened offers (#120).
+    lines: TypedLines,
     card_menu: Option<CardMenu>,
     /// The region the system reports, an ISO country code, which picks
     /// the units Tallies show unless this Device chose them.
@@ -1402,7 +1400,7 @@ impl App {
             editor: None,
             tally_form: None,
             tally_look: TallyLook::new(None),
-            line_text: String::new(),
+            lines: TypedLines::default(),
             card_menu: None,
             region: region_of(sys_locale::get_locale().as_deref()),
             changes: None,
@@ -2962,6 +2960,7 @@ impl App {
         if !self.capture.trim().is_empty() || self.recording() || self.holds_media() {
             self.apply(Action::Capture(Notes::default_nudge()));
         }
+        self.apply(Action::LeaveLines);
         self.apply(Action::SaveText);
     }
 
@@ -2980,6 +2979,14 @@ impl App {
     /// Reads what the panes show from the log. A selected place that is
     /// gone falls back to All Notes.
     fn refresh(&mut self) {
+        // The Lines of a Note left: stored, those left empty dropped
+        // (#141).
+        let left = match &self.lines.note {
+            Some(_) if self.lines.note != self.selected_note => {
+                self.lines.leave(&self.store, &*self.wall).err()
+            }
+            _ => None,
+        };
         // Each Note opened is looked at afresh; a page of another Note's
         // Tally goes.
         if self.tally_look.of != self.selected_note {
@@ -3014,6 +3021,23 @@ impl App {
             }
             Err(e) => self.error = Some(e.to_string()),
         }
+        if let Some(e) = left {
+            self.error = Some(e.to_string());
+        }
+        // The Lines shown keep what is typed into them.
+        let view = &self.view;
+        let detail = view.detail.as_ref().map(|(p, _)| p.note.id.as_str());
+        let editable = |id: &str| {
+            view.shopping
+                .as_ref()
+                .is_some_and(|s| s.editable.contains(id))
+        };
+        let shopping = view
+            .shopping
+            .as_ref()
+            .map(|s| (&s.list, &editable as &dyn Fn(&str) -> bool));
+        let checklist = view.checklist.as_ref().map(|s| &s.list);
+        self.lines.arrange(detail, checklist, shopping);
         // An Area or Topic deleted meanwhile is no place to capture into.
         if let Some(place) = &self.capture_choices.place
             && self.view.area(place).is_none()
@@ -3069,7 +3093,6 @@ impl App {
             self.amend.clear();
             self.amend_focus = false;
             self.amend_select = None;
-            self.line_text.clear();
         }
         self.kick();
     }
@@ -3743,8 +3766,6 @@ impl App {
                 | Action::Rename(_)
                 | Action::StartMerge
                 | Action::Share(_)
-                | Action::Checklist(ChecklistAction::Step(_, LineStep::Rename))
-                | Action::Shopping(ShoppingAction::Step(_, ShopStep::Rename))
         ) {
             self.focus = true;
         }
@@ -4283,18 +4304,7 @@ impl App {
                 self.store
                     .set_local_setting(&show_ticks_key(&note), if on { "true" } else { "false" })?;
             }
-            Action::RenameLine => {
-                if let Some(Dialog::RenameLine { id, text }) = self.dialog.take()
-                    && let Some(named) = checklist_view::renamed(&text)
-                {
-                    // A sync while the dialog was open may have taken it.
-                    if self.line_of(&id)?.is_some() {
-                        Checklists::new(&self.store).rename(&id, &named)?;
-                    } else if self.shopping_line_of(&id)?.is_some() {
-                        ShoppingLists::new(&self.store).rename(&id, &named)?;
-                    }
-                }
-            }
+            Action::LeaveLines => self.lines.leave(&self.store, &*self.wall)?,
             Action::DeleteLine => {
                 if let Some(Dialog::DeleteLine { id, .. }) = self.dialog.take() {
                     if self.line_of(&id)?.is_some() {
@@ -4802,6 +4812,11 @@ impl App {
                 }
             }
             ChecklistAction::Check(line, checked, on) => {
+                // A new Line is stored first; an empty one has nothing to
+                // check.
+                let Some(line) = self.lines.stored_id(&self.store, &line)? else {
+                    return Ok(());
+                };
                 // A sync meanwhile may have taken it.
                 if let Some((list, _)) = self.line_of(&line)? {
                     let lists = Checklists::new(&self.store);
@@ -4816,23 +4831,21 @@ impl App {
                     }
                 }
             }
-            ChecklistAction::Add(note) => {
-                if checklist_view::add_typed(&self.store, &note, &self.line_text)? {
-                    self.line_text.clear();
+            ChecklistAction::AddLine(note) => {
+                if self.lines.note.as_deref() == Some(note.as_str()) {
+                    self.lines.add_empty();
                 }
             }
+            ChecklistAction::Typed(asked) => self.lines.typing(&self.store, asked)?,
             ChecklistAction::Step(id, step) => {
+                // What was typed is stored first, so the step sees the
+                // list as shown.
+                self.lines.keep(&self.store)?;
                 let Some((list, line)) = self.line_of(&id)? else {
                     return Ok(());
                 };
                 let lists = Checklists::new(&self.store);
                 match step {
-                    LineStep::Rename => {
-                        self.dialog = Some(Dialog::RenameLine {
-                            id,
-                            text: line.text,
-                        });
-                    }
                     LineStep::Up => checklist_view::move_up(&self.store, &list, &line)?,
                     LineStep::Down => checklist_view::move_down(&self.store, &list, &line)?,
                     LineStep::Indent => lists.indent(&id, true)?,
@@ -4875,25 +4888,17 @@ impl App {
                 }
             }
             ShoppingAction::Add(note) => {
-                if lists.is_shopping_list(&note)?
-                    && lists.may_check(&note)?
-                    && shopping_view::add_typed(&self.store, &note, &self.line_text, &*self.wall)?
-                {
-                    self.line_text.clear();
+                if self.lines.note.as_deref() == Some(note.as_str()) {
+                    self.lines.add_typed(&self.store, &*self.wall)?;
                 }
             }
+            ShoppingAction::Typed(asked) => self.lines.typing(&self.store, asked)?,
             ShoppingAction::Step(id, step) => {
-                let Some(line) = self.shopping_line_of(&id)? else {
-                    return Ok(());
-                };
-                if !lists.may_edit(&id)? {
+                self.lines.keep(&self.store)?;
+                if self.shopping_line_of(&id)?.is_none() || !lists.may_edit(&id)? {
                     return Ok(());
                 }
                 match step {
-                    ShopStep::Rename => {
-                        let text = line.text;
-                        self.dialog = Some(Dialog::RenameLine { id, text });
-                    }
                     ShopStep::Reappear(reappear) => lists.set_reappear(&id, reappear)?,
                     ShopStep::Delete => {
                         self.dialog = Some(Dialog::DeleteLine { id, for_good: true });
@@ -5479,6 +5484,9 @@ impl App {
     /// Keeps the edited text of the shown Note when it changed; an
     /// emptied text goes back to what it was.
     fn save_text(&mut self) -> oldbrainfix_core::Result<()> {
+        // What was typed into its Lines first, by anyone who may add them
+        // (#141).
+        self.lines.keep(&self.store)?;
         let Some((placed, _)) = &self.view.detail else {
             return Ok(());
         };
@@ -6731,7 +6739,7 @@ impl App {
         let makes_checklist = self.view.makes_checklist;
         let shopping = self.view.shopping.as_ref();
         let makes_shopping = self.view.makes_shopping;
-        let typed = &mut self.line_text;
+        let typed = &mut self.lines;
         let note_frogs = &self.view.note_frogs;
         let may = self.view.may;
         let t = self.t;
@@ -7597,10 +7605,6 @@ impl App {
                                 actions.push(Action::DeleteEntry);
                             }
                         });
-                    }
-                    Dialog::RenameLine { text, .. } => {
-                        let form = (t.checklist_rename_title(), t.save(), Action::RenameLine);
-                        line_form(ui, &t, form, (text, focus), actions);
                     }
                     Dialog::DeleteLine { for_good, .. } => {
                         title(ui, t.checklist_delete_question());
@@ -9267,31 +9271,6 @@ fn link_form(
     });
 }
 
-/// Asks for a Line's text (#120): `(title, verb, done)` say what for.
-/// Enter takes it.
-fn line_form(
-    ui: &mut Ui,
-    t: &L10n,
-    (heading, verb, done): (&str, &str, Action),
-    (text, focus): (&mut String, bool),
-    actions: &mut Vec<Action>,
-) {
-    title(ui, heading);
-    let field = focused_field(ui, (&mut *text, focus), "line", t.checklist_rename_title());
-    let ready = checklist_view::renamed(text).is_some();
-    if ready && field.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-        actions.push(done.clone());
-    }
-    ui.horizontal(|ui| {
-        cancel(ui, t, actions);
-        let words = ui.visuals().text_color();
-        let button = egui::Button::new(RichText::new(verb).color(words));
-        if ui.add_enabled(ready, button).clicked() {
-            actions.push(done);
-        }
-    });
-}
-
 /// How an Area is shared: the role, and the button that shows the
 /// invite's code. Nobody types a name: the other person's Profile shows
 /// when their phone joins, to confirm (ADR 0017). Below, "Share with…"
@@ -10553,7 +10532,7 @@ fn agenda_row(ui: &mut Ui, t: &L10n, tones: Tones, row: &Row, actions: &mut Vec<
                     (t, tones),
                     &checklist_view::shown_lines(list),
                     (*checks, list.on.as_ref()),
-                    None,
+                    (None, None),
                     &mut asked,
                 );
             });

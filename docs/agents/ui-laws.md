@@ -306,7 +306,8 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   simply goes.
 - **In and out** sit on the bar above the keyboard, as the format bar
   does, and put the Line with the cursor under the Line above or back
-  at the top.
+  at the top. On the desktop **Tab and Shift+Tab** do it, in place of
+  the buttons.
 - **Nothing typed is lost on leaving**: what was typed is stored when
   the cursor leaves a Line and when the editor saves or is left; Lines
   left empty are dropped on leaving.

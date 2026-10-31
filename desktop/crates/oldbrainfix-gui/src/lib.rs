@@ -36,6 +36,7 @@ pub mod instance;
 pub mod l10n;
 #[cfg(target_os = "linux")]
 pub mod launcher;
+pub mod line_editing;
 pub mod login;
 pub mod media;
 pub mod media_view;

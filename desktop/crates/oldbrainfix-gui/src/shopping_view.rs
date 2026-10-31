@@ -6,30 +6,30 @@
 //! List part of a Note's editor.
 //!
 //! The editor's part has at the top a field and "Add" for anyone with a
-//! role in its Area, every line typed one Line, the first typed at the
-//! top; then the Lines to check; for who may change a Line, ⋮ and a
-//! right-click with Rename, its reappear time as radio buttons and
-//! "Delete for good"; and "Back to a plain Note" for who may change the
-//! Note. Nothing is written when a struck Line comes back: the window
+//! role in its Area, where Enter adds what was typed and leaves the field
+//! ready for the next, every line pasted one Line, the first at the top;
+//! then the Lines to check, each renamed in place where this Device may
+//! change it (#141, `line_editing`); for those, ⋮ and a right-click on
+//! its box's row with its reappear time as radio buttons and "Delete for
+//! good"; and "Back to a plain Note" for who may change the Note. Nothing is written when a struck Line comes back: the window
 //! reads the list again every half minute, so it shows open soon after
 //! the start of its day.
 
 use std::collections::HashSet;
 
 use egui::{Id, Key, Modifiers, RichText, TextEdit, Ui};
-use oldbrainfix_core::checklists::split_lines;
 use oldbrainfix_core::{Note, Reappear, ShoppingList, ShoppingLists, Store, WallClock};
 
 use crate::app::embossed;
 use crate::checklist_view::{self, CardMenu, LineAsk, ShownLine};
 use crate::l10n::L10n;
+use crate::line_editing::{self, FieldOf, TypedLines, Typing};
 use crate::schedule_text::short_day_text;
 use crate::theme::Tones;
 
 /// What the menu of a Shopping List's Line does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShopStep {
-    Rename,
     Reappear(Reappear),
     Delete,
 }
@@ -45,6 +45,8 @@ pub enum ShoppingAction {
     Check(String, bool),
     /// Adds every line typed into the add field to the Note's list.
     Add(String),
+    /// What a Line's field asked as it was renamed in place (#141).
+    Typed(Typing),
     /// A step of the menu of the Line with this id.
     Step(String, ShopStep),
 }
@@ -107,27 +109,6 @@ pub fn shown_lines(t: &L10n, list: &ShoppingList) -> Vec<ShownLine> {
         .collect()
 }
 
-/// Adds a Line to the Shopping List of `note_id` for every line of
-/// `typed` that is not blank, the first typed ending at the top; a name
-/// the list has already brings its Line back instead. Whether any line
-/// was taken.
-pub fn add_typed(
-    store: &Store,
-    note_id: &str,
-    typed: &str,
-    wall: &WallClock,
-) -> oldbrainfix_core::Result<bool> {
-    let lists = ShoppingLists::new(store);
-    let rows: Vec<String> = split_lines(typed)
-        .into_iter()
-        .filter(|row| !row.trim().is_empty())
-        .collect();
-    for row in rows.iter().rev() {
-        lists.add(note_id, row, wall)?;
-    }
-    Ok(!rows.is_empty())
-}
-
 /// The words of a reappear time: "Once" or "2 weeks".
 pub fn reappear_label(t: &L10n, reappear: Reappear) -> String {
     match reappear {
@@ -137,17 +118,13 @@ pub fn reappear_label(t: &L10n, reappear: Reappear) -> String {
 }
 
 /// The menu of a Line whose reappear time is `current`, from its ⋮ and a
-/// right-click on it: Rename, the reappear times as radio buttons under
-/// their heading and "Delete for good"; the step clicked. A click on the
+/// right-click on it: the reappear times as radio buttons under their
+/// heading and "Delete for good"; the step clicked. A click on the
 /// time it has already changes nothing.
 fn line_menu(ui: &mut Ui, t: &L10n, current: Reappear) -> Option<ShopStep> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut picked = None;
-    if ui.button(RichText::new(t.rename()).color(text)).clicked() {
-        picked = Some(ShopStep::Rename);
-    }
-    ui.separator();
     ui.label(RichText::new(t.shopping_reappear()).small().color(weak));
     for reappear in Reappear::ALL {
         let on = reappear == current;
@@ -174,13 +151,14 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &ShoppingList) {
 }
 
 /// The Shopping List part of a Note's editor (#122), under its text: the
-/// field `typed` and "Add" at the top, where a new Line shows, its Lines,
-/// and "Back to a plain Note" as `shown` allows.
+/// field and "Add" at the top, where a new Line shows, its Lines, each
+/// renamed in place in `typed` where this Device may (#141), and "Back to
+/// a plain Note" as `shown` allows.
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &ShoppingShown,
-    typed: &mut String,
+    typed: &mut TypedLines,
     actions: &mut Vec<ShoppingAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -190,14 +168,18 @@ pub fn section(
         ui.label(RichText::new(t.shopping_heading()).strong().color(text));
         if shown.checks {
             let id = Id::new("shopping add");
+            // Enter adds, and the field stays ready for the next.
             if ui.memory(|m| m.has_focus(id))
-                && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
-                && !typed.trim().is_empty()
+                && ui.input_mut(|i| {
+                    i.consume_key(Modifiers::NONE, Key::Enter)
+                        || i.consume_key(Modifiers::COMMAND, Key::Enter)
+                })
+                && !typed.add.trim().is_empty()
             {
                 actions.push(ShoppingAction::Add(note.clone()));
             }
             ui.add(
-                TextEdit::multiline(typed)
+                TextEdit::multiline(&mut typed.add)
                     .id(id)
                     .hint_text(t.checklist_new_line())
                     .text_color(text)
@@ -205,7 +187,7 @@ pub fn section(
                     .desired_width(f32::INFINITY),
             );
             let add = ui.add_enabled(
-                !typed.trim().is_empty(),
+                !typed.add.trim().is_empty(),
                 egui::Button::new(RichText::new(t.add()).color(text)),
             );
             if add.clicked() {
@@ -221,12 +203,43 @@ pub fn section(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<ShopStep>,
         );
         let rows = shown_lines(t, list);
-        for asked in checklist_view::line_rows(ui, (t, tones), &rows, shown.checks, Some(menus)) {
+        let fields: Vec<u64> = rows
+            .iter()
+            .filter_map(|line| typed.shown(&line.id).map(|r| r.key))
+            .collect();
+        let mut typing = Vec::new();
+        let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
+            let Some(key) = typed.shown(&line.id).map(|r| r.key) else {
+                return false;
+            };
+            let at = fields.iter().position(|k| *k == key);
+            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let below = at.and_then(|at| fields.get(at + 1)).copied();
+            let look = (line.checked, t.checklist_new_line(), width);
+            line_editing::field(
+                ui,
+                typed,
+                (key, FieldOf::Shopping),
+                look,
+                (above, below),
+                &mut typing,
+            );
+            true
+        };
+        let asked = checklist_view::line_rows(
+            ui,
+            (t, tones),
+            &rows,
+            shown.checks,
+            (Some(menus), Some(&mut field)),
+        );
+        for asked in asked {
             actions.push(match asked {
                 LineAsk::Check(id, checked) => ShoppingAction::Check(id, checked),
                 LineAsk::Menu(id, step) => ShoppingAction::Step(id, step),
             });
         }
+        actions.extend(typing.into_iter().map(ShoppingAction::Typed));
         if shown.plain
             && ui
                 .button(RichText::new(t.checklist_to_plain()).color(text))

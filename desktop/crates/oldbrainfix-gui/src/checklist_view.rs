@@ -5,13 +5,13 @@
 //! on a compact one "x of y checked"; and the Checklist part of a Note's
 //! editor.
 //!
-//! The editor's part lists the Lines to check; for who may change a
-//! Line, ⋮ and a right-click with Rename, Move up, Move down, putting it
-//! under the Line above or back to the top level, and Delete; a field and
-//! "Add Line" for anyone with a role in its Area, every line typed one
-//! Line, one starting with a space or a tab under the Line above;
-//! "Uncheck all" while one is checked; and "Back to a plain Note" for who
-//! may change the Note.
+//! The editor's part lists the Lines with their boxes, each typed in
+//! place where this Device may change it (#141, `line_editing`); for who
+//! may change a Line, ⋮ and a right-click on its box's row with Move up,
+//! Move down, putting it under the Line above or back to the top level,
+//! and Delete; "Add Line" for anyone with a role in its Area, starting an
+//! empty Line at the end; "Uncheck all" while one is checked; and "Back
+//! to a plain Note" for who may change the Note.
 //!
 //! A Checklist with a Routine or Reminder (#121) shows on its card and in
 //! its editor as checked for the Occurrence it is on now, and on the
@@ -24,8 +24,7 @@
 
 use std::collections::HashSet;
 
-use egui::{Frame, Id, Key, Modifiers, RichText, Sense, TextEdit, Ui, WidgetInfo};
-use oldbrainfix_core::checklists::split_lines;
+use egui::{Frame, Id, RichText, Sense, Ui, WidgetInfo};
 use oldbrainfix_core::sent::SentLine;
 use oldbrainfix_core::{
     Checklist, Checklists, Line, Note, RoutineOccurrence, ShoppingLists, Store, WallClock,
@@ -34,6 +33,7 @@ use oldbrainfix_core::{
 use crate::app::{check, embossed, icon_button};
 use crate::icons;
 use crate::l10n::L10n;
+use crate::line_editing::{self, FieldOf, TypedLine, TypedLines, Typing};
 use crate::shopping_view;
 use crate::theme::Tones;
 
@@ -91,7 +91,6 @@ pub fn sent_lines(t: &L10n, lines: &[SentLine]) -> Vec<ShownLine> {
 /// What the menu of a Line does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineStep {
-    Rename,
     Up,
     Down,
     Indent,
@@ -111,8 +110,10 @@ pub enum ChecklistAction {
     /// Checks the Line with this id, or unchecks it: for the Occurrence
     /// given, or by its own checks without one.
     Check(String, bool, Option<RoutineOccurrence>),
-    /// Adds every line typed into the add field to the Note's Checklist.
-    Add(String),
+    /// "Add Line": an empty Line at the end of the Note's Checklist.
+    AddLine(String),
+    /// What a Line's field asked as it was typed in (#141).
+    Typed(Typing),
     /// A step of the menu of the Line with this id.
     Step(String, LineStep),
     /// Reads what the menu of the card of the Note with this id offers,
@@ -233,7 +234,7 @@ fn neighbours(list: &Checklist, line: &Line) -> (Option<String>, bool) {
 pub fn steps(list: &Checklist, line: &Line) -> Vec<LineStep> {
     let at = list.lines.iter().position(|l| l.id == line.id);
     let (before, after) = neighbours(list, line);
-    let mut steps = vec![LineStep::Rename];
+    let mut steps = Vec::new();
     if before.is_some() {
         steps.push(LineStep::Up);
     }
@@ -285,34 +286,6 @@ pub fn move_down(store: &Store, list: &Checklist, line: &Line) -> oldbrainfix_co
     lists.indent(&line.id, true)
 }
 
-/// Adds a Line to the Checklist of `note_id` for every line of `typed`
-/// that is not blank, one that starts with a space or a tab under the
-/// Line above; whether any was added.
-pub fn add_typed(store: &Store, note_id: &str, typed: &str) -> oldbrainfix_core::Result<bool> {
-    let lists = Checklists::new(store);
-    let rows: Vec<String> = split_lines(typed)
-        .into_iter()
-        .filter(|row| !row.trim().is_empty())
-        .collect();
-    for row in &rows {
-        let indent = row.starts_with(' ') || row.starts_with('\t');
-        lists.add(note_id, row, None, indent)?;
-    }
-    Ok(!rows.is_empty())
-}
-
-/// A Line's new text as the rename dialog took it: on one line, trimmed;
-/// `None` when nothing is left.
-pub fn renamed(text: &str) -> Option<String> {
-    let named = text
-        .split(['\r', '\n'])
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let named = named.trim();
-    (!named.is_empty()).then(|| named.to_string())
-}
-
 /// The label of a Line's ⋮.
 pub fn menu_label(t: &L10n, line: &str) -> String {
     format!("{}: {line}", t.more())
@@ -321,7 +294,6 @@ pub fn menu_label(t: &L10n, line: &str) -> String {
 /// The words of a step of a Line's menu.
 fn step_label(t: &L10n, step: LineStep) -> &'static str {
     match step {
-        LineStep::Rename => t.rename(),
         LineStep::Up => t.checklist_move_up(),
         LineStep::Down => t.checklist_move_down(),
         LineStep::Indent => t.checklist_indent(),
@@ -413,17 +385,24 @@ pub enum LineAsk<P> {
     Menu(String, P),
 }
 
+/// What draws the field a Line is typed in, in place of its words, in
+/// the width given: whether it drew one (#141).
+pub type LineField<'f> = dyn FnMut(&mut Ui, &ShownLine, f32) -> bool + 'f;
+
+/// A [`LineField`] lent to the rows that draw it.
+pub type FieldFor<'a> = &'a mut LineField<'a>;
+
 /// The Lines of a Checklist, each with its checkbox, checkable with
 /// `checks` for the Occurrence `on` (by their own checks without one),
-/// and its text; with `menus`, the Lines whose ids it holds have ⋮ and a
-/// right-click with the steps `steps` gives each. What is asked goes to
-/// `actions`.
+/// and its text, or the field `field` draws for it; with `menus`, the
+/// Lines whose ids it holds have ⋮ and a right-click with the steps
+/// `steps` gives each. What is asked goes to `actions`.
 pub fn lines(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     (checks, on): (bool, Option<&RoutineOccurrence>),
-    menus: Option<LineMenus>,
+    (menus, field): (Option<LineMenus>, Option<FieldFor>),
     actions: &mut Vec<ChecklistAction>,
 ) {
     let menu = |ui: &mut Ui, id: &str| menus.and_then(|(_, steps)| line_menu(ui, t, &steps(id)));
@@ -433,7 +412,7 @@ pub fn lines(
             &menu as &dyn Fn(&mut Ui, &str) -> Option<LineStep>,
         )
     });
-    for asked in line_rows(ui, (t, tones), shown, checks, menus) {
+    for asked in line_rows(ui, (t, tones), shown, checks, (menus, field)) {
         actions.push(match asked {
             LineAsk::Check(id, checked) => ChecklistAction::Check(id, checked, on.cloned()),
             LineAsk::Menu(id, step) => ChecklistAction::Step(id, step),
@@ -442,15 +421,16 @@ pub fn lines(
 }
 
 /// The Lines `shown`, each with its checkbox, checkable with `checks`,
-/// its text and what shows under it; with `menus`, the Lines whose ids
-/// it holds have ⋮ and a right-click with the menu it draws. What is
-/// asked, in the order clicked.
+/// its text, or the field `field` draws for it, and what shows under it;
+/// with `menus`, the Lines whose ids it holds have ⋮ and, where no field
+/// takes the clicks, a right-click with the menu it draws. What is asked,
+/// in the order clicked.
 pub fn line_rows<P>(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &[ShownLine],
     checks: bool,
-    menus: Option<MenuOf<P>>,
+    (menus, mut field): (Option<MenuOf<P>>, Option<FieldFor>),
 ) -> Vec<LineAsk<P>> {
     let weak = ui.visuals().weak_text_color();
     let mut asked = Vec::new();
@@ -477,7 +457,9 @@ pub fn line_rows<P>(
                     Sense::hover()
                 };
                 let words = ui
-                    .allocate_ui(egui::vec2(room, 0.0), |ui| words(ui, line, sense))
+                    .allocate_ui(egui::vec2(room, 0.0), |ui| {
+                        words_or_field(ui, line, sense, (field.as_deref_mut(), room))
+                    })
                     .inner;
                 let Some((_, menu)) = editable else {
                     return;
@@ -492,7 +474,9 @@ pub fn line_rows<P>(
                     }
                     picked = picked.take().or(step);
                 };
-                words.context_menu(&mut entries);
+                if let Some(words) = words {
+                    words.context_menu(&mut entries);
+                }
                 // ⋮ at the right edge, as on an Agenda row.
                 let more = ui
                     .with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -512,9 +496,23 @@ pub fn line_rows<P>(
 /// A Line's words, sensing as `sense` says, and under them, dimmed, what
 /// shows below it: the response of the words.
 fn words(ui: &mut Ui, line: &ShownLine, sense: Sense) -> egui::Response {
+    let words = words_or_field(ui, line, sense, (None, 0.0));
+    words.unwrap_or_else(|| ui.response())
+}
+
+/// A Line's words, sensing as `sense` says, or the field `field` draws
+/// for it `width` wide, and under them, dimmed, what shows below it: the
+/// response of the words, none for a field.
+fn words_or_field<'f>(
+    ui: &mut Ui,
+    line: &ShownLine,
+    sense: Sense,
+    (field, width): (Option<&mut LineField<'f>>, f32),
+) -> Option<egui::Response> {
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        let words = ui.add(egui::Label::new(line_text(ui, line)).sense(sense));
+        let typed = field.is_some_and(|field| field(ui, line, width));
+        let words = (!typed).then(|| ui.add(egui::Label::new(line_text(ui, line)).sense(sense)));
         if let Some(below) = &line.below {
             let weak = ui.visuals().weak_text_color();
             ui.label(RichText::new(below).size(13.0).color(weak));
@@ -615,13 +613,14 @@ pub fn card_count(ui: &mut Ui, t: &L10n, list: &Checklist) {
 }
 
 /// The Checklist part of a Note's editor (#120), under its text: its
-/// Lines, the field `typed` to add Lines, and "Uncheck all" and "Back to
-/// a plain Note" as `shown` allows.
+/// Lines, each typed in place in `typed` where this Device may change it
+/// (#141), "Add Line", and "Uncheck all" and "Back to a plain Note" as
+/// `shown` allows.
 pub fn section(
     ui: &mut Ui,
     (t, tones): (&L10n, Tones),
     shown: &ChecklistShown,
-    typed: &mut String,
+    typed: &mut TypedLines,
     actions: &mut Vec<ChecklistAction>,
 ) {
     let text = ui.visuals().text_color();
@@ -629,39 +628,66 @@ pub fn section(
     let note = &list.note_id;
     embossed(ui, tones, false, None, |ui| {
         ui.label(RichText::new(t.checklist_heading()).strong().color(text));
-        let lines_shown = shown_lines(list);
+        let rows: Vec<ShownLine> = typed
+            .rows
+            .iter()
+            .map(|row| ShownLine {
+                id: row.shown_id(),
+                text: row.typed(),
+                in_group: row.in_group,
+                checked: row
+                    .id
+                    .as_ref()
+                    .and_then(|id| list.line(id))
+                    .is_some_and(|l| l.checked),
+                below: None,
+            })
+            .collect();
+        // A new Line, and one this Device may change, by anyone who may add.
+        let in_place = |row: &TypedLine| {
+            shown.adds && row.id.as_ref().is_none_or(|id| shown.editable.contains(id))
+        };
+        let fields: Vec<u64> = typed
+            .rows
+            .iter()
+            .filter(|r| in_place(r))
+            .map(|r| r.key)
+            .collect();
+        let mut typing = Vec::new();
+        let mut field = |ui: &mut Ui, line: &ShownLine, width: f32| {
+            let Some(key) = typed.shown(&line.id).filter(|r| in_place(r)).map(|r| r.key) else {
+                return false;
+            };
+            let at = fields.iter().position(|k| *k == key);
+            let above = at.and_then(|at| at.checked_sub(1)).map(|at| fields[at]);
+            let below = at.and_then(|at| fields.get(at + 1)).copied();
+            let look = (line.checked, t.checklist_new_line(), width);
+            line_editing::field(
+                ui,
+                typed,
+                (key, FieldOf::Checklist),
+                look,
+                (above, below),
+                &mut typing,
+            );
+            true
+        };
         let steps = |id: &str| list.line(id).map(|l| steps(list, l)).unwrap_or_default();
         lines(
             ui,
             (t, tones),
-            &lines_shown,
+            &rows,
             (shown.checks, list.on.as_ref()),
-            Some((&shown.editable, &steps)),
+            (Some((&shown.editable, &steps)), Some(&mut field)),
             actions,
         );
-        if shown.adds {
-            let id = Id::new("checklist add");
-            if ui.memory(|m| m.has_focus(id))
-                && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Enter))
-                && !typed.trim().is_empty()
-            {
-                actions.push(ChecklistAction::Add(note.clone()));
-            }
-            ui.add(
-                TextEdit::multiline(typed)
-                    .id(id)
-                    .hint_text(t.checklist_new_line())
-                    .text_color(text)
-                    .desired_rows(1)
-                    .desired_width(f32::INFINITY),
-            );
-            let add = ui.add_enabled(
-                !typed.trim().is_empty(),
-                egui::Button::new(RichText::new(t.checklist_add_line()).color(text)),
-            );
-            if add.clicked() {
-                actions.push(ChecklistAction::Add(note.clone()));
-            }
+        actions.extend(typing.into_iter().map(ChecklistAction::Typed));
+        if shown.adds
+            && ui
+                .button(RichText::new(t.checklist_add_line()).color(text))
+                .clicked()
+        {
+            actions.push(ChecklistAction::AddLine(note.clone()));
         }
         let uncheck = shown.checks && list.checked_count() > 0;
         if uncheck || shown.plain {
@@ -724,19 +750,7 @@ pub fn preview(ui: &mut Ui, (t, tones): (&L10n, Tones), lines_sent: &[SentLine])
         (t, tones),
         &sent_lines(t, lines_sent),
         (false, None),
-        None,
+        (None, None),
         &mut ignored,
     );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_renamed_line_is_one_trimmed_line_or_nothing() {
-        assert_eq!(renamed("  Milk \r\n oat ").as_deref(), Some("Milk   oat"));
-        assert_eq!(renamed(" \n "), None);
-        assert_eq!(renamed("Bread").as_deref(), Some("Bread"));
-    }
 }
