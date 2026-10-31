@@ -3516,7 +3516,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sessionWeekdayCountsExplain =>
-      'A weekday left empty picks as many as every day.';
+      'A weekday without its own count picks as many as every day.';
 
   @override
   String get sessionWeekdayCountHint => 'As every day';

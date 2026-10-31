@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:oldbrainfix_core/oldbrainfix_core.dart';
 
+import 'l10n.dart';
+
 /// The colours of one brightness (UI laws, "Look"): a light teal ground
 /// or an anthracite one, question marks a touch darker or brighter than
 /// it, and cards that clearly stand out from both.
@@ -302,6 +304,50 @@ class RadioColumn<T> extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A number with a minus and a plus button, and its [unit] after it: the
+/// one way to pick a small count, never a typed field, so it holds no
+/// invalid value. Minus stops at [min], plus at [max] when given.
+class CountStepper extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+  final int min;
+  final int? max;
+  final String? unit;
+
+  const CountStepper({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.min = 1,
+    this.max,
+    this.unit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final max = this.max;
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        IconButton(
+          tooltip: context.t.fewer,
+          onPressed: value > min ? () => onChanged(value - 1) : null,
+          icon: const Icon(Icons.remove),
+        ),
+        Text('$value', style: Theme.of(context).textTheme.titleMedium),
+        IconButton(
+          tooltip: context.t.more,
+          onPressed: max == null || value < max
+              ? () => onChanged(value + 1)
+              : null,
+          icon: const Icon(Icons.add),
+        ),
+        if (unit case final unit?) Text(unit),
+      ],
     );
   }
 }

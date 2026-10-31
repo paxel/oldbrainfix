@@ -71,15 +71,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> enter(WidgetTester tester, Finder finder, String text) async {
-    if (finder.evaluate().isEmpty) await reveal(tester, finder);
-    await tester.ensureVisible(finder);
-    await tester.pumpAndSettle();
-    await tester.enterText(finder, text);
-    await tester.pumpAndSettle();
-  }
-
   Finder key(String value) => find.byKey(ValueKey(value));
+
+  /// The minus or, with [plus], the plus button of the stepper [stepper].
+  Finder step(String stepper, {bool plus = false}) => find.descendant(
+    of: key(stepper),
+    matching: find.widgetWithIcon(IconButton, plus ? Icons.add : Icons.remove),
+  );
+
+  /// Whether the button [button] can be pressed.
+  bool enabled(WidgetTester tester, Finder button) =>
+      tester.widget<IconButton>(button).onPressed != null;
 
   /// The picks of today's Occurrence as written.
   List<String> picked(Session s) => [
@@ -201,8 +203,8 @@ void main() {
 
   group('the Session editor', () {
     testWidgets('"Session" in the card\'s menu opens the Routine editor with '
-        'the pool, the count, the weekdays\' counts and the rule; Save says '
-        'under each field what to fix', (tester) async {
+        'the pool, the count and the weekdays\' counts as − / + steppers and '
+        'the rule; Save asks for a Tally', (tester) async {
       final pushUps = tally('Push-ups');
       final wallSit = tally('Wall sit', unit: 'min', target: 60);
       await start(tester);
@@ -231,23 +233,38 @@ void main() {
       expect(find.text('Choose at least one Tally.'), findsOneWidget);
       expect(sessions.all(), isEmpty);
 
-      await enter(tester, key('session-count'), '0');
-      expect(find.text('Type a number from 1 to 99.'), findsOneWidget);
-      await enter(tester, key('session-count'), '2');
-      expect(find.text('Type a number from 1 to 99.'), findsNothing);
+      // No typed number: the count starts at 1, which minus cannot go
+      // below.
+      expect(
+        find.descendant(of: key('session-count'), matching: find.text('1')),
+        findsOneWidget,
+      );
+      expect(enabled(tester, step('session-count')), isFalse);
+      await tap(tester, step('session-count', plus: true));
+      expect(
+        find.descendant(of: key('session-count'), matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(enabled(tester, step('session-count')), isTrue);
       await tap(tester, key('session-pool-$pushUps'));
       await tap(tester, key('session-pool-$wallSit'));
       expect(find.text('Choose at least one Tally.'), findsNothing);
       await tap(tester, find.text('Random'));
 
-      // A weekday's count is folded away, and fixed where it is typed.
-      expect(key('session-count-6'), findsNothing);
+      // The weekdays are folded away; each picks as every day until its
+      // switch gives it a count of its own, starting from every day's.
+      expect(key('session-own-6'), findsNothing);
       await tap(tester, find.text('Count per weekday'));
-      await enter(tester, key('session-count-6'), '100');
-      expect(find.text('Type a number from 1 to 99.'), findsWidgets);
-      await tap(tester, find.text('Save'));
-      expect(sessions.all(), isEmpty);
-      await enter(tester, key('session-count-6'), '1');
+      expect(find.text('As every day'), findsNWidgets(7));
+      expect(key('session-count-6'), findsNothing);
+      await tap(tester, key('session-own-6'));
+      expect(find.text('As every day'), findsNWidgets(6));
+      expect(
+        find.descendant(of: key('session-count-6'), matching: find.text('2')),
+        findsOneWidget,
+      );
+      await tap(tester, step('session-count-6'));
+      expect(enabled(tester, step('session-count-6')), isFalse);
       expect(find.text('1 weekday with its own count'), findsOneWidget);
       await tap(tester, find.text('Save'));
 
@@ -262,6 +279,35 @@ void main() {
       // Saturday picks one, at the editor's time of day.
       final occurrence = made.routine.schedule.on(Day(2026, 10, 24)).single;
       expect(sessions.on(made.id, occurrence).picks, hasLength(1));
+    });
+
+    testWidgets('plus stops at 99, for every day and a weekday; a weekday\'s '
+        'switch turned off takes its own count away', (tester) async {
+      final made = session([tally('Push-ups')], count: 99);
+      sessions.setCountOn(made.id, DateTime.sunday, 3);
+      await start(tester);
+      await tap(tester, find.text('Sport').first);
+      expect(enabled(tester, step('session-count', plus: true)), isFalse);
+      expect(enabled(tester, step('session-count')), isTrue);
+
+      await tap(tester, find.text('Count per weekday'));
+      expect(
+        find.descendant(of: key('session-count-7'), matching: find.text('3')),
+        findsOneWidget,
+      );
+      await tap(tester, key('session-own-1'));
+      expect(
+        find.descendant(of: key('session-count-1'), matching: find.text('99')),
+        findsOneWidget,
+      );
+      expect(enabled(tester, step('session-count-1', plus: true)), isFalse);
+      await tap(tester, key('session-own-7'));
+      expect(key('session-count-7'), findsNothing);
+      await tap(tester, find.text('Save'));
+
+      final saved = sessions.byId(made.id);
+      expect(saved?.count, 99);
+      expect(saved?.counts, {DateTime.monday: 99});
     });
 
     testWidgets('a Session opens in its editor; the pool is ordered by its '

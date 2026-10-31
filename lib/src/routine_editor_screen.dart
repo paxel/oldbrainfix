@@ -442,8 +442,6 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     final draft = _draft;
     if (draft != null && !draft.valid) {
       setState(() => draft.checked = true);
-      // The weekday to fix comes into view.
-      if (!draft.weekdaysValid) draft.weekdays.expand();
       return;
     }
     if (widget.capture != null) {
@@ -937,33 +935,19 @@ class _RoutineEditorScreenState extends State<RoutineEditorScreen> {
     ];
   }
 
-  /// A number with a minus and a plus button, and its unit after it.
+  /// A [CountStepper] whose changes go through [_change].
   Widget _stepper(
     int value, {
     required ValueChanged<int> onChanged,
     int min = 1,
     int? max,
     String? unit,
-  }) => Wrap(
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      IconButton(
-        tooltip: context.t.fewer,
-        onPressed: value > min
-            ? () => _change(() => onChanged(value - 1))
-            : null,
-        icon: const Icon(Icons.remove),
-      ),
-      Text('$value', style: Theme.of(context).textTheme.titleMedium),
-      IconButton(
-        tooltip: context.t.more,
-        onPressed: max == null || value < max
-            ? () => _change(() => onChanged(value + 1))
-            : null,
-        icon: const Icon(Icons.add),
-      ),
-      if (unit != null) Text(unit),
-    ],
+  }) => CountStepper(
+    value: value,
+    min: min,
+    max: max,
+    unit: unit,
+    onChanged: (n) => _change(() => onChanged(n)),
   );
 
   /// A single choice under its text (UI laws, "Dialogs and pages").

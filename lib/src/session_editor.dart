@@ -27,11 +27,13 @@ class SessionDraft {
   /// The Note of each Tally of [order], null when it is gone.
   final Map<String, Note?> notes;
   SessionRule rule;
-  final TextEditingController count;
 
-  /// The count typed for each weekday, 1 for Monday to 7 for Sunday;
-  /// empty for none.
-  final Map<int, TextEditingController> counts;
+  /// How many it picks each time, 1 to 99.
+  int count;
+
+  /// The own count of each weekday that has one, 1 for Monday to 7 for
+  /// Sunday, 1 to 99.
+  final Map<int, int> counts;
   final weekdays = ExpansibleController();
 
   /// Whether the weekdays' counts were left open on this Device.
@@ -47,13 +49,9 @@ class SessionDraft {
     required this.chosen,
     required this.notes,
     required this.rule,
-    required int count,
-    required Map<int, int> counts,
-  }) : count = TextEditingController(text: '$count'),
-       counts = {
-         for (var day = 1; day <= 7; day++)
-           day: TextEditingController(text: counts[day]?.toString() ?? ''),
-       };
+    required this.count,
+    required this.counts,
+  });
 
   /// The draft of [session], or of a new Session spawned from the Note
   /// [entity]: its pool as held, then the other Tallies it may pick.
@@ -72,17 +70,11 @@ class SessionDraft {
       notes: {for (final id in order) id: notes.byId(id)},
       rule: session?.rule ?? SessionRule.rolling,
       count: session?.count ?? 1,
-      counts: session?.counts ?? const {},
+      counts: {...?session?.counts},
     );
   }
 
-  void dispose() {
-    count.dispose();
-    for (final controller in counts.values) {
-      controller.dispose();
-    }
-    weekdays.dispose();
-  }
+  void dispose() => weekdays.dispose();
 
   /// The chosen Tallies in their order.
   List<String> get pool => [
@@ -90,43 +82,17 @@ class SessionDraft {
       if (chosen.contains(id)) id,
   ];
 
-  /// [text] as a count, 1 to 99; null when it is none.
-  static int? countOf(String text) {
-    final typed = text.trim();
-    if (!RegExp(r'^\d{1,2}$').hasMatch(typed)) return null;
-    final count = int.parse(typed);
-    return count < 1 || count > SessionKeys.maxCount ? null : count;
-  }
+  /// Gives the weekday [day] its own count, starting from every day's,
+  /// or takes it away when [own] is false.
+  void setOwn(int day, bool own) =>
+      own ? counts[day] = count : counts.remove(day);
 
-  bool get countValid => countOf(count.text) != null;
-
-  /// Whether the weekday [day]'s count is empty or a count.
-  bool weekdayValid(int day) {
-    final text = counts[day]?.text.trim() ?? '';
-    return text.isEmpty || countOf(text) != null;
-  }
-
-  bool get weekdaysValid =>
-      [for (var d = 1; d <= 7; d++) d].every(weekdayValid);
-
-  /// How many weekdays have their own count typed.
-  int get ownCounts => [
-    for (final controller in counts.values)
-      if (countOf(controller.text) != null) controller,
-  ].length;
-
-  bool get valid => pool.isNotEmpty && countValid && weekdaysValid;
+  bool get valid => pool.isNotEmpty;
 
   /// What the draft holds as plain values, kept after it is disposed;
   /// read while it is [valid].
-  SessionChoice get choice => (
-    pool: pool,
-    count: countOf(count.text) ?? 1,
-    counts: {
-      for (var day = 1; day <= 7; day++) day: ?countOf(counts[day]?.text ?? ''),
-    },
-    rule: rule,
-  );
+  SessionChoice get choice =>
+      (pool: pool, count: count, counts: {...counts}, rule: rule);
 
   /// Spawns the Session from the Note [noteId] on [schedule]; its id.
   String spawn(String noteId, Schedule schedule) =>
@@ -138,10 +104,9 @@ class SessionDraft {
     final id = session.id;
     final pool = this.pool;
     if (pool.join(',') != session.pool.join(',')) sessions.setPool(id, pool);
-    final count = countOf(this.count.text) ?? session.count;
     if (count != session.count) sessions.setCount(id, count);
     for (var day = 1; day <= 7; day++) {
-      final own = countOf(counts[day]?.text ?? '');
+      final own = counts[day];
       if (own != session.counts[day]) sessions.setCountOn(id, day, own);
     }
     if (rule != session.rule) sessions.setRule(id, rule);
@@ -150,9 +115,10 @@ class SessionDraft {
 
 /// The Session's part of the Routine editor, on top of its schedule: the
 /// pool picker, a checkbox per Tally, with drag handles to order it for
-/// Rolling; the count; the folded weekdays' own counts, open as last
-/// left on this Device; and the rule as radio buttons. [onChanged] runs
-/// after each change of [draft].
+/// Rolling; the count's − / + stepper; the folded weekdays, each with a
+/// switch for its own count and then its stepper, open as last left on
+/// this Device; and the rule as radio buttons. [onChanged] runs after
+/// each change of [draft].
 class SessionFields extends StatelessWidget {
   final SessionDraft draft;
   final VoidCallback onChanged;
@@ -205,14 +171,14 @@ class SessionFields extends StatelessWidget {
           ),
         ),
         EditorPanel(
-          child: TextField(
-            key: const ValueKey('session-count'),
-            controller: draft.count,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => onChanged(),
-            decoration: InputDecoration(
-              labelText: t.sessionCount,
-              errorText: draft.countValid ? null : t.sessionCountInvalid,
+          child: ControlBelow(
+            padding: EdgeInsets.zero,
+            title: Text(t.sessionCount),
+            control: CountStepper(
+              key: const ValueKey('session-count'),
+              value: draft.count,
+              max: SessionKeys.maxCount,
+              onChanged: (n) => _change(() => draft.count = n),
             ),
           ),
         ),
@@ -225,9 +191,9 @@ class SessionFields extends StatelessWidget {
               shape: const Border(),
               collapsedShape: const Border(),
               title: Text(t.sessionWeekdayCounts),
-              subtitle: draft.weekdaysValid
-                  ? Text(t.sessionWeekdayCountsSummary(draft.ownCounts))
-                  : Text(t.sessionCountInvalid, style: error),
+              subtitle: Text(
+                t.sessionWeekdayCountsSummary(draft.counts.length),
+              ),
               initiallyExpanded: draft.weekdaysOpen,
               onExpansionChanged: (open) => draft.store.setLocalSetting(
                 SessionDraft.weekdaysOpenKey,
@@ -238,19 +204,7 @@ class SessionFields extends StatelessWidget {
               children: [
                 Text(t.sessionWeekdayCountsExplain),
                 for (var day = DateTime.monday; day <= DateTime.sunday; day++)
-                  TextField(
-                    key: ValueKey('session-count-$day'),
-                    controller: draft.counts[day],
-                    keyboardType: TextInputType.number,
-                    onChanged: (_) => onChanged(),
-                    decoration: InputDecoration(
-                      labelText: weekdayName(locale, day),
-                      hintText: t.sessionWeekdayCountHint,
-                      errorText: draft.weekdayValid(day)
-                          ? null
-                          : t.sessionCountInvalid,
-                    ),
-                  ),
+                  _weekday(context, locale, day),
               ],
             ),
           ),
@@ -280,6 +234,34 @@ class SessionFields extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  /// The weekday [day]'s row: a switch for an own count, "As every day"
+  /// while it is off, and the count's stepper once it is on.
+  Widget _weekday(BuildContext context, String locale, int day) {
+    final own = draft.counts[day];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchBelow(
+          switchKey: ValueKey('session-own-$day'),
+          padding: const EdgeInsets.only(top: 8),
+          title: Text(weekdayName(locale, day)),
+          subtitle: own == null
+              ? Text(context.t.sessionWeekdayCountHint)
+              : null,
+          value: own != null,
+          onChanged: (on) => _change(() => draft.setOwn(day, on)),
+        ),
+        if (own != null)
+          CountStepper(
+            key: ValueKey('session-count-$day'),
+            value: own,
+            max: SessionKeys.maxCount,
+            onChanged: (n) => _change(() => draft.counts[day] = n),
+          ),
       ],
     );
   }

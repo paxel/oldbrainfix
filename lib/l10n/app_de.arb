@@ -945,7 +945,7 @@
   "sessionCountInvalid": "Gib eine Zahl von 1 bis 99 ein.",
   "sessionWeekdayCounts": "Anzahl je Wochentag",
   "sessionWeekdayCountsSummary": "{count, plural, =0{Jeden Tag gleich} =1{1 Wochentag mit eigener Anzahl} other{{count} Wochentage mit eigener Anzahl}}",
-  "sessionWeekdayCountsExplain": "Ein leer gelassener Wochentag wählt so viele wie jeder Tag.",
+  "sessionWeekdayCountsExplain": "Ein Wochentag ohne eigene Anzahl wählt so viele wie jeder Tag.",
   "sessionWeekdayCountHint": "Wie jeden Tag",
   "sessionRule": "Wie sie auswählt",
   "sessionRuleRandom": "Zufällig",

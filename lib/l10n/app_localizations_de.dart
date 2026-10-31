@@ -3552,7 +3552,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get sessionWeekdayCountsExplain =>
-      'Ein leer gelassener Wochentag wählt so viele wie jeder Tag.';
+      'Ein Wochentag ohne eigene Anzahl wählt so viele wie jeder Tag.';
 
   @override
   String get sessionWeekdayCountHint => 'Wie jeden Tag';

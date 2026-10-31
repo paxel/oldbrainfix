@@ -5717,7 +5717,7 @@ abstract class AppLocalizations {
   /// No description provided for @sessionWeekdayCountsExplain.
   ///
   /// In en, this message translates to:
-  /// **'A weekday left empty picks as many as every day.'**
+  /// **'A weekday without its own count picks as many as every day.'**
   String get sessionWeekdayCountsExplain;
 
   /// No description provided for @sessionWeekdayCountHint.

@@ -1878,7 +1878,7 @@
   "sessionWeekdayCounts": "Count per weekday",
   "sessionWeekdayCountsSummary": "{count, plural, =0{Every day the same} =1{1 weekday with its own count} other{{count} weekdays with their own count}}",
   "@sessionWeekdayCountsSummary": {"placeholders": {"count": {"type": "int"}}},
-  "sessionWeekdayCountsExplain": "A weekday left empty picks as many as every day.",
+  "sessionWeekdayCountsExplain": "A weekday without its own count picks as many as every day.",
   "sessionWeekdayCountHint": "As every day",
   "sessionRule": "How it picks",
   "sessionRuleRandom": "Random",
