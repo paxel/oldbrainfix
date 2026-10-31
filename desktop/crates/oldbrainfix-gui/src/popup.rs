@@ -795,7 +795,7 @@ impl CapturePopup {
     fn page_asked(&mut self, asked: PageAsk) -> oldbrainfix_core::Result<bool> {
         match (asked, &mut self.page) {
             (PageAsk::Schedule(Intent::Save), Some(Page::Schedule(editor))) => {
-                let Some(choice) = editor.choice(&self.store)? else {
+                let Some(choice) = editor.choice() else {
                     return Ok(false);
                 };
                 self.choices.schedules.push(choice);

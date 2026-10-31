@@ -4281,7 +4281,7 @@ impl App {
                 Intent::Save => match &mut self.editor {
                     // Set up for the Note being captured: held with it.
                     Some(editor) if editor.capturing() => {
-                        if let Some(choice) = editor.choice(&self.store)? {
+                        if let Some(choice) = editor.choice() {
                             self.capture_choices.schedules.push(choice);
                             self.editor = None;
                         }

@@ -30,7 +30,7 @@ use crate::capture_choices::ScheduleChoice;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::schedule_text::{clock_text, day_text, occurrence_time, weekday_long, weekday_text};
-use crate::session_editor::{SessionDraft, SessionIntent, WEEKDAYS_OPEN};
+use crate::session_editor::{SessionDraft, SessionIntent};
 use crate::theme::Tones;
 
 /// The Re-nag intervals offered, in minutes (the phone's choices).
@@ -421,45 +421,38 @@ impl RoutineEditor {
 
     /// Whether a Session's part needs fixing, which then says so under
     /// its fields.
-    fn session_to_fix(&mut self, store: &Store) -> oldbrainfix_core::Result<bool> {
+    fn session_to_fix(&mut self) -> bool {
         let Some((draft, _)) = &mut self.session else {
-            return Ok(false);
+            return false;
         };
         if draft.valid() {
-            return Ok(false);
+            return false;
         }
-        let was_open = draft.weekdays_open;
         draft.check();
-        // The weekday to fix comes into view, and stays so here.
-        if draft.weekdays_open && !was_open {
-            store.set_local_setting(WEEKDAYS_OPEN, "true")?;
-        }
-        Ok(true)
+        true
     }
 
     /// What was set up for the Note being captured, written nowhere;
     /// `None` while there is no schedule or a Session's part needs
     /// fixing, which then says so under its fields.
-    pub fn choice(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<ScheduleChoice>> {
-        let Some(schedule) = self.schedule.clone() else {
-            return Ok(None);
-        };
-        if self.session_to_fix(store)? {
-            return Ok(None);
+    pub fn choice(&mut self) -> Option<ScheduleChoice> {
+        let schedule = self.schedule.clone()?;
+        if self.session_to_fix() {
+            return None;
         }
-        Ok(Some(ScheduleChoice {
+        Some(ScheduleChoice {
             schedule,
             renag: self.renag.map(Duration::minutes),
             escalation: self.escalation,
             session: self.session.as_ref().map(|(draft, _)| draft.choice()),
-        }))
+        })
     }
 
     /// Writes the Routine; its id, or `None` when a Session's part needs
     /// fixing first, which then says so under its fields and writes
     /// nothing.
     pub fn save(&mut self, store: &Store) -> oldbrainfix_core::Result<Option<String>> {
-        if self.session_to_fix(store)? {
+        if self.session_to_fix() {
             return Ok(None);
         }
         let routines = Routines::new(store);
@@ -971,7 +964,7 @@ impl RoutineEditor {
 
 /// A number from `min` to `max` with a minus and a plus button, and its
 /// `unit` after it; whether it changed.
-fn stepper(
+pub(crate) fn stepper(
     ui: &mut Ui,
     t: &L10n,
     value: &mut i64,

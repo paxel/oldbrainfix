@@ -4,9 +4,9 @@
 //! with the targets and without a date, which records the entry for the
 //! Occurrence, or the entry it has; "Another one" swaps a pick; once every
 //! pick has an entry the box stays checked. "Session" in a Note's editor
-//! opens the Routine editor with the pool, the count, the weekdays' counts
-//! and the rule on top, which say under each field what to fix and write
-//! only what changed; "New Session" on All Routines and Reminders makes
+//! opens the Routine editor with the pool, the count's − / + stepper,
+//! the weekdays with a checkbox each for an own count, and the rule on
+//! top, which say what to fix in the pool and write only what changed; "New Session" on All Routines and Reminders makes
 //! one with its Note from the text typed. Without a Tally both still
 //! offer it, the editor says how to make one, and Save makes nothing.
 
@@ -129,25 +129,29 @@ fn click_button(harness: &mut Harness<'_, App>, label: &str) {
     harness.run();
 }
 
-/// Types `text` over what the field labelled `label` holds.
-fn type_into(harness: &mut Harness<'_, App>, label: &str, text: &str) {
-    harness
-        .get_by_role_and_label(Role::TextInput, label)
-        .click();
-    harness.run();
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
-    harness.run();
-    harness
-        .get_by_role_and_label(Role::TextInput, label)
-        .type_text(text);
-    harness.run();
-}
-
 fn holds(harness: &Harness<'_, App>, label: &str) -> Option<String> {
     harness
         .get_by_role_and_label(Role::TextInput, label)
         .accesskit_node()
         .value()
+}
+
+/// Clicks the `nth` button labelled `label`, the Session's steppers
+/// first.
+fn click_nth(harness: &mut Harness<'_, App>, label: &str, nth: usize) -> TestResult {
+    harness
+        .query_all_by_role_and_label(Role::Button, label)
+        .nth(nth)
+        .ok_or_else(|| format!("{label} #{nth}"))?
+        .click_accesskit();
+    harness.run();
+    Ok(())
+}
+
+/// The Session's count and weekdays' own counts in the Routine editor.
+fn draft_counts(harness: &Harness<'_, App>) -> Option<(i64, [Option<i64>; 7])> {
+    let draft = harness.state().routine_editor()?.session()?;
+    Some((draft.count, draft.counts))
 }
 
 /// Whether the first widget of `role` labelled `label` is checked: on
@@ -314,7 +318,7 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
         Role::RadioButton,
         t.session_rule_rolling()
     ));
-    assert_eq!(holds(&harness, t.session_count()).as_deref(), Some("1"));
+    assert_eq!(draft_counts(&harness), Some((1, [None; 7])));
     assert!(shows(&harness, &t.session_weekday_counts_summary(0)));
 
     // Nothing chosen: Save says so and writes nothing.
@@ -333,10 +337,20 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
     assert!(!shows(&harness, t.session_pool_missing()));
     // Newest capture first; Push-ups goes above Wall sit for Rolling.
     click_button(&mut harness, &t.session_move_up("Push-ups"));
-    type_into(&mut harness, t.session_count(), "0");
-    assert!(shows(&harness, t.session_count_invalid()));
-    type_into(&mut harness, t.session_count(), "2");
-    assert!(!shows(&harness, t.session_count_invalid()));
+    // − is gone at 1; + counts up, and − back down.
+    let fewer = harness
+        .query_all_by_role_and_label(Role::Button, t.fewer())
+        .count();
+    click_nth(&mut harness, t.more(), 0)?;
+    click_nth(&mut harness, t.more(), 0)?;
+    click_nth(&mut harness, t.fewer(), 0)?;
+    assert_eq!(draft_counts(&harness), Some((2, [None; 7])));
+    assert_eq!(
+        harness
+            .query_all_by_role_and_label(Role::Button, t.fewer())
+            .count(),
+        fewer + 1
+    );
 
     // The fold opens and stays so on this Device.
     harness.get_by_label(t.session_weekday_counts()).click();
@@ -345,7 +359,31 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
         device.store.local_setting(WEEKDAYS_OPEN)?.as_deref(),
         Some("true")
     );
-    type_into(&mut harness, "Saturday", "1");
+    // Each weekday picks as many as every day until it gets its own
+    // count, which starts from every day's.
+    assert_eq!(
+        harness
+            .query_all_by_label(t.session_weekday_count_hint())
+            .count(),
+        7
+    );
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Saturday")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(
+        harness
+            .query_all_by_label(t.session_weekday_count_hint())
+            .count(),
+        6
+    );
+    let mut own = [None; 7];
+    own[5] = Some(2);
+    assert_eq!(draft_counts(&harness), Some((2, own)));
+    // Saturday's stepper comes after every day's.
+    click_nth(&mut harness, t.fewer(), 1)?;
+    own[5] = Some(1);
+    assert_eq!(draft_counts(&harness), Some((2, own)));
     click_button(&mut harness, t.save());
 
     let sessions = Sessions::new(&device.store).all()?;
@@ -365,10 +403,10 @@ fn the_note_editor_makes_a_session_saying_what_to_fix() -> TestResult {
 }
 
 #[test]
-fn a_wrong_weekday_count_opens_the_fold_on_save() -> TestResult {
+fn a_weekday_unchecked_picks_as_many_as_every_day_again() -> TestResult {
     let device = device()?;
     let id = spawn(&device)?;
-    Sessions::new(&device.store).set_count_on(&id, 3, Some(1))?;
+    Sessions::new(&device.store).set_count_on(&id, 3, Some(4))?;
     let mut harness = window(&device.store, None);
     harness.state_mut().open_routine(&id);
     harness.run();
@@ -378,19 +416,32 @@ fn a_wrong_weekday_count_opens_the_fold_on_save() -> TestResult {
     assert!(shows(&harness, &t.session_weekday_counts_summary(1)));
     harness.get_by_label(t.session_weekday_counts()).click();
     harness.run();
-    assert_eq!(holds(&harness, "Wednesday").as_deref(), Some("1"));
-    type_into(&mut harness, "Wednesday", "x");
-    // Folded again, then saved: the fold opens on the field to fix.
+    assert!(checked(&harness, Role::CheckBox, "Wednesday"));
+    assert_eq!(
+        harness
+            .query_all_by_label(t.session_weekday_count_hint())
+            .count(),
+        6
+    );
+    harness
+        .get_by_role_and_label(Role::CheckBox, "Wednesday")
+        .click_accesskit();
+    harness.run();
+    assert_eq!(
+        harness
+            .query_all_by_label(t.session_weekday_count_hint())
+            .count(),
+        7
+    );
     harness.get_by_label(t.session_weekday_counts()).click();
     harness.run();
-    assert!(shows(&harness, t.session_count_invalid()));
+    assert!(shows(&harness, &t.session_weekday_counts_summary(0)));
     click_button(&mut harness, t.save());
-    assert!(harness.state().routine_editor().is_some());
-    assert_eq!(holds(&harness, "Wednesday").as_deref(), Some("x"));
-    assert_eq!(
-        device.store.local_setting(WEEKDAYS_OPEN)?.as_deref(),
-        Some("true")
-    );
+    assert!(harness.state().routine_editor().is_none());
+    let session = Sessions::new(&device.store)
+        .by_id(&id)?
+        .ok_or("a Session")?;
+    assert!(session.counts.is_empty());
     Ok(())
 }
 

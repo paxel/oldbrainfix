@@ -1874,7 +1874,6 @@
   "sessionMove": "Move {name}",
   "@sessionMove": {"description": "The drag handle of a Tally in a Session's pool.", "placeholders": {"name": {"type": "String"}}},
   "sessionCount": "How many it picks each time",
-  "sessionCountInvalid": "Type a number from 1 to 99.",
   "sessionWeekdayCounts": "Count per weekday",
   "sessionWeekdayCountsSummary": "{count, plural, =0{Every day the same} =1{1 weekday with its own count} other{{count} weekdays with their own count}}",
   "@sessionWeekdayCountsSummary": {"placeholders": {"count": {"type": "int"}}},

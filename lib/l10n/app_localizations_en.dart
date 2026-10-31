@@ -3497,9 +3497,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sessionCount => 'How many it picks each time';
 
   @override
-  String get sessionCountInvalid => 'Type a number from 1 to 99.';
-
-  @override
   String get sessionWeekdayCounts => 'Count per weekday';
 
   @override

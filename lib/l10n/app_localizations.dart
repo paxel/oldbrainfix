@@ -5696,12 +5696,6 @@ abstract class AppLocalizations {
   /// **'How many it picks each time'**
   String get sessionCount;
 
-  /// No description provided for @sessionCountInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Type a number from 1 to 99.'**
-  String get sessionCountInvalid;
-
   /// No description provided for @sessionWeekdayCounts.
   ///
   /// In en, this message translates to:

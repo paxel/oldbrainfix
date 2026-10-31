@@ -942,7 +942,6 @@
   "sessionPoolMissing": "Wähle mindestens eine Strichliste.",
   "sessionMove": "{name} verschieben",
   "sessionCount": "Wie viele sie jedes Mal auswählt",
-  "sessionCountInvalid": "Gib eine Zahl von 1 bis 99 ein.",
   "sessionWeekdayCounts": "Anzahl je Wochentag",
   "sessionWeekdayCountsSummary": "{count, plural, =0{Jeden Tag gleich} =1{1 Wochentag mit eigener Anzahl} other{{count} Wochentage mit eigener Anzahl}}",
   "sessionWeekdayCountsExplain": "Ein Wochentag ohne eigene Anzahl wählt so viele wie jeder Tag.",

@@ -1,14 +1,15 @@
 //! The Session's part of the Routine editor (#104, ADR 0029), as the
 //! phone's `session_editor.dart` draws it, on top of the schedule: the
 //! pool as a checkbox per Tally, ordered with up and down buttons for
-//! Rolling; the count; the weekdays' own counts in a fold, open as last
-//! left on this Device; and the rule as radio buttons. Nothing is written
+//! Rolling; the count's − / + stepper; the weekdays in a fold, each with
+//! a checkbox for its own count and then its stepper, open as last left
+//! on this Device; and the rule as radio buttons. Nothing is written
 //! before Save, and then only what changed. For a Note being captured
 //! (#113) Save hands the draft back as a [`SessionChoice`].
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use egui::{Id, RichText, TextEdit, Ui};
+use egui::{RichText, Ui};
 use oldbrainfix_core::sessions::keys::MAX_COUNT;
 use oldbrainfix_core::{Notes, Schedule, Session, SessionRule, Sessions, Store};
 
@@ -16,6 +17,7 @@ use crate::app::{embossed, icon_button, row_title};
 use crate::capture_choices::SessionChoice;
 use crate::icons;
 use crate::l10n::L10n;
+use crate::routine_editor::stepper;
 use crate::schedule_text::weekday_long;
 use crate::theme::Tones;
 
@@ -41,10 +43,10 @@ pub struct SessionDraft {
     /// What each Tally of [`SessionDraft::order`] shows as.
     names: BTreeMap<String, String>,
     pub rule: SessionRule,
-    /// The count as typed.
-    pub count: String,
-    /// The count typed for each weekday, Monday first; empty for none.
-    pub counts: [String; 7],
+    /// How many it picks each time, 1 to 99.
+    pub count: i64,
+    /// The own count of each weekday that has one, Monday first, 1 to 99.
+    pub counts: [Option<i64>; 7],
     /// Whether the weekdays' counts are open.
     pub weekdays_open: bool,
     /// Set by a Save that found something to fix: the pool's error shows
@@ -80,11 +82,8 @@ impl SessionDraft {
             order,
             names,
             rule: session.map_or(SessionRule::Rolling, |s| s.rule),
-            count: session.map_or(1, |s| s.count).to_string(),
-            counts: std::array::from_fn(|i| {
-                let day = i as u32 + 1;
-                counts.get(&day).map(i64::to_string).unwrap_or_default()
-            }),
+            count: session.map_or(1, |s| s.count),
+            counts: std::array::from_fn(|i| counts.get(&(i as u32 + 1)).copied()),
             weekdays_open: store.local_setting(WEEKDAYS_OPEN)?.as_deref() == Some("true"),
             checked: false,
         })
@@ -99,53 +98,24 @@ impl SessionDraft {
             .collect()
     }
 
-    /// `text` as a count, 1 to 99, as the core reads one: one or two
-    /// digits; `None` when it is none.
-    pub fn count_of(text: &str) -> Option<i64> {
-        let typed = text.trim();
-        if typed.is_empty() || typed.len() > 2 || !typed.bytes().all(|b| b.is_ascii_digit()) {
-            return None;
-        }
-        typed
-            .parse::<i64>()
-            .ok()
-            .filter(|c| (1..=MAX_COUNT).contains(c))
+    /// Gives the weekday at `index` (0 for Monday) its own count,
+    /// starting from every day's, or takes it away when `own` is false.
+    pub fn set_own(&mut self, index: usize, own: bool) {
+        self.counts[index] = own.then_some(self.count);
     }
 
-    pub fn count_valid(&self) -> bool {
-        Self::count_of(&self.count).is_some()
-    }
-
-    /// Whether the count of the weekday at `index` (0 for Monday) is
-    /// empty or a count.
-    pub fn weekday_valid(&self, index: usize) -> bool {
-        let text = self.counts[index].trim();
-        text.is_empty() || Self::count_of(text).is_some()
-    }
-
-    pub fn weekdays_valid(&self) -> bool {
-        (0..7).all(|i| self.weekday_valid(i))
-    }
-
-    /// How many weekdays have their own count typed.
+    /// How many weekdays have their own count.
     pub fn own_counts(&self) -> i64 {
-        self.counts
-            .iter()
-            .filter(|c| Self::count_of(c).is_some())
-            .count() as i64
+        self.counts.iter().flatten().count() as i64
     }
 
     pub fn valid(&self) -> bool {
-        !self.pool().is_empty() && self.count_valid() && self.weekdays_valid()
+        !self.pool().is_empty()
     }
 
-    /// Marks the draft as checked by a Save: the pool's error shows, and
-    /// a weekday to fix comes into view.
+    /// Marks the draft as checked by a Save: the pool's error shows.
     pub fn check(&mut self) {
         self.checked = true;
-        if !self.weekdays_valid() {
-            self.weekdays_open = true;
-        }
     }
 
     /// What the draft holds as plain values, kept after the editor is
@@ -155,11 +125,11 @@ impl SessionDraft {
             .counts
             .iter()
             .enumerate()
-            .filter_map(|(i, typed)| Some((i as u32 + 1, Self::count_of(typed)?)))
+            .filter_map(|(i, own)| Some((i as u32 + 1, (*own)?)))
             .collect();
         SessionChoice {
             pool: self.pool(),
-            count: Self::count_of(&self.count).unwrap_or(1),
+            count: self.count,
             counts,
             rule: self.rule,
         }
@@ -183,13 +153,11 @@ impl SessionDraft {
         if pool != session.pool {
             sessions.set_pool(id, &pool)?;
         }
-        let count = Self::count_of(&self.count).unwrap_or(session.count);
-        if count != session.count {
-            sessions.set_count(id, count)?;
+        if self.count != session.count {
+            sessions.set_count(id, self.count)?;
         }
-        for (i, typed) in self.counts.iter().enumerate() {
+        for (i, own) in self.counts.iter().copied().enumerate() {
             let day = i as u32 + 1;
-            let own = Self::count_of(typed);
             if own != session.counts.get(&day).copied() {
                 sessions.set_count_on(id, day, own)?;
             }
@@ -226,17 +194,8 @@ impl SessionDraft {
             }
         });
         embossed(ui, tones, false, None, |ui| {
-            let label = ui.label(RichText::new(t.session_count()).strong().color(text));
-            ui.add(
-                TextEdit::singleline(&mut self.count)
-                    .id(Id::new("session count"))
-                    .text_color(text)
-                    .desired_width(60.0),
-            )
-            .labelled_by(label.id);
-            if !self.count_valid() {
-                ui.label(RichText::new(t.session_count_invalid()).color(error));
-            }
+            ui.label(RichText::new(t.session_count()).strong().color(text));
+            stepper(ui, t, &mut self.count, (1, Some(MAX_COUNT)), None);
         });
         embossed(ui, tones, false, None, |ui| {
             let open = self.weekdays_open;
@@ -255,12 +214,8 @@ impl SessionDraft {
                 intent = Some(SessionIntent::WeekdaysOpen(!open));
             }
             if !open {
-                if self.weekdays_valid() {
-                    let summary = t.session_weekday_counts_summary(self.own_counts());
-                    ui.label(RichText::new(summary).small().color(weak));
-                } else {
-                    ui.label(RichText::new(t.session_count_invalid()).color(error));
-                }
+                let summary = t.session_weekday_counts_summary(self.own_counts());
+                ui.label(RichText::new(summary).small().color(weak));
             }
         });
         embossed(ui, tones, false, None, |ui| {
@@ -337,43 +292,35 @@ impl SessionDraft {
         }
     }
 
-    /// The count of the weekday at `index`, 0 for Monday: empty for as
-    /// many as every day.
+    /// The weekday at `index`, 0 for Monday: a checkbox for an own
+    /// count, "As every day" while it is off, and the count's stepper
+    /// once it is on.
     fn weekday_row(&mut self, ui: &mut Ui, t: &L10n, index: usize) {
         let text = ui.visuals().text_color();
-        let valid = self.weekday_valid(index);
-        ui.horizontal(|ui| {
-            let day = weekday_long(t, index as u32 + 1);
-            let label = ui.add_sized(
-                [110.0, 20.0],
-                egui::Label::new(RichText::new(day).color(text)),
-            );
-            ui.add(
-                TextEdit::singleline(&mut self.counts[index])
-                    .id(Id::new(("session weekday count", index)))
-                    .hint_text(t.session_weekday_count_hint())
-                    .text_color(text)
-                    .desired_width(110.0),
-            )
-            .labelled_by(label.id);
-        });
-        if !valid {
-            ui.label(RichText::new(t.session_count_invalid()).color(ui.visuals().error_fg_color));
+        let weak = ui.visuals().weak_text_color();
+        let day = weekday_long(t, index as u32 + 1);
+        let mut own = self.counts[index].is_some();
+        if ui
+            .checkbox(&mut own, RichText::new(day).color(text))
+            .changed()
+        {
+            self.set_own(index, own);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_count_is_one_or_two_digits_from_1_to_99() {
-        assert_eq!(SessionDraft::count_of("3"), Some(3));
-        assert_eq!(SessionDraft::count_of(" 12 "), Some(12));
-        assert_eq!(SessionDraft::count_of("99"), Some(99));
-        for wrong in ["", "0", "00", "100", "-1", "+1", "1.5", "x"] {
-            assert_eq!(SessionDraft::count_of(wrong), None, "{wrong:?}");
+        match &mut self.counts[index] {
+            Some(count) => {
+                ui.indent(("session weekday", index), |ui| {
+                    stepper(ui, t, count, (1, Some(MAX_COUNT)), None);
+                });
+            }
+            None => {
+                ui.indent(("session weekday", index), |ui| {
+                    ui.label(
+                        RichText::new(t.session_weekday_count_hint())
+                            .small()
+                            .color(weak),
+                    );
+                });
+            }
         }
     }
 }
