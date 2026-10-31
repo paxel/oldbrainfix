@@ -22,7 +22,7 @@ use crate::places::{NotesGo, Places};
 use crate::routines::{Routine, Routines};
 use crate::schedule::{ClockTime, Day, Recurrence, Schedule};
 use crate::search::Search;
-use crate::settings::DeviceSettings;
+use crate::settings::{DeviceSettings, QuickNoteControl};
 use crate::store::Store;
 use crate::{Error, Result};
 
@@ -182,7 +182,7 @@ pub fn tools() -> Vec<Value> {
         ),
         tool(
             "read_settings",
-            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours and whether alerts are on. They cannot be changed here.",
+            "Reads this Device's settings: the Re-nag interval, the Nudge's repeat, Quiet Hours, whether alerts are on, and what the quick note shows besides its text (quickNote: each control switched on, and whether the three Nudge buttons show instead of a single Save). They cannot be changed here.",
             true,
             json!({}),
             &[],
@@ -593,9 +593,18 @@ impl Store {
             "read_settings" => {
                 let settings = DeviceSettings::new(self);
                 let quiet = settings.quiet_hours()?;
+                let shows = |control| settings.quick_note_shows(control);
                 ToolOutput::json(&json!({
                     "alertsOn": settings.alerts_on()?,
                     "nudgeRepeatMinutes": settings.nudge_repeat()?.num_minutes(),
+                    "quickNote": {
+                        "fileInto": shows(QuickNoteControl::FileInto)?,
+                        "formatBar": shows(QuickNoteControl::FormatBar)?,
+                        "importance": shows(QuickNoteControl::Importance)?,
+                        "nudgeButtons": settings.quick_note_nudge_buttons_on()?,
+                        "schedule": shows(QuickNoteControl::Schedule)?,
+                        "shopping": shows(QuickNoteControl::Shopping)?,
+                    },
                     "quietHours": {
                         "from": quiet.start.to_string(),
                         "on": settings.quiet_hours_on()?,
@@ -832,8 +841,16 @@ mod tests {
         assert_eq!(routines.pointer("/0/times/0"), Some(&json!("08:00")));
         assert_eq!(routines.pointer("/0/rule"), Some(&json!("FREQ=DAILY")));
         assert_eq!(store.all_entries()?.len(), logged);
+        DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
         let settings = store.ai_tool(&task, "read_settings", &json!({}))?;
         assert!(!settings.is_error);
+        let [ToolContent::Text(text)] = &settings.content[..] else {
+            return Err("a text".into());
+        };
+        let read: Value = serde_json::from_str(text)?;
+        assert_eq!(read.pointer("/quickNote/fileInto"), Some(&json!(true)));
+        assert_eq!(read.pointer("/quickNote/formatBar"), Some(&json!(false)));
+        assert_eq!(read.pointer("/quickNote/nudgeButtons"), Some(&json!(true)));
         Ok(())
     }
 }

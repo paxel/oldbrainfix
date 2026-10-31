@@ -96,7 +96,7 @@ pub use schedule::{
 };
 pub use search::Search;
 pub use sessions::{Session, SessionMarks, SessionOccurrence, SessionPick, SessionRule, Sessions};
-pub use settings::DeviceSettings;
+pub use settings::{DeviceSettings, QuickNoteControl};
 pub use shared::{AreaAccess, AreaRole, Grant, Invite, Person};
 pub use shopping_lists::{
     Reappear, ShoppingAgenda, ShoppingAgendaList, ShoppingLine, ShoppingList, ShoppingLists,

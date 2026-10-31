@@ -79,8 +79,8 @@ use oldbrainfix_core::{
     AREA_ICONS, AgendaRow, Alarms, Area, AreaAccess, AreaRole, Blob, BoxState, Boxes,
     CaptureContext, CardTaken, Checklist, Checklists, ClockTime, Coordinates, Day, DeviceSettings,
     Frog, Frogs, FrogsToday, Importance, Invite, Line, MissedSummary, Note, Notes, NotesGo,
-    Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuietHours, Routine,
-    RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda, ShoppingLine,
+    Occurrence, OwnProfile, Person, PersonFilter, Places, Profile, QuickNoteControl, QuietHours,
+    Routine, RoutineOccurrence, Routines, Search, Section, Sessions, ShoppingAgenda, ShoppingLine,
     ShoppingList, ShoppingLists, ShownBox, Store, Tallies, Topic, UnitSystem, bundle, markdown,
     text_format,
 };
@@ -93,7 +93,9 @@ use crate::autostart::Autostart;
 use crate::background;
 use crate::backup_view::{self, BackupAction, Passphrase, Welcome, WelcomeAction};
 use crate::backups;
-use crate::capture_choices::{self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens};
+use crate::capture_choices::{
+    self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
+};
 use crate::checklist_view::{self, CardMenu, ChecklistAction, ChecklistShown, LineStep};
 use crate::enrich::Enricher;
 use crate::folder_sync;
@@ -367,6 +369,8 @@ struct View {
     detail: Option<(Placed, Vec<Section>)>,
     /// Whether the Note being captured may spawn where it goes (#113).
     capture_spawns: bool,
+    /// What this Device's quick note shows (#142).
+    capture_quick: QuickNote,
     /// The Shopping Lists the Note being captured can go into, by their
     /// Note's id with their title (#124).
     capture_lists: Vec<ListTitle>,
@@ -725,6 +729,10 @@ enum Action {
     Capture(Duration),
     /// Something asked of the capture's buttons or its choices (#113).
     CaptureChoice(Ask),
+    /// "To full editor" (#142): captures as leaving does and opens the
+    /// Note in the Note editor on the right, its text taking the
+    /// keyboard.
+    CaptureToEditor,
     /// Starts recording voice into the Note being captured.
     Record,
     /// Ends the recording and holds it on the capture field.
@@ -1019,6 +1027,10 @@ enum Setting {
     ShoppingAgenda(ShoppingAgenda),
     /// Whether a Routine's History shows its Streak (Q400).
     Streaks(bool),
+    /// Whether the quick note shows this control (#142).
+    QuickNote(QuickNoteControl, bool),
+    /// Whether the quick note shows the three Nudge buttons (#142).
+    QuickNoteNudgeButtons(bool),
 }
 
 /// The wall clock the window shows days on.
@@ -1057,6 +1069,9 @@ pub struct App {
     /// written yet (#113).
     capture: String,
     capture_choices: CaptureChoices,
+    /// The Note "To full editor" opens, until its text takes the
+    /// keyboard on the right (#142).
+    edit_wanted: Option<String>,
     /// The selected Note's text as it is being edited, and that Note.
     text: String,
     text_of: Option<String>,
@@ -1387,6 +1402,7 @@ impl App {
             trail: Trail::default(),
             capture: String::new(),
             capture_choices: CaptureChoices::default(),
+            edit_wanted: None,
             text: String::new(),
             text_of: None,
             text_editing: false,
@@ -2953,6 +2969,14 @@ impl App {
         self.apply(Action::SelectNote(id.to_string()));
     }
 
+    /// Opens the Note `id` in the Note editor on the right, its text
+    /// taking the keyboard, as the capture popup's "To full editor" asks
+    /// (#142); the middle pane stays as it was.
+    pub fn edit_note(&mut self, id: &str) {
+        self.edit_wanted = Some(id.to_string());
+        self.apply(Action::SelectNote(id.to_string()));
+    }
+
     /// Keeps what is typed but not saved yet, as the window closes: the
     /// capture field's text as a new Note nudged in 1 h, as leaving the
     /// phone's capture screen does, and the selected Note's edited text.
@@ -3093,6 +3117,13 @@ impl App {
             self.amend.clear();
             self.amend_focus = false;
             self.amend_select = None;
+        }
+        // "To full editor": the Note's text takes the keyboard (#142).
+        if let Some(wanted) = self.edit_wanted.take()
+            && self.text_of.as_ref() == Some(&wanted)
+        {
+            self.text_editing = true;
+            self.text_focus = true;
         }
         self.kick();
     }
@@ -3687,6 +3718,7 @@ impl App {
                 self.capture_place().as_deref(),
             )?,
             capture_lists: capture_choices::shopping_lists(&self.store, &self.t)?,
+            capture_quick: QuickNote::read(&self.store)?,
             routines: note_routines,
             newer_routines,
             note_frogs,
@@ -3813,6 +3845,16 @@ impl App {
                     self.recorded.push(bytes);
                 }
                 self.capture_note(nudge_in, &[], &[])?;
+            }
+            Action::CaptureToEditor => {
+                if let Some(r) = &mut self.recorder
+                    && r.recording()
+                    && let Some(bytes) = r.stop()
+                {
+                    self.recorded.push(bytes);
+                }
+                // Its text takes the keyboard once it shows on the right.
+                self.edit_wanted = self.capture_note(Notes::default_nudge(), &[], &[])?;
             }
             Action::CaptureChoice(asked) => self.capture_choice(asked)?,
             Action::StopRecording => {
@@ -5265,12 +5307,14 @@ impl App {
         Ok(())
     }
 
+    /// Captures what the capture field holds; the Note it shows on the
+    /// right, if it kept one.
     fn capture_note(
         &mut self,
         nudge_in: Duration,
         photos: &[Vec<u8>],
         recordings: &[Vec<u8>],
-    ) -> oldbrainfix_core::Result<()> {
+    ) -> oldbrainfix_core::Result<Option<String>> {
         let place = self.capture_place();
         // The photos and recordings held on the field go into the same
         // Note.
@@ -5298,7 +5342,7 @@ impl App {
             self.announce_done(said, details);
         }
         let shown = match captured {
-            Captured::Nothing => return Ok(()),
+            Captured::Nothing => return Ok(None),
             Captured::Note(note) | Captured::Kept(note) => Some(note),
             Captured::Poured | Captured::Waiting(_) => None,
         };
@@ -5310,12 +5354,13 @@ impl App {
         self.untranscribable.append(&mut self.held_problems);
         self.capture_choices = CaptureChoices::default();
         self.save_text()?;
-        if let Some(note) = shown {
-            self.selected_note = Some(note.id);
-            self.editor = None;
-            self.tally_form = None;
-        }
-        Ok(())
+        let Some(note) = shown else {
+            return Ok(None);
+        };
+        self.selected_note = Some(note.id.clone());
+        self.editor = None;
+        self.tally_form = None;
+        Ok(Some(note.id))
     }
 
     /// Pastes into the capture field `id` (#130): the clipboard's text,
@@ -5477,6 +5522,8 @@ impl App {
             Setting::Units(system) => settings.set_chosen_unit_system(system)?,
             Setting::ShoppingAgenda(way) => settings.set_shopping_agenda(way)?,
             Setting::Streaks(on) => settings.set_streaks_on(on)?,
+            Setting::QuickNote(control, on) => settings.set_quick_note_shows(control, on)?,
+            Setting::QuickNoteNudgeButtons(on) => settings.set_quick_note_nudge_buttons_on(on)?,
         }
         Ok(())
     }
@@ -6262,12 +6309,15 @@ impl App {
     }
 
     /// The capture field (UI laws, "Capture"): it never asks anything.
-    /// Once something is typed, the Note card's buttons show (#113),
-    /// whose choices show at the top, not saved yet, and under them the
-    /// Nudge times, Ctrl+Enter taking the 1 h one; a Note filed or with
-    /// something set up gets one Save instead and no Nudge. With a
-    /// Shopping List picked in "More", the lines go into it instead of a
-    /// Note (#124).
+    /// Once something is typed, "To full editor" shows (#142) and beside
+    /// it what of the Note card's buttons (#113) this Device switched on
+    /// in Settings ▸ Quick note, whose choices show at the top, not saved
+    /// yet, and under them the Nudge times, Ctrl+Enter taking the 1 h
+    /// one; a Note filed or with something set up, or where the Nudge
+    /// buttons are switched off, gets one Save instead, nudging only an
+    /// Unsorted Note. With a Shopping List picked in "More", the lines go
+    /// into it instead of a Note (#124). The format bar shows over the
+    /// field where it is switched on.
     fn capture_card(&mut self, ui: &mut Ui, tones: Tones, actions: &mut Vec<Action>) {
         let t = self.t;
         let place = self.capture_place();
@@ -6277,6 +6327,7 @@ impl App {
             capture_choices::place_name(&t, &self.view.areas, id).map(|name| (name, true))
         });
         let spawns = self.view.capture_spawns;
+        let quick = self.view.capture_quick;
         let text = ui.visuals().text_color();
         let weak = ui.visuals().weak_text_color();
         let id = Id::new("capture");
@@ -6311,6 +6362,9 @@ impl App {
             }
             if self.paste_empty {
                 paste::empty_line(ui, &t);
+            }
+            if quick.format_bar {
+                format_bar::capture_bar(ui, &t, id, &mut self.capture, (text, tones.accent));
             }
             let field = ui.add(
                 TextEdit::multiline(&mut self.capture)
@@ -6370,20 +6424,25 @@ impl App {
             }
             ui.add_space(4.0);
             let offer = (self.view.areas.as_slice(), spawns, self.capture_lists());
-            if let Some(asked) = capture_choices::action_row(ui, &t, &self.capture_choices, offer) {
-                actions.push(Action::CaptureChoice(asked));
+            let row = (&quick, true);
+            match capture_choices::action_row(ui, &t, &self.capture_choices, offer, row) {
+                Some(RowAsk::Choice(asked)) => actions.push(Action::CaptureChoice(asked)),
+                Some(RowAsk::ToEditor) => actions.push(Action::CaptureToEditor),
+                None => {}
             }
             ui.add_space(4.0);
-            if sorted {
-                // A sorted Note needs no Nudge (#113).
+            if sorted || !quick.nudge_buttons {
+                // A sorted Note needs no Nudge (#113); without the Nudge
+                // buttons, Save nudges in 1 h (#142).
                 if ui.button(RichText::new(t.save()).color(text)).clicked() {
                     actions.push(Action::Capture(Notes::default_nudge()));
                 }
-                ui.label(
-                    RichText::new(t.capture_keys_hint_sorted())
-                        .small()
-                        .color(weak),
-                );
+                let hint = if sorted {
+                    t.capture_keys_hint_sorted()
+                } else {
+                    t.capture_keys_hint()
+                };
+                ui.label(RichText::new(hint).small().color(weak));
                 return;
             }
             ui.label(RichText::new(t.nudge_heading()).strong().color(text));
@@ -8665,6 +8724,7 @@ impl App {
             .unwrap_or(ShoppingAgenda::STANDARD);
         let region_units = oldbrainfix_core::tally_units::system_for_region(self.region.as_deref());
         let streaks = settings.streaks_on().unwrap_or(true);
+        let quick = self.view.capture_quick;
         egui::ScrollArea::vertical()
             .id_salt("settings")
             .auto_shrink([false, false])
@@ -8706,6 +8766,9 @@ impl App {
                 });
                 embossed(ui, tones, false, None, |ui| {
                     quick_capture_card(ui, &t, hotkey_text, &stored_hotkey, hotkey_status, actions);
+                });
+                embossed(ui, tones, false, None, |ui| {
+                    quick_note_card(ui, &t, &quick, actions);
                 });
                 if let Some(speech) = speech {
                     embossed(ui, tones, false, None, |ui| {
@@ -10278,6 +10341,68 @@ fn quick_capture_card(
         ui.label(RichText::new(line).small().color(weak));
     }
     ui.label(RichText::new(t.capture_command()).small().color(weak));
+}
+
+/// The Settings' card on what the quick note, the capture field and the
+/// popup, shows besides its text (#142): one switch for each of the Note
+/// card's buttons and the format bar, off until switched on, and the
+/// Nudge buttons, on until switched off.
+fn quick_note_card(ui: &mut Ui, t: &L10n, quick: &QuickNote, actions: &mut Vec<Action>) {
+    let text = ui.visuals().text_color();
+    let weak = ui.visuals().weak_text_color();
+    ui.label(RichText::new(t.settings_quick_note()).strong().color(text));
+    ui.label(
+        RichText::new(t.settings_quick_note_detail_device())
+            .small()
+            .color(weak),
+    );
+    let switches = [
+        (QuickNoteControl::FileInto, quick.file_into, t.file_into()),
+        (
+            QuickNoteControl::Schedule,
+            quick.schedule,
+            t.quick_note_schedule(),
+        ),
+        (
+            QuickNoteControl::Shopping,
+            quick.shopping,
+            t.add_to_shopping_list(),
+        ),
+        (
+            QuickNoteControl::Importance,
+            quick.importance,
+            t.importance(),
+        ),
+        (
+            QuickNoteControl::FormatBar,
+            quick.format_bar,
+            t.quick_note_format_bar(),
+        ),
+    ];
+    for (control, shows, label) in switches {
+        let mut on = shows;
+        if ui
+            .checkbox(&mut on, RichText::new(label).color(text))
+            .changed()
+        {
+            actions.push(Action::Setting(Setting::QuickNote(control, on)));
+        }
+    }
+    let mut on = quick.nudge_buttons;
+    if ui
+        .checkbox(
+            &mut on,
+            RichText::new(t.quick_note_nudge_buttons()).color(text),
+        )
+        .changed()
+    {
+        actions.push(Action::Setting(Setting::QuickNoteNudgeButtons(on)));
+    }
+    ui.label(
+        RichText::new(t.quick_note_nudge_buttons_detail())
+            .small()
+            .color(weak),
+    );
 }
 
 /// The Settings' alarm sound (#102): the own chime or the file chosen,

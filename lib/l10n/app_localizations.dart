@@ -7207,6 +7207,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.'**
   String get quickNoteNudgeButtonsDetail;
+
+  /// Switch in Settings ▸ Quick note: the buttons for a Routine, Reminder, Frog or Session and 'Make it a Tally' (Q481).
+  ///
+  /// In en, this message translates to:
+  /// **'Routine, Reminder, Frog, Session or Tally'**
+  String get quickNoteSchedule;
 }
 
 class _AppLocalizationsDelegate

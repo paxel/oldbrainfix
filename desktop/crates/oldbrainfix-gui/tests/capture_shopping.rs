@@ -19,7 +19,10 @@ use egui::Key;
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use oldbrainfix_core::{Note, Notes, OwnProfile, Places, ShoppingLists, SigningKey, Store};
+use oldbrainfix_core::{
+    DeviceSettings, Note, Notes, OwnProfile, Places, QuickNoteControl, ShoppingLists, SigningKey,
+    Store,
+};
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::enrich::{Engine, Enricher, Kind};
 use oldbrainfix_gui::l10n::L10n;
@@ -48,6 +51,10 @@ fn store() -> Result<(Arc<Store>, String, String), Box<dyn std::error::Error>> {
     });
     let store = Store::in_memory(clock, || Ok(SigningKey::from_seed([3; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
+    // Every Quick note switch on (#142).
+    for control in QuickNoteControl::ALL {
+        DeviceSettings::new(&store).set_quick_note_shows(control, true)?;
+    }
     let household = Places::new(&store).add_area("Household")?.id;
     let list = Notes::new(&store)
         .capture("Groceries\nMilk", None, None)?

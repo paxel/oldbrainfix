@@ -12,7 +12,9 @@
 //! prints it.
 //!
 //! The hotkey, the tray's Capture and `oldbrainfix capture` open the
-//! capture popup: over the window while it is open, else on its own.
+//! capture popup: over the window while it is open, else on its own. Its
+//! "To full editor" opens the window, which shows the Note in its Note
+//! editor.
 //! `oldbrainfix capture TEXT` keeps TEXT without any window, through the
 //! running app when there is one, and `oldbrainfix import FILE` imports
 //! the sync bundle FILE the same way. `oldbrainfix open FILE` shows the
@@ -151,8 +153,16 @@ impl eframe::App for Native {
         if let Some(popup) = &mut self.popup {
             let builder = popup.viewport();
             let outcome = ctx.show_viewport_immediate(popup_id(), builder, |ui, _| popup.show(ui));
-            if outcome == Outcome::Closed {
-                self.popup = None;
+            match outcome {
+                Outcome::Open => {}
+                Outcome::Closed => self.popup = None,
+                // Hidden into the tray on Windows and macOS, the window
+                // comes back for it.
+                Outcome::Edit(id) => {
+                    self.popup = None;
+                    self.app.edit_note(&id);
+                    focus(ctx);
+                }
             }
         }
     }
@@ -175,6 +185,9 @@ struct PopupWindow {
     commands: Arc<Mutex<Receiver<Command>>>,
     /// What the app does once the popup is gone: open the window, quit.
     next: Rc<Cell<Option<Command>>>,
+    /// The Note "To full editor" saved, for the window to open in its
+    /// Note editor.
+    edit: Rc<RefCell<Option<String>>>,
 }
 
 impl eframe::App for PopupWindow {
@@ -192,6 +205,11 @@ impl eframe::App for PopupWindow {
         }
         if outcome == Outcome::Open {
             outcome = self.popup.show(ui);
+        }
+        if let Outcome::Edit(id) = &outcome {
+            *self.edit.borrow_mut() = Some(id.clone());
+            self.next.set(Some(Command::Open));
+            outcome = Outcome::Closed;
         }
         if outcome == Outcome::Closed {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
@@ -236,6 +254,9 @@ struct Shell {
     /// The tray's texts and where it sends, until it goes up in the first
     /// event loop (Windows, macOS).
     tray_wanted: RefCell<Option<(tray::Labels, Sender<Command>)>>,
+    /// The Note the popup's "To full editor" saved while the window was
+    /// closed, for the window to open in its Note editor.
+    edit: Rc<RefCell<Option<String>>>,
 }
 
 impl Shell {
@@ -284,6 +305,9 @@ impl Shell {
         app.set_autostart(self.autostart.clone());
         // Nothing written here yet: a Backup may be restored first.
         app.offer_restore();
+        if let Some(id) = self.edit.borrow_mut().take() {
+            app.edit_note(&id);
+        }
         let hotkey: Rc<RefCell<dyn hotkey::Control>> = self.hotkey.clone();
         app.set_hotkey(Some(hotkey));
         app.set_recorder(Box::new(MicRecorder::default()));
@@ -326,6 +350,7 @@ impl Shell {
             popup,
             commands: self.commands.clone(),
             next: next.clone(),
+            edit: self.edit.clone(),
         };
         self.run(viewport, Box::new(window))?;
         Ok(next.get())
@@ -727,6 +752,7 @@ fn run() -> Result<i32, String> {
         handed,
         tray: tray.clone(),
         tray_wanted: RefCell::new(tray_wanted),
+        edit: Rc::new(RefCell::new(None)),
     };
     if tray::IN_EVENT_LOOP {
         // Windows, macOS: the window runs for as long as the app, hidden

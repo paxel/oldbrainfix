@@ -5,11 +5,17 @@
 //! close button keeps what is typed the same way as Enter, as leaving the
 //! phone's capture screen does; empty, it just closes.
 //!
-//! Above the Nudge buttons sit the Note card's buttons (#113): "File
-//! into…", Routine, Reminder, Frog and Session where this Device may
-//! spawn, and "More" with the Importance, "Make it a Tally" and "Add to a
-//! Shopping List", whose lines then go into the list picked instead of a
-//! Note, the rest waiting unshown (#124). Routine,
+//! Above the Nudge buttons sits "To full editor" (#142), which saves the
+//! Note as Enter does and opens it in the window's Note editor; it waits
+//! while there is nothing to save. Beside it, of the Note card's buttons
+//! (#113), only what this Device switched on in Settings ▸ Quick note
+//! shows: "File into…", Routine, Reminder, Frog and Session where this
+//! Device may spawn, and "More" with the Importance, "Make it a Tally"
+//! (with Routine and the rest) and "Add to a Shopping List", whose lines
+//! then go into the list picked instead of a Note, the rest waiting
+//! unshown (#124), and no "To full editor" meanwhile; the format bar too.
+//! With the Nudge buttons switched off, one Save takes their place and
+//! nudges in 1 h. Routine,
 //! Reminder, Session and the Tally open their page in the popup, grown
 //! for it, which hands its choice back; every choice shows at the top,
 //! not saved yet, with a button that drops it. All of it is saved with
@@ -51,9 +57,12 @@ use oldbrainfix_core::{
 };
 
 use crate::app::{Wall, done_form, failure_form, local_wall, name_field, region_of};
-use crate::capture_choices::{self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens};
+use crate::capture_choices::{
+    self, Ask, CaptureChoices, Captured, Held, ListTitle, Opens, QuickNote, RowAsk,
+};
 use crate::cli::note_text;
 use crate::enrich::Enricher;
+use crate::format_bar;
 use crate::icons;
 use crate::l10n::L10n;
 use crate::media::{Clipboard, Recorder};
@@ -70,11 +79,14 @@ const SIZE: [f32; 2] = [480.0, 340.0];
 const PAGE_SIZE: [f32; 2] = [560.0, 680.0];
 
 /// What the popup is after a frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
     Open,
     /// Done with: it saved what was typed, or nothing was.
     Closed,
+    /// Done with, the Note of this id saved, to be opened in the
+    /// window's Note editor ("To full editor", #142).
+    Edit(String),
 }
 
 /// Captures `text` as a new Unsorted Note nudged `nudge_in` from now,
@@ -171,6 +183,8 @@ pub struct CapturePopup {
     page: Option<Page>,
     /// The region the system reports, for the units of a Tally.
     region: Option<String>,
+    /// What this Device's quick note shows (#142), read with the Areas.
+    quick: QuickNote,
 }
 
 impl CapturePopup {
@@ -198,6 +212,7 @@ impl CapturePopup {
             wall: Arc::new(local_wall),
             page: None,
             region: region_of(sys_locale::get_locale().as_deref()),
+            quick: QuickNote::default(),
         };
         popup.read_places();
         popup
@@ -339,9 +354,13 @@ impl CapturePopup {
         self.read_places();
     }
 
-    /// Reads the Areas with their Topics, and whether the Note may spawn
-    /// where it goes.
+    /// Reads the Areas with their Topics, whether the Note may spawn
+    /// where it goes, and what the quick note shows.
     fn read_places(&mut self) {
+        match QuickNote::read(&self.store) {
+            Ok(quick) => self.quick = quick,
+            Err(e) => self.error = Some(Failure::of(&self.t, &e)),
+        }
         let places = Places::new(&self.store);
         let read = places.areas().and_then(|areas| {
             areas
@@ -384,6 +403,22 @@ impl CapturePopup {
     }
 
     fn save(&mut self, nudge_in: Duration) -> Outcome {
+        self.keep(nudge_in).0
+    }
+
+    /// "To full editor": saves as leaving does, and hands the Note on to
+    /// the window's Note editor; stays open when nothing was saved.
+    fn open_in_editor(&mut self) -> Outcome {
+        match self.keep(Notes::default_nudge()) {
+            (Outcome::Closed, Some(id)) => Outcome::Edit(id),
+            (Outcome::Closed, None) => Outcome::Open,
+            (outcome, _) => outcome,
+        }
+    }
+
+    /// Saves as [`CapturePopup::save`] does; with it, the Note kept, if
+    /// one was.
+    fn keep(&mut self, nudge_in: Duration) -> (Outcome, Option<String>) {
         // A running recording is ended and kept first.
         if let Some(recorder) = &mut self.recorder
             && recorder.recording()
@@ -409,6 +444,10 @@ impl CapturePopup {
         match saved {
             // Only once all of it is written: a failed save keeps it here.
             Ok((saved, said)) => {
+                let kept = match &saved {
+                    Captured::Note(note) | Captured::Kept(note) => Some(note.id.clone()),
+                    _ => None,
+                };
                 self.text.clear();
                 self.recorded.clear();
                 self.photos.clear();
@@ -430,13 +469,13 @@ impl CapturePopup {
                         details,
                     });
                     self.read_places();
-                    return Outcome::Open;
+                    return (Outcome::Open, kept);
                 }
-                Outcome::Closed
+                (Outcome::Closed, kept)
             }
             Err(e) => {
                 self.error = Some(Failure::of(&self.t, &e));
-                Outcome::Open
+                (Outcome::Open, None)
             }
         }
     }
@@ -498,6 +537,8 @@ impl CapturePopup {
             return self.save(Notes::default_nudge());
         }
         let mut picked = None;
+        let mut to_editor = false;
+        let quick = self.quick;
         let mut record = false;
         let mut stop = false;
         let mut asked = None;
@@ -532,6 +573,9 @@ impl CapturePopup {
                 }
                 if self.paste_empty {
                     paste::empty_line(ui, &t);
+                }
+                if quick.format_bar {
+                    format_bar::capture_bar(ui, &t, id, &mut self.text, (text, tones.accent));
                 }
                 let field = ui.add(
                     TextEdit::singleline(&mut self.text)
@@ -579,12 +623,15 @@ impl CapturePopup {
                 });
                 ui.add_space(4.0);
                 let offer = (self.areas.as_slice(), self.spawns, lists.as_slice());
-                if let Some(button) = capture_choices::action_row(ui, &t, &self.choices, offer) {
-                    asked = Some(button);
+                match capture_choices::action_row(ui, &t, &self.choices, offer, (&quick, typed)) {
+                    Some(RowAsk::Choice(button)) => asked = Some(button),
+                    Some(RowAsk::ToEditor) => to_editor = true,
+                    None => {}
                 }
                 ui.add_space(4.0);
-                if sorted {
-                    // A sorted Note needs no Nudge (#113).
+                if sorted || !quick.nudge_buttons {
+                    // A sorted Note needs no Nudge (#113); without the
+                    // Nudge buttons, Save nudges in 1 h (#142).
                     let save = egui::Button::new(RichText::new(t.save()).color(text));
                     if ui.add_enabled(typed, save).clicked() {
                         picked = Some(Notes::default_nudge());
@@ -637,6 +684,9 @@ impl CapturePopup {
         }
         if let Some(asked) = asked {
             self.ask(ui.ctx(), asked);
+        }
+        if to_editor {
+            return self.open_in_editor();
         }
         match picked {
             Some(nudge_in) => self.save(nudge_in),

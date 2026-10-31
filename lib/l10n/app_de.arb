@@ -1193,5 +1193,6 @@
   "settingsQuickNoteDetail": "Die Schnellnotiz zeigt den Text, Foto, Sprache, Galerie, Einfügen und „Zum vollen Editor“. Schalte hier ein, was sie außerdem zeigt; alles davon gibt es auch im vollen Editor.",
   "quickNoteFormatBar": "Formatleiste",
   "quickNoteNudgeButtons": "Stupser-Knöpfe",
-  "quickNoteNudgeButtonsDetail": "Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite."
+  "quickNoteNudgeButtonsDetail": "Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite.",
+  "quickNoteSchedule": "Routine, Erinnerung, Frosch, Einheit oder Strichliste"
 }

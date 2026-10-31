@@ -402,5 +402,7 @@
   "showStreaksDevice": "Show Streaks on this computer",
   "@showStreaksDevice": {"description": "Desktop wording of the phone's showStreaks: the switch in the Settings that hides the Streak on a Routine's History."},
   "snoozesHereDevice": "Snoozes show only as this computer recorded them, for about the last month.",
-  "@snoozesHereDevice": {"description": "Desktop wording of the phone's snoozesHere, under the Log of a Routine's History."}
+  "@snoozesHereDevice": {"description": "Desktop wording of the phone's snoozesHere, under the Log of a Routine's History."},
+  "settingsQuickNoteDetailDevice": "The capture field and the capture popup show the text, Record voice, Paste, \"To full editor\" and, in the field, From file…; switch on here what they show besides. All of it is on the Note as well.",
+  "@settingsQuickNoteDetailDevice": {"description": "Desktop wording of the phone's settingsQuickNoteDetail, under the Settings card 'Quick note'."}
 }

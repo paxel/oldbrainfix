@@ -103,19 +103,30 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   nothing to save and is not offered behind the App Lock or while a
   Shopping List is picked.
 - **Settings ▸ Quick note** (per Device, ADR 0008) has one switch each,
-  all off by default, for File into…, Routine, Reminder, Frog or
-  Session, Add to a Shopping List, the Importance and the format bar,
+  all off by default, for File into…, Routine, Reminder, Frog, Session
+  or Tally, Add to a Shopping List, the Importance and the format bar,
   and the switch Nudge buttons, on by default. What is switched on shows
   in the Note card's action row beside To full editor, on every capture
   path (text, Voice, Photo, Gallery, Paste, share, widget, tile,
   shortcut, also one a phone key or gesture starts): File into… and the
-  alarm clock, and ⋮ with the Importance and Add to a Shopping List.
-  Make it a Tally is not on the capture screen. Each opens its usual
+  alarm clock, and ⋮ with the Importance, Make it a Tally (with the
+  Routine switch, Q481) and Add to a Shopping List. Each opens its usual
   page and comes back to the capture screen with the choice shown at the
   top ("→ Household"), not saved yet; the user can keep typing or add
   more. All of it is optional. With the format bar on, it rides on the
   keyboard; where the room is small the buttons under the text scroll
   and the text keeps two lines.
+- **On the desktop** the capture popup and the window's capture field
+  are the quick note and follow the same switches (desktop Settings ▸
+  Quick note, beside Quick capture): by default the text, Record voice,
+  Paste (the field also From file…), the Nudge buttons and To full
+  editor; switched on, File into…, Routine, Reminder, Frog and Session,
+  and More with the Importance, Make it a Tally and Add to a Shopping
+  List, and the format bar over the field, without ☐, link and table.
+  To full editor in the window opens the Note in the editor on the
+  right, the middle pane staying where it was; in the popup it closes
+  the popup and opens the Note there in the window, brought back from
+  the tray.
 - **Add to a Shopping List** makes each line of the capture a Line of
   the list picked, and keeps no Note. While a list is picked, the other
   choices wait unshown. It is not offered with a photo on the screen, a
@@ -125,10 +136,10 @@ a screen that breaks one is a bug, not a style choice. Terms are those of
   once it is, and without one it stays a Note, announced at the top.
 - **Everything is saved together** when the user leaves the screen or
   taps a save button. Nothing is half-saved: for an empty Note nothing
-  is saved, so no Routine, Reminder, Frog or Session ever hangs
+  is saved, so no Routine, Reminder, Frog, Session or Tally ever hangs
   on an empty Note.
 - **A sorted Note needs no Nudge.** Once an Area or Topic is chosen, or
-  a Routine, Reminder, Frog or Session is set up, the three
+  a Routine, Reminder, Frog, Session or Tally is set up, the three
   Nudge buttons become one Save and no Nudge is set; leaving saves too.
 - Behind the App Lock, the row offers neither File into… nor the
   Session, which would show the Areas and the Tallies. File into… lists

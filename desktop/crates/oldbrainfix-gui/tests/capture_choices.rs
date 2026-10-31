@@ -13,8 +13,8 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use oldbrainfix_core::{
-    Frogs, Importance, Note, Notes, OwnProfile, Places, Routines, Sessions, SigningKey, Store,
-    Tallies, parse_time,
+    DeviceSettings, Frogs, Importance, Note, Notes, OwnProfile, Places, QuickNoteControl, Routines,
+    Sessions, SigningKey, Store, Tallies, parse_time,
 };
 use oldbrainfix_gui::App;
 use oldbrainfix_gui::capture_choices::CaptureChoices;
@@ -22,12 +22,16 @@ use oldbrainfix_gui::popup::{CapturePopup, Outcome};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// A store with the Area "Household" and the Tally "Push-ups"; the
-/// store, the Area's id and the Tally's Note.
+/// A store with the Area "Household" and the Tally "Push-ups", every
+/// Quick note switch on (#142); the store, the Area's id and the Tally's
+/// Note.
 fn store() -> Result<(Arc<Store>, String, String), Box<dyn std::error::Error>> {
     let now = parse_time("2026-10-26T09:00:00.000Z")?;
     let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([3; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
+    for control in QuickNoteControl::ALL {
+        DeviceSettings::new(&store).set_quick_note_shows(control, true)?;
+    }
     let household = Places::new(&store).add_area("Household")?.id;
     let tally = Notes::new(&store).capture("Push-ups", None, None)?.id;
     Tallies::new(&store).add_field(&tally, "Push-ups", "times", Some(20.0), None)?;
@@ -389,6 +393,7 @@ fn file_into_without_areas_says_how_the_desktop_makes_one() -> TestResult {
     let now = parse_time("2026-10-26T09:00:00.000Z")?;
     let store = Store::in_memory(Box::new(move || now), || Ok(SigningKey::from_seed([4; 32])))?;
     OwnProfile::new(&store).apply_defaults("Desk", None)?;
+    DeviceSettings::new(&store).set_quick_note_shows(QuickNoteControl::FileInto, true)?;
     let store = Arc::new(store);
     let mut harness = window(&store);
     type_in_window(&mut harness, "Water the plants");

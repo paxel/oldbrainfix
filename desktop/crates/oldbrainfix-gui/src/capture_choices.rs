@@ -6,10 +6,12 @@
 //! in one batch, so a write that fails on the way leaves nothing, and an
 //! empty Note writes nothing at all.
 //!
-//! The capture popup and the window's capture field share it, with the
-//! Note card's buttons ([`action_row`]) and the choices shown at the top
-//! ([`chips`]), each with a button that drops it again. Merging, sending
-//! and the trash need a saved Note and are not offered here.
+//! The capture popup and the window's capture field share it, with
+//! "To full editor" and the Note card's buttons ([`action_row`]) and the
+//! choices shown at the top ([`chips`]), each with a button that drops it
+//! again. Of the buttons only what this Device switched on in Settings ▸
+//! Quick note shows ([`QuickNote`], #142). Merging, sending and the trash
+//! need a saved Note and are not offered here.
 //!
 //! "Add to a Shopping List" in "More" (#124) makes each line typed a Line
 //! of the list picked instead, and keeps no Note; the other choices wait
@@ -29,8 +31,9 @@ use std::sync::Arc;
 use chrono::Duration;
 use egui::{Frame, Margin, RichText, Stroke, Ui};
 use oldbrainfix_core::{
-    Area, Error, Frogs, Importance, Note, Notes, Routines, Schedule, SessionRule, Sessions,
-    ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock, markdown, text_format,
+    Area, DeviceSettings, Error, Frogs, Importance, Note, Notes, QuickNoteControl, Routines,
+    Schedule, SessionRule, Sessions, ShoppingLists, Store, Tallies, TallyRule, Topic, WallClock,
+    markdown, text_format,
 };
 
 use crate::app::{Wall, icon_button};
@@ -620,17 +623,74 @@ fn shopping_picker(
     picked
 }
 
-/// The Note card's buttons on a capture: "File into…" over `areas`,
-/// Routine, Reminder, Frog and Session while `spawns`, else why not, and
-/// "More" with the Importance, "Make it a Tally" and "Add to a Shopping
-/// List" over `lists`, offered while there is one. While a Shopping List
-/// is picked, "More" holds only that.
+/// What this Device's quick note, the capture field and the popup, shows
+/// besides its text, its buttons for recordings, pictures and files and
+/// "To full editor" (#142, ADR 0008): each control once switched on in
+/// Settings ▸ Quick note, and the Nudge buttons until switched off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QuickNote {
+    pub file_into: bool,
+    pub schedule: bool,
+    pub shopping: bool,
+    pub importance: bool,
+    pub format_bar: bool,
+    pub nudge_buttons: bool,
+}
+
+impl Default for QuickNote {
+    /// As a Device that switched nothing.
+    fn default() -> QuickNote {
+        QuickNote {
+            file_into: false,
+            schedule: false,
+            shopping: false,
+            importance: false,
+            format_bar: false,
+            nudge_buttons: true,
+        }
+    }
+}
+
+impl QuickNote {
+    /// What this Device's settings switched on.
+    pub fn read(store: &Store) -> oldbrainfix_core::Result<QuickNote> {
+        let settings = DeviceSettings::new(store);
+        let shows = |control| settings.quick_note_shows(control);
+        Ok(QuickNote {
+            file_into: shows(QuickNoteControl::FileInto)?,
+            schedule: shows(QuickNoteControl::Schedule)?,
+            shopping: shows(QuickNoteControl::Shopping)?,
+            importance: shows(QuickNoteControl::Importance)?,
+            format_bar: shows(QuickNoteControl::FormatBar)?,
+            nudge_buttons: settings.quick_note_nudge_buttons_on()?,
+        })
+    }
+}
+
+/// What was asked of the capture's action row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RowAsk {
+    /// A choice for the Note.
+    Choice(Ask),
+    /// "To full editor": save the Note and open it in the Note editor.
+    ToEditor,
+}
+
+/// The capture's action row: "To full editor", waiting until `ready`,
+/// then of the Note card's buttons what `quick` switched on: "File
+/// into…" over `areas`, Routine, Reminder, Frog and Session while
+/// `spawns`, else why not, and "More" with the Importance, "Make it a
+/// Tally", which goes with Routine and the rest (Q481), and "Add to a
+/// Shopping List" over `lists`, offered while there is one. While a
+/// Shopping List is picked, only "More" with the lists shows, and no
+/// "To full editor", as the lines make no Note.
 pub fn action_row(
     ui: &mut Ui,
     t: &L10n,
     choices: &CaptureChoices,
     (areas, spawns, lists): Offer<'_>,
-) -> Option<Ask> {
+    (quick, ready): (&QuickNote, bool),
+) -> Option<RowAsk> {
     let text = ui.visuals().text_color();
     let weak = ui.visuals().weak_text_color();
     let mut asked = None;
@@ -640,17 +700,24 @@ pub fn action_row(
         ui.horizontal_wrapped(|ui| {
             ui.menu_button(RichText::new(t.more()).color(text), |ui| {
                 if let Some(list) = shopping_picker(ui, t, shopping, lists) {
-                    asked = Some(Ask::Shopping(list));
+                    asked = Some(RowAsk::Choice(Ask::Shopping(list)));
                 }
             });
         });
         return asked;
     }
+    let lists = if quick.shopping { lists } else { &[] };
     ui.horizontal_wrapped(|ui| {
-        if let Some(place) = file_into_menu(ui, t, areas) {
-            asked = Some(Ask::FileInto(place));
+        let editor = egui::Button::new(RichText::new(t.to_full_editor()).color(text));
+        if ui.add_enabled(ready, editor).clicked() {
+            asked = Some(RowAsk::ToEditor);
         }
-        if spawns {
+        if quick.file_into
+            && let Some(place) = file_into_menu(ui, t, areas)
+        {
+            asked = Some(RowAsk::Choice(Ask::FileInto(place)));
+        }
+        if quick.schedule && spawns {
             let offered = [
                 (Spawn::Routine, t.routine()),
                 (Spawn::Reminder, t.reminder()),
@@ -663,41 +730,51 @@ pub fn action_row(
                     continue;
                 }
                 if ui.button(RichText::new(label).color(text)).clicked() {
-                    asked = Some(Ask::Spawn(spawn));
+                    asked = Some(RowAsk::Choice(Ask::Spawn(spawn)));
                 }
             }
         }
+        let tally = quick.schedule && choices.tally.is_none();
+        if !quick.importance && !tally && lists.is_empty() {
+            return;
+        }
         ui.menu_button(RichText::new(t.more()).color(text), |ui| {
-            ui.label(RichText::new(t.importance()).strong().color(text));
-            let levels = [
-                (Importance::Important, t.importance_important()),
-                (Importance::Normal, t.importance_normal()),
-                (Importance::Unimportant, t.importance_unimportant()),
-            ];
-            for (importance, label) in levels {
-                let on = choices.importance == importance;
-                if ui.radio(on, RichText::new(label).color(text)).clicked() && !on {
-                    asked = Some(Ask::Importance(importance));
+            if quick.importance {
+                ui.label(RichText::new(t.importance()).strong().color(text));
+                let levels = [
+                    (Importance::Important, t.importance_important()),
+                    (Importance::Normal, t.importance_normal()),
+                    (Importance::Unimportant, t.importance_unimportant()),
+                ];
+                for (importance, label) in levels {
+                    let on = choices.importance == importance;
+                    if ui.radio(on, RichText::new(label).color(text)).clicked() && !on {
+                        asked = Some(RowAsk::Choice(Ask::Importance(importance)));
+                    }
                 }
             }
-            if choices.tally.is_none() {
-                ui.separator();
+            if tally {
+                if quick.importance {
+                    ui.separator();
+                }
                 if ui
                     .button(RichText::new(t.make_tally()).color(text))
                     .clicked()
                 {
-                    asked = Some(Ask::MakeTally);
+                    asked = Some(RowAsk::Choice(Ask::MakeTally));
                 }
             }
             if !lists.is_empty() {
-                ui.separator();
+                if quick.importance || tally {
+                    ui.separator();
+                }
                 if let Some(list) = shopping_picker(ui, t, None, lists) {
-                    asked = Some(Ask::Shopping(list));
+                    asked = Some(RowAsk::Choice(Ask::Shopping(list)));
                 }
             }
         });
     });
-    if !spawns {
+    if quick.schedule && !spawns {
         ui.label(RichText::new(t.only_managers()).small().color(weak));
     }
     asked

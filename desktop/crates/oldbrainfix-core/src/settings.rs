@@ -26,6 +26,47 @@ const ALARM_SOUND: &str = "alarmSound";
 const UNIT_SYSTEM: &str = "unitSystem";
 const SHOPPING_AGENDA: &str = "shoppingAgenda";
 const STREAKS_OFF: &str = "streaksOff";
+const QUICK_NOTE_NUDGE_BUTTONS_OFF: &str = "quickNoteNudgeButtonsOff";
+
+/// What the quick note (the capture field and popup on the desktop)
+/// shows beyond its text, its buttons that add a recording, a picture or
+/// a file, its Nudge buttons and "To full editor", each once this Device
+/// switched it on (#142), as the Dart core's `QuickNoteControl`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum QuickNoteControl {
+    /// "File into…".
+    FileInto,
+    /// Routine, Reminder, Frog, Session and "Make it a Tally" (Q481).
+    Schedule,
+    /// "Add to a Shopping List".
+    Shopping,
+    /// The Importance.
+    Importance,
+    /// The format bar (ADR 0033).
+    FormatBar,
+}
+
+impl QuickNoteControl {
+    /// All of them, in the Settings' order.
+    pub const ALL: [QuickNoteControl; 5] = [
+        QuickNoteControl::FileInto,
+        QuickNoteControl::Schedule,
+        QuickNoteControl::Shopping,
+        QuickNoteControl::Importance,
+        QuickNoteControl::FormatBar,
+    ];
+
+    /// The local setting that holds "true" while it is switched on.
+    pub fn key(self) -> &'static str {
+        match self {
+            QuickNoteControl::FileInto => "quickNoteFileInto",
+            QuickNoteControl::Schedule => "quickNoteSchedule",
+            QuickNoteControl::Shopping => "quickNoteShopping",
+            QuickNoteControl::Importance => "quickNoteImportance",
+            QuickNoteControl::FormatBar => "quickNoteFormatBar",
+        }
+    }
+}
 
 /// The playback speeds of voice recordings offered, 1 being normal speed.
 pub const PLAYBACK_SPEEDS: [f64; 5] = [0.5, 0.75, 1.0, 1.5, 2.0];
@@ -184,6 +225,32 @@ impl<'a> DeviceSettings<'a> {
             .set_local_setting(STREAKS_OFF, &(!on).to_string())
     }
 
+    /// Whether the quick note on this Device shows `control`; off until
+    /// switched on.
+    pub fn quick_note_shows(&self, control: QuickNoteControl) -> Result<bool> {
+        Ok(self.store.local_setting(control.key())?.as_deref() == Some("true"))
+    }
+
+    pub fn set_quick_note_shows(&self, control: QuickNoteControl, on: bool) -> Result<()> {
+        self.store.set_local_setting(control.key(), &on.to_string())
+    }
+
+    /// Whether the quick note on this Device shows the three Nudge
+    /// buttons; on unless switched off, which gives a single Save in
+    /// their place.
+    pub fn quick_note_nudge_buttons_on(&self) -> Result<bool> {
+        Ok(self
+            .store
+            .local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF)?
+            .as_deref()
+            != Some("true"))
+    }
+
+    pub fn set_quick_note_nudge_buttons_on(&self, on: bool) -> Result<()> {
+        self.store
+            .set_local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF, &(!on).to_string())
+    }
+
     /// When the desktop last showed what was due; `None` before the first
     /// time.
     pub fn last_fired(&self) -> Result<Option<DateTime<Utc>>> {
@@ -309,6 +376,10 @@ mod tests {
         assert!(settings.alerts_on()?);
         assert!(settings.autostart_on()?);
         assert!(settings.streaks_on()?);
+        for control in QuickNoteControl::ALL {
+            assert!(!settings.quick_note_shows(control)?, "{control:?}");
+        }
+        assert!(settings.quick_note_nudge_buttons_on()?);
         assert_eq!(settings.capture_hotkey()?, DEFAULT_CAPTURE_HOTKEY);
         assert_eq!(settings.missed_seen()?, None);
         store.set_local_setting(RENAG_MINUTES, "0")?;
@@ -350,6 +421,27 @@ mod tests {
         assert_eq!(store.local_setting(STREAKS_OFF)?.as_deref(), Some("true"));
         settings.set_streaks_on(true)?;
         assert!(settings.streaks_on()?);
+        for control in QuickNoteControl::ALL {
+            settings.set_quick_note_shows(control, true)?;
+            assert!(settings.quick_note_shows(control)?, "{control:?}");
+            assert_eq!(store.local_setting(control.key())?.as_deref(), Some("true"));
+            settings.set_quick_note_shows(control, false)?;
+            assert!(!settings.quick_note_shows(control)?, "{control:?}");
+        }
+        assert_eq!(
+            store.local_setting("quickNoteFormatBar")?.as_deref(),
+            Some("false")
+        );
+        settings.set_quick_note_nudge_buttons_on(false)?;
+        assert!(!settings.quick_note_nudge_buttons_on()?);
+        assert_eq!(
+            store
+                .local_setting(QUICK_NOTE_NUDGE_BUTTONS_OFF)?
+                .as_deref(),
+            Some("true")
+        );
+        settings.set_quick_note_nudge_buttons_on(true)?;
+        assert!(settings.quick_note_nudge_buttons_on()?);
         settings.set_capture_hotkey("Super+Shift+K")?;
         assert_eq!(settings.capture_hotkey()?, "Super+Shift+K");
         let now = store.now();

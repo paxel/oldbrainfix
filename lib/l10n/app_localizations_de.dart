@@ -4442,4 +4442,8 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get quickNoteNudgeButtonsDetail =>
       'Aus: an ihrer Stelle ein einziges Speichern, mit einem Stupser in 1 Std., wie beim Verlassen der Seite.';
+
+  @override
+  String get quickNoteSchedule =>
+      'Routine, Erinnerung, Frosch, Einheit oder Strichliste';
 }

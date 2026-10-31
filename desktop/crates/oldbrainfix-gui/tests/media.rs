@@ -212,7 +212,7 @@ fn recording_starts_at_once_and_the_big_stop_button_holds_it_until_saved() -> Te
     // Stopped, it stays on the capture field with the buttons, unsaved.
     assert!(Notes::new(&store).all()?.is_empty());
     assert!(shows(&harness, "Voice recording"));
-    assert!(shows(&harness, "Routine"));
+    assert!(shows(&harness, "To full editor"));
     harness.get_by_label("1 h").click();
     harness.run();
     let notes = Notes::new(&store).all()?;

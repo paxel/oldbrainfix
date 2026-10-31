@@ -4383,4 +4383,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get quickNoteNudgeButtonsDetail =>
       'Off: a single Save in their place, with a Nudge in 1 h, as on leaving.';
+
+  @override
+  String get quickNoteSchedule => 'Routine, Reminder, Frog, Session or Tally';
 }
